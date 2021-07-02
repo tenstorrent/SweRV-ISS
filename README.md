@@ -49,7 +49,7 @@ simulator. In particular you would need:
 # Compiling Whisper
 
 On a Unix system, in the whisper directory, do the following:
-    make BOOST_DIR=x
+    make BOOST_DIR=x 
 where x is the path to your boost library installation.
 
 
