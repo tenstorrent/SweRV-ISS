@@ -589,17 +589,38 @@ doubleToF64(double x)
 /// vice versa since RISCV consider that as an invalid operation.
 static
 float
-fusedMultiplyAdd(float x, float y, float z, bool& invalid)
+fusedMultiplyAdd(float x, float y, float z, bool roundAfterMul, bool& invalid)
 {
+  float res = 0;
+
 #ifndef SOFT_FLOAT
   #ifdef __FP_FAST_FMA
-  float res = x*y + z;
+  if (roundAfterMul)
+    {
+      res = x*y;
+      res = res + z;
+    }
+  else
+    res = x*y + z;
   #else
-  float res = std::fma(x, y, z);
+  if (roundAfterMul)
+    {
+      res = x*y;
+      res = res + z;
+    }
+  else
+    res = std::fma(x, y, z);
   #endif
 #else
-  float32_t tmp = f32_mulAdd(floatToF32(x), floatToF32(y), floatToF32(z));
-  float res = f32ToFloat(tmp);
+  float32_t tmp = 0;
+  if (roundAfterMul)
+    {
+      tmp = f32_mul(floatToF32(x), floatToF32(y));
+      tmp = f32_add(tmp, floatToF32(z));
+    }
+  else
+    tmp = f32_mulAdd(floatToF32(x), floatToF32(y), floatToF32(z));
+  res = f32ToFloat(tmp);
 #endif
 
   invalid = (std::isinf(x) and y == 0) or (x == 0 and std::isinf(y));
@@ -610,16 +631,37 @@ fusedMultiplyAdd(float x, float y, float z, bool& invalid)
 /// Use fused mutiply-add to perform x*y + z.
 static
 double
-fusedMultiplyAdd(double x, double y, double z, bool& invalid)
+fusedMultiplyAdd(double x, double y, double z, bool roundAfterMul, bool& invalid)
 {
+  double res = 0;
+
 #ifndef SOFT_FLOAT
   #ifdef __FP_FAST_FMA
-  double res = x*y + z;
+  if (roundAfterMul)
+    {
+      res = x*y;
+      res = res + z;
+    }
+  else
+    res = x*y + z;
   #else
-  double res = std::fma(x, y, z);
+  if (roundAfterMul)
+    {
+      res = x*y;
+      res = res + z;
+    }
+  else
+    res = std::fma(x, y, z);
   #endif
 #else
-  float64_t tmp = f64_mulAdd(doubleToF64(x), doubleToF64(y), doubleToF64(z));
+  float64_t tmp = 0;
+  if (roundAfterMul)
+    {
+      tmp = f64_mul(floatToF64(x), floatToF64(y));
+      tmp = f64_add(tmp, floatToF64(z));
+    }
+  else
+    tmp = f64_mulAdd(doubleToF64(x), doubleToF64(y), doubleToF64(z));
   double res = f64ToDouble(tmp);
 #endif
 
@@ -640,7 +682,7 @@ Hart<URV>::execFmadd_s(const DecodedInst* di)
   float f3 = fpRegs_.readSingle(di->op3());
 
   bool invalid = false;
-  float res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
@@ -664,7 +706,7 @@ Hart<URV>::execFmsub_s(const DecodedInst* di)
   float f3 = -fpRegs_.readSingle(di->op3());
 
   bool invalid = false;
-  float res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
@@ -688,7 +730,7 @@ Hart<URV>::execFnmsub_s(const DecodedInst* di)
   float f3 = fpRegs_.readSingle(di->op3());
 
   bool invalid = false;
-  float res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
@@ -714,7 +756,7 @@ Hart<URV>::execFnmadd_s(const DecodedInst* di)
   float f3 = -fpRegs_.readSingle(di->op3());
 
   bool invalid = false;
-  float res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
@@ -1728,7 +1770,7 @@ Hart<URV>::execFmadd_d(const DecodedInst* di)
   double f3 = fpRegs_.readDouble(di->op3());
 
   bool invalid = false;
-  double res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  double res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<double>::quiet_NaN();
 
@@ -1752,7 +1794,7 @@ Hart<URV>::execFmsub_d(const DecodedInst* di)
   double f3 = -fpRegs_.readDouble(di->op3());
 
   bool invalid = false;
-  double res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  double res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
 
   if (std::isnan(res))
     res = std::numeric_limits<double>::quiet_NaN();
@@ -1777,7 +1819,7 @@ Hart<URV>::execFnmsub_d(const DecodedInst* di)
   double f3 = fpRegs_.readDouble(di->op3());
 
   bool invalid = false;
-  double res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  double res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<double>::quiet_NaN();
 
@@ -1803,7 +1845,7 @@ Hart<URV>::execFnmadd_d(const DecodedInst* di)
   double f3 = -fpRegs_.readDouble(di->op3());
 
   bool invalid = false;
-  double res = fusedMultiplyAdd(f1, f2, f3, invalid);
+  double res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<double>::quiet_NaN();
 

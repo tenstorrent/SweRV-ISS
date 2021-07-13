@@ -1284,8 +1284,17 @@ namespace WdRiscv
     URV syscallSlam() const
     { return syscallSlam_; }
 
+    /// Force floating point rounding mode to the given mode
+    /// regardless of the setting of the FRM CSR. This is useful for
+    /// testing/bringup.
     void forceRoundingMode(RoundingMode mode)
     { forcedRounding_ = mode; forceRounding_ = true; }
+
+    /// Force rounding after the multiply step of the fused
+    /// multiply-add multiply-sub instructions. This is useful for
+    /// testing/bringup.
+    void roundAfterFusedMultiply(bool flag)
+    { roundAfterFusedMul_ = flag; }
 
   protected:
 
@@ -2891,6 +2900,8 @@ namespace WdRiscv
 
     bool forceRounding_ = false;
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
+
+    bool roundAfterFusedMul_ = false; // Force rounding after multiply in fused multiply-add/sub.
 
     bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
     bool rva_ = false;           // True if extension A (atomic) enabled.

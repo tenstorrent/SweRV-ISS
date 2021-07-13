@@ -1359,6 +1359,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	}
     }
 
+  tag = "round_after_fused_multiply";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+	errors++;
+      else
+	hart.roundAfterFusedMultiply(flag);
+    }
+
   return errors == 0;
 }
 
