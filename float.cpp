@@ -670,6 +670,16 @@ fusedMultiplyAdd(double x, double y, double z, bool roundAfterMul, bool& invalid
 }
 
 
+template <typename T>
+T
+subnormalAdjust(T x)
+{
+  if (std::fpclassify(x) != FP_SUBNORMAL)
+    return x;
+  return std::signbit(x) == 0 ? 0.0 : -0.0;
+}
+
+
 template <typename URV>
 void
 Hart<URV>::execFmadd_s(const DecodedInst* di)
@@ -681,6 +691,13 @@ Hart<URV>::execFmadd_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = fpRegs_.readSingle(di->op3());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
@@ -688,8 +705,10 @@ Hart<URV>::execFmadd_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, invalid);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, invalid);
   markFsDirty();
 }
 
@@ -705,6 +724,13 @@ Hart<URV>::execFmsub_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = -fpRegs_.readSingle(di->op3());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
@@ -712,8 +738,10 @@ Hart<URV>::execFmsub_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, invalid);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, invalid);
   markFsDirty();
 }
 
@@ -729,6 +757,13 @@ Hart<URV>::execFnmsub_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = fpRegs_.readSingle(di->op3());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
@@ -736,8 +771,10 @@ Hart<URV>::execFnmsub_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, invalid);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, invalid);
   markFsDirty();
 }
 
@@ -755,6 +792,13 @@ Hart<URV>::execFnmadd_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = -fpRegs_.readSingle(di->op3());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
   if (std::isnan(res))
@@ -762,8 +806,10 @@ Hart<URV>::execFnmadd_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, invalid);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, invalid);
   markFsDirty();
 }
 
@@ -778,6 +824,12 @@ Hart<URV>::execFadd_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
 #ifdef SOFT_FLOAT
   float res = f32ToFloat(f32_add(floatToF32(f1), floatToF32(f2)));
 #else
@@ -789,8 +841,10 @@ Hart<URV>::execFadd_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, false /*invalid*/);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
 }
 
@@ -805,6 +859,12 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
 #ifdef SOFT_FLOAT
   float res = f32ToFloat(f32_sub(floatToF32(f1), floatToF32(f2)));
 #else
@@ -816,8 +876,10 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, false /*invalid*/);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
 }
 
@@ -832,6 +894,12 @@ Hart<URV>::execFmul_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
 #ifdef SOFT_FLOAT
   float res = f32ToFloat(f32_mul(floatToF32(f1), floatToF32(f2)));
 #else
@@ -843,8 +911,10 @@ Hart<URV>::execFmul_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, false /*invalid*/);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
 }
 
@@ -859,6 +929,12 @@ Hart<URV>::execFdiv_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
 #ifdef SOFT_FLOAT
   float res = f32ToFloat(f32_div(floatToF32(f1), floatToF32(f2)));
 #else
@@ -870,8 +946,10 @@ Hart<URV>::execFdiv_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, false /*invalid*/);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
 }
 
@@ -885,6 +963,9 @@ Hart<URV>::execFsqrt_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
 
+  if (subnormToZero_)
+      f1 = subnormalAdjust(f1);
+
 #ifdef SOFT_FLOAT
   float res = f32ToFloat(f32_sqrt(floatToF32(f1)));
 #else
@@ -896,8 +977,10 @@ Hart<URV>::execFsqrt_s(const DecodedInst* di)
 
   fpRegs_.writeSingle(di->op0(), res);
 
-  updateAccruedFpBits(res, false /*invalid*/);
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
 
+  updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
 }
 

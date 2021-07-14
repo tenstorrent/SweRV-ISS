@@ -1369,6 +1369,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	hart.roundAfterFusedMultiply(flag);
     }
 
+  tag = "force_subnormal_to_zero";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+	errors++;
+      else
+	hart.forceSubnormalToZero(flag);
+    }
+
   return errors == 0;
 }
 

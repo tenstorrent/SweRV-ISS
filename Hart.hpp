@@ -1296,6 +1296,12 @@ namespace WdRiscv
     void roundAfterFusedMultiply(bool flag)
     { roundAfterFusedMul_ = flag; }
 
+    /// Force floating point arithmetic operation input/output to zero
+    /// if subnormal when true.  If enabled, this breaks IEEE FP
+    /// specs.
+    void forceSubnormalToZero(bool flag)
+    { subnormToZero_ = flag; }
+
   protected:
 
     /// Helper to reset: reset floating point related structures.
@@ -2902,6 +2908,7 @@ namespace WdRiscv
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
 
     bool roundAfterFusedMul_ = false; // Force rounding after multiply in fused multiply-add/sub.
+    bool subnormToZero_ = false;
 
     bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
     bool rva_ = false;           // True if extension A (atomic) enabled.
