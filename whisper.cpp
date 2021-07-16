@@ -986,7 +986,8 @@ getElfFilesIsaString(const Args& args, std::string& isaString)
           if (not ext.empty())
             {
               char cc = ext.front();
-              isaChars.insert(cc);
+	      if (cc != 'z')
+		isaChars.insert(cc);
             }
         }
     }
