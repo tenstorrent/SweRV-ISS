@@ -797,6 +797,10 @@ namespace WdRiscv
     void enableRvzbt(bool flag)
     { rvzbt_ = flag; }
 
+    /// Enable/disable the half-precision floating point extension.
+    void enableZfh(bool flag)
+    { rvzfh_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -920,6 +924,11 @@ namespace WdRiscv
     /// extension is enabled in this hart.
     bool isRvf() const
     { return rvf_; }
+
+    /// Return true if the half-precision floating point extension is
+    /// enabled.
+    bool isRvzfh() const
+    { return rvzfh_; }
 
     /// Return true if rv64d (double precision floating point)
     /// extension is enabled in this hart.
@@ -1312,6 +1321,12 @@ namespace WdRiscv
     bool isFpEnabled() const
     { return mstatusFs_ != FpFs::Off; }
 
+    // Return true if it is legal to execute an zfh instruction: f and zfh
+    // extensions must be enabled and FS feild of MSTATUS must not be
+    // OFF.
+    bool isZfhLegal() const
+    { return isRvf() and isRvzfh() and isFpEnabled(); }
+
     // Return true if it is legal to execute an FP instruction: F extension must
     // be enabled and FS feild of MSTATUS must not be OFF.
     bool isFpLegal() const
@@ -1439,10 +1454,12 @@ namespace WdRiscv
     /// exception returning false; otherwise, return true.
     bool checkRoundingModeSp(const DecodedInst* di);
 
-    /// Preamble to double precision instruction execution: If D
-    /// extension is not enabled or if the instruction rounding mode
-    /// is not valid returning, the take an illegal-instruction
-    /// exception returning false; otherwise, return true.
+    /// Similar to checkRoundingModeSp but for for half-precision (zfh
+    /// extension) instructions.
+    bool checkRoundingModeHp(const DecodedInst* di);
+
+    /// Similar to checkRoundingModeSp but for for double-precision (D
+    /// extension) instructions.
     bool checkRoundingModeDp(const DecodedInst* di);
 
     /// Record the destination register and corresponding value (prior
@@ -1703,7 +1720,7 @@ namespace WdRiscv
     /// Helper to decode: Decode instructions associated with opcode
     /// 1010011.
     const InstEntry& decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			      uint32_t& op2, uint32_t& op3);
+			      uint32_t& op2);
 
     /// Helper to decode: Decode instructions associated with opcode
     /// 1010111.
@@ -1988,6 +2005,44 @@ namespace WdRiscv
     void execFcvt_d_lu(const DecodedInst*);
     void execFmv_d_x(const DecodedInst*);
     void execFmv_x_d(const DecodedInst*);
+
+    // zfh (half precision floating point)
+    void execFlh(const DecodedInst*);
+    void execFsh(const DecodedInst*);
+    void execFmadd_h(const DecodedInst*);
+    void execFmsub_h(const DecodedInst*);
+    void execFnmsub_h(const DecodedInst*);
+    void execFnmadd_h(const DecodedInst*);
+    void execFadd_h(const DecodedInst*);
+    void execFsub_h(const DecodedInst*);
+    void execFmul_h(const DecodedInst*);
+    void execFdiv_h(const DecodedInst*);
+    void execFsqrt_h(const DecodedInst*);
+    void execFsgnj_h(const DecodedInst*);
+    void execFsgnjn_h(const DecodedInst*);
+    void execFsgnjx_h(const DecodedInst*);
+    void execFmin_h(const DecodedInst*);
+    void execFmax_h(const DecodedInst*);
+    void execFcvt_s_h(const DecodedInst*);
+    void execFcvt_d_h(const DecodedInst*);
+    void execFcvt_h_s(const DecodedInst*);
+    void execFcvt_h_d(const DecodedInst*);
+    void execFcvt_w_h(const DecodedInst*);
+    void execFcvt_wu_h(const DecodedInst*);
+    void execFmv_x_h(const DecodedInst*);
+    void execFeq_h(const DecodedInst*);
+    void execFlt_h(const DecodedInst*);
+    void execFle_h(const DecodedInst*);
+    void execFclass_h(const DecodedInst*);
+    void execFcvt_h_w(const DecodedInst*);
+    void execFcvt_h_wu(const DecodedInst*);
+    void execFmv_h_x(const DecodedInst*);
+
+    // zfh + rv64
+    void execFcvt_l_h(const DecodedInst*);
+    void execFcvt_lu_h(const DecodedInst*);
+    void execFcvt_h_l(const DecodedInst*);
+    void execFcvt_h_lu(const DecodedInst*);
 
     // atomic
     void execAmoadd_w(const DecodedInst*);
@@ -2916,6 +2971,7 @@ namespace WdRiscv
     bool rvd_ = false;           // True if extension D (double fp) enabled.
     bool rve_ = false;           // True if extension E (embedded) enabled.
     bool rvf_ = false;           // True if extension F (single fp) enabled.
+    bool rvzfh_ = false;         // True if extension zfh (half fp) enabled.
     bool rvm_ = true;            // True if extension M (mul/div) enabled.
     bool rvs_ = false;           // True if extension S (supervisor-mode) enabled.
     bool rvu_ = false;           // True if extension U (user-mode) enabled.

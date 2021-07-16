@@ -34,20 +34,6 @@ extern "C" {
 using namespace WdRiscv;
 
 
-/// Unsigned-float union: reinterpret bits as uint32_t or float
-union Uint32FloatUnion
-{
-  Uint32FloatUnion(uint32_t u) : u(u)
-  { }
-
-  Uint32FloatUnion(float f) : f(f)
-  { }
-
-  uint32_t u = 0;
-  float f;
-};
-
-
 /// Unsigned-float union: reinterpret bits as uint64_t or double
 union Uint64DoubleUnion
 {
@@ -66,8 +52,9 @@ template <typename URV>
 void
 Hart<URV>::resetFloat()
 {
-  // Enable FP if f/d extension and linux/newlib.
-  if ((isRvf() or isRvd()) and (newlib_ or linux_))
+  // Enable FP in MSTATUS.FS if f/d/f16 extension present and linux/newlib.
+  bool hasFp = isRvf() or isRvd() or isRvzfh();
+  if (hasFp and (newlib_ or linux_))
     {
       URV val = csRegs_.peekMstatus();
       MstatusFields<URV> fields(val);
@@ -75,11 +62,15 @@ Hart<URV>::resetFloat()
       csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, fields.value_);
     }
 
-  if (isRvf() or isRvd())
+  if (hasFp)
     {
-      unsigned flen = isRvd()? 64 : 32;
+      unsigned flen = 16;
+      if (isRvf())
+	flen = 32;
+      if (isRvd())
+	flen = 64;
       fpRegs_.setFlen(flen);
-      fpRegs_.reset(isRvd());
+      fpRegs_.reset(isRvzfh(), isRvf(), isRvd());
     }
 
   #ifdef SOFT_FLOAT
@@ -170,6 +161,7 @@ Hart<URV>::markFsDirty()
 
 
 #else
+
 
 template <typename URV>
 inline
@@ -406,6 +398,30 @@ clearSimulatorFpFlags()
 template <typename URV>
 inline
 bool
+Hart<URV>::checkRoundingModeHp(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  RoundingMode riscvMode = effectiveRoundingMode(di->roundingMode());
+  if (riscvMode >= RoundingMode::Invalid1)
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  clearSimulatorFpFlags();
+  setSimulatorRoundingMode(riscvMode);
+  return true;
+}
+
+
+template <typename URV>
+inline
+bool
 Hart<URV>::checkRoundingModeSp(const DecodedInst* di)
 {
   if (not isFpLegal())
@@ -546,6 +562,14 @@ Hart<URV>::execFsw(const DecodedInst* di)
 
 #ifdef SOFT_FLOAT
 
+/// Convert softfloat float16_t to Float16.
+inline Float16
+f16ToFloat16(float16_t f16)
+{
+  return Float16{f16};
+}
+
+
 /// Convert softfloat float32_t to a native float.
 inline float
 f32ToFloat(float32_t f32)
@@ -564,12 +588,29 @@ f64ToDouble(float64_t f64)
 }
 
 
+/// Convert Float16 to a softfloat float16_t
+inline float16_t
+Float16toF16(Float16 x)
+{
+  return float16_t{x.i16};
+}
+
+
 /// Convert a native float to a softfloat float32_t
 inline float32_t
 floatToF32(float x)
 {
   Uint32FloatUnion tmp(x);
   return float32_t{tmp.u};
+}
+
+
+/// Convert a native double to a softfloat float64_t
+inline float64_t
+doubleToF64(double x)
+{
+  Uint64DoubleUnion tmp(x);
+  return float64_t{tmp.u};
 }
 
 
@@ -629,6 +670,47 @@ fusedMultiplyAdd(float x, float y, float z, bool roundAfterMul, bool& invalid)
 
 
 /// Use fused mutiply-add to perform x*y + z.
+/// Set invalid to true if x and y are zero and infinity or
+/// vice versa since RISCV consider that as an invalid operation.
+static
+Float16
+fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool roundAfterMul, bool& invalid)
+{
+  Float16 res{0.0F};
+
+#ifndef SOFT_FLOAT
+  #ifdef __FP_FAST_FMA
+  if (roundAfterMul)
+    {
+      res = Float16{x.toFloat() * y.toFloat()};
+      res = Float16{res.toFloat() + z.toFloat()};
+    }
+  else
+    res = Float16{x.toFloat() * y.toFloat() + z.toFloat()};
+  #else
+  if (roundAfterMul)
+    {
+      res = Float16{x.toFloat() * y.toFloat()};
+      res = Float16{res.toFloat() + z.toFloat()};
+    }
+  else
+    res = Float16{std::fma(x.toFloat(), y.toFloat(), z.toFloat())};
+  #endif
+#else
+  Float16 tmp{0f};
+  if (roundAfterMul)
+    tmp = f16_add(f16_mul(Float16ToF16(x), Float16ToF16(y)), Float16ToF16(z));
+  else
+    tmp = f16_mulAdd(Float16ToF16(x), Float16ToF16(y), Float16ToF16(z));
+  res = f16ToFloat16(tmp);
+#endif
+
+  invalid = (std::isinf(x.toFloat()) and y.toFloat() == 0) or (x.toFloat() == 0 and std::isinf(y.toFloat()));
+  return res;
+}
+
+
+/// Use fused mutiply-add to perform x*y + z.
 static
 double
 fusedMultiplyAdd(double x, double y, double z, bool roundAfterMul, bool& invalid)
@@ -680,6 +762,15 @@ subnormalAdjust(T x)
 }
 
 
+Float16
+subnormalAdjust(Float16 x)
+{
+  if (not x.isSubnormal())
+    return x;
+  return x.clearMantissa();
+}
+
+
 template <typename URV>
 void
 Hart<URV>::execFmadd_s(const DecodedInst* di)
@@ -703,10 +794,10 @@ Hart<URV>::execFmadd_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, invalid);
   markFsDirty();
@@ -736,10 +827,10 @@ Hart<URV>::execFmsub_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, invalid);
   markFsDirty();
@@ -769,10 +860,10 @@ Hart<URV>::execFnmsub_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, invalid);
   markFsDirty();
@@ -804,10 +895,10 @@ Hart<URV>::execFnmadd_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, invalid);
   markFsDirty();
@@ -839,10 +930,10 @@ Hart<URV>::execFadd_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
@@ -874,10 +965,10 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
@@ -909,10 +1000,10 @@ Hart<URV>::execFmul_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
@@ -944,10 +1035,10 @@ Hart<URV>::execFdiv_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
@@ -975,10 +1066,10 @@ Hart<URV>::execFsqrt_s(const DecodedInst* di)
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
 
-  fpRegs_.writeSingle(di->op0(), res);
-
   if (subnormToZero_)
     res = subnormalAdjust(res);
+
+  fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res, false /*invalid*/);
   markFsDirty();
@@ -1059,7 +1150,7 @@ issnan(float f)
     {
       Uint32FloatUnion ufu(f);
 
-      // Most sig bit of significant must be zero.
+      // Most sig bit of significand must be zero.
       return ((ufu.u >> 22) & 1) == 0;
     }
   return false;
@@ -1778,12 +1869,6 @@ Hart<URV>::execFld(const DecodedInst* di)
     }
 #endif
 
-  union UDU  // Unsigned double union: reinterpret bits as unsigned or double
-  {
-    uint64_t u;
-    double d;
-  };
-
   uint64_t val64 = 0;
   if (memory_.read(addr, val64))
     {
@@ -1794,8 +1879,7 @@ Hart<URV>::execFld(const DecodedInst* di)
           putInLoadQueue(ldSize, addr, rd, prevRdVal, false /*wide*/, true /*fp*/);
         }
 
-      UDU udu;
-      udu.u = val64;
+      Uint64DoubleUnion udu{val64};
       fpRegs_.writeDouble(di->op0(), udu.d);
 
       markFsDirty();
@@ -1828,14 +1912,7 @@ Hart<URV>::execFsd(const DecodedInst* di)
   URV addr = base + di->op2As<SRV>();
   double val = fpRegs_.readDouble(rs2);
 
-  union UDU  // Unsigned double union: reinterpret bits as unsigned or double
-  {
-    uint64_t u;
-    double d;
-  };
-
-  UDU udu;
-  udu.d = val;
+  Uint64DoubleUnion udu{val};
 
   store<uint64_t>(rs1, base, addr, udu.u);
 }
@@ -2801,14 +2878,7 @@ Hart<URV>::execFmv_d_x(const DecodedInst* di)
 
   uint64_t u1 = intRegs_.read(di->op1());
 
-  union UDU  // Unsigned double union: reinterpret bits as unsigned or double
-  {
-    uint64_t u;
-    double d;
-  };
-
-  UDU udu;
-  udu.u = u1;
+  Uint64DoubleUnion udu{u1};
 
   fpRegs_.writeDouble(di->op0(), udu.d);
 
@@ -2837,6 +2907,1252 @@ Hart<uint64_t>::execFmv_x_d(const DecodedInst* di)
 
   uint64_t v1 = fpRegs_.readBitsRaw(di->op1());
   intRegs_.write(di->op0(), v1);
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFlh(const DecodedInst* di)
+{
+  // TBD TODO: refactor with flw and fld
+
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  uint32_t rd = di->op0(), rs1 = di->op1();
+  SRV imm = di->op2As<SRV>();
+
+  URV base = intRegs_.read(rs1);
+  URV virtAddr = base + imm;
+
+  ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
+  uint64_t addr = virtAddr;
+  unsigned ldSize = 2;
+
+  auto secCause = SecondaryCause::NONE;
+  auto cause = ExceptionCause::NONE;
+
+#ifndef FAST_SLOPPY
+  if (loadQueueEnabled_)
+    removeFromLoadQueue(rs1, false);
+
+  if (hasActiveTrigger())
+    {
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
+			     privMode_, isInterruptEnabled()))
+	triggerTripped_ = true;
+      if (triggerTripped_)
+	return;
+    }
+
+  cause = determineLoadException(rs1, base, addr, ldSize, secCause);
+  if (cause != ExceptionCause::NONE)
+    {
+      if (not triggerTripped_)
+        initiateLoadException(cause, virtAddr, secCause);
+      return;
+    }
+#endif
+
+  uint16_t half = 0;
+  if (memory_.read(addr, half))
+    {
+      if (loadQueueEnabled_)
+        {
+          uint64_t prevRdVal = 0;
+          peekFpReg(rd, prevRdVal);
+          putInLoadQueue(ldSize, addr, rd, prevRdVal, false /*wide*/, true /*fp*/);
+        }
+      Float16 f16(half);
+      fpRegs_.writeHalf(rd, f16);
+      markFsDirty();
+      return;
+    }
+
+  cause = ExceptionCause::LOAD_ACC_FAULT;
+  secCause = SecondaryCause::LOAD_ACC_MEM_PROTECTION;
+  if (isAddrMemMapped(addr))
+    secCause = SecondaryCause::LOAD_ACC_PIC;
+
+  initiateLoadException(cause, virtAddr, secCause);
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFsh(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  uint32_t rs1 = di->op1(), rs2 = di->op0();
+  SRV imm = di->op2As<SRV>();
+
+  URV base = intRegs_.read(rs1);
+  URV addr = base + imm;
+
+  // This operation does not check for proper NAN boxing. We read raw bits.
+  uint16_t val = fpRegs_.readBitsRaw(rs2);
+
+  store<uint16_t>(rs1, base, addr, val);
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFmadd_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+  Float16 f3 = fpRegs_.readHalf(di->op3());
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
+  bool invalid = false;
+  Float16 res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), invalid);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFmsub_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+  Float16 f3 = fpRegs_.readHalf(di->op3()).negate();
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
+  bool invalid = false;
+  Float16 res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), invalid);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFnmsub_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1()).negate();
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+  Float16 f3 = fpRegs_.readHalf(di->op3());
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
+  bool invalid = false;
+  Float16 res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), invalid);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFnmadd_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  // we want -(f[op1] * f[op2]) - f[op3]
+
+  Float16 f1 = fpRegs_.readHalf(di->op1()).negate();
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+  Float16 f3 = fpRegs_.readHalf(di->op3()).negate();
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+      f3 = subnormalAdjust(f3);
+    }
+
+  bool invalid = false;
+  Float16 res = fusedMultiplyAdd(f1, f2, f3, roundAfterFusedMul_, invalid);
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), invalid);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFadd_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(f16_add(Float16ToF16(f1), Float16ToF16(f2)));
+#else
+  Float16 res = Float16{f1.toFloat() + f2.toFloat()};
+#endif
+
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFsub_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(f16_sub(Float16ToF16(f1), Float16ToF16(f2)));
+#else
+  Float16 res = Float16{f1.toFloat() - f2.toFloat()};
+#endif
+
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFmul_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(f16_mul(Float16ToF16(f1), Float16ToF16(f2)));
+#else
+  Float16 res = Float16{f1.toFloat() * f2.toFloat()};
+#endif
+
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFdiv_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+
+  if (subnormToZero_)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(f16_div(Float16ToF16(f1), Float16ToF16(f2)));
+#else
+  Float16 res = Float16{f1.toFloat() / f2.toFloat()};
+#endif
+
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFsqrt_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+
+  if (subnormToZero_)
+      f1 = subnormalAdjust(f1);
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(f16_sqrt(Float16ToF16(f1)));
+#else
+  Float16 res{std::sqrt(f1.toFloat())};
+#endif
+
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  if (subnormToZero_)
+    res = subnormalAdjust(res);
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFsgnj_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+  Float16 res = Float16::copySign(f1, f2);  // Magnitude of f1 and sign of f2
+  fpRegs_.writeHalf(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFsgnjn_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+  Float16 res = Float16::copySign(f1, f2);  // Magnitude of f1 and sign of f2
+  res = res.negate();  // Magnitude of f1 and negative the sign of f2
+  fpRegs_.writeHalf(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFsgnjx_h(const DecodedInst* di)
+{
+  if (not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readSingle(di->op1());
+  float f2 = fpRegs_.readSingle(di->op2());
+
+  int sign1 = (std::signbit(f1) == 0) ? 0 : 1;
+  int sign2 = (std::signbit(f2) == 0) ? 0 : 1;
+  int sign = sign1 ^ sign2;
+
+  float x = sign? -1 : 1;
+
+  float res = std::copysignf(f1, x);  // Magnitude of rs1 and sign of x
+  fpRegs_.writeSingle(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFmin_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 in1 = fpRegs_.readHalf(di->op1());
+  Float16 in2 = fpRegs_.readHalf(di->op2());
+  Float16 res;
+
+  bool isNan1 = in1.isNan(), isNan2 = in2.isNan();
+  if (isNan1 and isNan2)
+    res = Float16::quietNan();
+  else if (isNan1)
+    res = in2;
+  else if (isNan2)
+    res = in1;
+  else
+    res = Float16{std::fminf(in1.toFloat(), in2.toFloat())};
+
+  if (in1.isSnan() or in2.isSnan())
+    orFcsrFlags(FpFlags::Invalid);
+  else if (in1.signBit() != in2.signBit() and in1 == in2)
+    res = Float16::copySign(res, Float16{-1.0F});  // Make sure min(-0, +0) is -0.
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFmax_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 in1 = fpRegs_.readHalf(di->op1());
+  Float16 in2 = fpRegs_.readHalf(di->op2());
+  Float16 res;
+
+  bool isNan1 = in1.isNan(), isNan2 = in2.isNan();
+  if (isNan1 and isNan2)
+    res = Float16::quietNan();
+  else if (isNan1)
+    res = in2;
+  else if (isNan2)
+    res = in1;
+  else
+    res = Float16{std::fmaxf(in1.toFloat(), in2.toFloat())};
+
+  if (in1.isSnan() or in2.isSnan())
+    orFcsrFlags(FpFlags::Invalid);
+  else if (in1.signBit() != in2.signBit() and in1 == in2)
+    res = Float16::copySign(res, Float16{1.0F});  // Make sure max(-0, +0) is +0.
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_s_h(const DecodedInst* di)
+{
+  // Half to single
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+
+#ifdef SOFT_FLOAT
+  float res = f32ToFloat(f16_to_f32(Float16ToF16(f1)));
+#else
+  float res = f1.toFloat();
+#endif
+
+  if (std::isnan(res))
+    res = std::numeric_limits<double>::quiet_NaN();
+
+  fpRegs_.writeSingle(di->op0(), res);
+
+  updateAccruedFpBits(res, false /*invalid*/);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_d_h(const DecodedInst* di)
+{
+  // Half to double
+
+  if (not checkRoundingModeHp(di) or not isRvd())
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+
+#ifdef SOFT_FLOAT
+  double res = f64ToDouble(f16_to_f64(Float16ToF16(f1)));
+#else
+  double res = f1.toFloat();
+#endif
+
+  if (std::isnan(res))
+    res = std::numeric_limits<double>::quiet_NaN();
+
+  fpRegs_.writeDouble(di->op0(), res);
+
+  updateAccruedFpBits(res, false /*invalid*/);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_h_s(const DecodedInst* di)
+{
+  // Single to half.
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  float f1 = fpRegs_.readSingle(di->op1());
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(f32_to_f16(floatToF32(f1)));
+#else
+  Float16 res{f1};
+#endif
+
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_h_d(const DecodedInst* di)
+{
+  // Double to half.
+
+  if (not checkRoundingModeHp(di) or not isRvd())
+    return;
+
+  double d1 = fpRegs_.readDouble(di->op1());
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(f64_to_f16(doubleToF64(d1)));
+#else
+  Float16 res{float(d1)};
+#endif
+
+  if (res.isNan())
+    res = Float16::quietNan();
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_w_h(const DecodedInst* di)
+{
+  // Half to integer word.
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  SRV result = 0;
+  bool valid = false;
+
+#ifdef SOFT_FLOAT
+  result = f16_to_i32(Float16ToF16(f1), softfloat_roundingMode, true);
+  valid = true;  // We get invalid from softfloat library.
+#else
+
+  int32_t minInt = int32_t(1) << 31;
+  int32_t maxInt = (~uint32_t(0)) >> 1;
+
+  float f32 = f1.toFloat();
+
+  unsigned signBit = std::signbit(f32);
+  if (std::isinf(f32))
+    result = signBit ? minInt : maxInt;
+  else if (std::isnan(f32))
+    result = maxInt;
+  else
+    {
+      float near = std::nearbyint(f32);
+      if (near >= float(maxInt))
+	result = maxInt;
+      else if (near < float(minInt))
+	result = SRV(minInt);
+      else
+	{
+	  valid = true;
+          result = int32_t(std::lrintf(f32));
+	}
+    }
+
+#endif
+
+  intRegs_.write(di->op0(), result);
+
+  updateAccruedFpBits(0.0, not valid);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_wu_h(const DecodedInst* di)
+{
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  SRV result = 0;
+
+#ifdef SOFT_FLOAT
+
+  // In 64-bit mode, we sign extend the result to 64-bits.
+  result = SRV(int32_t(f16_to_ui32(Float16ToF16(f1), softfloat_roundingMode, true)));
+  updateAccruedFpBits(0.0f, false);
+
+#else
+
+  bool valid = false;
+  bool exact = true;
+  float f32 = f1.toFloat();
+
+  uint32_t maxUint32 = ~uint32_t(0);
+  if (std::isnan(f32))
+    {
+      result = ~URV(0);
+    }
+  else if (std::signbit(f32) and f32 != 0)
+    {
+      result = 0;
+    }
+  else
+    {
+      double near = std::nearbyint(f32);
+      if (near > double(maxUint32))
+        {
+          result = ~URV(0);
+        }
+      else if (near < 0)
+        {
+          result = 0;
+        }
+      else if (near == 0)
+        {
+          result = 0;
+          valid = true;
+          exact = near == f32;
+        }
+      else
+        {
+          result = SRV(int32_t(std::lrint(f32)));
+          valid = true;
+          exact = near == f32;
+        }
+    }
+
+  uint32_t incFlags = 0;
+  if (not valid)
+    incFlags |= uint32_t(FpFlags::Invalid);
+  if (not exact)
+    incFlags |= uint32_t(FpFlags::Inexact);
+  if (incFlags != 0)
+    orFcsrFlags(FpFlags(incFlags));
+
+#endif
+
+  intRegs_.write(di->op0(), result);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFmv_x_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // This operation does not check for proper NAN boxing. We read raw bits.
+  uint64_t v1 = fpRegs_.readBitsRaw(di->op1());
+  int16_t s1 = v1;  // Keep lower 32 bits
+
+  SRV value = SRV(s1); // Sign extend.
+
+  intRegs_.write(di->op0(), value);
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFeq_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
+  float f2 = fpRegs_.readHalf(di->op2()).toFloat();
+
+  URV res = 0;
+
+  if (std::isnan(f1) or std::isnan(f2))
+    {
+      if (issnan(f1) or issnan(f2))
+        orFcsrFlags(FpFlags::Invalid);
+    }
+  else
+    res = (f1 == f2)? 1 : 0;
+
+  intRegs_.write(di->op0(), res);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFlt_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
+  float f2 = fpRegs_.readHalf(di->op2()).toFloat();
+
+  URV res = 0;
+
+  if (std::isnan(f1) or std::isnan(f2))
+    orFcsrFlags(FpFlags::Invalid);
+  else
+    res = (f1 < f2)? 1 : 0;
+    
+  intRegs_.write(di->op0(), res);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFle_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
+  float f2 = fpRegs_.readHalf(di->op2()).toFloat();
+
+  URV res = 0;
+
+  if (std::isnan(f1) or std::isnan(f2))
+    orFcsrFlags(FpFlags::Invalid);
+  else
+    res = (f1 <= f2)? 1 : 0;
+    
+  intRegs_.write(di->op0(), res);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFclass_h(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
+  URV result = 0;
+
+  bool pos = not std::signbit(f1);
+  int type = std::fpclassify(f1);
+
+  if (type == FP_INFINITE)
+    {
+      if (pos)
+	result |= URV(FpClassifyMasks::PosInfinity);
+      else
+	result |= URV(FpClassifyMasks::NegInfinity);
+    }
+  else if (type == FP_NORMAL)
+    {
+      if (pos)
+	result |= URV(FpClassifyMasks::PosNormal);
+      else
+	result |= URV(FpClassifyMasks::NegNormal);
+    }
+  else if (type == FP_SUBNORMAL)
+    {
+      if (pos)
+	result |= URV(FpClassifyMasks::PosSubnormal);
+      else
+	result |= URV(FpClassifyMasks::NegSubnormal);
+    }
+  else if (type == FP_ZERO)
+    {
+      if (pos)
+	result |= URV(FpClassifyMasks::PosZero);
+      else
+	result |= URV(FpClassifyMasks::NegZero);
+    }
+  else if (type == FP_NAN)
+    {
+      bool quiet = mostSignificantFractionBit(f1);
+      if (quiet)
+	result |= URV(FpClassifyMasks::QuietNan);
+      else
+	result |= URV(FpClassifyMasks::SignalingNan);
+    }
+
+  intRegs_.write(di->op0(), result);
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_h_w(const DecodedInst* di)
+{
+  // Integer word to half fp.
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  int32_t i1 = intRegs_.read(di->op1());
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(i32_to_f16(i1));
+#else
+  Float16 res{float(i1)};
+#endif
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_h_wu(const DecodedInst* di)
+{
+  // Integer word to half fp.
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  uint32_t u1 = intRegs_.read(di->op1());
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(ui32_to_f16(u1));
+#else
+  Float16 res{float(u1)};
+#endif
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFmv_h_x(const DecodedInst* di)
+{
+  // move bits of integer register to half fp
+
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  URV u1 = intRegs_.read(di->op1());
+
+  Float16 f16{uint16_t(u1)};
+
+  fpRegs_.writeHalf(di->op0(), f16);
+
+  markFsDirty();
+}
+
+
+template<>
+void
+Hart<uint32_t>::execFcvt_l_h(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+template <>
+void
+Hart<uint64_t>::execFcvt_l_h(const DecodedInst* di)
+{
+  // half-precision to uin64_t
+
+  if (not isRv64())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  SRV result = 0;
+  bool valid = false;
+
+#ifdef SOFT_FLOAT
+  result = f16_to_i64(Float16ToF16(f1), softfloat_roundingMode, true);
+  valid = true;  // We get invalid from softfloat library.
+#else
+
+  float f32 = f1.toFloat();
+
+  int64_t maxInt = (~uint64_t(0)) >> 1;
+  int64_t minInt = int64_t(1) << 63;
+
+  unsigned signBit = std::signbit(f32);
+  if (std::isinf(f32))
+    {
+      if (signBit)
+	result = minInt;
+      else
+	result = maxInt;
+    }
+  else if (std::isnan(f32))
+    result = maxInt;
+  else
+    {
+      double near = std::nearbyint(double(f32));
+      if (near >= double(maxInt))
+	result = maxInt;
+      else if (near < double(minInt))
+	result = minInt;
+      else
+	{
+	  valid = true;
+          result = std::lrint(f32);
+	}
+    }
+
+#endif
+
+  intRegs_.write(di->op0(), result);
+
+  updateAccruedFpBits(0.0, not valid);
+
+  markFsDirty();
+}
+
+
+template<>
+void
+Hart<uint32_t>::execFcvt_lu_h(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template<>
+void
+Hart<uint64_t>::execFcvt_lu_h(const DecodedInst* di)
+{
+  if (not isRv64())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  uint64_t result = 0;
+
+#ifdef SOFT_FLOAT
+
+  result = f16_to_ui64(Float16ToF16(f1), softfloat_roundingMode, true);
+  updateAccruedFpBits(0.0f, false);
+
+#else
+
+  bool valid = false;
+  bool exact = true;
+  float f32 = f1.toFloat();
+
+  uint64_t maxUint = ~uint64_t(0);
+
+  unsigned signBit = std::signbit(f32);
+  if (std::isinf(f32))
+    {
+      if (signBit)
+	result = 0;
+      else
+	result = maxUint;
+    }
+  else if (std::isnan(f32))
+    result = maxUint;
+  else if (std::signbit(f32) and f32 != 0)
+    result = 0;
+  else
+    {
+      double near = std::nearbyint(double(f32));
+      if (near == 0)
+        {
+          result = 0;
+          valid = true;
+          exact = near == f32;
+        }
+      else if (near < 0)
+        {
+          result = 0;
+        }
+      else
+        {
+          // Using "near > maxUint" will not work beacuse of rounding.
+          if (near >= 2*double(uint64_t(1)<<63))
+            result = maxUint;
+          else
+            {
+              // std::lprint will produce an overflow if most sig bit
+              // of result is 1 (it thinks there's an overflow).  We
+              // compensate with the divide multiply by 2.
+              if (f32 < (uint64_t(1) << 63))
+                result = std::llrint(f32);
+              else
+                {
+                  result = std::llrint(f32/2);
+                  result *= 2;
+                }
+              valid = true;
+              exact = near == f32;
+            }
+        }
+    }
+
+
+  uint32_t incFlags = 0;  // Incremental FP flags.
+  if (not valid)
+    incFlags |= uint32_t(FpFlags::Invalid);
+  if (not exact)
+    incFlags |= uint32_t(FpFlags::Inexact);
+  if (incFlags)
+    orFcsrFlags(FpFlags(incFlags));
+
+#endif
+
+  intRegs_.write(di->op0(), result);
+  markFsDirty();
+}
+
+
+template<>
+void
+Hart<uint32_t>::execFcvt_h_l(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template<>
+void
+Hart<uint64_t>::execFcvt_h_l(const DecodedInst* di)
+{
+  // int64_t to half fp
+
+  if (not isRv64())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  SRV i1 = intRegs_.read(di->op1());
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(i64_to_f16(i1));
+#else
+  Float16 res{float(i1)};
+#endif
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+
+  markFsDirty();
+}
+
+
+template<>
+void
+Hart<uint32_t>::execFcvt_h_lu(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template<>
+void
+Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
+{
+  // uint64_t to half fp
+
+  if (not isRv64())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkRoundingModeHp(di))
+    return;
+
+  uint64_t u1 = intRegs_.read(di->op1());
+
+#ifdef SOFT_FLOAT
+  Float16 res = f16ToFloat16(ui64_to_f16(u1));
+#else
+  Float16 res{float(u1)};
+#endif
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  updateAccruedFpBits(res.toFloat(), false /*invalid*/);
+
+  markFsDirty();
 }
 
 

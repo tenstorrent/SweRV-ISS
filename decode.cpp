@@ -43,124 +43,192 @@ Hart<URV>::decode(URV addr, uint32_t inst, DecodedInst& di)
 
 template <typename URV>
 const InstEntry&
-Hart<URV>::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
-		    uint32_t& op3)
+Hart<URV>::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 {
   RFormInst rform(inst);
 
   op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
 
   unsigned f7 = rform.bits.funct7, f3 = rform.bits.funct3;
+  unsigned top5 = f7 >> 2;
 
-  op3 = f7 >> 2;  // For 4-operand instructions.
-
-  if (f7 & 1)
+  if ((f7 & 3) == 1)
     {
-      if (f7 == 1)              return instTable_.getEntry(InstId::fadd_d);
-      if (f7 == 5)              return instTable_.getEntry(InstId::fsub_d);
-      if (f7 == 9)              return instTable_.getEntry(InstId::fmul_d);
-      if (f7 == 0xd)            return instTable_.getEntry(InstId::fdiv_d);
-      if (f7 == 0x11)
+      if (top5 == 0)            return instTable_.getEntry(InstId::fadd_d);
+      if (top5 == 1)            return instTable_.getEntry(InstId::fsub_d);
+      if (top5 == 2)            return instTable_.getEntry(InstId::fmul_d);
+      if (top5 == 3)            return instTable_.getEntry(InstId::fdiv_d);
+      if (top5 == 4)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fsgnj_d);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::fsgnjn_d);
 	  if (f3 == 2)          return instTable_.getEntry(InstId::fsgnjx_d);
+	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (f7 == 0x15)
+      if (top5 == 5)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fmin_d);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::fmax_d);
+	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (f7==0x21 and op2==0)  return instTable_.getEntry(InstId::fcvt_d_s);
-      if (f7 == 0x2d)           return instTable_.getEntry(InstId::fsqrt_d);
-      if (f7 == 0x51)
+      if (top5==8 and op2==0)   return instTable_.getEntry(InstId::fcvt_d_s);
+      if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_d_h);
+      if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_d);
+      if (top5 == 0x14)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_d);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::flt_d);
 	  if (f3 == 2)          return instTable_.getEntry(InstId::feq_d);
+	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (f7 == 0x61)
+      if (top5 == 0x18)
 	{
 	  if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_w_d);
 	  if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_wu_d);
 	  if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_l_d);
 	  if (op2 == 3)         return instTable_.getEntry(InstId::fcvt_lu_d);
+	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (f7 == 0x69)
+      if (top5 == 0x1a)
 	{
 	  if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_d_w);
 	  if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_d_wu);
 	  if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_d_l);
 	  if (op2 == 3)         return instTable_.getEntry(InstId::fcvt_d_lu);
+	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (f7 == 0x71)
+      if (top5 == 0x1c)
 	{
 	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_x_d);
 	  if (op2==0 and f3==1) return instTable_.getEntry(InstId::fclass_d);
+	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (f7 == 0x79)
-	if (op2==0 and f3==0)   return instTable_.getEntry(InstId::fmv_d_x);
-
-      return instTable_.getEntry(InstId::illegal);
-    }
-
-  if (f7 == 0)      return instTable_.getEntry(InstId::fadd_s);
-  if (f7 == 4)      return instTable_.getEntry(InstId::fsub_s);
-  if (f7 == 8)      return instTable_.getEntry(InstId::fmul_s);
-  if (f7 == 0xc)    return instTable_.getEntry(InstId::fdiv_s);
-  if (f7 == 0x2c)   return instTable_.getEntry(InstId::fsqrt_s);
-  if (f7 == 0x10)
-    {
-      if (f3 == 0)  return instTable_.getEntry(InstId::fsgnj_s);
-      if (f3 == 1)  return instTable_.getEntry(InstId::fsgnjn_s);
-      if (f3 == 2)  return instTable_.getEntry(InstId::fsgnjx_s);
-    }
-  if (f7 == 0x14)
-    {
-      if (f3 == 0)  return instTable_.getEntry(InstId::fmin_s);
-      if (f3 == 1)  return instTable_.getEntry(InstId::fmax_s);
-    }
-  if (f7 == 0x20)
-    {
-      if (op2 == 1) return instTable_.getEntry(InstId::fcvt_s_d);
-      return instTable_.getEntry(InstId::illegal);
-    }
-  if (f7 == 0x50)
-    {
-      if (f3 == 0)  return instTable_.getEntry(InstId::fle_s);
-      if (f3 == 1)  return instTable_.getEntry(InstId::flt_s);
-      if (f3 == 2)  return instTable_.getEntry(InstId::feq_s);
-      return instTable_.getEntry(InstId::illegal);
-    }
-  if (f7 == 0x60)
-    {
-      if (op2 == 0) return instTable_.getEntry(InstId::fcvt_w_s);
-      if (op2 == 1) return instTable_.getEntry(InstId::fcvt_wu_s);
-      if (op2 == 2) return instTable_.getEntry(InstId::fcvt_l_s);
-      if (op2 == 3) return instTable_.getEntry(InstId::fcvt_lu_s);
-      return instTable_.getEntry(InstId::illegal);
-    }
-  if (f7 == 0x68)
-    {
-      if (op2 == 0) return instTable_.getEntry(InstId::fcvt_s_w);
-      if (op2 == 1) return instTable_.getEntry(InstId::fcvt_s_wu);
-      if (op2 == 2) return instTable_.getEntry(InstId::fcvt_s_l);
-      if (op2 == 3) return instTable_.getEntry(InstId::fcvt_s_lu);
-      return instTable_.getEntry(InstId::illegal);
-    }
-  if (f7 == 0x70)
-    {
-      if (op2 == 0)
+      if (top5 == 0x1e)
 	{
-	  if (f3 == 0) return instTable_.getEntry(InstId::fmv_x_w);
-	  if (f3 == 1) return instTable_.getEntry(InstId::fclass_s);
+	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_d_x);
 	}
+
+      return instTable_.getEntry(InstId::illegal);
     }
-  if (f7 == 0x78)
+
+  if ((f7 & 3) == 0)
     {
-      if (op2 == 0)
-	if (f3 == 0) return instTable_.getEntry(InstId::fmv_w_x);
+      if (top5 == 0)            return instTable_.getEntry(InstId::fadd_s);
+      if (top5 == 1)            return instTable_.getEntry(InstId::fsub_s);
+      if (top5 == 2)            return instTable_.getEntry(InstId::fmul_s);
+      if (top5 == 3)            return instTable_.getEntry(InstId::fdiv_s);
+      if (top5 == 4)
+	{
+	  if (f3 == 0)          return instTable_.getEntry(InstId::fsgnj_s);
+	  if (f3 == 1)          return instTable_.getEntry(InstId::fsgnjn_s);
+	  if (f3 == 2)          return instTable_.getEntry(InstId::fsgnjx_s);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 5)
+	{
+	  if (f3 == 0)          return instTable_.getEntry(InstId::fmin_s);
+	  if (f3 == 1)          return instTable_.getEntry(InstId::fmax_s);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5==8 and op2==1)   return instTable_.getEntry(InstId::fcvt_s_d);
+      if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_s_h);
+      if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_s);
+      if (top5 == 0x14)
+	{
+	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_s);
+	  if (f3 == 1)          return instTable_.getEntry(InstId::flt_s);
+	  if (f3 == 2)          return instTable_.getEntry(InstId::feq_s);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x18)
+	{
+	  if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_w_s);
+	  if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_wu_s);
+	  if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_l_s);
+	  if (op2 == 3)         return instTable_.getEntry(InstId::fcvt_lu_s);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x1a)
+	{
+	  if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_s_w);
+	  if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_s_wu);
+	  if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_s_l);
+	  if (op2 == 3)         return instTable_.getEntry(InstId::fcvt_s_lu);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x1c)
+	{
+	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_x_w);
+	  if (op2==0 and f3==1) return instTable_.getEntry(InstId::fclass_s);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x1e)
+	{
+	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_w_x);
+	}
+
+      return instTable_.getEntry(InstId::illegal);
     }
+
+  if ((f7 & 3) == 2)
+    {
+      if (top5 == 0)            return instTable_.getEntry(InstId::fadd_h);
+      if (top5 == 1)            return instTable_.getEntry(InstId::fsub_h);
+      if (top5 == 2)            return instTable_.getEntry(InstId::fmul_h);
+      if (top5 == 3)            return instTable_.getEntry(InstId::fdiv_h);
+      if (top5 == 4)
+	{
+	  if (f3 == 0)          return instTable_.getEntry(InstId::fsgnj_h);
+	  if (f3 == 1)          return instTable_.getEntry(InstId::fsgnjn_h);
+	  if (f3 == 2)          return instTable_.getEntry(InstId::fsgnjx_h);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 5)
+	{
+	  if (f3 == 0)          return instTable_.getEntry(InstId::fmin_h);
+	  if (f3 == 1)          return instTable_.getEntry(InstId::fmax_h);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5==8 and op2==0)   return instTable_.getEntry(InstId::fcvt_h_s);
+      if (top5==8 and op2==1)   return instTable_.getEntry(InstId::fcvt_h_d);
+      if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_h);
+      if (top5 == 0x14)
+	{
+	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_h);
+	  if (f3 == 1)          return instTable_.getEntry(InstId::flt_h);
+	  if (f3 == 2)          return instTable_.getEntry(InstId::feq_h);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x18)
+	{
+	  if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_w_h);
+	  if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_wu_h);
+	  if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_l_h);
+	  if (op2 == 3)         return instTable_.getEntry(InstId::fcvt_lu_h);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x1a)
+	{
+	  if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_h_w);
+	  if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_h_wu);
+	  if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_h_l);
+	  if (op2 == 3)         return instTable_.getEntry(InstId::fcvt_h_lu);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x1c)
+	{
+	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_x_h);
+	  if (op2==0 and f3==1) return instTable_.getEntry(InstId::fclass_h);
+	  return instTable_.getEntry(InstId::illegal);
+	}
+      if (top5 == 0x1e)
+	{
+	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_h_x);
+	}
+
+      return instTable_.getEntry(InstId::illegal);
+    }
+
   return instTable_.getEntry(InstId::illegal);
 }
 
@@ -1423,12 +1491,13 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	op0 = iform.fields.rd;
 	op1 = iform.fields.rs1;
 	uint32_t f3 = iform.fields.funct3;
-        if (f3 == 2 or f3 == 3)
-          op2 = iform.immed();  // flw or fld
+        if (f3 == 1 or f3 == 2 or f3 == 3)
+          op2 = iform.immed();  // flh, flw, or fld
         else
           op2 = iform.rs2();  // vector load
 
         if (f3 == 0)  return decodeVecLoad(f3, iform.uimmed(), op3);
+	if (f3 == 1)  return instTable_.getEntry(InstId::flh);
 	if (f3 == 2)  return instTable_.getEntry(InstId::flw);
 	if (f3 == 3)  return instTable_.getEntry(InstId::fld);
         if (f3 == 5)  return decodeVecLoad(f3, iform.uimmed(), op3);
@@ -1462,7 +1531,7 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	op1 = sform.bits.rs1;
 	op2 = sform.immed();
 	unsigned f3 = sform.bits.funct3;
-        if (f3 != 2 and f3 != 3)
+        if (f3 != 1 and f3 != 2 and f3 != 3)
           {     // vector instructions.
             op0 = sform.vbits.rd;
             op1 = sform.vbits.rs1;
@@ -1470,6 +1539,7 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           }
 
         if (f3 == 0)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+	if (f3 == 1)  return instTable_.getEntry(InstId::fsh);
 	if (f3 == 2)  return instTable_.getEntry(InstId::fsw);
 	if (f3 == 3)  return instTable_.getEntry(InstId::fsd);
         if (f3 == 5)  return decodeVecStore(f3, sform.vbits.imm12, op3);
@@ -1505,6 +1575,8 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  return instTable_.getEntry(InstId::fmadd_s);
 	if ((funct7 & 3) == 1)
 	  return instTable_.getEntry(InstId::fmadd_d);
+	if ((funct7 & 3) == 2)
+	  return instTable_.getEntry(InstId::fmadd_h);
       }
       return instTable_.getEntry(InstId::illegal);
 
@@ -1518,6 +1590,8 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  return instTable_.getEntry(InstId::fmsub_s);
 	if ((funct7 & 3) == 1)
 	  return instTable_.getEntry(InstId::fmsub_d);
+	if ((funct7 & 3) == 2)
+	  return instTable_.getEntry(InstId::fmsub_h);
       }
       return instTable_.getEntry(InstId::illegal);
 
@@ -1531,6 +1605,8 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  return instTable_.getEntry(InstId::fnmsub_s);
 	if ((funct7 & 3) == 1)
 	  return instTable_.getEntry(InstId::fnmsub_d);
+	if ((funct7 & 3) == 2)
+	  return instTable_.getEntry(InstId::fnmsub_h);
       }
       return instTable_.getEntry(InstId::illegal);
 
@@ -1544,11 +1620,13 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  return instTable_.getEntry(InstId::fnmadd_s);
 	if ((funct7 & 3) == 1)
 	  return instTable_.getEntry(InstId::fnmadd_d);
+	if ((funct7 & 3) == 2)
+	  return instTable_.getEntry(InstId::fnmadd_h);
       }
       return instTable_.getEntry(InstId::illegal);
 
     l20: // 10100
-      return decodeFp(inst, op0, op1, op2, op3);
+      return decodeFp(inst, op0, op1, op2);
 
     l21: // 10101
       return decodeVec(inst, op0, op1, op2, op3);

@@ -1172,7 +1172,7 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::fcvt_d_w:
       out << "fcvt.d.w " << fpRegName(di.op0()) << ", " << intRegName(di.op1())
-	  << roundingModeString(di.roundingMode());
+	  << ", " << roundingModeString(di.roundingMode());
       break;
 
     case InstId::fcvt_d_wu:
@@ -1208,6 +1208,161 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::fmv_d_x:
       out << "fmv.d.x " << fpRegName(di.op0()) << ", " << intRegName(di.op1());
+      break;
+
+    case InstId::flh:
+      printFpLdSt(*this, out, "flh", di);
+      break;
+
+    case InstId::fsh:
+      printFpLdSt(*this, out, "fsh", di);
+      break;
+
+    case InstId::fmadd_h:
+      printFp4Rm(*this, out, "fmadd.h", di);
+      break;
+
+    case InstId::fmsub_h:
+      printFp4Rm(*this, out, "fmsub.h", di);
+      break;
+
+    case InstId::fnmsub_h:
+      printFp4Rm(*this, out, "fnmsub.h", di);
+      break;
+
+    case InstId::fnmadd_h:
+      printFp4Rm(*this, out, "fnmadd.h", di);
+      break;
+
+    case InstId::fadd_h:
+      printFp3Rm(*this, out, "fadd.h", di);
+      break;
+
+    case InstId::fsub_h:
+      printFp3Rm(*this, out, "fsub.h", di);
+      break;
+
+    case InstId::fmul_h:
+      printFp3Rm(*this, out, "fmul.h", di);
+      break;
+
+    case InstId::fdiv_h:
+      printFp3Rm(*this, out, "fdiv.h", di);
+      break;
+
+    case InstId::fsqrt_h:
+      printFp2Rm(*this, out, "fsqrt.h", di);
+      break;
+
+    case InstId::fsgnj_h:
+      printFp3(*this, out, "fsgnj.h", di);
+      break;
+
+    case InstId::fsgnjn_h:
+      printFp3(*this, out, "fsgnjn.h", di);
+      break;
+
+    case InstId::fsgnjx_h:
+      printFp3(*this, out, "fsgnjx.h", di);
+      break;
+
+    case InstId::fmin_h:
+      printFp3(*this, out, "fmin.h", di);
+      break;
+
+    case InstId::fmax_h:
+      printFp3(*this, out, "fmax.h", di);
+      break;
+
+    case InstId::fcvt_s_h:
+      printFp2(*this, out, "fcvt.s.h", di);
+      break;
+
+    case InstId::fcvt_d_h:
+      printFp2(*this, out, "fcvt.d.h", di);
+      break;
+
+    case InstId::fcvt_h_s:
+      printFp2(*this, out, "fcvt.h.s", di);
+      break;
+
+    case InstId::fcvt_h_d:
+      printFp2(*this, out, "fcvt.h.d", di);
+      break;
+
+    case InstId::fcvt_w_h:
+      out << "fcvt.w.h "  << intRegName(di.op0()) << ", "
+	  << fpRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
+      break;
+
+    case InstId::fcvt_wu_h:
+      out << "fcvt.wu.h "  << intRegName(di.op0()) << ", "
+	  << fpRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
+      break;
+
+    case InstId::fmv_x_h:
+      out << "fmv.x.h  " << intRegName(di.op0()) << ", " << fpRegName(di.op1());
+      break;
+
+    case InstId::feq_h:
+      out << "feq.h    " << intRegName(di.op0()) << ", " << fpRegName(di.op1())
+	  << ", " << fpRegName(di.op2());
+      break;
+
+    case InstId::flt_h:
+      out << "flt.h    " << intRegName(di.op0()) << ", " << fpRegName(di.op1())
+	  << ", " << fpRegName(di.op2());
+      break;
+
+    case InstId::fle_h:
+      out << "fle.h    " << intRegName(di.op0()) << ", " << fpRegName(di.op1())
+	  << ", " << fpRegName(di.op2());
+      break;
+
+    case InstId::fclass_h:
+      out << "fclass.h " << intRegName(di.op0()) << ", " << fpRegName(di.op1());
+      break;
+
+    case InstId::fcvt_h_w:
+      out << "fcvt.h.w " << fpRegName(di.op0()) << ", "
+	  << intRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
+      break;
+
+    case InstId::fcvt_h_wu:
+      out << "fcvt.h.wu " << fpRegName(di.op0()) << ", "
+	  << intRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
+      break;
+
+    case InstId::fmv_h_x:
+      out << "fmv.h.x  " << fpRegName(di.op0()) << ", " << intRegName(di.op1());
+      break;
+
+    case InstId::fcvt_l_h:
+      out << "fcvt.l.h "  << intRegName(di.op0()) << ", "
+	  << fpRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
+      break;
+
+    case InstId::fcvt_lu_h:
+      out << "fcvt.lu.h "  << intRegName(di.op0()) << ", "
+	  << fpRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
+      break;
+
+    case InstId::fcvt_h_l:
+      out << "fcvt.h.l " << fpRegName(di.op0()) << ", "
+	  << intRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
+      break;
+
+    case InstId::fcvt_h_lu:
+      out << "fcvt.h.lu " << fpRegName(di.op0()) << ", "
+	  << intRegName(di.op1()) << ", "
+	  << roundingModeString(di.roundingMode());
       break;
 
     case InstId::mret:

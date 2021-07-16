@@ -3995,11 +3995,12 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
           uint64_t val = fpRegs_.readBitsRaw(regIx);
           if (regIx == rd and rdType == OperandType::FpReg)
             val = frdOrigVal;
-          bool sp = fpRegs_.isNanBoxed(val) or not isRvd();
+
+          bool sp = fpRegs_.isBoxedSingle(val);
           if (sp)
             {
               FpRegs::FpUnion u{val};
-              float spVal = u.sp.sp;
+              float spVal = u.sp;
               addToFpHistogram(prof.srcHisto_.at(srcIx), spVal);
             }
           else
@@ -5564,6 +5565,40 @@ Hart<URV>::execute(const DecodedInst* di)
      &&fcvt_d_l,
      &&fcvt_d_lu,
      &&fmv_d_x,
+     &&flh,
+     &&fsh,
+     &&fmadd_h,
+     &&fmsub_h,
+     &&fnmsub_h,
+     &&fnmadd_h,
+     &&fadd_h,
+     &&fsub_h,
+     &&fmul_h,
+     &&fdiv_h,
+     &&fsqrt_h,
+     &&fsgnj_h,
+     &&fsgnjn_h,
+     &&fsgnjx_h,
+     &&fmin_h,
+     &&fmax_h,
+     &&fcvt_s_h,
+     &&fcvt_d_h,
+     &&fcvt_h_s,
+     &&fcvt_h_d,
+     &&fcvt_w_h,
+     &&fcvt_wu_h,
+     &&fmv_x_h,
+     &&feq_h,
+     &&flt_h,
+     &&fle_h,
+     &&fclass_h,
+     &&fcvt_h_w,
+     &&fcvt_h_wu,
+     &&fmv_h_x,
+     &&fcvt_l_h,
+     &&fcvt_lu_h,
+     &&fcvt_h_l,
+     &&fcvt_h_lu,
      &&mret,
      &&uret,
      &&sret,
@@ -6589,6 +6624,142 @@ Hart<URV>::execute(const DecodedInst* di)
 
  fmv_d_x:
   execFmv_d_x(di);
+  return;
+
+ flh:
+  execFlh(di);
+  return;
+
+ fsh:
+  execFsh(di);
+  return;
+
+ fmadd_h:
+  execFmadd_h(di);
+  return;
+
+ fmsub_h:
+  execFmsub_h(di);
+  return;
+
+ fnmsub_h:
+  execFnmsub_h(di);
+  return;
+
+ fnmadd_h:
+  execFnmadd_h(di);
+  return;
+
+ fadd_h:
+  execFadd_h(di);
+  return;
+
+ fsub_h:
+  execFsub_h(di);
+  return;
+
+ fmul_h:
+  execFmul_h(di);
+  return;
+
+ fdiv_h:
+  execFdiv_h(di);
+  return;
+
+ fsqrt_h:
+  execFsqrt_h(di);
+  return;
+
+ fsgnj_h:
+  execFsgnj_h(di);
+  return;
+
+ fsgnjn_h:
+  execFsgnjn_h(di);
+  return;
+
+ fsgnjx_h:
+  execFsgnjx_h(di);
+  return;
+
+ fmin_h:
+  execFmin_h(di);
+  return;
+
+ fmax_h:
+  execFmax_h(di);
+  return;
+
+ fcvt_s_h:
+  execFcvt_s_h(di);
+  return;
+
+ fcvt_d_h:
+  execFcvt_d_h(di);
+  return;
+
+ fcvt_h_s:
+  execFcvt_h_s(di);
+  return;
+
+ fcvt_h_d:
+  execFcvt_h_d(di);
+  return;
+
+ fcvt_w_h:
+  execFcvt_w_h(di);
+  return;
+
+ fcvt_wu_h:
+  execFcvt_wu_h(di);
+  return;
+
+ fmv_x_h:
+  execFmv_x_h(di);
+  return;
+
+ feq_h:
+  execFeq_h(di);
+  return;
+
+ flt_h:
+  execFlt_h(di);
+  return;
+
+ fle_h:
+  execFle_h(di);
+  return;
+
+ fclass_h:
+  execFclass_h(di);
+  return;
+
+ fcvt_h_w:
+  execFcvt_h_w(di);
+  return;
+
+ fcvt_h_wu:
+  execFcvt_h_wu(di);
+  return;
+
+ fmv_h_x:
+  execFmv_h_x(di);
+  return;
+
+ fcvt_l_h:
+  execFcvt_l_h(di);
+  return;
+
+ fcvt_lu_h:
+  execFcvt_lu_h(di);
+  return;
+
+ fcvt_h_l:
+  execFcvt_h_l(di);
+  return;
+
+ fcvt_h_lu:
+  execFcvt_h_lu(di);
   return;
 
  mret:
@@ -9978,11 +10149,19 @@ Hart<URV>::execBbarrier(const DecodedInst* di)
 
 template
 bool
+WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, uint32_t, uint32_t, uint16_t);
+
+template
+bool
 WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, uint32_t, uint32_t, uint32_t);
 
 template
 bool
 WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, uint32_t, uint32_t, uint64_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::store<uint16_t>(uint32_t, uint64_t, uint64_t, uint16_t);
 
 template
 bool

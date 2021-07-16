@@ -53,3 +53,34 @@ FpRegs::findReg(const std::string& name, unsigned& ix) const
   ix = iter->second;
   return true;
 }
+
+
+void
+FpRegs::reset(bool hasHalf, bool hasSingle, bool hasDouble)
+{
+  hasHalf_ = hasHalf_;
+  hasSingle_ = hasSingle_;
+  hasDouble_ = hasDouble_;
+
+  if (hasDouble)
+    {
+      for (auto& reg : regs_)
+	reg = 0;
+    }
+  else if (hasSingle)
+    {
+      // F extension present without D. Reset to NAN-boxed
+      // single-precision zeros.
+      for (size_t i = 0; i < regs_.size(); ++i)
+	writeSingle(i, 0);
+    }
+  else if (hasHalf)
+    {
+      // F16 extension present without F or D. Reset to NAN-boxed
+      // half-precision zeros.
+      for (size_t i = 0; i < regs_.size(); ++i)
+	writeHalf(i, Float16(uint16_t{0}));
+    }
+
+  clearLastWrittenReg();
+}

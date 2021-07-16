@@ -17,10 +17,12 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cmath>
 #include <vector>
 #include <type_traits>
 #include <unordered_map>
 #include <string>
+#include <cassert>
 
 namespace WdRiscv
 {
@@ -152,9 +154,102 @@ namespace WdRiscv
   template <typename URV>
   class Hart;
 
+
+  /// Unsigned-float union: reinterpret bits as uint32_t or float
+  union Uint32FloatUnion
+  {
+    Uint32FloatUnion(uint32_t u) : u(u)
+    { }
+
+    Uint32FloatUnion(float f) : f(f)
+    { }
+
+    uint32_t u = 0;
+    float f;
+  };
+
+
+  class Float16
+  {
+  public:
+
+    /// Construct a Float16 from a 16-bit integer by reinterpreting
+    /// the bits as a float (no conversion from integer to float).
+    explicit Float16(uint16_t x = 0)
+      : i16(x)
+    { }
+
+    /// Construct a Float16 from a float by dropping the leat
+    /// significat 16 bits of the float.
+    explicit Float16(float x)
+    {
+      Uint32FloatUnion uf{x};
+      i16 = uf.u >> 16;
+    }
+
+    /// Return true if this Float16 is equal to the given Float16
+    /// according to the floating point rules (-0 is equal to +0).
+    bool operator==(const Float16& x) const
+    { return this->toFloat() == x.toFloat(); }
+
+    /// Return the bits of the Float16 as uint16_t (no conversion from
+    /// float to itneger).
+    uint16_t bits() const
+    { return i16; }
+
+    /// Convert this Float16 to a float by shifting left by 16.
+    float toFloat() const
+    {
+      uint32_t word = uint32_t(i16) << 16;
+      Uint32FloatUnion uf{word};
+      return uf.f;
+    }
+
+    /// Return the sign bit of this Float16 in the least significant
+    /// bit of the result.
+    unsigned signBit() const
+    { return i16 >> 15; }
+
+    /// Return true if this number is subnormal.
+    bool isSubnormal() const
+    {
+      // Exponent bits (bits 7 to 14) must be zero
+      return (i16 & 0x7f80) == 0;
+    }
+
+    /// Return copy of this Float16 with cleared  mantissa (bits 0 to 6).
+    Float16 clearMantissa() const
+    { Float16 x{*this}; x.i16 &= 0xff80; return x; }
+
+    /// Return the negative of this Float16.
+    Float16 negate() const
+    { Float16 x{*this}; x.i16 ^= 0x8000; return x; }
+
+    /// Return true if this number encodes not-a-number.
+    bool isNan() const
+    { return std::isnan(this->toFloat()); }
+
+    /// Return true if this number encodes a signaling not-a-number.
+    bool isSnan() const
+    { return ((i16 >> 6) & 1) == 0; } // Upper bit of significand (bit 6) is zero.
+
+    /// Return a Float16 with magnitude of x and sign of y.
+    static Float16 copySign(Float16 x, Float16 y)
+    { x.i16 = (x.i16 << 1) >> 1;  x.i16 |= (y.i16 >> 15 << 15); return x; }
+
+    /// Return the quiet NAN Float16 number.
+    static Float16 quietNan()
+    { return Float16{std::numeric_limits<float>::quiet_NaN()}; }
+
+  private:
+
+    uint16_t i16 = 0;
+  } __attribute__((packed));
+
+
   /// Model a RISCV floating point register file. We use double precision
   /// representation for each register and nan-boxing for single precision
-  /// values.
+  /// and float16 values.
   class FpRegs
   {
   public:
@@ -172,7 +267,7 @@ namespace WdRiscv
     
     /// Return value of ith register.
     double readDouble(unsigned i) const
-    { return regs_[i]; }
+    { assert(flen_ >= 64); return regs_[i]; }
 
     /// Return the bit pattern of the ith register as an unsigned
     /// integer. If the register contains a nan-boxed value, return
@@ -180,20 +275,29 @@ namespace WdRiscv
     uint64_t readBitsUnboxed(unsigned i) const
     {
       FpUnion u{regs_.at(i)};
-      if (nanBox_ and u.sp.pad == ~uint32_t(0))
-        u.sp.pad = 0;
+      if (hasHalf_ and u.isBoxedHalf())
+	return (u.i64 << 48) >> 48;
+
+      if (hasSingle_ and u.isBoxedSingle())
+	return (u.i64 << 32) >> 32;
 
       return u.i64;
     }
 
-    /// Return true if given value represents a nan-boxed single
-    /// precision value.
-    bool isNanBoxed(uint64_t value) const
+    /// Return true if given bit pattern represents a nan-boxed
+    /// single precision value.
+    bool isBoxedSingle(uint64_t value) const
     {
-      if (not nanBox_)
-        return false;
       FpUnion u{value};
-      return u.sp.pad == ~uint32_t(0);
+      return u.isBoxedSingle();
+    }
+
+    /// Return true if given bite pattern represents a nan-boxed
+    /// half precision value.
+    bool isBoxedHalf(uint64_t value) const
+    {
+      FpUnion u{value};
+      return u.isBoxedHalf();
     }
 
     /// Return the bit pattern of the ith register as an unsigned
@@ -202,9 +306,7 @@ namespace WdRiscv
     uint64_t readBitsRaw(unsigned i) const
     {
       FpUnion u {regs_.at(i)};
-      if (flen_ == 32)
-        u.sp.pad = 0;
-      return u.i64;
+      return u.i64 & mask_;
     }
 
     /// Set FP register i to the given value.
@@ -217,21 +319,25 @@ namespace WdRiscv
     /// Set value of ith register to the given value.
     void writeDouble(unsigned i, double value)
     {
+      assert(flen_ >= 64);
       originalValue_ = regs_.at(i);
       regs_.at(i) = value;
       lastWrittenReg_ = i;
     }
 
     /// Read a single precision floating point number from the ith
-    /// register.  If the register width is 64-bit, this will recover
-    /// the least significant 32 bits (it assumes that the number in
-    /// the register is NAN-boxed). If the register width is 32-bit,
-    /// this will simply recover the number in it.
+    /// register.  If the register width is greater than 32 bits, this
+    /// will recover the least significant 32 bits (it assumes that
+    /// the number in the register is NAN-boxed). If the register
+    /// width is 32-bit, this will simply recover the number in it.
     float readSingle(unsigned i) const;
 
     /// Write a single precision number into the ith register. NAN-box
     /// the number if the register is 64-bit wide.
     void writeSingle(unsigned i, float x);
+
+    Float16 readHalf(unsigned i) const;
+    void writeHalf(unsigned i, Float16 x);
 
     /// Return the count of registers in this register file.
     size_t size() const
@@ -259,23 +365,7 @@ namespace WdRiscv
 
   protected:
 
-    void reset(bool isDouble)
-    {
-      if (isDouble)
-        {
-          for (auto& reg : regs_)
-            reg = 0;
-        }
-      else
-        {
-          // Only F extension present. Reset to NAN-boxed zeros if
-          // flen is 64.
-          for (size_t i = 0; i < regs_.size(); ++i)
-            writeSingle(i, 0);
-        }
-
-      clearLastWrittenReg();
-    }
+    void reset(bool hasHalf, bool hasSingle, bool hasDouble);
 
     /// Clear the number denoting the last written register.
     void clearLastWrittenReg()
@@ -319,51 +409,52 @@ namespace WdRiscv
     void setLastFpFlags(unsigned flags)
     { lastFpFlags_ = flags; }
 
-    /// Set width of floating point register (flen). Internal
-    /// representation always uses 64-bits. If flen is set to 32 then
-    /// nan-boxing is not done. Return true on success and false
-    /// on failure (fail if length is neither 32 or 64).
-    /// Flen should not be set to 32 if D extension is enabled.
     bool setFlen(unsigned length)
     {
       if (length != 32 and length != 64)
         return false;
       flen_ = length;
-      nanBox_ = (flen_ == 64);
+      mask_ = ~uint64_t(0) >> (64 - length);
       return true;
     }
 
   private:
-
-    // Single precision number with a 32-bit padding.
-    struct SpPad
-    {
-      SpPad(float x)  : sp(x), pad(0) { }
-
-      float sp;
-      uint32_t pad;
-    };
 
     // Union of double and single precision numbers used for NAN boxing.
     union FpUnion
     {
       FpUnion(double x)   : dp(x)  { }
       FpUnion(uint64_t x) : i64(x) { }
-      FpUnion(float x)    : sp(x)  { }
+      FpUnion(float x)    : sp(x)  { i64 |= ~uint64_t(0) << 32; }
+      FpUnion(Float16 x)  : hp(x)  { i64 |= ~uint64_t(0) << 16; }
 
-      SpPad sp;
-      double dp;
+      /// Return true if bit pattern corresponds to a nan-boxed single
+      /// precision float.
+      bool isBoxedSingle() const
+      { return (i64 >> 32) == ~uint32_t(0); }
+
+      /// Return true if bit pattern corresponds to a nan-boxed half
+      /// precision (16-bit) float.
+      bool isBoxedHalf() const
+      { return (i64 >> 16) == (~uint64_t(0) >> 16); }
+
+      float    sp;
+      Float16  hp;
+      double   dp;
       uint64_t i64;
     };
 	
   private:
 
     std::vector<double> regs_;
-    int lastWrittenReg_ = -1;    // Register accessed in most recent write.
+    bool hasHalf_ = false;         // True if half (16-bit) precision enabled.
+    bool hasSingle_ = false;       // True if F extension enabled.
+    bool hasDouble_ = false;       // True if D extension enabled.
+    int lastWrittenReg_ = -1;      // Register accessed in most recent write.
     unsigned lastFpFlags_ = 0;
-    double originalValue_ = 0;   // Original value of last written reg.
-    unsigned flen_ = 64;         // Floating point register width.
-    bool nanBox_ = true;
+    double originalValue_ = 0;     // Original value of last written reg.
+    unsigned flen_ = 64;           // Floating point register width.
+    uint64_t mask_ = ~uint64_t(0);
     std::unordered_map<std::string, FpRegNumber> nameToNumber_;
     std::vector<std::string> numberToAbiName_;
     std::vector<std::string> numberToName_;
@@ -374,14 +465,14 @@ namespace WdRiscv
   float
   FpRegs::readSingle(unsigned i) const
   {
-    FpUnion u{regs_.at(i)};
-    if (not nanBox_)
-      return u.sp.sp;
+    assert(flen_ >= 32);
 
-    // Check for proper nan-boxing. If not properly boxed, replace with NaN.
-    if (~u.sp.pad != 0)
-      return std::numeric_limits<float>::quiet_NaN();
-    return u.sp.sp;
+    FpUnion u{regs_.at(i)};
+    if (flen_ == 32 or u.isBoxedSingle())
+      return u.sp;
+
+    // Not properly boxed single, replace with NaN.
+    return std::numeric_limits<float>::quiet_NaN();
   }
 
 
@@ -389,9 +480,37 @@ namespace WdRiscv
   void
   FpRegs::writeSingle(unsigned i, float x)
   {
+    assert(flen_ >= 32);
+    originalValue_ = regs_.at(i);
+
     FpUnion u{x};
-    if (nanBox_)
-      u.sp.pad = ~uint32_t(0);  // Nan box: Bit pattern for negative quiet NAN.
+    regs_.at(i) = u.dp;
+    lastWrittenReg_ = i;
+  }
+
+
+  inline
+  Float16
+  FpRegs::readHalf(unsigned i) const
+  {
+    assert(flen_ >= 16);
+
+    FpUnion u{regs_.at(i)};
+    if (flen_ == 16 or u.isBoxedHalf())
+      return u.hp;
+
+    return Float16::quietNan();
+  }
+
+
+  inline
+  void
+  FpRegs::writeHalf(unsigned i, Float16 x)
+  {
+    assert(flen_ >= 16);
+
+    FpUnion u{x};
     writeDouble(i, u.dp);
   }
+
 }

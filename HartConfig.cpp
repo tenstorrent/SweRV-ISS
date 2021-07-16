@@ -1230,6 +1230,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  tag = "enable_zfh";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableZfh(flag);
+      else
+        errors++;
+    }
+
   tag = "load_queue_size";
   if (config_ -> count(tag))
     {

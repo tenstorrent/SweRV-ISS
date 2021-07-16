@@ -75,6 +75,7 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::ld))      .setLoadSize(8);
   instVec_.at(size_t(InstId::lr_w))    .setLoadSize(4);
   instVec_.at(size_t(InstId::lr_d))    .setLoadSize(8);
+  instVec_.at(size_t(InstId::flh))     .setLoadSize(2);
   instVec_.at(size_t(InstId::flw))     .setLoadSize(4);
   instVec_.at(size_t(InstId::fld))     .setLoadSize(8);
   instVec_.at(size_t(InstId::c_fld))   .setLoadSize(8);
@@ -94,12 +95,12 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::sd))      .setStoreSize(8);
   instVec_.at(size_t(InstId::sc_w))    .setStoreSize(4);
   instVec_.at(size_t(InstId::sc_d))    .setStoreSize(8);
+  instVec_.at(size_t(InstId::fsh))     .setStoreSize(2);
   instVec_.at(size_t(InstId::fsw))     .setStoreSize(4);
   instVec_.at(size_t(InstId::fsd))     .setStoreSize(8);
   instVec_.at(size_t(InstId::c_fsd))   .setStoreSize(8);
   instVec_.at(size_t(InstId::c_sq))    .setStoreSize(16);
   instVec_.at(size_t(InstId::c_sw))    .setStoreSize(4);
-  instVec_.at(size_t(InstId::c_flw))   .setStoreSize(4);
   instVec_.at(size_t(InstId::c_sd))    .setStoreSize(8);
   instVec_.at(size_t(InstId::c_fsdsp)) .setStoreSize(8);
   instVec_.at(size_t(InstId::c_swsp))  .setStoreSize(4);
@@ -1074,6 +1075,199 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "fmv.d.x", InstId::fmv_d_x, 0xf2000053, 0xfff0707f,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      // zfh  (half precision floating point)
+      { "flh", InstId::flh, 0x1007, funct3Low7Mask,
+	InstType::Load,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::Imm, OperandMode::None, immTop12 },
+
+      { "fsh", InstId::fsh, 0x1027, funct3Low7Mask,
+	InstType::Store,
+	OperandType::FpReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::Imm, OperandMode::None, immBeq },
+
+      { "fmadd.h", InstId::fmadd_h, 0x04000043, fmaddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask,
+	OperandType::FpReg, OperandMode::Read, rs3Mask },
+
+      { "fmsub.h", InstId::fmsub_h, 0x04000047, fmaddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask,
+	OperandType::FpReg, OperandMode::Read, rs3Mask },
+
+      { "fnmsub.h", InstId::fnmsub_h, 0x0400004b, fmaddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask,
+	OperandType::FpReg, OperandMode::Read, rs3Mask },
+
+      { "fnmadd.h", InstId::fnmadd_h, 0x0400004f, fmaddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask,
+	OperandType::FpReg, OperandMode::Read, rs3Mask },
+
+      { "fadd.h", InstId::fadd_h, 0x04000053, faddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fsub.h", InstId::fsub_h, 0x0c000053, faddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fmul.h", InstId::fmul_h, 0x14000053, faddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fdiv.h", InstId::fdiv_h, 0x1c000053, faddMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fsqrt.h", InstId::fsqrt_h, 0x5c000053, fsqrtMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "fsgnj.h", InstId::fsgnj_h, 0x24000053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fsgnjn.h", InstId::fsgnjn_h, 0x24001053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fsgnjx.h", InstId::fsgnjx_h, 0x24002053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fmin.h", InstId::fmin_h, 0x2c000053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fmax.h", InstId::fmax_h, 0x2c001053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fcvt.s.h", InstId::fcvt_s_h, 0x40200053, fsqrtMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.d.h", InstId::fcvt_d_h, 0x42200053, fsqrtMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.h.s", InstId::fcvt_h_s, 0x44000053, fsqrtMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.h.d", InstId::fcvt_h_d, 0x44100053, fsqrtMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.w.h", InstId::fcvt_w_h, 0xc4000053, 0xfff1c07f,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.wu.h", InstId::fcvt_wu_h, 0xc4100053, fsqrtMask,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "fmv.x.h", InstId::fmv_x_h, 0xe4000053, 0xfff0707f,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "feq.h", InstId::feq_h, 0xa4002053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "flt.h", InstId::flt_h, 0xa4001053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fle.h", InstId::fle_h, 0xa4000053, top7Funct3Low7Mask,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask,
+	OperandType::FpReg, OperandMode::Read, rs2Mask },
+
+      { "fclass.h", InstId::fclass_h, 0xe4001053, 0xfff0707f,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.h.w", InstId::fcvt_h_w, 0xd4000053, fsqrtMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.h.wu", InstId::fcvt_h_wu, 0xd4100053, fsqrtMask,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fmv.h.x", InstId::fmv_h_x, 0xf4000053, 0xfff0707f,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.l.h", InstId::fcvt_l_h, 0xc4200053, 0xfff0007f,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.lu.h", InstId::fcvt_lu_h, 0xc4300053, 0xfff0007f,
+	InstType::Fp,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.h.l", InstId::fcvt_h_l, 0xd4200053, 0xfff0007f,
+	InstType::Fp,
+	OperandType::FpReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "fcvt.h.lu", InstId::fcvt_h_lu, 0xd4300053, 0xfff0007f,
 	InstType::Fp,
 	OperandType::FpReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
