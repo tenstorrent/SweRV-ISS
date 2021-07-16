@@ -722,7 +722,7 @@ applyZisaStrings(const std::vector<std::string>& zisa, Hart<URV>& hart)
 	  hart.enableRvzbs(true);
 	  std::cerr << "ISA option zbmini is deprecated. Using zbb and zbs.\n";
 	}
-      else if (ext == "zfh")
+      else if (ext == "zfh" or ext == "fh")
 	hart.enableZfh(true);
       else
 	{
