@@ -722,6 +722,8 @@ applyZisaStrings(const std::vector<std::string>& zisa, Hart<URV>& hart)
 	  hart.enableRvzbs(true);
 	  std::cerr << "ISA option zbmini is deprecated. Using zbb and zbs.\n";
 	}
+      else if (ext == "zfh")
+	hart.enableZfh(true);
       else
 	{
 	  std::cerr << "No such Z extension: " << ext << '\n';
@@ -999,6 +1001,26 @@ getElfFilesIsaString(const Args& args, std::string& isaString)
 }
 
 
+/// Return the string representing the current contents of the MISA CSR.
+template<typename URV>
+static
+std::string
+getIsaStringFromCsr(const Hart<URV>& hart)
+{
+  std::string res;
+
+  URV val;
+  if (not hart.peekCsr(CsrNumber::MISA, val))
+    return res;
+
+  URV mask = 1;
+  for (char c = 'a'; c <= 'z'; ++c, mask <<= 1)
+    if (val & mask)
+      res += c;
+
+  return res;
+}
+
 /// Apply command line arguments: Load ELF and HEX files, set
 /// start/end/tohost. Return true on success and false on failure.
 template<typename URV>
@@ -1021,8 +1043,13 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system)
   if (clib and isa.empty() and not args.raw)
     {
       if (args.verbose)
-        std::cerr << "Enabling a/c/m/f/d extensions for newlib/linux\n";
-      isa = "icmafd";
+        std::cerr << "Adding a/c/m/f/d extensions for newlib/linux\n";
+      isa = getIsaStringFromCsr(hart);
+      for (auto c : std::string("icmafd"))
+	if (isa.find(c) == std::string::npos)
+	  isa += c;
+      if (args.verbose)
+	std::cerr << "Final ISA: " << isa << '\n';
     }
 
   if (not isa.empty())
