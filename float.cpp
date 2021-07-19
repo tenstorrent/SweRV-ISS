@@ -52,7 +52,7 @@ template <typename URV>
 void
 Hart<URV>::resetFloat()
 {
-  // Enable FP in MSTATUS.FS if f/d/f16 extension present and linux/newlib.
+  // Enable FP in MSTATUS.FS if f/d/zfh extension present and linux/newlib.
   bool hasFp = isRvf() or isRvd() or isRvzfh();
   if (hasFp and (newlib_ or linux_))
     {

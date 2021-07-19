@@ -1328,7 +1328,7 @@ namespace WdRiscv
     { return isRvf() and isRvzfh() and isFpEnabled(); }
 
     // Return true if it is legal to execute an FP instruction: F extension must
-    // be enabled and FS feild of MSTATUS must not be OFF.
+    // be enabled and FS field of MSTATUS must not be OFF.
     bool isFpLegal() const
     { return isRvf() and isFpEnabled(); }
 
