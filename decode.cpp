@@ -280,6 +280,12 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               if (op2 == 0) return instTable_.getEntry(InstId::vmv_v_v);
             }
           break;
+        case 0x18: return instTable_.getEntry(InstId::vmseq_vv);
+        case 0x19: return instTable_.getEntry(InstId::vmsne_vv);
+        case 0x1a: return instTable_.getEntry(InstId::vmsltu_vv);
+        case 0x1b: return instTable_.getEntry(InstId::vmslt_vv);
+        case 0x1c: return instTable_.getEntry(InstId::vmsleu_vv);
+        case 0x1d: return instTable_.getEntry(InstId::vmsle_vv);
         case 0x20: return instTable_.getEntry(InstId::vsaddu_vv);
         case 0x21: return instTable_.getEntry(InstId::vsadd_vv);
         case 0x22: return instTable_.getEntry(InstId::vssubu_vv);
@@ -402,6 +408,12 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               if (op2 == 0) return instTable_.getEntry(InstId::vmv_v_i);
             }
           break;
+        case 0x18: return instTable_.getEntry(InstId::vmseq_vi);
+        case 0x19: return instTable_.getEntry(InstId::vmsne_vi);
+        case 0x1c: return instTable_.getEntry(InstId::vmsleu_vi);
+        case 0x1d: return instTable_.getEntry(InstId::vmsle_vi);
+        case 0x1e: return instTable_.getEntry(InstId::vmsgtu_vi);
+        case 0x1f: return instTable_.getEntry(InstId::vmsgt_vi);
         case 0x20: return instTable_.getEntry(InstId::vsaddu_vi);
         case 0x21: return instTable_.getEntry(InstId::vsadd_vi);
         case 0x27:
@@ -451,6 +463,14 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               if (op2 == 0) return instTable_.getEntry(InstId::vmv_v_x);
             }
           break;
+        case 0x18: return instTable_.getEntry(InstId::vmseq_vx);
+        case 0x19: return instTable_.getEntry(InstId::vmsne_vx);
+        case 0x1a: return instTable_.getEntry(InstId::vmsltu_vx);
+        case 0x1b: return instTable_.getEntry(InstId::vmslt_vx);
+        case 0x1c: return instTable_.getEntry(InstId::vmsleu_vx);
+        case 0x1d: return instTable_.getEntry(InstId::vmsle_vx);
+        case 0x1e: return instTable_.getEntry(InstId::vmsgtu_vx);
+        case 0x1f: return instTable_.getEntry(InstId::vmsgt_vx);
         case 0x20: return instTable_.getEntry(InstId::vsaddu_vx);
         case 0x21: return instTable_.getEntry(InstId::vsaddu_vx);
         case 0x22: return instTable_.getEntry(InstId::vssubu_vx);
@@ -477,6 +497,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0xa:  return instTable_.getEntry(InstId::vasubu_vx);
         case 0xb:  return instTable_.getEntry(InstId::vasub_vx);
         case 0xe:   return instTable_.getEntry(InstId::vslide1up_vx);
+        case 0xf:   return instTable_.getEntry(InstId::vslide1down_vx);
         case 0x10:  std::swap(op1, op2); // per spec !
                     return instTable_.getEntry(InstId::vmv_s_x);
         case 0x20:  return instTable_.getEntry(InstId::vdivu_vx);

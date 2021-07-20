@@ -5788,6 +5788,28 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vwadd_wx,
      &&vwsub_wv,
      &&vwsub_wx,
+
+     &&vmseq_vv,
+     &&vmseq_vx,
+     &&vmseq_vi,
+     &&vmsne_vv,
+     &&vmsne_vx,
+     &&vmsne_vi,
+     &&vmsltu_vv,
+     &&vmsltu_vx,
+     &&vmslt_vv,
+     &&vmslt_vx,
+     &&vmsleu_vv,
+     &&vmsleu_vx,
+     &&vmsleu_vi,
+     &&vmsle_vv,
+     &&vmsle_vx,
+     &&vmsle_vi,
+     &&vmsgtu_vx,
+     &&vmsgtu_vi,
+     &&vmsgt_vx,
+     &&vmsgt_vi,
+
      &&vminu_vv,
      &&vminu_vx,
      &&vmin_vv,
@@ -5838,6 +5860,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vslide1up_vx,
      &&vslidedown_vx,
      &&vslidedown_vi,
+     &&vslide1down_vx,
      &&vmul_vv,
      &&vmul_vx,
      &&vmulh_vv,
@@ -7436,6 +7459,86 @@ Hart<URV>::execute(const DecodedInst* di)
   execVwsub_wx(di);
   return;
 
+ vmseq_vv:
+  execVmseq_vv(di);
+  return;
+
+ vmseq_vx:
+  execVmseq_vx(di);
+  return;
+
+ vmseq_vi:
+  execVmseq_vi(di);
+  return;
+
+ vmsne_vv:
+  execVmsne_vv(di);
+  return;
+
+ vmsne_vx:
+  execVmsne_vx(di);
+  return;
+
+ vmsne_vi:
+  execVmsne_vi(di);
+  return;
+
+ vmsltu_vv:
+  execVmsltu_vv(di);
+  return;
+
+ vmsltu_vx:
+  execVmsltu_vx(di);
+  return;
+
+ vmslt_vv:
+  execVmslt_vv(di);
+  return;
+
+ vmslt_vx:
+  execVmslt_vx(di);
+  return;
+
+ vmsleu_vv:
+  execVmsleu_vv(di);
+  return;
+
+ vmsleu_vx:
+  execVmsleu_vx(di);
+  return;
+
+ vmsleu_vi:
+  execVmsleu_vi(di);
+  return;
+
+ vmsle_vv:
+  execVmsle_vv(di);
+  return;
+
+ vmsle_vx:
+  execVmsle_vx(di);
+  return;
+
+ vmsle_vi:
+  execVmsle_vi(di);
+  return;
+
+ vmsgtu_vx:
+  execVmsgtu_vx(di);
+  return;
+
+ vmsgtu_vi:
+  execVmsgtu_vi(di);
+  return;
+
+ vmsgt_vx:
+  execVmsgt_vx(di);
+  return;
+
+ vmsgt_vi:
+  execVmsgt_vi(di);
+  return;
+
  vminu_vv:
   execVminu_vv(di);
   return;
@@ -7634,6 +7737,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vslidedown_vi:
   execVslidedown_vi(di);
+  return;
+
+ vslide1down_vx:
+  execVslide1down_vx(di);
   return;
 
  vmul_vv:

@@ -2079,6 +2079,106 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       out << "vwsub.wx v" << di.op0() << ", v" << di.op1() << ", x" << di.op2();
       break;
 
+    case InstId::vmseq_vv:
+      out << "vmseq.vv v" << di.op0() << ", v" << di.op1() << ", v" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmseq_vx:
+      out << "vmseq.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmseq_vi:
+      out << "vmseq.vi v" << di.op0() << ", v" << di.op1() <<  ", " << di.op2As<int32_t>();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsne_vv:
+      out << "vmsne.vv v" << di.op0() << ", v" << di.op1() << ", v" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsne_vx:
+      out << "vmsne.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsne_vi:
+      out << "vmsne.vi v" << di.op0() << ", v" << di.op1() <<  ", " << di.op2As<int32_t>();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsltu_vv:
+      out << "vmsltu.vv v" << di.op0() << ", v" << di.op1() << ", v" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsltu_vx:
+      out << "vmsltu.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmslt_vv:
+      out << "vmslt.vv v" << di.op0() << ", v" << di.op1() << ", v" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmslt_vx:
+      out << "vmslt.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsleu_vv:
+      out << "vmsleu.vv v" << di.op0() << ", v" << di.op1() << ", v" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsleu_vx:
+      out << "vmsleu.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsleu_vi:
+      out << "vmsleu.vi v" << di.op0() << ", v" << di.op1() << ", " << di.op2As<int32_t>();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsle_vv:
+      out << "vmsle.vv v" << di.op0() << ", v" << di.op1() << ", v" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsle_vx:
+      out << "vmsle.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsle_vi:
+      out << "vmsle.vi v" << di.op0() << ", v" << di.op1() << ", " << di.op2As<int32_t>();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsgtu_vx:
+      out << "vmsgtu.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsgtu_vi:
+      out << "vmsgtu.vi v" << di.op0() << ", v" << di.op1() << ", " << di.op2As<int32_t>();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsgt_vx:
+      out << "vmsgt.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op3();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
+    case InstId::vmsgt_vi:
+      out << "vmsgt.vi v" << di.op0() << ", v" << di.op1() << ", " << di.op2As<int32_t>();
+      if (di.isMasked()) out << ", v0.t";
+      break;
+
     case InstId::vminu_vv:
       out << "vminu.vv v" << di.op0() << ", v" << di.op1() << ", v" << di.op2();
       if (di.isMasked()) out << ", v0.t";
@@ -2305,6 +2405,10 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::vslidedown_vi:
       out << "vslidedown.vi v" << di.op0() << ", v" << di.op1() << ", " << di.op2();
+      break;
+
+    case InstId::vslide1down_vx:
+      out << "vslide1down.vx v" << di.op0() << ", v" << di.op1() << ", x" << di.op2();
       break;
 
     case InstId::vmul_vv:
