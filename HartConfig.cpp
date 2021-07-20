@@ -1395,16 +1395,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 
 template<typename URV>
 bool
-HartConfig::configHarts(System<URV>& system, const std::string& isaString,
+HartConfig::configHarts(System<URV>& system, bool userMode,
                         bool verbose) const
 {
-  bool user = this->userModeEnabled();
-
-  user = user or (isaString.find("uU") != std::string::npos);
+  userMode = userMode or this->userModeEnabled();
 
   // Apply JSON configuration.
   for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyConfig(*system.ithHart(i), user, verbose))
+    if (not applyConfig(*system.ithHart(i), userMode, verbose))
       return false;
 
   return finalizeCsrConfig(system);
@@ -2071,12 +2069,10 @@ template bool
 HartConfig::applyConfig<uint64_t>(Hart<uint64_t>&, bool, bool) const;
 
 template bool
-HartConfig::configHarts<uint32_t>(System<uint32_t>&, const std::string&,
-                                  bool) const;
+HartConfig::configHarts<uint32_t>(System<uint32_t>&, bool, bool) const;
 
 template bool
-HartConfig::configHarts<uint64_t>(System<uint64_t>&, const std::string&,
-                                  bool) const;
+HartConfig::configHarts<uint64_t>(System<uint64_t>&, bool, bool) const;
 
 template bool
 HartConfig::configMemory(System<uint32_t>&, bool, bool, bool) const;

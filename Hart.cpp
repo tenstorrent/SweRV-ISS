@@ -328,7 +328,7 @@ Hart<URV>::processExtensions()
         rvv_ = true;
 
       for (auto ec : { 'b', 'g', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
-	    'q', 'r', 't', 'v', 'w', 'x', 'y', 'z' } )
+	    'q', 'r', 't', 'w', 'x', 'y', 'z' } )
 	{
 	  unsigned bit = ec - 'a';
 	  if (value & (URV(1) << bit))
