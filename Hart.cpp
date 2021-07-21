@@ -3358,26 +3358,46 @@ template <typename URV>
 void
 formatFpInstTrace(FILE* out, uint64_t tag, unsigned hartId, URV currPc,
 		  const char* opcode, unsigned fpReg,
-		  uint64_t fpVal, const char* assembly);
+		  uint64_t fpVal, unsigned width, const char* assembly);
 
 template <>
 void
-formatFpInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId, uint32_t currPc,
-		  const char* opcode, unsigned fpReg,
-		  uint64_t fpVal, const char* assembly)
+formatFpInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId,
+			    uint32_t currPc, const char* opcode, unsigned fpReg,
+			    uint64_t fpVal, unsigned width,
+			    const char* assembly)
 {
-  fprintf(out, "#%" PRId64 " %d %08x %8s f %02x %016" PRIx64 "  %s",
-          tag, hartId, currPc, opcode, fpReg, fpVal, assembly);
+  if (width == 64)
+    {
+      fprintf(out, "#%" PRId64 " %d %08x %8s f %02x %016" PRIx64 "  %s",
+	      tag, hartId, currPc, opcode, fpReg, fpVal, assembly);
+    }
+  else
+    {
+      uint32_t val32 = fpVal;
+      fprintf(out, "#%" PRId64 " %d %08x %8s f %02x         %08" PRIx32 "  %s",
+	      tag, hartId, currPc, opcode, fpReg, val32, assembly);
+    }
 }
 
 template <>
 void
-formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId, uint64_t currPc,
-		  const char* opcode, unsigned fpReg,
-		  uint64_t fpVal, const char* assembly)
+formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
+			    uint64_t currPc, const char* opcode, unsigned fpReg,
+			    uint64_t fpVal, unsigned width,
+			    const char* assembly)
 {
-  fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s f %016" PRIx64 " %016" PRIx64 "  %s",
+  if (width == 64)
+    {
+      fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s f %016" PRIx64 " %016" PRIx64 "  %s",
           tag, hartId, currPc, opcode, uint64_t(fpReg), fpVal, assembly);
+    }
+  else
+    {
+      uint32_t val32 = fpVal;
+      fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s f %016" PRIx64 "         %08" PRIx32 "  %s",
+          tag, hartId, currPc, opcode, uint64_t(fpReg), val32, assembly);
+    }
 }
 
 
@@ -3441,8 +3461,9 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     {
       uint64_t val = fpRegs_.readBitsRaw(fpReg);
       if (pending) fprintf(out, "  +\n");
+      unsigned width = isRvd() ? 64 : 32;
       formatFpInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff, fpReg,
-			     val, tmp.c_str());
+			     val, width, tmp.c_str());
       pending = true;
     }
 
