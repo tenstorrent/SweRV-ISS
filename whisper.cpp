@@ -1156,7 +1156,8 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
     hart.setInstructionCountLimit(*args.instCountLim);
 
   // Print load-instruction data-address when tracing instructions.
-  hart.setTraceLoadStore(args.traceLdSt);
+  if (args.traceLdSt)
+    hart.setTraceLoadStore(args.traceLdSt);
 
   // Setup periodic external interrupts.
   if (args.alarmInterval)
@@ -1172,7 +1173,8 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
   if (args.gdbTcpPort.size()>hart.sysHartIndex())
     hart.setGdbTcpPort(args.gdbTcpPort[hart.sysHartIndex()]);
   hart.enablePerformanceCounters(args.counters);
-  hart.enableAbiNames(args.abiNames);
+  if (args.abiNames)
+    hart.enableAbiNames(args.abiNames);
 
   if (args.fastExt)
     hart.enableFastInterrupts(args.fastExt);

@@ -988,6 +988,17 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  // Print memory address of load/store instruction in trace log.
+  tag = "print_load_store_address";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.setTraceLoadStore(flag);
+      else
+        errors++;
+    }
+
   // Atomic instructions illegal outside of DCCM.
   tag = "amo_illegal_outside_dccm";
   if (config_ -> count(tag))
