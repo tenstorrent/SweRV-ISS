@@ -15,6 +15,9 @@
     "Comment" : "Use ABI register names in log file (e.g. sp instead of x2).",
     "abi_names" : "true",
     
+    "Comment" : "Print memory addres of ld/st instructions in trace log.",
+    "print_load_store_address" : "true",
+
     "csr" : {
 	"misa" : {
 	    "reset-comment" : "imfdv",
@@ -23,7 +26,8 @@
 	    "mask" : 0
 	},
 	"mstatus" : {
-	    "reset" : "0xffffffff"
+	    "reset" : "0xffffffff",
+	    "mask" : "0xffffffff"
 	}
     },
 
