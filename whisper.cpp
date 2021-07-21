@@ -1540,6 +1540,27 @@ snapshotRun(System<URV>& system, FILE* traceFile,
 
 static
 bool
+extractOptVersion(const std::string& isa, size_t& i, std::string& opt)
+{
+  while (i+1 < isa.size() and std::isdigit(isa.at(i+1)))
+    opt.push_back(isa.at(++i));
+  if (std::isdigit(opt.back()))
+    {
+      if (i+1 < isa.size() and isa.at(i+1) == 'p')
+	{
+	  opt.push_back(isa.at(++i));
+	  while (i+1 < isa.size() and std::isdigit(isa.at(i+1)))
+	    opt.push_back(isa.at(++i));
+	  if (opt.back() == 'p')
+	    return false;
+	}
+    }
+  return true;
+}
+
+
+static
+bool
 determineIsa(const Args& args, StringVec& isaVec)
 {
   isaVec.clear();
@@ -1565,59 +1586,52 @@ determineIsa(const Args& args, StringVec& isaVec)
       return false;
     }
 
-  if (isa.find('_') == std::string::npos)
+  bool hasZ = false, good = true;
+  
+  for (size_t i = 0; i < isa.size() and good; ++i)
     {
-      // No underscore: each character in string represents an extension.
-      for (auto& c : isa)
+      char c = isa.at(i);
+      if (c == '_')  { good = i > 0; continue; }
+      if (c == 'z')
 	{
-	  if (c != 'z')
-	    isaVec.push_back(std::string(1, c));
+	  if (i == 0)
+	    good = false;
+	  else if (hasZ and i > 0 and isa.at(i-1) != '_')
+	    good = false;
+	  else if (i+3 > isa.size())
+	    good = false;
+	  else if (std::isdigit(i+1) or std::isdigit(i+2))
+	    good = false;
 	  else
 	    {
-	      std::cerr << "Invalid ISA: " << isa << '\n';
-	      return false;
+	      hasZ = true;
+	      std::string opt = isa.substr(i, 3);
+	      i += 2;
+	      good = extractOptVersion(isa, i, opt);
+	      if (good)
+		isaVec.push_back(opt);
 	    }
 	}
-      return true;
-    }
-
-  // Split isa string around underscore.
-  std::vector<std::string> extensions;
-  boost::split(extensions, isa, boost::is_any_of("_"));
-
-  for (const auto& ext : extensions)
-    {
-      if (ext.empty())
-	continue;
-
-      // If extension has a digit, it has to be of the form <e><n1>p<n2>. For example:
-      // i2p0.  I extension has no digit then it has to be a single char unless it begins
-      // with 'z' in which case it must have 3 characters.
-      auto pos = ext.find_first_of("0123456789");
-      if (pos == std::string::npos)
+      else if (c >= 'a' and c < 'z')
 	{
-	  if (ext.at(0) == 'z')
+	  if (hasZ)
+	    good = false;
+	  else
 	    {
-	      if (ext.size() != 3)
-		{
-		  std::cerr << "Invalid ISA: " << isa << '\n';
-		  return false;
-		}
+	      std::string opt = isa.substr(i, 1);
+	      good = extractOptVersion(isa, i, opt);
+	      if (good)
+		isaVec.push_back(opt);
 	    }
-	  else if (ext.size() > 1)
-	    {
-	      std::cerr << "Invalid ISA: " << isa << '\n';
-	      return false;
-	    }
-	  isaVec.push_back(ext);
 	}
       else
-	{
-	  isaVec.push_back(ext);
-	}
+	good = false;
     }
 
-  return true;
+  if (not good)
+    std::cerr << "Invalid ISA: " << isa << '\n';
+
+  return good;
 }
 
 
