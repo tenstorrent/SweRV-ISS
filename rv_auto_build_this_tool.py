@@ -18,7 +18,7 @@ if __name__ == "__main__":
     if os.path.exists(WHISPER_QUAL_FILE):
         os.remove(WHISPER_QUAL_FILE)
     print("\nWARNING: Compile (whisper) may take more than 2+ mins, please do NOT Ctrl-C or kill this!\n" * 10)
-    os.system('make BOOST_DIR=/usr/local')
+    os.system('make BOOST_DIR=/usr/local SOFT_FOLAT=1')
     expected_exe = os.path.join(build_dir, 'whisper')
     final_exe = os.path.join(release_dir, 'whisper')
     logging.info("Attempt to move executable (%s) to (%s) as (%s)" % (expected_exe, release_dir, final_exe))
