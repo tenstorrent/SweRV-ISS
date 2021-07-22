@@ -477,6 +477,16 @@ namespace WdRiscv
      vxor_vx,
      vxor_vi,
 
+     vsll_vv,
+     vsll_vx,
+     vsll_vi,
+     vsrl_vv,
+     vsrl_vx,
+     vsrl_vi,
+     vsra_vv,
+     vsra_vx,
+     vsra_vi,
+
      vrgather_vv,
      vrgather_vx,
      vrgather_vi,

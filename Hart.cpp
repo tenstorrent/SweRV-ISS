@@ -3313,6 +3313,43 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
 
 template <typename URV>
 void
+formatVecInstTrace(FILE* out, uint64_t tag, unsigned hartId, URV currPc,
+		   const char* opcode, unsigned vecReg, const uint8_t* data,
+		   unsigned byteCount, const char* assembly);
+
+
+template <>
+void
+formatVecInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId,
+			     uint32_t currPc, const char* opcode,
+			     unsigned vecReg, const uint8_t* data,
+			     unsigned byteCount, const char* assembly)
+{
+  fprintf(out, "#%" PRId64 " %d %08x %8s v %02x ",
+	  tag, hartId, currPc, opcode, vecReg);
+  for (unsigned i = 0; i < byteCount; ++i)
+    fprintf(out, "%02x", data[byteCount - 1 - i]);
+  fprintf(out, " %s", assembly);
+}
+
+
+template <>
+void
+formatVecInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
+			     uint64_t currPc, const char* opcode,
+			     unsigned vecReg, const uint8_t* data,
+			     unsigned byteCount, const char* assembly)
+{
+  fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s v %02x ",
+          tag, hartId, currPc, opcode, vecReg);
+  for (unsigned i = 0; i < byteCount; ++i)
+    fprintf(out, "%02x", data[byteCount - 1 - i]);
+  fprintf(out, " %s", assembly);
+}
+
+
+template <typename URV>
+void
 formatInstTrace(FILE* out, uint64_t tag, unsigned hartId, URV currPc,
 		const char* opcode, char resource, URV addr,
 		URV value, const char* assembly);
@@ -3323,7 +3360,7 @@ formatInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId, uint32_t cur
 		const char* opcode, char resource, uint32_t addr,
 		uint32_t value, const char* assembly)
 {
-  if (resource == 'r' or resource == 'v')
+  if (resource == 'r')
     {
       fprintf(out, "#%" PRId64 " %d %08x %8s r %02x         %08x  %s",
               tag, hartId, currPc, opcode, addr, value, assembly);
@@ -3344,6 +3381,7 @@ formatInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId, uint32_t cur
     }
 }
 
+
 template <>
 void
 formatInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId, uint64_t currPc,
@@ -3353,6 +3391,7 @@ formatInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId, uint64_t cur
   fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s %c %016" PRIx64 " %016" PRIx64 "  %s",
           tag, hartId, currPc, opcode, resource, addr, value, assembly);
 }
+
 
 template <typename URV>
 void
@@ -3472,11 +3511,9 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   int vecReg = vecRegs_.getLastWrittenReg(elemIx, elemWidth);
   if (vecReg >= 0)
     {
-      if (pending)
-        fprintf(out, " +\n");
-      uint32_t checksum = vecRegs_.checksum(vecReg, 0, elemIx, elemWidth);
-      formatInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff, 'v',
-			   vecReg, checksum, tmp.c_str());
+      formatVecInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff,
+			      vecReg, vecRegs_.getVecData(vecReg),
+			      vecRegs_.bytesPerRegister(), tmp.c_str());
       pending = true;
     }
 
@@ -5848,6 +5885,15 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vxor_vv,
      &&vxor_vx,
      &&vxor_vi,
+     &&vsll_vv,
+     &&vsll_vx,
+     &&vsll_vi,
+     &&vsrl_vv,
+     &&vsrl_vx,
+     &&vsrl_vi,
+     &&vsra_vv,
+     &&vsra_vx,
+     &&vsra_vi,
      &&vrgather_vv,
      &&vrgather_vx,
      &&vrgather_vi,
@@ -7626,6 +7672,42 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vxor_vi:
   execVxor_vi(di);
+  return;
+
+ vsll_vv:
+  execVsll_vv(di);
+  return;
+
+ vsll_vx:
+  execVsll_vx(di);
+  return;
+
+ vsll_vi:
+  execVsll_vi(di);
+  return;
+
+ vsrl_vv:
+  execVsrl_vv(di);
+  return;
+
+ vsrl_vx:
+  execVsrl_vx(di);
+  return;
+
+ vsrl_vi:
+  execVsrl_vi(di);
+  return;
+
+ vsra_vv:
+  execVsra_vv(di);
+  return;
+
+ vsra_vx:
+  execVsra_vx(di);
+  return;
+
+ vsra_vi:
+  execVsra_vi(di);
   return;
 
  vrgather_vv:

@@ -382,7 +382,7 @@ namespace WdRiscv
     /// Set the ith bit of the given mask regiser to the given value.
     /// Return true on success and false on failure (register or
     /// element index out of bound.
-    bool setMaskRegister(uint32_t maskReg, uint32_t i, bool value)
+    bool writeMaskRegister(uint32_t maskReg, uint32_t i, bool value)
     {
       if (maskReg >= regCount_)
         return false;
@@ -398,6 +398,7 @@ namespace WdRiscv
         data[byteIx] |= mask;
       else
         data[byteIx] &= ~mask;
+      lastWrittenReg_ = maskReg;
       return true;
     }
 

@@ -2402,6 +2402,31 @@ namespace WdRiscv
 
 
     template<typename ELEM_TYPE>
+    void vsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVsll_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vsll_vx(unsigned vd, unsigned vs1, URV e2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVsll_vx(const DecodedInst*);
+    void execVsll_vi(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vsr_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		unsigned start, unsigned elems, bool masked);
+    void execVsrl_vv(const DecodedInst*);
+    void execVsra_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vsr_vx(unsigned vd, unsigned vs1, URV e2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVsrl_vx(const DecodedInst*);
+    void execVsrl_vi(const DecodedInst*);
+    void execVsra_vx(const DecodedInst*);
+    void execVsra_vi(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
     void vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems);
     void execVrgather_vv(const DecodedInst*);
