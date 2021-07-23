@@ -2309,6 +2309,30 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printVec_vi(*this, out, "vsra.vi", di);
       break;
 
+    case InstId::vnsrl_wv:
+      printVec_vv(*this, out, "vnsrl.wv", di);
+      break;
+
+    case InstId::vnsrl_wx:
+      printVec_vx(*this, out, "vnsrl.wx", di);
+      break;
+
+    case InstId::vnsrl_wi:
+      printVec_vi(*this, out, "vnsrl.wi", di);
+      break;
+
+    case InstId::vnsra_wv:
+      printVec_vv(*this, out, "vnsra.wv", di);
+      break;
+
+    case InstId::vnsra_wx:
+      printVec_vx(*this, out, "vnsra.wx", di);
+      break;
+
+    case InstId::vnsra_wi:
+      printVec_vi(*this, out, "vnsra.wi", di);
+      break;
+
     case InstId::vrgather_vv:
       printVec_vv(*this, out, "vrgather.vv", di);
       break;
@@ -2482,6 +2506,38 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::vmulhsu_vx:
       printVec_vx(*this, out, "vmulhsu.vx", di);
+      break;
+
+    case InstId::vmadd_vv:
+      printVec_vv(*this, out, "vmadd.vv", di);
+      break;
+
+    case InstId::vmadd_vx:
+      printVec_vx(*this, out, "vmadd.vx", di);
+      break;
+
+    case InstId::vnmsub_vv:
+      printVec_vv(*this, out, "vnmsub.vv", di);
+      break;
+
+    case InstId::vnmsub_vx:
+      printVec_vx(*this, out, "vnmsub.vx", di);
+      break;
+
+    case InstId::vmacc_vv:
+      printVec_vv(*this, out, "vmacc.vv", di);
+      break;
+
+    case InstId::vmacc_vx:
+      printVec_vx(*this, out, "vmacc.vx", di);
+      break;
+
+    case InstId::vnmsac_vv:
+      printVec_vv(*this, out, "vnmsac.vv", di);
+      break;
+
+    case InstId::vnmsac_vx:
+      printVec_vx(*this, out, "vnmsac.vx", di);
       break;
 
     case InstId::vwmulu_vv:

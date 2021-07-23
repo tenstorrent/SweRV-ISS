@@ -487,6 +487,13 @@ namespace WdRiscv
      vsra_vx,
      vsra_vi,
 
+     vnsrl_wv,
+     vnsrl_wx,
+     vnsrl_wi,
+     vnsra_wv,
+     vnsra_wx,
+     vnsra_wi,
+
      vrgather_vv,
      vrgather_vx,
      vrgather_vi,
@@ -534,6 +541,15 @@ namespace WdRiscv
      vmulhu_vx,
      vmulhsu_vv,
      vmulhsu_vx,
+
+     vmadd_vv,
+     vmadd_vx,
+     vnmsub_vv,
+     vnmsub_vx,
+     vmacc_vv,
+     vmacc_vx,
+     vnmsac_vv,
+     vnmsac_vx,
 
      vwmulu_vv,
      vwmulu_vx,

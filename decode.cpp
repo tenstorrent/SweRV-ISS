@@ -296,6 +296,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x29: return instTable_.getEntry(InstId::vsra_vv);
         case 0x2a: return instTable_.getEntry(InstId::vssrl_vv);
         case 0x2b: return instTable_.getEntry(InstId::vssra_vv);
+        case 0x2c: return instTable_.getEntry(InstId::vnsrl_wv);
+        case 0x2d: return instTable_.getEntry(InstId::vnsra_wv);
         case 0x2e: return instTable_.getEntry(InstId::vnclipu_wv);
         case 0x2f: return instTable_.getEntry(InstId::vnclip_wv);
         }
@@ -359,6 +361,18 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x25: return instTable_.getEntry(InstId::vmul_vv);
         case 0x26: return instTable_.getEntry(InstId::vmulhsu_vv);
         case 0x27: return instTable_.getEntry(InstId::vmulh_vv);
+        case 0x29:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vmadd_vv);
+        case 0x2b:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vnmsub_vv);
+	case 0x2d:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vmacc_vv);
+	case 0x2f:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vnmsac_vv);
         case 0x30: return instTable_.getEntry(InstId::vwaddu_vv);
         case 0x31: return instTable_.getEntry(InstId::vwadd_vv);
         case 0x32: return instTable_.getEntry(InstId::vwsubu_vv);
@@ -430,6 +444,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x29: return instTable_.getEntry(InstId::vsra_vi);
         case 0x2a: return instTable_.getEntry(InstId::vssrl_vi);
         case 0x2b: return instTable_.getEntry(InstId::vssra_vi);
+	case 0x2c: return instTable_.getEntry(InstId::vnsrl_wi);
+	case 0x2d: return instTable_.getEntry(InstId::vnsra_wi);
         case 0x2e: return instTable_.getEntry(InstId::vnclipu_wi);
         case 0x2f: return instTable_.getEntry(InstId::vnclip_wi);
         }
@@ -487,6 +503,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x29: return instTable_.getEntry(InstId::vsra_vx);
         case 0x2a: return instTable_.getEntry(InstId::vssrl_vx);
         case 0x2b: return instTable_.getEntry(InstId::vssra_vx);
+        case 0x2c: return instTable_.getEntry(InstId::vnsrl_wx);
+        case 0x2d: return instTable_.getEntry(InstId::vnsra_wx);
         case 0x2e: return instTable_.getEntry(InstId::vnclipu_wx);
         case 0x2f: return instTable_.getEntry(InstId::vnclip_wx);
         }
@@ -517,6 +535,18 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x25:  return instTable_.getEntry(InstId::vmul_vx);
         case 0x26:  return instTable_.getEntry(InstId::vmulhsu_vx);
         case 0x27:  return instTable_.getEntry(InstId::vmulh_vx);
+	case 0x29:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vmadd_vx);
+	case 0x2b:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vnmsub_vx);
+	case 0x2d:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vmacc_vx);
+	case 0x2f:
+          std::swap(op1, op2);  // per spec
+	  return instTable_.getEntry(InstId::vnmsac_vx);
         case 0x30:  return instTable_.getEntry(InstId::vwaddu_vx);
         case 0x31:  return instTable_.getEntry(InstId::vwadd_vx);
         case 0x32:  return instTable_.getEntry(InstId::vwsubu_vx);

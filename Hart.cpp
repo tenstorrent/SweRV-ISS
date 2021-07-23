@@ -5894,6 +5894,12 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsra_vv,
      &&vsra_vx,
      &&vsra_vi,
+     &&vnsrl_wv,
+     &&vnsrl_wx,
+     &&vnsrl_wi,
+     &&vnsra_wv,
+     &&vnsra_wx,
+     &&vnsra_wi,
      &&vrgather_vv,
      &&vrgather_vx,
      &&vrgather_vi,
@@ -5936,6 +5942,14 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vmulhu_vx,
      &&vmulhsu_vv,
      &&vmulhsu_vx,
+     &&vmadd_vv,
+     &&vmadd_vx,
+     &&vnmsub_vv,
+     &&vnmsub_vx,
+     &&vmacc_vv,
+     &&vmacc_vx,
+     &&vnmsac_vv,
+     &&vnmsac_vx,
      &&vwmulu_vv,
      &&vwmulu_vx,
      &&vwmul_vv,
@@ -7710,6 +7724,30 @@ Hart<URV>::execute(const DecodedInst* di)
   execVsra_vi(di);
   return;
 
+ vnsrl_wv:
+  execVnsrl_wv(di);
+  return;
+
+ vnsrl_wx:
+  execVnsrl_wx(di);
+  return;
+
+ vnsrl_wi:
+  execVnsrl_wi(di);
+  return;
+
+ vnsra_wv:
+  execVnsra_wv(di);
+  return;
+
+ vnsra_wx:
+  execVnsra_wx(di);
+  return;
+
+ vnsra_wi:
+  execVnsra_wi(di);
+  return;
+
  vrgather_vv:
   execVrgather_vv(di);
   return;
@@ -7876,6 +7914,38 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vmulhsu_vx:
   execVmulhsu_vx(di);
+  return;
+
+ vmadd_vv:
+  execVmadd_vv(di);
+  return;
+
+ vmadd_vx:
+  execVmadd_vx(di);
+  return;
+
+ vnmsub_vv:
+  execVnmsub_vv(di);
+  return;
+
+ vnmsub_vx:
+  execVnmsub_vx(di);
+  return;
+
+ vmacc_vv:
+  execVmacc_vv(di);
+  return;
+
+ vmacc_vx:
+  execVmacc_vx(di);
+  return;
+
+ vnmsac_vv:
+  execVnmsac_vv(di);
+  return;
+
+ vnmsac_vx:
+  execVnmsac_vx(di);
   return;
 
  vwmulu_vv:

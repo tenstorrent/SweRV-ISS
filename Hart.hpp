@@ -2427,6 +2427,20 @@ namespace WdRiscv
     void execVsra_vi(const DecodedInst*);
 
     template<typename ELEM_TYPE>
+    void vnsr_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		unsigned start, unsigned elems, bool masked);
+    void execVnsrl_wv(const DecodedInst*);
+    void execVnsra_wv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vnsr_wx(unsigned vd, unsigned vs1, URV e2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVnsrl_wx(const DecodedInst*);
+    void execVnsrl_wi(const DecodedInst*);
+    void execVnsra_wx(const DecodedInst*);
+    void execVnsra_wi(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
     void vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems);
     void execVrgather_vv(const DecodedInst*);
@@ -2557,6 +2571,46 @@ namespace WdRiscv
     void vmulhsu_vx(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked);
     void execVmulhsu_vx(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVmadd_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmadd_vx(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVmadd_vx(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVnmsub_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vnmsub_vx(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVnmsub_vx(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVmacc_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmacc_vx(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVmacc_vx(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVnmsac_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vnmsac_vx(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked);
+    void execVnmsac_vx(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vwmulu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
