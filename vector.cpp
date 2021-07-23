@@ -534,10 +534,10 @@ Hart<URV>::execVadd_vv(const DecodedInst* di)
     case EW::Half:   vadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vadd_vv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vadd_vv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vadd_vv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vadd_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -595,10 +595,10 @@ Hart<URV>::execVadd_vx(const DecodedInst* di)
     case EW::Half:   vadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vadd_vx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vadd_vx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vadd_vx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: vadd_vx<Int1024>(vd, vs1, Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -624,10 +624,10 @@ Hart<URV>::execVadd_vi(const DecodedInst* di)
     case EW::Half:   vadd_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vadd_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vadd_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  vadd_vx<Int128> (vd, vs1, Int128(imm),  group, start, elems, masked); break;
-    case EW::Word8:  vadd_vx<Int256> (vd, vs1, Int256(imm),  group, start, elems, masked); break;
-    case EW::Word16: vadd_vx<Int512> (vd, vs1, Int512(imm),  group, start, elems, masked); break;
-    case EW::Word32: vadd_vx<Int1024>(vd, vs1, Int1024(imm), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -684,10 +684,10 @@ Hart<URV>::execVsub_vv(const DecodedInst* di)
     case EW::Half: vsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vsub_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vsub_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vsub_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vsub_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -743,10 +743,10 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
     case EW::Half: vsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vsub_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vsub_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vsub_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vsub_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -802,10 +802,10 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
     case EW::Half: vrsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vrsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vrsub_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vrsub_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vrsub_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vrsub_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -863,10 +863,10 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
     case EW::Half: vrsub_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vrsub_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vrsub_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4: vrsub_vi<Int128>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word8: vrsub_vi<Int256>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word16: vrsub_vi<Int512>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word32: vrsub_vi<Int1024>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -930,9 +930,9 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
     case EW::Half: vwadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwadd_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwadd_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwadd_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -965,9 +965,9 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
     case EW::Half: vwadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwadd_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwadd_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwadd_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1037,9 +1037,9 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwadd_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4: vwadd_vx<Uint128>(vd, vs1, Uint128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwadd_vx<Uint256>(vd, vs1, Uint256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwadd_vx<Uint512>(vd, vs1, Uint512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1074,9 +1074,9 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4: vwadd_vx<Int128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwadd_vx<Int256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwadd_vx<Int512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1111,9 +1111,9 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<uint16_t>(vd, vs1, -uint16_t(e2), group, start, elems, masked); break;
     case EW::Word: vwadd_vx<uint32_t>(vd, vs1, -uint32_t(e2), group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<uint64_t>(vd, vs1, -uint64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwadd_vx<Uint128>(vd, vs1, -Uint128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwadd_vx<Uint256>(vd, vs1, Uint256(0)-Uint256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwadd_vx<Uint512>(vd, vs1, Uint512(0)-Uint512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1148,9 +1148,9 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<int16_t>(vd, vs1, -e2, group, start, elems, masked); break;
     case EW::Word: vwadd_vx<int32_t>(vd, vs1, -e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<int64_t>(vd, vs1, -e2, group, start, elems, masked); break;
-    case EW::Word4: vwadd_vx<Int128>(vd, vs1, -Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwadd_vx<Int256>(vd, vs1, -Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwadd_vx<Int512>(vd, vs1, -Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1215,9 +1215,9 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
     case EW::Half: vwsub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwsub_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwsub_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwsub_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1250,9 +1250,9 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
     case EW::Half: vwsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwsub_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwsub_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwsub_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1320,9 +1320,9 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
     case EW::Half: vwadd_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwadd_wv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwadd_wv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwadd_wv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1355,9 +1355,9 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
     case EW::Half: vwadd_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwadd_wv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwadd_wv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwadd_wv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1392,9 +1392,9 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
     case EW::Half: vadd_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vadd_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vadd_vx<Uint128>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4: vadd_vx<Uint256>(vd, vs1, Uint256(e2), group, start, elems, masked); break;
-    case EW::Word8: vadd_vx<Uint512>(vd, vs1, Uint512(e2), group, start, elems, masked); break;
-    case EW::Word16: vadd_vx<Uint1024>(vd, vs1, Uint1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1429,9 +1429,9 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
     case EW::Half: vadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vadd_vx<Int128>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4: vadd_vx<Int256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word8: vadd_vx<Int512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
-    case EW::Word16: vadd_vx<Int1024>(vd, vs1, Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1466,9 +1466,9 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
     case EW::Half: vadd_vx<uint32_t>(vd, vs1, -e2, group, start, elems, masked); break;
     case EW::Word: vadd_vx<uint64_t>(vd, vs1, -e2, group, start, elems, masked); break;
     case EW::Word2: vadd_vx<Uint128>(vd, vs1, -e2, group, start, elems, masked); break;
-    case EW::Word4: vadd_vx<Uint256>(vd, vs1, Uint256(0)-Uint256(e2), group, start, elems, masked); break;
-    case EW::Word8: vadd_vx<Uint512>(vd, vs1, Uint512(0)-Uint512(e2), group, start, elems, masked); break;
-    case EW::Word16: vadd_vx<Uint1024>(vd, vs1, Uint1024(0)-Uint1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1503,9 +1503,9 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
     case EW::Half: vadd_vx<int32_t>(vd, vs1, -e2, group, start, elems, masked); break;
     case EW::Word: vadd_vx<int64_t>(vd, vs1, -e2, group, start, elems, masked); break;
     case EW::Word2: vadd_vx<Int128>(vd, vs1, -e2, group, start, elems, masked); break;
-    case EW::Word4: vadd_vx<Int256>(vd, vs1, -Int256(e2), group, start, elems, masked); break;
-    case EW::Word8: vadd_vx<Int512>(vd, vs1, -Int512(e2), group, start, elems, masked); break;
-    case EW::Word16: vadd_vx<Int1024>(vd, vs1, -Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1570,9 +1570,9 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
     case EW::Half: vwsub_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwsub_wv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwsub_wv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwsub_wv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -1605,9 +1605,9 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
     case EW::Half: vwsub_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwsub_wv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwsub_wv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwsub_wv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -2514,14 +2514,14 @@ Hart<URV>::execVminu_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vminu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vminu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vminu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vminu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vminu_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vminu_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vminu_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vminu_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:   vminu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:   vminu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vminu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vminu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2578,14 +2578,14 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vminu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vminu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vminu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vminu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vminu_vx<Uint128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vminu_vx<Uint256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vminu_vx<Uint512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vminu_vx<Uint1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:   vminu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:   vminu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:   vminu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2:  vminu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2635,14 +2635,14 @@ Hart<URV>::execVmin_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmin_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmin_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmin_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vmin_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vmin_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vmin_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vmin_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vmin_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:   vmin_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:   vmin_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vmin_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vmin_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2695,14 +2695,14 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmin_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmin_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmin_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vmin_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vmin_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vmin_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vmin_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vmin_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:   vmin_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:   vmin_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:   vmin_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2:  vmin_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2752,14 +2752,14 @@ Hart<URV>::execVmaxu_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmaxu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmaxu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmaxu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vmaxu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vmaxu_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vmaxu_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vmaxu_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vmaxu_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:   vmaxu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:   vmaxu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vmaxu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vmaxu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2816,14 +2816,14 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmaxu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmaxu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmaxu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vmaxu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vmaxu_vx<Uint128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vmaxu_vx<Uint256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vmaxu_vx<Uint512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vmaxu_vx<Uint1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:   vmaxu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:   vmaxu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:   vmaxu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2:  vmaxu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2873,14 +2873,14 @@ Hart<URV>::execVmax_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmax_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmax_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmax_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vmax_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vmax_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vmax_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vmax_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vmax_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:   vmax_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:   vmax_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vmax_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vmax_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2933,14 +2933,14 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmax_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmax_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmax_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vmax_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vmax_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vmax_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vmax_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vmax_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:   vmax_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:   vmax_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:   vmax_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2:  vmax_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -2990,14 +2990,14 @@ Hart<URV>::execVand_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vand_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vand_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vand_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vand_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vand_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vand_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vand_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vand_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:   vand_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:   vand_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vand_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vand_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3052,14 +3052,14 @@ Hart<URV>::execVand_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vand_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vand_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vand_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vand_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vand_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vand_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vand_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vand_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:   vand_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:   vand_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:   vand_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2:  vand_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3119,10 +3119,10 @@ Hart<URV>::execVand_vi(const DecodedInst* di)
     case EW::Half: vand_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vand_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vand_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4: vand_vi<Int128>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word8: vand_vi<Int256>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word16: vand_vi<Int512>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word32: vand_vi<Int1024>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3179,10 +3179,10 @@ Hart<URV>::execVor_vv(const DecodedInst* di)
     case EW::Half: vor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vor_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vor_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vor_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vor_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3241,10 +3241,10 @@ Hart<URV>::execVor_vx(const DecodedInst* di)
     case EW::Half: vor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vor_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vor_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vor_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vor_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3304,10 +3304,10 @@ Hart<URV>::execVor_vi(const DecodedInst* di)
     case EW::Half: vor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4: vor_vi<Int128>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word8: vor_vi<Int256>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word16: vor_vi<Int512>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word32: vor_vi<Int1024>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3364,10 +3364,10 @@ Hart<URV>::execVxor_vv(const DecodedInst* di)
     case EW::Half: vxor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vxor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vxor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vxor_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vxor_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vxor_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vxor_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3426,10 +3426,10 @@ Hart<URV>::execVxor_vx(const DecodedInst* di)
     case EW::Half: vxor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vxor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vxor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vxor_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vxor_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vxor_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vxor_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3489,10 +3489,10 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
     case EW::Half: vxor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vxor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vxor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4: vxor_vi<Int128>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word8: vxor_vi<Int256>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word16: vxor_vi<Int512>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word32: vxor_vi<Int1024>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -3552,8 +3552,8 @@ Hart<URV>::execVsll_vv(const DecodedInst* di)
     case EW::Half: vsll_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsll_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsll_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: illegalInst(di); break;
-    case EW::Word8: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
@@ -3713,8 +3713,8 @@ Hart<URV>::execVsrl_vv(const DecodedInst* di)
     case EW::Half: vsr_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsr_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsr_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: illegalInst(di); break;
-    case EW::Word8: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
@@ -3840,8 +3840,8 @@ Hart<URV>::execVsra_vv(const DecodedInst* di)
     case EW::Half:  vsr_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vsr_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsr_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: illegalInst(di); break;
-    case EW::Word8: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
@@ -3969,8 +3969,8 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
     case EW::Half: vnsr_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vnsr_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: illegalInst(di); break;
-    case EW::Word8: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
@@ -4100,8 +4100,8 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
     case EW::Half:  vnsr_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: illegalInst(di); break;
-    case EW::Word8: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
@@ -4222,10 +4222,10 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
     case EW::Half: vrgather_vv<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vrgather_vv<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vrgather_vv<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vrgather_vv<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vrgather_vv<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vrgather_vv<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vrgather_vv<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4282,10 +4282,10 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
     case EW::Half: vrgather_vx<uint16_t>(vd, vs1, rs2, group, start, elems); break;
     case EW::Word: vrgather_vx<uint32_t>(vd, vs1, rs2, group, start, elems); break;
     case EW::Word2: vrgather_vx<uint64_t>(vd, vs1, rs2, group, start, elems); break;
-    case EW::Word4: vrgather_vx<Uint128>(vd, vs1, rs2, group, start, elems); break;
-    case EW::Word8: vrgather_vx<Uint256>(vd, vs1, rs2, group, start, elems); break;
-    case EW::Word16: vrgather_vx<Uint512>(vd, vs1, rs2, group, start, elems); break;
-    case EW::Word32: vrgather_vx<Uint1024>(vd, vs1, rs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4338,10 +4338,10 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
     case EW::Half: vrgather_vi<uint16_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word: vrgather_vi<uint32_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word2: vrgather_vi<uint64_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word4: vrgather_vi<Uint128>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word8: vrgather_vi<Uint256>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word16: vrgather_vi<Uint512>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word32: vrgather_vi<Uint1024>(vd, vs1, imm, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4402,10 +4402,10 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
     case EW::Half: vrgatherei16_vv<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vrgatherei16_vv<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vrgatherei16_vv<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vrgatherei16_vv<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vrgatherei16_vv<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vrgatherei16_vv<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vrgatherei16_vv<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4462,10 +4462,10 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
     case EW::Half: vcompress_vm<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vcompress_vm<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vcompress_vm<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vcompress_vm<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vcompress_vm<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vcompress_vm<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vcompress_vm<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4522,10 +4522,10 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
     case EW::Half: vredsum_vs<int16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredsum_vs<int64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredsum_vs<Int128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredsum_vs<Int256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredsum_vs<Int512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredsum_vs<Int1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4581,10 +4581,10 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
     case EW::Half: vredand_vs<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredand_vs<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredand_vs<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredand_vs<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredand_vs<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredand_vs<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredand_vs<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4640,10 +4640,10 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
     case EW::Half: vredor_vs<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredor_vs<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredor_vs<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredor_vs<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredor_vs<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredor_vs<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredor_vs<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4699,10 +4699,10 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
     case EW::Half: vredxor_vs<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredxor_vs<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredxor_vs<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredxor_vs<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredxor_vs<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredxor_vs<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredxor_vs<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4758,10 +4758,10 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
     case EW::Half: vredminu_vs<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredminu_vs<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredminu_vs<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredminu_vs<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredminu_vs<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredminu_vs<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredminu_vs<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4816,10 +4816,10 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
     case EW::Half: vredmin_vs<int16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredmin_vs<int32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredmin_vs<int64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredmin_vs<Int128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredmin_vs<Int256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredmin_vs<Int512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredmin_vs<Int1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4874,10 +4874,10 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
     case EW::Half: vredmaxu_vs<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredmaxu_vs<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredmaxu_vs<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredmaxu_vs<Uint128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredmaxu_vs<Uint256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredmaxu_vs<Uint512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredmaxu_vs<Uint1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -4932,10 +4932,10 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
     case EW::Half: vredmax_vs<int16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vredmax_vs<int32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vredmax_vs<int64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vredmax_vs<Int128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vredmax_vs<Int256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vredmax_vs<Int512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vredmax_vs<Int1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -5557,10 +5557,10 @@ Hart<URV>::execViota_m(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(sum)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(sum)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(sum)); break;
-        case ElementWidth::Word4: vecRegs_.write(vd, ix, group, Int128(sum)); break;
-        case ElementWidth::Word8: vecRegs_.write(vd, ix, group, Int256(sum)); break;
-        case ElementWidth::Word16: vecRegs_.write(vd, ix, group, Int512(sum)); break;
-        case ElementWidth::Word32: vecRegs_.write(vd, ix, group, Int1024(sum)); break;
+        case ElementWidth::Word4:  illegalInst(di); break;
+        case ElementWidth::Word8:  illegalInst(di); break;
+        case ElementWidth::Word16: illegalInst(di); break;
+        case ElementWidth::Word32: illegalInst(di); break;
         }
 
       if (sourceSet)
@@ -5609,10 +5609,10 @@ Hart<URV>::execVid_v(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(ix)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(ix)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(ix)); break;
-        case ElementWidth::Word4: vecRegs_.write(vd, ix, group, Int128(ix)); break;
-        case ElementWidth::Word8: vecRegs_.write(vd, ix, group, Int256(ix)); break;
-        case ElementWidth::Word16: vecRegs_.write(vd, ix, group, Int512(ix)); break;
-        case ElementWidth::Word32: vecRegs_.write(vd, ix, group, Int1024(ix)); break;
+        case ElementWidth::Word4:  illegalInst(di); break;
+        case ElementWidth::Word8:  illegalInst(di); break;
+        case ElementWidth::Word16: illegalInst(di); break;
+        case ElementWidth::Word32: illegalInst(di); break;
         }
     }
 }
@@ -5684,10 +5684,10 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
     case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4: vslideup<Uint128>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word8: vslideup<Uint256>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word16: vslideup<Uint512>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word32: vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -5722,10 +5722,10 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
     case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4: vslideup<Uint128>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word8: vslideup<Uint256>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word16: vslideup<Uint512>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word32: vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -5777,25 +5777,25 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
       vecRegs_.write(vd, 0, group, int64_t(replacement));
       break;
 
-    case ElementWidth::Word4:
-      vslideup<Uint128>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, Int128(replacement));
-      break;
+    case ElementWidth::Word4:  illegalInst(di); break;
+      // vslideup<Uint128>(vd, vs1, amount, group, start, elems, masked);
+      // vecRegs_.write(vd, 0, group, Int128(replacement));
+      // break;
 
-    case ElementWidth::Word8:
-      vslideup<Uint256>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, Int256(replacement));
-      break;
+    case ElementWidth::Word8: illegalInst(di); break;
+      // vslideup<Uint256>(vd, vs1, amount, group, start, elems, masked);
+      // vecRegs_.write(vd, 0, group, Int256(replacement));
+      // break;
 
-    case ElementWidth::Word16:
-      vslideup<Uint512>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, Int512(replacement));
-      break;
+    case ElementWidth::Word16: illegalInst(di); break;
+      // vslideup<Uint512>(vd, vs1, amount, group, start, elems, masked);
+      // vecRegs_.write(vd, 0, group, Int512(replacement));
+      // break;
 
-    case ElementWidth::Word32:
-      vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, Int1024(replacement));
-      break;
+    case ElementWidth::Word32: illegalInst(di); break;
+      // vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked);
+      // vecRegs_.write(vd, 0, group, Int1024(replacement));
+      // break;
     }
 }
 
@@ -5854,14 +5854,14 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vslidedown<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Half: vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word: vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word2: vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4: vslidedown<Uint128>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word8: vslidedown<Uint256>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word16: vslidedown<Uint512>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word32: vslidedown<Uint1024>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Byte:   vslidedown<uint8_t> (vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Half:   vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word:   vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word2:  vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -5896,10 +5896,10 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
     case EW::Half: vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4: vslidedown<Uint128>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word8: vslidedown<Uint256>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word16: vslidedown<Uint512>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word32: vslidedown<Uint1024>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -5951,28 +5951,25 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
       vecRegs_.write(vd, 0, group, int64_t(replacement));
       break;
 
-    case ElementWidth::Word4:
-      illegalInst(di);
+    case ElementWidth::Word4: illegalInst(di); break;
       // vslideup<Uint128>(vd, vs1, amount, group, start, elems, masked);
       // vecRegs_.write(vd, 0, group, Int128(replacement));
-      break;
+      // break;
 
-    case ElementWidth::Word8:
-      illegalInst(di);
+    case ElementWidth::Word8: illegalInst(di); break;
       // vslideup<Uint256>(vd, vs1, amount, group, start, elems, masked);
       // vecRegs_.write(vd, 0, group, Int256(replacement));
-      break;
+      // break;
 
-    case ElementWidth::Word16:
-      illegalInst(di);
+    case ElementWidth::Word16: illegalInst(di); break;
       // vslideup<Uint512>(vd, vs1, amount, group, start, elems, masked);
       // vecRegs_.write(vd, 0, group, Int512(replacement));
-      break;
+      // break;
 
-    case ElementWidth::Word32:
-      vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, Int1024(replacement));
-      break;
+    case ElementWidth::Word32: illegalInst(di); break;
+      // vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked);
+      // vecRegs_.write(vd, 0, group, Int1024(replacement));
+      // break;
     }
 }
 
@@ -6028,10 +6025,10 @@ Hart<URV>::execVmul_vv(const DecodedInst* di)
     case EW::Half: vmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vmul_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vmul_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vmul_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vmul_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -6088,10 +6085,10 @@ Hart<URV>::execVmul_vx(const DecodedInst* di)
     case EW::Half: vmul_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmul_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmul_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vmul_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vmul_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vmul_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vmul_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -6148,10 +6145,10 @@ Hart<URV>::execVmulh_vv(const DecodedInst* di)
     case EW::Half: vmulh_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vmulh_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vmulh_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vmulh_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vmulh_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -6208,10 +6205,10 @@ Hart<URV>::execVmulh_vx(const DecodedInst* di)
     case EW::Half: vmulh_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vmulh_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vmulh_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vmulh_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vmulh_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -6237,10 +6234,10 @@ Hart<URV>::execVmulhu_vv(const DecodedInst* di)
     case EW::Half: vmulh_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vmulh_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vmulh_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vmulh_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vmulh_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -6297,10 +6294,10 @@ Hart<URV>::execVmulhu_vx(const DecodedInst* di)
     case EW::Half: vmulhu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulhu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vmulhu_vx<Uint128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vmulhu_vx<Uint256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vmulhu_vx<Uint512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vmulhu_vx<Uint1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -6360,10 +6357,10 @@ Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
     case EW::Half: vmulhsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulhsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vmulhsu_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vmulhsu_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vmulhsu_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vmulhsu_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -6423,10 +6420,10 @@ Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
     case EW::Half: vmulhsu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulhsu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vmulhsu_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vmulhsu_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vmulhsu_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vmulhsu_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -7059,9 +7056,9 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
     case EW::Half: vwmulu_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmulu_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulu_vx<uint64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwmulu_vx<Uint128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwmulu_vx<Uint256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwmulu_vx<Uint512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7130,9 +7127,9 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
     case EW::Half: vwmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwmul_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwmul_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwmul_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7204,9 +7201,9 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
     case EW::Half: vwmul_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmul_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwmul_vx<Int128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwmul_vx<Int256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwmul_vx<Int512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7278,9 +7275,9 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
     case EW::Half: vwmulsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmulsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwmulsu_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwmulsu_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwmulsu_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7355,9 +7352,9 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
     case EW::Half: vwmulsu_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmulsu_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwmulsu_vx<Int128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwmulsu_vx<Int256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwmulsu_vx<Int512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7426,9 +7423,9 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
     case EW::Half: vwmacc_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmacc_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwmacc_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwmacc_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwmacc_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7500,9 +7497,9 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
     case EW::Half: vwmaccu_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmaccu_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmaccu_vx<uint64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwmaccu_vx<Uint128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwmaccu_vx<Uint256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwmaccu_vx<Uint512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7536,9 +7533,9 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
     case EW::Half: vwmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwmacc_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwmacc_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwmacc_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7609,9 +7606,9 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
     case EW::Half: vwmacc_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmacc_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwmacc_vx<Int128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwmacc_vx<Int256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwmacc_vx<Int512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7684,9 +7681,9 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
     case EW::Half: vwmaccsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vwmaccsu_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vwmaccsu_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vwmaccsu_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7761,9 +7758,9 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
     case EW::Half: vwmaccsu_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmaccsu_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwmaccsu_vx<Int128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwmaccsu_vx<Int256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwmaccsu_vx<Int512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7839,9 +7836,9 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
     case EW::Half: vwmaccus_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmaccus_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmaccus_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4: vwmaccus_vx<Int128>(vd, vs1, Int128(e2), group, start, elems, masked); break;
-    case EW::Word8: vwmaccus_vx<Int256>(vd, vs1, Int256(e2), group, start, elems, masked); break;
-    case EW::Word16: vwmaccus_vx<Int512>(vd, vs1, Int512(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -7901,10 +7898,10 @@ Hart<URV>::execVdivu_vv(const DecodedInst* di)
     case EW::Half: vdivu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vdivu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdivu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vdivu_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vdivu_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vdivu_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vdivu_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -7966,10 +7963,10 @@ Hart<URV>::execVdivu_vx(const DecodedInst* di)
     case EW::Half: vdivu_vv<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vdivu_vv<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vdivu_vv<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vdivu_vv<Uint128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vdivu_vv<Uint256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vdivu_vv<Uint512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vdivu_vv<Uint1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8036,10 +8033,10 @@ Hart<URV>::execVdiv_vv(const DecodedInst* di)
     case EW::Half: vdiv_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vdiv_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vdiv_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vdiv_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vdiv_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vdiv_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8106,10 +8103,10 @@ Hart<URV>::execVdiv_vx(const DecodedInst* di)
     case EW::Half: vdiv_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vdiv_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vdiv_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vdiv_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vdiv_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vdiv_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8168,10 +8165,10 @@ Hart<URV>::execVremu_vv(const DecodedInst* di)
     case EW::Half: vremu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vremu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vremu_vv<Uint128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vremu_vv<Uint256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vremu_vv<Uint512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vremu_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8233,10 +8230,10 @@ Hart<URV>::execVremu_vx(const DecodedInst* di)
     case EW::Half: vremu_vv<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vremu_vv<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vv<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vremu_vv<Uint128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vremu_vv<Uint256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vremu_vv<Uint512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vremu_vv<Uint1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8303,10 +8300,10 @@ Hart<URV>::execVrem_vv(const DecodedInst* di)
     case EW::Half: vrem_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vrem_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrem_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4: vrem_vv<Int128>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8: vrem_vv<Int256>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vrem_vv<Int512>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vrem_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8372,10 +8369,10 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
     case EW::Half: vremu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vremu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4: vremu_vx<Int128>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word8: vremu_vx<Int256>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word16: vremu_vx<Int512>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word32: vremu_vx<Int1024>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8465,10 +8462,10 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
     case EW::Half: vsext<int16_t,int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word: vsext<int32_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4: vsext<Int128, int64_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word8: vsext<Int256, Int128>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word16: vsext<Int512, Int256>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word32: vsext<Int1024, Int512>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8525,10 +8522,10 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
     case EW::Half: illegalInst(di); break;
     case EW::Word: vsext<int32_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4: vsext<Int128, int32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word8: vsext<Int256, int64_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word16: vsext<Int512, Int128>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word32: vsext<Int1024, Int256>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8585,10 +8582,10 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
     case EW::Half: illegalInst(di); return;
     case EW::Word: illegalInst(di); return;
     case EW::Word2: vsext<int64_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4: vsext<Int128, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word8: vsext<Int256, int32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word16: vsext<Int512, int64_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word32: vsext<Int1024, Int128>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8677,10 +8674,10 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
     case EW::Half: vzext<uint16_t,uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word: vzext<uint32_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4: vzext<Uint128, uint64_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word8: vzext<Uint256, Uint128>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word16: vzext<Uint512, Uint256>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word32: vzext<Uint1024, Uint512>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8737,10 +8734,10 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
     case EW::Half: illegalInst(di); break;
     case EW::Word: vzext<uint32_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4: vzext<Uint128, uint32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word8: vzext<Uint256, uint64_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word16: vzext<Uint512, Uint128>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word32: vzext<Uint1024, Uint256>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -8797,10 +8794,10 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
     case EW::Half: illegalInst(di); break;
     case EW::Word: illegalInst(di); break;
     case EW::Word2: vzext<uint64_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4: vzext<Uint128, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word8: vzext<Uint256, uint32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word16: vzext<Uint512, uint64_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word32: vzext<Uint1024, Uint128>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9066,10 +9063,10 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
     case EW::Half: vadc_vvm<uint16_t>(vd, vs1, vs2, vcin, group, start, elems); break;
     case EW::Word: vadc_vvm<uint32_t>(vd, vs1, vs2, vcin, group, start, elems); break;
     case EW::Word2: vadc_vvm<uint64_t>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Word4: vadc_vvm<Uint128>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Word8: vadc_vvm<Uint256>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Word16: vadc_vvm<Uint512>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Word32: vadc_vvm<Uint1024>(vd, vs1, vs2, vcin, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9105,10 +9102,10 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
     case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
     case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    case EW::Word4: vadc_vxm<Uint128>(vd, vs1, Int128(e2), vcin, group, start, elems); break;
-    case EW::Word8: vadc_vxm<Uint256>(vd, vs1, Int256(e2), vcin, group, start, elems); break;
-    case EW::Word16: vadc_vxm<Uint512>(vd, vs1, Int512(e2), vcin, group, start, elems); break;
-    case EW::Word32: vadc_vxm<Uint1024>(vd, vs1, Int1024(e2), vcin, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9144,10 +9141,10 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
     case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
     case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    case EW::Word4: vadc_vxm<Uint128>(vd, vs1, Int128(e2), vcin, group, start, elems); break;
-    case EW::Word8: vadc_vxm<Uint256>(vd, vs1, Int256(e2), vcin, group, start, elems); break;
-    case EW::Word16: vadc_vxm<Uint512>(vd, vs1, Int512(e2), vcin, group, start, elems); break;
-    case EW::Word32: vadc_vxm<Uint1024>(vd, vs1, Int1024(e2), vcin, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9181,10 +9178,10 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
     case EW::Half: vsbc_vvm<uint16_t>(vd, vs1, vs2, vbin, group, start, elems); break;
     case EW::Word: vsbc_vvm<uint32_t>(vd, vs1, vs2, vbin, group, start, elems); break;
     case EW::Word2: vsbc_vvm<uint64_t>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Word4: vsbc_vvm<Uint128>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Word8: vsbc_vvm<Uint256>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Word16: vsbc_vvm<Uint512>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Word32: vsbc_vvm<Uint1024>(vd, vs1, vs2, vbin, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9220,10 +9217,10 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
     case EW::Half: vsbc_vxm<uint16_t>(vd, vs1, e2, vbin, group, start, elems); break;
     case EW::Word: vsbc_vxm<uint32_t>(vd, vs1, int32_t(e2), vbin, group, start, elems); break;
     case EW::Word2: vsbc_vxm<uint64_t>(vd, vs1, int64_t(e2), vbin, group, start, elems); break;
-    case EW::Word4: vsbc_vxm<Uint128>(vd, vs1, Int128(e2), vbin, group, start, elems); break;
-    case EW::Word8: vsbc_vxm<Uint256>(vd, vs1, Int256(e2), vbin, group, start, elems); break;
-    case EW::Word16: vsbc_vxm<Uint512>(vd, vs1, Int512(e2), vbin, group, start, elems); break;
-    case EW::Word32: vsbc_vxm<Uint1024>(vd, vs1, Int1024(e2), vbin, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9372,10 +9369,10 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
     case EW::Half: vmsbc_vvm<uint16_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
     case EW::Word: vmsbc_vvm<uint32_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vvm<uint64_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Word4: vmsbc_vvm<Uint128>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Word8: vmsbc_vvm<Uint256>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Word16: vmsbc_vvm<Uint512>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Word32: vmsbc_vvm<Uint1024>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9411,10 +9408,10 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
     case EW::Half: vmsbc_vxm<uint16_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
     case EW::Word: vmsbc_vxm<uint32_t>(vbout, vs1, int32_t(e2), borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vxm<uint64_t>(vbout, vs1, int64_t(e2), borrow, vbin, group, start, elems); break;
-    case EW::Word4: vmsbc_vxm<Uint128>(vbout, vs1, Int128(e2), borrow, vbin, group, start, elems); break;
-    case EW::Word8: vmsbc_vxm<Uint256>(vbout, vs1, Int256(e2), borrow, vbin, group, start, elems); break;
-    case EW::Word16: vmsbc_vxm<Uint512>(vbout, vs1, Int512(e2), borrow, vbin, group, start, elems); break;
-    case EW::Word32: vmsbc_vxm<Uint1024>(vbout, vs1, Int1024(e2), borrow, vbin, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9474,10 +9471,10 @@ Hart<URV>::execVmerge_vv(const DecodedInst* di)
     case EW::Half: vmerge_vv<int16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vmerge_vv<int32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vmerge_vv<int64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4: vmerge_vv<Int128>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word8: vmerge_vv<Int256>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word16: vmerge_vv<Int512>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word32: vmerge_vv<Int1024>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9538,10 +9535,10 @@ Hart<URV>::execVmerge_vx(const DecodedInst* di)
     case EW::Half: vmerge_vx<int16_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word: vmerge_vx<int32_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word2: vmerge_vx<int64_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Word4: vmerge_vx<Int128>(vd, vs1, Int128(e2), group, start, elems); break;
-    case EW::Word8: vmerge_vx<Int256>(vd, vs1, Int256(e2), group, start, elems); break;
-    case EW::Word16: vmerge_vx<Int512>(vd, vs1, Int512(e2), group, start, elems); break;
-    case EW::Word32: vmerge_vx<Int1024>(vd, vs1, Int1024(e2), group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9577,10 +9574,10 @@ Hart<URV>::execVmerge_vi(const DecodedInst* di)
     case EW::Half: vmerge_vx<int16_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word: vmerge_vx<int32_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word2: vmerge_vx<int64_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word4: vmerge_vx<Int128>(vd, vs1, Int128(imm), group, start, elems); break;
-    case EW::Word8: vmerge_vx<Int256>(vd, vs1, Int256(imm), group, start, elems); break;
-    case EW::Word16: vmerge_vx<Int512>(vd, vs1, Int512(imm), group, start, elems); break;
-    case EW::Word32: vmerge_vx<Int1024>(vd, vs1, Int1024(imm), group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9634,35 +9631,10 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
       break;
 
     case ElementWidth::Word4:
-      {
-        Int128 val = 0;
-        vecRegs_.read(vs1, 0, groupX8, val);
-        intRegs_.write(rd, SRV(val));
-      }
-      break;
-
     case ElementWidth::Word8:
-      {
-        Int256 val = 0;
-        vecRegs_.read(vs1, 0, groupX8, val);
-        intRegs_.write(rd, SRV(val));
-      }
-      break;
-
     case ElementWidth::Word16:
-      {
-        Int512 val = 0;
-        vecRegs_.read(vs1, 0, groupX8, val);
-        intRegs_.write(rd, SRV(val));
-      }
-      break;
-
     case ElementWidth::Word32:
-      {
-        Int1024 val = 0;
-        vecRegs_.read(vs1, 0, groupX8, val);
-        intRegs_.write(rd, SRV(val));
-      }
+      illegalInst(di);
       break;
     }
 }
@@ -9691,10 +9663,10 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
     case EW::Half: vecRegs_.write(vd, 0, groupX8, int16_t(val)); break;
     case EW::Word: vecRegs_.write(vd, 0, groupX8, int32_t(val)); break;
     case EW::Word2: vecRegs_.write(vd, 0, groupX8, int64_t(val)); break;
-    case EW::Word4: vecRegs_.write(vd, 0, groupX8, Int128(val)); break;
-    case EW::Word8: vecRegs_.write(vd, 0, groupX8, Int256(val)); break;
-    case EW::Word16: vecRegs_.write(vd, 0, groupX8, Int512(val)); break;
-    case EW::Word32: vecRegs_.write(vd, 0, groupX8, Int1024(val)); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9747,10 +9719,10 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
     case EW::Half: vmv_v_v<int16_t>(vd, vs1, group, start, elems); break;
     case EW::Word: vmv_v_v<int32_t>(vd, vs1, group, start, elems); break;
     case EW::Word2: vmv_v_v<int64_t>(vd, vs1, group, start, elems); break;
-    case EW::Word4: vmv_v_v<Int128>(vd, vs1, group, start, elems); break;
-    case EW::Word8: vmv_v_v<Int256>(vd, vs1, group, start, elems); break;
-    case EW::Word16: vmv_v_v<Int512>(vd, vs1, group, start, elems); break;
-    case EW::Word32: vmv_v_v<Int1024>(vd, vs1, group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9797,10 +9769,10 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
     case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
     case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    case EW::Word4: vmv_v_x<Int128>(vd, Int128(e1), group, start, elems); break;
-    case EW::Word8: vmv_v_x<Int256>(vd, Int256(e1), group, start, elems); break;
-    case EW::Word16: vmv_v_x<Int512>(vd, Int512(e1), group, start, elems); break;
-    case EW::Word32: vmv_v_x<Int1024>(vd, Int1024(e1), group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -9830,10 +9802,10 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
     case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
     case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    case EW::Word4: vmv_v_x<Int128>(vd, Int128(e1), group, start, elems); break;
-    case EW::Word8: vmv_v_x<Int256>(vd, Int256(e1), group, start, elems); break;
-    case EW::Word16: vmv_v_x<Int512>(vd, Int512(e1), group, start, elems); break;
-    case EW::Word32: vmv_v_x<Int1024>(vd, Int1024(e1), group, start, elems); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10022,10 +9994,10 @@ Hart<URV>::execVsaddu_vv(const DecodedInst* di)
     case EW::Half:   vsaddu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsaddu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vsaddu_vv<Uint128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vsaddu_vv<Uint256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vsaddu_vv<Uint512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vsaddu_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10090,10 +10062,10 @@ Hart<URV>::execVsaddu_vx(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vsaddu_vx<Uint128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vsaddu_vx<Uint256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vsaddu_vx<Uint512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: vsaddu_vx<Uint1024>(vd, vs1, Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10119,10 +10091,10 @@ Hart<URV>::execVsaddu_vi(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  vsaddu_vx<Uint128> (vd, vs1, Int128(imm),  group, start, elems, masked); break;
-    case EW::Word8:  vsaddu_vx<Uint256> (vd, vs1, Int256(imm),  group, start, elems, masked); break;
-    case EW::Word16: vsaddu_vx<Uint512> (vd, vs1, Int512(imm),  group, start, elems, masked); break;
-    case EW::Word32: vsaddu_vx<Uint1024>(vd, vs1, Int1024(imm), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10191,10 +10163,10 @@ Hart<URV>::execVsadd_vv(const DecodedInst* di)
     case EW::Half:   vsadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vsadd_vv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vsadd_vv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vsadd_vv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vsadd_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10265,10 +10237,10 @@ Hart<URV>::execVsadd_vx(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vsadd_vx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vsadd_vx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vsadd_vx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: vsadd_vx<Int1024>(vd, vs1, Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10294,10 +10266,10 @@ Hart<URV>::execVsadd_vi(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  vsadd_vx<Int128> (vd, vs1, Int128(imm),  group, start, elems, masked); break;
-    case EW::Word8:  vsadd_vx<Int256> (vd, vs1, Int256(imm),  group, start, elems, masked); break;
-    case EW::Word16: vsadd_vx<Int512> (vd, vs1, Int512(imm),  group, start, elems, masked); break;
-    case EW::Word32: vsadd_vx<Int1024>(vd, vs1, Int1024(imm), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10360,10 +10332,10 @@ Hart<URV>::execVssubu_vv(const DecodedInst* di)
     case EW::Half:   vssubu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssubu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssubu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vssubu_vv<Uint128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vssubu_vv<Uint256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vssubu_vv<Uint512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vssubu_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10428,10 +10400,10 @@ Hart<URV>::execVssubu_vx(const DecodedInst* di)
     case EW::Half:   vssubu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssubu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssubu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vssubu_vx<Uint128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vssubu_vx<Uint256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vssubu_vx<Uint512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: vssubu_vx<Uint1024>(vd, vs1, Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10500,10 +10472,10 @@ Hart<URV>::execVssub_vv(const DecodedInst* di)
     case EW::Half:   vssub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vssub_vv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vssub_vv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vssub_vv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vssub_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10574,10 +10546,10 @@ Hart<URV>::execVssub_vx(const DecodedInst* di)
     case EW::Half:   vssub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vssub_vx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vssub_vx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vssub_vx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: vssub_vx<Int1024>(vd, vs1, Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10682,10 +10654,10 @@ Hart<URV>::execVaadd_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vaadd_vv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vaadd_vv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vaadd_vv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10710,10 +10682,10 @@ Hart<URV>::execVaaddu_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vaadd_vv<Uint128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vaadd_vv<Uint256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vaadd_vv<Uint512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10780,10 +10752,10 @@ Hart<URV>::execVaadd_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vaadd_vx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vaadd_vx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vaadd_vx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10810,10 +10782,10 @@ Hart<URV>::execVaaddu_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vaadd_vx<Uint128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vaadd_vx<Uint256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vaadd_vx<Uint512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10878,10 +10850,10 @@ Hart<URV>::execVasub_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vasub_vv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vasub_vv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vasub_vv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10906,10 +10878,10 @@ Hart<URV>::execVasubu_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vasub_vv<Uint128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vasub_vv<Uint256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vasub_vv<Uint512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -10976,10 +10948,10 @@ Hart<URV>::execVasub_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vasub_vx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vasub_vx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vasub_vx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11006,10 +10978,10 @@ Hart<URV>::execVasubu_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vasub_vx<Uint128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vasub_vx<Uint256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vasub_vx<Uint512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11088,10 +11060,10 @@ Hart<URV>::execVsmul_vv(const DecodedInst* di)
     case EW::Half:   vsmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vsmul_vv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vsmul_vv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vsmul_vv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11172,10 +11144,10 @@ Hart<URV>::execVsmul_vx(const DecodedInst* di)
     case EW::Half:   vsmul_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsmul_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsmul_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vsmul_vx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vsmul_vx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vsmul_vx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: assert(0 && "1024-bit fixed point not yet implemented"); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11241,10 +11213,10 @@ Hart<URV>::execVssrl_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vssr_vv<Uint128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vssr_vv<Uint256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vssr_vv<Uint512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vssr_vv<Uint1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11311,10 +11283,10 @@ Hart<URV>::execVssrl_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    case EW::Word4:  vssr_vx<Uint128> (vd, vs1, Uint128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vssr_vx<Uint256> (vd, vs1, Uint256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vssr_vx<Uint512> (vd, vs1, Uint512(e2),  group, start, elems, masked); break;
-    case EW::Word32: vssr_vx<Uint1024>(vd, vs1, Uint1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11339,10 +11311,10 @@ Hart<URV>::execVssrl_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  vssr_vx<Uint128> (vd, vs1, Uint128(imm),  group, start, elems, masked); break;
-    case EW::Word8:  vssr_vx<Uint256> (vd, vs1, Uint256(imm),  group, start, elems, masked); break;
-    case EW::Word16: vssr_vx<Uint512> (vd, vs1, Uint512(imm),  group, start, elems, masked); break;
-    case EW::Word32: vssr_vx<Uint1024>(vd, vs1, Uint1024(imm), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11367,10 +11339,10 @@ Hart<URV>::execVssra_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vssr_vv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vssr_vv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vssr_vv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word32: vssr_vv<Int1024>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11397,10 +11369,10 @@ Hart<URV>::execVssra_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vssr_vx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vssr_vx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vssr_vx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
-    case EW::Word32: vssr_vx<Int1024>(vd, vs1, Int1024(e2), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11426,10 +11398,10 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  vssr_vx<Int128> (vd, vs1, Int128(imm),  group, start, elems, masked); break;
-    case EW::Word8:  vssr_vx<Int256> (vd, vs1, Int256(imm),  group, start, elems, masked); break;
-    case EW::Word16: vssr_vx<Int512> (vd, vs1, Int512(imm),  group, start, elems, masked); break;
-    case EW::Word32: vssr_vx<Int1024>(vd, vs1, Int1024(imm), group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
     }
 }
 
@@ -11508,9 +11480,9 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vnclip_wv<Uint128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vnclip_wv<Uint256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vnclip_wv<Uint512> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -11591,9 +11563,9 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    case EW::Word4:  vnclip_wx<Uint128> (vd, vs1, Uint128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vnclip_wx<Uint256> (vd, vs1, Uint256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vnclip_wx<Uint512> (vd, vs1, Uint512(e2),  group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -11619,9 +11591,9 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  vnclip_wx<Uint128> (vd, vs1, Uint128(imm),  group, start, elems, masked); break;
-    case EW::Word8:  vnclip_wx<Uint256> (vd, vs1, Uint256(imm),  group, start, elems, masked); break;
-    case EW::Word16: vnclip_wx<Uint512> (vd, vs1, Uint512(imm),  group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -11647,9 +11619,9 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  vnclip_wv<Int128> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word8:  vnclip_wv<Int256> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word16: vnclip_wv<Int512> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -11677,9 +11649,9 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  vnclip_wx<Int128> (vd, vs1, Int128(e2),  group, start, elems, masked); break;
-    case EW::Word8:  vnclip_wx<Int256> (vd, vs1, Int256(e2),  group, start, elems, masked); break;
-    case EW::Word16: vnclip_wx<Int512> (vd, vs1, Int512(e2),  group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -11705,9 +11677,9 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  vnclip_wx<Int128> (vd, vs1, Int128(imm),  group, start, elems, masked); break;
-    case EW::Word8:  vnclip_wx<Int256> (vd, vs1, Int256(imm),  group, start, elems, masked); break;
-    case EW::Word16: vnclip_wx<Int512> (vd, vs1, Int512(imm),  group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
     }
 }
@@ -11832,7 +11804,7 @@ template <typename URV>
 void
 Hart<URV>::execVle128_v(const DecodedInst* di)
 {
-  vectorLoad<Uint128>(di, ElementWidth::Word4, false);
+  illegalInst(di);
 }
 
 
@@ -11840,7 +11812,7 @@ template <typename URV>
 void
 Hart<URV>::execVle256_v(const DecodedInst* di)
 {
-  vectorLoad<Uint256>(di, ElementWidth::Word8, false);
+  illegalInst(di);
 }
 
 
@@ -11848,7 +11820,7 @@ template <typename URV>
 void
 Hart<URV>::execVle512_v(const DecodedInst* di)
 {
-  vectorLoad<Uint512>(di, ElementWidth::Word16, false);
+  illegalInst(di);
 }
 
 
@@ -11856,7 +11828,7 @@ template <typename URV>
 void
 Hart<URV>::execVle1024_v(const DecodedInst* di)
 {
-  vectorLoad<Uint1024>(di, ElementWidth::Word32, false);
+  illegalInst(di);
 }
 
 
@@ -11979,7 +11951,7 @@ template <typename URV>
 void
 Hart<URV>::execVse128_v(const DecodedInst* di)
 {
-  vectorStore<Uint128>(di, ElementWidth::Word4);
+  illegalInst(di);
 }
 
 
@@ -11987,7 +11959,7 @@ template <typename URV>
 void
 Hart<URV>::execVse256_v(const DecodedInst* di)
 {
-  vectorStore<Uint256>(di, ElementWidth::Word8);
+  illegalInst(di);
 }
 
 
@@ -11995,7 +11967,7 @@ template <typename URV>
 void
 Hart<URV>::execVse512_v(const DecodedInst* di)
 {
-  vectorStore<Uint512>(di, ElementWidth::Word16);
+  illegalInst(di);
 }
 
 
@@ -12003,7 +11975,7 @@ template <typename URV>
 void
 Hart<URV>::execVse1024_v(const DecodedInst* di)
 {
-  vectorStore<Uint1024>(di, ElementWidth::Word32);
+  illegalInst(di);
 }
 
 
@@ -12109,7 +12081,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre128_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<Uint128>(di, ElementWidth::Word4);
+  illegalInst(di);
 }
 
 
@@ -12117,7 +12089,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre256_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<Uint256>(di, ElementWidth::Word8);
+  illegalInst(di);
 }
 
 
@@ -12125,7 +12097,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre512_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<Uint512>(di, ElementWidth::Word16);
+  illegalInst(di);
 }
 
 
@@ -12133,7 +12105,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre1024_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<Uint1024>(di, ElementWidth::Word32);
+  illegalInst(di);
 }
 
 
@@ -12238,7 +12210,7 @@ template <typename URV>
 void
 Hart<URV>::execVsre128_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<Uint128>(di, ElementWidth::Word4);
+  illegalInst(di);
 }
 
 
@@ -12246,7 +12218,7 @@ template <typename URV>
 void
 Hart<URV>::execVsre256_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<Uint256>(di, ElementWidth::Word8);
+  illegalInst(di);
 }
 
 
@@ -12254,7 +12226,7 @@ template <typename URV>
 void
 Hart<URV>::execVsre512_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<Uint512>(di, ElementWidth::Word16);
+  illegalInst(di);
 }
 
 
@@ -12262,7 +12234,7 @@ template <typename URV>
 void
 Hart<URV>::execVsre1024_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<Uint1024>(di, ElementWidth::Word32);
+  illegalInst(di);
 }
 
 
@@ -12302,7 +12274,7 @@ template <typename URV>
 void
 Hart<URV>::execVle128ff_v(const DecodedInst* di)
 {
-  vectorLoad<Uint128>(di, ElementWidth::Word4, true);
+  illegalInst(di);
 }
 
 
@@ -12310,7 +12282,7 @@ template <typename URV>
 void
 Hart<URV>::execVle256ff_v(const DecodedInst* di)
 {
-  vectorLoad<Uint256>(di, ElementWidth::Word8, true);
+  illegalInst(di);
 }
 
 
@@ -12318,7 +12290,7 @@ template <typename URV>
 void
 Hart<URV>::execVle512ff_v(const DecodedInst* di)
 {
-  vectorLoad<Uint512>(di, ElementWidth::Word16, true);
+  illegalInst(di);
 }
 
 
@@ -12326,7 +12298,7 @@ template <typename URV>
 void
 Hart<URV>::execVle1024ff_v(const DecodedInst* di)
 {
-  vectorLoad<Uint1024>(di, ElementWidth::Word32, true);
+  illegalInst(di);
 }
 
 
@@ -12449,7 +12421,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse128_v(const DecodedInst* di)
 {
-  vectorLoadStrided<Uint128>(di, ElementWidth::Word4);
+  illegalInst(di);
 }
 
 
@@ -12457,7 +12429,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse256_v(const DecodedInst* di)
 {
-  vectorLoadStrided<Uint256>(di, ElementWidth::Word8);
+  illegalInst(di);
 }
 
 
@@ -12465,7 +12437,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse512_v(const DecodedInst* di)
 {
-  vectorLoadStrided<Uint512>(di, ElementWidth::Word16);
+  illegalInst(di);
 }
 
 
@@ -12473,7 +12445,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse1024_v(const DecodedInst* di)
 {
-  vectorLoadStrided<Uint1024>(di, ElementWidth::Word32);
+  illegalInst(di);
 }
 
 
@@ -12584,7 +12556,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse128_v(const DecodedInst* di)
 {
-  vectorStoreStrided<Uint128>(di, ElementWidth::Word4);
+  illegalInst(di);
 }
 
 
@@ -12592,7 +12564,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse256_v(const DecodedInst* di)
 {
-  vectorStoreStrided<Uint256>(di, ElementWidth::Word8);
+  illegalInst(di);
 }
 
 
@@ -12600,7 +12572,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse512_v(const DecodedInst* di)
 {
-  vectorStoreStrided<Uint512>(di, ElementWidth::Word16);
+  illegalInst(di);
 }
 
 
@@ -12608,7 +12580,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse1024_v(const DecodedInst* di)
 {
-  vectorStoreStrided<Uint1024>(di, ElementWidth::Word32);
+  illegalInst(di);
 }
 
 
