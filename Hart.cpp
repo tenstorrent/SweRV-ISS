@@ -6100,10 +6100,18 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vlxei16_v,
      &&vlxei32_v,
      &&vlxei64_v,
+     &&vluxei8_v,
+     &&vluxei16_v,
+     &&vluxei32_v,
+     &&vluxei64_v,
      &&vsxei8_v,
      &&vsxei16_v,
      &&vsxei32_v,
      &&vsxei64_v,
+     &&vsuxei8_v,
+     &&vsuxei16_v,
+     &&vsuxei32_v,
+     &&vsuxei64_v,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8521,6 +8529,22 @@ Hart<URV>::execute(const DecodedInst* di)
   execVlxei64_v(di);
   return;
 
+ vluxei8_v:
+  execVluxei8_v(di);
+  return;
+
+ vluxei16_v:
+  execVluxei16_v(di);
+  return;
+
+ vluxei32_v:
+  execVluxei32_v(di);
+  return;
+
+ vluxei64_v:
+  execVluxei64_v(di);
+  return;
+
  vsxei8_v:
   execVsxei8_v(di);
   return;
@@ -8537,6 +8561,21 @@ Hart<URV>::execute(const DecodedInst* di)
   execVsxei64_v(di);
   return;
 
+ vsuxei8_v:
+  execVsuxei8_v(di);
+  return;
+
+ vsuxei16_v:
+  execVsuxei16_v(di);
+  return;
+
+ vsuxei32_v:
+  execVsuxei32_v(di);
+  return;
+
+ vsuxei64_v:
+  execVsuxei64_v(di);
+  return;
 }
 
 

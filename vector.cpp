@@ -11769,7 +11769,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
         }
       else
         {
-          if (determineLoadException(rs1, addr, addr, sizeof(elem), secCause) !=
+          if (determineLoadException(rs1, addr, addr, sizeof(elem), secCause) ==
               ExceptionCause::NONE)
             memory_.read(addr, elem);
         }
@@ -12387,7 +12387,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
         }
       else
         {
-          if (determineLoadException(rs1, addr, addr, sizeof(elem), secCause) !=
+          if (determineLoadException(rs1, addr, addr, sizeof(elem), secCause) ==
               ExceptionCause::NONE)
             memory_.read(addr, elem);
         }
@@ -12630,7 +12630,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint32_t offsetGroupX8 = (offsetElemWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
-  bool badConfig = vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   if (not badConfig)
     badConfig = not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (badConfig)
@@ -12683,7 +12683,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
         }
       else
         {
-          if (determineLoadException(rs1, eaddr, eaddr, sizeof(elem), secCause) !=
+          if (determineLoadException(rs1, eaddr, eaddr, sizeof(elem), secCause) ==
               ExceptionCause::NONE)
             memory_.read(eaddr, elem);
         }
@@ -12740,6 +12740,38 @@ Hart<URV>::execVlxei64_v(const DecodedInst* di)
 
 
 template <typename URV>
+void
+Hart<URV>::execVluxei8_v(const DecodedInst* di)
+{
+  vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxei16_v(const DecodedInst* di)
+{
+  vectorLoadIndexed<uint16_t>(di, ElementWidth::Half);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxei32_v(const DecodedInst* di)
+{
+  vectorLoadIndexed<uint32_t>(di, ElementWidth::Word);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxei64_v(const DecodedInst* di)
+{
+  vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2);
+}
+
+
+template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
@@ -12757,7 +12789,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint32_t offsetGroupX8 = (offsetElemWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
-  bool badConfig = vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   if (not badConfig)
     badConfig = not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (badConfig)
@@ -12862,6 +12894,38 @@ Hart<URV>::execVsxei32_v(const DecodedInst* di)
 template <typename URV>
 void
 Hart<URV>::execVsxei64_v(const DecodedInst* di)
+{
+  vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxei8_v(const DecodedInst* di)
+{
+  vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxei16_v(const DecodedInst* di)
+{
+  vectorStoreIndexed<uint16_t>(di, ElementWidth::Half);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxei32_v(const DecodedInst* di)
+{
+  vectorStoreIndexed<uint32_t>(di, ElementWidth::Word);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxei64_v(const DecodedInst* di)
 {
   vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2);
 }

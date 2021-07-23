@@ -709,12 +709,20 @@ namespace WdRiscv
      vlxei16_v,
      vlxei32_v,
      vlxei64_v,
+     vluxei8_v,
+     vluxei16_v,
+     vluxei32_v,
+     vluxei64_v,
 
      vsxei8_v,
      vsxei16_v,
      vsxei32_v,
      vsxei64_v,
+     vsuxei8_v,
+     vsuxei16_v,
+     vsuxei32_v,
+     vsuxei64_v,
 
-     maxId = vsxei64_v
+     maxId = vsuxei64_v
     };
 }

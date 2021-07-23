@@ -660,7 +660,15 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op3)
     }
 
   if (mop == 1)
-    return instTable_.getEntry(InstId::illegal);
+    {      // indexed unordered
+      if (mew == 0)
+        {
+          if (f3 == 0) return instTable_.getEntry(InstId::vluxei8_v);
+          if (f3 == 5) return instTable_.getEntry(InstId::vluxei16_v);
+          if (f3 == 6) return instTable_.getEntry(InstId::vluxei32_v);
+          if (f3 == 7) return instTable_.getEntry(InstId::vluxei64_v);
+        }
+    }
 
   if (mop == 2)
     {      // Strided
@@ -746,6 +754,13 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op3)
 
   if (mop == 1)
     {      // indexed ordered
+      if (mew == 0)
+        {
+          if (f3 == 0) return instTable_.getEntry(InstId::vsuxei8_v);
+          if (f3 == 5) return instTable_.getEntry(InstId::vsuxei16_v);
+          if (f3 == 6) return instTable_.getEntry(InstId::vsuxei32_v);
+          if (f3 == 7) return instTable_.getEntry(InstId::vsuxei64_v);
+        }
     }
 
   if (mop == 2)

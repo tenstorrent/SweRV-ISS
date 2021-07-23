@@ -3006,6 +3006,10 @@ namespace WdRiscv
     void execVlxei16_v(const DecodedInst*);
     void execVlxei32_v(const DecodedInst*);
     void execVlxei64_v(const DecodedInst*);
+    void execVluxei8_v(const DecodedInst*);
+    void execVluxei16_v(const DecodedInst*);
+    void execVluxei32_v(const DecodedInst*);
+    void execVluxei64_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
     void vectorStoreIndexed(const DecodedInst*, ElementWidth);
@@ -3014,6 +3018,10 @@ namespace WdRiscv
     void execVsxei16_v(const DecodedInst*);
     void execVsxei32_v(const DecodedInst*);
     void execVsxei64_v(const DecodedInst*);
+    void execVsuxei8_v(const DecodedInst*);
+    void execVsuxei16_v(const DecodedInst*);
+    void execVsuxei32_v(const DecodedInst*);
+    void execVsuxei64_v(const DecodedInst*);
 
   private:
 

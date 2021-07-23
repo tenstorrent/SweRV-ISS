@@ -3193,6 +3193,26 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       if (di.isMasked()) out << ", v0";
       break;
 
+    case InstId::vluxei8_v:
+      out << "vluxei8.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vluxei16_v:
+      out << "vluxei16.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vluxei32_v:
+      out << "vluxei32.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vluxei64_v:
+      out << "vluxei64.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
     case InstId::vsxei8_v:
       out << "vsxei8.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
       if (di.isMasked()) out << ", v0";
@@ -3210,6 +3230,26 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::vsxei64_v:
       out << "vsxei64.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vsuxei8_v:
+      out << "vsuxei8.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vsuxei16_v:
+      out << "vsuxei16.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vsuxei32_v:
+      out << "vsuxei32.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
+      if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vsuxei64_v:
+      out << "vsuxei64.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
       if (di.isMasked()) out << ", v0";
       break;
 
