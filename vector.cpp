@@ -5097,7 +5097,6 @@ Hart<URV>::execVmxor_mm(const DecodedInst* di)
       elems = elems >> 3;
       for (unsigned i = start; i < elems; ++i)
         vdData[i] = vs1Data[i] ^ vs2Data[i];
-      return;
     }
   else    // Bit indices are not byte aligned.
     for (unsigned i = start; i < elems; ++i)
@@ -5141,7 +5140,6 @@ Hart<URV>::execVmor_mm(const DecodedInst* di)
       elems = elems >> 3;
       for (unsigned i = start; i < elems; ++i)
         vdData[i] = vs1Data[i] | vs2Data[i];
-      return;
     }
   else    // Bit indices are not byte aligned.
     for (unsigned i = start; i < elems; ++i)
@@ -5388,11 +5386,11 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       unsigned byteIx = ix >> 3;
       unsigned bitIx = ix & 7; // Bit index in byte
       uint8_t mask = 1 << bitIx;
-      found = found or (vs1Data[byteIx] & mask);
 
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
 
+      found = found or (vs1Data[byteIx] & mask);
       vdData[byteIx] = vdData[byteIx] & ~mask;
       if (not found)
 	vdData[byteIx] |= mask;
@@ -5445,9 +5443,8 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
 	  vdData[byteIx] = vdData[byteIx] & ~mask;
 	  if (not found)
 	    vdData[byteIx] |= mask;
+	  found = found or (inputByte & mask);
 	}
-
-      found = found or (inputByte & mask);
     }
 
   vecRegs_.touchMask(vd);
@@ -5500,9 +5497,11 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       if (found or not inputSet)
 	continue;
 
-      found = true;
       if (active)
-	vdData[byteIx] |= mask;
+	{
+	  found = true;
+	  vdData[byteIx] |= mask;
+	}
     }
 
   vecRegs_.touchMask(vd);
