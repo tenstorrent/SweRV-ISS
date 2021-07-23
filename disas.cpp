@@ -535,6 +535,19 @@ printVec_vx(Hart<URV>& hart, std::ostream& out, const char* inst,
 template <typename URV>
 static
 void
+printVec_xv(Hart<URV>& hart, std::ostream& out, const char* inst,
+	    const DecodedInst& di, bool mask = true)
+{
+  out << inst << " v" << di.op0() << ", " << hart.intRegName(di.op1())
+      << ", v" << di.op2();
+  if (mask and di.isMasked())
+    out << ", v0.t";
+}
+
+
+template <typename URV>
+static
+void
 printVec_vi(Hart<URV>& , std::ostream& out, const char* inst,
 	    const DecodedInst& di, bool mask = true)
 {
@@ -2513,7 +2526,7 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::vmadd_vx:
-      printVec_vx(*this, out, "vmadd.vx", di);
+      printVec_xv(*this, out, "vmadd.vx", di);
       break;
 
     case InstId::vnmsub_vv:
@@ -2521,7 +2534,7 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::vnmsub_vx:
-      printVec_vx(*this, out, "vnmsub.vx", di);
+      printVec_xv(*this, out, "vnmsub.vx", di);
       break;
 
     case InstId::vmacc_vv:
@@ -2529,7 +2542,7 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::vmacc_vx:
-      printVec_vx(*this, out, "vmacc.vx", di);
+      printVec_xv(*this, out, "vmacc.vx", di);
       break;
 
     case InstId::vnmsac_vv:
@@ -2537,7 +2550,7 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::vnmsac_vx:
-      printVec_vx(*this, out, "vnmsac.vx", di);
+      printVec_xv(*this, out, "vnmsac.vx", di);
       break;
 
     case InstId::vwmulu_vv:
