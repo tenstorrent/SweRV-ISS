@@ -325,7 +325,7 @@ Hart<URV>::processExtensions()
         enableUserMode(true);
 
       if (value & (URV(1) << ('v' - 'a')))  // User-mode option.
-        rvv_ = true;
+	enableVectorMode(true);
 
       for (auto ec : { 'b', 'g', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
 	    'q', 'r', 't', 'w', 'x', 'y', 'z' } )
@@ -3507,14 +3507,23 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Process vector register diff.
-  unsigned elemWidth = 0, elemIx = 0;
-  int vecReg = vecRegs_.getLastWrittenReg(elemIx, elemWidth);
+  unsigned groupX8 = 8;
+  int vecReg = vecRegs_.getLastWrittenReg(groupX8);
   if (vecReg >= 0)
     {
-      formatVecInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff,
-			      vecReg, vecRegs_.getVecData(vecReg),
-			      vecRegs_.bytesPerRegister(), tmp.c_str());
-      pending = true;
+      // We want to report all the registers in the group.
+      unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
+      vecReg = vecReg - (vecReg % groupSize);
+
+      for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
+	{
+	  if (pending)
+	    fprintf(out, " +\n");
+	  formatVecInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff,
+				  vecReg, vecRegs_.getVecData(vecReg),
+				  vecRegs_.bytesPerRegister(), tmp.c_str());
+	  pending = true;
+	}
     }
 
   // Process memory diff.

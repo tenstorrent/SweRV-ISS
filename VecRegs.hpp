@@ -167,8 +167,7 @@ namespace WdRiscv
       T* data = reinterpret_cast<T*>(data_ + regNum*bytesPerReg_);
       data[elemIx] = value;
       lastWrittenReg_ = regNum;
-      lastElemWidth_ = sizeof(T)*8;
-      lastElemIx_ = elemIx;
+      lastGroupX8_ = groupX8;
       return true;
     }
 
@@ -346,12 +345,11 @@ namespace WdRiscv
     
     /// Return the number of the last written vector regsiter or -1 if no
     /// no register has been written since the last clearLastWrittenReg.
-    int getLastWrittenReg(uint32_t& lastElemIx, uint32_t& lastElemWidth) const
+    int getLastWrittenReg(uint32_t& groupX8) const
     {
       if (lastWrittenReg_ >= 0)
         {
-          lastElemWidth = lastElemWidth_;
-          lastElemIx = lastElemIx_;
+          groupX8 = lastGroupX8_;
           return lastWrittenReg_;
         }
       return -1;
@@ -359,8 +357,12 @@ namespace WdRiscv
 
     /// For instructions that do not use the write method, mark the
     /// last written register and the effective element widht.
-    void setLastWrittenReg(uint32_t reg, uint32_t lastIx, uint32_t elemWidth)
-    { lastWrittenReg_ = reg; lastElemIx_ = lastIx; lastElemWidth_ = elemWidth; }
+    void touchReg(uint32_t reg, uint32_t groupX8)
+    { lastWrittenReg_ = reg; lastGroupX8_ = groupX8; }
+
+    /// Same as above for mask registers
+    void touchMask(uint32_t reg)
+    { touchReg(reg, 8); }  // Grouping of of 1
 
     /// Return true if element of given index is active with respect
     /// to the given mask vector register. Element is active if the
@@ -399,6 +401,7 @@ namespace WdRiscv
       else
         data[byteIx] &= ~mask;
       lastWrittenReg_ = maskReg;
+      lastGroupX8_ = 8;
       return true;
     }
 
@@ -499,7 +502,6 @@ namespace WdRiscv
     GroupsForWidth legalConfigs_;
 
     int lastWrittenReg_ = -1;
-    uint32_t lastElemWidth_ = 0;   // Width (in bits) of last written element.
-    uint32_t lastElemIx_ = 0;
+    uint32_t lastGroupX8_ = 8;   // 8 times last grouping factor
   };
 }

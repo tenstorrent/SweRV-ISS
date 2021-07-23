@@ -224,6 +224,30 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
 
 template <typename URV>
+void
+CsRegs<URV>::enableVectorMode(bool flag)
+{
+  if (not flag)
+    return;
+
+  for (auto csrn : { CsrNumber::VSTART, CsrNumber::VXSAT, CsrNumber::VXRM,
+                      CsrNumber::VCSR, CsrNumber::VL, CsrNumber::VTYPE,
+                      CsrNumber::VLENB } )
+    {
+      auto csr = findCsr(csrn);
+      if (not csr)
+        {
+          std::cerr << "Error: enableVectorMode: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+          assert(0);
+        }
+      else if (not csr->isImplemented())
+        csr->setImplemented(true);
+    }
+}
+
+
+template <typename URV>
 URV
 CsRegs<URV>::legalizeMstatusValue(URV value) const
 {
@@ -1265,7 +1289,7 @@ CsRegs<URV>::defineVectorRegs()
   defineCsr("vstart", CsrNumber::VSTART, !mand, !imp, 0, 0, 0);
   defineCsr("vxsat",  CsrNumber::VXSAT,  !mand, !imp, 0, 1, 1);  // 1 bit
   defineCsr("vxrm",   CsrNumber::VXRM,   !mand, !imp, 0, 3, 3);  // 2 bits
-  defineCsr("VCSR",   CsrNumber::VCSR,   !mand, !imp, 0, 7, 7);  // 3 bits
+  defineCsr("vcsr",   CsrNumber::VCSR,   !mand, !imp, 0, 7, 7);  // 3 bits
   defineCsr("vl",     CsrNumber::VL,     !mand, !imp, 0, 0, 0);
 
   uint64_t mask = 0x800000ff;

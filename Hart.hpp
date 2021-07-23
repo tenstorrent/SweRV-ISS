@@ -1155,6 +1155,10 @@ namespace WdRiscv
     void enableSupervisorMode(bool flag)
     { rvs_ = flag; csRegs_.enableSupervisorMode(flag); }
 
+    /// Enable supervisor mode.
+    void enableVectorMode(bool flag)
+    { rvv_ = flag; csRegs_.enableVectorMode(flag); }
+
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
     void enableMisalignedData(bool flag)

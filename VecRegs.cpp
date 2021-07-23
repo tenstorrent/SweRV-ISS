@@ -145,6 +145,5 @@ VecRegs::reset()
   if (data_)
     memset(data_, 0, bytesInRegFile_);
   lastWrittenReg_ = -1;
-  lastElemIx_ = 0;
-  lastElemWidth_ = 0;
+  lastGroupX8_ = 8;
 }
