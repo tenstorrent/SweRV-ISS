@@ -572,6 +572,19 @@ printVec_vim(Hart<URV>& hart, std::ostream& out, const char* inst,
 
 
 template <typename URV>
+static
+void
+printVec_vf(Hart<URV>& hart, std::ostream& out, const char* inst,
+	    const DecodedInst& di, bool mask = true)
+{
+  out << inst << " v" << di.op0() << ", v" << di.op1() << ", "
+      << hart.fpRegName(di.op2());
+  if (mask and di.isMasked())
+    out << ", v0.t";
+}
+
+
+template <typename URV>
 void
 Hart<URV>::disassembleInst(uint32_t inst, std::ostream& stream)
 {
@@ -3251,6 +3264,58 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
     case InstId::vsuxei64_v:
       out << "vsuxei64.v v" << di.op0() << ", (" << intRegName(di.op1()) << "), v" << di.op2();
       if (di.isMasked()) out << ", v0";
+      break;
+
+    case InstId::vfadd_vv:
+      printVec_vv(*this, out, "vfadd.vv", di);
+      break;
+
+    case InstId::vfadd_vf:
+      printVec_vf(*this, out, "vfadd.vf", di);
+      break;
+
+    case InstId::vfsub_vv:
+      printVec_vv(*this, out, "vfsub.vv", di);
+      break;
+
+    case InstId::vfsub_vf:
+      printVec_vf(*this, out, "vfsub.vf", di);
+      break;
+
+    case InstId::vfrsub_vf:
+      printVec_vf(*this, out, "vfrsub.vf", di);
+      break;
+
+    case InstId::vfwadd_vv:
+      printVec_vv(*this, out, "vfwadd.vv", di);
+      break;
+
+    case InstId::vfwadd_vf:
+      printVec_vf(*this, out, "vfwadd.vf", di);
+      break;
+
+    case InstId::vfwsub_vv:
+      printVec_vv(*this, out, "vfwsub.vv", di);
+      break;
+
+    case InstId::vfwsub_vf:
+      printVec_vf(*this, out, "vfwsub.vf", di);
+      break;
+
+    case InstId::vfwadd_wv:
+      printVec_vv(*this, out, "vfwadd.wv", di);
+      break;
+
+    case InstId::vfwadd_wf:
+      printVec_vf(*this, out, "vfwadd.wf", di);
+      break;
+
+    case InstId::vfwsub_wv:
+      printVec_vv(*this, out, "vfwsub.wv", di);
+      break;
+
+    case InstId::vfwsub_wf:
+      printVec_vf(*this, out, "vfwsub.wf", di);
       break;
 
     default:

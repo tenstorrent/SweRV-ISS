@@ -304,6 +304,24 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
       return instTable_.getEntry(InstId::illegal);  
     }
 
+  if (f3 == 1)
+    {
+      op0 = rform.bits.rd;
+      op1 = rform.bits.rs2;
+      op2 = rform.bits.rs1;
+
+      switch (f6)
+	{
+	case 0:    return instTable_.getEntry(InstId::vfadd_vv);
+	case 2:    return instTable_.getEntry(InstId::vfsub_vv);
+	case 0x30: return instTable_.getEntry(InstId::vfwadd_vv);
+	case 0x32: return instTable_.getEntry(InstId::vfwsub_vv);
+	case 0x34: return instTable_.getEntry(InstId::vfwadd_wv);
+	case 0x36: return instTable_.getEntry(InstId::vfwsub_wv);
+	}
+      return instTable_.getEntry(InstId::illegal);
+    }
+
   if (f3 == 2)
     {
       op0 = rform.bits.rd;
@@ -572,6 +590,25 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           return instTable_.getEntry(InstId::vwmaccsu_vx);
         }
       return instTable_.getEntry(InstId::illegal);  
+    }
+
+  if (f3 == 5)
+    {
+      op0 = rform.bits.rd;
+      op1 = rform.bits.rs2;
+      op2 = rform.bits.rs1;
+
+      switch (f6)
+	{
+	case 0:    return instTable_.getEntry(InstId::vfadd_vf);
+	case 2:    return instTable_.getEntry(InstId::vfsub_vf);
+	case 0x27: return instTable_.getEntry(InstId::vfrsub_vf);
+	case 0x30: return instTable_.getEntry(InstId::vfwadd_vf);
+	case 0x32: return instTable_.getEntry(InstId::vfwsub_vf);
+	case 0x34: return instTable_.getEntry(InstId::vfwadd_wf);
+	case 0x36: return instTable_.getEntry(InstId::vfwsub_wf);
+	}
+      return instTable_.getEntry(InstId::illegal);
     }
 
   if (f3 == 7)

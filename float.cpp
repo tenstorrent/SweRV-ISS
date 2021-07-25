@@ -34,20 +34,6 @@ extern "C" {
 using namespace WdRiscv;
 
 
-/// Unsigned-float union: reinterpret bits as uint64_t or double
-union Uint64DoubleUnion
-{
-  Uint64DoubleUnion(uint64_t u) : u(u)
-  { }
-
-  Uint64DoubleUnion(double d) : d(d)
-  { }
-
-  uint64_t u = 0;
-  double d;
-};
-
-
 template <typename URV>
 void
 Hart<URV>::resetFloat()
@@ -73,12 +59,12 @@ Hart<URV>::resetFloat()
       fpRegs_.reset(isRvzfh(), isRvf(), isRvd());
     }
 
-  #ifdef SOFT_FLOAT
+#ifdef SOFT_FLOAT
 
   softfloat_exceptionFlags = 0;
   softfloat_detectTininess = softfloat_tininess_afterRounding;
 
-  #endif
+#endif
 }
 
 
@@ -292,18 +278,6 @@ Hart<URV>::markFsDirty()
 #endif
 
 
-#ifdef SOFT_FLOAT
-/// Map a RISCV rounding mode to a soft-float constant.
-static std::array<int, 5> riscvRoungingModeToSoftFloat =
-  {
-   softfloat_round_near_even,   // NearsetEven
-   softfloat_round_minMag,      // Zero
-   softfloat_round_min,         // Down
-   softfloat_round_max,         // Up
-   softfloat_round_near_maxMag  // NearestMax
-  };
-#endif
-
 
 #ifdef SOFT_FLOAT
 
@@ -312,29 +286,31 @@ inline
 int
 mapRiscvRoundingModeToSoftFloat(RoundingMode mode)
 {
+  static std::array<int, 5> riscvToSoftFloat =
+    {
+      softfloat_round_near_even,   // NearsetEven
+      softfloat_round_minMag,      // Zero
+      softfloat_round_min,         // Down
+      softfloat_round_max,         // Up
+      softfloat_round_near_maxMag  // NearestMax
+    };
+
   uint32_t ix = uint32_t(mode);
-  return riscvRoungingModeToSoftFloat.at(ix);
+  return riscvToSoftFloat.at(ix);
 }
 
 
-static
-inline
 int
 setSimulatorRoundingMode(RoundingMode mode)
 {
   int previous = softfloat_roundingMode;
-  int next = mapRiscvRoundingModeToSoftFloat(mode);
-
-  softfloat_roundingMode = next;
-
+  softfloat_roundingMode = mapRiscvRoundingModeToSoftFloat(mode);
   return previous;
 }
 
 
 /// Clear the floating point flags in the machine running this
 /// simulator. Do nothing in the simuated RISCV machine.
-static
-inline
 void
 clearSimulatorFpFlags()
 {
@@ -343,46 +319,39 @@ clearSimulatorFpFlags()
 
 #else
 
-/// Map a RISCV rounding mode to an fetsetround constant.
-static std::array<int, 5> riscvRoungingModeToFe =
-  {
-   FE_TONEAREST,  // NearsetEven
-   FE_TOWARDZERO, // Zero
-   FE_DOWNWARD,   // Down
-   FE_UPWARD,     // Up
-   FE_TONEAREST   // NearestMax
-  };
-
 
 static
 inline
 int
 mapRiscvRoundingModeToFe(RoundingMode mode)
 {
+  static std::array<int, 5> riscvToFe =
+    {
+      FE_TONEAREST,  // NearsetEven
+      FE_TOWARDZERO, // Zero
+      FE_DOWNWARD,   // Down
+      FE_UPWARD,     // Up
+      FE_TONEAREST   // NearestMax
+    };
+
   uint32_t ix = uint32_t(mode);
-  return riscvRoungingModeToFe.at(ix);
+  return riscvToFe.at(ix);
 }
   
 
-static
-inline
 int
 setSimulatorRoundingMode(RoundingMode mode)
 {
   int previous = std::fegetround();
   int next = mapRiscvRoundingModeToFe(mode);
-
   if (next != previous)
     std::fesetround(next);
-
   return previous;
 }
 
 
 /// Clear the floating point flags in the machine running this
-/// simulator. Do nothing in the simuated RISCV machine.
-static
-inline
+/// simulator. Do nothing in the simulated RISCV machine.
 void
 clearSimulatorFpFlags()
 {
@@ -613,14 +582,6 @@ doubleToF64(double x)
   return float64_t{tmp.u};
 }
 
-
-/// Convert a native double to a softfloat float64_t
-inline float64_t
-doubleToF64(double x)
-{
-  Uint64DoubleUnion tmp(x);
-  return float64_t{tmp.u};
-}
 
 #endif
 

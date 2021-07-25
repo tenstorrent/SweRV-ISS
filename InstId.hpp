@@ -723,6 +723,22 @@ namespace WdRiscv
      vsuxei32_v,
      vsuxei64_v,
 
-     maxId = vsuxei64_v
+     vfadd_vv,
+     vfadd_vf,
+     vfsub_vv,
+     vfsub_vf,
+     vfrsub_vf,
+
+     vfwadd_vv,
+     vfwadd_vf,
+     vfwsub_vv,
+     vfwsub_vf,
+
+     vfwadd_wv,
+     vfwadd_wf,
+     vfwsub_wv,
+     vfwsub_wf,
+
+     maxId = vfwsub_wf
     };
 }

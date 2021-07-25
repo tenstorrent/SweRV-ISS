@@ -169,6 +169,20 @@ namespace WdRiscv
   };
 
 
+  /// Unsigned-float union: reinterpret bits as uint64_t or double
+  union Uint64DoubleUnion
+  {
+    Uint64DoubleUnion(uint64_t u) : u(u)
+    { }
+
+    Uint64DoubleUnion(double d) : d(d)
+    { }
+
+    uint64_t u = 0;
+    double d;
+  };
+
+
   class Float16
   {
   public:
@@ -204,6 +218,12 @@ namespace WdRiscv
       Uint32FloatUnion uf{word};
       return uf.f;
     }
+
+    /// Convert this Float16 to a float.
+    explicit operator float() const { return this->toFloat(); }
+
+    /// Convert this Float16 to a double.
+    explicit operator double() const { return this->toFloat(); }
 
     /// Return the sign bit of this Float16 in the least significant
     /// bit of the result.
@@ -245,6 +265,11 @@ namespace WdRiscv
 
     uint16_t i16 = 0;
   } __attribute__((packed));
+
+
+  /// Unary minus operator.
+  inline Float16 operator - (Float16 x)
+  { return x.negate(); }
 
 
   /// Model a RISCV floating point register file. We use double precision
@@ -336,8 +361,22 @@ namespace WdRiscv
     /// the number if the register is 64-bit wide.
     void writeSingle(unsigned i, float x);
 
+    /// Similar to readSingle but for for half precision.
     Float16 readHalf(unsigned i) const;
+
+    /// Similar to writeSingle but for for half precision.
     void writeHalf(unsigned i, Float16 x);
+
+    /// Read from register i a value of type FT (Float16, float, or double).
+    template <typename FT>
+    FT read(unsigned i) const
+    {
+      if constexpr (std::is_same<FT, Float16>::value) return readHalf(i);
+      if constexpr (std::is_same<FT, float>::value)   return readSingle(i);
+      if constexpr (std::is_same<FT, double>::value)  return readDouble(i);
+      assert(0);
+      return FT(0.0f);
+    }
 
     /// Return the count of registers in this register file.
     size_t size() const
@@ -512,5 +551,4 @@ namespace WdRiscv
     FpUnion u{x};
     writeDouble(i, u.dp);
   }
-
 }

@@ -189,6 +189,8 @@ namespace WdRiscv
   template <> struct makeDoubleWide<Int256>     { typedef Int512  type; };
   template <> struct makeDoubleWide<Int512>     { typedef Int1024 type; };
 
+  template <> struct makeDoubleWide<Float16>    { typedef float   type; };
+  template <> struct makeDoubleWide<float>      { typedef double  type; };
 
   template <typename T>
   T
@@ -378,6 +380,102 @@ Hart<URV>::checkMaskableInst(const DecodedInst* di)
 
   return true;
 }
+
+
+// From float.cpp
+extern void clearSimulatorFpFlags();
+extern int  setSimulatorRoundingMode(RoundingMode mode);
+
+
+template <typename URV>
+bool
+Hart<URV>::checkFpMaskableInst(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return false;
+
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  bool ok = false;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   ok = isZfhLegal(); break;
+    case EW::Word:   ok = isFpLegal();  break;
+    case EW::Word2:  ok = isDpLegal();  break;
+    default:         ok = false;        break;
+    }
+
+  // Clear soft-float library or x86 exception flags
+  clearSimulatorFpFlags();
+
+
+  // Set soft-float library or x86 rounding mode.
+  setSimulatorRoundingMode(getFpRoundingMode());
+
+  if (not ok)
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  return ok;
+}
+
+
+#ifdef SOFT_FLOAT
+
+/// Convert softfloat float16_t type to Float16.
+inline Float16 softToNative(float16_t f16)
+{
+  return Float16{f16};
+}
+
+
+/// Convert softfloat float32_t type to float.
+inline float softToNative(float32_t f32)
+{
+  Uint32FloatUnion tmp(f32.v);
+  return tmp.f;
+}
+
+
+/// Convert softfloat float64_t to double.
+inline double softToNative(float64_t f64)
+{
+  Uint64DoubleUnion tmp(f64.v);
+  return tmp.d;
+}
+
+
+/// Convert Float16 to a softfloat float16_t
+inline float16_t
+nativeToSoft(Float16 x)
+{
+  return float16_t{x.i16};
+}
+
+
+/// Convert a native float to a softfloat float32_t
+inline float32_t
+nativeToSoft(float x)
+{
+  Uint32FloatUnion tmp(x);
+  return float32_t{tmp.u};
+}
+
+
+/// Convert a native double to a softfloat float64_t
+inline float64_t
+nativeToSoft(double x)
+{
+  Uint64DoubleUnion tmp(x);
+  return float64_t{tmp.u};
+}
+
+
+#endif
 
 
 template <typename URV>
@@ -12900,6 +12998,948 @@ void
 Hart<URV>::execVsuxei64_v(const DecodedInst* di)
 {
   vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2);
+}
+
+
+template <typename T>
+static
+T
+subnormalAdjust(T x)
+{
+  if (std::fpclassify(x) != FP_SUBNORMAL)
+    return x;
+  return std::signbit(x) == 0 ? 0.0 : -0.0;
+}
+
+
+static
+Float16
+subnormalAdjust(Float16 x)
+{
+  if (not x.isSubnormal())
+    return x;
+  return x.clearMantissa();
+}
+
+
+namespace std
+{
+  static
+  bool isnan(Float16 x)
+  {
+    return x.isNan();
+  }
+}
+
+
+template<>
+Float16
+std::numeric_limits<Float16>::quiet_NaN()
+{
+  return Float16::quietNan();
+}
+
+
+Float16
+operator+ (Float16 f1, Float16 f2)
+{
+  return Float16{f1.toFloat() + f2.toFloat()};
+}
+
+
+template <typename FT>
+static FT
+doFadd(FT f1, FT f2, bool subnormToZero)
+{
+  if (subnormToZero)
+    {
+      f1 = subnormalAdjust(f1);
+      f2 = subnormalAdjust(f2);
+    }
+
+#ifdef SOFT_FLOAT
+  FT res = softAdd(f1, f2);
+#else
+  FT res = f1 + f2;
+#endif
+
+  if (std::isnan(res))
+    res = std::numeric_limits<FT>::quiet_NaN();
+
+  if (subnormToZero)
+    res = subnormalAdjust(res);
+  return res;
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                   unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f), dest = ELEM_TYPE(0.0f);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  dest = doFadd(e1, e2, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfadd_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:         illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = doFadd(e1, e2, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfadd_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfadd_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f), dest = ELEM_TYPE(0.0f);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  dest = doFadd(e1, -e2, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsub_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:         illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE negE2 = - fpRegs_.read<ELEM_TYPE>(fs2);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = doFadd(e1, negE2, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsub_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfrsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = doFadd(e2, -e1, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfrsub_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfrsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfrsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfrsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  e1dw = ELEM_TYPE2X(e1);
+	  e2dw = ELEM_TYPE2X(e2);
+	  dest = doFadd(e1dw, e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwadd_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfwadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfwadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); return;
+    default:         illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  e1dw = ELEM_TYPE2X(e1);
+          dest = doFadd(e1dw, e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwadd_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfwadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfwadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: illegalInst(di); return;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  e1dw = ELEM_TYPE2X(e1);
+	  e2dw = ELEM_TYPE2X(e2);
+	  dest = doFadd(e1dw, -e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwsub_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfwsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfwsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); return;
+    default:         illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE2X e1dw{0.0f}, negE2dw{-e2}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  e1dw = ELEM_TYPE2X(e1);
+          dest = doFadd(e1dw, negE2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwsub_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfwsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfwsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: illegalInst(di); return;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e2 = ELEM_TYPE(0.0f);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  e2dw = ELEM_TYPE2X(e2);
+	  dest = doFadd(e1dw, e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwadd_wv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfwadd_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfwadd_wv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); return;
+    default:         illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1dw))
+        {
+          dest = doFadd(e1dw, e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwadd_wf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfwadd_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfwadd_wf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: illegalInst(di); return;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE  e2 = ELEM_TYPE(0.0f);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  e2dw = ELEM_TYPE2X(e2);
+	  dest = doFadd(e1dw, -e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwsub_wv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfwsub_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfwsub_wv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); return;
+    default:         illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE2X e1dw{0.0f}, negE2dw{-e2}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1dw))
+        {
+          dest = doFadd(e1dw, negE2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwsub_wf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfwsub_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfwsub_wf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: illegalInst(di); return;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
 }
 
 

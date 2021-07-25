@@ -1838,6 +1838,15 @@ namespace WdRiscv
       return 0x1f;
     }
 
+    // Return true if maskable vector instruction is legal. Take an
+    // illegal instuction exception and return false otherwise.
+    bool checkMaskableInst(const DecodedInst* di);
+
+    // Return true if maskable floating point vecotr instruction is
+    // legal. Take an illegal instuction exception and return false
+    // otherwise.
+    bool checkFpMaskableInst(const DecodedInst* di);
+
     // rs1: index of source register (value range: 0 to 31)
     // rs2: index of source register (value range: 0 to 31)
     // rd: index of destination register (value range: 0 to 31)
@@ -2178,10 +2187,6 @@ namespace WdRiscv
     void execLoad64(const DecodedInst*);
     void execStore64(const DecodedInst*);
     void execBbarrier(const DecodedInst*);
-
-    // Return true if maskable instruction is legal. Take an illegal instuction
-    // exception and return false otherwise.
-    bool checkMaskableInst(const DecodedInst* di);
 
     void vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
     void execVsetvli(const DecodedInst*);
@@ -3022,6 +3027,71 @@ namespace WdRiscv
     void execVsuxei16_v(const DecodedInst*);
     void execVsuxei32_v(const DecodedInst*);
     void execVsuxei64_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVfadd_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfadd_vf(unsigned vd, unsigned vs1, unsigned f2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
+    void execVfadd_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVfsub_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfsub_vf(unsigned vd, unsigned vs1, unsigned f2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
+    void execVfsub_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfrsub_vf(unsigned vd, unsigned vs1, unsigned f2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfrsub_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfwadd_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwadd_vf(unsigned vd, unsigned vs1, unsigned f2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
+    void execVfwadd_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVfwsub_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwsub_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfwsub_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfwadd_wv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwadd_wf(unsigned vd, unsigned vs1, unsigned f2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
+    void execVfwadd_wf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                 unsigned start, unsigned elems, bool masked);
+    void execVfwsub_wv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwsub_wf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfwsub_wf(const DecodedInst*);
 
   private:
 

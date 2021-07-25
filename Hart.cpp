@@ -6112,6 +6112,21 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsuxei16_v,
      &&vsuxei32_v,
      &&vsuxei64_v,
+
+     &&vfadd_vv,
+     &&vfadd_vf,
+     &&vfsub_vv,
+     &&vfsub_vf,
+     &&vfrsub_vf,
+
+     &&vfwadd_vv,
+     &&vfwadd_vf,
+     &&vfwsub_vv,
+     &&vfwsub_vf,
+     &&vfwadd_wv,
+     &&vfwadd_wf,
+     &&vfwsub_wv,
+     &&vfwsub_wf,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8575,6 +8590,58 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vsuxei64_v:
   execVsuxei64_v(di);
+  return;
+
+ vfadd_vv:
+  execVfadd_vv(di);
+  return;
+
+ vfadd_vf:
+  execVfadd_vf(di);
+  return;
+
+ vfsub_vv:
+  execVfsub_vv(di);
+  return;
+
+ vfsub_vf:
+  execVfsub_vf(di);
+  return;
+
+ vfrsub_vf:
+  execVfrsub_vf(di);
+  return;
+
+ vfwadd_vv:
+  execVfwadd_vv(di);
+  return;
+
+ vfwadd_vf:
+  execVfwadd_vf(di);
+  return;
+
+ vfwsub_vv:
+  execVfwsub_vv(di);
+  return;
+
+ vfwsub_vf:
+  execVfwsub_vf(di);
+  return;
+
+ vfwadd_wv:
+  execVfwadd_wv(di);
+  return;
+
+ vfwadd_wf:
+  execVfwadd_wf(di);
+  return;
+
+ vfwsub_wv:
+  execVfwsub_wv(di);
+  return;
+
+ vfwsub_wf:
+  execVfwsub_wf(di);
   return;
 }
 
