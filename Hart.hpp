@@ -3134,11 +3134,36 @@ namespace WdRiscv
     void execVfnmsub_vf(const DecodedInst*);
 
     template<typename ELEM_TYPE>
+    void vfmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfmul_vv(const DecodedInst*);
+    template<typename ELEM_TYPE>
+
+    void vfmul_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfmul_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfdiv_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfdiv_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfdiv_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfdiv_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfrdiv_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfrdiv_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
     void vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		   unsigned start, unsigned elems, bool masked);
     void execVfmacc_vv(const DecodedInst*);
-    template<typename ELEM_TYPE>
 
+    template<typename ELEM_TYPE>
     void vfmacc_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		   unsigned start, unsigned elems, bool masked);
     void execVfmacc_vf(const DecodedInst*);

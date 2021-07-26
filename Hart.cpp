@@ -6128,6 +6128,12 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfwsub_wv,
      &&vfwsub_wf,
 
+     &&vfmul_vv,
+     &&vfmul_vf,
+     &&vfdiv_vv,
+     &&vfdiv_vf,
+     &&vfrdiv_vf,
+
      &&vfmadd_vv,
      &&vfmadd_vf,
      &&vfnmadd_vv,
@@ -8659,6 +8665,26 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfwsub_wf:
   execVfwsub_wf(di);
+  return;
+
+ vfmul_vv:
+  execVfmul_vv(di);
+  return;
+
+ vfmul_vf:
+  execVfmul_vf(di);
+  return;
+
+ vfdiv_vv:
+  execVfdiv_vv(di);
+  return;
+
+ vfdiv_vf:
+  execVfdiv_vf(di);
+  return;
+
+ vfrdiv_vf:
+  execVfrdiv_vf(di);
   return;
 
  vfmadd_vv:

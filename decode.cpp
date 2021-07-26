@@ -314,6 +314,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	{
 	case 0:    return instTable_.getEntry(InstId::vfadd_vv);
 	case 2:    return instTable_.getEntry(InstId::vfsub_vv);
+	case 0x20: return instTable_.getEntry(InstId::vfdiv_vv);
+	case 0x24: return instTable_.getEntry(InstId::vfmul_vv);
 	case 0x28:
           std::swap(op1, op2);  // per spec
 	  return instTable_.getEntry(InstId::vfmadd_vv);
@@ -626,6 +628,9 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	{
 	case 0:    return instTable_.getEntry(InstId::vfadd_vf);
 	case 2:    return instTable_.getEntry(InstId::vfsub_vf);
+	case 0x20:    return instTable_.getEntry(InstId::vfdiv_vf);
+	case 0x21:    return instTable_.getEntry(InstId::vfrdiv_vf);
+	case 0x24:    return instTable_.getEntry(InstId::vfmul_vf);
 	case 0x27: return instTable_.getEntry(InstId::vfrsub_vf);
 	case 0x28:
           std::swap(op1, op2);  // per spec

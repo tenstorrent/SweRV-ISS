@@ -20,15 +20,9 @@
 #include <cmath>
 #include <emmintrin.h>
 #include <array>
-
-#ifdef SOFT_FLOAT
-extern "C" {
-#include <softfloat.h>
-}
-#endif
-
 #include "Hart.hpp"
 #include "instforms.hpp"
+#include "softfloat-util.hpp"
 
 
 using namespace WdRiscv;
@@ -527,63 +521,6 @@ Hart<URV>::execFsw(const DecodedInst* di)
 
   store<uint32_t>(rs1, base, addr, uint32_t(val));
 }
-
-
-#ifdef SOFT_FLOAT
-
-/// Convert softfloat float16_t to Float16.
-inline Float16
-f16ToFloat16(float16_t f16)
-{
-  return Float16{f16};
-}
-
-
-/// Convert softfloat float32_t to a native float.
-inline float
-f32ToFloat(float32_t f32)
-{
-  Uint32FloatUnion tmp(f32.v);
-  return tmp.f;
-}
-
-
-/// Convert softfloat float64_t to a native double.
-inline double
-f64ToDouble(float64_t f64)
-{
-  Uint64DoubleUnion tmp(f64.v);
-  return tmp.d;
-}
-
-
-/// Convert Float16 to a softfloat float16_t
-inline float16_t
-Float16toF16(Float16 x)
-{
-  return float16_t{x.i16};
-}
-
-
-/// Convert a native float to a softfloat float32_t
-inline float32_t
-floatToF32(float x)
-{
-  Uint32FloatUnion tmp(x);
-  return float32_t{tmp.u};
-}
-
-
-/// Convert a native double to a softfloat float64_t
-inline float64_t
-doubleToF64(double x)
-{
-  Uint64DoubleUnion tmp(x);
-  return float64_t{tmp.u};
-}
-
-
-#endif
 
 
 /// Use fused mutiply-add to perform x*y + z.

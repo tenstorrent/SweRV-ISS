@@ -739,6 +739,12 @@ namespace WdRiscv
      vfwsub_wv,
      vfwsub_wf,
 
+     vfmul_vv,
+     vfmul_vf,
+     vfdiv_vv,
+     vfdiv_vf,
+     vfrdiv_vf,
+
      vfmadd_vv,
      vfmadd_vf,
      vfnmadd_vv,
