@@ -13943,5 +13943,154 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 }
 
 
+extern Float16
+subnormalAdjust(Float16);
+
+extern float
+subnormalAdjust(float);
+
+extern double
+subnormalAdjust(double);
+
+extern Float16
+fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool roundAfterMul, bool& invalid);
+
+extern float
+fusedMultiplyAdd(float x, float y, float z, bool roundAfterMul, bool& invalid);
+
+extern double
+fusedMultiplyAdd(double x, double y, double z, bool roundAfterMul, bool& invalid);
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f), dest = ELEM_TYPE(0.0f);
+
+  bool invalid = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and
+	  vecRegs_.read(vs2, ix, group, e2) and
+	  vecRegs_.read(vd, ix, group, dest))
+        {
+	  bool elemInv = false;  // True if fp invalid flag true for element
+	  dest = fusedMultiplyAdd(e1, dest, e2, roundAfterFusedMul_, elemInv);
+	  if (subnormToZero_)
+	    dest = subnormalAdjust(dest);
+	  invalid = invalid or elemInv;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+
+  updateAccruedFpBits(0.0f, invalid);
+  markFsDirty();
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmadd_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfmadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfmadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfmadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:         illegalInst(di); return;
+    }
+}
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  bool invalid = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+        {
+	  bool elemInv = false;
+          dest = fusedMultiplyAdd(e1, dest, e2, roundAfterFusedMul_, elemInv);
+	  if (subnormToZero_)
+	    dest = subnormalAdjust(dest);
+	  invalid = invalid or elemInv;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, invalid);
+  markFsDirty();
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmadd_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfmadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfmadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfmadd_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+}
+
 template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;

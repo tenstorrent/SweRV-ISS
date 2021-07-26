@@ -589,7 +589,6 @@ doubleToF64(double x)
 /// Use fused mutiply-add to perform x*y + z.
 /// Set invalid to true if x and y are zero and infinity or
 /// vice versa since RISCV consider that as an invalid operation.
-static
 float
 fusedMultiplyAdd(float x, float y, float z, bool roundAfterMul, bool& invalid)
 {
@@ -633,7 +632,6 @@ fusedMultiplyAdd(float x, float y, float z, bool roundAfterMul, bool& invalid)
 /// Use fused mutiply-add to perform x*y + z.
 /// Set invalid to true if x and y are zero and infinity or
 /// vice versa since RISCV consider that as an invalid operation.
-static
 Float16
 fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool roundAfterMul, bool& invalid)
 {
@@ -672,7 +670,6 @@ fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool roundAfterMul, bool& inva
 
 
 /// Use fused mutiply-add to perform x*y + z.
-static
 double
 fusedMultiplyAdd(double x, double y, double z, bool roundAfterMul, bool& invalid)
 {
@@ -713,9 +710,17 @@ fusedMultiplyAdd(double x, double y, double z, bool roundAfterMul, bool& invalid
 }
 
 
-template <typename T>
-T
-subnormalAdjust(T x)
+float
+subnormalAdjust(float x)
+{
+  if (std::fpclassify(x) != FP_SUBNORMAL)
+    return x;
+  return std::signbit(x) == 0 ? 0.0 : -0.0;
+}
+
+
+double
+subnormalAdjust(double x)
 {
   if (std::fpclassify(x) != FP_SUBNORMAL)
     return x;

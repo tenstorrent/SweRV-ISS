@@ -585,6 +585,20 @@ printVec_vf(Hart<URV>& hart, std::ostream& out, const char* inst,
 
 
 template <typename URV>
+static
+void
+printVec_fv(Hart<URV>& hart, std::ostream& out, const char* inst,
+	    const DecodedInst& di, bool mask = true)
+{
+  out << inst << " v" << di.op0() << ", " << hart.fpRegName(di.op1())
+      << ", v" << di.op2();
+
+  if (mask and di.isMasked())
+    out << ", v0.t";
+}
+
+
+template <typename URV>
 void
 Hart<URV>::disassembleInst(uint32_t inst, std::ostream& stream)
 {
@@ -3316,6 +3330,14 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::vfwsub_wf:
       printVec_vf(*this, out, "vfwsub.wf", di);
+      break;
+
+    case InstId::vfmadd_vv:
+      printVec_vv(*this, out, "vfmadd.vv", di);
+      break;
+
+    case InstId::vfmadd_vf:
+      printVec_fv(*this, out, "vfmadd.vf", di);
       break;
 
     default:
