@@ -748,6 +748,15 @@ namespace WdRiscv
      vfnmsub_vv,
      vfnmsub_vf,
 
-     maxId = vfmsub_vf
+     vfmacc_vv,
+     vfmacc_vf,
+     vfnmacc_vv,
+     vfnmacc_vf,
+     vfmsac_vv,
+     vfmsac_vf,
+     vfnmsac_vv,
+     vfnmsac_vf,
+
+     maxId = vfmsac_vf
     };
 }
