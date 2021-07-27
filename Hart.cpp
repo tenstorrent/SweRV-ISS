@@ -6152,6 +6152,14 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfmsac_vf,
      &&vfnmsac_vv,
      &&vfnmsac_vf,
+     &&vfwmacc_vv,
+     &&vfwmacc_vf,
+     &&vfwnmacc_vv,
+     &&vfwnmacc_vf,
+     &&vfwmsac_vv,
+     &&vfwmsac_vf,
+     &&vfwnmsac_vv,
+     &&vfwnmsac_vf,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8759,6 +8767,38 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfnmsac_vf:
   execVfnmsac_vf(di);
+  return;
+
+ vfwmacc_vv:
+  execVfwmacc_vv(di);
+  return;
+
+ vfwmacc_vf:
+  execVfwmacc_vf(di);
+  return;
+
+ vfwnmacc_vv:
+  execVfwnmacc_vv(di);
+  return;
+
+ vfwnmacc_vf:
+  execVfwnmacc_vf(di);
+  return;
+
+ vfwmsac_vv:
+  execVfwmsac_vv(di);
+  return;
+
+ vfwmsac_vf:
+  execVfwmsac_vf(di);
+  return;
+
+ vfwnmsac_vv:
+  execVfwnmsac_vv(di);
+  return;
+
+ vfwnmsac_vf:
+  execVfwnmsac_vf(di);
   return;
 }
 

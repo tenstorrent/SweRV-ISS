@@ -3208,6 +3208,46 @@ namespace WdRiscv
 		   unsigned start, unsigned elems, bool masked);
     void execVfnmsac_vf(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked);
+    void execVfwmacc_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwmacc_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked);
+    void execVfwmacc_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked);
+    void execVfwnmacc_vv(const DecodedInst*);
+    template<typename ELEM_TYPE>
+
+    void vfwnmacc_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked);
+    void execVfwnmacc_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked);
+    void execVfwmsac_vv(const DecodedInst*);
+    template<typename ELEM_TYPE>
+
+    void vfwmsac_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked);
+    void execVfwmsac_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked);
+    void execVfwnmsac_vv(const DecodedInst*);
+    template<typename ELEM_TYPE>
+
+    void vfwnmsac_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked);
+    void execVfwnmsac_vf(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
