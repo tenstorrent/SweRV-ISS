@@ -3159,6 +3159,16 @@ namespace WdRiscv
     void execVfrdiv_vf(const DecodedInst*);
 
     template<typename ELEM_TYPE>
+    void vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfwmul_vv(const DecodedInst*);
+    template<typename ELEM_TYPE>
+
+    void vfwmul_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfwmul_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
     void vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		   unsigned start, unsigned elems, bool masked);
     void execVfmacc_vv(const DecodedInst*);

@@ -344,6 +344,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x32: return instTable_.getEntry(InstId::vfwsub_vv);
 	case 0x34: return instTable_.getEntry(InstId::vfwadd_wv);
 	case 0x36: return instTable_.getEntry(InstId::vfwsub_wv);
+	case 0x38: return instTable_.getEntry(InstId::vfwmul_vv);
 	}
       return instTable_.getEntry(InstId::illegal);
     }
@@ -660,6 +661,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x32: return instTable_.getEntry(InstId::vfwsub_vf);
 	case 0x34: return instTable_.getEntry(InstId::vfwadd_wf);
 	case 0x36: return instTable_.getEntry(InstId::vfwsub_wf);
+	case 0x38: return instTable_.getEntry(InstId::vfwmul_vf);
 	}
       return instTable_.getEntry(InstId::illegal);
     }

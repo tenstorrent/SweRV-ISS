@@ -13401,7 +13401,7 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13430,15 +13430,16 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -13475,7 +13476,7 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13503,15 +13504,16 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -13547,7 +13549,7 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13576,15 +13578,16 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -13621,7 +13624,7 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13649,15 +13652,16 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -13693,7 +13697,7 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13721,15 +13725,16 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -13765,7 +13770,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13792,15 +13797,16 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -13836,7 +13842,7 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13864,15 +13870,16 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -13908,7 +13915,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -13935,15 +13942,16 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
 
@@ -14254,6 +14262,145 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
 }
 
 
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                   unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  unsigned errors = 0;
+  ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group2x);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  e1dw = ELEM_TYPE2X(e1);
+	  e2dw = ELEM_TYPE2X(e2);
+	  dest = doFmul(e1dw, e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwmul_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfwmul_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfwmul_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    default:         illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group2x);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  e1dw = ELEM_TYPE2X(e1);
+          dest = doFmul(e1dw, e2dw, subnormToZero_);
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwmul_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfwmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfwmul_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
 
 
 extern Float16

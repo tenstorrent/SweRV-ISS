@@ -28,6 +28,11 @@
 	"mstatus" : {
 	    "reset" : "0xffffffff",
 	    "mask" : "0xffffffff"
+	},
+	"ttcsr7c0" : {
+	    "number" : "0x7c0",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
 	}
     },
 

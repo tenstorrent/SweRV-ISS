@@ -3352,6 +3352,14 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printVec_vf(*this, out, "vfrdiv.vf", di);
       break;
 
+    case InstId::vfwmul_vv:
+      printVec_vv(*this, out, "vfwmul.vv", di);
+      break;
+
+    case InstId::vfwmul_vf:
+      printVec_vf(*this, out, "vfwmul.vf", di);
+      break;
+
     case InstId::vfmadd_vv:
       printVec_vv(*this, out, "vfmadd.vv", di);
       break;

@@ -366,6 +366,13 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
             }
         }
 
+      if (not csr)
+	{
+	  std::cerr << "A CSR number must be provided in configuration of non-standard CSR "
+		    << csrName << '\n';
+	  errors++;
+	  continue;
+	}
       bool exists0 = csr->isImplemented(), isDebug0 = csr->isDebug();
       bool shared0 = csr->isShared();
       URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
