@@ -774,6 +774,8 @@ namespace WdRiscv
      vfwnmsac_vv,
      vfwnmsac_vf,
 
-     maxId = vfwnmsac_vf
+     vfsqrt_v,
+
+     maxId = vfsqrt_v
     };
 }

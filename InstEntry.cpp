@@ -4932,5 +4932,13 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::FpReg, OperandMode::Read, rs2Mask,
       },
+
+      { "vfsqrt.v", InstId::vfsqrt_v,
+        0b010011'0'00000'00000'001'00000'1010111, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+      },
     };
 }

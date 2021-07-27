@@ -112,7 +112,7 @@ namespace WdRiscv
   }
 
 
-  /// Perform a floating point mul using the softfloat library.
+  /// Perform a floating point divide using the softfloat library.
   inline float
   softDiv(float a, float b)
   {
@@ -121,7 +121,7 @@ namespace WdRiscv
   }
 
 
-  /// Perform a floating point div using the softfloat library.
+  /// Perform a floating point divide using the softfloat library.
   inline double
   softDiv(double a, double b)
   {
@@ -130,7 +130,7 @@ namespace WdRiscv
   }
 
 
-  /// Perform a floating point div using the softfloat library.
+  /// Perform a floating point divide using the softfloat library.
   inline Float16
   softDiv(Float16 a, Float16 b)
   {
@@ -138,6 +138,32 @@ namespace WdRiscv
     return res;
   }
 
+
+  /// Perform a floating point sqrt using the softfloat library.
+  inline float
+  softSqrt(float a)
+  {
+    float res = softToNative(f32_sqrt(nativeToSoft(a)));
+    return res;
+  }
+
+
+  /// Perform a floating point sqrt using the softfloat library.
+  inline double
+  softSqrt(double a)
+  {
+    double res = softToNative(f64_sqrt(nativeToSoft(a)));
+    return res;
+  }
+
+
+  /// Perform a floating point sqrt using the softfloat library.
+  inline Float16
+  softSqrt(Float16 a)
+  {
+    Float16 res = softToNative(f16_sqrt(nativeToSoft(a)));
+    return res;
+  }
 }
 
 #endif

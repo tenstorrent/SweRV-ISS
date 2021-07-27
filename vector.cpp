@@ -938,7 +938,10 @@ Hart<URV>::vwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchReg(vd, wideGroup);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
@@ -1032,7 +1035,7 @@ Hart<URV>::vwadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  unsigned errors = 0, doubleGroup = group*2;
+  unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0;
   DWT dest = 0;
@@ -1041,7 +1044,7 @@ Hart<URV>::vwadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -1049,7 +1052,7 @@ Hart<URV>::vwadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
         {
           dest = DWT(e1);
           dest += DWT(e2);
-          if (not vecRegs_.write(vd, ix, doubleGroup, dest))
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
         }
       else
@@ -1215,7 +1218,7 @@ Hart<URV>::vwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  unsigned errors = 0, doubleGroup = group*2;
+  unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0;
@@ -1223,13 +1226,16 @@ Hart<URV>::vwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchReg(vd, wideGroup);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
           dest = DWT(e1);
           dest -= DWT(e2);
-          if (not vecRegs_.write(vd, ix, doubleGroup, dest))
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
         }
       else
@@ -1317,7 +1323,7 @@ Hart<URV>::vwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  unsigned errors = 0, doubleGroup = group*2;
+  unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT e1 = 0, dest = 0;
@@ -1326,15 +1332,15 @@ Hart<URV>::vwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, doubleGroup);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, doubleGroup, e1) and vecRegs_.read(vs2, ix, group, e2))
+      if (vecRegs_.read(vs1, ix, wideGroup, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
           dest = e1;
           dest += DWT(e2);
-          if (not vecRegs_.write(vd, ix, doubleGroup, dest))
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
         }
       else
@@ -1570,7 +1576,7 @@ Hart<URV>::vwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  unsigned errors = 0, doubleGroup = group*2;
+  unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT e1 = 0, dest = 0;
@@ -1578,13 +1584,16 @@ Hart<URV>::vwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchReg(vd, wideGroup);
+	  continue;
+	}
 
-      if (vecRegs_.read(vs1, ix, doubleGroup, e1) and vecRegs_.read(vs2, ix, group, e2))
+      if (vecRegs_.read(vs1, ix, wideGroup, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
           dest = e1;
           dest -= DWT(e2);
-          if (not vecRegs_.write(vd, ix, doubleGroup, dest))
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
         }
       else
@@ -1736,7 +1745,10 @@ Hart<URV>::vmseq_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
@@ -1883,7 +1895,10 @@ Hart<URV>::vmsne_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
@@ -2030,7 +2045,10 @@ Hart<URV>::vmslt_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
@@ -2205,7 +2223,10 @@ Hart<URV>::vmsle_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
@@ -2533,7 +2554,10 @@ Hart<URV>::vminu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
@@ -2654,7 +2678,10 @@ Hart<URV>::vmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
@@ -2771,7 +2798,10 @@ Hart<URV>::vmaxu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
@@ -2892,7 +2922,10 @@ Hart<URV>::vmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
@@ -3009,7 +3042,10 @@ Hart<URV>::vand_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-        continue;
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
@@ -6545,12 +6581,12 @@ Hart<URV>::execVmadd_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vmadd_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+Hart<URV>::vmadd_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1 = 0, dest = 0;
-  ELEM_TYPE e2 = SRV(intRegs_.read(rs2));
+  ELEM_TYPE e2 = 0, dest = 0;
+  ELEM_TYPE e1 = SRV(intRegs_.read(rs1));
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -6560,7 +6596,7 @@ Hart<URV>::vmadd_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(v2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  dest = (e1 * dest) + e2;
           if (not vecRegs_.write(vd, ix, group, dest))
@@ -6667,12 +6703,12 @@ Hart<URV>::execVnmsub_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vnmsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+Hart<URV>::vnmsub_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1 = 0, dest = 0;
-  ELEM_TYPE e2 = SRV(intRegs_.read(rs2));
+  ELEM_TYPE e2 = 0, dest = 0;
+  ELEM_TYPE e1 = SRV(intRegs_.read(rs1));
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -6682,7 +6718,7 @@ Hart<URV>::vnmsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(v2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  dest = -(e1 * dest) + e2;
           if (not vecRegs_.write(vd, ix, group, dest))
@@ -7204,7 +7240,7 @@ Hart<URV>::vwmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -7279,7 +7315,7 @@ Hart<URV>::vwmulsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -7355,7 +7391,7 @@ Hart<URV>::vwmulsu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -7428,7 +7464,7 @@ Hart<URV>::vwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -7486,29 +7522,30 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vwmaccu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+Hart<URV>::vwmaccu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
   typedef typename std::make_signed<DWT>::type SDWT; // Signed double wide type
-  unsigned errors = 0, doubleGroup = group*2;
+  unsigned errors = 0, wideGroup = group*2;
 
-  ELEM_TYPE e1 = 0;
+  ELEM_TYPE e2 = 0;
   DWT dest = 0;
-  SDWT de2 = SDWT(e2);  // sign extend (spec is foolish)
+  SDWT sde1 = SDWT(e1);  // sign extend (spec is foolish)
+  DWT de1 = sde1;  // And make unsigned
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs1, ix, doubleGroup, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
         {
-          dest += DWT(e1) * DWT(de2);
-          if (not vecRegs_.write(vd, ix, doubleGroup, dest))
+          dest += de1 * DWT(e2);
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
         }
       else
@@ -7527,7 +7564,7 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -7540,15 +7577,15 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
       return;
     }
 
-  SRV e2 = SRV(intRegs_.read(rs2));  // Spec says sign extend. Bogus.
+  SRV e1 = SRV(intRegs_.read(rs1));  // Spec says sign extend. Bogus.
 
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vwmaccu_vx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwmaccu_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwmaccu_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2: vwmaccu_vx<uint64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
+    case EW::Byte: vwmaccu_vx<uint8_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Half: vwmaccu_vx<uint16_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word: vwmaccu_vx<uint32_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vwmaccu_vx<uint64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -7596,28 +7633,28 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vwmacc_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+Hart<URV>::vwmacc_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  unsigned errors = 0, doubleGroup = group*2;
+  unsigned errors = 0, wideGroup = group*2;
 
-  ELEM_TYPE e1 = 0;
+  ELEM_TYPE e2 = 0;
   DWT dest = 0;
-  DWT de2 = DWT(e2);  // sign extend
+  DWT de1 = DWT(e1);  // sign extend
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs1, ix, doubleGroup, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
         {
-          dest += DWT(e1) * de2;
-          if (not vecRegs_.write(vd, ix, doubleGroup, dest))
+          dest += de1 * DWT(e2);
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
         }
       else
@@ -7636,7 +7673,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -7649,15 +7686,15 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
       return;
     }
 
-  SRV e2 = SRV(intRegs_.read(rs2));  // Sign extend.
+  SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
 
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vwmacc_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwmacc_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwmacc_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2: vwmacc_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
+    case EW::Byte:  vwmacc_vx<int8_t> (vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmacc_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmacc_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vwmacc_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -7684,7 +7721,7 @@ Hart<URV>::vwmaccsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -7744,7 +7781,7 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vwmaccsu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+Hart<URV>::vwmaccsu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
@@ -7752,22 +7789,22 @@ Hart<URV>::vwmaccsu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   unsigned errors = 0, wideGroup = group*2;
 
-  ELEM_TYPE e1 = 0;
-  DWT de2 = DWT(e2);  // Sign extend.  Spec is bogus.
-  DWTU de2u = DWTU(de2); // Then make unsigned,
+  ELEM_TYPE e2 = 0;
+  DWT de1 = DWT(e1);  // Sign extend.  Spec is bogus.
+  DWTU de1u = DWTU(de1); // Then make unsigned,
   DWT dest = 0, temp = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, wideGroup, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
         {
-          mulsu(DWT(e1), de2u, temp);
+          mulsu(DWT(e2), de1u, temp);
           dest += temp;
           if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
@@ -7821,7 +7858,7 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vwmaccus_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+Hart<URV>::vwmaccus_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
@@ -7830,8 +7867,9 @@ Hart<URV>::vwmaccus_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   unsigned errors = 0, wideGroup = group*2;
 
-  ELEM_TYPEU e1 = 0;
-  DWT de2 = DWT(e2);  // Sign extend.
+  ELEM_TYPEU e2 = 0;
+  DWT de1 = DWT(e1);  // Sign extend.
+  DWTU de1u = de1;
   DWT dest = 0, temp = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -7842,10 +7880,10 @@ Hart<URV>::vwmaccus_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, wideGroup, dest)
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest)
           and vecRegs_.read(vd, ix, wideGroup, dest))
         {
-          mulsu(de2, DWTU(e1), temp);
+          mulsu(DWT(e2), de1u, temp);
           dest += temp;
           if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
@@ -13042,6 +13080,33 @@ doFadd(FT f1, FT f2, bool subnormToZero)
 
 template <typename FT>
 static FT
+doFsqrt(FT f1, bool subnormToZero)
+{
+  if (subnormToZero)
+    f1 = subnormalAdjust(f1);
+
+  FT res{0.0f};
+
+#ifdef SOFT_FLOAT
+  res = softSqrt(f1);
+#else
+  if constexpr (std::is_same<FT, Float16>::value)
+    res = FT{std::sqrt(float(f1))};
+  else
+   res = std::sqrt(f1);
+#endif
+
+  if (std::isnan(res))
+    res = std::numeric_limits<FT>::quiet_NaN();
+
+  if (subnormToZero)
+    res = subnormalAdjust(res);
+  return res;
+}
+
+
+template <typename FT>
+static FT
 doFmul(FT f1, FT f2, bool subnormToZero)
 {
   if (subnormToZero)
@@ -15555,7 +15620,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -15713,7 +15778,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -15871,7 +15936,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -16008,6 +16073,7 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
     }
 }
 
+
 template <typename URV>
 template <typename ELEM_TYPE>
 void
@@ -16029,7 +16095,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -16081,6 +16147,69 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
     case EW::Half:  vfnmsac_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfnmsac_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfnmsac_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
+		       unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+
+  bool invalid = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = doFsqrt(e1, subnormToZero_);
+	  if (subnormToZero_)
+	    dest = subnormalAdjust(dest);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, invalid);
+  markFsDirty();
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsqrt_v(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfsqrt_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfsqrt_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2: vfsqrt_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
 }

@@ -6160,6 +6160,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfwmsac_vf,
      &&vfwnmsac_vv,
      &&vfwnmsac_vf,
+     &&vfsqrt_v,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8799,6 +8800,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfwnmsac_vf:
   execVfwnmsac_vf(di);
+  return;
+
+ vfsqrt_v:
+  execVfsqrt_v(di);
   return;
 }
 
