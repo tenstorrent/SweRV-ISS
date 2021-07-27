@@ -6161,6 +6161,8 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfwnmsac_vv,
      &&vfwnmsac_vf,
      &&vfsqrt_v,
+     &&vfmerge_vfm,
+     &&vfmv_v_f,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8804,6 +8806,14 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfsqrt_v:
   execVfsqrt_v(di);
+  return;
+
+ vfmerge_vfm:
+  execVfmerge_vfm(di);
+  return;
+
+ vfmv_v_f:
+  execVfmv_v_f(di);
   return;
 }
 

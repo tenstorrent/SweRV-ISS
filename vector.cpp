@@ -9598,20 +9598,13 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vx(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not isVecLegal() or not vecRegs_.legalConfig() or not di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
-  bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  if (not masked)
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16161,8 +16154,6 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{0.0f}, dest{0.0f};
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -16183,7 +16174,7 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
 
   assert(errors == 0);
@@ -16210,6 +16201,106 @@ Hart<URV>::execVfsqrt_v(const DecodedInst* di)
     case EW::Half:  vfsqrt_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfsqrt_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2: vfsqrt_v<double> (vd, vs1, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmerge(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+		   unsigned start, unsigned elems)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = vecRegs_.isActive(0, ix) ? e1 : e2;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig() or not di->isMasked())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfmerge<Float16>(vd, vs1, rs2, group, start, elems); break;
+    case EW::Word:  vfmerge<float>  (vd, vs1, rs2, group, start, elems); break;
+    case EW::Word2: vfmerge<double> (vd, vs1, rs2, group, start, elems); break;
+    default:        illegalInst(di); return;
+    }
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmv_v_f(unsigned vd, unsigned rs1, unsigned group,
+		    unsigned start, unsigned elems)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+  e1 = fpRegs_.read<ELEM_TYPE>(rs1);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (not vecRegs_.write(vd, ix, group, e1))
+	errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmv_v_f(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  rs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfmv_v_f<Float16>(vd, rs1, group, start, elems); break;
+    case EW::Word:  vfmv_v_f<float>  (vd, rs1, group, start, elems); break;
+    case EW::Word2: vfmv_v_f<double> (vd, rs1, group, start, elems); break;
     default:        illegalInst(di); return;
     }
 }

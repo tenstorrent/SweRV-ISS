@@ -3253,6 +3253,16 @@ namespace WdRiscv
 		     unsigned start, unsigned elems, bool masked);
     void execVfsqrt_v(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfmerge(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+		 unsigned start, unsigned elems);
+    void execVfmerge_vfm(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfmv_v_f(unsigned vd, unsigned rs1, unsigned group,
+		  unsigned start, unsigned elems);
+    void execVfmv_v_f(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load

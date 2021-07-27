@@ -587,11 +587,11 @@ template <typename URV>
 static
 void
 printVec_vf(Hart<URV>& hart, std::ostream& out, const char* inst,
-	    const DecodedInst& di, bool mask = true)
+	    const DecodedInst& di)
 {
   out << inst << " v" << di.op0() << ", v" << di.op1() << ", "
       << hart.fpRegName(di.op2());
-  if (mask and di.isMasked())
+  if (di.isMasked())
     out << ", v0.t";
 }
 
@@ -600,12 +600,12 @@ template <typename URV>
 static
 void
 printVec_fv(Hart<URV>& hart, std::ostream& out, const char* inst,
-	    const DecodedInst& di, bool mask = true)
+	    const DecodedInst& di)
 {
   out << inst << " v" << di.op0() << ", " << hart.fpRegName(di.op1())
       << ", v" << di.op2();
 
-  if (mask and di.isMasked())
+  if (di.isMasked())
     out << ", v0.t";
 }
 
@@ -3470,6 +3470,14 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::vfsqrt_v:
       printVec_v(*this, out, "vsqrt.v", di);
+      break;
+
+    case InstId::vfmerge_vfm:
+      printVec_vf(*this, out, "vfmerge.vfm", di);
+      break;
+
+    case InstId::vfmv_v_f:
+      out << "vfmv.v.f v" << di.op0() << this->fpRegName(di.op1());
       break;
 
     default:
