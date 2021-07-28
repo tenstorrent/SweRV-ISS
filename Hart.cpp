@@ -3749,14 +3749,6 @@ addToUnsignedHistogram(std::vector<uint64_t>& histo, uint64_t val)
 }
 
 
-extern bool
-mostSignificantFractionBit(float x);
-
-
-extern bool
-mostSignificantFractionBit(double x);
-
-
 template <typename FP_TYPE>
 void
 addToFpHistogram(std::vector<uint64_t>& histo, FP_TYPE val)
@@ -3786,8 +3778,8 @@ addToFpHistogram(std::vector<uint64_t>& histo, FP_TYPE val)
     }
   else if (type == FP_NAN)
     {
-      bool quiet = mostSignificantFractionBit(val);
-      FpKinds kind = quiet? FpKinds::QuietNan : FpKinds::SignalingNan;
+      bool signaling = isSnan(val);
+      FpKinds kind = signaling? FpKinds::SignalingNan : FpKinds::QuietNan;
       histo.at(unsigned(kind))++;
     }
 }
@@ -6173,6 +6165,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vmfle_vf,
      &&vmfgt_vf,
      &&vmfge_vf,
+     &&vfclass_v,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8864,6 +8857,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vmfge_vf:
   execVmfge_vf(di);
+  return;
+
+ vfclass_v:
+  execVfclass_v(di);
   return;
 }
 

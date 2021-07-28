@@ -193,6 +193,22 @@ namespace WdRiscv
   template <> struct makeDoubleWide<Float16>    { typedef float   type; };
   template <> struct makeDoubleWide<float>      { typedef double  type; };
 
+
+  /// Return the integral type that is the same width as the given
+  /// floating point. For example:
+  ///    getSameWidthIntegerType<float>::type
+  /// yields the type
+  ///    int32_t.
+  template <typename T>
+  struct getSameWidthIntType
+  {
+  };
+
+  template <> struct getSameWidthIntType<Float16>  { typedef int16_t  type; };
+  template <> struct getSameWidthIntType<float>    { typedef int32_t  type; };
+  template <> struct getSameWidthIntType<double>   { typedef int64_t  type; };
+
+  /// Return smallest representable value of the given integer type T.
   template <typename T>
   T
   minVal()
@@ -208,6 +224,7 @@ namespace WdRiscv
   }
 
 
+  /// Return largest representable value of the given integer type T.
   template <typename T>
   T
   maxVal()
@@ -16328,7 +16345,7 @@ Hart<URV>::vmfeq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16395,7 +16412,7 @@ Hart<URV>::vmfeq_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16461,7 +16478,7 @@ Hart<URV>::vmfne_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16528,7 +16545,7 @@ Hart<URV>::vmfne_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16594,7 +16611,7 @@ Hart<URV>::vmflt_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16661,7 +16678,7 @@ Hart<URV>::vmflt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16727,7 +16744,7 @@ Hart<URV>::vmfle_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16794,7 +16811,7 @@ Hart<URV>::vmfle_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16861,7 +16878,7 @@ Hart<URV>::vmfgt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16928,7 +16945,7 @@ Hart<URV>::vmfge_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  bool flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
-	      if (issnan(e1) or issnan(e2))
+	      if (isSnan(e1) or isSnan(e2))
 		orFcsrFlags(FpFlags::Invalid);
 	    }
 	  else
@@ -16964,6 +16981,66 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
     case EW::Half:   vmfge_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vmfge_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vmfge_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfclass_v(unsigned vd, unsigned vs1, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
+	  INT_TYPE dest = fpClassifyRiscv(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfclass_v(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfclass_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfclass_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;

@@ -1068,7 +1068,7 @@ Hart<URV>::execFmin_s(const DecodedInst* di)
   else
     res = std::fminf(in1, in2);
 
-  if (issnan(in1) or issnan(in2))
+  if (isSnan(in1) or isSnan(in2))
     orFcsrFlags(FpFlags::Invalid);
   else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
     res = std::copysign(res, -1.0F);  // Make sure min(-0, +0) is -0.
@@ -1103,7 +1103,7 @@ Hart<URV>::execFmax_s(const DecodedInst* di)
   else
     res = std::fmaxf(in1, in2);
 
-  if (issnan(in1) or issnan(in2))
+  if (isSnan(in1) or isSnan(in2))
     orFcsrFlags(FpFlags::Invalid);
   else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
     res = std::copysign(res, 1.0F);  // Make sure max(-0, +0) is +0.
@@ -1269,7 +1269,7 @@ Hart<URV>::execFeq_s(const DecodedInst* di)
 
   if (std::isnan(f1) or std::isnan(f2))
     {
-      if (issnan(f1) or issnan(f2))
+      if (isSnan(f1) or isSnan(f2))
         orFcsrFlags(FpFlags::Invalid);
     }
   else
@@ -1330,21 +1330,62 @@ Hart<URV>::execFle_s(const DecodedInst* di)
 }
 
 
-bool
-mostSignificantFractionBit(float x)
+template <typename FT>
+unsigned
+WdRiscv::fpClassifyRiscv(FT val)
 {
-  Uint32FloatUnion ufu(x);
-  return (ufu.u >> 22) & 1;
+  unsigned result = 0;
+
+  bool pos = not std::signbit(val);
+  int type = std::fpclassify(val);
+
+  if (type == FP_INFINITE)
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosInfinity);
+      else
+	result |= unsigned(FpClassifyMasks::NegInfinity);
+    }
+  else if (type == FP_NORMAL)
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosNormal);
+      else
+	result |= unsigned(FpClassifyMasks::NegNormal);
+    }
+  else if (type == FP_SUBNORMAL)
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosSubnormal);
+      else
+	result |= unsigned(FpClassifyMasks::NegSubnormal);
+    }
+  else if (type == FP_ZERO)
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosZero);
+      else
+	result |= unsigned(FpClassifyMasks::NegZero);
+    }
+  else if (type == FP_NAN)
+    {
+      if (isSnan(val))
+	result |= unsigned(FpClassifyMasks::SignalingNan);
+      else
+	result |= unsigned(FpClassifyMasks::QuietNan);
+    }
+
+  return result;
 }
 
 
-bool
-mostSignificantFractionBit(double x)
+template <>
+unsigned
+WdRiscv::fpClassifyRiscv(Float16 val)
 {
-  Uint64DoubleUnion udu(x);
-  return (udu.u >> 51) & 1;
+  float f = val.toFloat();
+  return fpClassifyRiscv(f);
 }
-
 
 
 template <typename URV>
@@ -1358,48 +1399,7 @@ Hart<URV>::execFclass_s(const DecodedInst* di)
     }
 
   float f1 = fpRegs_.readSingle(di->op1());
-  URV result = 0;
-
-  bool pos = not std::signbit(f1);
-  int type = std::fpclassify(f1);
-
-  if (type == FP_INFINITE)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosInfinity);
-      else
-	result |= URV(FpClassifyMasks::NegInfinity);
-    }
-  else if (type == FP_NORMAL)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosNormal);
-      else
-	result |= URV(FpClassifyMasks::NegNormal);
-    }
-  else if (type == FP_SUBNORMAL)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosSubnormal);
-      else
-	result |= URV(FpClassifyMasks::NegSubnormal);
-    }
-  else if (type == FP_ZERO)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosZero);
-      else
-	result |= URV(FpClassifyMasks::NegZero);
-    }
-  else if (type == FP_NAN)
-    {
-      bool quiet = mostSignificantFractionBit(f1);
-      if (quiet)
-	result |= URV(FpClassifyMasks::QuietNan);
-      else
-	result |= URV(FpClassifyMasks::SignalingNan);
-    }
-
+  URV result = fpClassifyRiscv(f1);
   intRegs_.write(di->op0(), result);
 }
 
@@ -2085,7 +2085,7 @@ Hart<URV>::execFmin_d(const DecodedInst* di)
   else
     res = fmin(in1, in2);
 
-  if (issnan(in1) or issnan(in2))
+  if (isSnan(in1) or isSnan(in2))
     orFcsrFlags(FpFlags::Invalid);
   else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
     res = std::copysign(res, -1.0);  // Make sure min(-0, +0) is -0.
@@ -2120,7 +2120,7 @@ Hart<URV>::execFmax_d(const DecodedInst* di)
   else
     res = std::fmax(in1, in2);
 
-  if (issnan(in1) or issnan(in2))
+  if (isSnan(in1) or isSnan(in2))
     orFcsrFlags(FpFlags::Invalid);
   else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
     res = std::copysign(res, 1.0);  // Make sure max(-0, +0) is +0.
@@ -2276,7 +2276,7 @@ Hart<URV>::execFeq_d(const DecodedInst* di)
 
   if (std::isnan(d1) or std::isnan(d2))
     {
-      if (issnan(d1) or issnan(d2))
+      if (isSnan(d1) or isSnan(d2))
         orFcsrFlags(FpFlags::Invalid);
     }
   else
@@ -2463,48 +2463,7 @@ Hart<URV>::execFclass_d(const DecodedInst* di)
     }
 
   double d1 = fpRegs_.readDouble(di->op1());
-  URV result = 0;
-
-  bool pos = not std::signbit(d1);
-  int type = std::fpclassify(d1);
-
-  if (type == FP_INFINITE)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosInfinity);
-      else
-	result |= URV(FpClassifyMasks::NegInfinity);
-    }
-  else if (type == FP_NORMAL)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosNormal);
-      else
-	result |= URV(FpClassifyMasks::NegNormal);
-    }
-  else if (type == FP_SUBNORMAL)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosSubnormal);
-      else
-	result |= URV(FpClassifyMasks::NegSubnormal);
-    }
-  else if (type == FP_ZERO)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosZero);
-      else
-	result |= URV(FpClassifyMasks::NegZero);
-    }
-  else if(type == FP_NAN)
-    {
-      bool quiet = mostSignificantFractionBit(d1);
-      if (quiet)
-	result |= URV(FpClassifyMasks::QuietNan);
-      else
-	result |= URV(FpClassifyMasks::SignalingNan);
-    }
-
+  URV result = fpClassifyRiscv(d1);
   intRegs_.write(di->op0(), result);
 }
 
@@ -3588,7 +3547,7 @@ Hart<URV>::execFeq_h(const DecodedInst* di)
 
   if (std::isnan(f1) or std::isnan(f2))
     {
-      if (issnan(f1) or issnan(f2))
+      if (isSnan(f1) or isSnan(f2))
         orFcsrFlags(FpFlags::Invalid);
     }
   else
@@ -3660,48 +3619,7 @@ Hart<URV>::execFclass_h(const DecodedInst* di)
     }
 
   float f1 = fpRegs_.readHalf(di->op1()).toFloat();
-  URV result = 0;
-
-  bool pos = not std::signbit(f1);
-  int type = std::fpclassify(f1);
-
-  if (type == FP_INFINITE)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosInfinity);
-      else
-	result |= URV(FpClassifyMasks::NegInfinity);
-    }
-  else if (type == FP_NORMAL)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosNormal);
-      else
-	result |= URV(FpClassifyMasks::NegNormal);
-    }
-  else if (type == FP_SUBNORMAL)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosSubnormal);
-      else
-	result |= URV(FpClassifyMasks::NegSubnormal);
-    }
-  else if (type == FP_ZERO)
-    {
-      if (pos)
-	result |= URV(FpClassifyMasks::PosZero);
-      else
-	result |= URV(FpClassifyMasks::NegZero);
-    }
-  else if (type == FP_NAN)
-    {
-      bool quiet = mostSignificantFractionBit(f1);
-      if (quiet)
-	result |= URV(FpClassifyMasks::QuietNan);
-      else
-	result |= URV(FpClassifyMasks::SignalingNan);
-    }
-
+  URV result = fpClassifyRiscv(f1);
   intRegs_.write(di->op0(), result);
 }
 

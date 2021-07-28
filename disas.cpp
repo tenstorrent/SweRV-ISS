@@ -3520,6 +3520,10 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
        printVec_vf(*this, out, "vmfge.vf", di);
        break;
 
+     case InstId::vfclass_v:
+       printVec_v(*this, out, "vfclass.v", di);
+       break;
+
     default:
       out << "illegal";
     }

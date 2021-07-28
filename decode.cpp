@@ -314,7 +314,10 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	{
 	case 0:    return instTable_.getEntry(InstId::vfadd_vv);
 	case 2:    return instTable_.getEntry(InstId::vfsub_vv);
-	case 0x13: return instTable_.getEntry(InstId::vfsqrt_v);
+	case 0x13:
+	  if (op2 == 0)     return instTable_.getEntry(InstId::vfsqrt_v);
+	  if (op2 == 0x10) return instTable_.getEntry(InstId::vfclass_v);
+	  break;
 	case 0x18: return instTable_.getEntry(InstId::vmfeq_vv);
 	case 0x19: return instTable_.getEntry(InstId::vmfle_vv);
 	case 0x1b: return instTable_.getEntry(InstId::vmflt_vv);

@@ -576,7 +576,7 @@ namespace WdRiscv
 
   /// Return true if given float is a signaling not-a-number.
   inline bool
-  issnan(float f)
+  isSnan(float f)
   {
     if (std::isnan(f))
       {
@@ -589,16 +589,15 @@ namespace WdRiscv
 
   /// Return true if given float is a signaling not-a-number.
   inline bool
-  issnan(Float16 f16)
+  isSnan(Float16 f16)
   {
-    float f = f16.toFloat();
-    return issnan(f);
+    return f16.isSnan();
   }
 
 
   /// Return true if given double is a signaling not-a-number.
   inline bool
-  issnan(double d)
+  isSnan(double d)
   {
     if (std::isnan(d))
       {
@@ -607,5 +606,14 @@ namespace WdRiscv
       }
     return false;
   }
+
+
+  /// Classify given floating point value (see std::fpclassify)
+  /// returning the classifications in the least significant 10 bits
+  /// of the result according to the RISCV spec. FT must be one of
+  /// float, double, or Float16.
+  template <typename FT>
+  unsigned
+  fpClassifyRiscv(FT val);
 
 }

@@ -3313,6 +3313,11 @@ namespace WdRiscv
                   unsigned start, unsigned elems, bool masked);
     void execVmfge_vf(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfclass_v(unsigned vd, unsigned vs1, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfclass_v(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
