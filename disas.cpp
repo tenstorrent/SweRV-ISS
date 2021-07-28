@@ -3480,6 +3480,46 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       out << "vfmv.v.f v" << di.op0() << this->fpRegName(di.op1());
       break;
 
+     case InstId::vmfeq_vv:
+       printVec_vv(*this, out, "vmfeq.vv", di);
+       break;
+
+     case InstId::vmfeq_vf:
+       printVec_vf(*this, out, "vmfeq.vf", di);
+       break;
+
+     case InstId::vmfne_vv:
+       printVec_vv(*this, out, "vmfne.vv", di);
+       break;
+
+     case InstId::vmfne_vf:
+       printVec_vf(*this, out, "vmfne.vf", di);
+       break;
+
+     case InstId::vmflt_vv:
+       printVec_vv(*this, out, "vmflt.vv", di);
+       break;
+
+     case InstId::vmflt_vf:
+       printVec_vf(*this, out, "vmflt.vf", di);
+       break;
+
+     case InstId::vmfle_vv:
+       printVec_vv(*this, out, "vmfle.vv", di);
+       break;
+
+     case InstId::vmfle_vf:
+	 printVec_vf(*this, out, "vmfle.vf", di);
+       break;
+
+     case InstId::vmfgt_vf:
+       printVec_vf(*this, out, "vmfgt.vf", di);
+       break;
+
+     case InstId::vmfge_vf:
+       printVec_vf(*this, out, "vmfge.vf", di);
+       break;
+
     default:
       out << "illegal";
     }

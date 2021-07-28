@@ -779,6 +779,17 @@ namespace WdRiscv
      vfmerge_vfm,
      vfmv_v_f,
 
-     maxId = vfmv_v_f
+     vmfeq_vv,
+     vmfeq_vf,
+     vmfne_vv,
+     vmfne_vf,
+     vmflt_vv,
+     vmflt_vf,
+     vmfle_vv,
+     vmfle_vf,
+     vmfgt_vf,
+     vmfge_vf,
+
+     maxId = vmfge_vf
     };
 }

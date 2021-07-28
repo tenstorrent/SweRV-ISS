@@ -6163,6 +6163,16 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfsqrt_v,
      &&vfmerge_vfm,
      &&vfmv_v_f,
+     &&vmfeq_vv,
+     &&vmfeq_vf,
+     &&vmfne_vv,
+     &&vmfne_vf,
+     &&vmflt_vv,
+     &&vmflt_vf,
+     &&vmfle_vv,
+     &&vmfle_vf,
+     &&vmfgt_vf,
+     &&vmfge_vf,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8814,6 +8824,46 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfmv_v_f:
   execVfmv_v_f(di);
+  return;
+
+ vmfeq_vv:
+  execVmfeq_vv(di);
+  return;
+
+ vmfeq_vf:
+  execVmfeq_vf(di);
+  return;
+
+ vmfne_vv:
+  execVmfne_vv(di);
+  return;
+
+ vmfne_vf:
+  execVmfne_vf(di);
+  return;
+
+ vmflt_vv:
+  execVmflt_vv(di);
+  return;
+
+ vmflt_vf:
+  execVmflt_vf(di);
+  return;
+
+ vmfle_vv:
+  execVmfle_vv(di);
+  return;
+
+ vmfle_vf:
+  execVmfle_vf(di);
+  return;
+
+ vmfgt_vf:
+  execVmfgt_vf(di);
+  return;
+
+ vmfge_vf:
+  execVmfge_vf(di);
   return;
 }
 

@@ -3263,6 +3263,56 @@ namespace WdRiscv
 		  unsigned start, unsigned elems);
     void execVfmv_v_f(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vmfeq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfeq_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmfeq_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfeq_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmfne_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfne_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmfne_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfne_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmflt_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmflt_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmflt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmflt_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmfle_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfle_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmfle_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfle_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmfgt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfgt_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vmfge_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVmfge_vf(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load

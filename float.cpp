@@ -1044,38 +1044,6 @@ Hart<URV>::execFsgnjx_s(const DecodedInst* di)
 }
 
 
-/// Return true if given float is a signaling not-a-number.
-static
-bool
-issnan(float f)
-{
-  if (std::isnan(f))
-    {
-      Uint32FloatUnion ufu(f);
-
-      // Most sig bit of significand must be zero.
-      return ((ufu.u >> 22) & 1) == 0;
-    }
-  return false;
-}
-
-
-/// Return true if given double is a signaling not-a-number.
-static
-bool
-issnan(double d)
-{
-  if (std::isnan(d))
-    {
-      Uint64DoubleUnion udu(d);
-
-      // Most sig bit of significant must be zero.
-      return ((udu.u >> 51) & 1) == 0;
-    }
-  return false;
-}
-
-
 template <typename URV>
 void
 Hart<URV>::execFmin_s(const DecodedInst* di)

@@ -27,74 +27,74 @@
 namespace WdRiscv
 {
 
-    /// Symbolic names of the integer registers.
-    enum FpRegNumber
-      {
-	RegF0   = 0,
-	RegF1   = 1,
-	RegF2   = 2,
-	RegF3   = 3,
-	RegF4   = 4,
-	RegF5   = 5,
-	RegF6   = 6,
-	RegF7   = 7,
-	RegF8   = 8,
-	RegF9   = 9,
-	RegF10  = 10,
-	RegF11  = 11,
-	RegF12  = 12,
-	RegF13  = 13,
-	RegF14  = 14,
-	RegF15  = 15,
-	RegF16  = 16,
-	RegF17  = 17,
-	RegF18  = 18,
-	RegF19  = 19,
-	RegF20  = 20,
-	RegF21  = 21,
-	RegF22  = 22,
-	RegF23  = 23,
-	RegF24  = 24,
-	RegF25  = 25,
-	RegF26  = 26,
-	RegF27  = 27,
-	RegF28  = 28,
-	RegF29  = 29,
-	RegF30  = 30,
-	RegF31  = 31,
-	RegFt0  = RegF0,
-	RegFt1  = RegF1,
-	RegFt2  = RegF2,
-	RegFt3  = RegF3,
-	RegFt4  = RegF4,
-	RegFt5  = RegF5,
-	RegFt6  = RegF6,
-	RegFt7  = RegF7,
-	RegFs0  = RegF8,
-	RegFs1  = RegF9,
-	RegFa0  = RegF10,
-	RegFa1  = RegF11,
-	RegFa2  = RegF12,
-	RegFa3  = RegF13,
-	RegFa4  = RegF14,
-	RegFa5  = RegF15,
-	RegFa6  = RegF16,
-	RegFa7  = RegF17,
-	RegFs2  = RegF18,
-	RegFs3  = RegF19,
-	RegFs4  = RegF20,
-	RegFs5  = RegF21,
-	RegFs6  = RegF22,
-	RegFs7  = RegF23,
-	RegFs8  = RegF24,
-	RegFs9  = RegF25,
-	RegFs10 = RegF26,
-	RegFs11 = RegF27,
-	RegFt8  = RegF28,
-	RegFt9  = RegF29,
-	RegFt10 = RegF30,
-	RegFt11 = RegF31
-      };
+  /// Symbolic names of the integer registers.
+  enum FpRegNumber
+    {
+      RegF0   = 0,
+      RegF1   = 1,
+      RegF2   = 2,
+      RegF3   = 3,
+      RegF4   = 4,
+      RegF5   = 5,
+      RegF6   = 6,
+      RegF7   = 7,
+      RegF8   = 8,
+      RegF9   = 9,
+      RegF10  = 10,
+      RegF11  = 11,
+      RegF12  = 12,
+      RegF13  = 13,
+      RegF14  = 14,
+      RegF15  = 15,
+      RegF16  = 16,
+      RegF17  = 17,
+      RegF18  = 18,
+      RegF19  = 19,
+      RegF20  = 20,
+      RegF21  = 21,
+      RegF22  = 22,
+      RegF23  = 23,
+      RegF24  = 24,
+      RegF25  = 25,
+      RegF26  = 26,
+      RegF27  = 27,
+      RegF28  = 28,
+      RegF29  = 29,
+      RegF30  = 30,
+      RegF31  = 31,
+      RegFt0  = RegF0,
+      RegFt1  = RegF1,
+      RegFt2  = RegF2,
+      RegFt3  = RegF3,
+      RegFt4  = RegF4,
+      RegFt5  = RegF5,
+      RegFt6  = RegF6,
+      RegFt7  = RegF7,
+      RegFs0  = RegF8,
+      RegFs1  = RegF9,
+      RegFa0  = RegF10,
+      RegFa1  = RegF11,
+      RegFa2  = RegF12,
+      RegFa3  = RegF13,
+      RegFa4  = RegF14,
+      RegFa5  = RegF15,
+      RegFa6  = RegF16,
+      RegFa7  = RegF17,
+      RegFs2  = RegF18,
+      RegFs3  = RegF19,
+      RegFs4  = RegF20,
+      RegFs5  = RegF21,
+      RegFs6  = RegF22,
+      RegFs7  = RegF23,
+      RegFs8  = RegF24,
+      RegFs9  = RegF25,
+      RegFs10 = RegF26,
+      RegFs11 = RegF27,
+      RegFt8  = RegF28,
+      RegFt9  = RegF29,
+      RegFt10 = RegF30,
+      RegFt11 = RegF31
+    };
 
 
   /// RISCV floating point rounding modes.
@@ -130,25 +130,25 @@ namespace WdRiscv
   /// instructions (e.g. flcass.s).
   enum class FpClassifyMasks : uint32_t
     {
-     NegInfinity  = 1,       // bit 0
-     NegNormal    = 1 << 1,  // bit 1
-     NegSubnormal = 1 << 2,  // bit 2
-     NegZero      = 1 << 3,  // bit 3
-     PosZero      = 1 << 4,  // bit 4
-     PosSubnormal = 1 << 5,  // bit 5
-     PosNormal    = 1 << 6,  // bit 6
-     PosInfinity  = 1 << 7,  // bit 7
-     SignalingNan = 1 << 8,  // bit 8
-     QuietNan     = 1 << 9   // bit 9
+      NegInfinity  = 1,       // bit 0
+      NegNormal    = 1 << 1,  // bit 1
+      NegSubnormal = 1 << 2,  // bit 2
+      NegZero      = 1 << 3,  // bit 3
+      PosZero      = 1 << 4,  // bit 4
+      PosSubnormal = 1 << 5,  // bit 5
+      PosNormal    = 1 << 6,  // bit 6
+      PosInfinity  = 1 << 7,  // bit 7
+      SignalingNan = 1 << 8,  // bit 8
+      QuietNan     = 1 << 9   // bit 9
     };
 
   /// Values of FS field in mstatus.
   enum class FpFs : uint32_t
     {
-     Off = 0,
-     Initial = 1,
-     Clean = 2,
-     Dirty = 3
+      Off = 0,
+      Initial = 1,
+      Clean = 2,
+      Dirty = 3
     };
 
   template <typename URV>
@@ -201,10 +201,31 @@ namespace WdRiscv
       i16 = uf.u >> 16;
     }
 
-    /// Return true if this Float16 is equal to the given Float16
-    /// according to the floating point rules (-0 is equal to +0).
-    bool operator==(const Float16& x) const
+    /// Return true if this Float16 is equal to the given Float16.
+    bool operator == (const Float16& x) const
     { return this->toFloat() == x.toFloat(); }
+
+    /// Return true if this Float16 is not equal to the given Float16.
+    bool operator != (const Float16& x) const
+    { return this->toFloat() != x.toFloat(); }
+
+    /// Return true if this Float16 is less than the given Float16.
+    bool operator < (const Float16& x) const
+    { return this->toFloat() < x.toFloat(); }
+
+    /// Return true if this Float16 is less than or equal to the given
+    /// Float16.
+    bool operator <= (const Float16& x) const
+    { return this->toFloat() <= x.toFloat(); }
+
+    /// Return true if this Float16 is grater than the given Float16.
+    bool operator > (const Float16& x) const
+    { return this->toFloat() > x.toFloat(); }
+
+    /// Return true if this Float16 is greater than or equal to the given
+    /// Float16.
+    bool operator >= (const Float16& x) const
+    { return this->toFloat() >= x.toFloat(); }
 
     /// Return the bits of the Float16 as uint16_t (no conversion from
     /// float to itneger).
@@ -551,4 +572,40 @@ namespace WdRiscv
     FpUnion u{x};
     writeDouble(i, u.dp);
   }
+
+
+  /// Return true if given float is a signaling not-a-number.
+  inline bool
+  issnan(float f)
+  {
+    if (std::isnan(f))
+      {
+	Uint32FloatUnion ufu(f);
+	return ((ufu.u >> 22) & 1) == 0; // Most sig bit of significand must be zero.
+      }
+    return false;
+  }
+
+
+  /// Return true if given float is a signaling not-a-number.
+  inline bool
+  issnan(Float16 f16)
+  {
+    float f = f16.toFloat();
+    return issnan(f);
+  }
+
+
+  /// Return true if given double is a signaling not-a-number.
+  inline bool
+  issnan(double d)
+  {
+    if (std::isnan(d))
+      {
+	Uint64DoubleUnion udu(d);
+	return ((udu.u >> 51) & 1) == 0; // Most sig bit of significant must be zero.
+      }
+    return false;
+  }
+
 }
