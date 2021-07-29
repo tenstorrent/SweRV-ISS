@@ -2525,7 +2525,7 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::vslide1down_vx:
-      printVec_vx(*this, out, "vslide1doen.vx", di);
+      printVec_vx(*this, out, "vslide1down.vx", di);
       break;
 
     case InstId::vmul_vv:

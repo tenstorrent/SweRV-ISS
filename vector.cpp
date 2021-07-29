@@ -5748,14 +5748,14 @@ Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (ix < amount)
-        continue;
-
       if (masked and not vecRegs_.isActive(0, ix))
 	{
 	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
+
+      if (ix < amount)
+        continue;
 
       unsigned from = ix - amount;
 
@@ -5878,43 +5878,32 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
     {
     case ElementWidth::Byte:
       vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int8_t(replacement));
+      if (not masked or vecRegs_.isActive(0, 0))
+	vecRegs_.write(vd, 0, group, int8_t(replacement));
       break;
 
     case ElementWidth::Half:
       vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int16_t(replacement));
+      if (not masked or vecRegs_.isActive(0, 0))
+	vecRegs_.write(vd, 0, group, int16_t(replacement));
       break;
 
     case ElementWidth::Word:
       vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int32_t(replacement));
+      if (not masked or vecRegs_.isActive(0, 0))
+	vecRegs_.write(vd, 0, group, int32_t(replacement));
       break;
 
     case ElementWidth::Word2:
       vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int64_t(replacement));
+      if (not masked or vecRegs_.isActive(0, 0))
+	vecRegs_.write(vd, 0, group, int64_t(replacement));
       break;
 
     case ElementWidth::Word4:  illegalInst(di); break;
-      // vslideup<Uint128>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int128(replacement));
-      // break;
-
     case ElementWidth::Word8: illegalInst(di); break;
-      // vslideup<Uint256>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int256(replacement));
-      // break;
-
     case ElementWidth::Word16: illegalInst(di); break;
-      // vslideup<Uint512>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int512(replacement));
-      // break;
-
     case ElementWidth::Word32: illegalInst(di); break;
-      // vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int1024(replacement));
-      // break;
     }
 }
 
@@ -6052,43 +6041,32 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
     {
     case ElementWidth::Byte:
       vslidedown<uint8_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int8_t(replacement));
+      if (not masked or vecRegs_.isActive(0, elems-1))
+	vecRegs_.write(vd, elems-1, group, int8_t(replacement));
       break;
 
     case ElementWidth::Half:
       vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int16_t(replacement));
+      if (not masked or vecRegs_.isActive(0, elems-1))
+	vecRegs_.write(vd, elems-1, group, int16_t(replacement));
       break;
 
     case ElementWidth::Word:
       vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int32_t(replacement));
+      if (not masked or vecRegs_.isActive(0, elems-1))
+	vecRegs_.write(vd, elems-1, group, int32_t(replacement));
       break;
 
     case ElementWidth::Word2:
       vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked);
-      vecRegs_.write(vd, 0, group, int64_t(replacement));
+      if (not masked or vecRegs_.isActive(0, elems-1))
+	vecRegs_.write(vd, elems-1, group, int64_t(replacement));
       break;
 
     case ElementWidth::Word4: illegalInst(di); break;
-      // vslideup<Uint128>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int128(replacement));
-      // break;
-
     case ElementWidth::Word8: illegalInst(di); break;
-      // vslideup<Uint256>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int256(replacement));
-      // break;
-
     case ElementWidth::Word16: illegalInst(di); break;
-      // vslideup<Uint512>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int512(replacement));
-      // break;
-
     case ElementWidth::Word32: illegalInst(di); break;
-      // vslideup<Uint1024>(vd, vs1, amount, group, start, elems, masked);
-      // vecRegs_.write(vd, 0, group, Int1024(replacement));
-      // break;
     }
 }
 
