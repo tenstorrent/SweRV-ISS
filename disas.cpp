@@ -3524,6 +3524,22 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
        printVec_v(*this, out, "vfclass.v", di);
        break;
 
+     case InstId::vfcvt_xu_f_v:
+       printVec_v(*this, out, "vfcvt_xu_f.v", di);
+       break;
+
+     case InstId::vfcvt_x_f_v:
+       printVec_v(*this, out, "vfcvt_x_f.v", di);
+       break;
+
+     case InstId::vfcvt_rtz_xu_f_v:
+       printVec_v(*this, out, "vfcvt_rtz_xu_f.v", di);
+       break;
+
+     case InstId::vfcvt_rtz_x_f_v:
+       printVec_v(*this, out, "vfcvt_rtz_x_f.v", di);
+       break;
+
     default:
       out << "illegal";
     }

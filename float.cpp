@@ -1185,24 +1185,16 @@ Hart<URV>::execFcvt_wu_s(const DecodedInst* di)
 
   uint32_t maxUint32 = ~uint32_t(0);
   if (std::isnan(f1))
-    {
-      result = ~URV(0);
-    }
+    result = ~URV(0);
   else if (std::signbit(f1) and f1 != 0)
-    {
-      result = 0;
-    }
+    result = 0;
   else
     {
       double near = std::nearbyint(f1);
       if (near > double(maxUint32))
-        {
-          result = ~URV(0);
-        }
+	result = ~URV(0);
       else if (near < 0)
-        {
-          result = 0;
-        }
+	result = 0;
       else if (near == 0)
         {
           result = 0;

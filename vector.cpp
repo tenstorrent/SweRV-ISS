@@ -208,6 +208,20 @@ namespace WdRiscv
   template <> struct getSameWidthIntType<float>    { typedef int32_t  type; };
   template <> struct getSameWidthIntType<double>   { typedef int64_t  type; };
 
+  /// Return the unsignefd integral type that is the same width as the given
+  /// floating point. For example:
+  ///    getSameWidthIntegerType<float>::type
+  /// yields the type
+  ///    uint32_t.
+  template <typename T>
+  struct getSameWidthUintType
+  {
+  };
+
+  template <> struct getSameWidthUintType<Float16>  { typedef uint16_t  type; };
+  template <> struct getSameWidthUintType<float>    { typedef uint32_t  type; };
+  template <> struct getSameWidthUintType<double>   { typedef uint64_t  type; };
+
   /// Return smallest representable value of the given integer type T.
   template <typename T>
   T
@@ -17041,6 +17055,317 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
     case EW::Half:   vfclass_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfclass_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+#ifdef SOFT_FLOAT
+
+static uint32_t
+softFpToUnsigned(float x)
+{
+  return f32_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
+}
+
+static uint64_t
+softFpToUnsigned(double x)
+{
+  return f64_to_ui64(nativeToSoft(x), softfloat_roundingMode, true);
+}
+
+static uint16_t
+softFpToUnsigned(Float16 x)
+{
+  uint32_t u = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
+  if (u > 0xffff)
+    {
+      u = 0xffff;
+      softfloat_exceptionFlags |= softfloat_flag_inexact;
+    }
+  return u;
+}
+
+static int32_t
+softFpToSigned(float x)
+{
+  return f32_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
+}
+
+static int64_t
+softFpToSigned(double x)
+{
+  return f64_to_i64(nativeToSoft(x), softfloat_roundingMode, true);
+}
+
+static int16_t
+softFpToSigned(Float16 x)
+{
+  int32_t i = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
+  if (i > 0x3fff)
+    {
+      softfloat_exceptionFlags |= softfloat_flag_inexact;
+      return 0x3fff;
+    }
+  else if (i < int16_t(0x8000))
+    {
+      softfloat_exceptionFlags |= softfloat_flag_inexact;
+      return int16_t(0x8000);
+    }
+
+  return i;
+}
+
+#endif
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
+			unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
+	  UINT_TYPE dest = 0;
+#ifdef SOFT_FLOAT
+	  dest = softFpToUnsigned(e1);
+#else
+	  dest = e1;
+#endif
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, false);
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
+		       unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
+	  UINT_TYPE dest = 0;
+#ifdef SOFT_FLOAT
+	  dest = softFpToSigned(e1);
+#else
+	  dest = e1;
+#endif
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, false);
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfcvt_rtz_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
+			   unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
+	  INT_TYPE dest = fpClassifyRiscv(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfcvt_rtz_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfcvt_rtz_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  vfcvt_rtz_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfcvt_rtz_x_f_v(unsigned vd, unsigned vs1, unsigned group,
+			   unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
+	  INT_TYPE dest = fpClassifyRiscv(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfcvt_rtz_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfcvt_rtz_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  vfcvt_rtz_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
