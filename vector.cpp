@@ -17183,7 +17183,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17252,7 +17252,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17277,43 +17277,12 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
 
 
 template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vfcvt_rtz_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
-			   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
-	  INT_TYPE dest = fpClassifyRiscv(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
+  setSimulatorRoundingMode(RoundingMode::Zero);
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
@@ -17325,9 +17294,9 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfcvt_rtz_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfcvt_rtz_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  vfcvt_rtz_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
+    case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -17337,43 +17306,12 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
 
 
 template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vfcvt_rtz_x_f_v(unsigned vd, unsigned vs1, unsigned group,
-			   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
-	  INT_TYPE dest = fpClassifyRiscv(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
+  setSimulatorRoundingMode(RoundingMode::Zero);
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
@@ -17385,9 +17323,9 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfcvt_rtz_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfcvt_rtz_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  vfcvt_rtz_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
+    case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
