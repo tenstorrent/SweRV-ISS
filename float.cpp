@@ -550,15 +550,15 @@ fusedMultiplyAdd(float x, float y, float z, bool roundAfterMul, bool& invalid)
     res = std::fma(x, y, z);
   #endif
 #else
-  float32_t tmp = 0;
+  float32_t tmp{0};
   if (roundAfterMul)
     {
-      tmp = f32_mul(floatToF32(x), floatToF32(y));
-      tmp = f32_add(tmp, floatToF32(z));
+      tmp = f32_mul(nativeToSoft(x), nativeToSoft(y));
+      tmp = f32_add(tmp, nativeToSoft(z));
     }
   else
-    tmp = f32_mulAdd(floatToF32(x), floatToF32(y), floatToF32(z));
-  res = f32ToFloat(tmp);
+    tmp = f32_mulAdd(nativeToSoft(x), nativeToSoft(y), nativeToSoft(z));
+  res = softToNative(tmp);
 #endif
 
   invalid = (std::isinf(x) and y == 0) or (x == 0 and std::isinf(y));
@@ -593,12 +593,12 @@ fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool roundAfterMul, bool& inva
     res = Float16{std::fma(x.toFloat(), y.toFloat(), z.toFloat())};
   #endif
 #else
-  Float16 tmp{0f};
+  float16_t tmp{0};
   if (roundAfterMul)
-    tmp = f16_add(f16_mul(Float16ToF16(x), Float16ToF16(y)), Float16ToF16(z));
+    tmp = f16_add(f16_mul(nativeToSoft(x), nativeToSoft(y)), nativeToSoft(z));
   else
-    tmp = f16_mulAdd(Float16ToF16(x), Float16ToF16(y), Float16ToF16(z));
-  res = f16ToFloat16(tmp);
+    tmp = f16_mulAdd(nativeToSoft(x), nativeToSoft(y), nativeToSoft(z));
+  res = softToNative(tmp);
 #endif
 
   invalid = (std::isinf(x.toFloat()) and y.toFloat() == 0) or (x.toFloat() == 0 and std::isinf(y.toFloat()));
@@ -631,15 +631,15 @@ fusedMultiplyAdd(double x, double y, double z, bool roundAfterMul, bool& invalid
     res = std::fma(x, y, z);
   #endif
 #else
-  float64_t tmp = 0;
+  float64_t tmp{0};
   if (roundAfterMul)
     {
-      tmp = f64_mul(floatToF64(x), floatToF64(y));
-      tmp = f64_add(tmp, floatToF64(z));
+      tmp = f64_mul(nativeToSoft(x), nativeToSoft(y));
+      tmp = f64_add(tmp, nativeToSoft(z));
     }
   else
-    tmp = f64_mulAdd(doubleToF64(x), doubleToF64(y), doubleToF64(z));
-  double res = f64ToDouble(tmp);
+    tmp = f64_mulAdd(nativeToSoft(x), nativeToSoft(y), nativeToSoft(z));
+  res = softToNative(tmp);
 #endif
 
   invalid = (std::isinf(x) and y == 0) or (x == 0 and std::isinf(y));
@@ -825,7 +825,7 @@ Hart<URV>::execFadd_s(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(f32_add(floatToF32(f1), floatToF32(f2)));
+  float res = softToNative(f32_add(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   float res = f1 + f2;
 #endif
@@ -860,7 +860,7 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(f32_sub(floatToF32(f1), floatToF32(f2)));
+  float res = softToNative(f32_sub(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   float res = f1 - f2;
 #endif
@@ -895,7 +895,7 @@ Hart<URV>::execFmul_s(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(f32_mul(floatToF32(f1), floatToF32(f2)));
+  float res = softToNative(f32_mul(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   float res = f1 * f2;
 #endif
@@ -930,7 +930,7 @@ Hart<URV>::execFdiv_s(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(f32_div(floatToF32(f1), floatToF32(f2)));
+  float res = softToNative(f32_div(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   float res = f1 / f2;
 #endif
@@ -961,7 +961,7 @@ Hart<URV>::execFsqrt_s(const DecodedInst* di)
       f1 = subnormalAdjust(f1);
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(f32_sqrt(floatToF32(f1)));
+  float res = softToNative(f32_sqrt(nativeToSoft(f1)));
 #else
   float res = std::sqrt(f1);
 #endif
@@ -1126,7 +1126,7 @@ Hart<URV>::execFcvt_w_s(const DecodedInst* di)
   bool valid = false;
 
 #ifdef SOFT_FLOAT
-  result = f32_to_i32(floatToF32(f1), softfloat_roundingMode, true);
+  result = f32_to_i32(nativeToSoft(f1), softfloat_roundingMode, true);
   valid = true;  // We get invalid from softfloat library.
 #else
 
@@ -1175,7 +1175,7 @@ Hart<URV>::execFcvt_wu_s(const DecodedInst* di)
 #ifdef SOFT_FLOAT
 
   // In 64-bit mode, we sign extend the result to 64-bits.
-  result = SRV(int32_t(f32_to_ui32(floatToF32(f1), softfloat_roundingMode, true)));
+  result = SRV(int32_t(f32_to_ui32(nativeToSoft(f1), softfloat_roundingMode, true)));
   updateAccruedFpBits(0.0f, false);
 
 #else
@@ -1414,7 +1414,7 @@ Hart<URV>::execFcvt_s_w(const DecodedInst* di)
   int32_t i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(i32_to_f32(i1));
+  float res = softToNative(i32_to_f32(i1));
 #else
   float res = float(i1);
 #endif
@@ -1437,7 +1437,7 @@ Hart<URV>::execFcvt_s_wu(const DecodedInst* di)
   uint32_t u1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(ui32_to_f32(u1));
+  float res = softToNative(ui32_to_f32(u1));
 #else
   float res = float(u1);
 #endif
@@ -1495,7 +1495,7 @@ Hart<uint64_t>::execFcvt_l_s(const DecodedInst* di)
   bool valid = false;
 
 #ifdef SOFT_FLOAT
-  result = f32_to_i64(floatToF32(f1), softfloat_roundingMode, true);
+  result = f32_to_i64(nativeToSoft(f1), softfloat_roundingMode, true);
   valid = true;  // We get invalid from softfloat library.
 #else
 
@@ -1562,7 +1562,7 @@ Hart<uint64_t>::execFcvt_lu_s(const DecodedInst* di)
 
 #ifdef SOFT_FLOAT
 
-  result = f32_to_ui64(floatToF32(f1), softfloat_roundingMode, true);
+  result = f32_to_ui64(nativeToSoft(f1), softfloat_roundingMode, true);
   updateAccruedFpBits(0.0f, false);
 
 #else
@@ -1652,7 +1652,7 @@ Hart<URV>::execFcvt_s_l(const DecodedInst* di)
   SRV i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(i64_to_f32(i1));
+  float res = softToNative(i64_to_f32(i1));
 #else
   float res = float(i1);
 #endif
@@ -1681,7 +1681,7 @@ Hart<URV>::execFcvt_s_lu(const DecodedInst* di)
   URV i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(ui64_to_f32(i1));
+  float res = softToNative(ui64_to_f32(i1));
 #else
   float res = float(i1);
 #endif
@@ -1899,7 +1899,7 @@ Hart<URV>::execFadd_d(const DecodedInst* di)
   double d2 = fpRegs_.readDouble(di->op2());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(f64_add(doubleToF64(d1), doubleToF64(d2)));
+  double res = softToNative(f64_add(nativeToSoft(d1), nativeToSoft(d2)));
 #else
   double res = d1 + d2;
 #endif
@@ -1926,7 +1926,7 @@ Hart<URV>::execFsub_d(const DecodedInst* di)
   double d2 = fpRegs_.readDouble(di->op2());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(f64_sub(doubleToF64(d1), doubleToF64(d2)));
+  double res = softToNative(f64_sub(nativeToSoft(d1), nativeToSoft(d2)));
 #else
   double res = d1 - d2;
 #endif
@@ -1953,7 +1953,7 @@ Hart<URV>::execFmul_d(const DecodedInst* di)
   double d2 = fpRegs_.readDouble(di->op2());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(f64_mul(doubleToF64(d1), doubleToF64(d2)));
+  double res = softToNative(f64_mul(nativeToSoft(d1), nativeToSoft(d2)));
 #else
   double res = d1 * d2;
 #endif
@@ -1980,7 +1980,7 @@ Hart<URV>::execFdiv_d(const DecodedInst* di)
   double d2 = fpRegs_.readDouble(di->op2());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(f64_div(doubleToF64(d1), doubleToF64(d2)));
+  double res = softToNative(f64_div(nativeToSoft(d1), nativeToSoft(d2)));
 #else
   double res = d1 / d2;
 #endif
@@ -2141,7 +2141,7 @@ Hart<URV>::execFcvt_d_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(f32_to_f64(floatToF32(f1)));
+  double res = softToNative(f32_to_f64(nativeToSoft(f1)));
 #else
   double res = f1;
 #endif
@@ -2167,7 +2167,7 @@ Hart<URV>::execFcvt_s_d(const DecodedInst* di)
   double d1 = fpRegs_.readDouble(di->op1());
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(f64_to_f32(doubleToF64(d1)));
+  float res = softToNative(f64_to_f32(nativeToSoft(d1)));
 #else
   float res = float(d1);
 #endif
@@ -2193,7 +2193,7 @@ Hart<URV>::execFsqrt_d(const DecodedInst* di)
   double d1 = fpRegs_.readDouble(di->op1());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(f64_sqrt(doubleToF64(d1)));
+  double res = softToNative(f64_sqrt(nativeToSoft(d1)));
 #else
   double res = std::sqrt(d1);
 #endif
@@ -2299,7 +2299,7 @@ Hart<URV>::execFcvt_w_d(const DecodedInst* di)
   bool valid = false;
 
 #ifdef SOFT_FLOAT
-  result = f64_to_i32(doubleToF64(d1), softfloat_roundingMode, true);
+  result = f64_to_i32(nativeToSoft(d1), softfloat_roundingMode, true);
   valid = true;  // We get invalid from softfloat library.
 #else
 
@@ -2348,7 +2348,7 @@ Hart<URV>::execFcvt_wu_d(const DecodedInst* di)
 
 #ifdef SOFT_FLOAT
 
-  result = SRV(int32_t(f64_to_ui32(doubleToF64(d1), softfloat_roundingMode, true)));
+  result = SRV(int32_t(f64_to_ui32(nativeToSoft(d1), softfloat_roundingMode, true)));
   updateAccruedFpBits(0.0f, false);
 
 #else
@@ -2416,7 +2416,7 @@ Hart<URV>::execFcvt_d_w(const DecodedInst* di)
   int32_t i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(i64_to_f64(i1));
+  double res = softToNative(i64_to_f64(i1));
 #else
   double res = i1;
 #endif
@@ -2439,7 +2439,7 @@ Hart<URV>::execFcvt_d_wu(const DecodedInst* di)
   uint32_t i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(ui64_to_f64(i1));
+  double res = softToNative(ui64_to_f64(i1));
 #else                           
   double res = i1;
 #endif
@@ -2494,7 +2494,7 @@ Hart<uint64_t>::execFcvt_l_d(const DecodedInst* di)
   bool valid = false;
 
 #ifdef SOFT_FLOAT
-  result = f64_to_i64(doubleToF64(f1), softfloat_roundingMode, true);
+  result = f64_to_i64(nativeToSoft(f1), softfloat_roundingMode, true);
   valid = true;  // We get invalid from softfloat library.
 #else
 
@@ -2564,7 +2564,7 @@ Hart<uint64_t>::execFcvt_lu_d(const DecodedInst* di)
 
 #ifdef SOFT_FLOAT
 
-  result = f64_to_ui64(doubleToF64(f1), softfloat_roundingMode, true);
+  result = f64_to_ui64(nativeToSoft(f1), softfloat_roundingMode, true);
   updateAccruedFpBits(0.0f, false);
 
 #else
@@ -2654,7 +2654,7 @@ Hart<URV>::execFcvt_d_l(const DecodedInst* di)
   SRV i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(i64_to_f64(i1));
+  double res = softToNative(i64_to_f64(i1));
 #else
   double res = double(i1);
 #endif
@@ -2683,7 +2683,7 @@ Hart<URV>::execFcvt_d_lu(const DecodedInst* di)
   URV i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(ui64_to_f64(i1));
+  double res = softToNative(ui64_to_f64(i1));
 #else
   double res = double(i1);
 #endif
@@ -2986,7 +2986,7 @@ Hart<URV>::execFadd_h(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(f16_add(Float16ToF16(f1), Float16ToF16(f2)));
+  Float16 res = softToNative(f16_add(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   Float16 res = Float16{f1.toFloat() + f2.toFloat()};
 #endif
@@ -3021,7 +3021,7 @@ Hart<URV>::execFsub_h(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(f16_sub(Float16ToF16(f1), Float16ToF16(f2)));
+  Float16 res = softToNative(f16_sub(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   Float16 res = Float16{f1.toFloat() - f2.toFloat()};
 #endif
@@ -3056,7 +3056,7 @@ Hart<URV>::execFmul_h(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(f16_mul(Float16ToF16(f1), Float16ToF16(f2)));
+  Float16 res = softToNative(f16_mul(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   Float16 res = Float16{f1.toFloat() * f2.toFloat()};
 #endif
@@ -3091,7 +3091,7 @@ Hart<URV>::execFdiv_h(const DecodedInst* di)
     }
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(f16_div(Float16ToF16(f1), Float16ToF16(f2)));
+  Float16 res = softToNative(f16_div(nativeToSoft(f1), nativeToSoft(f2)));
 #else
   Float16 res = Float16{f1.toFloat() / f2.toFloat()};
 #endif
@@ -3122,7 +3122,7 @@ Hart<URV>::execFsqrt_h(const DecodedInst* di)
       f1 = subnormalAdjust(f1);
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(f16_sqrt(Float16ToF16(f1)));
+  Float16 res = softToNative(f16_sqrt(nativeToSoft(f1)));
 #else
   Float16 res{std::sqrt(f1.toFloat())};
 #endif
@@ -3287,7 +3287,7 @@ Hart<URV>::execFcvt_s_h(const DecodedInst* di)
   Float16 f1 = fpRegs_.readHalf(di->op1());
 
 #ifdef SOFT_FLOAT
-  float res = f32ToFloat(f16_to_f32(Float16ToF16(f1)));
+  float res = softToNative(f16_to_f32(nativeToSoft(f1)));
 #else
   float res = f1.toFloat();
 #endif
@@ -3315,7 +3315,7 @@ Hart<URV>::execFcvt_d_h(const DecodedInst* di)
   Float16 f1 = fpRegs_.readHalf(di->op1());
 
 #ifdef SOFT_FLOAT
-  double res = f64ToDouble(f16_to_f64(Float16ToF16(f1)));
+  double res = softToNative(f16_to_f64(nativeToSoft(f1)));
 #else
   double res = f1.toFloat();
 #endif
@@ -3343,7 +3343,7 @@ Hart<URV>::execFcvt_h_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(f32_to_f16(floatToF32(f1)));
+  Float16 res = softToNative(f32_to_f16(nativeToSoft(f1)));
 #else
   Float16 res{f1};
 #endif
@@ -3371,7 +3371,7 @@ Hart<URV>::execFcvt_h_d(const DecodedInst* di)
   double d1 = fpRegs_.readDouble(di->op1());
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(f64_to_f16(doubleToF64(d1)));
+  Float16 res = softToNative(f64_to_f16(nativeToSoft(d1)));
 #else
   Float16 res{float(d1)};
 #endif
@@ -3401,7 +3401,7 @@ Hart<URV>::execFcvt_w_h(const DecodedInst* di)
   bool valid = false;
 
 #ifdef SOFT_FLOAT
-  result = f16_to_i32(Float16ToF16(f1), softfloat_roundingMode, true);
+  result = f16_to_i32(nativeToSoft(f1), softfloat_roundingMode, true);
   valid = true;  // We get invalid from softfloat library.
 #else
 
@@ -3452,7 +3452,7 @@ Hart<URV>::execFcvt_wu_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
 
   // In 64-bit mode, we sign extend the result to 64-bits.
-  result = SRV(int32_t(f16_to_ui32(Float16ToF16(f1), softfloat_roundingMode, true)));
+  result = SRV(int32_t(f16_to_ui32(nativeToSoft(f1), softfloat_roundingMode, true)));
   updateAccruedFpBits(0.0f, false);
 
 #else
@@ -3636,7 +3636,7 @@ Hart<URV>::execFcvt_h_w(const DecodedInst* di)
   int32_t i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(i32_to_f16(i1));
+  Float16 res = softToNative(i32_to_f16(i1));
 #else
   Float16 res{float(i1)};
 #endif
@@ -3661,7 +3661,7 @@ Hart<URV>::execFcvt_h_wu(const DecodedInst* di)
   uint32_t u1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(ui32_to_f16(u1));
+  Float16 res = softToNative(ui32_to_f16(u1));
 #else
   Float16 res{float(u1)};
 #endif
@@ -3723,7 +3723,7 @@ Hart<uint64_t>::execFcvt_l_h(const DecodedInst* di)
   bool valid = false;
 
 #ifdef SOFT_FLOAT
-  result = f16_to_i64(Float16ToF16(f1), softfloat_roundingMode, true);
+  result = f16_to_i64(nativeToSoft(f1), softfloat_roundingMode, true);
   valid = true;  // We get invalid from softfloat library.
 #else
 
@@ -3792,7 +3792,7 @@ Hart<uint64_t>::execFcvt_lu_h(const DecodedInst* di)
 
 #ifdef SOFT_FLOAT
 
-  result = f16_to_ui64(Float16ToF16(f1), softfloat_roundingMode, true);
+  result = f16_to_ui64(nativeToSoft(f1), softfloat_roundingMode, true);
   updateAccruedFpBits(0.0f, false);
 
 #else
@@ -3893,7 +3893,7 @@ Hart<uint64_t>::execFcvt_h_l(const DecodedInst* di)
   SRV i1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(i64_to_f16(i1));
+  Float16 res = softToNative(i64_to_f16(i1));
 #else
   Float16 res{float(i1)};
 #endif
@@ -3932,7 +3932,7 @@ Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
   uint64_t u1 = intRegs_.read(di->op1());
 
 #ifdef SOFT_FLOAT
-  Float16 res = f16ToFloat16(ui64_to_f16(u1));
+  Float16 res = softToNative(ui64_to_f16(u1));
 #else
   Float16 res{float(u1)};
 #endif
