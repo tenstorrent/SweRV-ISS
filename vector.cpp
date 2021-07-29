@@ -17124,7 +17124,10 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 #ifdef SOFT_FLOAT
 	  dest = softFpToUnsigned(e1);
 #else
-	  dest = e1;
+	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
+            dest = e1.toFloat();
+	  else
+	    dest = e1;
 #endif
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -17190,7 +17193,10 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 #ifdef SOFT_FLOAT
 	  dest = softFpToSigned(e1);
 #else
-	  dest = e1;
+	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
+            dest = e1.toFloat();
+	  else
+	    dest = e1;
 #endif
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
