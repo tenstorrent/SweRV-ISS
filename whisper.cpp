@@ -761,6 +761,9 @@ static
 bool
 applyIsaStrings(const StringVec& isaStrings, Hart<URV>& hart)
 {
+  if (isaStrings.empty())
+    return true;
+
   URV isa = 0;
   unsigned errors = 0;
 

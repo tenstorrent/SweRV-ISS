@@ -20,10 +20,10 @@
 
     "csr" : {
 	"misa" : {
-	    "reset-comment" : "imfdv",
-	    "reset" : "0x201128",
-	    "mask-comment" : "none of the bits are writeable/pokeable",
-	    "mask" : 0
+	    "reset-comment" : "imfv",
+	    "reset" : "0x40201120",
+	    "mask-comment" : "all the bits are writeable/pokeable",
+	    "mask" : "0xffffffff"
 	},
 	"mstatus" : {
 	    "reset" : "0xffffffff",

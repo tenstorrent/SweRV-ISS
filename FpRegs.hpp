@@ -568,9 +568,11 @@ namespace WdRiscv
   FpRegs::writeHalf(unsigned i, Float16 x)
   {
     assert(flen_ >= 16);
+    originalValue_ = regs_.at(i);
 
     FpUnion u{x};
-    writeDouble(i, u.dp);
+    regs_.at(0) = u.dp;
+    lastWrittenReg_ = i;
   }
 
 
