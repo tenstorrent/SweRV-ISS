@@ -25,14 +25,106 @@
 	    "mask-comment" : "all the bits are writeable/pokeable",
 	    "mask" : "0xffffffff"
 	},
+
 	"mstatus" : {
 	    "reset" : "0xffffffff",
 	    "mask" : "0xffffffff"
 	},
-	"ttcsr7c0" : {
+
+	"hwa_status" : {
+	    "number" : "0x7c3",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"hwa_mask" : {
+	    "number" : "0x7c4",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"hwa_cfg" : {
+	    "number" : "0x7c5",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"cfg" : {
 	    "number" : "0x7c0",
 	    "reset" : "0x0",
 	    "mask" : "0xffffffff"
+	},
+
+	"pmacfg" : {
+	    "number" : "0x7c1",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"pmacfg" : {
+	    "number" : "0x7c2",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Qstatus" : {
+	    "number" : "0xfc0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Bstatus" : {
+	    "number" : "0xfc1",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus0" : {
+	    "number" : "0xfc2",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus1" : {
+	    "number" : "0xfc3",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus2" : {
+	    "number" : "0xfc4",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus3" : {
+	    "number" : "0xfc5",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus4" : {
+	    "number" : "0xfc6",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus5" : {
+	    "number" : "0xfc7",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus6" : {
+	    "number" : "0xfc8",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tt_cfg_Sstatus7" : {
+	    "number" : "0xfc9",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
 	}
     },
 

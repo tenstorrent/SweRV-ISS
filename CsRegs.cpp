@@ -1305,6 +1305,7 @@ template <typename URV>
 void
 CsRegs<URV>::defineNonStandardRegs()
 {
+  return;
   URV rom = 0;        // Read-only mask: no bit writeable.
   URV wam = ~URV(0);  // Write-all mask: all bits writeable.
 
