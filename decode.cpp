@@ -325,6 +325,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  if (op2 == 9)   return instTable_.getEntry(InstId::vfwcvt_x_f_v);
 	  if (op2 == 0xa) return instTable_.getEntry(InstId::vfwcvt_f_xu_v);
 	  if (op2 == 0xb) return instTable_.getEntry(InstId::vfwcvt_f_x_v);
+	  if (op2 == 0xc) return instTable_.getEntry(InstId::vfwcvt_f_f_v);
 	  if (op2 == 0xe) return instTable_.getEntry(InstId::vfwcvt_rtz_xu_f_v);
 	  if (op2 == 0xf) return instTable_.getEntry(InstId::vfwcvt_rtz_x_f_v);
 	  break;

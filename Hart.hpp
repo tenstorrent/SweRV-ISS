@@ -3366,6 +3366,11 @@ namespace WdRiscv
 			 unsigned start, unsigned elems, bool masked);
     void execVfwcvt_f_x_v(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
+			 unsigned start, unsigned elems, bool masked);
+    void execVfwcvt_f_f_v(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load

@@ -5151,5 +5151,12 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask
       },
 
+      { "vfwcvt.f.f.v", InstId::vfwcvt_f_f_v,
+	0b010010'1'00000'01100'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
     };
 }
