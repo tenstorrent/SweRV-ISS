@@ -3342,6 +3342,30 @@ namespace WdRiscv
 			 unsigned start, unsigned elems, bool masked);
     void execVfcvt_f_x_v(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfwcvt_xu_f_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfwcvt_x_f_v(const DecodedInst*);
+
+    void execVfwcvt_rtz_xu_f_v(const DecodedInst*);
+
+    void execVfwcvt_rtz_x_f_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
+			  unsigned start, unsigned elems, bool masked);
+    void execVfwcvt_f_xu_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
+			 unsigned start, unsigned elems, bool masked);
+    void execVfwcvt_f_x_v(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
