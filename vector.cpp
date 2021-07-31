@@ -17041,151 +17041,250 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
 }
 
 
+static double
+unsignedToFp2x(uint32_t x)
+{
 #ifdef SOFT_FLOAT
+  return softToNative(ui32_to_f64(x));
+#else
+  return double(x);
+#endif
+}
+
+static float
+unsignedToFp2x(uint16_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(ui32_to_f32(x));
+#else
+  return float(x);
+#endif
+}
+
+
+static double
+signedToFp2x(int32_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i32_to_f64(x));
+#else
+  return double(x);
+#endif
+}
+
+static float
+signedToFp2x(int16_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i32_to_f32(x));
+#else
+  return float(x);
+#endif
+}
+
 
 static uint32_t
-softFpToUnsigned(float x)
+fpToUnsigned(float x)
 {
+#ifdef SOFT_FLOAT
   return f32_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
+#else
+  return uint32_t(x);
+#endif
 }
 
 static uint64_t
-softFpToUnsigned(double x)
+fpToUnsigned(double x)
 {
+#ifdef SOFT_FLOAT
   return f64_to_ui64(nativeToSoft(x), softfloat_roundingMode, true);
+#else
+  return uint64_t(x);
+#endif
 }
 
 static uint16_t
-softFpToUnsigned(Float16 x)
+fpToUnsigned(Float16 x)
 {
-  uint32_t u = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  if (u > 0xffff)
+#ifdef SOFT_FLOAT
+  uint32_t i = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
+  if (i > 0xffff)
     {
-      u = 0xffff;
       softfloat_exceptionFlags |= softfloat_flag_inexact;
+      return 0xffff;
     }
-  return u;
+  return i;
+#else
+  // TODO: handle NAN and infinity.
+  uint32_t i = uint32_t(x.toFloat());
+  if (i > 0xffff)
+    return 0xffff;
+  return i;
+#endif
 }
 
+
 static int32_t
-softFpToSigned(float x)
+fpToSigned(float x)
 {
+#ifdef SOFT_FLOAT
   return f32_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
+#else
+  return int32_t(x);
+#endif
 }
 
 static int64_t
-softFpToSigned(double x)
+fpToSigned(double x)
 {
+#ifdef SOFT_FLOAT
   return f64_to_i64(nativeToSoft(x), softfloat_roundingMode, true);
+#else
+  return int64_t(x);
+#endif
 }
 
 static int16_t
-softFpToSigned(Float16 x)
+fpToSigned(Float16 x)
 {
+#ifdef SOFT_FLOAT
   int32_t i = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
   if (i > 0x3fff)
     {
       softfloat_exceptionFlags |= softfloat_flag_inexact;
       return 0x3fff;
     }
-  else if (i < int16_t(0x8000))
+  if (i < int16_t(0x8000))
     {
       softfloat_exceptionFlags |= softfloat_flag_inexact;
       return int16_t(0x8000);
     }
-
   return i;
+#else
+  // TODO: handle NAN and infinity.
+  int32_t i = int32_t(x.toFloat());
+  if (i > 0x3fff)
+    {
+      return 0x3fff;
+    }
+    if (i < int16_t(0x8000))
+    {
+      return int16_t(0x8000);
+    }
+  return i;
+#endif
 }
+
+
 
 static uint64_t
-softFpToUnsigned2x(float x)
+fpToUnsigned2x(float x)
 {
+#ifdef SOFT_FLOAT
   return f32_to_ui64(nativeToSoft(x), softfloat_roundingMode, true);
+#else
+  // TODO: handle NAN and infinity.
+  return uint64_t(x);
+#endif
 }
 
-static int32_t
-softFpToUnsigned2x(Float16 x)
+static uint32_t
+fpToUnsigned2x(Float16 x)
 {
-  uint32_t u = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  return u;
+#ifdef SOFT_FLOAT
+  return f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
+#else
+  // TODO: handle NAN and infinity.
+  return uint32_t(x.toFloat());
+#endif
 }
+
 
 static int64_t
-softFpToSigned2x(float x)
+fpToSigned2x(float x)
 {
+#ifdef SOFT_FLOAT
   return f32_to_i64(nativeToSoft(x), softfloat_roundingMode, true);
-}
-
-static int32_t
-softFpToSigned2x(Float16 x)
-{
-  uint32_t u = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  return u;
-}
-
-
-static float
-softUnsignedToFp(uint32_t x)
-{
-  return softToNative(ui32_to_f32(x));
-}
-
-static double
-softUnsignedToFp(uint64_t x)
-{
-  return softToNative(ui64_to_f64(x));
-}
-
-static Float16
-softUnsignedToFp(uint16_t x)
-{
-  return softToNative(ui32_to_f16(x));
-}
-
-static float
-softSignedToFp(int32_t x)
-{
-  return softToNative(i32_to_f32(x));
-}
-
-static double
-softSignedToFp(int64_t x)
-{
-  return softToNative(i64_to_f64(x));
-}
-
-static Float16
-softSignedToFp(int16_t x)
-{
-  return softToNative(i32_to_f16(x));
-}
-
-
-static double
-softUnsignedToFp2x(uint32_t x)
-{
-  return softToNative(ui32_to_f64(x));
-}
-
-static float
-softUnsignedToFp2x(uint16_t x)
-{
-  return softToNative(ui32_to_f32(x));
-}
-
-static double
-softSignedToFp2x(int32_t x)
-{
-  return softToNative(i32_to_f64(x));
-}
-
-static float
-softSignedToFp2x(int16_t x)
-{
-  return softToNative(i32_to_f32(x));
-}
-
+#else
+  // TODO: handle NAN and infinity.
+  return int64_t(x);
 #endif
+}
+
+static uint32_t
+fpToSigned2x(Float16 x)
+{
+#ifdef SOFT_FLOAT
+  return f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
+#else
+  // TODO: handle NAN and infinity.
+  return int32_t(x.toFloat());
+#endif
+}
+
+
+static float
+unsignedToFp(uint32_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(ui32_to_f32(x));
+#else
+  return float(x);
+#endif
+}
+
+static double
+unsignedToFp(uint64_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(ui64_to_f64(x));
+#else
+  return double(x);
+#endif
+}
+
+
+static Float16
+unsignedToFp(uint16_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(ui32_to_f16(x));
+#else
+  return Float16(float(x));
+#endif
+}
+
+
+static float
+signedToFp(int32_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i32_to_f32(x));
+#else
+  return float(x);
+#endif
+}
+
+static double
+signedToFp(int64_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i64_to_f64(x));
+#else
+  return double(x);
+#endif
+}
+
+
+static Float16
+signedToFp(int16_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i32_to_f16(x));
+#else
+  return Float16(float(x));
+#endif
+}
 
 
 template <typename URV>
@@ -17208,15 +17307,7 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
-	  UINT_TYPE dest = 0;
-#ifdef SOFT_FLOAT
-	  dest = softFpToUnsigned(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-            dest = e1.toFloat();
-	  else
-	    dest = e1;
-#endif
+	  UINT_TYPE dest = fpToUnsigned(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -17277,15 +17368,7 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
-	  INT_TYPE dest = 0;
-#ifdef SOFT_FLOAT
-	  dest = softFpToSigned(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-            dest = e1.toFloat();
-	  else
-	    dest = e1;
-#endif
+	  INT_TYPE dest = fpToSigned(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -17406,14 +17489,7 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-#ifdef SOFT_FLOAT
-	  dest = softUnsignedToFp(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-	    dest = ELEM_TYPE{e1};
-	  else
-	    dest = e1;
-#endif
+	  dest = unsignedToFp(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -17476,14 +17552,7 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-#ifdef SOFT_FLOAT
-	  dest = softSignedToFp(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-            dest = ELEM_TYPE(uint16_t(e1));
-	  else
-	    dest = e1;
-#endif
+	  dest = signedToFp(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -17546,15 +17615,8 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
         {
 	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
 	  typedef typename makeDoubleWide<UINT_TYPE>::type UINT_TYPE2X;
-	  UINT_TYPE2X dest = 0;
-#ifdef SOFT_FLOAT
-	  dest = softFpToUnsigned2x(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-            dest = e1.toFloat();
-	  else
-	    dest = e1;
-#endif
+	  UINT_TYPE2X dest = fpToUnsigned2x(e1);
+
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17624,15 +17686,8 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
         {
 	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
 	  typedef typename makeDoubleWide<INT_TYPE>::type INT_TYPE2X;
-	  INT_TYPE2X dest = 0;
-#ifdef SOFT_FLOAT
-	  dest = softFpToSigned2x(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-            dest = e1.toFloat();
-	  else
-	    dest = e1;
-#endif
+	  INT_TYPE2X dest = fpToSigned2x(e1);
+
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17777,14 +17832,7 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-#ifdef SOFT_FLOAT
-	  dest = softUnsignedToFp2x(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-	    dest = ELEM_TYPE{e1};
-	  else
-	    dest = e1;
-#endif
+	  dest = unsignedToFp2x(e1);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17856,14 +17904,7 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-#ifdef SOFT_FLOAT
-	  dest = softSignedToFp2x(e1);
-#else
-	  if constexpr(std::is_same<ELEM_TYPE,Float16>::value)
-            dest = ELEM_TYPE(uint16_t(e1));
-	  else
-	    dest = e1;
-#endif
+	  dest = signedToFp2x(e1);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
