@@ -5104,7 +5104,7 @@ InstTable::setupInstVec()
       },
 
       { "vfwcvt.xu.f.v", InstId::vfwcvt_xu_f_v,
-	0b010010'1'00000'10000'001'00000'1010111,
+	0b010010'1'00000'01000'001'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5112,7 +5112,7 @@ InstTable::setupInstVec()
       },
 
       { "vfwcvt.x.f.v", InstId::vfwcvt_x_f_v,
-	0b010010'1'00000'10001'001'00000'1010111,
+	0b010010'1'00000'01001'001'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5120,7 +5120,7 @@ InstTable::setupInstVec()
       },
 
       { "vfwcvt.rtz.xu.f.v", InstId::vfwcvt_rtz_xu_f_v,
-	0b010010'1'00000'10110'001'00000'1010111,
+	0b010010'1'00000'01110'001'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5128,7 +5128,7 @@ InstTable::setupInstVec()
       },
 
       { "vfwcvt.rtz.x.f.v", InstId::vfwcvt_rtz_x_f_v,
-	0b010010'1'00000'10111'001'00000'1010111,
+	0b010010'1'00000'01111'001'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5136,7 +5136,7 @@ InstTable::setupInstVec()
       },
 
       { "vfwcvt.f.xu.v", InstId::vfwcvt_f_xu_v,
-	0b010010'1'00000'10010'001'00000'1010111,
+	0b010010'1'00000'01010'001'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5144,7 +5144,7 @@ InstTable::setupInstVec()
       },
 
       { "vfwcvt.f.x.v", InstId::vfwcvt_f_x_v,
-	0b010010'1'00000'10011'001'00000'1010111,
+	0b010010'1'00000'01011'001'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5153,6 +5153,70 @@ InstTable::setupInstVec()
 
       { "vfwcvt.f.f.v", InstId::vfwcvt_f_f_v,
 	0b010010'1'00000'01100'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.xu.f.w", InstId::vfncvt_xu_f_w,
+	0b010010'1'00000'10000'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.x.f.w", InstId::vfncvt_x_f_w,
+	0b010010'1'00000'10001'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.rtz.xu.f.w", InstId::vfncvt_rtz_xu_f_w,
+	0b010010'1'00000'10110'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.rtz.x.f.w", InstId::vfncvt_rtz_x_f_w,
+	0b010010'1'00000'10111'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.f.xu.w", InstId::vfncvt_f_xu_w,
+	0b010010'1'00000'10010'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.f.x.w", InstId::vfncvt_f_x_w,
+	0b010010'1'00000'10011'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.f.f.w", InstId::vfncvt_f_f_w,
+	0b010010'1'00000'10100'001'00000'1010111,
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask
+      },
+
+      { "vfncvt.rod.f.f.w", InstId::vfncvt_rod_f_f_w,
+	0b010010'1'00000'10101'001'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,

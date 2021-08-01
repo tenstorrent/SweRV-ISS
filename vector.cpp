@@ -222,6 +222,24 @@ namespace WdRiscv
   template <> struct getSameWidthUintType<float>    { typedef uint32_t  type; };
   template <> struct getSameWidthUintType<double>   { typedef uint64_t  type; };
 
+  /// Return the floating point type that is the same width as the given
+  /// integer type. For example:
+  ///    getSameWidthFloatType<int32_t>::type
+  /// yields the type
+  ///    float.
+  template <typename T>
+  struct getSameWidthFloatType
+  {
+  };
+
+  template <> struct getSameWidthFloatType<int16_t>   { typedef Float16  type; };
+  template <> struct getSameWidthFloatType<int32_t>   { typedef float    type; };
+  template <> struct getSameWidthFloatType<int64_t>   { typedef double   type; };
+  template <> struct getSameWidthFloatType<uint16_t>  { typedef Float16  type; };
+  template <> struct getSameWidthFloatType<uint32_t>  { typedef float    type; };
+  template <> struct getSameWidthFloatType<uint64_t>  { typedef double   type; };
+
+
   /// Return smallest representable value of the given integer type T.
   template <typename T>
   T
@@ -17149,10 +17167,10 @@ fpToSigned(Float16 x)
 {
 #ifdef SOFT_FLOAT
   int32_t i = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  if (i > 0x3fff)
+  if (i > 0x7fff)
     {
       softfloat_exceptionFlags |= softfloat_flag_inexact;
-      return 0x3fff;
+      return 0x7fff;
     }
   if (i < int16_t(0x8000))
     {
@@ -17163,9 +17181,9 @@ fpToSigned(Float16 x)
 #else
   // TODO: handle NAN and infinity.
   int32_t i = int32_t(x.toFloat());
-  if (i > 0x3fff)
+  if (i > 0x7fff)
     {
-      return 0x3fff;
+      return 0x7fff;
     }
     if (i < int16_t(0x8000))
     {
@@ -17219,6 +17237,90 @@ fpToSigned2x(Float16 x)
 #else
   // TODO: handle NAN and infinity.
   return int32_t(x.toFloat());
+#endif
+}
+
+
+static uint32_t
+fpToUnsignedHalf(double x)
+{
+#ifdef SOFT_FLOAT
+  return f64_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
+#else
+  // TODO: handle NAN and infinity.
+  return uint32_t(x);
+#endif
+}
+
+static uint16_t
+fpToUnsignedHalf(float x)
+{
+#ifdef SOFT_FLOAT
+  uint32_t val = f32_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
+  if (val > 0xffff)
+    return 0xffff;
+  return val;
+#else
+  // TODO: handle NAN and infinity.
+  return uint16_t(x);
+#endif
+}
+
+static uint8_t
+fpToUnsignedHalf(Float16 x)
+{
+#ifdef SOFT_FLOAT
+  uint32_t val = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
+  if (val > 0xff)
+    return 0xff;
+  return val;
+#else
+  // TODO: handle NAN and infinity.
+  return uint8_t(x.toFloat());
+#endif
+}
+
+
+static int32_t
+fpToSignedHalf(double x)
+{
+#ifdef SOFT_FLOAT
+  return f64_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
+#else
+  // TODO: handle NAN and infinity.
+  return int32_t(x);
+#endif
+}
+
+static int16_t
+fpToSignedHalf(float x)
+{
+#ifdef SOFT_FLOAT
+  int32_t val = f32_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
+  if (val > int16_t(0x7fff))
+    return int16_t(0x7fff);
+  if (val < int16_t(0x8000))
+    return int16_t(0x8000);
+  return val;
+#else
+  // TODO: handle NAN and infinity.
+  return uint16_t(x);
+#endif
+}
+
+static int8_t
+fpToSignedHalf(Float16 x)
+{
+#ifdef SOFT_FLOAT
+  int32_t val = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
+  if (val > int8_t(0x7f))
+    return int8_t(0x7f);
+  if (val < int8_t(0x80))
+    return int8_t(0x80);
+  return val;
+#else
+  // TODO: handle NAN and infinity.
+  return int8_t(x.toFloat());
 #endif
 }
 
@@ -17283,6 +17385,48 @@ signedToFp(int16_t x)
   return softToNative(i32_to_f16(x));
 #else
   return Float16(float(x));
+#endif
+}
+
+
+static Float16
+unsignedToFpHalf(uint32_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(ui32_to_f16(x));
+#else
+  return Float16(float(x));
+#endif
+}
+
+static float
+unsignedToFpHalf(uint64_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(ui64_to_f32(x));
+#else
+  return float(x);
+#endif
+}
+
+
+static Float16
+signedToFpHalf(int32_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i32_to_f16(x));
+#else
+  return Float16(float(x));
+#endif
+}
+
+static float
+signedToFpHalf(int64_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i64_to_f32(x));
+#else
+  return float(x);
 #endif
 }
 
@@ -18017,6 +18161,482 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
     case EW::Byte:   illegalInst(di); break;
     case EW::Half:   vfwcvt_f_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
+			 unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FLOAT_TYPE2X;
+
+  unsigned errors = 0;
+  FLOAT_TYPE2X e1{0.0f};
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1))
+        {
+	  ELEM_TYPE dest = fpToUnsignedHalf(e1);
+
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, false);
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked); break;
+    case EW::Half:   vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
+			unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FLOAT_TYPE2X;
+
+  unsigned errors = 0;
+  FLOAT_TYPE2X e1{0.0f};
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1))
+        {
+	  ELEM_TYPE dest = fpToSignedHalf(e1);
+
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, false);
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+      // PASS int type and do int8_t.
+    case EW::Byte:   vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked); break;
+    case EW::Half:   vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_x_f_w<int32_t> (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  setSimulatorRoundingMode(RoundingMode::Zero);
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked); break;
+    case EW::Half:   vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+  setSimulatorRoundingMode(RoundingMode::Zero);
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked); break;
+    case EW::Half:   vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_x_f_w<int32_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
+			 unsigned start, unsigned elems, bool masked)
+{
+  typedef typename getSameWidthFloatType<ELEM_TYPE>::type FLOAT_TYPE;
+  typedef typename makeDoubleWide<ELEM_TYPE>::type UINT_TYPE2X;
+
+  unsigned errors = 0;
+  UINT_TYPE2X e1{0};
+  FLOAT_TYPE dest{0.0f};
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1))
+        {
+	  dest = unsignedToFpHalf(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, false);
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
+			unsigned start, unsigned elems, bool masked)
+{
+  typedef typename getSameWidthFloatType<ELEM_TYPE>::type FLOAT_TYPE;
+  typedef typename makeDoubleWide<ELEM_TYPE>::type INT_TYPE2X;
+
+  unsigned errors = 0;
+  INT_TYPE2X e1{0};
+  FLOAT_TYPE dest{0.0f};
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group2x, e1))
+        {
+	  dest = signedToFpHalf(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, false);
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
+			unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE2X dest{0.0f};
+  unsigned group2x = group*2;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchMask(vd);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  if constexpr(std::is_same<ELEM_TYPE, Float16>::value)
+            dest = e1.toFloat();
+	  else
+	    dest = e1;
+          if (not vecRegs_.write(vd, ix, group2x, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  updateAccruedFpBits(0.0f, false);
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+#ifdef SOFT_FLOAT
+  softfloat_roundingMode = softfloat_round_odd;
+  // TBD FIX: what if not using SOFT_FLOAT
+#endif
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  // Double wide legal. Destination register multiple of emul.
+  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vs1*8) % (group*2)) != 0)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  illegalInst(di); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;

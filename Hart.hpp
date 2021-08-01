@@ -3358,18 +3358,48 @@ namespace WdRiscv
 
     template<typename ELEM_TYPE>
     void vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
-			  unsigned start, unsigned elems, bool masked);
+		       unsigned start, unsigned elems, bool masked);
     void execVfwcvt_f_xu_v(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
-			 unsigned start, unsigned elems, bool masked);
+		      unsigned start, unsigned elems, bool masked);
     void execVfwcvt_f_x_v(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
-			 unsigned start, unsigned elems, bool masked);
+		      unsigned start, unsigned elems, bool masked);
     void execVfwcvt_f_f_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
+		       unsigned start, unsigned elems, bool masked);
+    void execVfncvt_xu_f_w(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfncvt_x_f_w(const DecodedInst*);
+
+    void execVfncvt_rtz_xu_f_w(const DecodedInst*);
+
+    void execVfncvt_rtz_x_f_w(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
+		       unsigned start, unsigned elems, bool masked);
+    void execVfncvt_f_xu_w(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfncvt_f_x_w(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfncvt_f_f_w(const DecodedInst*);
+    void execVfncvt_rod_f_f_w(const DecodedInst*);
 
   private:
 

@@ -6172,6 +6172,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfcvt_rtz_x_f_v,
      &&vfcvt_f_xu_v,
      &&vfcvt_f_x_v,
+
      &&vfwcvt_xu_f_v,
      &&vfwcvt_x_f_v,
      &&vfwcvt_rtz_xu_f_v,
@@ -6179,6 +6180,15 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfwcvt_f_xu_v,
      &&vfwcvt_f_x_v,
      &&vfwcvt_f_f_v,
+
+     &&vfncvt_xu_f_w,
+     &&vfncvt_x_f_w,
+     &&vfncvt_rtz_xu_f_w,
+     &&vfncvt_rtz_x_f_w,
+     &&vfncvt_f_xu_w,
+     &&vfncvt_f_x_w,
+     &&vfncvt_f_f_w,
+     &&vfncvt_rod_f_f_w,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8926,6 +8936,38 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfwcvt_f_f_v:
   execVfwcvt_f_f_v(di);
+  return;
+
+ vfncvt_xu_f_w:
+  execVfncvt_xu_f_w(di);
+  return;
+
+ vfncvt_x_f_w:
+  execVfncvt_x_f_w(di);
+  return;
+
+ vfncvt_rtz_xu_f_w:
+  execVfncvt_rtz_xu_f_w(di);
+  return;
+
+ vfncvt_rtz_x_f_w:
+  execVfncvt_rtz_x_f_w(di);
+  return;
+
+ vfncvt_f_xu_w:
+  execVfncvt_f_xu_w(di);
+  return;
+
+ vfncvt_f_x_w:
+  execVfncvt_f_x_w(di);
+  return;
+
+ vfncvt_f_f_w:
+  execVfncvt_f_f_w(di);
+  return;
+
+ vfncvt_rod_f_f_w:
+  execVfncvt_rod_f_f_w(di);
   return;
 }
 
