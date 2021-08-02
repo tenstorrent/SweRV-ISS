@@ -3951,7 +3951,7 @@ Hart<URV>::execVsrl_vi(const DecodedInst* di)
 
   bool msk = di->isMasked();
   unsigned vd = di->op0(),  v1 = di->op1();
-  SRV imm = di->op2();   // Unsigned -- zero extended.
+  URV imm = di->op2();   // Unsigned -- zero extended.
 
   unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -4042,7 +4042,7 @@ Hart<URV>::execVsra_vi(const DecodedInst* di)
 
   bool msk = di->isMasked();
   unsigned vd = di->op0(),  v1 = di->op1();
-  SRV imm = di->op2();   // Unsigned -- zero extended
+  URV imm = di->op2();   // Unsigned -- zero extended
 
   unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -4211,7 +4211,7 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
 
   bool msk = di->isMasked();
   unsigned vd = di->op0(),  v1 = di->op1();
-  SRV imm = di->op2();   // Unsigned -- zero extended.
+  URV imm = di->op2();   // Unsigned -- zero extended.
 
   unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -4302,7 +4302,7 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
 
   bool msk = di->isMasked();
   unsigned vd = di->op0(),  v1 = di->op1();
-  SRV imm = di->op2();   // Unsigned -- zero extended
+  URV imm = di->op2();   // Unsigned -- zero extended
 
   unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -4477,8 +4477,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
       return;
     }
 
-  unsigned vd = di->op0(),  vs1 = di->op1();
-  uint32_t imm = di->op2();
+  uint32_t vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -11559,8 +11558,7 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
-  SRV imm = di->op2As<int32_t>();
+  unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();

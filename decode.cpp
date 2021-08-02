@@ -495,7 +495,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
     {
       op0 = rform.bits.rd;
       op1 = rform.bits.rs2; // operand order reversed
-      int32_t imm = (int32_t(rform.bits.rs1) << 27) >> 27;
+      uint32_t uimm = rform.bits.rs1;             // Unsigned immediate.
+      int32_t imm = (int32_t(uimm) << 27) >> 27;  // Sign extended immediate.
       op2 = imm;
 
       switch (f6)
@@ -505,9 +506,9 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 9:    return instTable_.getEntry(InstId::vand_vi);
         case 0xa:  return instTable_.getEntry(InstId::vor_vi);
         case 0xb:  return instTable_.getEntry(InstId::vxor_vi);
-        case 0xc:  return instTable_.getEntry(InstId::vrgather_vi);
-        case 0xe:  return instTable_.getEntry(InstId::vslideup_vi);
-        case 0xf:  return instTable_.getEntry(InstId::vslidedown_vi);
+        case 0xc:  op2 = uimm; return instTable_.getEntry(InstId::vrgather_vi);
+        case 0xe:  op2 = uimm; return instTable_.getEntry(InstId::vslideup_vi);
+        case 0xf:  op2 = uimm; return instTable_.getEntry(InstId::vslidedown_vi);
         case 0x10: return instTable_.getEntry(InstId::vadc_vim);
         case 0x11: return instTable_.getEntry(InstId::vmadc_vim);
         case 0x17:
@@ -527,21 +528,21 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x1f: return instTable_.getEntry(InstId::vmsgt_vi);
         case 0x20: return instTable_.getEntry(InstId::vsaddu_vi);
         case 0x21: return instTable_.getEntry(InstId::vsadd_vi);
-        case 0x25: return instTable_.getEntry(InstId::vsll_vi);
+        case 0x25: op2 = uimm; return instTable_.getEntry(InstId::vsll_vi);
         case 0x27:
           if (imm == 0) return instTable_.getEntry(InstId::vmv1r_v);
           if (imm == 1) return instTable_.getEntry(InstId::vmv2r_v);
           if (imm == 3) return instTable_.getEntry(InstId::vmv4r_v);
           if (imm == 7) return instTable_.getEntry(InstId::vmv8r_v);
           break;
-        case 0x28: return instTable_.getEntry(InstId::vsrl_vi);
-        case 0x29: return instTable_.getEntry(InstId::vsra_vi);
-        case 0x2a: return instTable_.getEntry(InstId::vssrl_vi);
-        case 0x2b: return instTable_.getEntry(InstId::vssra_vi);
-	case 0x2c: return instTable_.getEntry(InstId::vnsrl_wi);
-	case 0x2d: return instTable_.getEntry(InstId::vnsra_wi);
-        case 0x2e: return instTable_.getEntry(InstId::vnclipu_wi);
-        case 0x2f: return instTable_.getEntry(InstId::vnclip_wi);
+        case 0x28: op2 = uimm; return instTable_.getEntry(InstId::vsrl_vi);
+        case 0x29: op2 = uimm; return instTable_.getEntry(InstId::vsra_vi);
+        case 0x2a: op2 = uimm; return instTable_.getEntry(InstId::vssrl_vi);
+        case 0x2b: op2 = uimm; return instTable_.getEntry(InstId::vssra_vi);
+	case 0x2c: op2 = uimm; return instTable_.getEntry(InstId::vnsrl_wi);
+	case 0x2d: op2 = uimm; return instTable_.getEntry(InstId::vnsra_wi);
+        case 0x2e: op2 = uimm; return instTable_.getEntry(InstId::vnclipu_wi);
+        case 0x2f: op2 = uimm; return instTable_.getEntry(InstId::vnclip_wi);
         }
       return instTable_.getEntry(InstId::illegal);  
     }
