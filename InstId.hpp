@@ -816,6 +816,13 @@ namespace WdRiscv
      vfncvt_f_f_w,
      vfncvt_rod_f_f_w,
 
-     maxId = vfncvt_rod_f_f_w
+     vfredsum_vs,
+     vfredosum_vs,
+     vfredmin_vs,
+     vfredmax_vs,
+     vfwredsum_vs,
+     vfwredosum_vs,
+
+     maxId = vfwredosum_vs
     };
 }

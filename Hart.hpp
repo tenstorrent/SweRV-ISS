@@ -2476,42 +2476,42 @@ namespace WdRiscv
 
     template<typename ELEM_TYPE>
     void vredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems);
+                    unsigned start, unsigned elems, bool masked);
     void execVredsum_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vredand_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems);
+                    unsigned start, unsigned elems, bool masked);
     void execVredand_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vredor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems);
+                   unsigned start, unsigned elems, bool masked);
     void execVredor_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vredxor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems);
+                    unsigned start, unsigned elems, bool masked);
     void execVredxor_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vredminu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                     unsigned start, unsigned elems);
+                     unsigned start, unsigned elems, bool masked);
     void execVredminu_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems);
+                    unsigned start, unsigned elems, bool masked);
     void execVredmin_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vredmaxu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                     unsigned start, unsigned elems);
+                     unsigned start, unsigned elems, bool masked);
     void execVredmaxu_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems);
+                    unsigned start, unsigned elems, bool masked);
     void execVredmax_vs(const DecodedInst*);
 
     void execVmand_mm(const DecodedInst*);
@@ -3400,6 +3400,36 @@ namespace WdRiscv
 		      unsigned start, unsigned elems, bool masked);
     void execVfncvt_f_f_w(const DecodedInst*);
     void execVfncvt_rod_f_f_w(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfredsum_vs(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfredosum_vs(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfredmin_vs(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfredmax_vs(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfwredsum_vs(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked);
+    void execVfwredosum_vs(const DecodedInst*);
 
   private:
 

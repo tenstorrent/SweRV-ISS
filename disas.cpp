@@ -3608,6 +3608,30 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
        printVec_v(*this, out, "vfncvt.rod.f.f.w", di);
        break;
 
+    case InstId::vfredsum_vs:
+      printVec_vv(*this, out, "vfredsum.vv", di);
+      break;
+
+    case InstId::vfredosum_vs:
+      printVec_vv(*this, out, "vfredosum.vv", di);
+      break;
+
+    case InstId::vfredmin_vs:
+      printVec_vv(*this, out, "vfredmin.vv", di);
+      break;
+
+    case InstId::vfredmax_vs:
+      printVec_vv(*this, out, "vfredmax.vv", di);
+      break;
+
+    case InstId::vfwredsum_vs:
+      printVec_vv(*this, out, "vfwredsum.vv", di);
+      break;
+
+    case InstId::vfwredosum_vs:
+      printVec_vv(*this, out, "vfwredosum.vv", di);
+      break;
+
     default:
       out << "illegal";
     }

@@ -6189,6 +6189,12 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfncvt_f_x_w,
      &&vfncvt_f_f_w,
      &&vfncvt_rod_f_f_w,
+     &&vfredsum_vs,
+     &&vfredosum_vs,
+     &&vfredmin_vs,
+     &&vfredmax_vs,
+     &&vfwredsum_vs,
+     &&vfwredosum_vs,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8968,6 +8974,30 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfncvt_rod_f_f_w:
   execVfncvt_rod_f_f_w(di);
+  return;
+
+ vfredsum_vs:
+  execVfredsum_vs(di);
+  return;
+
+ vfredosum_vs:
+  execVfredosum_vs(di);
+  return;
+
+ vfredmin_vs:
+  execVfredmin_vs(di);
+  return;
+
+ vfredmax_vs:
+  execVfredmax_vs(di);
+  return;
+
+ vfwredsum_vs:
+  execVfwredsum_vs(di);
+  return;
+
+ vfwredosum_vs:
+  execVfwredosum_vs(di);
   return;
 }
 

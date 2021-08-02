@@ -313,7 +313,11 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
       switch (f6)
 	{
 	case 0:    return instTable_.getEntry(InstId::vfadd_vv);
+	case 1:    return instTable_.getEntry(InstId::vfredsum_vs);
 	case 2:    return instTable_.getEntry(InstId::vfsub_vv);
+	case 3:    return instTable_.getEntry(InstId::vfredosum_vs);
+	case 5:    return instTable_.getEntry(InstId::vfredmin_vs);
+	case 7:    return instTable_.getEntry(InstId::vfredmax_vs);
 	case 0x12:
 	  if (op2 == 0)    return instTable_.getEntry(InstId::vfcvt_xu_f_v);
 	  if (op2 == 1)    return instTable_.getEntry(InstId::vfcvt_x_f_v);
@@ -372,7 +376,9 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           std::swap(op1, op2);  // per spec
 	  return instTable_.getEntry(InstId::vfnmsac_vv);
 	case 0x30: return instTable_.getEntry(InstId::vfwadd_vv);
+	case 0x31: return instTable_.getEntry(InstId::vfwredsum_vs);
 	case 0x32: return instTable_.getEntry(InstId::vfwsub_vv);
+	case 0x33: return instTable_.getEntry(InstId::vfwredosum_vs);
 	case 0x34: return instTable_.getEntry(InstId::vfwadd_wv);
 	case 0x36: return instTable_.getEntry(InstId::vfwsub_wv);
 	case 0x38: return instTable_.getEntry(InstId::vfwmul_vv);
