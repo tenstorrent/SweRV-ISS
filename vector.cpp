@@ -12156,7 +12156,7 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 {
-  unsigned groupCode = di->op3();
+  unsigned groupCode = di->op2();
   bool badConfig = groupCode > 3;
   GroupMultiplier gm = GroupMultiplier(groupCode);
 
@@ -12286,7 +12286,7 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
 {
-  unsigned groupCode = di->op3();
+  unsigned groupCode = di->op2();
   bool badConfig = groupCode > 3;
   GroupMultiplier gm = GroupMultiplier(groupCode);
 

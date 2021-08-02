@@ -1732,14 +1732,14 @@ namespace WdRiscv
                                uint32_t& op2, uint32_t& op3);
 
     /// Helper to decode: Decode vector instructions associated with
-    /// opcode 0100111. For whole register or segment load, op3 is set
+    /// opcode 0100111. For whole register or segment load, op2 is set
     /// to the code of the register count or segment field count.
-    const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op3);
+    const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2);
 
     /// Helper to decode: Decode vector instructions associated with
     /// opcode 0000111. For whole register or segment store, op3 is
     /// set to the code of the register count or segment field count.
-    const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op3);
+    const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2);
 
     /// Helper to disassembleInst32: Disassemble instructions
     /// associated with opcode 1010011.

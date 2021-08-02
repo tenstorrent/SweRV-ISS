@@ -763,7 +763,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 
 template <typename URV>
 const InstEntry&
-Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op3)
+Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2)
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   // unsigned vm = (imm12 >> 5) & 1;      // Bit 5 of imm12
@@ -792,7 +792,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op3)
         }
       else if (lumop == 0x8)
         {   // whole registers
-          op3 = nf;
+          op2 = nf;
 
           if (mew == 0)
             {
@@ -874,7 +874,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op3)
 
 template <typename URV>
 const InstEntry&
-Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op3)
+Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2)
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   // unsigned vm = (imm12 >> 5) & 1;      // Bit 5 of imm12
@@ -903,7 +903,7 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op3)
         }
       else if (lumop == 8)
         {
-          op3 = nf;
+          op2 = nf;
           if (mew == 0)
             {
               if (f3 == 0) return instTable_.getEntry(InstId::vsre8_v);
@@ -1740,13 +1740,13 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         else
           op2 = iform.rs2();  // vector load
 
-        if (f3 == 0)  return decodeVecLoad(f3, iform.uimmed(), op3);
+        if (f3 == 0)  return decodeVecLoad(f3, iform.uimmed(), op2);
 	if (f3 == 1)  return instTable_.getEntry(InstId::flh);
 	if (f3 == 2)  return instTable_.getEntry(InstId::flw);
 	if (f3 == 3)  return instTable_.getEntry(InstId::fld);
-        if (f3 == 5)  return decodeVecLoad(f3, iform.uimmed(), op3);
-        if (f3 == 6)  return decodeVecLoad(f3, iform.uimmed(), op3);
-        if (f3 == 7)  return decodeVecLoad(f3, iform.uimmed(), op3);
+        if (f3 == 5)  return decodeVecLoad(f3, iform.uimmed(), op2);
+        if (f3 == 6)  return decodeVecLoad(f3, iform.uimmed(), op2);
+        if (f3 == 7)  return decodeVecLoad(f3, iform.uimmed(), op2);
       }
       return instTable_.getEntry(InstId::illegal);
 
@@ -1782,13 +1782,13 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             op2 = sform.rs2();
           }
 
-        if (f3 == 0)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+        if (f3 == 0)  return decodeVecStore(f3, sform.vbits.imm12, op2);
 	if (f3 == 1)  return instTable_.getEntry(InstId::fsh);
 	if (f3 == 2)  return instTable_.getEntry(InstId::fsw);
 	if (f3 == 3)  return instTable_.getEntry(InstId::fsd);
-        if (f3 == 5)  return decodeVecStore(f3, sform.vbits.imm12, op3);
-        if (f3 == 6)  return decodeVecStore(f3, sform.vbits.imm12, op3);
-        if (f3 == 7)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+        if (f3 == 5)  return decodeVecStore(f3, sform.vbits.imm12, op2);
+        if (f3 == 6)  return decodeVecStore(f3, sform.vbits.imm12, op2);
+        if (f3 == 7)  return decodeVecStore(f3, sform.vbits.imm12, op2);
       }
       return instTable_.getEntry(InstId::illegal);
 
