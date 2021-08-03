@@ -5,7 +5,7 @@
     "force_rounding_mode" : "rne",
 
     "Comment" : "Round after multiply operation in fused mutliply-add/sub instructions.",
-    "round_after_fused_multiply" : "true",
+    "#round_after_fused_multiply" : "true",
 
     "Comment" : "Replace subnormal floating point results with zero.",
     "force_subnormal_to_zero" : "true",

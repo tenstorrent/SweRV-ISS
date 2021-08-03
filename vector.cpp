@@ -17207,7 +17207,7 @@ Hart<URV>::vfclass_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -17639,7 +17639,7 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -17700,7 +17700,7 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -17822,7 +17822,7 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -17885,7 +17885,7 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -17946,7 +17946,7 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -18017,7 +18017,7 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -18165,7 +18165,7 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -18237,7 +18237,7 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -18308,7 +18308,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -18382,7 +18382,7 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -18454,7 +18454,7 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -18601,7 +18601,7 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -18676,7 +18676,7 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
@@ -18750,7 +18750,7 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchMask(vd);
+	  vecRegs_.touchReg(vd, group2x);
 	  continue;
 	}
 
@@ -19354,6 +19354,276 @@ Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
     case EW::Word2: vfrsqrt7_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+
+  bool invalid = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  bool einv = false; // Invalid fp exception raised for element.
+          dest = doFmin(e1, e2, subnormToZero_, einv);
+	  invalid = invalid or einv;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  if (invalid)
+    orFcsrFlags(FpFlags::Invalid);
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmin_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfmin_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfmin_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfmin_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  bool invalid = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  bool einv = false; // Invalid fp exception raised for element.
+          dest = doFmin(e1, e2, subnormToZero_, einv);
+	  invalid = invalid or einv;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  if (invalid)
+    orFcsrFlags(FpFlags::Invalid);
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmin_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfmin_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfmin_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfmin_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+
+  bool invalid = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  bool einv = false; // Invalid fp exception raised for element.
+          dest = doFmin(e1, e2, subnormToZero_, einv);
+	  invalid = invalid or einv;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  if (invalid)
+    orFcsrFlags(FpFlags::Invalid);
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmax_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfmax_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfmax_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfmax_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  bool invalid = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  bool einv = false; // Invalid fp exception raised for element.
+          dest = doFmin(e1, e2, subnormToZero_, einv);
+	  invalid = invalid or einv;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  if (invalid)
+    orFcsrFlags(FpFlags::Invalid);
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmax_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfmax_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfmax_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfmax_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
 }
 
 

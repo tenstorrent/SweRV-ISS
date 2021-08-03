@@ -3436,6 +3436,26 @@ namespace WdRiscv
 		    unsigned start, unsigned elems, bool masked);
     void execVfrsqrt7_v(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVfmin_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		 unsigned start, unsigned elems, bool masked);
+    void execVfmin_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVfmax_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
+    void execVfmax_vf(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
