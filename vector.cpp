@@ -13295,6 +13295,81 @@ doFdiv(FT f1, FT f2, bool subnormToZero)
 }
 
 
+// Approximate 1 / sqrt(val)
+double
+doFrsqrt7(double val, bool& divByZero, bool& invalid)
+{
+  divByZero = false;
+  invalid = false;
+
+  bool signBit = std::signbit(val);
+  if (val == 0)
+    {
+      val = std::numeric_limits<double>::infinity();
+      if (signBit)
+	val = -val;
+      divByZero = true;
+    }
+  else if (std::isinf(val) and not signBit)
+    {
+      val = 0;
+    }
+  else if (std::isnan(val))
+    {
+      if (isSnan(val))
+	invalid = true;
+      val = std::numeric_limits<double>::quiet_NaN();
+    }
+  else if (signBit)
+    {
+      val = std::numeric_limits<double>::quiet_NaN();
+      invalid = true;
+    }
+  else
+    {
+      static uint32_t table[128] = {
+	52,  51,  50,  48,  47,  46,  44,  43,  42,  41,  40,  39,  38,  36,  35,  34,
+	33,  32,  31,  30,  30,  29,  28,  27,  26,  25,  24,  23,  23,  22,  21,  20,
+	19,  19,  18,  17,  16,  16,  15,  14,	14,  13,  12,  12,  11,  10,  10,  9,
+	9,   8,   7,   7,   6,   6,   5,   4,   4,   3,   3,   2,   2,   1,   1,   0,
+	127, 125, 123, 121, 119, 118, 116, 114, 113, 111, 109, 108, 106, 105, 103, 102,
+	100, 99,  97,  96,  95,  93,  92,  91,  90,  88,  87,  86,  85,  84,  83,  82,
+	80,  79,  78,  77,  76,  75,  74,  73,  72,  71,  70,  70,  69,  68,  67,  66,
+	65,  64,  63,  63,  62,  61,  60,  59,  59,  58,  57,  56,  56,  55,  54,  53
+      };
+
+      int bias = 1023;
+      int inExp = 0;
+      double inFrac = std::frexp(val, &inExp);
+      inExp += bias - 1;
+      Uint64DoubleUnion ud(inFrac);
+      int sigMs6 = (ud.u >> 46) & 0x3f;  // Most sig 6 bits of significand
+      uint64_t outExp = (3*bias - 1 - inExp) / 2;
+      int index = (uint64_t(inExp & 1) << 6) |  sigMs6;
+      uint64_t outSigMs7 = table[index];
+      ud.u = (outSigMs7 << 45) | (outExp << 52);
+      val = ud.d;
+    }
+
+  return val;
+}
+
+
+float
+doFrsqrt7(float val, bool& divByZero, bool& invalid)
+{
+  return doFrsqrt7(double(val), divByZero, invalid);
+}
+
+
+Float16
+doFrsqrt7(Float16 val, bool& divByZero, bool& invalid)
+{
+  float ff = doFrsqrt7(val.toFloat(), divByZero, invalid);
+  return Float16(ff);
+}
+
+
 template <typename URV>
 template <typename ELEM_TYPE>
 void
@@ -19205,6 +19280,80 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+
+  bool inv = false, dbz = false;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  bool edbz = false, einv = false;  // Element divide-by-zero and invalid
+	  dest = doFrsqrt7(e1, edbz, einv);
+	  dbz = dbz or edbz;
+	  inv = inv or einv;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  clearSimulatorFpFlags();
+
+#ifdef SOFT_FLOAT
+  if (inv) softfloat_exceptionFlags |= softfloat_flag_invalid;
+  if (dbz) softfloat_exceptionFlags |= softfloat_flag_infinite;
+#else
+  if (inv) feraiseexcept(FE_INVALID);
+  if (dbz) feraiseexcept(FE_DIVBYZERO);
+#endif
+
+  updateAccruedFpBits(0.0f, false);
+  markFsDirty();
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfrsqrt7_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfrsqrt7_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2: vfrsqrt7_v<double> (vd, vs1, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
 }
 
 

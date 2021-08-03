@@ -6195,6 +6195,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfredmax_vs,
      &&vfwredsum_vs,
      &&vfwredosum_vs,
+     &&vfrsqrt7_v,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8998,6 +8999,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfwredosum_vs:
   execVfwredosum_vs(di);
+  return;
+
+ vfrsqrt7_v:
+  execVfrsqrt7_v(di);
   return;
 }
 

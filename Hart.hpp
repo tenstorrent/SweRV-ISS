@@ -3431,6 +3431,11 @@ namespace WdRiscv
 		      unsigned start, unsigned elems, bool masked);
     void execVfwredosum_vs(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
+		    unsigned start, unsigned elems, bool masked);
+    void execVfrsqrt7_v(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
