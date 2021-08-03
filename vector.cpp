@@ -19487,7 +19487,6 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
 }
 
@@ -19622,7 +19621,381 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsgnj_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+                    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+          dest = std::copysign(e1, e2);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfsgnj_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfsgnj_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfsgnj_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsgnj_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = std::copysign(e1, e2);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfsgnj_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnj_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnj_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsgnjn_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+          dest = std::copysign(e1, e2);
+	  dest = -dest;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfsgnjn_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfsgnjn_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfsgnjn_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = std::copysign(e1, e2);
+	  dest = -dest;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfsgnjn_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnjn_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnjn_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsgnjx_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  int s1 = (std::signbit(e1) == 0) ? 0 : 1;
+	  int s2 = (std::signbit(e2) == 0) ? 0 : 1;
+	  int sign = s1 ^ s2;
+	  ELEM_TYPE x(1.0f);
+	  if (sign)
+	    x = -x;
+	  dest = std::copysign(e1, x);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   illegalInst(di); break;
+    case EW::Half:   vfsgnjx_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfsgnjx_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2:  vfsgnjx_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfsgnjx_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  int s1 = (std::signbit(e1) == 0) ? 0 : 1;
+	  int s2 = (std::signbit(e2) == 0) ? 0 : 1;
+	  int sign = s1 ^ s2;
+	  ELEM_TYPE x(1.0f);
+	  if (sign)
+	    x = -x;
+	  dest = std::copysign(e1, x);
+
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfsgnjx_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnjx_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnjx_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+
   markFsDirty();
 }
 

@@ -6200,6 +6200,12 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfmin_vf,
      &&vfmax_vv,
      &&vfmax_vf,
+     &&vfsgnj_vv,
+     &&vfsgnj_vf,
+     &&vfsgnjn_vv,
+     &&vfsgnjn_vf,
+     &&vfsgnjx_vv,
+     &&vfsgnjx_vf,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -9023,6 +9029,30 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfmax_vf:
   execVfmax_vf(di);
+  return;
+
+ vfsgnj_vv:
+  execVfsgnj_vv(di);
+  return;
+
+ vfsgnj_vf:
+  execVfsgnj_vf(di);
+  return;
+
+ vfsgnjn_vv:
+  execVfsgnjn_vv(di);
+  return;
+
+ vfsgnjn_vf:
+  execVfsgnjn_vf(di);
+  return;
+
+ vfsgnjx_vv:
+  execVfsgnjx_vv(di);
+  return;
+
+ vfsgnjx_vf:
+  execVfsgnjx_vf(di);
   return;
 }
 

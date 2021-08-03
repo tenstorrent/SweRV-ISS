@@ -5320,5 +5320,59 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::FpReg, OperandMode::Read, rs2Mask,
       },
+
+      { "vfsgnj.vv", InstId::vfsgnj_vv,
+        0b001000'0'00000'00000'001'00000'1010111, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vfsgnj.vf", InstId::vfsgnj_vf,
+        0b001000'0'00000'00000'101'00000'1010111, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::FpReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vfsgnjn.vv", InstId::vfsgnjn_vv,
+        0b001001'0'00000'00000'001'00000'1010111, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vfsgnjn.vf", InstId::vfsgnjn_vf,
+        0b001001'0'00000'00000'101'00000'1010111, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::FpReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vfsgnjx.vv", InstId::vfsgnjx_vv,
+        0b001010'0'00000'00000'001'00000'1010111, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vfsgnjx.vf", InstId::vfsgnjx_vf,
+        0b001010'0'00000'00000'101'00000'1010111, // Opcode
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::FpReg, OperandMode::Read, rs2Mask,
+      },
     };
 }

@@ -830,6 +830,13 @@ namespace WdRiscv
      vfmax_vv,
      vfmax_vf,
 
-     maxId = vfmax_vf
+     vfsgnj_vv,
+     vfsgnj_vf,
+     vfsgnjn_vv,
+     vfsgnjn_vf,
+     vfsgnjx_vv,
+     vfsgnjx_vf,
+
+     maxId = vfsgnjx_vf
     };
 }

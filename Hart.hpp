@@ -3456,6 +3456,36 @@ namespace WdRiscv
 		  unsigned start, unsigned elems, bool masked);
     void execVfmax_vf(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vfsgnj_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfsgnj_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfsgnj_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfsgnj_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfsgnjn_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfsgnjn_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfsgnjn_vf(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfsgnjx_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfsgnjx_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vfsgnjx_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked);
+    void execVfsgnjx_vf(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load

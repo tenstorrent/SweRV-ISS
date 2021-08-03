@@ -320,6 +320,9 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 5:    return instTable_.getEntry(InstId::vfredmin_vs);
 	case 6:    return instTable_.getEntry(InstId::vfmax_vv);
 	case 7:    return instTable_.getEntry(InstId::vfredmax_vs);
+	case 8:    return instTable_.getEntry(InstId::vfsgnj_vv);
+	case 9:    return instTable_.getEntry(InstId::vfsgnjn_vv);
+	case 0xa:  return instTable_.getEntry(InstId::vfsgnjx_vv);
 	case 0x12:
 	  if (op2 == 0)    return instTable_.getEntry(InstId::vfcvt_xu_f_v);
 	  if (op2 == 1)    return instTable_.getEntry(InstId::vfcvt_x_f_v);
@@ -684,6 +687,9 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 2:    return instTable_.getEntry(InstId::vfsub_vf);
 	case 4:    return instTable_.getEntry(InstId::vfmin_vf);
 	case 6:    return instTable_.getEntry(InstId::vfmax_vf);
+	case 8:    return instTable_.getEntry(InstId::vfsgnj_vf);
+	case 9:    return instTable_.getEntry(InstId::vfsgnjn_vf);
+	case 0xa:  return instTable_.getEntry(InstId::vfsgnjx_vf);
         case 0x17:
           if (vm == 0) return instTable_.getEntry(InstId::vfmerge_vfm);
           if (vm == 1)
