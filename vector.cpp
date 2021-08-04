@@ -12370,8 +12370,6 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-      if (traceLdSt_)
-	vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12733,8 +12731,6 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-       if (traceLdSt_)
-	vecLdStAddr_.push_back(addr);
      addr += stride;
     }
 
@@ -13044,7 +13040,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	      memory_.write(hartIx_, eaddr, elem);
 	      if (traceLdSt_)
 		{
-		  vecLdStAddr_.push_back(addr);
+		  vecLdStAddr_.push_back(eaddr);
 		  vecStData_.push_back(elem);
 		}
 	    }
@@ -13057,9 +13053,6 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
           initiateStoreException(cause, eaddr, secCause);
           break;
         }
-
-      if (traceLdSt_)
-	vecLdStAddr_.push_back(eaddr);
     }
 
   assert(errors == 0);
