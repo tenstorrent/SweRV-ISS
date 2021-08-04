@@ -23,7 +23,7 @@
 	    "reset-comment" : "imfv",
 	    "reset" : "0x40201120",
 	    "mask-comment" : "all the bits are writeable/pokeable",
-	    "mask" : "0xffffffff"
+	    "mask" : "0xfffffffe"
 	},
 
 	"mstatus" : {

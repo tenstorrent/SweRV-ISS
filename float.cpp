@@ -3181,17 +3181,17 @@ Hart<URV>::execFsgnjx_h(const DecodedInst* di)
       return;
     }
 
-  float f1 = fpRegs_.readSingle(di->op1());
-  float f2 = fpRegs_.readSingle(di->op2());
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
 
-  int sign1 = (std::signbit(f1) == 0) ? 0 : 1;
-  int sign2 = (std::signbit(f2) == 0) ? 0 : 1;
-  int sign = sign1 ^ sign2;
+  unsigned sign1 = f1.signBit();
+  unsigned sign2 = f2.signBit();
+  unsigned sign = sign1 ^ sign2;
 
-  float x = sign? -1 : 1;
+  Float16 x = sign? Float16{-1.0f} : Float16{1.0f};
 
-  float res = std::copysignf(f1, x);  // Magnitude of rs1 and sign of x
-  fpRegs_.writeSingle(di->op0(), res);
+  Float16 res = Float16::copySign(f1, x);  // Magnitude of rs1 and sign of x
+  fpRegs_.writeHalf(di->op0(), res);
 
   markFsDirty();
 }

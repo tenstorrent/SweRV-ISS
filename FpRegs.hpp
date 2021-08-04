@@ -276,7 +276,7 @@ namespace WdRiscv
 
     /// Return a Float16 with magnitude of x and sign of y.
     static Float16 copySign(Float16 x, Float16 y)
-    { x.i16 = (x.i16 << 1) >> 1;  x.i16 |= (y.i16 >> 15 << 15); return x; }
+    { x.i16 &= 0x7fff;  x.i16 |= (y.i16 >> 15 << 15); return x; }
 
     /// Return the quiet NAN Float16 number.
     static Float16 quietNan()
