@@ -11933,6 +11933,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           break;
         }
 
+      // vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12080,6 +12081,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
+      // vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12172,7 +12174,8 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   URV addr = intRegs_.read(rs1);
 
   unsigned groupX8 = vecRegs_.groupMultiplierX8(gm), start = 0;
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / 8;
+  unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
+  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -12210,6 +12213,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
+      // vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12302,7 +12306,8 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
   URV addr = intRegs_.read(rs1);
 
   unsigned groupX8 = vecRegs_.groupMultiplierX8(gm), start = 0;
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / 8;
+  unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
+  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -12339,6 +12344,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
+      // vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12550,6 +12556,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
+      // vecLdStAddr_.push_back(addr);
       addr += stride;
     }
 
