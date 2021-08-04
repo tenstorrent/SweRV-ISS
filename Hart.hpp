@@ -3437,6 +3437,11 @@ namespace WdRiscv
     void execVfrsqrt7_v(const DecodedInst*);
 
     template<typename ELEM_TYPE>
+    void vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
+    void execVfrec7_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
     void vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                   unsigned start, unsigned elems, bool masked);
     void execVfmin_vv(const DecodedInst*);

@@ -824,6 +824,7 @@ namespace WdRiscv
      vfwredosum_vs,
 
      vfrsqrt7_v,
+     vfrec7_v,
 
      vfmin_vv,
      vfmin_vf,

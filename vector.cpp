@@ -13370,6 +13370,154 @@ doFrsqrt7(Float16 val, bool& divByZero, bool& invalid)
 }
 
 
+static uint32_t frec7Table[128] = {
+  127, 125, 123, 121, 119, 117, 116, 114, 112, 110, 109, 107, 105, 104, 102, 100, 
+  99,  97,  96,  94,  93,  91,  90,  88,  87,  85,  84,  83,  81,  80,  79,  77,  
+  76,  75,  74,  72,  71,  70,  69,  68,  66,  65,  64,  63,  62,  61,  60,  59,  
+  58,  57,  56,  55,  54,  53,  52,  51,  50,  49,  48,  47,  46,  45,  44,  43,  
+  42,  41,  40,  40,  39,  38,  37,  36,  35,  35,  34,  33,  32,  31,  31,  30,  
+  29,  28,  28,  27,  26,  25,  25,  24,  23,  23,  22,  21,  21,  20,  19,  19,  
+  18,  17,  17,  16,  15,  15,  14,  14,  13,  12,  12,  11,  11,  10,  9,   9,   
+  8,   8,   7,   7,   6,   5,   5,   4,   4,   3,   3,   2,   2,   1,   1,   0
+};
+
+// Approximate 1 / x
+double
+static doFrec7(double val, RoundingMode mode, FpFlags& flags)
+{
+  flags = FpFlags::None;
+  bool signBit = std::signbit(val);
+  
+  if (val == 0)
+    {
+      val = std::numeric_limits<double>::infinity();
+      if (signBit)
+	val = -val;
+      flags = FpFlags(unsigned(FpFlags::DivByZero) | unsigned(flags));
+    }
+  else if (std::isinf(val))
+    {
+      val = signBit? -0 : +0;
+    }
+  else if (std::isnan(val))
+    {
+      if (isSnan(val))
+	flags = FpFlags(unsigned(FpFlags::Invalid) | unsigned(flags));
+      val = std::numeric_limits<double>::quiet_NaN();
+    }
+  else
+    {
+      int bias = 1023;
+      int inExp = 0;
+      double inFrac = std::frexp(val, &inExp);
+      inExp += bias - 1;
+
+      if (inExp < -1 or inExp > 2*bias)
+	{
+	  if (mode == RoundingMode::Up or mode == RoundingMode::Zero)
+	    {
+	      val = std::numeric_limits<double>::max();
+	      if (signBit)
+		val = -val;
+	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
+			      unsigned(flags));
+	    }
+	  else
+	    {
+	      val = std::numeric_limits<double>::infinity();
+	      if (signBit)
+		val = -val;
+	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
+			      unsigned(flags));
+	    }
+	}
+      else
+	{
+	  Uint64DoubleUnion ud(inFrac);
+	  int sigMs7 = (ud.u >> 45) & 0x7f;  // Most sig 7 bits of significand
+	  uint64_t outExp = (2*bias - 1 - inExp);
+	  uint64_t outSigMs7 = frec7Table[sigMs7];
+	  ud.u = (outSigMs7 << 45) | (outExp << 52);
+	  val = ud.d;
+	}
+    }
+
+  return val;
+}
+
+
+static float
+doFrec7(float val, RoundingMode mode, FpFlags& flags)
+{
+  flags = FpFlags::None;
+  bool signBit = std::signbit(val);
+  
+  if (val == 0)
+    {
+      val = std::numeric_limits<float>::infinity();
+      if (signBit)
+	val = -val;
+      flags = FpFlags(unsigned(FpFlags::DivByZero) | unsigned(flags));
+    }
+  else if (std::isinf(val))
+    {
+      val = signBit? -0 : +0;
+    }
+  else if (std::isnan(val))
+    {
+      if (isSnan(val))
+	flags = FpFlags(unsigned(FpFlags::Invalid) | unsigned(flags));
+      val = std::numeric_limits<float>::quiet_NaN();
+    }
+  else
+    {
+      int bias = 127;
+      int inExp = 0;
+      float inFrac = std::frexp(val, &inExp);
+      inExp += bias - 1;
+
+      if (inExp < -1 or inExp > 2*bias)
+	{
+	  if (mode == RoundingMode::Up or mode == RoundingMode::Zero)
+	    {
+	      val = std::numeric_limits<float>::max();
+	      if (signBit)
+		val = -val;
+	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
+			      unsigned(flags));
+	    }
+	  else
+	    {
+	      val = std::numeric_limits<float>::infinity();
+	      if (signBit)
+		val = -val;
+	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
+			      unsigned(flags));
+	    }
+	}
+      else
+	{
+	  Uint32FloatUnion uf(inFrac);
+	  int sigMs7 = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
+	  uint32_t outExp = (2*bias - 1 - inExp);
+	  uint32_t outSigMs7 = frec7Table[sigMs7];
+	  uf.u = (outSigMs7 << 16) | (outExp << 23);
+	  val = uf.f;
+	}
+    }
+
+  return val;
+}
+
+
+static Float16
+doFrec7(Float16 val, RoundingMode mode, FpFlags& flags)
+{
+  float ff = doFrec7(val.toFloat(), mode, flags);
+  return Float16(ff);
+}
+
+
 template <typename URV>
 template <typename ELEM_TYPE>
 void
@@ -19352,6 +19500,70 @@ Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
     case EW::Half:  vfrsqrt7_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfrsqrt7_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2: vfrsqrt7_v<double> (vd, vs1, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
+    }
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1{0.0f}, dest{0.0f};
+
+  FpFlags flags = FpFlags::None;
+  auto mode = getFpRoundingMode();
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  FpFlags elemFlags = FpFlags::None;
+	  dest = doFrec7(e1, mode, elemFlags);
+	  flags = FpFlags(unsigned(flags) | unsigned(elemFlags));
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  orFcsrFlags(flags);
+  markFsDirty();
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfrec7_v(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:  vfrec7_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfrec7_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Word2: vfrec7_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
 }

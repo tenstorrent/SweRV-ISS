@@ -5285,6 +5285,14 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs1Mask,
       },
 
+      { "vfrec7.v", InstId::vfrec7_v,
+        0b010011'0'00000'00101'001'00000'1010111, // Opcode
+        0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+      },
+
       { "vfmin.vv", InstId::vfmin_vv,
         0b000100'0'00000'00000'001'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
