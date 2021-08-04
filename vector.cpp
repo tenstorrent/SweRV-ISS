@@ -11862,6 +11862,9 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 {
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
@@ -11933,7 +11936,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           break;
         }
 
-      // vecLdStAddr_.push_back(addr);
+      if (traceLdSt_)
+	vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12010,6 +12014,9 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 {
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
@@ -12068,9 +12075,15 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       else
         {
           bool forced = false;
-          if (determineStoreException(rs1, URV(addr), addr, elem, secCause, forced) !=
-              ExceptionCause::NONE)
-            memory_.write(hartIx_, addr, elem);
+          if (determineStoreException(rs1, URV(addr), addr, elem, secCause, forced) == ExceptionCause::NONE)
+	    {
+	      memory_.write(hartIx_, addr, elem);
+	      if (traceLdSt_)
+		{
+		  vecLdStAddr_.push_back(addr);
+		  vecStData_.push_back(elem);
+		}
+	    }
         }
 
       if (cause != ExceptionCause::NONE)
@@ -12081,7 +12094,6 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-      // vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12158,6 +12170,9 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 {
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
   unsigned groupCode = di->op2();
   bool badConfig = groupCode > 3;
   GroupMultiplier gm = GroupMultiplier(groupCode);
@@ -12213,7 +12228,8 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-      // vecLdStAddr_.push_back(addr);
+      if (traceLdSt_)
+	vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12290,6 +12306,9 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
 {
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
   unsigned groupCode = di->op2();
   bool badConfig = groupCode > 3;
   GroupMultiplier gm = GroupMultiplier(groupCode);
@@ -12335,7 +12354,14 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
             }
         }
       else
-        memory_.write(hartIx_, addr, elem);
+	{
+	  memory_.write(hartIx_, addr, elem);
+	  if (traceLdSt_)
+	    {
+	      vecLdStAddr_.push_back(addr);
+	      vecStData_.push_back(elem);
+	    }
+	}
 
       if (exception)
         {
@@ -12344,7 +12370,8 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-      // vecLdStAddr_.push_back(addr);
+      if (traceLdSt_)
+	vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
 
@@ -12485,6 +12512,9 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 {
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
@@ -12556,7 +12586,8 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-      // vecLdStAddr_.push_back(addr);
+      if (traceLdSt_)
+	vecLdStAddr_.push_back(addr);
       addr += stride;
     }
 
@@ -12633,6 +12664,9 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 {
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
@@ -12683,7 +12717,14 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
             }
         }
       else
-        memory_.write(hartIx_, addr, elem);
+	{
+	  memory_.write(hartIx_, addr, elem);
+	  if (traceLdSt_)
+	    {
+	      vecLdStAddr_.push_back(addr);
+	      vecStData_.push_back(elem);
+	    }
+	}
 
       if (exception)
         {
@@ -12692,7 +12733,9 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-      addr += stride;
+       if (traceLdSt_)
+	vecLdStAddr_.push_back(addr);
+     addr += stride;
     }
 
   assert(errors == 0);
@@ -12768,11 +12811,8 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
-  if (not isVecLegal())
-    {
-      illegalInst(di);
-      return;
-    }
+  vecLdStAddr_.clear();
+  vecStData_.clear();
 
   uint32_t elemWidth = vecRegs_.elementWidthInBits();
   uint32_t offsetElemWidth = vecRegs_.elementWidthInBits(offsetEew);
@@ -12784,7 +12824,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   if (not badConfig)
     badConfig = not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (badConfig)
+  if (not isVecLegal() or badConfig)
     {
       illegalInst(di);
       return;
@@ -12852,6 +12892,9 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           errors++;
           break;
         }
+
+      if (traceLdSt_)
+	vecLdStAddr_.push_back(eaddr);
     }
 
   assert(errors == 0);
@@ -12927,11 +12970,8 @@ template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
-  if (not isVecLegal())
-    {
-      illegalInst(di);
-      return;
-    }
+  vecLdStAddr_.clear();
+  vecStData_.clear();
 
   uint32_t elemWidth = vecRegs_.elementWidthInBits();
   uint32_t offsetElemWidth = vecRegs_.elementWidthInBits(offsetEew);
@@ -12943,7 +12983,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   if (not badConfig)
     badConfig = not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (badConfig)
+  if (not isVecLegal() or badConfig)
     {
       illegalInst(di);
       return;
@@ -12988,8 +13028,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
             {
               uint64_t dword = elem;
               bool forced = false;
-              cause = determineStoreException(rs1, URV(eaddr), eaddr, dword, secCause,
-                                              forced);
+              cause = determineStoreException(rs1, URV(eaddr), eaddr, dword, secCause, forced);
               if (cause != ExceptionCause::NONE)
                 break;
 
@@ -13000,9 +13039,15 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       else
         {
           bool forced = false;
-          if (determineStoreException(rs1, URV(eaddr), eaddr, elem, secCause, forced) !=
-              ExceptionCause::NONE)
-            memory_.write(hartIx_, eaddr, elem);
+          if (determineStoreException(rs1, URV(eaddr), eaddr, elem, secCause, forced) == ExceptionCause::NONE)
+	    {
+	      memory_.write(hartIx_, eaddr, elem);
+	      if (traceLdSt_)
+		{
+		  vecLdStAddr_.push_back(addr);
+		  vecStData_.push_back(elem);
+		}
+	    }
         }
 
       if (cause != ExceptionCause::NONE)
@@ -13012,6 +13057,9 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
           initiateStoreException(cause, eaddr, secCause);
           break;
         }
+
+      if (traceLdSt_)
+	vecLdStAddr_.push_back(eaddr);
     }
 
   assert(errors == 0);

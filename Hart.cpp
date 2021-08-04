@@ -3466,11 +3466,27 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   if (interrupt)
     tmp += " (interrupted)";
 
-  if (traceLdSt_ and ldStAddrValid_)
+  if (traceLdSt_)
     {
-      std::ostringstream oss;
-      oss << "0x" << std::hex << ldStAddr_;
-      tmp += " [" + oss.str() + "]";
+      if (ldStAddrValid_)
+	{
+	  std::ostringstream oss;
+	  oss << "0x" << std::hex << ldStAddr_;
+	  tmp += " [" + oss.str() + "]";
+	}
+      else if (not vecLdStAddr_.empty())
+	{
+	  std::ostringstream oss;
+	  for (size_t i = 0; i < vecLdStAddr_.size(); ++i)
+	    {
+	      if (i > 0)
+		oss << ";";
+	      oss << "0x" << std::hex << vecLdStAddr_.at(i);
+	      if (i < vecStData_.size())
+		oss << ':' << "0x" << vecStData_.at(i);
+	    }
+	  tmp += " [" + oss.str() + "]";
+	}
     }
 
   char instBuff[128];
@@ -4136,6 +4152,8 @@ Hart<URV>::clearTraceData()
   vecRegs_.clearLastWrittenReg();
   memory_.clearLastWriteInfo(hartIx_);
   syscall_.clearMemoryChanges();
+  vecLdStAddr_.clear();
+  vecStData_.clear();
 }
 
 
