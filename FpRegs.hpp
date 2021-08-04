@@ -571,7 +571,7 @@ namespace WdRiscv
     originalValue_ = regs_.at(i);
 
     FpUnion u{x};
-    regs_.at(0) = u.dp;
+    regs_.at(i) = u.dp;
     lastWrittenReg_ = i;
   }
 
