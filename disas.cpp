@@ -509,11 +509,22 @@ printFp2Rm(const Hart<URV>& hart, std::ostream& stream, const char* inst,
 
 static
 std::string
-wholeRegLdStInst(const DecodedInst& di)
+wholeRegLdInst(const DecodedInst& di)
 {
   unsigned count = di.op2();  // register count
   std::string name = di.instEntry()->name(); 
   std::string res = name.substr(0, 2) + std::to_string(count) + name.substr(2);
+  return res;
+}
+
+
+static
+std::string
+segLdStInst(const DecodedInst& di)
+{
+  unsigned count = di.op2();  // field count
+  std::string name = di.instEntry()->name(); 
+  std::string res = name.substr(0, 5) + std::to_string(count) + name.substr(5);
   return res;
 }
 
@@ -530,7 +541,9 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
     {  // Vector load store
       std::string name = di.instEntry()->name();
       if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
-	name = wholeRegLdStInst(di);
+	name = wholeRegLdInst(di);
+      if (id >= InstId::vlsege8_v and id <= InstId::vssege1024_v)
+	name = segLdStInst(di);
       out << name << " v" << di.op0();
       out << ", ("  << hart.intRegName(di.op1()) << ")";
       if (di.isMasked())

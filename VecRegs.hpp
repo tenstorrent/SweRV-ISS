@@ -152,7 +152,7 @@ namespace WdRiscv
     }
 
     /// Set the element with given index within the vector register of
-    /// the given number to the given value returning true on sucess
+    /// the given number to the given value returning true on success
     /// and false if the combination of element index, vector number
     /// and group multipier (presecaled by 8) is invalid. We pre-scale
     /// the group multiplier to avoid passing a fraction.

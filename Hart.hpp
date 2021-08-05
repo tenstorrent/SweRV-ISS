@@ -3023,6 +3023,30 @@ namespace WdRiscv
     void execVsuxei32_v(const DecodedInst*);
     void execVsuxei64_v(const DecodedInst*);
 
+    template <typename ELEM_TYPE>
+    void vectorLoadSeg(const DecodedInst*, ElementWidth);
+
+    void execVlsege8_v(const DecodedInst*);
+    void execVlsege16_v(const DecodedInst*);
+    void execVlsege32_v(const DecodedInst*);
+    void execVlsege64_v(const DecodedInst*);
+    void execVlsege128_v(const DecodedInst*);
+    void execVlsege256_v(const DecodedInst*);
+    void execVlsege512_v(const DecodedInst*);
+    void execVlsege1024_v(const DecodedInst*);
+
+    template <typename ELEM_TYPE>
+    void vectorStoreSeg(const DecodedInst*, ElementWidth);
+
+    void execVssege8_v(const DecodedInst*);
+    void execVssege16_v(const DecodedInst*);
+    void execVssege32_v(const DecodedInst*);
+    void execVssege64_v(const DecodedInst*);
+    void execVssege128_v(const DecodedInst*);
+    void execVssege256_v(const DecodedInst*);
+    void execVssege512_v(const DecodedInst*);
+    void execVssege1024_v(const DecodedInst*);
+
     template<typename ELEM_TYPE>
     void vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                  unsigned start, unsigned elems, bool masked);

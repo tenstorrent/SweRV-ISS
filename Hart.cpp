@@ -3524,12 +3524,18 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 
   // Process vector register diff.
   unsigned groupX8 = 8;
+  InstId instId = di.instEntry()->instId();
   int vecReg = vecRegs_.getLastWrittenReg(groupX8);
   if (vecReg >= 0)
     {
       // We want to report all the registers in the group.
       unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
       vecReg = vecReg - (vecReg % groupSize);
+      if (instId >= InstId::vlsege8_v and instId <= InstId::vlsege1024_v)
+	{
+	  vecReg = di.op0();
+	  groupSize = groupSize*di.op2();  // Scale by field count
+	}
 
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
 	{
@@ -6051,6 +6057,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vnclip_wv,
      &&vnclip_wx,
      &&vnclip_wi,
+
      &&vle8_v,
      &&vle16_v,
      &&vle32_v,
@@ -6067,6 +6074,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vse256_v,
      &&vse512_v,
      &&vse1024_v,
+
      &&vlre8_v,
      &&vlre16_v,
      &&vlre32_v,
@@ -6079,6 +6087,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vs2r_v,
      &&vs4r_v,
      &&vs8r_v,
+
      &&vle8ff_v,
      &&vle16ff_v,
      &&vle32ff_v,
@@ -6087,6 +6096,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vle256ff_v,
      &&vle512ff_v,
      &&vle1024ff_v,
+
      &&vlse8_v,
      &&vlse16_v,
      &&vlse32_v,
@@ -6103,6 +6113,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsse256_v,
      &&vsse512_v,
      &&vsse1024_v,
+
      &&vlxei8_v,
      &&vlxei16_v,
      &&vlxei32_v,
@@ -6119,6 +6130,23 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsuxei16_v,
      &&vsuxei32_v,
      &&vsuxei64_v,
+
+     &&vlsege8_v,
+     &&vlsege16_v,
+     &&vlsege32_v,
+     &&vlsege64_v,
+     &&vlsege128_v,
+     &&vlsege256_v,
+     &&vlsege512_v,
+     &&vlsege1024_v,
+     &&vssege8_v,
+     &&vssege16_v,
+     &&vssege32_v,
+     &&vssege64_v,
+     &&vssege128_v,
+     &&vssege256_v,
+     &&vssege512_v,
+     &&vssege1024_v,
 
      &&vfadd_vv,
      &&vfadd_vf,
@@ -8669,6 +8697,70 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vsuxei64_v:
   execVsuxei64_v(di);
+  return;
+
+ vlsege8_v:
+  execVlsege8_v(di);
+  return;
+
+ vlsege16_v:
+  execVlsege16_v(di);
+  return;
+
+ vlsege32_v:
+  execVlsege32_v(di);
+  return;
+
+ vlsege64_v:
+  execVlsege64_v(di);
+  return;
+
+ vlsege128_v:
+  execVlsege128_v(di);
+  return;
+
+ vlsege256_v:
+  execVlsege256_v(di);
+  return;
+
+ vlsege512_v:
+  execVlsege512_v(di);
+  return;
+
+ vlsege1024_v:
+  execVlsege1024_v(di);
+  return;
+
+ vssege8_v:
+  execVssege8_v(di);
+  return;
+
+ vssege16_v:
+  execVssege16_v(di);
+  return;
+
+ vssege32_v:
+  execVssege32_v(di);
+  return;
+
+ vssege64_v:
+  execVssege64_v(di);
+  return;
+
+ vssege128_v:
+  execVssege128_v(di);
+  return;
+
+ vssege256_v:
+  execVssege256_v(di);
+  return;
+
+ vssege512_v:
+  execVssege512_v(di);
+  return;
+
+ vssege1024_v:
+  execVssege1024_v(di);
   return;
 
  vfadd_vv:
