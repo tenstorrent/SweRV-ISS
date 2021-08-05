@@ -1734,12 +1734,14 @@ namespace WdRiscv
     /// Helper to decode: Decode vector instructions associated with
     /// opcode 0100111. For whole register or segment load, op2 is set
     /// to the code of the register count or segment field count.
-    const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2);
+    const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12,
+				    uint32_t& op2, uint32_t& op3);
 
     /// Helper to decode: Decode vector instructions associated with
     /// opcode 0000111. For whole register or segment store, op3 is
     /// set to the code of the register count or segment field count.
-    const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2);
+    const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12,
+				   uint32_t& op2, uint32_t& op3);
 
     /// Helper to disassembleInst32: Disassemble instructions
     /// associated with opcode 1010011.
@@ -3024,7 +3026,8 @@ namespace WdRiscv
     void execVsuxei64_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorLoadSeg(const DecodedInst*, ElementWidth);
+    void vectorLoadSeg(const DecodedInst*, ElementWidth, unsigned fields,
+		       uint64_t stride);
 
     void execVlsege8_v(const DecodedInst*);
     void execVlsege16_v(const DecodedInst*);
@@ -3036,7 +3039,8 @@ namespace WdRiscv
     void execVlsege1024_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorStoreSeg(const DecodedInst*, ElementWidth);
+    void vectorStoreSeg(const DecodedInst*, ElementWidth, unsigned fields,
+			uint64_t stride);
 
     void execVssege8_v(const DecodedInst*);
     void execVssege16_v(const DecodedInst*);
@@ -3046,6 +3050,24 @@ namespace WdRiscv
     void execVssege256_v(const DecodedInst*);
     void execVssege512_v(const DecodedInst*);
     void execVssege1024_v(const DecodedInst*);
+
+    void execVlssege8_v(const DecodedInst*);
+    void execVlssege16_v(const DecodedInst*);
+    void execVlssege32_v(const DecodedInst*);
+    void execVlssege64_v(const DecodedInst*);
+    void execVlssege128_v(const DecodedInst*);
+    void execVlssege256_v(const DecodedInst*);
+    void execVlssege512_v(const DecodedInst*);
+    void execVlssege1024_v(const DecodedInst*);
+
+    void execVsssege8_v(const DecodedInst*);
+    void execVsssege16_v(const DecodedInst*);
+    void execVsssege32_v(const DecodedInst*);
+    void execVsssege64_v(const DecodedInst*);
+    void execVsssege128_v(const DecodedInst*);
+    void execVsssege256_v(const DecodedInst*);
+    void execVsssege512_v(const DecodedInst*);
+    void execVsssege1024_v(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,

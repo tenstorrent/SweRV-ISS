@@ -13262,11 +13262,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = false;
-  if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
-    badConfig = true;
-  else
-    badConfig = not vecRegs_.legalConfig(eew, lmul);
+  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
+  badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
   if (not isVecLegal() or badConfig)
     {
@@ -13275,7 +13272,14 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(), rs1 = di->op1(), errors = 0;
+  unsigned vd = di->op0(), rs1 = di->op1();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  if (vd % eg)
+    {
+      illegalInst(di);
+      return;
+    }
+
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = vecRegs_.startIndex();
@@ -13324,17 +13328,12 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
         }
 
       if (not vecRegs_.write(vd, ix, groupX8, elem))
-        {
-          errors++;
-          break;
-        }
+	assert(0);
 
       if (traceLdSt_)
 	vecLdStAddr_.push_back(addr);
       addr += sizeof(ELEM_TYPE);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -13556,6 +13555,8 @@ Hart<URV>::execVse1024_v(const DecodedInst* di)
 {
   illegalInst(di);
 }
+
+
 
 
 template <typename URV>
@@ -14457,7 +14458,8 @@ Hart<URV>::execVsuxei64_v(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew)
+Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
+			 unsigned fieldCount, uint64_t stride)
 {
   vecLdStAddr_.clear();
   vecStData_.clear();
@@ -14488,19 +14490,20 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew)
 
   unsigned start = vecRegs_.startIndex();
   unsigned elemCount = vecRegs_.elemCount();
-  unsigned nfields = di->op2();
 
   // Used registers must not exceed 32.
-  if (vd + nfields*eg > 32)
+  if (vd + fieldCount*eg > 32)
     {
       illegalInst(di);
       return;
     }
 
   // FIX TODO: check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
-      for (unsigned field = 0; field < nfields; ++field)
+      uint64_t faddr = addr;  // Field address
+
+      for (unsigned field = 0; field < fieldCount; ++field)
 	{
 	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
@@ -14513,14 +14516,14 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew)
 	  auto secCause = SecondaryCause::NONE;
 
 	  ELEM_TYPE elem(0);
-	  if (determineLoadException(rs1, addr, addr, sizeof(elem), secCause) == ExceptionCause::NONE)
-            memory_.read(addr, elem);
+	  if (determineLoadException(rs1, faddr, faddr, sizeof(elem), secCause) == ExceptionCause::NONE)
+            memory_.read(faddr, elem);
 
 	  if (cause != ExceptionCause::NONE)
 	    {
 	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(cause, addr, secCause);
+	      initiateLoadException(cause, faddr, secCause);
 	      return;
 	    }
 
@@ -14528,8 +14531,9 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew)
 	    assert(0);
 
 	  if (traceLdSt_)
-	    vecLdStAddr_.push_back(addr);
-	  addr += sizeof(ELEM_TYPE);
+	    vecLdStAddr_.push_back(faddr);
+
+	  faddr += sizeof(elem);
 	}
     }
 }
@@ -14539,7 +14543,9 @@ template <typename URV>
 void
 Hart<URV>::execVlsege8_v(const DecodedInst* di)
 {
-  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint8_t);
+  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
 }
 
 
@@ -14547,7 +14553,9 @@ template <typename URV>
 void
 Hart<URV>::execVlsege16_v(const DecodedInst* di)
 {
-  vectorLoadSeg<uint16_t>(di, ElementWidth::Half);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint16_t);
+  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
 }
 
 
@@ -14555,7 +14563,9 @@ template <typename URV>
 void
 Hart<URV>::execVlsege32_v(const DecodedInst* di)
 {
-  vectorLoadSeg<uint32_t>(di, ElementWidth::Word);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint32_t);
+  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
 }
 
 
@@ -14563,7 +14573,9 @@ template <typename URV>
 void
 Hart<URV>::execVlsege64_v(const DecodedInst* di)
 {
-  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint64_t);
+  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
 }
 
 
@@ -14602,7 +14614,8 @@ Hart<URV>::execVlsege1024_v(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew)
+Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
+			  unsigned fieldCount, uint64_t stride)
 {
   vecLdStAddr_.clear();
   vecStData_.clear();
@@ -14633,19 +14646,20 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew)
 
   unsigned start = vecRegs_.startIndex();
   unsigned elemCount = vecRegs_.elemCount();
-  unsigned nfields = di->op2();
 
   // Used registers must not exceed 32.
-  if (vd + nfields*eg > 32)
+  if (vd + fieldCount*eg > 32)
     {
       illegalInst(di);
       return;
     }
 
   // FIX TODO: check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
-      for (unsigned field = 0; field < nfields; ++field)
+      uint64_t faddr = addr;   // Field address
+
+      for (unsigned field = 0; field < fieldCount; ++field)
 	{
 	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
@@ -14659,12 +14673,12 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew)
 	  auto secCause = SecondaryCause::NONE;
 
 	  bool forced = false;
-	  if (determineStoreException(rs1, URV(addr), addr, elem, secCause, forced) == ExceptionCause::NONE)
+	  if (determineStoreException(rs1, URV(faddr), faddr, elem, secCause, forced) == ExceptionCause::NONE)
 	    {
-	      memory_.write(hartIx_, addr, elem);
+	      memory_.write(hartIx_, faddr, elem);
 	      if (traceLdSt_)
 		{
-		  vecLdStAddr_.push_back(addr);
+		  vecLdStAddr_.push_back(faddr);
 		  vecStData_.push_back(elem);
 		}
 	    }
@@ -14673,11 +14687,11 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew)
 	    {
 	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(cause, addr, secCause);
+	      initiateStoreException(cause, faddr, secCause);
 	      return;
 	    }
 
-	  addr += sizeof(ELEM_TYPE);
+	  faddr += sizeof(elem);
 	}
     }
 }
@@ -14687,7 +14701,9 @@ template <typename URV>
 void
 Hart<URV>::execVssege8_v(const DecodedInst* di)
 {
-  vectorStoreSeg<uint8_t>(di, ElementWidth::Byte);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint8_t);
+  vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
 }
 
 
@@ -14695,7 +14711,9 @@ template <typename URV>
 void
 Hart<URV>::execVssege16_v(const DecodedInst* di)
 {
-  vectorStoreSeg<uint16_t>(di, ElementWidth::Half);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint16_t);
+  vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
 }
 
 
@@ -14703,7 +14721,9 @@ template <typename URV>
 void
 Hart<URV>::execVssege32_v(const DecodedInst* di)
 {
-  vectorStoreSeg<uint32_t>(di, ElementWidth::Word);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint32_t);
+  vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
 }
 
 
@@ -14711,7 +14731,9 @@ template <typename URV>
 void
 Hart<URV>::execVssege64_v(const DecodedInst* di)
 {
-  vectorStoreSeg<uint64_t>(di, ElementWidth::Word2);
+  unsigned fieldCount = di->op2();
+  unsigned stride = fieldCount*sizeof(uint64_t);
+  vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
 }
 
 
@@ -14742,6 +14764,152 @@ Hart<URV>::execVssege512_v(const DecodedInst* di)
 template <typename URV>
 void
 Hart<URV>::execVssege1024_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege8_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege16_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege32_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege64_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege128_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege256_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege512_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlssege1024_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege8_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege16_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege32_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege64_v(const DecodedInst* di)
+{
+  uint64_t stride = intRegs_.read(di->op2());
+  unsigned fieldCount = di->op3();
+  vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege128_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege256_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege512_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsssege1024_v(const DecodedInst* di)
 {
   illegalInst(di);
 }

@@ -3531,10 +3531,15 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       // We want to report all the registers in the group.
       unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
       vecReg = vecReg - (vecReg % groupSize);
-      if (instId >= InstId::vlsege8_v and instId <= InstId::vlsege1024_v)
+      if (instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v)
 	{
 	  vecReg = di.op0();
 	  groupSize = groupSize*di.op2();  // Scale by field count
+	}
+      else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
+	{
+	  vecReg = di.op0();
+	  groupSize = groupSize*di.op3();  // Scale by field count
 	}
 
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
@@ -6147,6 +6152,23 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vssege256_v,
      &&vssege512_v,
      &&vssege1024_v,
+
+     &&vlssege8_v,
+     &&vlssege16_v,
+     &&vlssege32_v,
+     &&vlssege64_v,
+     &&vlssege128_v,
+     &&vlssege256_v,
+     &&vlssege512_v,
+     &&vlssege1024_v,
+     &&vsssege8_v,
+     &&vsssege16_v,
+     &&vsssege32_v,
+     &&vsssege64_v,
+     &&vsssege128_v,
+     &&vsssege256_v,
+     &&vsssege512_v,
+     &&vsssege1024_v,
 
      &&vfadd_vv,
      &&vfadd_vf,
@@ -8761,6 +8783,70 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vssege1024_v:
   execVssege1024_v(di);
+  return;
+
+ vlssege8_v:
+  execVlssege8_v(di);
+  return;
+
+ vlssege16_v:
+  execVlssege16_v(di);
+  return;
+
+ vlssege32_v:
+  execVlssege32_v(di);
+  return;
+
+ vlssege64_v:
+  execVlssege64_v(di);
+  return;
+
+ vlssege128_v:
+  execVlssege128_v(di);
+  return;
+
+ vlssege256_v:
+  execVlssege256_v(di);
+  return;
+
+ vlssege512_v:
+  execVlssege512_v(di);
+  return;
+
+ vlssege1024_v:
+  execVlssege1024_v(di);
+  return;
+
+ vsssege8_v:
+  execVsssege8_v(di);
+  return;
+
+ vsssege16_v:
+  execVsssege16_v(di);
+  return;
+
+ vsssege32_v:
+  execVsssege32_v(di);
+  return;
+
+ vsssege64_v:
+  execVsssege64_v(di);
+  return;
+
+ vsssege128_v:
+  execVsssege128_v(di);
+  return;
+
+ vsssege256_v:
+  execVsssege256_v(di);
+  return;
+
+ vsssege512_v:
+  execVsssege512_v(di);
+  return;
+
+ vsssege1024_v:
+  execVsssege1024_v(di);
   return;
 
  vfadd_vv:
