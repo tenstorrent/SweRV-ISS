@@ -669,14 +669,10 @@ namespace WdRiscv
      vlre512_v,
      vlre1024_v,
 
-     vsre8_v,
-     vsre16_v,
-     vsre32_v,
-     vsre64_v,
-     vsre128_v,
-     vsre256_v,
-     vsre512_v,
-     vsre1024_v,
+     vs1r_v,
+     vs2r_v,
+     vs4r_v,
+     vs8r_v,
 
      vle8ff_v,
      vle16ff_v,

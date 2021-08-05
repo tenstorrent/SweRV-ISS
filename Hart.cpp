@@ -3537,7 +3537,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	    fprintf(out, " +\n");
 	  formatVecInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff,
 				  vecReg, vecRegs_.getVecData(vecReg),
-				  vecRegs_.bytesPerRegister(), tmp.c_str());
+				  vecRegs_.bytesPerRegister(),
+				  tmp.c_str());
 	  pending = true;
 	}
     }
@@ -6074,14 +6075,10 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vlre256_v,
      &&vlre512_v,
      &&vlre1024_v,
-     &&vsre8_v,
-     &&vsre16_v,
-     &&vsre32_v,
-     &&vsre64_v,
-     &&vsre128_v,
-     &&vsre256_v,
-     &&vsre512_v,
-     &&vsre1024_v,
+     &&vs1r_v,
+     &&vs2r_v,
+     &&vs4r_v,
+     &&vs8r_v,
      &&vle8ff_v,
      &&vle16ff_v,
      &&vle32ff_v,
@@ -8498,36 +8495,20 @@ Hart<URV>::execute(const DecodedInst* di)
   execVlre1024_v(di);
   return;
 
- vsre8_v:
-  execVsre8_v(di);
+ vs1r_v:
+  execVs1r_v(di);
   return;
 
- vsre16_v:
-  execVsre16_v(di);
+ vs2r_v:
+  execVs2r_v(di);
   return;
 
- vsre32_v:
-  execVsre32_v(di);
+ vs4r_v:
+  execVs4r_v(di);
   return;
 
- vsre64_v:
-  execVsre64_v(di);
-  return;
-
- vsre128_v:
-  execVsre128_v(di);
-  return;
-
- vsre256_v:
-  execVsre256_v(di);
-  return;
-
- vsre512_v:
-  execVsre512_v(di);
-  return;
-
- vsre1024_v:
-  execVsre1024_v(di);
+ vs8r_v:
+  execVs8r_v(di);
   return;
 
  vle8ff_v:

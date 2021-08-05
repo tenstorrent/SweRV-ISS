@@ -2959,17 +2959,12 @@ namespace WdRiscv
     void execVlre512_v(const DecodedInst*);
     void execVlre1024_v(const DecodedInst*);
 
-    template <typename ELEM_TYPE>
-    void vectorStoreWholeReg(const DecodedInst*, ElementWidth);
+    void vectorStoreWholeReg(const DecodedInst*, GroupMultiplier);
 
-    void execVsre8_v(const DecodedInst*);
-    void execVsre16_v(const DecodedInst*);
-    void execVsre32_v(const DecodedInst*);
-    void execVsre64_v(const DecodedInst*);
-    void execVsre128_v(const DecodedInst*);
-    void execVsre256_v(const DecodedInst*);
-    void execVsre512_v(const DecodedInst*);
-    void execVsre1024_v(const DecodedInst*);
+    void execVs1r_v(const DecodedInst*);
+    void execVs2r_v(const DecodedInst*);
+    void execVs4r_v(const DecodedInst*);
+    void execVs8r_v(const DecodedInst*);
 
     void execVle8ff_v(const DecodedInst*);
     void execVle16ff_v(const DecodedInst*);

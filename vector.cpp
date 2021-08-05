@@ -12173,10 +12173,9 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   vecLdStAddr_.clear();
   vecStData_.clear();
 
-  unsigned groupCode = di->op2();
-  bool badConfig = groupCode > 3;
-  GroupMultiplier gm = GroupMultiplier(groupCode);
-
+  unsigned groupX8 = di->op2() * 8;
+  GroupMultiplier gm = GroupMultiplier::One;
+  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, gm);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
   if ((not isVecLegal()) or badConfig)
     {
@@ -12188,7 +12187,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   unsigned vd = di->op0(), rs1 = di->op1(), errors = 0;
   URV addr = intRegs_.read(rs1);
 
-  unsigned groupX8 = vecRegs_.groupMultiplierX8(gm), start = 0;
+  unsigned start = 0;
   unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
 
@@ -12302,19 +12301,15 @@ Hart<URV>::execVlre1024_v(const DecodedInst* di)
 
 
 template <typename URV>
-template <typename ELEM_TYPE>
 void
-Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
+Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 {
   vecLdStAddr_.clear();
   vecStData_.clear();
 
-  unsigned groupCode = di->op2();
-  bool badConfig = groupCode > 3;
-  GroupMultiplier gm = GroupMultiplier(groupCode);
-
-  badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
-  if ((not isVecLegal()) or badConfig)
+  unsigned groupX8 = vecRegs_.groupMultiplierX8(gm);
+  ElementWidth eew = ElementWidth::Byte;
+  if (not isVecLegal()  or  not vecRegs_.legalConfig(eew, gm))
     {
       illegalInst(di);
       return;
@@ -12324,9 +12319,8 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
   unsigned vd = di->op0(), rs1 = di->op1(), errors = 0;
   URV addr = intRegs_.read(rs1);
 
-  unsigned groupX8 = vecRegs_.groupMultiplierX8(gm), start = 0;
-  unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
+  unsigned start = 0;
+  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / 8;
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -12337,30 +12331,18 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
 	  continue;
 	}
       bool exception = false;
-      ELEM_TYPE elem = 0;
+      uint8_t elem = 0;
       if (not vecRegs_.read(vd, ix, groupX8, elem))
         {
           errors++;
           break;
         }
 
-      if constexpr (sizeof(elem) > 8)
-        {
-          for (unsigned n = 0; n < sizeof(elem) and not exception; n += 8)
-            {
-              uint64_t dword = uint64_t(elem);
-              memory_.write(hartIx_, addr + n, dword);
-              elem >>= 64;
-            }
-        }
-      else
+      memory_.write(hartIx_, addr, elem);
+      if (traceLdSt_)
 	{
-	  memory_.write(hartIx_, addr, elem);
-	  if (traceLdSt_)
-	    {
-	      vecLdStAddr_.push_back(addr);
-	      vecStData_.push_back(elem);
-	    }
+	  vecLdStAddr_.push_back(addr);
+	  vecStData_.push_back(elem);
 	}
 
       if (exception)
@@ -12370,7 +12352,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
-      addr += sizeof(ELEM_TYPE);
+      addr += sizeof(elem);
     }
 
   assert(errors == 0);
@@ -12379,65 +12361,33 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, ElementWidth eew)
 
 template <typename URV>
 void
-Hart<URV>::execVsre8_v(const DecodedInst* di)
+Hart<URV>::execVs1r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<uint8_t>(di, ElementWidth::Byte);
+  vectorStoreWholeReg(di, GroupMultiplier::One);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsre16_v(const DecodedInst* di)
+Hart<URV>::execVs2r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<uint16_t>(di, ElementWidth::Half);
+  vectorStoreWholeReg(di, GroupMultiplier::Two);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsre32_v(const DecodedInst* di)
+Hart<URV>::execVs4r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<uint32_t>(di, ElementWidth::Word);
+  vectorStoreWholeReg(di, GroupMultiplier::Four);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsre64_v(const DecodedInst* di)
+Hart<URV>::execVs8r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg<uint64_t>(di, ElementWidth::Word2);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execVsre128_v(const DecodedInst* di)
-{
-  illegalInst(di);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execVsre256_v(const DecodedInst* di)
-{
-  illegalInst(di);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execVsre512_v(const DecodedInst* di)
-{
-  illegalInst(di);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execVsre1024_v(const DecodedInst* di)
-{
-  illegalInst(di);
+  vectorStoreWholeReg(di, GroupMultiplier::Eight);
 }
 
 

@@ -4152,15 +4152,15 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
-      { "vsre8.v", InstId::vsre8_v,
-        0b000000'0'01000'00000'000'00000'0100111,
+      { "vs1r.v", InstId::vs1r_v,
+        0b000000'1'01000'00000'000'00000'0100111,
         0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
-      { "vsre16.v", InstId::vsre16_v,
+      { "vs2r.v", InstId::vs2r_v,
         0b000000'0'01000'00000'101'00000'0100111,
         0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4168,7 +4168,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
-      { "vsre32.v", InstId::vsre32_v,
+      { "vs4r.v", InstId::vs4r_v,
         0b000000'0'01000'00000'110'00000'0100111,
         0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4176,40 +4176,8 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
-      { "vsre64.v", InstId::vsre64_v,
+      { "vs8r.v", InstId::vs8r_v,
         0b000000'0'01000'00000'111'00000'0100111,
-        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
-        InstType::Vector,
-        OperandType::VecReg, OperandMode::Read, rdMask,
-        OperandType::IntReg, OperandMode::Read, rs1Mask,
-      },
-
-      { "vsre128.v", InstId::vsre128_v,
-        0b000100'0'01000'00000'000'00000'0100111,
-        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
-        InstType::Vector,
-        OperandType::VecReg, OperandMode::Read, rdMask,
-        OperandType::IntReg, OperandMode::Read, rs1Mask,
-      },
-
-      { "vsre256.v", InstId::vsre256_v,
-        0b000100'0'01000'00000'101'00000'0100111,
-        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
-        InstType::Vector,
-        OperandType::VecReg, OperandMode::Read, rdMask,
-        OperandType::IntReg, OperandMode::Read, rs1Mask,
-      },
-
-      { "vsre512.v", InstId::vsre512_v,
-        0b000100'0'01000'00000'110'00000'0100111,
-        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
-        InstType::Vector,
-        OperandType::VecReg, OperandMode::Read, rdMask,
-        OperandType::IntReg, OperandMode::Read, rs1Mask,
-      },
-
-      { "vsre1024.v", InstId::vsre1024_v,
-        0b000100'0'01000'00000'111'00000'0100111,
         0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,

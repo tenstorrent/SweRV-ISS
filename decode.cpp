@@ -803,8 +803,10 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2)
             }
         }
       else if (lumop == 0x8)
-        {   // whole registers
-          op2 = nf;
+        {   // load whole registers
+	  if (nf != 0 and nf != 1 and nf != 3 and nf != 7)
+	    return instTable_.getEntry(InstId::illegal);
+          op2 = nf + 1;
 
           if (mew == 0)
             {
@@ -914,21 +916,14 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2)
             }
         }
       else if (lumop == 8)
-        {
-          op2 = nf;
+        {   // store whole register
           if (mew == 0)
             {
-              if (f3 == 0) return instTable_.getEntry(InstId::vsre8_v);
-              if (f3 == 5) return instTable_.getEntry(InstId::vsre16_v);
-              if (f3 == 6) return instTable_.getEntry(InstId::vsre32_v);
-              if (f3 == 7) return instTable_.getEntry(InstId::vsre64_v);
-            }
-          else
-            {
-              if (f3 == 0) return instTable_.getEntry(InstId::vsre128_v);
-              if (f3 == 5) return instTable_.getEntry(InstId::vsre256_v);
-              if (f3 == 6) return instTable_.getEntry(InstId::vsre512_v);
-              if (f3 == 7) return instTable_.getEntry(InstId::vsre1024_v);
+              if (nf == 0) return instTable_.getEntry(InstId::vs1r_v);
+              if (nf == 1) return instTable_.getEntry(InstId::vs2r_v);
+              if (nf == 3) return instTable_.getEntry(InstId::vs4r_v);
+              if (nf == 7) return instTable_.getEntry(InstId::vs8r_v);
+	      return instTable_.getEntry(InstId::illegal);
             }
         }
     }

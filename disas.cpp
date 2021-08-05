@@ -524,10 +524,12 @@ void
 printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 {
   uint32_t opcode7 = di.inst() & 0x7f;  // Least sig 7 bits
+  InstId id = di.instEntry()->instId();
+
   if (opcode7 == 0x7 or opcode7 == 0x27)
     {  // Vector load store
       std::string name = di.instEntry()->name();
-      if (di.operandCount() == 3)
+      if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
 	name = wholeRegLdStInst(di);
       out << name << " v" << di.op0();
       out << ", ("  << hart.intRegName(di.op1()) << ")";
