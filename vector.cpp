@@ -6390,11 +6390,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
       bool sourceSet = vecRegs_.isActive(vs1, ix);
 
       if (masked and not vecRegs_.isActive(0, ix))
-        {
-          if (sourceSet)
-            sum++;
-          continue;
-        }
+	continue;
 
       switch (sew)
         {
