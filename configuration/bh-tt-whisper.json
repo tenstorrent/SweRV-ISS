@@ -12,6 +12,9 @@
 
     "enable_zfh" : "true",
 
+    "enable_zba" : "true",
+    "enable_zbb" : "true",
+
     "Comment" : "Use ABI register names in log file (e.g. sp instead of x2).",
     "abi_names" : "true",
     
