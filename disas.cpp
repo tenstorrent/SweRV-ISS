@@ -533,8 +533,12 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 	name = insertFieldCountInName(name, di.op2(), 5);
       else if (id >= InstId::vlssege8_v and id <= InstId::vsssege1024_v)
 	name = insertFieldCountInName(name, di.op3(), 6);
+      else if (id >= InstId::vluxsegei8_v and id <= InstId::vsoxsegei1024_v)
+	name = insertFieldCountInName(name, di.op3(), 7);
       out << name << " v" << di.op0();
       out << ", ("  << hart.intRegName(di.op1()) << ")";
+      if (di.operandCount() == 3)
+	out << ", v" << di.op2();
       if (di.isMasked())
 	out << ", v0";
       return;

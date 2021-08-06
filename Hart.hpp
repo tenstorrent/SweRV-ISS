@@ -3069,6 +3069,48 @@ namespace WdRiscv
     void execVsssege512_v(const DecodedInst*);
     void execVsssege1024_v(const DecodedInst*);
 
+    template <typename ELEM_TYPE>
+    void vectorLoadSegIndexed(const DecodedInst*, ElementWidth);
+
+    void execVluxsegei8_v(const DecodedInst*);
+    void execVluxsegei16_v(const DecodedInst*);
+    void execVluxsegei32_v(const DecodedInst*);
+    void execVluxsegei64_v(const DecodedInst*);
+    void execVluxsegei128_v(const DecodedInst*);
+    void execVluxsegei256_v(const DecodedInst*);
+    void execVluxsegei512_v(const DecodedInst*);
+    void execVluxsegei1024_v(const DecodedInst*);
+
+    template <typename ELEM_TYPE>
+    void vectorStoreSegIndexed(const DecodedInst*, ElementWidth);
+
+    void execVsuxsegei8_v(const DecodedInst*);
+    void execVsuxsegei16_v(const DecodedInst*);
+    void execVsuxsegei32_v(const DecodedInst*);
+    void execVsuxsegei64_v(const DecodedInst*);
+    void execVsuxsegei128_v(const DecodedInst*);
+    void execVsuxsegei256_v(const DecodedInst*);
+    void execVsuxsegei512_v(const DecodedInst*);
+    void execVsuxsegei1024_v(const DecodedInst*);
+
+    void execVloxsegei8_v(const DecodedInst*);
+    void execVloxsegei16_v(const DecodedInst*);
+    void execVloxsegei32_v(const DecodedInst*);
+    void execVloxsegei64_v(const DecodedInst*);
+    void execVloxsegei128_v(const DecodedInst*);
+    void execVloxsegei256_v(const DecodedInst*);
+    void execVloxsegei512_v(const DecodedInst*);
+    void execVloxsegei1024_v(const DecodedInst*);
+
+    void execVsoxsegei8_v(const DecodedInst*);
+    void execVsoxsegei16_v(const DecodedInst*);
+    void execVsoxsegei32_v(const DecodedInst*);
+    void execVsoxsegei64_v(const DecodedInst*);
+    void execVsoxsegei128_v(const DecodedInst*);
+    void execVsoxsegei256_v(const DecodedInst*);
+    void execVsoxsegei512_v(const DecodedInst*);
+    void execVsoxsegei1024_v(const DecodedInst*);
+
     template<typename ELEM_TYPE>
     void vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                  unsigned start, unsigned elems, bool masked);

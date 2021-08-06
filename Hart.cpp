@@ -3541,6 +3541,11 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	  vecReg = di.op0();
 	  groupSize = groupSize*di.op3();  // Scale by field count
 	}
+      else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
+	{
+	  vecReg = di.op0();
+	  groupSize = groupSize*di.op3();  // Scale by field count
+	}
 
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
 	{
@@ -6169,6 +6174,40 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsssege256_v,
      &&vsssege512_v,
      &&vsssege1024_v,
+
+     &&vluxsegei8_v,
+     &&vluxsegei16_v,
+     &&vluxsegei32_v,
+     &&vluxsegei64_v,
+     &&vluxsegei128_v,
+     &&vluxsegei256_v,
+     &&vluxsegei512_v,
+     &&vluxsegei1024_v,
+     &&vsuxsegei8_v,
+     &&vsuxsegei16_v,
+     &&vsuxsegei32_v,
+     &&vsuxsegei64_v,
+     &&vsuxsegei128_v,
+     &&vsuxsegei256_v,
+     &&vsuxsegei512_v,
+     &&vsuxsegei1024_v,
+
+     &&vloxsegei8_v,
+     &&vloxsegei16_v,
+     &&vloxsegei32_v,
+     &&vloxsegei64_v,
+     &&vloxsegei128_v,
+     &&vloxsegei256_v,
+     &&vloxsegei512_v,
+     &&vloxsegei1024_v,
+     &&vsoxsegei8_v,
+     &&vsoxsegei16_v,
+     &&vsoxsegei32_v,
+     &&vsoxsegei64_v,
+     &&vsoxsegei128_v,
+     &&vsoxsegei256_v,
+     &&vsoxsegei512_v,
+     &&vsoxsegei1024_v,
 
      &&vfadd_vv,
      &&vfadd_vf,
@@ -8847,6 +8886,134 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vsssege1024_v:
   execVsssege1024_v(di);
+  return;
+
+ vluxsegei8_v:
+  execVluxsegei8_v(di);
+  return;
+
+ vluxsegei16_v:
+  execVluxsegei16_v(di);
+  return;
+
+ vluxsegei32_v:
+  execVluxsegei32_v(di);
+  return;
+
+ vluxsegei64_v:
+  execVluxsegei64_v(di);
+  return;
+
+ vluxsegei128_v:
+  execVluxsegei128_v(di);
+  return;
+
+ vluxsegei256_v:
+  execVluxsegei256_v(di);
+  return;
+
+ vluxsegei512_v:
+  execVluxsegei512_v(di);
+  return;
+
+ vluxsegei1024_v:
+  execVluxsegei1024_v(di);
+  return;
+
+ vsuxsegei8_v:
+  execVsuxsegei8_v(di);
+  return;
+
+ vsuxsegei16_v:
+  execVsuxsegei16_v(di);
+  return;
+
+ vsuxsegei32_v:
+  execVsuxsegei32_v(di);
+  return;
+
+ vsuxsegei64_v:
+  execVsuxsegei64_v(di);
+  return;
+
+ vsuxsegei128_v:
+  execVsuxsegei128_v(di);
+  return;
+
+ vsuxsegei256_v:
+  execVsuxsegei256_v(di);
+  return;
+
+ vsuxsegei512_v:
+  execVsuxsegei512_v(di);
+  return;
+
+ vsuxsegei1024_v:
+  execVsuxsegei1024_v(di);
+  return;
+
+ vloxsegei8_v:
+  execVloxsegei8_v(di);
+  return;
+
+ vloxsegei16_v:
+  execVloxsegei16_v(di);
+  return;
+
+ vloxsegei32_v:
+  execVloxsegei32_v(di);
+  return;
+
+ vloxsegei64_v:
+  execVloxsegei64_v(di);
+  return;
+
+ vloxsegei128_v:
+  execVloxsegei128_v(di);
+  return;
+
+ vloxsegei256_v:
+  execVloxsegei256_v(di);
+  return;
+
+ vloxsegei512_v:
+  execVloxsegei512_v(di);
+  return;
+
+ vloxsegei1024_v:
+  execVloxsegei1024_v(di);
+  return;
+
+ vsoxsegei8_v:
+  execVsoxsegei8_v(di);
+  return;
+
+ vsoxsegei16_v:
+  execVsoxsegei16_v(di);
+  return;
+
+ vsoxsegei32_v:
+  execVsoxsegei32_v(di);
+  return;
+
+ vsoxsegei64_v:
+  execVsoxsegei64_v(di);
+  return;
+
+ vsoxsegei128_v:
+  execVsoxsegei128_v(di);
+  return;
+
+ vsoxsegei256_v:
+  execVsoxsegei256_v(di);
+  return;
+
+ vsoxsegei512_v:
+  execVsoxsegei512_v(di);
+  return;
+
+ vsoxsegei1024_v:
+  execVsoxsegei1024_v(di);
   return;
 
  vfadd_vv:

@@ -14139,15 +14139,14 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecStData_.clear();
 
   uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetElemWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
-  uint32_t offsetGroupX8 = (offsetElemWidth*groupX8)/elemWidth;
+  uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
-  if (not badConfig)
-    badConfig = not vecRegs_.legalConfig(offsetEew, offsetGroup);
+  badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not isVecLegal() or badConfig)
     {
       illegalInst(di);
@@ -14155,11 +14154,18 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(), rs1 = di->op1(), vi = di->op2(), errors = 0;
+  uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  if (vd % eg)
+    {
+      illegalInst(di);
+      return;
+    }
+
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = vecRegs_.startIndex();
-  unsigned elemCount = vecRegs_.elemCount();
+  unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -14170,40 +14176,44 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  continue;
 	}
 
-      auto cause = ExceptionCause::NONE;
-      auto secCause = SecondaryCause::NONE;
-
       uint64_t offset = 0;
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
-        {
-          errors++;
-          break;
-        }
+	assert(0);
 
-      ELEM_TYPE elem = 0;
       uint64_t eaddr = addr + offset;
 
-      if constexpr (sizeof(elem) > 8)
-        {
-          for (unsigned n = 0; n < sizeof(elem); n += 8)
-            {
-              uint64_t dword = 0;
-              cause = determineLoadException(rs1, eaddr, addr, 8, secCause);
-              if (cause != ExceptionCause::NONE)
-                break;
-              memory_.read(eaddr + n, dword);
-              elem <<= 64;
-              elem |= dword;
-            }
-        }
+      auto secCause = SecondaryCause::NONE;
+      auto cause = determineLoadException(rs1, eaddr, eaddr, elemSize, secCause);
+      if (cause == ExceptionCause::NONE)
+	{
+	  if (elemSize == 1)
+	    {
+	      uint8_t x = 0;
+	      memory_.read(eaddr, x);
+	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	    }
+	  else if (elemSize == 2)
+	    {
+	      uint16_t x = 0;
+	      memory_.read(eaddr, x);
+	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	    }
+	  else if (elemSize == 4)
+	    {
+	      uint32_t x = 0;
+	      memory_.read(eaddr, x);
+	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	    }
+	  else if (elemSize == 8)
+	    {
+	      uint64_t x = 0;
+	      memory_.read(eaddr, x);
+	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	    }
+	  else
+	    assert(0);
+	}
       else
-        {
-          if (determineLoadException(rs1, eaddr, eaddr, sizeof(elem), secCause) ==
-              ExceptionCause::NONE)
-            memory_.read(eaddr, elem);
-        }
-
-      if (cause != ExceptionCause::NONE)
         {
           vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
@@ -14211,17 +14221,9 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
           break;
         }
 
-      if (not vecRegs_.write(vd, ix, groupX8, elem))
-        {
-          errors++;
-          break;
-        }
-
       if (traceLdSt_)
 	vecLdStAddr_.push_back(eaddr);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -14298,15 +14300,14 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecStData_.clear();
 
   uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetElemWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
-  uint32_t offsetGroupX8 = (offsetElemWidth*groupX8)/elemWidth;
+  uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
-  if (not badConfig)
-    badConfig = not vecRegs_.legalConfig(offsetEew, offsetGroup);
+  badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not isVecLegal() or badConfig)
     {
       illegalInst(di);
@@ -14314,11 +14315,18 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
     }
 
   bool masked = di->isMasked();
-  uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2(), errors = 0;
+  uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  if (vd % eg)
+    {
+      illegalInst(di);
+      return;
+    }
+
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = vecRegs_.startIndex();
-  unsigned elemCount = vecRegs_.elemCount();
+  unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
 
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -14328,51 +14336,58 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  vecRegs_.touchReg(vd, groupX8);
 	  continue;
 	}
-      ELEM_TYPE elem = 0;
-      if (not vecRegs_.read(vd, ix, groupX8, elem))
-        {
-          errors++;
-          break;
-        }
 
       uint64_t offset = 0;
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
-        {
-          errors++;
-          break;
-        }
+	assert(0);
 
-      uint64_t eaddr = addr + offset;
-      auto cause = ExceptionCause::NONE;
+      uint64_t eaddr = addr + offset, data = 0;
+
       auto secCause = SecondaryCause::NONE;
-
-      if constexpr (sizeof(elem) > 8)
-        {
-          for (unsigned n = 0; n < sizeof(elem); n += 8)
-            {
-              uint64_t dword = elem;
-              bool forced = false;
-              cause = determineStoreException(rs1, URV(eaddr), eaddr, dword, secCause, forced);
-              if (cause != ExceptionCause::NONE)
-                break;
-
-              memory_.write(hartIx_, eaddr + n, dword);
-              elem >>= 64;
-            }
-        }
+      auto cause = ExceptionCause::NONE;
+      bool forced = false;
+      if (elemSize == 1)
+	{
+	  uint8_t x = 0;
+	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  cause = determineStoreException(rs1, URV(eaddr), eaddr, x,
+					  secCause, forced);
+	  if (cause == ExceptionCause::NONE)
+	    memory_.write(hartIx_, eaddr, x);
+	  data = x;
+	}
+      else if (elemSize == 2)
+	{
+	  uint16_t x = 0;
+	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  cause = determineStoreException(rs1, URV(eaddr), eaddr, x,
+					  secCause, forced);
+	  if (cause == ExceptionCause::NONE)
+	    memory_.write(hartIx_, eaddr, x);
+	  data = x;
+	}
+      else if (elemSize == 4)
+	{
+	  uint32_t x = 0;
+	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  cause = determineStoreException(rs1, URV(eaddr), eaddr, x,
+					  secCause, forced);
+	  if (cause == ExceptionCause::NONE)
+	    memory_.write(hartIx_, eaddr, x);
+	  data = x;
+	}
+      else if (elemSize == 8)
+	{
+	  uint64_t x = 0;
+	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  cause = determineStoreException(rs1, URV(eaddr), eaddr, x,
+					  secCause, forced);
+	  if (cause == ExceptionCause::NONE)
+	    memory_.write(hartIx_, eaddr, x);
+	  data = x;
+	}
       else
-        {
-          bool forced = false;
-          if (determineStoreException(rs1, URV(eaddr), eaddr, elem, secCause, forced) == ExceptionCause::NONE)
-	    {
-	      memory_.write(hartIx_, eaddr, elem);
-	      if (traceLdSt_)
-		{
-		  vecLdStAddr_.push_back(eaddr);
-		  vecStData_.push_back(elem);
-		}
-	    }
-        }
+	assert(0);
 
       if (cause != ExceptionCause::NONE)
         {
@@ -14381,9 +14396,13 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
           initiateStoreException(cause, eaddr, secCause);
           break;
         }
-    }
 
-  assert(errors == 0);
+      if (traceLdSt_)
+	{
+	  vecLdStAddr_.push_back(eaddr);
+	  vecStData_.push_back(data);
+	}
+    }
 }
 
 
@@ -14494,12 +14513,14 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
       return;
     }
 
+  unsigned elemSize = sizeof(ELEM_TYPE);
+
   // FIX TODO: check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
       uint64_t faddr = addr;  // Field address
 
-      for (unsigned field = 0; field < fieldCount; ++field)
+      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
 	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
@@ -14528,8 +14549,6 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 	  if (traceLdSt_)
 	    vecLdStAddr_.push_back(faddr);
-
-	  faddr += sizeof(elem);
 	}
     }
 }
@@ -14641,7 +14660,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = vecRegs_.startIndex();
-  unsigned elemCount = vecRegs_.elemCount();
+  unsigned elemCount = vecRegs_.elemCount(), elemSize = sizeof(ELEM_TYPE);
 
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg > 32)
@@ -14655,7 +14674,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
     {
       uint64_t faddr = addr;   // Field address
 
-      for (unsigned field = 0; field < fieldCount; ++field)
+      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
 	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
@@ -14686,8 +14705,6 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	      initiateStoreException(cause, faddr, secCause);
 	      return;
 	    }
-
-	  faddr += sizeof(elem);
 	}
     }
 }
@@ -14763,8 +14780,6 @@ Hart<URV>::execVssege1024_v(const DecodedInst* di)
 {
   illegalInst(di);
 }
-
-
 
 
 template <typename URV>
@@ -14906,6 +14921,499 @@ Hart<URV>::execVsssege512_v(const DecodedInst* di)
 template <typename URV>
 void
 Hart<URV>::execVsssege1024_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
+{
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
+  uint32_t elemWidth = vecRegs_.elementWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+
+  uint32_t groupX8 = vecRegs_.groupMultiplierX8();
+  uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
+
+  GroupMultiplier offsetGroup{GroupMultiplier::One};
+  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
+  if (not isVecLegal() or badConfig)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  if (vd % eg)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  uint64_t addr = intRegs_.read(rs1);
+
+  unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
+  unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->op3();
+
+  // Used registers must not exceed 32.
+  if (vd + fieldCount*eg > 32)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // TODO check permissions, translate, ....
+  for (unsigned ix = start; ix < elemCount; ++ix)
+    {
+      uint64_t offset = 0;
+      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+	assert(0);
+
+      uint64_t faddr = addr + offset;
+
+      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+	{
+	  unsigned dvg = vd + field*eg;  // Destination vector grop.
+	  if (masked and not vecRegs_.isActive(0, ix))
+	    {
+	      vecRegs_.touchReg(dvg, groupX8);
+	      continue;
+	    }
+
+	  auto cause = ExceptionCause::NONE;
+	  auto secCause = SecondaryCause::NONE;
+
+          if (determineLoadException(rs1, faddr, faddr, elemSize, secCause) ==
+	      ExceptionCause::NONE)
+	    {
+	      if (elemSize == 1)
+		{
+		  uint8_t x = 0;
+		  memory_.read(faddr, x);
+		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		}
+	      else if (elemSize == 2)
+		{
+		  uint16_t x = 0;
+		  memory_.read(faddr, x);
+		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		}
+	      else if (elemSize == 4)
+		{
+		  uint32_t x = 0;
+		  memory_.read(faddr, x);
+		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		}
+	      else if (elemSize == 8)
+		{
+		  uint64_t x = 0;
+		  memory_.read(faddr, x);
+		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		}
+	      else
+		assert(0);
+	    }
+	  else
+	    {
+	      vecRegs_.setStartIndex(ix);
+	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+	      initiateLoadException(cause, faddr, secCause);
+	      return;
+	    }
+
+	  if (traceLdSt_)
+	    vecLdStAddr_.push_back(faddr);
+	}
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei8_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei16_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei32_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei64_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei128_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei256_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei512_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVluxsegei1024_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
+{
+  vecLdStAddr_.clear();
+  vecStData_.clear();
+
+  uint32_t elemWidth = vecRegs_.elementWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+
+  uint32_t groupX8 = vecRegs_.groupMultiplierX8();
+  uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
+
+  GroupMultiplier offsetGroup{GroupMultiplier::One};
+  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
+  if (not isVecLegal() or badConfig)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  if (vd % eg)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  uint64_t addr = intRegs_.read(rs1);
+
+  unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
+  unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->op3();
+
+  // Used registers must not exceed 32.
+  if (vd + fieldCount*eg > 32)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // TODO check permissions, translate, ....
+  for (unsigned ix = start; ix < elemCount; ++ix)
+    {
+      uint64_t offset = 0;
+      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+	assert(0);
+
+      uint64_t faddr = addr + offset, data = 0;
+
+      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+	{
+	  unsigned dvg = vd + field*eg;  // Source vector grop.
+	  if (masked and not vecRegs_.isActive(0, ix))
+	    {
+	      vecRegs_.touchReg(dvg, groupX8);
+	      continue;
+	    }
+
+	  auto cause = ExceptionCause::NONE;
+	  auto secCause = SecondaryCause::NONE;
+	  bool forced = false;
+
+	  if (elemSize == 1)
+	    {
+	      uint8_t x = 0;
+	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      cause = determineStoreException(rs1, URV(faddr), faddr, x,
+					      secCause, forced);
+	      if (cause == ExceptionCause::NONE)
+		memory_.write(hartIx_, faddr, x);
+	      data = x;
+	    }
+	  else if (elemSize == 2)
+	    {
+	      uint16_t x = 0;
+	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      cause = determineStoreException(rs1, URV(faddr), faddr, x,
+					      secCause, forced);
+	      if (cause == ExceptionCause::NONE)
+		memory_.write(hartIx_, faddr, x);
+	      data = x;
+	    }
+	  else if (elemSize == 4)
+	    {
+	      uint32_t x = 0;
+	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      cause = determineStoreException(rs1, URV(faddr), faddr, x,
+					      secCause, forced);
+	      if (cause == ExceptionCause::NONE)
+		memory_.write(hartIx_, faddr, x);
+	      data = x;
+	    }
+	  else if (elemSize == 8)
+	    {
+	      uint64_t x = 0;
+	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      cause = determineStoreException(rs1, URV(faddr), faddr, x,
+					      secCause, forced);
+	      if (cause == ExceptionCause::NONE)
+		memory_.write(hartIx_, faddr, x);
+	      data = x;
+	    }
+	  else
+	    assert(0);
+
+	  if (cause != ExceptionCause::NONE)
+	    {
+	      vecRegs_.setStartIndex(ix);
+	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+	      initiateStoreException(cause, faddr, secCause);
+	      break;
+	    }
+
+	  if (traceLdSt_)
+	    {
+	      vecLdStAddr_.push_back(faddr);
+	      vecStData_.push_back(data);
+	    }
+	}
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei8_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei16_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei32_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei64_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei128_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei256_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei512_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsuxsegei1024_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
+{
+  vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei128_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei256_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei512_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVloxsegei1024_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
+{
+  vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei128_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei256_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei512_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsoxsegei1024_v(const DecodedInst* di)
 {
   illegalInst(di);
 }

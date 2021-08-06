@@ -865,13 +865,27 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
 
   if (mop == 1)
     {      // indexed unordered
-      if (mew == 0)
-        {
-          if (f3 == 0) return instTable_.getEntry(InstId::vluxei8_v);
-          if (f3 == 5) return instTable_.getEntry(InstId::vluxei16_v);
-          if (f3 == 6) return instTable_.getEntry(InstId::vluxei32_v);
-          if (f3 == 7) return instTable_.getEntry(InstId::vluxei64_v);
-        }
+      if (nf == 0)
+	{
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vluxei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vluxei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vluxei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vluxei64_v);
+	    }
+	}
+      else
+	{
+	  op3 = 1 + nf;  // number of fieldsin sgemtent
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vluxsegei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vluxsegei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vluxsegei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vluxsegei64_v);
+	    }
+	}
     }
 
   if (mop == 2)
@@ -915,13 +929,27 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
 
   if (mop == 3)
     {      // Indexed
-      if (mew == 0)
-        {
-          if (f3 == 0) return instTable_.getEntry(InstId::vlxei8_v);
-          if (f3 == 5) return instTable_.getEntry(InstId::vlxei16_v);
-          if (f3 == 6) return instTable_.getEntry(InstId::vlxei32_v);
-          if (f3 == 7) return instTable_.getEntry(InstId::vlxei64_v);
-        }
+      if (nf == 0)
+	{
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vlxei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vlxei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vlxei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vlxei64_v);
+	    }
+	}
+      else
+	{
+	  op3 = 1 + nf;
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vloxsegei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vloxsegei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vloxsegei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vloxsegei64_v);
+	    }
+	}
     }
 
   return instTable_.getEntry(InstId::illegal);
@@ -961,7 +989,7 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
 	    }
 	  else
 	    {
-	      op2 = nf + 1;   // Number of fields in segment
+	      op2 = 1 + nf;   // Number of fields in segment
 	      if (mew == 0)
 		{
 		  if (f3 == 0) return instTable_.getEntry(InstId::vssege8_v);
@@ -992,14 +1020,28 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
     }
 
   if (mop == 1)
-    {      // indexed ordered
-      if (mew == 0)
-        {
-          if (f3 == 0) return instTable_.getEntry(InstId::vsuxei8_v);
-          if (f3 == 5) return instTable_.getEntry(InstId::vsuxei16_v);
-          if (f3 == 6) return instTable_.getEntry(InstId::vsuxei32_v);
-          if (f3 == 7) return instTable_.getEntry(InstId::vsuxei64_v);
-        }
+    {      // indexed unordered
+      if (nf == 0)
+	{
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vsuxei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vsuxei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vsuxei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vsuxei64_v);
+	    }
+	}
+      else
+	{
+	  op3 = 1 + nf; // Number of fields in sgemtent
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vsuxsegei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vsuxsegei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vsuxsegei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vsuxsegei64_v);
+	    }
+	}
     }
 
   if (mop == 2)
@@ -1023,7 +1065,7 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
 	}
       else
 	{
-	  op3 = 1 + nf;   // number of fields in segment.
+	  op3 = 1 + nf;   // Number of fields in segment.
 	  if (mew == 0)
 	    {
 	      if (f3 == 0) return instTable_.getEntry(InstId::vsssege8_v);
@@ -1043,14 +1085,29 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
 
   if (mop == 3)
     {      // Indexed
-      if (mew == 0)
-        {
-          if (f3 == 0) return instTable_.getEntry(InstId::vsxei8_v);
-          if (f3 == 5) return instTable_.getEntry(InstId::vsxei16_v);
-          if (f3 == 6) return instTable_.getEntry(InstId::vsxei32_v);
-          if (f3 == 7) return instTable_.getEntry(InstId::vsxei64_v);
-        }
+      if (nf == 0)
+	{
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vsxei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vsxei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vsxei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vsxei64_v);
+	    }
+	}
+      else
+	{
+	  op3 = 1 + nf;  // number of fields in segment
+	  if (mew == 0)
+	    {
+	      if (f3 == 0) return instTable_.getEntry(InstId::vsoxsegei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vsoxsegei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vsoxsegei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vsoxsegei64_v);
+	    }
+	}
     }
+
   return instTable_.getEntry(InstId::illegal);
 }
 
