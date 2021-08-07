@@ -411,15 +411,16 @@ namespace WdRiscv
     result = -result;
   }
 
-  /// Set result to the product of a and b where a is signed and
+  /// Set result to the product of a and b where a is signed and b
   /// is an unsigned and where a and b have the same width.
   template <typename TS, typename TU>
   void mulsu(const TS& a, const TU& b, TS& result)
   {
-    TU aa = TU(a);
+    bool neg = a < 0;
+    TU aa = neg? TU(-a) : TU(a);
     aa *= b;
-    result = TS(a);
-    if (a < 0)
+    result = TS(aa);
+    if (neg)
       result = - result;
   }
 }
@@ -8402,7 +8403,7 @@ Hart<URV>::vwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2)
           and vecRegs_.read(vd, ix, wideGroup, dest))
         {
-          dest += DWT(e2) * DWT(e2);
+          dest += DWT(e1) * DWT(e2);
           if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
         }
@@ -8667,6 +8668,7 @@ Hart<URV>::vwmaccsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
   typedef typename std::make_unsigned<DWT>::type DWTU; // Double wide type unsigned
+  typedef typename std::make_unsigned<ELEM_TYPE>::type SWTU; // Single wide type unsigned
 
   unsigned errors = 0, wideGroup = group*2;
 
@@ -8684,8 +8686,7 @@ Hart<URV>::vwmaccsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2)
           and vecRegs_.read(vd, ix, wideGroup, dest))
         {
-          DWTU de2 = DWT(e2);
-          mulsu(DWT(e1), de2, temp);
+          mulsu(DWT(e1), DWTU(SWTU(e2)), temp);
           dest += temp;
           if (not vecRegs_.write(vd, ix, wideGroup, dest))
             errors++;
@@ -8748,12 +8749,95 @@ Hart<URV>::vwmaccsu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
   typedef typename std::make_unsigned<DWT>::type DWTU; // Double wide type unsigned
+  typedef typename std::make_unsigned<ELEM_TYPE>::type SWTU; // Single wide type unsigned
 
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
-  DWT de1 = DWT(e1);  // Sign extend.  Spec is bogus.
-  DWTU de1u = DWTU(de1); // Then make unsigned,
+  DWT de1 = DWT(e1);  // Sign extend.
+  DWT dest = 0, temp = 0;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, wideGroup);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
+        {
+          mulsu(de1, DWTU(SWTU(e2)), temp);
+          dest += temp;
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
+{
+  if (not checkMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if ((vd % (eg*2)) or (vs2 % eg))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte: vwmaccsu_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Half: vwmaccsu_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word: vwmaccsu_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vwmaccsu_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
+    case EW::Word4:  illegalInst(di); break;
+    case EW::Word8:  illegalInst(di); break;
+    case EW::Word16: illegalInst(di); break;
+    case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template <typename ELEM_TYPE>
+void
+Hart<URV>::vwmaccus_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
+                       unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  typedef typename std::make_unsigned<DWT>::type DWTU; // Double wide type unsigned
+  typedef typename std::make_unsigned<ELEM_TYPE>::type SWTU; // Single wide type unsigned
+
+  unsigned errors = 0, wideGroup = group*2;
+
+  ELEM_TYPE e2 = 0;
+  DWT de1u = DWTU(SWTU(e1));  // Sign extend.
   DWT dest = 0, temp = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -8781,98 +8865,13 @@ Hart<URV>::vwmaccsu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 
 template <typename URV>
 void
-Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
-{
-  if (not checkMaskableInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
-    {
-      illegalInst(di);
-      return;
-    }
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % (eg*2)) or (vs1 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
-
-  SRV e2 = SRV(intRegs_.read(rs2));  // Spec says sign extend. Bogus.
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte: vwmaccsu_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwmaccsu_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwmaccsu_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2: vwmaccsu_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
-    }
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vwmaccus_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
-                       unsigned start, unsigned elems, bool masked)
-{
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  typedef typename std::make_unsigned<ELEM_TYPE>::type ELEM_TYPEU;
-  typedef typename std::make_unsigned<DWT>::type DWTU; // Double wide type unsigned
-
-  unsigned errors = 0, wideGroup = group*2;
-
-  ELEM_TYPEU e2 = 0;
-  DWT de1 = DWT(e1);  // Sign extend.
-  DWTU de1u = de1;
-  DWT dest = 0, temp = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest)
-          and vecRegs_.read(vd, ix, wideGroup, dest))
-        {
-          mulsu(DWT(e2), de1u, temp);
-          dest += temp;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
-void
 Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -8885,21 +8884,21 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
     }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % (eg*2)) or (vs1 % eg))
+  if ((vd % (eg*2)) or (vs2 % eg))
     {
       illegalInst(di);
       return;
     }
 
-  SRV e2 = SRV(intRegs_.read(rs2));  // Sign extend.
+  URV e1 = intRegs_.read(rs1);
 
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vwmaccus_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwmaccus_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwmaccus_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2: vwmaccus_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
+    case EW::Byte: vwmaccus_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Half: vwmaccus_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word: vwmaccus_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vwmaccus_vx<int64_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
