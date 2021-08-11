@@ -233,6 +233,13 @@ Hart<URV>::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 }
 
 
+inline bool
+isMaskedVec(uint32_t inst)
+{
+  return ((inst >> 25) & 1) == 0;
+}
+
+
 // Least sig 7 bits already determined to be: 1010111
 template <typename URV>
 const InstEntry&
@@ -273,7 +280,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x12: return instTable_.getEntry(InstId::vsbc_vvm);
         case 0x13: return instTable_.getEntry(InstId::vmsbc_vvm);
         case 0x17:
-          if (vm == 0) return instTable_.getEntry(InstId::vmerge_vv);
+          if (vm == 0) return instTable_.getEntry(InstId::vmerge_vvm);
           if (vm == 1)
             {
               std::swap(op1, op2);  // Per spec !
@@ -446,14 +453,30 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           if (op2 == 0x11) return instTable_.getEntry(InstId::vid_v);
           return instTable_.getEntry(InstId::illegal);
         case 0x17: return instTable_.getEntry(InstId::vcompress_vm);
-        case 0x19: return instTable_.getEntry(InstId::vmand_mm);
-        case 0x1d: return instTable_.getEntry(InstId::vmnand_mm);
-        case 0x18: return instTable_.getEntry(InstId::vmandnot_mm);
-        case 0x1b: return instTable_.getEntry(InstId::vmxor_mm);
-        case 0x1a: return instTable_.getEntry(InstId::vmor_mm);
-        case 0x1e: return instTable_.getEntry(InstId::vmnor_mm);
-        case 0x1c: return instTable_.getEntry(InstId::vmornot_mm);
-        case 0x1f: return instTable_.getEntry(InstId::vmxnor_mm);
+        case 0x19:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmand_mm);
+        case 0x1d:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmnand_mm);
+        case 0x18:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmandnot_mm);
+        case 0x1b:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmxor_mm);
+        case 0x1a:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmor_mm);
+        case 0x1e:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmnor_mm);
+        case 0x1c:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmornot_mm);
+        case 0x1f:
+	  if (isMaskedVec(inst)) return instTable_.getEntry(InstId::illegal);
+	  return instTable_.getEntry(InstId::vmxnor_mm);
         case 0x20: return instTable_.getEntry(InstId::vdivu_vv);
         case 0x21: return instTable_.getEntry(InstId::vdiv_vv);
         case 0x22: return instTable_.getEntry(InstId::vremu_vv);
@@ -519,7 +542,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x10: return instTable_.getEntry(InstId::vadc_vim);
         case 0x11: return instTable_.getEntry(InstId::vmadc_vim);
         case 0x17:
-          if (vm == 0) return instTable_.getEntry(InstId::vmerge_vi);
+          if (vm == 0) return instTable_.getEntry(InstId::vmerge_vim);
           if (vm == 1)
             {
               op1 = (int32_t(rform.bits.rs1) << 27) >> 27;
@@ -580,7 +603,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x12: return instTable_.getEntry(InstId::vsbc_vxm);
         case 0x13: return instTable_.getEntry(InstId::vmsbc_vxm);
         case 0x17:
-          if (vm == 0) return instTable_.getEntry(InstId::vmerge_vx);
+          if (vm == 0) return instTable_.getEntry(InstId::vmerge_vxm);
           if (vm == 1)
             {
               std::swap(op1, op2);  // Per spec!

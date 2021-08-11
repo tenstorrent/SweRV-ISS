@@ -6023,9 +6023,9 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vmadc_vim,
      &&vmsbc_vvm,
      &&vmsbc_vxm,
-     &&vmerge_vv,
-     &&vmerge_vx,
-     &&vmerge_vi,
+     &&vmerge_vvm,
+     &&vmerge_vxm,
+     &&vmerge_vim,
      &&vmv_x_s,
      &&vmv_s_x,
      &&vmv_v_v,
@@ -8312,16 +8312,16 @@ Hart<URV>::execute(const DecodedInst* di)
   execVmsbc_vxm(di);
   return;
 
- vmerge_vv:
-  execVmerge_vv(di);
+ vmerge_vvm:
+  execVmerge_vvm(di);
   return;
 
- vmerge_vx:
-  execVmerge_vx(di);
+ vmerge_vxm:
+  execVmerge_vxm(di);
   return;
 
- vmerge_vi:
-  execVmerge_vi(di);
+ vmerge_vim:
+  execVmerge_vim(di);
   return;
 
  vmv_x_s:

@@ -593,9 +593,9 @@ namespace WdRiscv
      vmsbc_vvm,
      vmsbc_vxm,
 
-     vmerge_vv,
-     vmerge_vx,
-     vmerge_vi,
+     vmerge_vvm,
+     vmerge_vxm,
+     vmerge_vim,
 
      vmv_x_s,
      vmv_s_x,

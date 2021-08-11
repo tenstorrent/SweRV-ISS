@@ -10684,8 +10684,8 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vmerge_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                     unsigned start, unsigned elems)
+Hart<URV>::vmerge_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems)
 {
   unsigned errors = 0;
 
@@ -10709,7 +10709,7 @@ Hart<URV>::vmerge_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 template <typename URV>
 void
-Hart<URV>::execVmerge_vv(const DecodedInst* di)
+Hart<URV>::execVmerge_vvm(const DecodedInst* di)
 {
   if (not isVecLegal() or not vecRegs_.legalConfig())
     {
@@ -10739,10 +10739,10 @@ Hart<URV>::execVmerge_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmerge_vv<int8_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Half: vmerge_vv<int16_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word: vmerge_vv<int32_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word2: vmerge_vv<int64_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Byte: vmerge_vvm<int8_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Half: vmerge_vvm<int16_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word: vmerge_vvm<int32_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word2: vmerge_vvm<int64_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -10754,8 +10754,8 @@ Hart<URV>::execVmerge_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vmerge_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                     unsigned start, unsigned elems)
+Hart<URV>::vmerge_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		      unsigned start, unsigned elems)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
@@ -10778,7 +10778,7 @@ Hart<URV>::vmerge_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
 template <typename URV>
 void
-Hart<URV>::execVmerge_vx(const DecodedInst* di)
+Hart<URV>::execVmerge_vxm(const DecodedInst* di)
 {
   if (not isVecLegal() or not vecRegs_.legalConfig() or not di->isMasked())
     {
@@ -10803,10 +10803,10 @@ Hart<URV>::execVmerge_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmerge_vx<int8_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Half: vmerge_vx<int16_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Word: vmerge_vx<int32_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Word2: vmerge_vx<int64_t>(vd, vs1, e2, group, start, elems); break;
+    case EW::Byte: vmerge_vxm<int8_t>(vd, vs1, e2, group, start, elems); break;
+    case EW::Half: vmerge_vxm<int16_t>(vd, vs1, e2, group, start, elems); break;
+    case EW::Word: vmerge_vxm<int32_t>(vd, vs1, e2, group, start, elems); break;
+    case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -10817,7 +10817,7 @@ Hart<URV>::execVmerge_vx(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVmerge_vi(const DecodedInst* di)
+Hart<URV>::execVmerge_vim(const DecodedInst* di)
 {
   if (not isVecLegal() or not vecRegs_.legalConfig())
     {
@@ -10849,10 +10849,10 @@ Hart<URV>::execVmerge_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmerge_vx<int8_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Half: vmerge_vx<int16_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word: vmerge_vx<int32_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word2: vmerge_vx<int64_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Byte: vmerge_vxm<int8_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Half: vmerge_vxm<int16_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Word: vmerge_vxm<int32_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;

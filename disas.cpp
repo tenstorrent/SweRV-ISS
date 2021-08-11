@@ -555,14 +555,18 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       out << ew << ',' << gm << ',' << tt << ',' << mm;
       return;
     }
-  if (di.instEntry()->instId() == InstId::vsetvli)
+
+  if (di.instEntry()->instId() == InstId::vsetvl)
     {
       out << "vsetvl " << hart.intRegName(di.op0()) << ", "
 	  << hart.intRegName(di.op1()) << ", " << hart.intRegName(di.op2());
       return;
     }
 
-  out << di.instEntry()->name();
+  std::string name = di.instEntry()->name();
+  if (id >= InstId::vmadc_vvm and id <= InstId::vmsbc_vxm and not di.isMasked())
+    name = name.substr(0, name.size() - 1);
+  out << name;
 
   const char* sep = " ";
 
@@ -592,7 +596,14 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
     }
 
   if (di.isMasked())
-    out << sep << "v0.t";
+    {
+      if ((id >= InstId::vadc_vvm and id <= InstId::vmsbc_vxm) or
+	  (id >= InstId::vmerge_vvm and id <= InstId::vmerge_vim) or
+	  (id == InstId::vfmerge_vfm))
+	out << sep << "v0";
+      else
+	out << sep << "v0.t";
+    }
 }
 	  
 

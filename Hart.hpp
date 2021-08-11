@@ -2789,16 +2789,16 @@ namespace WdRiscv
     void execVmsbc_vxm(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vmerge_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vmerge_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                    unsigned start, unsigned elems);
-    void execVmerge_vv(const DecodedInst*);
+    void execVmerge_vvm(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vmerge_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+    void vmerge_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                    unsigned start, unsigned elems);
-    void execVmerge_vx(const DecodedInst*);
+    void execVmerge_vxm(const DecodedInst*);
 
-    void execVmerge_vi(const DecodedInst*);
+    void execVmerge_vim(const DecodedInst*);
 
     void execVmv_x_s(const DecodedInst*);
     void execVmv_s_x(const DecodedInst*);
