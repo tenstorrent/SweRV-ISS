@@ -4875,13 +4875,19 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                       unsigned start, unsigned elems)
+                       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
       if (vecRegs_.read(vs2, ix, group, e2))
         {
           unsigned vs1Ix = unsigned(e2);
@@ -4915,6 +4921,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vd % eg) or (vs1 % eg) or (vs2 % eg))
@@ -4926,10 +4933,10 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrgather_vv<uint8_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Half: vrgather_vv<uint16_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word: vrgather_vv<uint32_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word2: vrgather_vv<uint64_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Byte:  vrgather_vv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vrgather_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vrgather_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vrgather_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -4942,7 +4949,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vrgather_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                       unsigned start, unsigned elems)
+                       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
 
@@ -4956,6 +4963,12 @@ Hart<URV>::vrgather_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
       dest = 0;
       if (vecRegs_.read(vs1, vs1Ix, group, e1))
         dest = e1;
@@ -4982,6 +4995,7 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vd % eg) or (vs1 % eg))
@@ -4993,10 +5007,10 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrgather_vx<uint8_t>(vd, vs1, rs2, group, start, elems); break;
-    case EW::Half: vrgather_vx<uint16_t>(vd, vs1, rs2, group, start, elems); break;
-    case EW::Word: vrgather_vx<uint32_t>(vd, vs1, rs2, group, start, elems); break;
-    case EW::Word2: vrgather_vx<uint64_t>(vd, vs1, rs2, group, start, elems); break;
+    case EW::Byte:  vrgather_vx<uint8_t> (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vrgather_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vrgather_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vrgather_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -5009,7 +5023,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vrgather_vi(unsigned vd, unsigned vs1, uint32_t imm, unsigned group,
-                       unsigned start, unsigned elems)
+                       unsigned start, unsigned elems, bool masked)
 {
   uint32_t vs1Ix = imm;
   unsigned errors = 0;
@@ -5017,6 +5031,12 @@ Hart<URV>::vrgather_vi(unsigned vd, unsigned vs1, uint32_t imm, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
       dest = 0;
       if (vecRegs_.read(vs1, vs1Ix, group, e1))
         dest = e1;
@@ -5044,6 +5064,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vd % eg) or (vs1 % eg))
@@ -5055,10 +5076,10 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrgather_vi<uint8_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Half: vrgather_vi<uint16_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word: vrgather_vi<uint32_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word2: vrgather_vi<uint64_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Byte:  vrgather_vi<uint8_t> (vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Half:  vrgather_vi<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word:  vrgather_vi<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word2: vrgather_vi<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -6691,7 +6712,8 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
 
       unsigned from = ix + amount;
       e1 = 0;
-      vecRegs_.read(vs1, from, group, e1);
+      if (from >= ix)  // Avoid overflow
+	vecRegs_.read(vs1, from, group, e1);
       dest = e1;
       if (not vecRegs_.write(vd, ix, group, dest))
         errors++;

@@ -2461,17 +2461,17 @@ namespace WdRiscv
 
     template<typename ELEM_TYPE>
     void vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                     unsigned start, unsigned elems);
+                     unsigned start, unsigned elems, bool masked);
     void execVrgather_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vrgather_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                     unsigned start, unsigned elems);
+                     unsigned start, unsigned elems, bool masked);
     void execVrgather_vx(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vrgather_vi(unsigned vd, unsigned vs1, uint32_t imm, unsigned group,
-                     unsigned start, unsigned elems);
+                     unsigned start, unsigned elems, bool masked);
     void execVrgather_vi(const DecodedInst*);
 
     template<typename ELEM_TYPE>

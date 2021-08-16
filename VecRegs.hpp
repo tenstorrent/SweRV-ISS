@@ -142,9 +142,9 @@ namespace WdRiscv
     bool read(uint32_t regNum, uint32_t elemIx, uint32_t groupX8,
               T& value) const
     {
-      if ((elemIx + 1) * sizeof(T) > ((bytesPerReg_*groupX8) >> 3))
+      if (elemIx*sizeof(T) > ((bytesPerReg_*groupX8) >> 3) - sizeof(T))
         return false;
-      if (regNum*bytesPerReg_ + (elemIx + 1)*sizeof(T) > bytesPerReg_*regCount_)
+      if (regNum*bytesPerReg_ + elemIx*sizeof(T) > bytesPerReg_*regCount_ - sizeof(T))
         return false;
       const T* data = reinterpret_cast<const T*>(data_ + regNum*bytesPerReg_);
       value = data[elemIx];
