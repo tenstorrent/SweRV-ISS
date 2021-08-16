@@ -2315,7 +2315,6 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  }
 	else if (funct7 == 1)
 	  {
-	    if (not isRvm()) return instTable_.getEntry(InstId::illegal);
 	    if (funct3 == 0) return instTable_.getEntry(InstId::mul);
 	    if (funct3 == 1) return instTable_.getEntry(InstId::mulh);
 	    if (funct3 == 2) return instTable_.getEntry(InstId::mulhsu);

@@ -10681,6 +10681,12 @@ template<typename URV>
 void
 Hart<URV>::execMul(const DecodedInst* di)
 {
+  if (not isRvm())
+    {
+      illegalInst(di);
+      return;
+    }
+
   SRV a = intRegs_.read(di->op1());
   SRV b = intRegs_.read(di->op2());
 
@@ -10696,6 +10702,12 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulh(const DecodedInst* di)
   {
+    if (not isRvm())
+      {
+	illegalInst(di);
+	return;
+      }
+
     int64_t a = int32_t(intRegs_.read(di->op1()));  // sign extend.
     int64_t b = int32_t(intRegs_.read(di->op2()));
     int64_t c = a * b;
@@ -10709,6 +10721,12 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhsu(const DecodedInst* di)
   {
+    if (not isRvm())
+      {
+	illegalInst(di);
+	return;
+      }
+
     int64_t a = int32_t(intRegs_.read(di->op1()));
     uint64_t b = uint32_t(intRegs_.read(di->op2()));
     int64_t c = a * b;
@@ -10722,6 +10740,12 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhu(const DecodedInst* di)
   {
+    if (not isRvm())
+      {
+	illegalInst(di);
+	return;
+      }
+
     uint64_t a = uint32_t(intRegs_.read(di->op1()));
     uint64_t b = uint32_t(intRegs_.read(di->op2()));
     uint64_t c = a * b;
@@ -10735,6 +10759,12 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulh(const DecodedInst* di)
   {
+    if (not isRvm())
+      {
+	illegalInst(di);
+	return;
+      }
+
     Int128 a = int64_t(intRegs_.read(di->op1()));  // sign extend.
     Int128 b = int64_t(intRegs_.read(di->op2()));
     Int128 c = a * b;
@@ -10748,6 +10778,11 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhsu(const DecodedInst* di)
   {
+    if (not isRvm())
+      {
+	illegalInst(di);
+	return;
+      }
 
     Int128 a = int64_t(intRegs_.read(di->op1()));
     Int128 b = intRegs_.read(di->op2());
@@ -10762,6 +10797,12 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhu(const DecodedInst* di)
   {
+    if (not isRvm())
+      {
+	illegalInst(di);
+	return;
+      }
+
     Uint128 a = intRegs_.read(di->op1());
     Uint128 b = intRegs_.read(di->op2());
     Uint128 c = a * b;
@@ -10777,6 +10818,12 @@ template <typename URV>
 void
 Hart<URV>::execDiv(const DecodedInst* di)
 {
+  if (not isRvm())
+    {
+      illegalInst(di);
+      return;
+    }
+
   SRV a = intRegs_.read(di->op1());
   SRV b = intRegs_.read(di->op2());
   SRV c = -1;   // Divide by zero result
@@ -10799,6 +10846,12 @@ template <typename URV>
 void
 Hart<URV>::execDivu(const DecodedInst* di)
 {
+  if (not isRvm())
+    {
+      illegalInst(di);
+      return;
+    }
+
   URV a = intRegs_.read(di->op1());
   URV b = intRegs_.read(di->op2());
   URV c = ~ URV(0);  // Divide by zero result.
@@ -10816,6 +10869,12 @@ template <typename URV>
 void
 Hart<URV>::execRem(const DecodedInst* di)
 {
+  if (not isRvm())
+    {
+      illegalInst(di);
+      return;
+    }
+
   SRV a = intRegs_.read(di->op1());
   SRV b = intRegs_.read(di->op2());
   SRV c = a;  // Divide by zero remainder.
@@ -10839,6 +10898,12 @@ template <typename URV>
 void
 Hart<URV>::execRemu(const DecodedInst* di)
 {
+  if (not isRvm())
+    {
+      illegalInst(di);
+      return;
+    }
+
   URV a = intRegs_.read(di->op1());
   URV b = intRegs_.read(di->op2());
   URV c = a;  // Divide by zero remainder.
