@@ -24,7 +24,7 @@
     "csr" : {
 	"misa" : {
 	    "reset-comment" : "imfv",
-	    "reset" : "0x40201120",
+	    "reset" : "0x40201121",
 	    "mask-comment" : "all the bits are writeable/pokeable",
 	    "mask" : "0xffffffff"
 	},

@@ -743,6 +743,14 @@ namespace WdRiscv
     void enableRvzba(bool flag)
     { rvzba_ = flag; }
 
+    /// Enable/disable the f (floating point) extension.
+    void enableRvf(bool flag)
+    { rvf_ = flag; csRegs_.enableRvf(flag); }
+
+    /// Enable/disable the d (double-precision floating point) extension.
+    void enableRvd(bool flag)
+    { rvd_ = flag; }
+
     /// Enable/disable the zbb (bit manipulation base) extension. When
     /// disabled all the instructions in zbb extension result in an
     /// illegal instruction exception.

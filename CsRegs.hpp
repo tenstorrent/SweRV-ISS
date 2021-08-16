@@ -1058,6 +1058,9 @@ namespace WdRiscv
     void enableUserMode(bool flag)
     { userModeEnabled_ = flag; }
 
+    /// Enable/disable F extension.
+    void enableRvf(bool flag);
+
     /// Enable supervisor mode.
     void enableSupervisorMode(bool flag);
 

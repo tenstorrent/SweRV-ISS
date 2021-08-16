@@ -281,29 +281,15 @@ Hart<URV>::processExtensions()
       if (value & (URV(1) << ('c' - 'a')))  // Compress option.
 	rvc_ = true;
 
-      if (value & (URV(1) << ('f' - 'a')))  // Single precision FP
-	{
-	  rvf_ = true;
+      bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
+      enableRvf(flag);
 
-	  bool isDebug = false, shared = true;
-
-	  // Make sure FCSR/FRM/FFLAGS are enabled if F extension is on.
-	  if (not csRegs_.isImplemented(CsrNumber::FCSR))
-	    csRegs_.configCsr("fcsr", true, 0, 0xff, 0xff, isDebug, shared);
-	  if (not csRegs_.isImplemented(CsrNumber::FRM))
-	    csRegs_.configCsr("frm", true, 0, 0x7, 0x7, isDebug, shared);
-	  if (not csRegs_.isImplemented(CsrNumber::FFLAGS))
-	    csRegs_.configCsr("fflags", true, 0, 0x1f, 0x1f, isDebug, shared);
-	}
-
-      if (value & (URV(1) << ('d' - 'a')))  // Double precision FP.
-	{
-	  if (rvf_)
-	    rvd_ = true;
-	  else
-	    std::cerr << "Bit 3 (d) is set in the MISA register but f "
-		      << "extension (bit 5) is not enabled -- ignored\n";
-	}
+      flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
+      if (flag and not rvf_)
+	std::cerr << "Bit 3 (d) is set in the MISA register but f "
+		  << "extension (bit 5) is not enabled -- ignored\n";
+      else
+	enableRvd(flag);
 
       if (value & (URV(1) << ('e' - 'a')))
         {
@@ -10143,7 +10129,7 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
     }
 
   if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
-    if (not isFpEnabled())
+    if (not isFpLegal())
       {
         illegalInst(di);
         return false;
@@ -10200,7 +10186,7 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
     }
 
   if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
-    if (not isFpEnabled())
+    if (not isFpLegal())
       {
         illegalInst(di);
         return;

@@ -172,9 +172,6 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 {
   supervisorModeEnabled_ = flag;
 
-  if (not flag)
-    return;
-
   for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SEDELEG, CsrNumber::SIDELEG,
                       CsrNumber::STVEC, CsrNumber::SIE, CsrNumber::STVEC,
                       CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
@@ -189,8 +186,11 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
           assert(0);
         }
       else if (not csr->isImplemented())
-        csr->setImplemented(true);
+        csr->setImplemented(flag);
     }
+
+  if (not flag)
+    return;
 
   typedef InterruptCause IC;
 
@@ -219,6 +219,25 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
       mask = csr->getPokeMask();
       csr->setPokeMask(mask | extra);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableRvf(bool flag)
+{
+  for (auto csrn : { CsrNumber::FCSR, CsrNumber::FFLAGS, CsrNumber::FRM } )
+    {
+      auto csr = findCsr(csrn);
+      if (not csr)
+        {
+          std::cerr << "Error: enableRvf: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+          assert(0);
+        }
+      else if (not csr->isImplemented())
+        csr->setImplemented(flag);
     }
 }
 

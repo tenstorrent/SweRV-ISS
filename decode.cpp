@@ -619,7 +619,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x1e: return instTable_.getEntry(InstId::vmsgtu_vx);
         case 0x1f: return instTable_.getEntry(InstId::vmsgt_vx);
         case 0x20: return instTable_.getEntry(InstId::vsaddu_vx);
-        case 0x21: return instTable_.getEntry(InstId::vsaddu_vx);
+        case 0x21: return instTable_.getEntry(InstId::vsadd_vx);
         case 0x22: return instTable_.getEntry(InstId::vssubu_vx);
         case 0x23: return instTable_.getEntry(InstId::vssub_vx);
         case 0x25: return instTable_.getEntry(InstId::vsll_vx);
