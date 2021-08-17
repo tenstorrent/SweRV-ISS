@@ -185,7 +185,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
                     << std::hex << URV(csrn) << " undefined\n";
           assert(0);
         }
-      else if (not csr->isImplemented())
+      else
         csr->setImplemented(flag);
     }
 
@@ -246,12 +246,9 @@ template <typename URV>
 void
 CsRegs<URV>::enableVectorMode(bool flag)
 {
-  if (not flag)
-    return;
-
   for (auto csrn : { CsrNumber::VSTART, CsrNumber::VXSAT, CsrNumber::VXRM,
-                      CsrNumber::VCSR, CsrNumber::VL, CsrNumber::VTYPE,
-                      CsrNumber::VLENB } )
+		     CsrNumber::VCSR, CsrNumber::VL, CsrNumber::VTYPE,
+		     CsrNumber::VLENB } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -260,8 +257,8 @@ CsRegs<URV>::enableVectorMode(bool flag)
                     << std::hex << URV(csrn) << " undefined\n";
           assert(0);
         }
-      else if (not csr->isImplemented())
-        csr->setImplemented(true);
+      else
+        csr->setImplemented(flag);
     }
 }
 

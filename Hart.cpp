@@ -261,67 +261,52 @@ template <typename URV>
 void
 Hart<URV>::processExtensions()
 {
-  // D requires F and is enabled only if F is enabled.
-  rva_ = false;
-  rvc_ = false;
-  rvd_ = false;
-  rve_ = false;
-  rvf_ = false;
-  rvm_ = false;
-  rvs_ = false;
-  rvu_ = false;
-  rvv_ = false;
-
   URV value = 0;
-  if (peekCsr(CsrNumber::MISA, value))
+  peekCsr(CsrNumber::MISA, value);
+
+  rva_ = value & 1;   // Atomic ('a') option.
+
+  rvc_ = value & (URV(1) << ('c' - 'a'));  // Compress option.
+
+  bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
+  enableRvf(flag);
+
+  // D requires F and is enabled only if F is enabled.
+  flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
+  if (flag and not rvf_)
+    std::cerr << "Bit 3 (d) is set in the MISA register but f "
+	      << "extension (bit 5) is not enabled -- ignored\n";
+  else
+    enableRvd(flag);
+
+  rve_ = value & (URV(1) << ('e' - 'a'));
+  if (rve_)
+    intRegs_.regs_.resize(16);
+
+  flag = value & (URV(1) << ('i' - 'a'));
+  if (flag and not rve_)
+    std::cerr << "Bit 8 (i extension) is cleared in the MISA register "
+	      << " but extension is mandatory -- assuming bit 8 set\n";
+
+  rvm_ = value & (URV(1) << ('m' - 'a'));
+
+  flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
+  enableSupervisorMode(flag);
+
+  flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
+  enableUserMode(flag);
+
+  flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
+  enableVectorMode(flag);
+
+  for (auto ec : { 'b', 'g', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
+		  'q', 'r', 't', 'w', 'x', 'y', 'z' } )
     {
-      if (value & 1)    // Atomic ('a') option.
-	rva_ = true;
-
-      if (value & (URV(1) << ('c' - 'a')))  // Compress option.
-	rvc_ = true;
-
-      bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
-      enableRvf(flag);
-
-      flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
-      if (flag and not rvf_)
-	std::cerr << "Bit 3 (d) is set in the MISA register but f "
-		  << "extension (bit 5) is not enabled -- ignored\n";
-      else
-	enableRvd(flag);
-
-      if (value & (URV(1) << ('e' - 'a')))
-        {
-          rve_ = true;
-          intRegs_.regs_.resize(16);
-        }
-
-      if (not (value & (URV(1) << ('i' - 'a'))))
-	std::cerr << "Bit 8 (i extension) is cleared in the MISA register "
-		  << " but extension is mandatory -- assuming bit 8 set\n";
-
-      if (value & (URV(1) << ('m' - 'a')))  // Multiply/divide option.
-	rvm_ = true;
-
-      if (value & (URV(1) << ('s' - 'a')))  // Supervisor-mode option.
-        enableSupervisorMode(true);
-
-      if (value & (URV(1) << ('u' - 'a')))  // User-mode option.
-        enableUserMode(true);
-
-      if (value & (URV(1) << ('v' - 'a')))  // User-mode option.
-	enableVectorMode(true);
-
-      for (auto ec : { 'b', 'g', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
-	    'q', 'r', 't', 'w', 'x', 'y', 'z' } )
-	{
-	  unsigned bit = ec - 'a';
-	  if (value & (URV(1) << bit))
-	    std::cerr << "Bit " << bit << " (" << ec << ") set in the MISA "
-		      << "register but extension is not supported "
-		      << "-- ignored\n";
-	}
+      unsigned bit = ec - 'a';
+      if (value & (URV(1) << bit))
+	std::cerr << "Bit " << bit << " (" << ec << ") set in the MISA "
+		  << "register but extension is not supported "
+		  << "-- ignored\n";
     }
 }
 
