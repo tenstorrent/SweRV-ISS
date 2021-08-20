@@ -5246,13 +5246,11 @@ Hart<URV>::vredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2 = 0;
+  ELEM_TYPE e1 = 0, result = 0;
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  
-  ELEM_TYPE e1 = 0, result = e2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -5318,14 +5316,12 @@ Hart<URV>::vredand_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2 = 0;
+  ELEM_TYPE e1 = 0, result = 0;
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
   
-  ELEM_TYPE e1 = 0, result = e2;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -5390,19 +5386,17 @@ Hart<URV>::vredor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2 = 0;
+  ELEM_TYPE e1 = 0, result = 0;
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
   
-  ELEM_TYPE e1 = 0, result = e2;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
-      
+
       if (vecRegs_.read(vs1, ix, group, e1))
 	result = result | e1;
       else
@@ -5462,19 +5456,17 @@ Hart<URV>::vredxor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2 = 0;
+  ELEM_TYPE e1 = 0, result = 0;
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
   
-  ELEM_TYPE e1 = 0, result = e2;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
-      
+
       if (vecRegs_.read(vs1, ix, group, e1))
 	result = result ^ e1;
       else
@@ -5533,19 +5525,18 @@ void
 Hart<URV>::vredminu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
-  ELEM_TYPE e2 = 0;
-  unsigned errors = 0, scalarElemIx = 0, scalarElemGroupX8 = 8;
+  unsigned errors = 0;
+  ELEM_TYPE e1 = 0, result = 0;
+  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  
-  ELEM_TYPE e1 = 0, result = e2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
-      
+
       if (vecRegs_.read(vs1, ix, group, e1))
 	result = result < e1 ? result : e1;
       else
@@ -5556,7 +5547,6 @@ Hart<URV>::vredminu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     errors++;
 
   assert(errors == 0);
-
 }
 
 
@@ -5605,13 +5595,12 @@ void
 Hart<URV>::vredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
-  ELEM_TYPE e2 = 0;
-  unsigned errors = 0, scalarElemIx = 0, scalarElemGroupX8 = 8;
+  unsigned errors = 0;
+  ELEM_TYPE e1 = 0, result = 0;
+  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  
-  ELEM_TYPE e1 = 0, result = e2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -5676,13 +5665,12 @@ void
 Hart<URV>::vredmaxu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
-  ELEM_TYPE e2 = 0;
-  unsigned errors = 0, scalarElemIx = 0, scalarElemGroupX8 = 8;
+  unsigned errors = 0;
+  ELEM_TYPE e1 = 0, result = 0;
+  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  
-  ELEM_TYPE e1 = 0, result = e2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -5747,13 +5735,12 @@ void
 Hart<URV>::vredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
-  ELEM_TYPE e2 = 0;
-  unsigned errors = 0, scalarElemIx = 0, scalarElemGroupX8 = 8;
+  unsigned errors = 0;
+  ELEM_TYPE e1 = 0, result = 0;
+  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  
-  ELEM_TYPE e1 = 0, result = e2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -5821,10 +5808,10 @@ Hart<URV>::vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE2X e2 = 0, result = 0;
+  ELEM_TYPE2X result = 0;
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
   
   ELEM_TYPE e1 = 0;
@@ -5837,7 +5824,7 @@ Hart<URV>::vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
 	  ELEM_TYPE2X e1dw = e1;
-	  result += e1;
+	  result += e1dw;
 	}
       else
 	errors++;
