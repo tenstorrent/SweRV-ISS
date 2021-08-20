@@ -5239,7 +5239,6 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
 }
 
 
-
 template <typename URV>
 template<typename ELEM_TYPE>
 void
@@ -5809,6 +5808,126 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
     case EW::Word32: illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		       unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+
+  unsigned errors = 0;
+  ELEM_TYPE2X e2 = 0, result = 0;
+  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
+
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+    errors++;
+  
+  ELEM_TYPE e1 = 0;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	continue;
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+	{
+	  ELEM_TYPE2X e1dw = e1;
+	  result += e1;
+	}
+      else
+	errors++;
+    }
+
+  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
+    errors++;
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if ((vd % (eg*2)) or (vs1 % eg) or (vs2 % eg))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:  vwredsum_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwredsum_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwredsum_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVwredsum_vs(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if ((vd % (eg*2)) or (vs1 % eg) or (vs2 % eg))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:  vwredsum_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwredsum_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 }
 
@@ -22540,7 +22659,7 @@ template <typename URV>
 template<typename ELEM_TYPE>
 void
 Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		       unsigned start, unsigned elems, bool masked)
+			unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 

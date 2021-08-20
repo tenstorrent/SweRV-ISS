@@ -2524,6 +2524,12 @@ namespace WdRiscv
                     unsigned start, unsigned elems, bool masked);
     void execVredmax_vs(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked);
+    void execVwredsumu_vs(const DecodedInst*);
+    void execVwredsum_vs(const DecodedInst*);
+
     void execVmand_mm(const DecodedInst*);
     void execVmnand_mm(const DecodedInst*);
     void execVmandnot_mm(const DecodedInst*);

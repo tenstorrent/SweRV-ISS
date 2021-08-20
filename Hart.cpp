@@ -284,7 +284,7 @@ Hart<URV>::processExtensions()
     intRegs_.regs_.resize(16);
 
   flag = value & (URV(1) << ('i' - 'a'));
-  if (flag and not rve_)
+  if (not flag and not rve_)
     std::cerr << "Bit 8 (i extension) is cleared in the MISA register "
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
@@ -5920,6 +5920,9 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vredmin_vs,
      &&vredmaxu_vs,
      &&vredmax_vs,
+     &&vwredsumu_vs,
+     &&vwredsum_vs,
+
      &&vmand_mm,
      &&vmnand_mm,
      &&vmandnot_mm,
@@ -7985,6 +7988,14 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vredmax_vs:
   execVredmax_vs(di);
+  return;
+
+ vwredsumu_vs:
+  execVwredsumu_vs(di);
+  return;
+
+ vwredsum_vs:
+  execVwredsum_vs(di);
   return;
 
  vmand_mm:

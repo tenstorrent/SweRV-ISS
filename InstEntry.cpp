@@ -2921,6 +2921,24 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
+      { "vwredsumu.vs", InstId::vwredsumu_vs,
+        0b110000'0'00000'00000'000'00000'1010111,
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vwredsum.vs", InstId::vwredsum_vs,
+        0b110001'0'00000'00000'000'00000'1010111,
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::VecReg, OperandMode::Read, rs2Mask,
+      },
+
       { "vmand.mm", InstId::vmand_mm,
         0b011001'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits

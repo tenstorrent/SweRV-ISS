@@ -106,7 +106,6 @@ $(BUILD_DIR)/%.c.o:  %.c
 $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
                          $(BUILD_DIR)/librvcore.a \
 			 $(soft_float_lib)
-	echo sf $(SOFT_FLOAT) cpp $(CPPFLAGS)
 	$(CXX) -o $@ $^ $(LINK_DIRS) $(LINK_LIBS)
 
 # List of all CPP sources needed for librvcore.a

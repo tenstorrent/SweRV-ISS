@@ -509,6 +509,8 @@ namespace WdRiscv
      vredmin_vs,
      vredmaxu_vs,
      vredmax_vs,
+     vwredsumu_vs,
+     vwredsum_vs,
 
      vmand_mm,
      vmnand_mm,

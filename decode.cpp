@@ -308,6 +308,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x2d: return instTable_.getEntry(InstId::vnsra_wv);
         case 0x2e: return instTable_.getEntry(InstId::vnclipu_wv);
         case 0x2f: return instTable_.getEntry(InstId::vnclip_wv);
+        case 0x30: return instTable_.getEntry(InstId::vwredsumu_vs);
+        case 0x31: return instTable_.getEntry(InstId::vwredsum_vs);
         }
       return instTable_.getEntry(InstId::illegal);  
     }
