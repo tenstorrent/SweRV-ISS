@@ -13,9 +13,126 @@
 // limitations under the License.
 
 #include "FpRegs.hpp"
-
+#include "softfloat-util.hpp"
 
 using namespace WdRiscv;
+
+
+float
+Float16::toFloat() const
+{
+#ifdef SOFT_FLOAT
+
+  auto sf16 = nativeToSoft(*this);
+  auto sf32 = f16_to_f32(sf16);
+  return softToNative(sf32);
+
+#else
+
+  bool sign = (i16 >> 15) & 1;
+  if (isInf())
+    {
+      float x = std::numeric_limits<float>::infinity();
+      return sign? -x : x;
+    }
+
+  if (isSnan())
+    {
+      float x = std::limits_<float>::signaling_nan();
+      return sign? -x : x;
+    }
+
+  if (isQnan())
+    {
+      float x = std::limits_<float>::quiet_nan();
+      return sign? -x : x;
+    }
+
+  if (isZero())
+    return sign? -0.0f : 0.0f;
+
+  if (isSubnormal())
+    {
+      // Subnormal in half precision would be normal in float.
+      // Renormalize.
+      uint32_t sig = sigBits();
+      assert(sig != 0);
+      uint32_t exp = expBits();
+      unsigned mssb = __bultin_clz(sig);  // Most sig set bit
+      assert(mssb <= 9);
+      unsigned shift = 10 - mssb;
+      sig = sig & ~(uint32_t(1) << shift);  // Clear most sig bit
+      sig = sig << shift;
+      exp = exp - shift;
+      exp = exp - 15 + 127;  // Update bias
+      uint32_t val = sign? 1 : 0;
+      val = (val << 31) | (exp << 23) | sig;
+      uint32FloatUnion uf{val};
+      return uf.f;
+    }
+
+  // Normalized number. Update exponent for float bias.
+  uint32_t sig = sigBits();
+  uint32_t exp = expBits();
+  exp = exp - 15 + 127;
+  uint32_t val = sign? 1 : 0;
+  val = (val << 31) | (exp << 23) | sig;
+  uint32FloatUnion uf{val};
+  return uf.f;
+
+#endif
+}
+
+
+Float16
+Float16::fromFloat(float val)
+{
+#ifdef SOFT_FLOAT
+
+  auto sf32 = nativeToSoft(val);
+  auto sf16 = f32_to_f16(sf32);
+  return softToNative(sf16);
+
+#else
+
+  bool sign = std::signbit(val);
+  if (std::isinf(val))
+    {
+      Float16 x = Float16::infinity();
+      return sign? -x : x;
+    }
+
+  if (std::isnan(val))
+    {
+      Float16 x = isSnan(val)? Float16::signalingNan() : Float16::quietNan();
+      return sign? -x : x;
+    }
+
+  if (val == 0 or not std::isnormal(val))
+    return sign? -Float16{} : Float16{};
+
+  // Normalized number. Update exponent for float16 bias.
+  uint32FloatUnion uf{val};
+
+  uint32_t sig = (uf.u << 9) >> 9;
+  int exp = ((uf.u) >> 23) & 0xff;
+  exp = exp - 127 + 15;
+  if (exp < -10)
+    return sign? -Float16{} : Float16{};
+  if (exp < 0)
+    {
+      assert(0);
+    }
+  if (exp >= 0x1f)
+    return sign? -Float16::infinity() : Float16:infinity();
+
+  uint16_t res = sign? 1 : 0;
+  res = (res << 15) | uint16_t(exp << 10) | uint16_t(sig >> 13);
+
+  return Float16{res};
+
+#endif
+}
 
 
 FpRegs::FpRegs(unsigned regCount)

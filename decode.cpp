@@ -705,7 +705,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           if (vm == 0) return instTable_.getEntry(InstId::vfmerge_vfm);
           if (vm == 1)
             {
-              op1 = (int32_t(rform.bits.rs1) << 27) >> 27;
+              op1 = (uint32_t(rform.bits.rs1) << 27) >> 27;
               op2 = rform.bits.rs2;
               if (op2 == 0) return instTable_.getEntry(InstId::vfmv_v_f);
             }

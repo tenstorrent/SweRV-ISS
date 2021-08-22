@@ -572,7 +572,7 @@ fusedMultiplyAdd(float x, float y, float z, bool roundAfterMul, bool& invalid)
 Float16
 fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool roundAfterMul, bool& invalid)
 {
-  Float16 res{0.0F};
+  Float16 res{0};
 
 #ifndef SOFT_FLOAT
   #ifdef __FP_FAST_FMA
@@ -1375,8 +1375,46 @@ template <>
 unsigned
 WdRiscv::fpClassifyRiscv(Float16 val)
 {
-  float f = val.toFloat();
-  return fpClassifyRiscv(f);
+  unsigned result = 0;
+  bool pos = not val.signBit();
+
+  if (val.isInf())
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosInfinity);
+      else
+	result |= unsigned(FpClassifyMasks::NegInfinity);
+    }
+  else if (val.isSubnormal())
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosSubnormal);
+      else
+	result |= unsigned(FpClassifyMasks::NegSubnormal);
+    }
+  else if (val.isZero())
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosZero);
+      else
+	result |= unsigned(FpClassifyMasks::NegZero);
+    }
+  else if (val.isNan())
+    {
+      if (val.isSnan())
+	result |= unsigned(FpClassifyMasks::SignalingNan);
+      else
+	result |= unsigned(FpClassifyMasks::QuietNan);
+    }
+  else
+    {
+      if (pos)
+	result |= unsigned(FpClassifyMasks::PosNormal);
+      else
+	result |= unsigned(FpClassifyMasks::NegNormal);
+    }
+
+  return result;
 }
 
 
@@ -3188,9 +3226,7 @@ Hart<URV>::execFsgnjx_h(const DecodedInst* di)
   unsigned sign2 = f2.signBit();
   unsigned sign = sign1 ^ sign2;
 
-  Float16 x = sign? Float16{-1.0f} : Float16{1.0f};
-
-  Float16 res = Float16::copySign(f1, x);  // Magnitude of rs1 and sign of x
+  Float16 res = sign != sign1? -f1 : f1;
   fpRegs_.writeHalf(di->op0(), res);
 
   markFsDirty();
@@ -3219,12 +3255,12 @@ Hart<URV>::execFmin_h(const DecodedInst* di)
   else if (isNan2)
     res = in1;
   else
-    res = Float16{std::fminf(in1.toFloat(), in2.toFloat())};
+    res = Float16::fromFloat(std::fminf(in1.toFloat(), in2.toFloat()));
 
   if (in1.isSnan() or in2.isSnan())
     orFcsrFlags(FpFlags::Invalid);
   else if (in1.signBit() != in2.signBit() and in1 == in2)
-    res = Float16::copySign(res, Float16{-1.0F});  // Make sure min(-0, +0) is -0.
+    res.setSign();  // Make sure min(-0, +0) is -0.
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -3254,12 +3290,12 @@ Hart<URV>::execFmax_h(const DecodedInst* di)
   else if (isNan2)
     res = in1;
   else
-    res = Float16{std::fmaxf(in1.toFloat(), in2.toFloat())};
+    res = Float16::fromFloat(std::fmaxf(in1.toFloat(), in2.toFloat()));
 
   if (in1.isSnan() or in2.isSnan())
     orFcsrFlags(FpFlags::Invalid);
   else if (in1.signBit() != in2.signBit() and in1 == in2)
-    res = Float16::copySign(res, Float16{1.0F});  // Make sure max(-0, +0) is +0.
+    res.clearSign();  // Make sure max(-0, +0) is +0.
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -3610,7 +3646,7 @@ Hart<URV>::execFclass_h(const DecodedInst* di)
       return;
     }
 
-  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
+  Float16 f1 = fpRegs_.readHalf(di->op1());
   URV result = fpClassifyRiscv(f1);
   intRegs_.write(di->op0(), result);
 }

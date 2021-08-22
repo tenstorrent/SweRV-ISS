@@ -1323,6 +1323,8 @@ namespace WdRiscv
     void forceSubnormalToZero(bool flag)
     { subnormToZero_ = flag; }
 
+    void genVec();
+
   protected:
 
     /// Helper to reset: reset floating point related structures.

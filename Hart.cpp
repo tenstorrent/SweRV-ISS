@@ -256,7 +256,6 @@ Hart<URV>::countImplementedPmpRegisters() const
 }
       
 
-
 template <typename URV>
 void
 Hart<URV>::processExtensions()
@@ -908,6 +907,49 @@ Hart<URV>::removeFromLoadQueue(unsigned regIx, bool isDiv, bool fp)
 
   if (removeIx < loadQueue_.size())
     loadQueue_.erase(loadQueue_.begin() + removeIx);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::genVec()
+{
+  uint32_t vc = 0b1010111;
+  DecodedInst di;
+  uint32_t illegal = 0, vector = 0;
+
+  std::string tmp;
+  vecRegs_.updateConfig(ElementWidth::Word, GroupMultiplier::One, false,
+			false, false);
+
+  for (uint32_t i = 0; i <= 0x1ffffff; ++i)
+    {
+      uint32_t code = (i << 7) | vc;
+      decode(0, code, di);
+      mstatusFs_ = FpFs::Clean;
+      mstatusVs_ = FpFs::Clean;
+      auto instId = di.instEntry()->instId();
+      if (instId == InstId::illegal)
+	++illegal;
+      else if (instId == InstId::vsetvli or instId == InstId::vsetvl)
+	continue;
+      else if (di.instEntry()->isVector())
+	{
+	  pokePc(0);
+	  pokeMemory(0, code, false);
+	  execute(&di);
+	  if (exceptionCount_)
+	    exceptionCount_ = 0;
+	  else
+	    {
+	      vector++;
+	      disassembleInst(di, tmp);
+	      std::cout << "  " << tmp << '\n';
+	    }
+	}
+    }
+  std::cerr << "Illegal vec count: " << illegal << '\n';
+  std::cerr << "Legal vec count: " << vector << '\n';
 }
 
 

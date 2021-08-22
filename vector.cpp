@@ -15601,21 +15601,22 @@ std::numeric_limits<Float16>::quiet_NaN()
 Float16
 operator+ (Float16 f1, Float16 f2)
 {
-  return Float16{f1.toFloat() + f2.toFloat()};
+  float x = f1.toFloat() + f2.toFloat();
+  return Float16::fromFloat(x);
 }
 
 
 Float16
 operator* (Float16 f1, Float16 f2)
 {
-  return Float16{f1.toFloat() * f2.toFloat()};
+  return Float16::fromFloat(f1.toFloat() * f2.toFloat());
 }
 
 
 Float16
 operator/ (Float16 f1, Float16 f2)
 {
-  return Float16{f1.toFloat() / f2.toFloat()};
+  return Float16::fromFloat(f1.toFloat() / f2.toFloat());
 }
 
 
@@ -15648,7 +15649,7 @@ template <typename FT>
 static FT
 doFmin(FT f1, FT f2, bool subnormToZero, bool& invalid)
 {
-  FT res{0.0f};
+  FT res{};
   invalid = false;
 
   bool isNan1 = isSnan(f1), isNan2 = isSnan(f2);
@@ -15664,7 +15665,7 @@ doFmin(FT f1, FT f2, bool subnormToZero, bool& invalid)
   if (isSnan(f1) or isSnan(f2))
     invalid = true;
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
-    res = std::copysign(res, FT{-1.0F});  // Make sure min(-0, +0) is -0.
+    res = std::copysign(res, -FT{});  // Make sure min(-0, +0) is -0.
 
   if (subnormToZero)
     res = subnormalAdjust(res);
@@ -15677,7 +15678,7 @@ template <typename FT>
 static FT
 doFmax(FT f1, FT f2, bool subnormToZero, bool& invalid)
 {
-  FT res{0.0f};
+  FT res{};
   invalid = false;
 
   bool isNan1 = isSnan(f1), isNan2 = isSnan(f2);
@@ -15693,7 +15694,7 @@ doFmax(FT f1, FT f2, bool subnormToZero, bool& invalid)
   if (isSnan(f1) or isSnan(f2))
     invalid = true;
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
-    res = std::copysign(res, FT{1.0F});  // Make sure max(-0, +0) is +0.
+    res = std::copysign(res, FT{});  // Make sure max(-0, +0) is +0.
 
   if (subnormToZero)
     res = subnormalAdjust(res);
@@ -15709,7 +15710,7 @@ doFsqrt(FT f1, bool subnormToZero)
   if (subnormToZero)
     f1 = subnormalAdjust(f1);
 
-  FT res{0.0f};
+  FT res{};
 
 #ifdef SOFT_FLOAT
   res = softSqrt(f1);
@@ -16074,7 +16075,7 @@ Hart<URV>::vfadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -16219,7 +16220,7 @@ Hart<URV>::vfsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE negE2 = - fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -16292,7 +16293,7 @@ Hart<URV>::vfrsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -16371,7 +16372,7 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -16450,9 +16451,9 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -16537,7 +16538,7 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -16616,9 +16617,9 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, negE2dw{-e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, negE2dw{-e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -16703,7 +16704,7 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -16782,7 +16783,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -16867,7 +16868,7 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE  e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -16946,7 +16947,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, negE2dw{-e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, negE2dw{-e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -17093,7 +17094,7 @@ Hart<URV>::vfmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17236,7 +17237,7 @@ Hart<URV>::vfdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17314,7 +17315,7 @@ Hart<URV>::vfrdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17394,7 +17395,7 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -17471,9 +17472,9 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -17638,7 +17639,7 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -17795,7 +17796,7 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -17952,7 +17953,7 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -18109,7 +18110,7 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -18266,7 +18267,7 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -18423,7 +18424,7 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -18580,7 +18581,7 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -18737,7 +18738,7 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -18824,7 +18825,7 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -18909,9 +18910,9 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -19006,7 +19007,7 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -19091,9 +19092,9 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -19188,7 +19189,7 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -19273,9 +19274,9 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -19370,7 +19371,7 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{0.0f}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -19456,9 +19457,9 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{0.0f}, e2dw{e2}, dest{0.0f};
+  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
 
@@ -19550,7 +19551,7 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -19617,7 +19618,7 @@ Hart<URV>::vfmerge(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		   unsigned start, unsigned elems)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -19689,7 +19690,7 @@ Hart<URV>::vfmv_v_f(unsigned vd, unsigned rs1, unsigned group,
 		    unsigned start, unsigned elems)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   e1 = fpRegs_.read<ELEM_TYPE>(rs1);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -19827,7 +19828,7 @@ Hart<URV>::vmfeq_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -19983,7 +19984,7 @@ Hart<URV>::vmfne_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20138,7 +20139,7 @@ Hart<URV>::vmflt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20293,7 +20294,7 @@ Hart<URV>::vmfle_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20375,7 +20376,7 @@ Hart<URV>::vmfgt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20457,7 +20458,7 @@ Hart<URV>::vmfge_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20539,7 +20540,7 @@ Hart<URV>::vfclass_v(unsigned vd, unsigned vs1, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -20978,7 +20979,7 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -21046,7 +21047,7 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -21189,7 +21190,7 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned errors = 0;
   UINT_TYPE e1{0};
-  ELEM_TYPE dest{0.0f};
+  ELEM_TYPE dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -21259,7 +21260,7 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned errors = 0;
   INT_TYPE e1{0};
-  ELEM_TYPE dest{0.0f};
+  ELEM_TYPE dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -21326,7 +21327,7 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -21403,7 +21404,7 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -21569,7 +21570,7 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned errors = 0;
   UINT_TYPE e1{0};
-  ELEM_TYPE2X dest{0.0f};
+  ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -21647,7 +21648,7 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned errors = 0;
   INT_TYPE e1{0};
-  ELEM_TYPE2X dest{0.0f};
+  ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -21723,8 +21724,8 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
-  ELEM_TYPE2X dest{0.0f};
+  ELEM_TYPE e1{};
+  ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -21804,7 +21805,7 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
   typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FLOAT_TYPE2X;
 
   unsigned errors = 0;
-  FLOAT_TYPE2X e1{0.0f};
+  FLOAT_TYPE2X e1{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -21882,7 +21883,7 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
   typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FLOAT_TYPE2X;
 
   unsigned errors = 0;
-  FLOAT_TYPE2X e1{0.0f};
+  FLOAT_TYPE2X e1{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -22047,7 +22048,7 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned errors = 0;
   UINT_TYPE2X e1{0};
-  FLOAT_TYPE dest{0.0f};
+  FLOAT_TYPE dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -22128,7 +22129,7 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned errors = 0;
   INT_TYPE2X e1{0};
-  FLOAT_TYPE dest{0.0f};
+  FLOAT_TYPE dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -22207,8 +22208,8 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f};
-  ELEM_TYPE2X dest{0.0f};
+  ELEM_TYPE e1{};
+  ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -22337,13 +22338,13 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2{0.0f};
+  ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
   
-  ELEM_TYPE e1{0.0f}, result{e2};
+  ELEM_TYPE e1{}, result{e2};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -22412,13 +22413,13 @@ Hart<URV>::vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2{0.0f};
+  ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
   
-  ELEM_TYPE e1{0.0f}, result{e2};
+  ELEM_TYPE e1{}, result{e2};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -22487,13 +22488,13 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2{0.0f};
+  ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
   
-  ELEM_TYPE e1{0.0f}, result{e2};
+  ELEM_TYPE e1{}, result{e2};
 
   bool invalid = false;
 
@@ -22568,13 +22569,13 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e2{0.0f};
+  ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
   
-  ELEM_TYPE e1{0.0f}, result{e2};
+  ELEM_TYPE e1{}, result{e2};
 
   bool invalid = false;
 
@@ -22651,13 +22652,13 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE2X e2{0.0f}, result{0.0f};
+  ELEM_TYPE2X e2{}, result{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
   
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -22737,13 +22738,13 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE2X e2{0.0f}, result{0.0f};
+  ELEM_TYPE2X e2{}, result{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
   
-  ELEM_TYPE e1{0.0f};
+  ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -22821,7 +22822,7 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
 
   bool inv = false, dbz = false;
 
@@ -22901,7 +22902,7 @@ Hart<URV>::vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
 
   FpFlags flags = FpFlags::None;
   auto mode = getFpRoundingMode();
@@ -22971,7 +22972,7 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, e2{}, dest{};
 
   bool invalid = false;
 
@@ -23047,7 +23048,7 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -23131,7 +23132,7 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, e2{}, dest{};
 
   bool invalid = false;
 
@@ -23207,7 +23208,7 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   bool invalid = false;
@@ -23291,7 +23292,7 @@ Hart<URV>::vfsgnj_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -23360,7 +23361,7 @@ Hart<URV>::vfsgnj_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -23437,7 +23438,7 @@ Hart<URV>::vfsgnjn_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -23507,7 +23508,7 @@ Hart<URV>::vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -23585,7 +23586,7 @@ Hart<URV>::vfsgnjx_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, e2{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -23660,7 +23661,7 @@ Hart<URV>::vfsgnjx_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{0.0f}, dest{0.0f};
+  ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
