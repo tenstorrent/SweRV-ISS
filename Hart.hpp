@@ -2248,6 +2248,10 @@ namespace WdRiscv
                   unsigned start, unsigned elems, bool masked);
     void execVwaddu_vx(const DecodedInst*);
     void execVwadd_vx(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vwsub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
     void execVwsubu_vx(const DecodedInst*);
     void execVwsub_vx(const DecodedInst*);
 

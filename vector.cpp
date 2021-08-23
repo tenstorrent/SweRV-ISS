@@ -1288,6 +1288,41 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
 
 
 template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vwsub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  unsigned errors = 0, wideGroup = group*2;
+
+  ELEM_TYPE e1 = 0;
+  DWT dest = 0;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, wideGroup);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = DWT(e1);
+          dest -= DWT(e2);
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
+template <typename URV>
 void
 Hart<URV>::execVwsubu_vx(const DecodedInst* di)
 {
@@ -1319,10 +1354,10 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vwadd_vx<uint8_t>(vd, vs1, -uint8_t(e2), group, start, elems, masked); break;
-    case EW::Half: vwadd_vx<uint16_t>(vd, vs1, -uint16_t(e2), group, start, elems, masked); break;
-    case EW::Word: vwadd_vx<uint32_t>(vd, vs1, -uint32_t(e2), group, start, elems, masked); break;
-    case EW::Word2: vwadd_vx<uint64_t>(vd, vs1, -uint64_t(e2), group, start, elems, masked); break;
+    case EW::Byte: vwsub_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half: vwsub_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word: vwsub_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -1363,10 +1398,10 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vwadd_vx<int8_t>(vd, vs1, -e2, group, start, elems, masked); break;
-    case EW::Half: vwadd_vx<int16_t>(vd, vs1, -e2, group, start, elems, masked); break;
-    case EW::Word: vwadd_vx<int32_t>(vd, vs1, -e2, group, start, elems, masked); break;
-    case EW::Word2: vwadd_vx<int64_t>(vd, vs1, -e2, group, start, elems, masked); break;
+    case EW::Byte:  vwsub_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:  vwsub_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:  vwsub_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word2:  illegalInst(di); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
