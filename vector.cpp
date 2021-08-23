@@ -8065,7 +8065,7 @@ Hart<URV>::vwmulu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -8143,7 +8143,7 @@ Hart<URV>::vwmulu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
@@ -8222,7 +8222,7 @@ Hart<URV>::vwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group);
+	  vecRegs_.touchReg(vd, wideGroup);
 	  continue;
 	}
 
