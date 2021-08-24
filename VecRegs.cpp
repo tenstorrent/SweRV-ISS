@@ -31,7 +31,8 @@ VecRegs::VecRegs()
   for (auto& groupFlags : legalConfigs_)
     groupFlags.resize(size_t(VecEnums::GroupLimit));
 
-  // Temporary, for testing, make all combinations legal. FIX.
+  // Start by making all combinations of width/grouping legal. This
+  // gets adjusted when config method is called.
   for (auto& groupFlags : legalConfigs_)
     groupFlags.assign(groupFlags.size(), true);
 
@@ -108,6 +109,19 @@ VecRegs::config(unsigned bytesPerReg, unsigned bytesPerElem)
   bytesPerReg_ = bytesPerReg;
   bytesPerElem_ = bytesPerElem;
   bytesInRegFile_ = regCount_ * bytesPerReg_;
+
+  // Make illegal all group entries for element-widths greater than
+  // the max-element-width (which is in bytesPerElem_).
+  for (unsigned i = 0; i <= unsigned(ElementWidth::Word32); ++i)
+    {
+      ElementWidth ew = ElementWidth(i);
+      unsigned bytes = VecRegs::elementWidthInBytes(ew);
+      if (bytes > bytesPerElem_)
+	{
+	  auto& groupFlags = legalConfigs_.at(size_t(ew));
+	  groupFlags.assign(groupFlags.size(), false);
+	}
+    }
 
   delete [] data_;
   data_ = new uint8_t[bytesInRegFile_];

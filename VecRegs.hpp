@@ -476,7 +476,7 @@ namespace WdRiscv
   private:
 
     /// Map an vector group multiplier to a flag indicating whether given
-    /// group is supporte.
+    /// group is supported.
     typedef std::vector<bool> GroupFlags;
 
     /// Map an element width to a vector of flags indicating supported groups.
