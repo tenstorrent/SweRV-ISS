@@ -528,13 +528,13 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
     {  // Vector load store
       std::string name = di.instEntry()->name();
       if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
-	name = insertFieldCountInName(name, di.op2(), 2);
+	name = insertFieldCountInName(name, di.vecFieldCount(), 2);
       else if (id >= InstId::vlsege8_v and id <= InstId::vssege1024_v)
-	name = insertFieldCountInName(name, di.op2(), 5);
+	name = insertFieldCountInName(name, di.vecFieldCount(), 5);
       else if (id >= InstId::vlssege8_v and id <= InstId::vsssege1024_v)
-	name = insertFieldCountInName(name, di.op3(), 6);
+	name = insertFieldCountInName(name, di.vecFieldCount(), 6);
       else if (id >= InstId::vluxsegei8_v and id <= InstId::vsoxsegei1024_v)
-	name = insertFieldCountInName(name, di.op3(), 7);
+	name = insertFieldCountInName(name, di.vecFieldCount(), 7);
       out << name << " v" << di.op0();
       out << ", ("  << hart.intRegName(di.op1()) << ")";
       if (di.operandCount() == 3)

@@ -26,6 +26,9 @@ template <typename URV>
 void
 Hart<URV>::decode(URV addr, uint32_t inst, DecodedInst& di)
 {
+  // For vector load/store ops, op3 captures the number of fields
+  // (non-zero for segmented, and whole-register ld/st).
+
   uint32_t op0 = 0, op1 = 0, op2 = 0, op3 = 0;
 
   const InstEntry& entry = decode(inst, op0, op1, op2, op3);
@@ -37,6 +40,7 @@ Hart<URV>::decode(URV addr, uint32_t inst, DecodedInst& di)
     {
       bool masked = ((inst >> 25) & 1) == 0;  // Bit 25 of instruction
       di.setMasked(masked);
+      di.setVecFieldCount(op3);
     }
 }
 
@@ -785,7 +789,7 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 
 template <typename URV>
 const InstEntry&
-Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& op3)
+Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   unsigned mop = (imm12 >> 6) & 3;     // Bits 6 & 7 of imm12
@@ -815,7 +819,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
 	    }
 	  else
 	    {
-	      op2 = 1 + nf;   // number of fields in segment.
+	      fieldCount = 1 + nf;   // number of fields in segment.
 	      if (mew == 0)
 		{
 		  if (f3 == 0) return instTable_.getEntry(InstId::vlsege8_v);
@@ -836,7 +840,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
         {   // load whole registers
 	  if (nf != 0 and nf != 1 and nf != 3 and nf != 7)
 	    return instTable_.getEntry(InstId::illegal);
-          op2 = nf + 1;
+          fieldCount = nf + 1;
 
           if (mew == 0)
             {
@@ -886,7 +890,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
 	}
       else
 	{
-	  op3 = 1 + nf;  // number of fieldsin sgemtent
+	  fieldCount = 1 + nf;  // number of fields in sgement
 	  if (mew == 0)
 	    {
 	      if (f3 == 0) return instTable_.getEntry(InstId::vluxsegei8_v);
@@ -918,7 +922,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
 	}
       else
 	{
-	  op3 = 1 + nf;   // number of fields in segment.
+	  fieldCount = 1 + nf;   // number of fields in segment.
 	  if (mew == 0)
 	    {
 	      if (f3 == 0) return instTable_.getEntry(InstId::vlssege8_v);
@@ -950,7 +954,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
 	}
       else
 	{
-	  op3 = 1 + nf;
+	  fieldCount = 1 + nf;
 	  if (mew == 0)
 	    {
 	      if (f3 == 0) return instTable_.getEntry(InstId::vloxsegei8_v);
@@ -967,7 +971,7 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& o
 
 template <typename URV>
 const InstEntry&
-Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& op3)
+Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   // unsigned vm = (imm12 >> 5) & 1;      // Bit 5 of imm12
@@ -998,7 +1002,7 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
 	    }
 	  else
 	    {
-	      op2 = 1 + nf;   // Number of fields in segment
+	      fieldCount = 1 + nf;   // Number of fields in segment
 	      if (mew == 0)
 		{
 		  if (f3 == 0) return instTable_.getEntry(InstId::vssege8_v);
@@ -1042,7 +1046,7 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
 	}
       else
 	{
-	  op3 = 1 + nf; // Number of fields in sgemtent
+	  fieldCount = 1 + nf; // Number of fields in sgemtent
 	  if (mew == 0)
 	    {
 	      if (f3 == 0) return instTable_.getEntry(InstId::vsuxsegei8_v);
@@ -1074,7 +1078,7 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
 	}
       else
 	{
-	  op3 = 1 + nf;   // Number of fields in segment.
+	  fieldCount = 1 + nf;   // Number of fields in segment.
 	  if (mew == 0)
 	    {
 	      if (f3 == 0) return instTable_.getEntry(InstId::vsssege8_v);
@@ -1106,7 +1110,7 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& op2, uint32_t& 
 	}
       else
 	{
-	  op3 = 1 + nf;  // number of fields in segment
+	  fieldCount = 1 + nf;  // number of fields in segment
 	  if (mew == 0)
 	    {
 	      if (f3 == 0) return instTable_.getEntry(InstId::vsoxsegei8_v);
@@ -1897,13 +1901,13 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         else
           op2 = iform.rs2();  // vector load
 
-        if (f3 == 0)  return decodeVecLoad(f3, iform.uimmed(), op2, op3);
+        if (f3 == 0)  return decodeVecLoad(f3, iform.uimmed(), op3);
 	if (f3 == 1)  return instTable_.getEntry(InstId::flh);
 	if (f3 == 2)  return instTable_.getEntry(InstId::flw);
 	if (f3 == 3)  return instTable_.getEntry(InstId::fld);
-        if (f3 == 5)  return decodeVecLoad(f3, iform.uimmed(), op2, op3);
-        if (f3 == 6)  return decodeVecLoad(f3, iform.uimmed(), op2, op3);
-        if (f3 == 7)  return decodeVecLoad(f3, iform.uimmed(), op2, op3);
+        if (f3 == 5)  return decodeVecLoad(f3, iform.uimmed(), op3);
+        if (f3 == 6)  return decodeVecLoad(f3, iform.uimmed(), op3);
+        if (f3 == 7)  return decodeVecLoad(f3, iform.uimmed(), op3);
       }
       return instTable_.getEntry(InstId::illegal);
 
@@ -1939,13 +1943,13 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             op2 = sform.rs2();
           }
 
-        if (f3 == 0)  return decodeVecStore(f3, sform.vbits.imm12, op2, op3);
+        if (f3 == 0)  return decodeVecStore(f3, sform.vbits.imm12, op3);
 	if (f3 == 1)  return instTable_.getEntry(InstId::fsh);
 	if (f3 == 2)  return instTable_.getEntry(InstId::fsw);
 	if (f3 == 3)  return instTable_.getEntry(InstId::fsd);
-        if (f3 == 5)  return decodeVecStore(f3, sform.vbits.imm12, op2, op3);
-        if (f3 == 6)  return decodeVecStore(f3, sform.vbits.imm12, op2, op3);
-        if (f3 == 7)  return decodeVecStore(f3, sform.vbits.imm12, op2, op3);
+        if (f3 == 5)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+        if (f3 == 6)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+        if (f3 == 7)  return decodeVecStore(f3, sform.vbits.imm12, op3);
       }
       return instTable_.getEntry(InstId::illegal);
 

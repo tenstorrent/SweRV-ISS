@@ -3547,17 +3547,17 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       if (instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v)
 	{
 	  vecReg = di.op0();
-	  groupSize = groupSize*di.op2();  // Scale by field count
+	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
 	}
       else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
 	{
 	  vecReg = di.op0();
-	  groupSize = groupSize*di.op3();  // Scale by field count
+	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
 	}
       else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
 	{
 	  vecReg = di.op0();
-	  groupSize = groupSize*di.op3();  // Scale by field count
+	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
 	}
 
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)

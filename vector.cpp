@@ -13745,7 +13745,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   vecLdStAddr_.clear();
   vecStData_.clear();
 
-  unsigned groupX8 = di->op2() * 8;
+  unsigned groupX8 = di->vecFieldCount() * 8;
   GroupMultiplier gm = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, gm);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
@@ -14740,7 +14740,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege8_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
   vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
 }
@@ -14750,7 +14750,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege16_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
   vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
 }
@@ -14760,7 +14760,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege32_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
   vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
 }
@@ -14770,7 +14770,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege64_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
   vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
 }
@@ -14896,7 +14896,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege8_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
   vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
 }
@@ -14906,7 +14906,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege16_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
   vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
 }
@@ -14916,7 +14916,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege32_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
   vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
 }
@@ -14926,7 +14926,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege64_v(const DecodedInst* di)
 {
-  unsigned fieldCount = di->op2();
+  unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
   vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
 }
@@ -14969,7 +14969,7 @@ void
 Hart<URV>::execVlssege8_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
 }
 
@@ -14979,7 +14979,7 @@ void
 Hart<URV>::execVlssege16_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
 }
 
@@ -14989,7 +14989,7 @@ void
 Hart<URV>::execVlssege32_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
 }
 
@@ -14999,7 +14999,7 @@ void
 Hart<URV>::execVlssege64_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
 }
 
@@ -15041,7 +15041,7 @@ void
 Hart<URV>::execVsssege8_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
 }
 
@@ -15051,7 +15051,7 @@ void
 Hart<URV>::execVsssege16_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
 }
 
@@ -15061,7 +15061,7 @@ void
 Hart<URV>::execVsssege32_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
 }
 
@@ -15071,7 +15071,7 @@ void
 Hart<URV>::execVsssege64_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
-  unsigned fieldCount = di->op3();
+  unsigned fieldCount = di->vecFieldCount();
   vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
 }
 
@@ -15143,7 +15143,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
-  unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->op3();
+  unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
 
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg > 32)
@@ -15317,7 +15317,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   uint64_t addr = intRegs_.read(rs1);
 
   unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
-  unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->op3();
+  unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
 
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg > 32)
