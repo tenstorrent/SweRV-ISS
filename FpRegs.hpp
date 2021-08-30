@@ -183,6 +183,7 @@ namespace WdRiscv
   };
 
 
+  /// Model a half-precision floating point number.
   class Float16
   {
   public:
@@ -495,6 +496,11 @@ namespace WdRiscv
     void setLastFpFlags(unsigned flags)
     { lastFpFlags_ = flags; }
 
+    /// Set width of floating point register (flen). Internal
+    /// representation always uses 64-bits. If flen is set to 32 then
+    /// nan-boxing is not done. Return true on success and false
+    /// on failure (fail if length is neither 32 or 64).
+    /// Flen should not be set to 32 if D extension is enabled.
     bool setFlen(unsigned length)
     {
       if (length != 32 and length != 64)
@@ -506,7 +512,8 @@ namespace WdRiscv
 
   private:
 
-    // Union of double and single precision numbers used for NAN boxing.
+    // Union of double, single, and half precision numbers used for
+    // NAN boxing.
     union FpUnion
     {
       FpUnion(double x)   : dp(x)  { }
