@@ -144,7 +144,7 @@ FpRegs::FpRegs(unsigned regCount)
     {
       std::string name = "f" + std::to_string(ix);
       nameToNumber_[name] = FpRegNumber(ix);
-      numberToName_[ix] = name;
+      numberToName_.at(ix) = name;
     }
 
   numberToAbiName_ = { "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7",
