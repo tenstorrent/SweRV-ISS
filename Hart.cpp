@@ -4577,10 +4577,6 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
   std::string instStr;
   instStr.reserve(128);
 
-  // Need csr history when tracing or for triggers
-  bool trace = traceFile != nullptr or enableTriggers_;
-  clearTraceData();
-
   uint64_t limit = instCountLim_;
   bool doStats = instFreq_ or enableCounters_;
 
@@ -4594,6 +4590,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
     {
       if (userStop)
         break;
+      clearTraceData();
 
       if (enableGdb_ and ++gdbCount >= gdbLimit)
         {
@@ -4634,13 +4631,9 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 	  ++instCounter_;
 
           if (processExternalInterrupt(traceFile, instStr))
-            continue;
-
+            continue;  // Next instruction in trap handler.
           if (not fetchInstWithTrigger(pc_, inst, traceFile))
-            {
-	      clearTraceData();
-              continue;  // Next instruction in trap handler.
-            }
+	    continue;  // Next instruction in trap handler.
 
 	  // Decode unless match in decode cache.
 	  uint32_t ix = (pc_ >> 1) & decodeCacheMask_;
@@ -4659,10 +4652,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
               if (doStats)
                 accumulateInstructionStats(*di);
 	      if (traceFile)
-		{
-		  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
-		  clearTraceData();
-		}
+		printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 	      continue;
 	    }
 
@@ -4679,13 +4669,8 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 
 	  if (doStats)
 	    accumulateInstructionStats(*di);
-
-	  if (trace)
-	    {
-	      if (traceFile)
-		printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
-	      clearTraceData();
-	    }
+	  if (traceFile)
+	    printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 
 	  bool icountHit = (enableTriggers_ and
 			    icountTriggerHit(privMode_, isInterruptEnabled()));
