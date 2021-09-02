@@ -3756,6 +3756,20 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
     }
 
   // Changed CSR register(s).
+  std::vector<CsrNumber> csrns;
+  std::vector<unsigned> triggers;
+  lastCsr(csrns, triggers);
+  for (auto csrn : csrns)
+    {
+      URV val = 0;
+      peekCsr(csrn, val);
+      auto csr = csRegs_.getImplementedCsr(csrn);
+      if (csr)
+	{
+	  fprintf(out, "%s%s=%lx", sep, csr->getName().c_str(), uint64_t(val));
+	  sep = ";";
+	}
+    }
 
   // Changed vector register group.
   unsigned groupX8 = 8;
