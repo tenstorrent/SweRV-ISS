@@ -252,7 +252,7 @@ namespace WdRiscv
 
     /// Set the sign bit of this number.
     void setSign()
-    { i16 &= uint16_t(0x8000); }
+    { i16 |= uint16_t(0x8000); }
 
     /// Set the sign bit of this number to bit0 of the given number.
     void setSign(unsigned n)
