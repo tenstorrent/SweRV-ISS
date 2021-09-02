@@ -447,6 +447,7 @@ Hart<URV>::execFlw(const DecodedInst* di)
   URV virtAddr = base + imm;
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
   uint64_t addr = virtAddr;
   unsigned ldSize = 4;
@@ -474,6 +475,7 @@ Hart<URV>::execFlw(const DecodedInst* di)
         initiateLoadException(cause, virtAddr, secCause);
       return;
     }
+  ldStPhysAddr_ = addr;
 #endif
 
   uint32_t word = 0;
@@ -1741,6 +1743,7 @@ Hart<URV>::execFld(const DecodedInst* di)
   URV virtAddr = base + imm;
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
   unsigned ldSize = 8;
   uint64_t addr = virtAddr;
@@ -1768,6 +1771,7 @@ Hart<URV>::execFld(const DecodedInst* di)
         initiateLoadException(cause, virtAddr, secCause);
       return;
     }
+  ldStPhysAddr_ = addr;
 #endif
 
   uint64_t val64 = 0;
@@ -2789,6 +2793,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
   URV virtAddr = base + imm;
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
+  ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
   uint64_t addr = virtAddr;
   unsigned ldSize = 2;
@@ -2816,6 +2821,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
         initiateLoadException(cause, virtAddr, secCause);
       return;
     }
+  ldStPhysAddr_ = addr;
 #endif
 
   uint16_t half = 0;

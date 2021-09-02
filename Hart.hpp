@@ -3798,6 +3798,7 @@ namespace WdRiscv
 
     bool traceLdSt_ = false;        // Trace addr of ld/st insts if true.
     URV ldStAddr_ = 0;              // Address of data of most recent ld/st inst.
+    uint64_t ldStPhysAddr_ = 0;
     bool ldStAddrValid_ = false;    // True if ldStAddr_ valid.
     std::vector<uint64_t> vecLdStAddr_;  // Addresses of vector load/store instruction
     std::vector<uint64_t> vecStData_;  // Data of vector store instruction

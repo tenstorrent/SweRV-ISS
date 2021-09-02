@@ -1942,6 +1942,7 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
   unsigned ldSize = sizeof(LOAD_TYPE);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
 
   if (loadQueueEnabled_)
@@ -1967,6 +1968,7 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
       initiateLoadException(cause, virtAddr, secCause);
       return false;
     }
+  ldStPhysAddr_ = addr;
 
   if (wideLdSt_ and not triggerTripped_)
     return wideLoad(rd, addr);
@@ -2082,6 +2084,7 @@ Hart<URV>::store(uint32_t rs1, URV base, URV virtAddr, STORE_TYPE storeVal)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
 
   // ld/st-address or instruction-address triggers have priority over
@@ -2100,6 +2103,7 @@ Hart<URV>::store(uint32_t rs1, URV base, URV virtAddr, STORE_TYPE storeVal)
   bool forcedFail = false;
   ExceptionCause cause = determineStoreException(rs1, base, addr, maskedVal,
                                                  secCause, forcedFail);
+  ldStPhysAddr_ = addr;
 
   // Consider store-data trigger if there is no trap or if the trap is
   // due to an external cause.
@@ -3717,7 +3721,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
   std::lock_guard<std::mutex> guard(printInstTraceMutex);
 
   if (instCounter_ == 1)
-    fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilegege, trap, disassebly\n");
+    fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilegege, trap, disassembly\n");
 
   // Program counter.
   uint64_t virtPc = di.address(), physPc = di.physAddress();
@@ -3791,7 +3795,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
     }
 
   // Source operands.
-  fprintf(out, ",");
+  fputc(',', out);
   auto instEntry = di.instEntry();
   sep = "";
   for (unsigned i = 0; i < di.operandCount(); ++i)
@@ -3815,15 +3819,58 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
     }
 
   // Memory
-  fprintf(out, ",,");
+  fputc(',', out);
+  bool load = false, store = false;
+  if (ldStAddrValid_)
+    {
+      fprintf(out, "%lx", uint64_t(ldStAddr_));
+      if (ldStPhysAddr_ != ldStAddr_)
+	fprintf(out, ":%lx", ldStPhysAddr_);
+      uint64_t addr = 0, val = 0;
+      if (lastMemory(addr, val))
+	{
+	  store = true;
+	  fprintf(out, "=%lx", val);
+	}
+      else
+	load = true;
+    }
 
   // Instruction information.
-  fprintf(out, ",");
+  fputc(',', out);
+  InstType type = instEntry->type();
+  if (load)
+    fputc('l', out);
+  else if (store)
+    fputc('s', out);
+  else if (instEntry->isBranch())
+    {
+      if (instEntry->isConditionalBranch())
+	fputs(lastBranchTaken_ ? "t" : "nt", out);
+      else
+	{
+	  if (instEntry->isBranchToRegister() and
+	      di.op0() == IntRegNumber::RegRa)
+	    fputc('r', out);
+	  else if (di.op0() == IntRegNumber::RegRa)
+	    fputc('c', out);
+	  else if (di.ithOperandType(0) == OperandType::Imm)
+	    fputc('j', out);
+	}
+    }
+  else if (type == InstType::Fp)
+    fputc('f', out);
+  else if (type == InstType::Vector)
+    fputc('v', out);
+  else if (type == InstType::Atomic)
+    fputc('a', out);
+	   
 
   // Privilege mode.
-  if      (lastPriv_ == PrivilegeMode::Machine)    fprintf(out, "m");
-  else if (lastPriv_ == PrivilegeMode::Supervisor) fprintf(out, "s");
-  else if (lastPriv_ == PrivilegeMode::User)       fprintf(out, "u");
+  if      (lastPriv_ == PrivilegeMode::Machine)    fputs(",m", out);
+  else if (lastPriv_ == PrivilegeMode::Supervisor) fputs(",s", out);
+  else if (lastPriv_ == PrivilegeMode::User)       fputs(",u", out);
+  else                                             fputs(",",  out);
 
   // Interrupt/exception cause.
   if (interrupt)
@@ -3833,13 +3880,14 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
       fprintf(out, ",%lx,", uint64_t(cause));
     }
   else
-    fprintf(out, ",,");
+    fputs(",,", out);
 
   // Disassembly.
   std::string tmp;
   disassembleInst(di, tmp);
   std::replace(tmp.begin(), tmp.end(), ',', ';');
-  fprintf(out, "%s\n", tmp.c_str());
+  fputs(tmp.c_str(), out);
+  fputc('\n', out);
 }
 
 
