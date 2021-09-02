@@ -455,7 +455,7 @@ namespace WdRiscv
 
     /// Similar to the precedning decode method but with decoded data
     /// placed in the given DecodedInst object.
-    void decode(URV address, uint32_t inst, DecodedInst& decodedInst);
+    void decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& decodedInst);
 
     /// Return the 32-bit instruction corresponding to the given 16-bit
     /// compressed instruction. Return an illegal 32-bit opcode if given
@@ -1323,6 +1323,9 @@ namespace WdRiscv
     void forceSubnormalToZero(bool flag)
     { subnormToZero_ = flag; }
 
+    void enableCsvLog(bool flag)
+    { csvTrace_ = flag; }
+
     void genVec();
 
   protected:
@@ -1666,22 +1669,26 @@ namespace WdRiscv
     // using this method.
     void updatePerformanceCountersForCsr(const DecodedInst& di);
 
-    /// Fetch an instruction. Return true on success. Return false on
-    /// fail (in which case an exception is initiated). May fetch a
-    /// compressed instruction (16-bits) in which case the upper 16
-    /// bits are not defined (may contain arbitrary values).
-    bool fetchInst(URV address, uint32_t& instr);
+    /// Fetch an instruction from the given virtual address. Return
+    /// true on success. Return false on fail (in which case an
+    /// exception is initiated). May fetch a compressed instruction
+    /// (16-bits) in which case the upper 16 bits are not defined (may
+    /// contain arbitrary values). If successful set pysAddr to the
+    /// physical address corresponding to the given virtual address.
+    bool fetchInst(URV virAddr, uint64_t& physAddr, uint32_t& instr);
 
     /// Heler to the run methods: Fetch an instruction taking debug triggers
     /// into consideration. Return true if successful. Return false if
     /// instruction fetch fails (an exception is signaled in that case).
-    bool fetchInstWithTrigger(URV address, uint32_t& inst, FILE* trace);
+    bool fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
+			      FILE* trace);
 
     /// Helper to fetchInstWithTrigger. Fetch an instruction given
     /// that a trigger has tripped. Return true on success. Return
     /// false on a a fail in which case either a trigger exception is
     /// initiated (as opposed to an instruction-fail exception).
-    bool fetchInstPostTrigger(URV address, uint32_t& inst, FILE* trace);
+    bool fetchInstPostTrigger(URV virtAddr, uint64_t& physAddr, uint32_t& inst,
+			      FILE* trace);
 
     /// Write trace information about the given instruction to the
     /// given file. This is assumed to be called after instruction
@@ -1696,6 +1703,8 @@ namespace WdRiscv
     /// then a zero (illegal) value is required.
     void printInstTrace(uint32_t instruction, uint64_t tag, std::string& tmp,
 			FILE* out, bool interrupt = false);
+
+    void printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt = false);
 
     /// Start a synchronous exceptions.
     void initiateException(ExceptionCause cause, URV pc, URV info,
@@ -3748,6 +3757,8 @@ namespace WdRiscv
     // same type.
     bool eaCompatWithBase_ = false;
 
+    bool csvTrace_ = false;      // Print trace in CSV format.
+
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
     URV      fcsrValue_ = 0;     // Proxy for FCSR.
@@ -3787,6 +3798,7 @@ namespace WdRiscv
 
     bool traceLdSt_ = false;        // Trace addr of ld/st insts if true.
     URV ldStAddr_ = 0;              // Address of data of most recent ld/st inst.
+    uint64_t ldStPhysAddr_ = 0;
     bool ldStAddrValid_ = false;    // True if ldStAddr_ valid.
     std::vector<uint64_t> vecLdStAddr_;  // Addresses of vector load/store instruction
     std::vector<uint64_t> vecStData_;  // Data of vector store instruction

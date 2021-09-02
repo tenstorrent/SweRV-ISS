@@ -216,6 +216,7 @@ struct Args
   bool verbose = false;
   bool version = false;
   bool traceLdSt = false;  // Trace ld/st data address if true.
+  bool csv = false;        // Log files in CSV format when true.
   bool triggers = false;   // Enable debug triggers when true.
   bool counters = false;   // Enable performance counters when true.
   bool gdb = false;        // Enable gdb mode when true.
@@ -421,6 +422,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "HEX file to load into simulator memory.")
 	("logfile,f", po::value(&args.traceFile),
 	 "Enable tracing to given file of executed instructions.")
+	("csvlog", po::bool_switch(&args.csv),
+	 "Enable CSV format for log file.")
 	("consoleoutfile", po::value(&args.consoleOutFile),
 	 "Redirect console output to given file.")
 	("commandlog", po::value(&args.commandLogFile),
@@ -1212,6 +1215,9 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
       std::cerr << "Warning: Target program options present which requires\n"
 		<< "         the use of --newlib/--linux. Options ignored.\n";
     }
+
+  if (args.csv)
+    hart.enableCsvLog(args.csv);
 
   return errors == 0;
 }

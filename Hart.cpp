@@ -925,7 +925,9 @@ Hart<URV>::genVec()
   for (uint32_t i = 0; i <= 0x1ffffff; ++i)
     {
       uint32_t code = (i << 7) | vc;
-      decode(0, code, di);
+      URV pc = 0;
+      uint64_t physPc = pc;
+      decode(pc, physPc, code, di);
       mstatusFs_ = FpFs::Clean;
       mstatusVs_ = FpFs::Clean;
       auto instId = di.instEntry()->instId();
@@ -935,8 +937,8 @@ Hart<URV>::genVec()
 	continue;
       else if (di.instEntry()->isVector())
 	{
-	  pokePc(0);
-	  pokeMemory(0, code, false);
+	  pokePc(pc);
+	  pokeMemory(pc, code, false);
 	  execute(&di);
 	  if (exceptionCount_)
 	    exceptionCount_ = 0;
@@ -1940,6 +1942,7 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
   unsigned ldSize = sizeof(LOAD_TYPE);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
 
   if (loadQueueEnabled_)
@@ -1965,6 +1968,7 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
       initiateLoadException(cause, virtAddr, secCause);
       return false;
     }
+  ldStPhysAddr_ = addr;
 
   if (wideLdSt_ and not triggerTripped_)
     return wideLoad(rd, addr);
@@ -2080,6 +2084,7 @@ Hart<URV>::store(uint32_t rs1, URV base, URV virtAddr, STORE_TYPE storeVal)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
 
   // ld/st-address or instruction-address triggers have priority over
@@ -2098,6 +2103,7 @@ Hart<URV>::store(uint32_t rs1, URV base, URV virtAddr, STORE_TYPE storeVal)
   bool forcedFail = false;
   ExceptionCause cause = determineStoreException(rs1, base, addr, maskedVal,
                                                  secCause, forcedFail);
+  ldStPhysAddr_ = addr;
 
   // Consider store-data trigger if there is no trap or if the trap is
   // due to an external cause.
@@ -2442,7 +2448,7 @@ Hart<URV>::configMemoryDataAccess(const std::vector< std::pair<URV,URV> >& windo
 template <typename URV>
 inline
 bool
-Hart<URV>::fetchInst(URV virtAddr, uint32_t& inst)
+Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 {
   uint64_t addr = virtAddr;
 
@@ -2461,6 +2467,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint32_t& inst)
           return false;
         }
     }
+  physAddr = virtAddr;
 
   if (virtAddr & 1)
     {
@@ -2609,9 +2616,10 @@ Hart<URV>::fetchInst(URV virtAddr, uint32_t& inst)
 
 template <typename URV>
 bool
-Hart<URV>::fetchInstPostTrigger(URV virtAddr, uint32_t& inst, FILE* traceFile)
+Hart<URV>::fetchInstPostTrigger(URV virtAddr, uint64_t& physAddr,
+				uint32_t& inst, FILE* traceFile)
 {
-  if (fetchInst(virtAddr, inst))
+  if (fetchInst(virtAddr, physAddr, inst))
     return true;
 
   // Fetch failed: take pending trigger-exception.
@@ -3460,8 +3468,12 @@ void
 Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
 			  FILE* out, bool interrupt)
 {
+  if (not out)
+    return;
+
   DecodedInst di;
-  decode(pc_, inst, di);
+  uint64_t physPc = pc_;
+  decode(pc_, physPc, inst, di);
 
   printDecodedInstTrace(di, tag, tmp, out, interrupt);
 }
@@ -3472,6 +3484,15 @@ void
 Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::string& tmp,
                                  FILE* out, bool interrupt)
 {
+  if (not out)
+    return;
+
+  if (csvTrace_)
+    {
+      printInstCsvTrace(di, out, interrupt);
+      return;
+    }
+
   // Serialize to avoid jumbled output.
   std::lock_guard<std::mutex> guard(printInstTraceMutex);
 
@@ -3686,6 +3707,201 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 			  tmp.c_str());
       fprintf(out, "\n");
     }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
+{
+  if (not out)
+    return;
+
+  // Serialize to avoid jumbled output.
+  std::lock_guard<std::mutex> guard(printInstTraceMutex);
+
+  if (instCounter_ == 1)
+    fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilegege, trap, disassembly\n");
+
+  // Program counter.
+  uint64_t virtPc = di.address(), physPc = di.physAddress();
+  fprintf(out, "%lx", virtPc);
+  if (physPc != virtPc)
+    fprintf(out, ":%lx", physPc);
+
+  // Instruction.
+  fprintf(out, ",%x,", di.inst());
+
+  // Changed integer register.
+  int reg = intRegs_.getLastWrittenReg();
+  uint64_t val64 = 0;
+  const char* sep = "";
+  if (reg > 0)
+    {
+      val64 = intRegs_.read(reg);
+      fprintf(out, "x%d=%lx", reg, val64);
+      sep = ";";
+    }
+
+  // Changed fp register.
+  reg = fpRegs_.getLastWrittenReg();
+  if (reg >= 0)
+    {
+      val64 = fpRegs_.readBitsRaw(reg);
+      if (isRvd())
+	fprintf(out, "%sf%d=%lx", sep, reg, val64);
+      else
+	fprintf(out, "%sf%d=%x", sep, reg, uint32_t(val64));
+      sep = ";";
+    }
+
+  // Changed CSR register(s).
+  std::vector<CsrNumber> csrns;
+  std::vector<unsigned> triggers;
+  lastCsr(csrns, triggers);
+  for (auto csrn : csrns)
+    {
+      URV val = 0;
+      peekCsr(csrn, val);
+      auto csr = csRegs_.getImplementedCsr(csrn);
+      if (csr)
+	{
+	  fprintf(out, "%s%s=%lx", sep, csr->getName().c_str(), uint64_t(val));
+	  sep = ";";
+	}
+    }
+
+  // Changed vector register group.
+  unsigned groupX8 = 8;
+  int vecReg = vecRegs_.getLastWrittenReg(groupX8);
+  if (vecReg >= 0)
+    {
+      // We want to report all the registers in the group.
+      unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
+      vecReg = vecReg - (vecReg % groupSize);
+
+      InstId instId = di.instEntry()->instId();
+      if (instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v)
+	{
+	  vecReg = di.op0();
+	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
+	}
+      else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
+	{
+	  vecReg = di.op0();
+	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
+	}
+      else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
+	{
+	  vecReg = di.op0();
+	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
+	}
+
+      for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
+	{
+	  fprintf(out, "%sv%d=", sep, vecReg);
+	  const uint8_t* data = vecRegs_.getVecData(vecReg);
+	  unsigned byteCount = vecRegs_.bytesPerRegister();
+	  for (unsigned i = 0; i < byteCount; ++i)
+	    fprintf(out, "%02x", data[byteCount - 1 - i]);
+	}
+      sep = ";";
+    }
+
+  // Source operands.
+  fputc(',', out);
+  auto instEntry = di.instEntry();
+  sep = "";
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      auto mode = instEntry->ithOperandMode(i);
+      auto type = instEntry->ithOperandType(i);
+      if (mode == OperandMode::Read or mode == OperandMode::ReadWrite or
+	  type == OperandType::Imm)
+	{
+	  if      (type ==  OperandType::IntReg)
+	    { fprintf(out, "%sx%d", sep, di.ithOperand(i)); sep = ";"; }
+	  else if (type ==  OperandType::FpReg)
+	    { fprintf(out, "%sf%d", sep, di.ithOperand(i)); sep = ";"; }
+	  else if (type == OperandType::CsReg)
+	    { fprintf(out, "%sc%d", sep, di.ithOperand(i)); sep = ";"; }
+	  else if (type == OperandType::VecReg)
+	    { fprintf(out, "%sv%d", sep, di.ithOperand(i)); sep = ";"; }
+	  else if (type == OperandType::Imm)
+	    { fprintf(out, "%s%x", sep, di.ithOperand(i)); sep = ";"; }
+	}
+    }
+
+  // Memory
+  fputc(',', out);
+  bool load = false, store = false;
+  if (ldStAddrValid_)
+    {
+      fprintf(out, "%lx", uint64_t(ldStAddr_));
+      if (ldStPhysAddr_ != ldStAddr_)
+	fprintf(out, ":%lx", ldStPhysAddr_);
+      uint64_t addr = 0, val = 0;
+      if (lastMemory(addr, val))
+	{
+	  store = true;
+	  fprintf(out, "=%lx", val);
+	}
+      else
+	load = true;
+    }
+
+  // Instruction information.
+  fputc(',', out);
+  InstType type = instEntry->type();
+  if (load)
+    fputc('l', out);
+  else if (store)
+    fputc('s', out);
+  else if (instEntry->isBranch())
+    {
+      if (instEntry->isConditionalBranch())
+	fputs(lastBranchTaken_ ? "t" : "nt", out);
+      else
+	{
+	  if (instEntry->isBranchToRegister() and
+	      di.op0() == IntRegNumber::RegRa)
+	    fputc('r', out);
+	  else if (di.op0() == IntRegNumber::RegRa)
+	    fputc('c', out);
+	  else if (di.ithOperandType(0) == OperandType::Imm)
+	    fputc('j', out);
+	}
+    }
+  else if (type == InstType::Fp)
+    fputc('f', out);
+  else if (type == InstType::Vector)
+    fputc('v', out);
+  else if (type == InstType::Atomic)
+    fputc('a', out);
+	   
+
+  // Privilege mode.
+  if      (lastPriv_ == PrivilegeMode::Machine)    fputs(",m", out);
+  else if (lastPriv_ == PrivilegeMode::Supervisor) fputs(",s", out);
+  else if (lastPriv_ == PrivilegeMode::User)       fputs(",u", out);
+  else                                             fputs(",",  out);
+
+  // Interrupt/exception cause.
+  if (interrupt)
+    {
+      URV cause = 0;
+      peekCsr(CsrNumber::MCAUSE, cause);
+      fprintf(out, ",%lx,", uint64_t(cause));
+    }
+  else
+    fputs(",,", out);
+
+  // Disassembly.
+  std::string tmp;
+  disassembleInst(di, tmp);
+  std::replace(tmp.begin(), tmp.end(), ',', ';');
+  fputs(tmp.c_str(), out);
+  fputc('\n', out);
 }
 
 
@@ -4474,13 +4690,11 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
     {
       if (minstretEnabled())
         retiredInsts_++;
-      if (traceFile)
-	{
-	  uint32_t inst = 0;
-	  readInst(currPc_, inst);
-	  std::string instStr;
-	  printInstTrace(inst, counter, instStr, traceFile);
-	}
+
+      uint32_t inst = 0;
+      readInst(currPc_, inst);
+      std::string instStr;
+      printInstTrace(inst, counter, instStr, traceFile);
     }
 
   using std::cerr;
@@ -4519,7 +4733,8 @@ isInputPending(int fd)
 template <typename URV>
 inline
 bool
-Hart<URV>::fetchInstWithTrigger(URV addr, uint32_t& inst, FILE* file)
+Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
+				FILE* file)
 {
   // Process pre-execute address trigger and fetch instruction.
   bool hasTrig = hasActiveInstTrigger();
@@ -4530,7 +4745,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint32_t& inst, FILE* file)
   bool fetchOk = true;
   if (triggerTripped_)
     {
-      if (not fetchInstPostTrigger(addr, inst, file))
+      if (not fetchInstPostTrigger(addr, physAddr, inst, file))
         {
           ++cycleCount_;
           return false;  // Next instruction in trap handler.
@@ -4541,18 +4756,16 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint32_t& inst, FILE* file)
       uint32_t ix = (addr >> 1) & decodeCacheMask_;
       DecodedInst* di = &decodeCache_[ix];
       if (not di->isValid() or di->address() != pc_)
-        fetchOk = fetchInst(addr, inst);
+        fetchOk = fetchInst(addr, physAddr, inst);
       else
         inst = di->inst();
     }
   if (not fetchOk)
     {
       ++cycleCount_;
-      if (file)
-        {
-          std::string instStr;
-          printInstTrace(inst, instCounter_, instStr, file);
-        }
+
+      std::string instStr;
+      printInstTrace(inst, instCounter_, instStr, file);
 
       if (dcsrStep_)
         enterDebugMode_(DebugModeCause::STEP, pc_);
@@ -4632,14 +4845,15 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 
           if (processExternalInterrupt(traceFile, instStr))
             continue;  // Next instruction in trap handler.
-          if (not fetchInstWithTrigger(pc_, inst, traceFile))
+	  uint64_t physPc = 0;
+          if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
 	    continue;  // Next instruction in trap handler.
 
 	  // Decode unless match in decode cache.
 	  uint32_t ix = (pc_ >> 1) & decodeCacheMask_;
 	  DecodedInst* di = &decodeCache_[ix];
 	  if (not di->isValid() or di->address() != pc_)
-	    decode(pc_, inst, *di);
+	    decode(pc_, physPc, inst, *di);
 
           // Increment pc and execute instruction
 	  pc_ += di->instSize();
@@ -4651,8 +4865,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 	    {
               if (doStats)
                 accumulateInstructionStats(*di);
-	      if (traceFile)
-		printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
+	      printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 	      continue;
 	    }
 
@@ -4669,8 +4882,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 
 	  if (doStats)
 	    accumulateInstructionStats(*di);
-	  if (traceFile)
-	    printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
+	  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 
 	  bool icountHit = (enableTriggers_ and
 			    icountTriggerHit(privMode_, isInterruptEnabled()));
@@ -4779,9 +4991,10 @@ Hart<URV>::simpleRunWithLimit()
       if (not di->isValid() or di->address() != pc_)
         {
           uint32_t inst = 0;
-          if (not fetchInst(pc_, inst))
+	  uint64_t physPc = 0;
+          if (not fetchInst(pc_, physPc, inst))
             continue;
-          decode(pc_, inst, *di);
+          decode(pc_, physPc, inst, *di);
         }
 
       pc_ += di->instSize();
@@ -4806,9 +5019,10 @@ Hart<URV>::simpleRunNoLimit()
       if (not di->isValid() or di->address() != pc_)
         {
           uint32_t inst = 0;
-          if (not fetchInst(pc_, inst))
+	  uint64_t physPc = 0;
+          if (not fetchInst(pc_, physPc, inst))
             continue;
-          decode(pc_, inst, *di);
+          decode(pc_, physPc, inst, *di);
         }
 
       pc_ += di->instSize();
@@ -5021,8 +5235,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       nmiCause_ = NmiCause::UNKNOWN;
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
-      if (traceFile)  // Trace interrupted instruction.
-	printInstTrace(inst, instCounter_, instStr, traceFile, true);
+      printInstTrace(inst, instCounter_, instStr, traceFile, true);
       return true;
     }
 
@@ -5034,8 +5247,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       initiateInterrupt(cause, pc_);
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
-      if (traceFile)  // Trace interrupted instruction.
-	printInstTrace(inst, instCounter_, instStr, traceFile, true);
+      printInstTrace(inst, instCounter_, instStr, traceFile, true);
       ++cycleCount_;
       return true;
     }
@@ -5145,11 +5357,12 @@ Hart<URV>::singleStep(FILE* traceFile)
       if (processExternalInterrupt(traceFile, instStr))
 	return;  // Next instruction in interrupt handler.
 
-      if (not fetchInstWithTrigger(pc_, inst, traceFile))
+      uint64_t physPc = 0;
+      if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
         return;
 
       DecodedInst di;
-      decode(pc_, inst, di);
+      decode(pc_, physPc, inst, di);
 
       // Increment pc and execute instruction
       pc_ += di.instSize();
@@ -5168,8 +5381,7 @@ Hart<URV>::singleStep(FILE* traceFile)
 	{
 	  if (doStats)
 	    accumulateInstructionStats(di);
-	  if (traceFile)
-	    printDecodedInstTrace(di, instCounter_, instStr, traceFile);
+	  printDecodedInstTrace(di, instCounter_, instStr, traceFile);
 	  if (dcsrStep_ and not ebreakInstDebug_)
 	    enterDebugMode_(DebugModeCause::STEP, pc_);
 	  return;
@@ -5187,9 +5399,7 @@ Hart<URV>::singleStep(FILE* traceFile)
 
       if (doStats)
 	accumulateInstructionStats(di);
-
-      if (traceFile)
-	printInstTrace(inst, instCounter_, instStr, traceFile);
+      printInstTrace(inst, instCounter_, instStr, traceFile);
 
       // If a register is used as a source by an instruction then any
       // pending load with same register as target is removed from the
@@ -5249,7 +5459,8 @@ Hart<URV>::whatIfSingleStep(uint32_t inst, ChangeRecord& record)
   // Note: triggers not yet supported.
 
   DecodedInst di;
-  decode(pc_, inst, di);
+  uint64_t physPc = pc_;
+  decode(pc_, physPc, inst, di);
 
   // Execute instruction
   pc_ += di.instSize();
@@ -5283,7 +5494,8 @@ Hart<URV>::whatIfSingleStep(URV whatIfPc, uint32_t inst, ChangeRecord& record)
   // Fetch instruction. We don't care about what we fetch. Just checking
   // if there is a fetch exception.
   uint32_t tempInst = 0;
-  bool fetchOk = fetchInst(pc_, tempInst);
+  uint64_t physPc = 0;
+  bool fetchOk = fetchInst(pc_, physPc, tempInst);
 
   if (not fetchOk)
     {

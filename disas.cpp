@@ -612,7 +612,8 @@ void
 Hart<URV>::disassembleInst(uint32_t inst, std::ostream& stream)
 {
   DecodedInst di;
-  decode(pc_, inst, di);
+  uint64_t physPc = pc_;
+  decode(pc_, physPc, inst, di);
   disassembleInst(di, stream);
 }
 

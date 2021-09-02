@@ -24,7 +24,7 @@ using namespace WdRiscv;
 
 template <typename URV>
 void
-Hart<URV>::decode(URV addr, uint32_t inst, DecodedInst& di)
+Hart<URV>::decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& di)
 {
   // For vector load/store ops, op3 captures the number of fields
   // (non-zero for segmented, and whole-register ld/st).
@@ -33,7 +33,7 @@ Hart<URV>::decode(URV addr, uint32_t inst, DecodedInst& di)
 
   const InstEntry& entry = decode(inst, op0, op1, op2, op3);
 
-  di.reset(addr, inst, &entry, op0, op1, op2, op3);
+  di.reset(addr, physAddr, inst, &entry, op0, op1, op2, op3);
 
   // Set the mask bit for vector instructions.
   if (di.instEntry() and di.instEntry()->isVector())
