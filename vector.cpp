@@ -14689,7 +14689,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   unsigned elemCount = vecRegs_.elemCount();
 
   // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
+  if (vd + fieldCount*eg >= 32)
     {
       illegalInst(di);
       return;
@@ -14845,7 +14845,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   unsigned elemCount = vecRegs_.elemCount(), elemSize = sizeof(ELEM_TYPE);
 
   // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
+  if (vd + fieldCount*eg >= 32)
     {
       illegalInst(di);
       return;
@@ -15146,7 +15146,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
 
   // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
+  if (vd + fieldCount*eg >= 32)
     {
       illegalInst(di);
       return;
@@ -15320,7 +15320,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
 
   // Used registers must not exceed 32.
-  if (vd + fieldCount*eg > 32)
+  if (vd + fieldCount*eg >= 32)
     {
       illegalInst(di);
       return;
