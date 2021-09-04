@@ -3763,12 +3763,8 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
     {
       URV val = 0;
       peekCsr(csrn, val);
-      auto csr = csRegs_.getImplementedCsr(csrn);
-      if (csr)
-	{
-	  fprintf(out, "%s%s=%lx", sep, csr->getName().c_str(), uint64_t(val));
-	  sep = ";";
-	}
+      fprintf(out, "%sc%d=%lx", sep, unsigned(csrn), uint64_t(val));
+      sep = ";";
     }
 
   // Changed vector register group.
@@ -3828,7 +3824,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
 	  else if (type == OperandType::VecReg)
 	    { fprintf(out, "%sv%d", sep, di.ithOperand(i)); sep = ";"; }
 	  else if (type == OperandType::Imm)
-	    { fprintf(out, "%s%x", sep, di.ithOperand(i)); sep = ";"; }
+	    { fprintf(out, "%si%x", sep, di.ithOperand(i)); sep = ";"; }
 	}
     }
 
