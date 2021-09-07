@@ -1696,15 +1696,15 @@ namespace WdRiscv
     /// count after instruction is executed). Tmp is a temporary
     /// string (for performance).
     void printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::string& tmp,
-                               FILE* out, bool interrupt = false);
+                               FILE* out);
 
     /// Variant of the preceding method for cases where the trace is
     /// printed before decode. If the instruction is not available
     /// then a zero (illegal) value is required.
     void printInstTrace(uint32_t instruction, uint64_t tag, std::string& tmp,
-			FILE* out, bool interrupt = false);
+			FILE* out);
 
-    void printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt = false);
+    void printInstCsvTrace(const DecodedInst& di, FILE* out);
 
     /// Start a synchronous exceptions.
     void initiateException(ExceptionCause cause, URV pc, URV info,

@@ -3466,7 +3466,7 @@ static std::mutex printInstTraceMutex;
 template <typename URV>
 void
 Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
-			  FILE* out, bool interrupt)
+			  FILE* out)
 {
   if (not out)
     return;
@@ -3475,21 +3475,21 @@ Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
   uint64_t physPc = pc_;
   decode(pc_, physPc, inst, di);
 
-  printDecodedInstTrace(di, tag, tmp, out, interrupt);
+  printDecodedInstTrace(di, tag, tmp, out);
 }
 
 
 template <typename URV>
 void
 Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::string& tmp,
-                                 FILE* out, bool interrupt)
+                                 FILE* out)
 {
   if (not out)
     return;
 
   if (csvTrace_)
     {
-      printInstCsvTrace(di, out, interrupt);
+      printInstCsvTrace(di, out);
       return;
     }
 
@@ -3497,7 +3497,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   std::lock_guard<std::mutex> guard(printInstTraceMutex);
 
   disassembleInst(di, tmp);
-  if (interrupt)
+  if (hasInterrupt_)
     tmp += " (interrupted)";
 
   if (traceLdSt_)
@@ -3712,7 +3712,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 
 template <typename URV>
 void
-Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
+Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 {
   if (not out)
     return;
@@ -3721,7 +3721,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
   std::lock_guard<std::mutex> guard(printInstTraceMutex);
 
   if (instCounter_ == 1)
-    fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilegege, trap, disassembly\n");
+    fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly\n");
 
   // Program counter.
   uint64_t virtPc = di.address(), physPc = di.physAddress();
@@ -3804,9 +3804,17 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
       sep = ";";
     }
 
+  // Non sequential PC change.
+  auto instEntry = di.instEntry();
+  bool hasTrap = hasInterrupt_ or hasException_;
+  if (not hasTrap and instEntry->isBranch() and pc_ != currPc_ + di.instSize())
+    {
+      fprintf(out, "%spc=%lx", sep, uint64_t(pc_));
+      sep = ";";
+    }
+
   // Source operands.
   fputc(',', out);
-  auto instEntry = di.instEntry();
   sep = "";
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
@@ -3860,7 +3868,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
       else
 	{
 	  if (instEntry->isBranchToRegister() and
-	      di.op0() == IntRegNumber::RegRa)
+	      di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
 	    fputc('r', out);
 	  else if (di.op0() == IntRegNumber::RegRa)
 	    fputc('c', out);
@@ -3883,7 +3891,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out, bool interrupt)
   else                                             fputs(",",  out);
 
   // Interrupt/exception cause.
-  if (interrupt)
+  if (hasTrap)
     {
       URV cause = 0;
       peekCsr(CsrNumber::MCAUSE, cause);
@@ -5231,7 +5239,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       nmiCause_ = NmiCause::UNKNOWN;
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
-      printInstTrace(inst, instCounter_, instStr, traceFile, true);
+      printInstTrace(inst, instCounter_, instStr, traceFile);
       return true;
     }
 
@@ -5243,7 +5251,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       initiateInterrupt(cause, pc_);
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
-      printInstTrace(inst, instCounter_, instStr, traceFile, true);
+      printInstTrace(inst, instCounter_, instStr, traceFile);
       ++cycleCount_;
       return true;
     }
