@@ -1311,12 +1311,6 @@ namespace WdRiscv
     void forceRoundingMode(RoundingMode mode)
     { forcedRounding_ = mode; forceRounding_ = true; }
 
-    /// Force rounding after the multiply step of the fused
-    /// multiply-add multiply-sub instructions. This is useful for
-    /// testing/bringup.
-    void roundAfterFusedMultiply(bool flag)
-    { roundAfterFusedMul_ = flag; }
-
     /// Force floating point arithmetic operation input/output to zero
     /// if subnormal when true.  If enabled, this breaks IEEE FP
     /// specs.
@@ -3691,7 +3685,6 @@ namespace WdRiscv
     bool forceRounding_ = false;
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
 
-    bool roundAfterFusedMul_ = false; // Force rounding after multiply in fused multiply-add/sub.
     bool subnormToZero_ = false;
 
     bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
