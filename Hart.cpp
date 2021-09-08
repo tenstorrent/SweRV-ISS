@@ -3800,14 +3800,14 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	  unsigned byteCount = vecRegs_.bytesPerRegister();
 	  for (unsigned i = 0; i < byteCount; ++i)
 	    fprintf(out, "%02x", data[byteCount - 1 - i]);
+	  sep = ";";
 	}
-      sep = ";";
     }
 
   // Non sequential PC change.
   auto instEntry = di.instEntry();
   bool hasTrap = hasInterrupt_ or hasException_;
-  if (not hasTrap and instEntry->isBranch() and pc_ != currPc_ + di.instSize())
+  if (not hasTrap and instEntry->isBranch() and lastBranchTaken_)
     {
       fprintf(out, "%spc=%lx", sep, uint64_t(pc_));
       sep = ";";
@@ -3852,6 +3852,17 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	}
       else
 	load = true;
+    }
+  else if (not vecLdStAddr_.empty())
+    {
+      for (size_t i = 0; i < vecLdStAddr_.size(); ++i)
+	{
+	  if (i > 0)
+	    fputc(';', out);
+	  fprintf(out, "%lx", vecLdStAddr_.at(i));
+	  if (i < vecStData_.size())
+	    fprintf(out, "=%lx", vecStData_.at(i));
+	}
     }
 
   // Instruction information.
@@ -4404,6 +4415,7 @@ Hart<URV>::clearTraceData()
   syscall_.clearMemoryChanges();
   vecLdStAddr_.clear();
   vecStData_.clear();
+  lastBranchTaken_ = false;
 }
 
 

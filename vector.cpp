@@ -23189,7 +23189,7 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
 	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmin(e1, e2, subnormToZero_, einv);
+          dest = doFmax(e1, e2, subnormToZero_, einv);
 	  invalid = invalid or einv;
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -23266,7 +23266,7 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmin(e1, e2, subnormToZero_, einv);
+          dest = doFmax(e1, e2, subnormToZero_, einv);
 	  invalid = invalid or einv;
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
