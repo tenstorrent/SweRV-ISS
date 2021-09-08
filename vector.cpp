@@ -15694,7 +15694,7 @@ doFadd(FT f1, FT f2, bool subnormToZero)
 
 template <typename FT>
 static FT
-doFmin(FT f1, FT f2, bool subnormToZero, bool& invalid)
+doFmin(FT f1, FT f2, bool& invalid)
 {
   FT res{};
   invalid = false;
@@ -15714,16 +15714,13 @@ doFmin(FT f1, FT f2, bool subnormToZero, bool& invalid)
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
     res = std::copysign(res, -FT{});  // Make sure min(-0, +0) is -0.
 
-  if (subnormToZero)
-    res = subnormalAdjust(res);
-
   return res;
 }
 
 
 template <typename FT>
 static FT
-doFmax(FT f1, FT f2, bool subnormToZero, bool& invalid)
+doFmax(FT f1, FT f2, bool& invalid)
 {
   FT res{};
   invalid = false;
@@ -15742,9 +15739,6 @@ doFmax(FT f1, FT f2, bool subnormToZero, bool& invalid)
     invalid = true;
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
     res = std::copysign(res, FT{});  // Make sure max(-0, +0) is +0.
-
-  if (subnormToZero)
-    res = subnormalAdjust(res);
 
   return res;
 }
@@ -22553,7 +22547,7 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
 	  bool elemInvalid = false;
-	  result = doFmin(result, e1, subnormToZero_, elemInvalid);
+	  result = doFmin(result, e1, elemInvalid);
 	  invalid |= elemInvalid;
 	}
       else
@@ -22634,7 +22628,7 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
 	  bool elemInvalid = false;
-	  result = doFmax(result, e1, subnormToZero_, elemInvalid);
+	  result = doFmax(result, e1, elemInvalid);
 	  invalid |= elemInvalid;
 	}
       else
@@ -23034,7 +23028,7 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
 	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmin(e1, e2, subnormToZero_, einv);
+          dest = doFmin(e1, e2, einv);
 	  invalid = invalid or einv;
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -23111,7 +23105,7 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmin(e1, e2, subnormToZero_, einv);
+          dest = doFmin(e1, e2, einv);
 	  invalid = invalid or einv;
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -23194,7 +23188,7 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
 	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmax(e1, e2, subnormToZero_, einv);
+          dest = doFmax(e1, e2, einv);
 	  invalid = invalid or einv;
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -23271,7 +23265,7 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmax(e1, e2, subnormToZero_, einv);
+          dest = doFmax(e1, e2, einv);
 	  invalid = invalid or einv;
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
