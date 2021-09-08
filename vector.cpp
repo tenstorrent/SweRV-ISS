@@ -555,7 +555,11 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
     }
 
   if (vill or (rd != 0 or rs1 != 0))
-    csRegs_.write(CsrNumber::VL, PrivilegeMode::Machine,elems);  // Update VL.
+    {
+      // VL is not writeable: Poke it.
+      csRegs_.poke(CsrNumber::VL, elems);
+      recordCsrWrite(CsrNumber::VL);
+    }
   vecRegs_.elemCount(elems);  // Update cached value of VL.
 
   intRegs_.write(rd, elems);
@@ -564,7 +568,8 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   URV vtype = 0;
   vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 6);
   vtype |= (URV(vill) << (8*sizeof(URV) - 1));
-  csRegs_.write(CsrNumber::VTYPE, PrivilegeMode::Machine, vtype);
+  csRegs_.poke(CsrNumber::VTYPE, vtype);
+  recordCsrWrite(CsrNumber::VTYPE);
 
   // Update cached vtype fields in vecRegs_.
   vecRegs_.updateConfig(ew, gm, ma, ta, vill);
