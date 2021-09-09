@@ -1883,6 +1883,14 @@ namespace WdRiscv
     bool checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0, unsigned op1,
 			    unsigned groupX8);
 
+    // Similar to above but 3 vector operands and 1st 2 operands are wide.
+    bool checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0, unsigned op1,
+			    unsigned op2, unsigned groupX8);
+
+    // Similar to above but 2 vector operands and 1st 2 operands are wide.
+    bool checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0, unsigned op1,
+			     unsigned groupX8);
+
     // rs1: index of source register (value range: 0 to 31)
     // rs2: index of source register (value range: 0 to 31)
     // rd: index of destination register (value range: 0 to 31)
