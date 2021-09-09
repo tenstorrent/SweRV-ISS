@@ -15699,7 +15699,7 @@ doFmin(FT f1, FT f2, bool& invalid)
   FT res{};
   invalid = false;
 
-  bool isNan1 = isSnan(f1), isNan2 = isSnan(f2);
+  bool isNan1 = std::isnan(f1), isNan2 = std::isnan(f2);
   if (isNan1 and isNan2)
     res = std::numeric_limits<FT>::quiet_NaN();
   else if (isNan1)
@@ -15725,7 +15725,7 @@ doFmax(FT f1, FT f2, bool& invalid)
   FT res{};
   invalid = false;
 
-  bool isNan1 = isSnan(f1), isNan2 = isSnan(f2);
+  bool isNan1 = std::isnan(f1), isNan2 = std::isnan(f2);
   if (isNan1 and isNan2)
     res = std::numeric_limits<FT>::quiet_NaN();
   else if (isNan1)
