@@ -3508,16 +3508,16 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	  oss << "0x" << std::hex << ldStAddr_;
 	  tmp += " [" + oss.str() + "]";
 	}
-      else if (not vecLdStAddr_.empty())
+      else if (not vecRegs_.ldStAddr_.empty())
 	{
 	  std::ostringstream oss;
-	  for (size_t i = 0; i < vecLdStAddr_.size(); ++i)
+	  for (size_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
 	    {
 	      if (i > 0)
 		oss << ";";
-	      oss << "0x" << std::hex << vecLdStAddr_.at(i);
-	      if (i < vecStData_.size())
-		oss << ':' << "0x" << vecStData_.at(i);
+	      oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
+	      if (i < vecRegs_.stData_.size())
+		oss << ':' << "0x" << vecRegs_.stData_.at(i);
 	    }
 	  tmp += " [" + oss.str() + "]";
 	}
@@ -3853,15 +3853,15 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       else
 	load = true;
     }
-  else if (not vecLdStAddr_.empty())
+  else if (not vecRegs_.ldStAddr_.empty())
     {
-      for (size_t i = 0; i < vecLdStAddr_.size(); ++i)
+      for (size_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
 	{
 	  if (i > 0)
 	    fputc(';', out);
-	  fprintf(out, "%lx", vecLdStAddr_.at(i));
-	  if (i < vecStData_.size())
-	    fprintf(out, "=%lx", vecStData_.at(i));
+	  fprintf(out, "%lx", vecRegs_.ldStAddr_.at(i));
+	  if (i < vecRegs_.stData_.size())
+	    fprintf(out, "=%lx", vecRegs_.stData_.at(i));
 	}
     }
 
@@ -4410,11 +4410,9 @@ Hart<URV>::clearTraceData()
   intRegs_.clearLastWrittenReg();
   fpRegs_.clearLastWrittenReg();
   csRegs_.clearLastWrittenRegs();
-  vecRegs_.clearLastWrittenReg();
   memory_.clearLastWriteInfo(hartIx_);
   syscall_.clearMemoryChanges();
-  vecLdStAddr_.clear();
-  vecStData_.clear();
+  vecRegs_.clearTraceData();
   lastBranchTaken_ = false;
 }
 

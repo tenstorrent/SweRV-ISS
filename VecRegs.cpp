@@ -36,6 +36,11 @@ VecRegs::VecRegs()
   for (auto& groupFlags : legalConfigs_)
     groupFlags.assign(groupFlags.size(), true);
 
+  // Operands effective group multiplier is used for tracing/logging.
+  // Worst case we have 3 vector operands.
+  opsEmul_.resize(3);
+  opsEmul_.assign(opsEmul_.size(), 1);
+
   // Temporary, for testing. FIX.
   sew_ = ElementWidth::Word2;
   sewInBits_ = 64;

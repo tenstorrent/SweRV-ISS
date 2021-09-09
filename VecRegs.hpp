@@ -339,6 +339,15 @@ namespace WdRiscv
 
   protected:
 
+    /// Clear load/address and store data used for logging/tracing./
+    void clearTraceData()
+    {
+      ldStAddr_.clear();
+      stData_.clear();
+      clearLastWrittenReg();
+      opsEmul_.assign(opsEmul_.size(), 1);
+    }
+
     /// Clear the number denoting the last written register.
     void clearLastWrittenReg()
     { lastWrittenReg_ = -1; }
@@ -503,5 +512,11 @@ namespace WdRiscv
 
     int lastWrittenReg_ = -1;
     uint32_t lastGroupX8_ = 8;   // 8 times last grouping factor
+
+    // Following used for logging/tracing. Cleared before each instruction.
+    // Collected by a vector load/store instruction.
+    std::vector<uint64_t> ldStAddr_;  // Addresses of vector load/store instruction
+    std::vector<uint64_t> stData_;    // Data of vector store instruction
+    std::vector<unsigned> opsEmul_;   // Effecive grouping of vector operands.
   };
 }

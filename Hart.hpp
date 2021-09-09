@@ -1770,8 +1770,10 @@ namespace WdRiscv
     void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info,
 		      URV secCause);
 
-    /// Illegal instruction. One of the following:
+    /// Illegal instruction. Initiate an illegal instruction trap.
+    /// This is used for one of the following:
     ///   - Invalid opcode.
+    ///   - Extension instruction executed when extension is off in mstatus or misa.
     ///   - Machine mode instruction executed when not in machine mode.
     ///   - Invalid CSR.
     ///   - Write to a read-only CSR.
@@ -1862,6 +1864,24 @@ namespace WdRiscv
     // legal. Take an illegal instuction exception and return false
     // otherwise.
     bool checkFpMaskableInst(const DecodedInst* di);
+
+    // Return true if vector operands are mutliples of the given group
+    // multiplier (scaled by 8). Return false initiating an illegal instruction
+    // trap otherwise.
+    bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+			   unsigned op2, unsigned groupX8);
+
+    // Similar to above but for 2 vector operand instructions.
+    bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+			   unsigned groupX8);
+
+    // Similar to above but 3 vector operands and 1st operand is wide.
+    bool checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0, unsigned op1,
+			    unsigned op2, unsigned groupX8);
+
+    // Similar to above but 2 vector operands and 1st operand is wide.
+    bool checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0, unsigned op1,
+			    unsigned groupX8);
 
     // rs1: index of source register (value range: 0 to 31)
     // rs2: index of source register (value range: 0 to 31)
@@ -3793,8 +3813,6 @@ namespace WdRiscv
     URV ldStAddr_ = 0;              // Address of data of most recent ld/st inst.
     uint64_t ldStPhysAddr_ = 0;
     bool ldStAddrValid_ = false;    // True if ldStAddr_ valid.
-    std::vector<uint64_t> vecLdStAddr_;  // Addresses of vector load/store instruction
-    std::vector<uint64_t> vecStData_;  // Data of vector store instruction
 
     // We keep track of the last committed 8 loads so that we can
     // revert in the case of an imprecise load exception.
