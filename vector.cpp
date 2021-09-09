@@ -510,7 +510,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
   if ((op & mask) == 0)
     {
       auto& emul = vecRegs_.opsEmul_;
-      emul.assign(emul.size(), eg);  // Record operand group for tracing
+      emul.assign(emul.size(), eg);  // Track operand group for logging
       return true;
     }
 
@@ -531,7 +531,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
   if ((op & mask) == 0)
     {
       auto& emul = vecRegs_.opsEmul_;
-      emul.at(0) = emul.at(1) = eg;  // Record operand group for tracing
+      emul.at(0) = emul.at(1) = eg;  // Track operand group for logging
       return true;
     }
   illegalInst(di);
@@ -542,8 +542,8 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0,
-			     unsigned op1, unsigned op2, unsigned groupX8)
+Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
+			       unsigned op1, unsigned op2, unsigned groupX8)
 {
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
@@ -556,8 +556,8 @@ Hart<URV>::checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0,
   if ((op0 & mask2) == 0 and (op & mask) == 0)
     {
       auto& emul =  vecRegs_.opsEmul_;
-      emul.at(0) = eg2;  // Record operand group for tracing
-      emul.at(1) = emul.at(2) = eg;  // Record operand group for tracing
+      emul.at(0) = eg2;  // Track operand group for logging
+      emul.at(1) = emul.at(2) = eg;
       return true;
     }
 
@@ -569,8 +569,8 @@ Hart<URV>::checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0,
-			      unsigned op1, unsigned groupX8)
+Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
+			       unsigned op1, unsigned groupX8)
 {
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
@@ -581,7 +581,7 @@ Hart<URV>::checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0,
   if ((op0 & mask2) == 0 and (op1 & mask) == 0)
     {
       auto& emul =  vecRegs_.opsEmul_;
-      emul.at(0) = eg2;  // Record operand group for tracing
+      emul.at(0) = eg2;  // Track operand group for logging
       emul.at(1) = eg;
       return true;
     }
@@ -594,8 +594,8 @@ Hart<URV>::checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0,
-			       unsigned op1, unsigned op2, unsigned groupX8)
+Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
+				 unsigned op1, unsigned op2, unsigned groupX8)
 {
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
@@ -621,8 +621,8 @@ Hart<URV>::checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0,
-			       unsigned op1, unsigned groupX8)
+Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
+				 unsigned op1, unsigned groupX8)
 {
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned eg2 = eg*2;
@@ -634,6 +634,56 @@ Hart<URV>::checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0,
     {
       auto& emul =  vecRegs_.opsEmul_;
       emul.at(0) = emul.at(1) = eg2;
+      return true;
+    }
+
+  illegalInst(di);
+  return false;
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
+			       unsigned op1, unsigned op2, unsigned groupX8)
+{
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = eg - 1;
+  unsigned eg2 = eg*2;
+  unsigned mask2 = eg2 - 1;
+  
+  unsigned op = op0 | op2;
+
+  if ((op & mask) == 0 and (op1 & mask2) == 0)
+    {
+      auto& emul =  vecRegs_.opsEmul_;
+      emul.at(0) = emul.at(2) = eg;
+      emul.at(1) = eg2;
+      return true;
+    }
+
+  illegalInst(di);
+  return false;
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
+			       unsigned op1, unsigned groupX8)
+{
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = eg - 1;
+  unsigned eg2 = eg*2;
+  unsigned mask2 = eg2 - 1;
+  
+  if ((op0 & mask) == 0 and (op1 & mask2) == 0)
+    {
+      auto& emul =  vecRegs_.opsEmul_;
+      emul.at(0) = eg;
+      emul.at(1) = eg2;
       return true;
     }
 
@@ -1221,7 +1271,7 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -1259,7 +1309,7 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -1332,7 +1382,7 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(di->op2());
@@ -1447,7 +1497,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
@@ -1487,7 +1537,7 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
@@ -1562,7 +1612,7 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -1600,7 +1650,7 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -1673,7 +1723,7 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -1711,7 +1761,7 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -1749,7 +1799,7 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(di->op2());
@@ -1789,7 +1839,7 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
@@ -1829,7 +1879,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
@@ -1869,7 +1919,7 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
@@ -1944,7 +1994,7 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -1982,7 +2032,7 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -4519,12 +4569,8 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -4601,12 +4647,8 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   // Spec says sign extend scalar register. We comply. Looks foolish.
   URV e2 = SRV(intRegs_.read(rs2));
@@ -4647,12 +4689,8 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = gp >= 8 ? gp / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, gp))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -4689,12 +4727,8 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -4764,12 +4798,8 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = gp >= 8 ? gp / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, gp))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5759,7 +5789,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -5796,7 +5826,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -7978,7 +8008,7 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(rs2));  // Spec says sign extend. Bogus.
@@ -8054,7 +8084,7 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -8129,7 +8159,7 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(rs2));
@@ -8207,7 +8237,7 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -8284,7 +8314,7 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(rs2));   // Spec says sign extend. Bogus.
@@ -8359,7 +8389,7 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -8479,7 +8509,7 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -8635,7 +8665,7 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -12701,12 +12731,8 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -12795,12 +12821,8 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
@@ -12838,12 +12860,8 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -12879,12 +12897,8 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -12920,12 +12934,8 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
@@ -12963,12 +12973,8 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -15991,7 +15997,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16067,7 +16073,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16149,7 +16155,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16225,7 +16231,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16306,7 +16312,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16380,7 +16386,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16462,7 +16468,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16536,7 +16542,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulWW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
   unsigned start = vecRegs_.startIndex();
@@ -16964,7 +16970,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -17038,7 +17044,7 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -18333,7 +18339,7 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18412,7 +18418,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -18507,7 +18513,7 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18586,7 +18592,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -18681,7 +18687,7 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18760,7 +18766,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -18855,7 +18861,7 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18935,7 +18941,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20756,7 +20762,7 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20829,7 +20835,7 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20868,7 +20874,7 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20906,7 +20912,7 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20980,7 +20986,7 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -21054,7 +21060,7 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -21130,7 +21136,7 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -21204,12 +21210,8 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -21282,12 +21284,8 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -21326,12 +21324,8 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -21368,12 +21362,8 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -21446,12 +21436,8 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -21527,12 +21513,8 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -21610,12 +21592,8 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -21659,12 +21637,8 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vd % eg) or (vs1 % (eg*2)))
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -22041,7 +22015,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -22123,7 +22097,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW(di, vd, vs1, vs2, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;

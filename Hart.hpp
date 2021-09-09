@@ -1876,19 +1876,27 @@ namespace WdRiscv
 			   unsigned groupX8);
 
     // Similar to above but 3 vector operands and 1st operand is wide.
-    bool checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0, unsigned op1,
-			    unsigned op2, unsigned groupX8);
+    bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
+			     unsigned op2, unsigned groupX8);
 
     // Similar to above but 2 vector operands and 1st operand is wide.
-    bool checkVecOpsVsEmulW(const DecodedInst* di, unsigned op0, unsigned op1,
-			    unsigned groupX8);
+    bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
+			     unsigned groupX8);
 
     // Similar to above but 3 vector operands and 1st 2 operands are wide.
-    bool checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0, unsigned op1,
-			    unsigned op2, unsigned groupX8);
+    bool checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0, unsigned op1,
+			       unsigned op2, unsigned groupX8);
 
     // Similar to above but 2 vector operands and 1st 2 operands are wide.
-    bool checkVecOpsVsEmulWW(const DecodedInst* di, unsigned op0, unsigned op1,
+    bool checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0, unsigned op1,
+			       unsigned groupX8);
+
+    // Similar to above but 3 vector operands with 2nd operand wide.
+    bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
+			     unsigned op2, unsigned groupX8);
+
+    // Similar to above but 2 vector operands with 2nd operand wide.
+    bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
     // rs1: index of source register (value range: 0 to 31)
