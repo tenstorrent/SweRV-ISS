@@ -10531,6 +10531,7 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
       return;
     }
   vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -16960,7 +16961,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
 
   // Double wide legal. Destination register multiple of emul.
-  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
       illegalInst(di);
       return;
@@ -17034,7 +17035,7 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
 
   // Double wide legal. Destination register multiple of emul.
-  if (not vecRegs_.isDoubleWideLegal(sew, group) or ((vd*8) % (group*2)) != 0)
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
       illegalInst(di);
       return;
