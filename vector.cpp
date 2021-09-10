@@ -542,6 +542,23 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
 template <typename URV>
 inline
 bool
+Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned groupX8)
+{
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
+  if ((op0 & mask) == 0)
+    {
+      vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging
+      return true;
+    }
+  illegalInst(di);
+  return false;
+}
+
+
+template <typename URV>
+inline
+bool
 Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
 			       unsigned op1, unsigned op2, unsigned groupX8)
 {
@@ -5089,6 +5106,9 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = v2g; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5222,6 +5242,7 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5292,6 +5313,7 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5362,6 +5384,7 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5432,6 +5455,7 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5502,6 +5526,7 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5572,6 +5597,7 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5642,6 +5668,7 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -5712,6 +5739,7 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -6438,12 +6466,8 @@ Hart<URV>::execViota_m(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmul(di, vd, group))
+    return;
 
   unsigned sum = 0;
 
@@ -6498,12 +6522,8 @@ Hart<URV>::execVid_v(const DecodedInst* di)
       return;
     }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmul(di, vd, group))
+    return;
 
   for (uint32_t ix = start; ix < elems; ++ix)
     {
@@ -7733,6 +7753,8 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -8470,6 +8492,8 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg*2; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Spec says sign extend. Bogus.
 
@@ -8588,6 +8612,8 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg*2; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
 
@@ -8748,6 +8774,8 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg*2; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
 
@@ -8831,6 +8859,8 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg*2; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   URV e1 = intRegs_.read(rs1);
 
@@ -9473,6 +9503,8 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 2? eg/2 : 1; // Track operand group for logging.
 
   typedef ElementWidth EW;
 
@@ -9569,6 +9601,8 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging
 
   switch (sew)
     {
@@ -9630,12 +9664,8 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmul(di, vd, group))
+    return;
 
   switch (sew)
     {
@@ -9740,6 +9770,8 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 2? eg/2 : 1; // Track operand group for logging.
 
   switch (sew)
     {
@@ -9812,6 +9844,8 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging.
 
   switch (sew)
     {
@@ -9873,12 +9907,8 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmul(di, vd, group))
+    return;
 
   switch (sew)
     {
@@ -10360,6 +10390,8 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -10404,6 +10436,7 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
@@ -10450,6 +10483,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   SRV e2 = di->op2As<int32_t>();
 
@@ -10496,6 +10530,7 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -10540,6 +10575,7 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
@@ -10744,6 +10780,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10802,16 +10839,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
     }
 
   unsigned vd = di->op0(), rs1 = di->op1(), groupX8 = 8;
-
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
-
   ElementWidth sew = vecRegs_.elemWidth();
-
   SRV val = intRegs_.read(rs1);
 
   typedef ElementWidth EW;
@@ -10916,17 +10944,12 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
 
   unsigned vd = di->op0();
   unsigned rs1 = di->op1();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmul(di, vd, group))
+    return;
 
   int e1 = SRV(intRegs_.read(rs1));
 
@@ -10956,17 +10979,12 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
     }
 
   unsigned vd = di->op0();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmul(di, vd, group))
+    return;
 
   int e1 = di->op1As<int32_t>();
 
@@ -13014,12 +13032,9 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1();
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return;
 
   uint64_t addr = intRegs_.read(rs1);
 
@@ -13900,12 +13915,9 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return;
 
   uint64_t addr = intRegs_.read(rs1);
 
@@ -14061,15 +14073,11 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return;
 
   uint64_t addr = intRegs_.read(rs1);
-
   unsigned start = vecRegs_.startIndex();
   unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
 
@@ -14239,17 +14247,14 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1();
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return;
 
   uint64_t addr = intRegs_.read(rs1);
-
   unsigned start = vecRegs_.startIndex();
   unsigned elemCount = vecRegs_.elemCount();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg >= 32)
@@ -14395,17 +14400,14 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1();
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return;
 
   uint64_t addr = intRegs_.read(rs1);
-
   unsigned start = vecRegs_.startIndex();
   unsigned elemCount = vecRegs_.elemCount(), elemSize = sizeof(ELEM_TYPE);
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg >= 32)
@@ -14696,17 +14698,14 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return;
 
   uint64_t addr = intRegs_.read(rs1);
-
   unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
   unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg >= 32)
@@ -14870,17 +14869,14 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return;
 
   uint64_t addr = intRegs_.read(rs1);
-
   unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
   unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg >= 32)
@@ -19133,12 +19129,8 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkVecOpsVsEmul(di, vd, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19220,6 +19212,8 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19294,6 +19288,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19376,6 +19371,8 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19450,6 +19447,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19531,6 +19529,8 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19605,6 +19605,7 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19686,6 +19687,8 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19760,6 +19763,7 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19842,6 +19846,7 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19924,6 +19929,7 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
 
   typedef ElementWidth EW;
   switch (sew)
