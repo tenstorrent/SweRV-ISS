@@ -10049,7 +10049,7 @@ Hart<URV>::vmadc_vvm(unsigned vcout, unsigned vs1, unsigned vs2, bool carry, uns
           if (carry and vecRegs_.isActive(vcin, ix))
             dest += ELEM_TYPE(1);
 
-          bool cout = dest < e1 or dest < e2;
+          bool cout = ((e1 < 0) == (e2 < 0)) and ((dest < 0) != (e2 < 0));
           if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
             errors++;
         }
@@ -10078,7 +10078,7 @@ Hart<URV>::vmadc_vxm(unsigned vcout, unsigned vs1, ELEM_TYPE e2, bool carry, uns
           if (carry and vecRegs_.isActive(vcin, ix))
             dest += ELEM_TYPE(1);
 
-          bool cout = dest < e1 or dest < e2;
+          bool cout = ((e1 < 0) == (e2 < 0)) and ((dest < 0) != (e2 < 0));
           if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
             errors++;
         }
