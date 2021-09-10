@@ -3823,16 +3823,22 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       if (mode == OperandMode::Read or mode == OperandMode::ReadWrite or
 	  type == OperandType::Imm)
 	{
-	  if      (type ==  OperandType::IntReg)
-	    { fprintf(out, "%sx%d", sep, di.ithOperand(i)); sep = ";"; }
+	  if (type ==  OperandType::IntReg)
+	    fprintf(out, "%sx%d", sep, di.ithOperand(i));
 	  else if (type ==  OperandType::FpReg)
-	    { fprintf(out, "%sf%d", sep, di.ithOperand(i)); sep = ";"; }
+	    fprintf(out, "%sf%d", sep, di.ithOperand(i));
 	  else if (type == OperandType::CsReg)
-	    { fprintf(out, "%sc%d", sep, di.ithOperand(i)); sep = ";"; }
+	    fprintf(out, "%sc%d", sep, di.ithOperand(i));
 	  else if (type == OperandType::VecReg)
-	    { fprintf(out, "%sv%d", sep, di.ithOperand(i)); sep = ";"; }
+	    {
+	      fprintf(out, "%sv%d", sep, di.ithOperand(i));
+	      unsigned emul = i < vecRegs_.opsEmul_.size() ? vecRegs_.opsEmul_.at(i) : 1;
+	      if (emul >= 2 and emul <= 8)
+		fprintf(out, "m%d", emul);
+	    }
 	  else if (type == OperandType::Imm)
-	    { fprintf(out, "%si%x", sep, di.ithOperand(i)); sep = ";"; }
+	    fprintf(out, "%si%x", sep, di.ithOperand(i));
+	  sep = ";";
 	}
     }
 
