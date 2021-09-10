@@ -3245,7 +3245,7 @@ namespace WdRiscv
     void execVfmadd_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfmadd_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vfmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		   unsigned start, unsigned elems, bool masked);
     void execVfmadd_vf(const DecodedInst*);
 
@@ -3255,7 +3255,7 @@ namespace WdRiscv
     void execVfnmadd_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfnmadd_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		   unsigned start, unsigned elems, bool masked);
     void execVfnmadd_vf(const DecodedInst*);
 
@@ -3265,28 +3265,28 @@ namespace WdRiscv
     void execVfmsub_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfmsub_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		   unsigned start, unsigned elems, bool masked);
     void execVfmsub_vf(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		   unsigned start, unsigned elems, bool masked);
+		    unsigned start, unsigned elems, bool masked);
     void execVfnmsub_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfnmsub_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		   unsigned start, unsigned elems, bool masked);
+    void vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked);
     void execVfnmsub_vf(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		   unsigned start, unsigned elems, bool masked);
+		  unsigned start, unsigned elems, bool masked);
     void execVfmul_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfmul_vf(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		   unsigned start, unsigned elems, bool masked);
+		  unsigned start, unsigned elems, bool masked);
     void execVfmul_vf(const DecodedInst*);
 
     template<typename ELEM_TYPE>

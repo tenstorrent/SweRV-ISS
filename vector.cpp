@@ -17147,12 +17147,12 @@ Hart<URV>::execVfmadd_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfmadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -17164,7 +17164,7 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vf2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(e1, dest, e2, elemInv);
@@ -17193,12 +17193,12 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -17206,17 +17206,17 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfmadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfmadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfmadd_vf<float>  (vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfmadd_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfmadd_vf<double> (vd, f1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -17228,7 +17228,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		     unsigned start, unsigned elems, bool masked)
+		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f), dest = ELEM_TYPE(0.0f);
@@ -17296,12 +17296,12 @@ Hart<URV>::execVfnmadd_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfnmadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -17313,7 +17313,7 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(-e1, dest, -e2, elemInv);
@@ -17445,12 +17445,12 @@ Hart<URV>::execVfmsub_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfmsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -17462,7 +17462,7 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(e1, dest, -e2, elemInv);
@@ -17491,12 +17491,12 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -17504,17 +17504,17 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfmsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfmsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfmsub_vf<float>  (vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfmsub_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfmsub_vf<double> (vd, f1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -17526,7 +17526,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		     unsigned start, unsigned elems, bool masked)
+		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f), dest = ELEM_TYPE(0.0f);
@@ -17594,12 +17594,12 @@ Hart<URV>::execVfnmsub_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfnmsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -17611,7 +17611,7 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(-e1, dest, e2, elemInv);
@@ -17743,12 +17743,12 @@ Hart<URV>::execVfmacc_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -17760,7 +17760,7 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(e1, e2, dest, elemInv);
@@ -17789,12 +17789,12 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -17802,17 +17802,17 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvf()) { illegalInst(di); return; }
-      vfmacc_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfmacc_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfmacc_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfmacc_vf<float>  (vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfmacc_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfmacc_vf<double> (vd, f1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -17892,12 +17892,12 @@ Hart<URV>::execVfnmacc_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfnmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -17909,7 +17909,7 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(-e1, e2, -dest, elemInv);
@@ -17938,12 +17938,12 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  v2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, v2, group))
     return;
 
   typedef ElementWidth EW;
@@ -17951,17 +17951,17 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmacc_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfnmacc_vf<Float16>(vd, f1, v2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfnmacc_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfnmacc_vf<float>  (vd, f1, v2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfnmacc_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfnmacc_vf<double> (vd, f1, v2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -18041,12 +18041,12 @@ Hart<URV>::execVfmsac_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -18058,7 +18058,7 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(e1, e2, -dest, elemInv);
@@ -18087,12 +18087,12 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18100,17 +18100,17 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfmsac_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfmsac_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfmsac_vf<float>  (vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfmsac_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfmsac_vf<double> (vd, f1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -18122,7 +18122,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		     unsigned start, unsigned elems, bool masked)
+		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(0.0f), e2 = ELEM_TYPE(0.0f), dest = ELEM_TYPE(0.0f);
@@ -18190,12 +18190,12 @@ Hart<URV>::execVfnmsac_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfnmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
+		      unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1{}, dest{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{}, dest{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
   bool invalid = false;
 
@@ -18207,7 +18207,7 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
 	  bool elemInv = false;
           dest = fusedMultiplyAdd(-e1, e2, dest, elemInv);
@@ -18352,14 +18352,14 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfwmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
   ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
@@ -18374,7 +18374,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group2x, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
 	  e1dw = ELEM_TYPE2X(e1);
@@ -18404,7 +18404,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -18415,7 +18415,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18423,17 +18423,17 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfmacc_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfmacc_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfmacc_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfmacc_vf<double> (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -18526,14 +18526,14 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
@@ -18548,7 +18548,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group2x, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
 	  e1dw = ELEM_TYPE2X(e1);
@@ -18578,7 +18578,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -18589,7 +18589,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18597,17 +18597,17 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmacc_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfnmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfnmacc_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfnmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfnmacc_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfnmacc_vf<double> (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -18700,14 +18700,14 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfwmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
@@ -18722,7 +18722,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group2x, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
 	  e1dw = ELEM_TYPE2X(e1);
@@ -18752,7 +18752,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -18763,7 +18763,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18771,17 +18771,17 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfmsac_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfmsac_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfmsac_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfmsac_vf<double> (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
@@ -18875,14 +18875,14 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
+Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
-  ELEM_TYPE e1{};
-  ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  ELEM_TYPE e2{};
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
@@ -18897,7 +18897,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vd, ix, group2x, dest))
+      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
 	  e1dw = ELEM_TYPE2X(e1);
@@ -18927,7 +18927,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -18938,7 +18938,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmulW0(di, vd, vs1, group))
+  if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -18946,17 +18946,17 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
     {
     case EW::Half:
       if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmsac_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
+      vfnmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
       if (not isRvf()) { illegalInst(di); return; }
-      vfnmsac_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
+      vfnmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
       if (not isRvd()) { illegalInst(di); return; }
-      vfnmsac_vf<double> (vd, vs1, rs2, group, start, elems, masked);
+      vfnmsac_vf<double> (vd, fs1, vs2, group, start, elems, masked);
       break;
 
     default: illegalInst(di); return;
