@@ -10049,7 +10049,7 @@ Hart<URV>::vmadc_vvm(unsigned vcout, unsigned vs1, unsigned vs2, bool carry, uns
           if (carry and vecRegs_.isActive(vcin, ix))
             dest += ELEM_TYPE(1);
 
-          bool cout = ((e1 < 0) == (e2 < 0)) and ((dest < 0) != (e2 < 0));
+          bool cout = carry? dest <= e1 : dest < e1;
           if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
             errors++;
         }
@@ -10078,7 +10078,7 @@ Hart<URV>::vmadc_vxm(unsigned vcout, unsigned vs1, ELEM_TYPE e2, bool carry, uns
           if (carry and vecRegs_.isActive(vcin, ix))
             dest += ELEM_TYPE(1);
 
-          bool cout = ((e1 < 0) == (e2 < 0)) and ((dest < 0) != (e2 < 0));
+          bool cout = carry? dest <= e1 : dest < e1;
           if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
             errors++;
         }
@@ -10396,10 +10396,10 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmadc_vvm<int8_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    case EW::Half: vmadc_vvm<int16_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    case EW::Word: vmadc_vvm<int32_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    case EW::Word2: vmadc_vvm<int64_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
+    case EW::Byte: vmadc_vvm<uint8_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
+    case EW::Half: vmadc_vvm<uint16_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
+    case EW::Word: vmadc_vvm<uint32_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
+    case EW::Word2: vmadc_vvm<uint64_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
