@@ -10046,10 +10046,11 @@ Hart<URV>::vmadc_vvm(unsigned vcout, unsigned vs1, unsigned vs2, bool carry, uns
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
           dest = e1 + e2;
-          if (carry and vecRegs_.isActive(vcin, ix))
+	  bool cin = carry and vecRegs_.isActive(vcin, ix);
+	  if (cin)
             dest += ELEM_TYPE(1);
 
-          bool cout = carry? dest <= e1 : dest < e1;
+          bool cout = cin? dest <= e1 : dest < e1;
           if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
             errors++;
         }
@@ -10075,10 +10076,11 @@ Hart<URV>::vmadc_vxm(unsigned vcout, unsigned vs1, ELEM_TYPE e2, bool carry, uns
       if (vecRegs_.read(vs1, ix, group, e1))
         {
           dest = e1 + e2;
-          if (carry and vecRegs_.isActive(vcin, ix))
-            dest += ELEM_TYPE(1);
+          bool cin = carry and vecRegs_.isActive(vcin, ix);
+	  if (cin)
+	    dest += ELEM_TYPE(1);
 
-          bool cout = carry? dest <= e1 : dest < e1;
+          bool cout = cin? dest <= e1 : dest < e1;
           if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
             errors++;
         }
@@ -12347,7 +12349,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          ELEM_TYPE2 dest = 0;
+          ELEM_TYPE dest = 0;
           if (e1 == minVal and e2 == minVal)
             {
               // Result saturates at max positive value.
@@ -12359,7 +12361,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
               ELEM_TYPE2 temp = e1;
               temp *= e2;
               roundoff(rm, temp, sizeof(ELEM_TYPE)*8 - 1);
-              dest = temp;
+              dest = ELEM_TYPE(temp);
             }
 
           if (not vecRegs_.write(vd, ix, group, dest))
