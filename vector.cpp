@@ -10376,11 +10376,6 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;
-  if (vcout == vcin)   // cannot overlap vcin
-    {
-      illegalInst(di);
-      return;
-    }
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -10422,12 +10417,6 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vcout == vcin)   // cannot overlap vcin
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -10469,11 +10458,6 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vcout == vcin)   // cannot overlap vcin
-    {
-      illegalInst(di);
-      return;
-    }
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -10516,11 +10500,6 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
-  if (vbout == vbin)   // cannot overlap borrow-in
-    {
-      illegalInst(di);
-      return;
-    }
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -10562,11 +10541,6 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vbin = 0;
-  if (vbout == vbin)   // cannot overlap borrow-in
-    {
-      illegalInst(di);
-      return;
-    }
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();

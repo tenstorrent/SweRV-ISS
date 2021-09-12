@@ -505,7 +505,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   cancelLr(); // Clear LR reservation (if any).
 
   clearPendingNmi();
-  clearTraceData();
 
   loadQueue_.clear();
 
@@ -570,6 +569,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // Make all idempotent override entries invalid.
   for (auto& entry : pmaOverrideVec_)
     entry.reset();
+
+  clearTraceData();
 }
 
 
