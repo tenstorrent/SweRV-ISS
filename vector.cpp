@@ -10476,10 +10476,10 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmadc_vxm<int8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
-    case EW::Half: vmadc_vxm<int16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
-    case EW::Word: vmadc_vxm<int32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
-    case EW::Word2: vmadc_vxm<int64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
+    case EW::Byte: vmadc_vxm<uint8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
+    case EW::Half: vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
+    case EW::Word: vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
+    case EW::Word2: vmadc_vxm<uint64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
