@@ -14215,6 +14215,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
+  badConfig = badConfig or (groupX8*fieldCount > 64);
 
   if (not isVecLegal() or badConfig)
     {
@@ -14368,6 +14369,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
+  badConfig = badConfig or (groupX8*fieldCount > 64);
 
   if (not isVecLegal() or badConfig)
     {
