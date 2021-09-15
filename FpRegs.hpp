@@ -188,10 +188,9 @@ namespace WdRiscv
   {
   public:
 
-    /// Construct a Float16 from a 16-bit integer by reinterpreting
-    /// the bits as a float (no conversion from integer to float).
-    explicit Float16(uint16_t x = 0)
-      : i16(x)
+    /// Default constructor: value will be zero.
+    Float16()
+      : i16(0)
     { }
 
     /// Return true if this Float16 is equal to the given Float16.
@@ -292,6 +291,11 @@ namespace WdRiscv
 
     /// Return a half precison float from the given single precison number.
     static Float16 fromFloat(float x);
+
+    /// Return a half precison float from the given bit pattern interpreted
+    /// as a half-precision floating point number.
+    static Float16 fromBits(uint16_t x)
+    { Float16 res; res.i16 = x; return res; }
 
     /// Return a Float16 with magnitude of x and sign of y.
     static Float16 copySign(Float16 x, Float16 y)
@@ -423,7 +427,7 @@ namespace WdRiscv
       if constexpr (std::is_same<FT, float>::value)   return readSingle(i);
       if constexpr (std::is_same<FT, double>::value)  return readDouble(i);
       assert(0);
-      return FT(0.0f);
+      return FT{};
     }
 
     /// Return the count of registers in this register file.

@@ -12,7 +12,7 @@ namespace WdRiscv
   /// Convert softfloat float16_t type to Float16.
   inline Float16 softToNative(float16_t f16)
   {
-    return Float16(f16.v);
+    return Float16::fromBits(f16.v);
   }
 
 

@@ -196,7 +196,7 @@ FpRegs::reset(bool hasHalf, bool hasSingle, bool hasDouble)
       // F16 extension present without F or D. Reset to NAN-boxed
       // half-precision zeros.
       for (size_t i = 0; i < regs_.size(); ++i)
-	writeHalf(i, Float16(uint16_t{0}));
+	writeHalf(i, Float16());
     }
 
   clearLastWrittenReg();

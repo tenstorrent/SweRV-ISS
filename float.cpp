@@ -555,7 +555,7 @@ fusedMultiplyAdd(float x, float y, float z, bool& invalid)
 Float16
 fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool& invalid)
 {
-  Float16 res{0};
+  Float16 res;
 
 #ifndef SOFT_FLOAT
   #ifdef __FP_FAST_FMA
@@ -2779,7 +2779,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
           peekFpReg(rd, prevRdVal);
           putInLoadQueue(ldSize, addr, rd, prevRdVal, false /*wide*/, true /*fp*/);
         }
-      Float16 f16(half);
+      Float16 f16 = Float16::fromBits(half);
       fpRegs_.writeHalf(rd, f16);
       markFsDirty();
       return;
@@ -3668,7 +3668,7 @@ Hart<URV>::execFmv_h_x(const DecodedInst* di)
 
   URV u1 = intRegs_.read(di->op1());
 
-  Float16 f16{uint16_t(u1)};
+  Float16 f16 = Float16::fromBits(uint16_t(u1));
 
   fpRegs_.writeHalf(di->op0(), f16);
 
