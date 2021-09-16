@@ -463,7 +463,7 @@ extern int  setSimulatorRoundingMode(RoundingMode mode);
 
 template <typename URV>
 bool
-Hart<URV>::checkFpMaskableInst(const DecodedInst* di)
+Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
 {
   if (not checkMaskableInst(di))
     return false;
@@ -481,18 +481,24 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di)
     default:         ok = false;        break;
     }
 
+  if (wide)
+    {
+      switch (sew)
+	{
+	case EW::Half:   ok = isFpLegal(); break;
+	case EW::Word:   ok = isDpLegal();  break;
+	default:         ok = false;        break;
+	}
+    }
+
   // Clear soft-float library or x86 exception flags
   clearSimulatorFpFlags();
-
 
   // Set soft-float library or x86 rounding mode.
   setSimulatorRoundingMode(getFpRoundingMode());
 
   if (not ok)
-    {
-      illegalInst(di);
-      return false;
-    }
+    illegalInst(di);
 
   return ok;
 }
@@ -15689,24 +15695,10 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfadd_vf<float>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfadd_vf<double>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default:
-      illegalInst(di);
-      return;
+    case EW::Half:  vfadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfadd_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -15826,17 +15818,10 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:
-      illegalInst(di); return;
+    case EW::Half:  vfsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -15895,20 +15880,10 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfrsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfrsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfrsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-
-    default:
-      illegalInst(di); return;
+    case EW::Half:  vfrsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfrsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfrsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -15958,7 +15933,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true /*widen*/))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16034,7 +16009,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16057,16 +16032,9 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfwadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfwadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-
-    default:
-      illegalInst(di); return;
+    case EW::Half: vfwadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word: vfwadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -16116,7 +16084,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16192,7 +16160,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16215,16 +16183,9 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfwsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfwsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-
-    default: illegalInst(di); return;
+    case EW::Half: vfwsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word: vfwsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -16273,7 +16234,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_wv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16347,7 +16308,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_wf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16370,17 +16331,9 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfwadd_wf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfwadd_wf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half: vfwadd_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word: vfwadd_wf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -16429,7 +16382,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_wv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16454,7 +16407,6 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     {
     case EW::Half:   vfwsub_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwsub_wv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
     default:         illegalInst(di); return;
     }
 
@@ -16503,7 +16455,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -16526,17 +16478,9 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfwsub_wf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfwsub_wf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half: vfwsub_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word: vfwsub_wf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -16656,22 +16600,10 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmul_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmul_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfmul_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfmul_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -16791,22 +16723,10 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfdiv_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfdiv_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfdiv_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfdiv_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -16865,22 +16785,10 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfrdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfrdiv_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfrdiv_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfrdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfrdiv_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfrdiv_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -16929,7 +16837,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmul_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -17003,7 +16911,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmul_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -17025,17 +16933,9 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfwmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfwmul_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half: vfwmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word: vfwmul_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -17196,22 +17096,10 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmadd_vf<float>  (vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmadd_vf<double> (vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfmadd_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -17349,22 +17237,10 @@ Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfnmadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfnmadd_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfnmadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfnmadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfnmadd_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -17502,22 +17378,10 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmsub_vf<float>  (vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmsub_vf<double> (vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfmsub_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -17655,22 +17519,10 @@ Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfnmsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfnmsub_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfnmsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfnmsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfnmsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -17961,22 +17813,10 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmacc_vf<Float16>(vd, f1, v2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfnmacc_vf<float>  (vd, f1, v2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfnmacc_vf<double> (vd, f1, v2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfnmacc_vf<Float16>(vd, f1, v2, group, start, elems, masked); break;
+    case EW::Word:  vfnmacc_vf<float>  (vd, f1, v2, group, start, elems, masked); break;
+    case EW::Word2: vfnmacc_vf<double> (vd, f1, v2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -18114,22 +17954,10 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmsac_vf<float>  (vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmsac_vf<double> (vd, f1, vs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfmsac_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -18267,22 +18095,10 @@ Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmsac_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfnmsac_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfnmsac_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfnmsac_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfnmsac_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfnmsac_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -18343,7 +18159,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18364,9 +18180,8 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:   vfwmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfwmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
 }
@@ -18424,7 +18239,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18445,22 +18260,9 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmacc_vf<double> (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half: vfwmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
+    case EW::Word: vfwmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 }
 
@@ -18521,7 +18323,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18542,10 +18344,9 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfnmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfnmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfnmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    case EW::Half: vfwnmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word: vfwnmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 }
 
@@ -18602,7 +18403,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18623,22 +18424,9 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfnmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfnmacc_vf<double> (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half: vfwnmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
+    case EW::Word: vfwnmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 }
 
@@ -18699,7 +18487,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18720,9 +18508,8 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:   vfwmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:   vfwmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
 }
@@ -18780,7 +18567,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18801,22 +18588,9 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmsac_vf<double> (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half: vfwmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
+    case EW::Word: vfwmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 }
 
@@ -18877,7 +18651,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18898,10 +18672,9 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfnmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfnmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfnmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    case EW::Half: vfwnmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word: vfwnmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    default:       illegalInst(di); return;
     }
 }
 
@@ -18959,7 +18732,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18980,21 +18753,8 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfnmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfnmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfnmsac_vf<double> (vd, fs1, vs2, group, start, elems, masked);
-      break;
-
+    case EW::Half: vfwnmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
+    case EW::Word: vfwnmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default: illegalInst(di); return;
     }
 }
@@ -19234,7 +18994,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfeq_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -19259,10 +19019,7 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
     case EW::Half:   vmfeq_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfeq_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfeq_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    default:         illegalInst(di); break;
     }
 }
 
@@ -19310,7 +19067,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfeq_vf(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19330,23 +19087,10 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vmfeq_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vmfeq_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vmfeq_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default:
-      illegalInst(di); return;
+    case EW::Half:  vmfeq_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmfeq_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vmfeq_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -19393,7 +19137,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfne_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -19418,10 +19162,7 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
     case EW::Half:   vmfne_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfne_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfne_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    default:         illegalInst(di); break;
     }
 }
 
@@ -19469,7 +19210,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfne_vf(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19489,22 +19230,10 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vmfne_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vmfne_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vmfne_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vmfne_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmfne_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vmfne_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 }
 
@@ -19551,7 +19280,7 @@ template <typename URV>
 void
 Hart<URV>::execVmflt_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -19572,14 +19301,11 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vmflt_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vmflt_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vmflt_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); break;
+    case EW::Half:  vmflt_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vmflt_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vmflt_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 }
 
@@ -19627,7 +19353,7 @@ template <typename URV>
 void
 Hart<URV>::execVmflt_vf(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19647,22 +19373,10 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vmflt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vmflt_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vmflt_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); break;
+    case EW::Half:  vmflt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmflt_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vmflt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 }
 
@@ -19709,7 +19423,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfle_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -19730,14 +19444,11 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vmfle_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vmfle_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vmfle_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); break;
+    case EW::Half:  vmfle_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vmfle_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vmfle_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 }
 
@@ -19785,7 +19496,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfle_vf(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19805,22 +19516,10 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vmfle_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vmfle_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vmfle_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); break;
+    case EW::Half:  vmfle_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmfle_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vmfle_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 }
 
@@ -19868,7 +19567,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfgt_vf(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19888,22 +19587,10 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vmfgt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vmfgt_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vmfgt_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); break;
+    case EW::Half:  vmfgt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmfgt_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vmfgt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 }
 
@@ -19951,7 +19638,7 @@ template <typename URV>
 void
 Hart<URV>::execVmfge_vf(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19971,22 +19658,10 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vmfge_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vmfge_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vmfge_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); break;
+    case EW::Half:  vmfge_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmfge_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vmfge_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 }
 
@@ -20027,7 +19702,7 @@ template <typename URV>
 void
 Hart<URV>::execVfclass_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -20046,10 +19721,7 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
     case EW::Half:   vfclass_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfclass_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    default:         illegalInst(di); break;
     }
 }
 
@@ -20790,6 +20462,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
 {
+  // Float to double-wide integer.
   if (not checkFpMaskableInst(di))
     return;
 
@@ -20811,14 +20484,10 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 }
 
@@ -20827,7 +20496,7 @@ template <typename URV>
 template<typename ELEM_TYPE>
 void
 Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
-		       unsigned start, unsigned elems, bool masked)
+			unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
   ELEM_TYPE e1{};
@@ -20863,6 +20532,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
 {
+  // Float to double-wide integer
   if (not checkFpMaskableInst(di))
     return;
 
@@ -20884,14 +20554,10 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 }
 
@@ -20923,14 +20589,10 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 }
 
@@ -20961,14 +20623,10 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 }
 
@@ -21014,6 +20672,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
 {
+  // Unsigned to double-wide fp.
   if (not checkMaskableInst(di))
     return;
 
@@ -21035,14 +20694,20 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfwcvt_f_xu_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfwcvt_f_xu_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:
+      illegalInst(di);
+      break;
+    case EW::Half:
+      if (not isFpLegal()) { illegalInst(di); return; }
+      vfwcvt_f_xu_v<Float16>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      if (not isDpLegal()) { illegalInst(di); return; }
+      vfwcvt_f_xu_v<float>  (vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      illegalInst(di);
+      break;
     }
 }
 
@@ -21088,6 +20753,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
 {
+  // signed to double-wide fp.
   if (not checkMaskableInst(di))
     return;
 
@@ -21109,14 +20775,20 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfwcvt_f_x_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfwcvt_f_x_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:
+      illegalInst(di);
+      break;
+    case EW::Half:
+      if (not isFpLegal()) { illegalInst(di); return; }
+      vfwcvt_f_x_v<Float16>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      if (not isDpLegal()) { illegalInst(di); return; }
+      vfwcvt_f_x_v<float>  (vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      illegalInst(di);
+      break;
     }
 }
 
@@ -21125,7 +20797,7 @@ template <typename URV>
 template<typename ELEM_TYPE>
 void
 Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
-		       unsigned start, unsigned elems, bool masked)
+			unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
@@ -21164,7 +20836,8 @@ template <typename URV>
 void
 Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  // Float to double-wide float.
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -21185,14 +20858,10 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfwcvt_f_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfwcvt_f_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 }
 
@@ -21238,7 +20907,8 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  // Double-wide float to unsigned 
+  if (not checkMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21259,14 +20929,19 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked); break;
-    case EW::Half:   vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:
+      if (not isZfhLegal()) { illegalInst(di); return; }
+      vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Half:
+      if (not isFpLegal()) { illegalInst(di); return; }
+      vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      if (not isDpLegal()) { illegalInst(di); return; }
+      vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked);
+      break;
+    default:       illegalInst(di); break;
     }
 }
 
@@ -21312,7 +20987,8 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  // Double-wide float to int.
+  if (not checkMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21333,15 +21009,21 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-      // PASS int type and do int8_t.
-    case EW::Byte:   vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked); break;
-    case EW::Half:   vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfncvt_x_f_w<int32_t> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:
+      if (not isZfhLegal()) { illegalInst(di); return; }
+      vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Half:
+      if (not isFpLegal()) { illegalInst(di); return; }
+      vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      if (not isDpLegal()) { illegalInst(di); return; }
+      vfncvt_x_f_w<int32_t>(vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      illegalInst(di);
+      break;
     }
 }
 
@@ -21350,7 +21032,8 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  // Double-wide float to unsigned
+  if (not checkMaskableInst(di))
     return;
 
   setSimulatorRoundingMode(RoundingMode::Zero);
@@ -21373,14 +21056,21 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked); break;
-    case EW::Half:   vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:
+      if (not isZfhLegal()) { illegalInst(di); return; }
+      vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Half:
+      if (not isFpLegal()) { illegalInst(di); return; }
+      vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      if (not isDpLegal()) { illegalInst(di); return; }
+      vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      illegalInst(di);
+      break;
     }
 }
 
@@ -21389,7 +21079,8 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  // double-wide float to int
+  if (not checkMaskableInst(di))
     return;
   setSimulatorRoundingMode(RoundingMode::Zero);
 
@@ -21411,14 +21102,21 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked); break;
-    case EW::Half:   vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfncvt_x_f_w<int32_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:
+      if (not isZfhLegal()) { illegalInst(di); return; }
+      vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Half:
+      if (not isFpLegal()) { illegalInst(di); return; }
+      vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      if (not isDpLegal()) { illegalInst(di); return; }
+      vfncvt_x_f_w<int32_t>(vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      illegalInst(di);
+      break;
     }
 }
 
@@ -21464,7 +21162,8 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  // Double-wide unsigned to float
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21485,14 +21184,10 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -21541,6 +21236,7 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
 {
+  // Double-wide int to float
   if (not checkFpMaskableInst(di))
     return;
 
@@ -21562,14 +21258,10 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -21620,7 +21312,8 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  // Double-wide float to float.
+  if (not checkFpMaskableInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -21644,11 +21337,7 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
     case EW::Byte:   illegalInst(di); break;
     case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    default:         illegalInst(di); break;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -21660,6 +21349,8 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 {
+  // Double-wide float to float.
+
   if (not checkFpMaskableInst(di))
     return;
 
@@ -21686,14 +21377,10 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); break;
+    case EW::Half: vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
+    default:       illegalInst(di); break;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
@@ -22039,7 +21726,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     {
       illegalInst(di);
       return;
@@ -22121,7 +21808,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpMaskableInst(di, true))
     {
       illegalInst(di);
       return;
@@ -22433,22 +22120,10 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmin_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmin_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmin_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfmin_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfmin_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfmin_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
@@ -22513,14 +22188,11 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfmax_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfmax_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfmax_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); break;
+    case EW::Half:  vfmax_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfmax_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfmax_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 
   markFsDirty();
@@ -22585,22 +22257,10 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfmax_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfmax_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfmax_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfmax_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfmax_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfmax_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
@@ -22658,14 +22318,11 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfsgnj_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfsgnj_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfsgnj_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); break;
+    case EW::Half:  vfsgnj_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnj_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnj_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 
   markFsDirty();
@@ -22723,22 +22380,10 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfsgnj_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfsgnj_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfsgnj_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfsgnj_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnj_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnj_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
@@ -22797,14 +22442,11 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfsgnjn_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfsgnjn_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfsgnjn_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); break;
+    case EW::Half:  vfsgnjn_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnjn_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnjn_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 
   markFsDirty();
@@ -22863,22 +22505,10 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfsgnjn_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfsgnjn_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfsgnjn_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfsgnjn_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnjn_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnjn_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
@@ -22942,14 +22572,11 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
-    case EW::Half:   vfsgnjx_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfsgnjx_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfsgnjx_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); break;
+    case EW::Half:  vfsgnjx_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnjx_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnjx_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    default:        illegalInst(di); break;
     }
 
   markFsDirty();
@@ -23014,22 +22641,10 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
-      vfsgnjx_vf<Float16>(vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
-      vfsgnjx_vf<float>  (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
-      vfsgnjx_vf<double> (vd, vs1, rs2, group, start, elems, masked);
-      break;
-
-    default: illegalInst(di); return;
+    case EW::Half:  vfsgnjx_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vfsgnjx_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vfsgnjx_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();

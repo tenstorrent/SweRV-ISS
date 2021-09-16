@@ -1863,7 +1863,7 @@ namespace WdRiscv
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
     // otherwise.
-    bool checkFpMaskableInst(const DecodedInst* di);
+    bool checkFpMaskableInst(const DecodedInst* di, bool wide = false);
 
     // Return true if vector operands are mutliples of the given group
     // multiplier (scaled by 8). Return false initiating an illegal instruction
