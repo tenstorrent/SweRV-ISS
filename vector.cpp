@@ -18838,7 +18838,7 @@ Hart<URV>::vfmerge(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          dest = vecRegs_.isActive(0, ix) ? e1 : e2;
+          dest = vecRegs_.isActive(0, ix) ? e2 : e1;
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
