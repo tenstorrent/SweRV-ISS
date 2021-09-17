@@ -17661,17 +17661,17 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isRvf()) { illegalInst(di); return; }
+      if (not isZfhLegal()) { illegalInst(di); return; }
       vfmacc_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
+      if (not isFpLegal()) { illegalInst(di); return; }
       vfmacc_vf<float>  (vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
+      if (not isDpLegal()) { illegalInst(di); return; }
       vfmacc_vf<double> (vd, f1, vs2, group, start, elems, masked);
       break;
 
@@ -18872,17 +18872,17 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
+      if (not isZfhLegal()) { illegalInst(di); return; }
       vfmerge<Float16>(vd, vs1, rs2, group, start, elems);
       break;
 
     case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
+      if (not isFpLegal()) { illegalInst(di); return; }
       vfmerge<float>  (vd, vs1, rs2, group, start, elems);
       break;
 
     case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
+      if (not isDpLegal()) { illegalInst(di); return; }
       vfmerge<double> (vd, vs1, rs2, group, start, elems);
       break;
 
@@ -18933,17 +18933,17 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isRvzfh()) { illegalInst(di); return; }
+      if (not isZfhLegal()) { illegalInst(di); return; }
       vfmv_v_f<Float16>(vd, rs1, group, start, elems);
       break;
 
     case EW::Word:
-      if (not isRvf()) { illegalInst(di); return; }
+      if (not isFpLegal()) { illegalInst(di); return; }
       vfmv_v_f<float>  (vd, rs1, group, start, elems);
       break;
 
     case EW::Word2:
-      if (not isRvd()) { illegalInst(di); return; }
+      if (not isDpLegal()) { illegalInst(di); return; }
       vfmv_v_f<double> (vd, rs1, group, start, elems);
       break;
 
