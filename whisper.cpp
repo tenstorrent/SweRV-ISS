@@ -231,6 +231,7 @@ struct Args
   bool iccmRw = false;
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
+  bool relativeInstCount = false;
 
   // Expand each target program string into program name and args.
   void expandTargets();
@@ -302,6 +303,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       auto numStr = varMap["maxinst"].as<std::string>();
       if (not parseCmdLineNumber("maxinst", numStr, args.instCountLim))
 	ok = false;
+      args.relativeInstCount = not numStr.empty() and numStr.at(0) == '+';
     }
 
   if (varMap.count("memorysize"))
@@ -451,7 +453,7 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "consoleio is not specified on the command line). Deafult: "
          "\"__whisper_console_io\".")
 	("maxinst,m", po::value<std::string>(),
-	 "Limit executed instruction count to arg.")
+	 "Limit executed instruction count to arg. With a leading plus sign interpret the count as relative to the loaded (from a snapshot) instruction count.")
 	("memorysize", po::value<std::string>(),
 	 "Memory size (must be a multiple of 4096).")
 	("interactive,i", po::bool_switch(&args.interactive),
@@ -1159,7 +1161,11 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
 
   // Set instruction count limit.
   if (args.instCountLim)
-    hart.setInstructionCountLimit(*args.instCountLim);
+    {
+      uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
+      count += *args.instCountLim;
+      hart.setInstructionCountLimit(count);
+    }
 
   // Print load-instruction data-address when tracing instructions.
   if (args.traceLdSt)
