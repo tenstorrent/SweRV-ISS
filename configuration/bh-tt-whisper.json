@@ -128,8 +128,25 @@
 	    "number" : "0xfc9",
 	    "reset" : "0x0",
 	    "mask" : "0x0"
-	}
+	},
 
+	"mepc" : {
+	    "reset" : "0x0",
+	    "mask" : "0x0",
+	    "poke_mask": "0x0"
+	},
+
+	"mcause" : {
+	    "reset" : "0x0",
+	    "mask" : "0x0",
+	    "poke_mask": "0x0"
+	},
+
+	"mtval" : {
+	    "reset" : "0x0",
+	    "mask" : "0x0",
+	    "poke_mask": "0x0"
+	}
     },
 
     "vector" : {
