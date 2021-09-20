@@ -19736,11 +19736,23 @@ unsignedToFp2x(uint32_t x)
 #endif
 }
 
+
 static float
 unsignedToFp2x(uint16_t x)
 {
 #ifdef SOFT_FLOAT
   return softToNative(ui32_to_f32(x));
+#else
+  return float(x);
+#endif
+}
+
+
+static Float16
+unsignedToFp2x(uint8_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(ui32_to_f16(x));
 #else
   return float(x);
 #endif
@@ -19757,11 +19769,23 @@ signedToFp2x(int32_t x)
 #endif
 }
 
+
 static float
 signedToFp2x(int16_t x)
 {
 #ifdef SOFT_FLOAT
   return softToNative(i32_to_f32(x));
+#else
+  return float(x);
+#endif
+}
+
+
+static Float16
+signedToFp2x(int8_t x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(i32_to_f16(x));
 #else
   return float(x);
 #endif
@@ -20635,14 +20659,14 @@ template <typename URV>
 template<typename ELEM_TYPE>
 void
 Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
-			unsigned start, unsigned elems, bool masked)
+			 unsigned start, unsigned elems, bool masked)
 {
-  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FP_TYPE2X;
 
   unsigned errors = 0;
-  UINT_TYPE e1{0};
-  ELEM_TYPE2X dest{};
+  ELEM_TYPE e1{};
+  FP_TYPE2X dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20695,15 +20719,16 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      illegalInst(di);
+      if (not isZfhLegal()) { illegalInst(di); return; }
+      vfwcvt_f_xu_v<uint8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
       if (not isFpLegal()) { illegalInst(di); return; }
-      vfwcvt_f_xu_v<Float16>(vd, vs1, group, start, elems, masked);
+      vfwcvt_f_xu_v<uint16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
       if (not isDpLegal()) { illegalInst(di); return; }
-      vfwcvt_f_xu_v<float>  (vd, vs1, group, start, elems, masked);
+      vfwcvt_f_xu_v<uint32_t>(vd, vs1, group, start, elems, masked);
       break;
     default:
       illegalInst(di);
@@ -20718,12 +20743,12 @@ void
 Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FP_TYPE2X;
 
   unsigned errors = 0;
-  INT_TYPE e1{0};
-  ELEM_TYPE2X dest{};
+  ELEM_TYPE e1{};
+  FP_TYPE2X dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20776,15 +20801,16 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      illegalInst(di);
+      if (not isZfhLegal()) { illegalInst(di); return; }
+      vfwcvt_f_x_v<int8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
       if (not isFpLegal()) { illegalInst(di); return; }
-      vfwcvt_f_x_v<Float16>(vd, vs1, group, start, elems, masked);
+      vfwcvt_f_x_v<int16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
       if (not isDpLegal()) { illegalInst(di); return; }
-      vfwcvt_f_x_v<float>  (vd, vs1, group, start, elems, masked);
+      vfwcvt_f_x_v<int32_t>(vd, vs1, group, start, elems, masked);
       break;
     default:
       illegalInst(di);
