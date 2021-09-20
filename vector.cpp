@@ -17683,6 +17683,9 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
   if (not checkFpMaskableInst(di))
     return;
 
+  clearSimulatorFpFlags();
+  setSimulatorRoundingMode(getFpRoundingMode());
+
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
@@ -20433,7 +20436,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -20499,7 +20502,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkFpMaskableInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -20780,6 +20783,9 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   if (not checkMaskableInst(di))
     return;
 
+  clearSimulatorFpFlags();
+  setSimulatorRoundingMode(getFpRoundingMode());
+
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
@@ -20861,6 +20867,9 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   // signed to double-wide fp.
   if (not checkMaskableInst(di))
     return;
+
+  clearSimulatorFpFlags();
+  setSimulatorRoundingMode(getFpRoundingMode());
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
@@ -21017,6 +21026,9 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
   if (not checkMaskableInst(di))
     return;
 
+  clearSimulatorFpFlags();
+  setSimulatorRoundingMode(getFpRoundingMode());
+
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
@@ -21097,6 +21109,9 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
   if (not checkMaskableInst(di))
     return;
 
+  clearSimulatorFpFlags();
+  setSimulatorRoundingMode(getFpRoundingMode());
+
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
@@ -21142,6 +21157,7 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
   if (not checkMaskableInst(di))
     return;
 
+  clearSimulatorFpFlags();
   setSimulatorRoundingMode(RoundingMode::Zero);
 
   bool masked = di->isMasked();
@@ -21188,6 +21204,8 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
   // double-wide float to int
   if (not checkMaskableInst(di))
     return;
+
+  clearSimulatorFpFlags();
   setSimulatorRoundingMode(RoundingMode::Zero);
 
   bool masked = di->isMasked();
