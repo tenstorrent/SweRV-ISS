@@ -15166,6 +15166,15 @@ subnormalAdjust(Float16 x)
 }
 
 
+template <typename T>
+static void
+subnormalAdjust2(T& x1, T& x2)
+{
+  x1 = subnormalAdjust(x1);
+  x2 = subnormalAdjust(x2);
+}
+
+
 namespace std
 {
   static
@@ -15915,6 +15924,8 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
+	  if (subnormToZero_)
+	    subnormalAdjust2(e1, e2);
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  dest = doFadd(e1dw, e2dw, subnormToZero_);
@@ -15978,6 +15989,8 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  if (subnormToZero_)
+    e2 = subnormalAdjust(e2);
   ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
@@ -15992,6 +16005,8 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
+	  if (subnormToZero_)
+	    e1 = subnormalAdjust(e1);
 	  e1dw = ELEM_TYPE2X(e1);
           dest = doFadd(e1dw, e2dw, subnormToZero_);
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -16066,6 +16081,8 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
+	  if (subnormToZero_)
+	    subnormalAdjust2(e1, e2);
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  dest = doFadd(e1dw, -e2dw, subnormToZero_);
@@ -16129,6 +16146,8 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  if (subnormToZero_)
+    e2 = subnormalAdjust(e2);
   ELEM_TYPE2X e1dw{}, negE2dw{-e2}, dest{};
 
   unsigned group2x = group*2;
@@ -16143,6 +16162,8 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
+	  if (subnormToZero_)
+	    e1 = subnormalAdjust(e1);
 	  e1dw = ELEM_TYPE2X(e1);
           dest = doFadd(e1dw, negE2dw, subnormToZero_);
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -16217,6 +16238,8 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
+	  if (subnormToZero_)
+	    e2 = subnormalAdjust(e2);
 	  e2dw = ELEM_TYPE2X(e2);
 	  dest = doFadd(e1dw, e2dw, subnormToZero_);
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -16278,6 +16301,8 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  if (subnormToZero_)
+    e2 = subnormalAdjust(e2);
   ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
@@ -16365,6 +16390,8 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
+	  if (subnormToZero_)
+	    e2 = subnormalAdjust(e2);
 	  e2dw = ELEM_TYPE2X(e2);
 	  dest = doFadd(e1dw, -e2dw, subnormToZero_);
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -16425,6 +16452,8 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  if (subnormToZero_)
+    e2 = subnormalAdjust(e2);
   ELEM_TYPE2X e1dw{}, negE2dw{-e2}, dest{};
 
   unsigned group2x = group*2;
@@ -16800,7 +16829,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
+		     unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
   unsigned errors = 0;
@@ -16819,6 +16848,8 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
+	  if (subnormToZero_)
+	    subnormalAdjust2(e1, e2);
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  dest = doFmul(e1dw, e2dw, subnormToZero_);
@@ -16873,13 +16904,15 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
+		     unsigned start, unsigned elems, bool masked)
 {
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
+  if (subnormToZero_)
+    e2 = subnormalAdjust(e2);
   ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
 
   unsigned group2x = group*2;
@@ -16894,6 +16927,8 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
+	  if (subnormToZero_)
+	    e1 = subnormalAdjust(e1);
 	  e1dw = ELEM_TYPE2X(e1);
           dest = doFmul(e1dw, e2dw, subnormToZero_);
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -18132,6 +18167,8 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;  // True if fp invalid flag true for element
+	  if (subnormToZero_)
+	    subnormalAdjust2(e1, e2);
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
@@ -18197,7 +18234,9 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  if (subnormToZero_)
+    e1 = subnormalAdjust(e1);
+  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -18213,8 +18252,10 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
+	  if (subnormToZero_)
+	    e2 = subnormalAdjust(e2);
 	  bool elemInv = false;
-	  e1dw = ELEM_TYPE2X(e1);
+	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
 	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
           dest = fusedMultiplyAdd(e1dw, e2dw, dest, elemInv);
@@ -18295,6 +18336,9 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
+	  if (subnormToZero_)
+	    subnormalAdjust2(e1, e2);
+
 	  bool elemInv = false;  // True if fp invalid flag true for element
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
@@ -18361,7 +18405,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -18377,8 +18421,11 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
+	  if (subnormToZero_)
+	    e2 = subnormalAdjust(e2);
+
 	  bool elemInv = false;
-	  e1dw = ELEM_TYPE2X(e1);
+	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
 	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
           dest = fusedMultiplyAdd(-e1dw, e2dw, -dest, elemInv);
@@ -18459,6 +18506,8 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
+	  if (subnormToZero_)
+	    subnormalAdjust2(e1, e2);
 	  bool elemInv = false;  // True if fp invalid flag true for element
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
@@ -18525,7 +18574,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -18541,8 +18590,11 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
+	  if (subnormToZero_)
+	    e2 = subnormalAdjust(e2);
+
 	  bool elemInv = false;
-	  e1dw = ELEM_TYPE2X(e1);
+	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
 	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
           dest = fusedMultiplyAdd(e1dw, e2dw, -dest, elemInv);
@@ -18623,6 +18675,9 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
+	  if (subnormToZero_)
+	    subnormalAdjust2(e1, e2);
+
 	  bool elemInv = false;  // True if fp invalid flag true for element
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
@@ -18690,7 +18745,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -18706,8 +18761,11 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
+	  if (subnormToZero_)
+	    e2 = subnormalAdjust(e2);
+
 	  bool elemInv = false;
-	  e1dw = ELEM_TYPE2X(e1);
+	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
 	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
           dest = fusedMultiplyAdd(-e1dw, e2dw, dest, elemInv);
@@ -21743,6 +21801,7 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
+  result = e2;
   
   ELEM_TYPE e1{};
 
@@ -21753,6 +21812,8 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
+	  if (subnormToZero_)
+	    e1 = subnormalAdjust(e1);
 	  ELEM_TYPE2X e1dw = e1;
 	  result = doFadd(result, e1dw, subnormToZero_);
 	}
@@ -21825,6 +21886,7 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
+  result = e2;
   
   ELEM_TYPE e1{};
 
@@ -21835,6 +21897,8 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
+	  if (subnormToZero_)
+	    e1 = subnormalAdjust(e1);
 	  ELEM_TYPE2X e1dw = e1;
 	  result = doFadd(result, e1dw, subnormToZero_);
 	}
