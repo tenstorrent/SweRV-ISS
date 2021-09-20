@@ -19885,7 +19885,6 @@ fpToSigned(Float16 x)
 }
 
 
-
 static uint64_t
 fpToUnsigned2x(float x)
 {
@@ -20111,6 +20110,7 @@ signedToFpHalf(int32_t x)
 #endif
 }
 
+
 static float
 signedToFpHalf(int64_t x)
 {
@@ -20118,6 +20118,28 @@ signedToFpHalf(int64_t x)
   return softToNative(i64_to_f32(x));
 #else
   return float(x);
+#endif
+}
+
+
+static Float16
+fpToHalfFp(float x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(f32_to_f16(nativeToSoft(x)));
+#else
+  return Float16::fromFloat(x);
+#endif
+}
+
+
+static float
+fpToHalfFp(double x)
+{
+#ifdef SOFT_FLOAT
+  return softToNative(f64_to_f32(nativeToSoft(x)));
+#else
+  return x;
 #endif
 }
 
@@ -21304,25 +21326,22 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE e1{};
-  ELEM_TYPE2X dest{};
+  ELEM_TYPE2X e1{};
+  ELEM_TYPE dest{};
   unsigned group2x = group*2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
-	  vecRegs_.touchReg(vd, group2x);
+	  vecRegs_.touchReg(vd, group);
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
+      if (vecRegs_.read(vs1, ix, group2x, e1))
         {
-	  if constexpr(std::is_same<ELEM_TYPE, Float16>::value)
-            dest = e1.toFloat();
-	  else
-	    dest = e1;
-          if (not vecRegs_.write(vd, ix, group2x, dest))
+	  dest = fpToHalfFp(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
       else
