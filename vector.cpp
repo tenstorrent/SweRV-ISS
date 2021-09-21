@@ -13025,7 +13025,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   unsigned elemCount = vecRegs_.elemCount();
 
   // FIX TODO: check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
@@ -13071,7 +13071,6 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
       if (traceLdSt_)
 	vecRegs_.ldStAddr_.push_back(addr);
-      addr += sizeof(ELEM_TYPE);
     }
 }
 
@@ -13172,7 +13171,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   unsigned elemCount = vecRegs_.elemCount();
 
   // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
@@ -13224,8 +13223,6 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
           initiateStoreException(cause, addr, secCause);
           break;
         }
-
-      addr += sizeof(ELEM_TYPE);
     }
 
   assert(errors == 0);
@@ -13324,7 +13321,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
 
   // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
     {
       bool exception = false;
       ELEM_TYPE elem = 0;
@@ -13356,7 +13353,6 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
       if (traceLdSt_)
 	vecRegs_.ldStAddr_.push_back(addr);
-      addr += sizeof(ELEM_TYPE);
     }
 
   assert(errors == 0);
@@ -13449,7 +13445,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / 8;
 
   // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, ++addr)
     {
       bool exception = false;
       uint8_t elem = 0;
@@ -13472,8 +13468,6 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           break;
         }
-
-      addr += sizeof(elem);
     }
 
   assert(errors == 0);
@@ -13609,7 +13603,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   unsigned elemCount = vecRegs_.elemCount();
 
   // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
@@ -13657,7 +13651,6 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
       if (traceLdSt_)
 	vecRegs_.ldStAddr_.push_back(addr);
-      addr += stride;
     }
 
   assert(errors == 0);
@@ -13761,7 +13754,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   unsigned elemCount = vecRegs_.elemCount();
 
   // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	{
@@ -13801,8 +13794,6 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           break;
         }
-
-     addr += stride;
     }
 
   assert(errors == 0);
