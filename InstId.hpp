@@ -601,6 +601,8 @@ namespace WdRiscv
 
      vmv_x_s,
      vmv_s_x,
+     vfmv_f_s,
+     vfmv_s_f,
 
      vmv_v_v,
      vmv_v_x,

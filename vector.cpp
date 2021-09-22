@@ -10801,10 +10801,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
       }
       break;
 
-    case ElementWidth::Word4:
-    case ElementWidth::Word8:
-    case ElementWidth::Word16:
-    case ElementWidth::Word32:
+    default:
       illegalInst(di);
       break;
     }
@@ -10832,10 +10829,129 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
     case EW::Half: vecRegs_.write(vd, 0, groupX8, int16_t(val)); break;
     case EW::Word: vecRegs_.write(vd, 0, groupX8, int32_t(val)); break;
     case EW::Word2: vecRegs_.write(vd, 0, groupX8, int64_t(val)); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    default:
+      illegalInst(di); break;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmv_f_s(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned rd = di->op0(), vs1 = di->op1(), groupX8 = 8;
+
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  if (vs1 % eg)
+    {
+      illegalInst(di);
+      return;
+    }
+  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  switch (sew)
+    {
+    case ElementWidth::Byte:
+      illegalInst(di);
+      break;
+
+    case ElementWidth::Half:
+      if (not isZfhLegal())
+	illegalInst(di);
+      else
+	{
+	  Float16 val{};
+	  vecRegs_.read(vs1, 0, groupX8, val);
+	  fpRegs_.writeHalf(rd, val);
+	}
+      break;
+
+    case ElementWidth::Word:
+      if (not isFpLegal())
+	illegalInst(di);
+      else
+	{
+	  float val{};
+	  vecRegs_.read(vs1, 0, groupX8, val);
+	  fpRegs_.writeSingle(rd, val);
+	}
+      break;
+
+    case ElementWidth::Word2:
+      if (not isDpLegal())
+	illegalInst(di);
+      else
+	{
+	  double val{};
+	  vecRegs_.read(vs1, 0, groupX8, val);
+	  fpRegs_.writeDouble(rd, val);
+	}
+      break;
+
+    default:
+      illegalInst(di);
+      break;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfmv_s_f(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(), rs1 = di->op1(), groupX8 = 8;
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      illegalInst(di);
+      break;
+    case EW::Half:
+      if (not isZfhLegal())
+	illegalInst(di);
+      else
+	{
+	  Float16 val = fpRegs_.readHalf(rs1);
+	  vecRegs_.write(vd, 0, groupX8, val);
+	}
+      break;
+    case EW::Word:
+      if (not isFpLegal())
+	illegalInst(di);
+      else
+	{
+	  float val = fpRegs_.readSingle(rs1);
+	  vecRegs_.write(vd, 0, groupX8, val);
+	}
+      break;
+    case EW::Word2:
+      if (not isDpLegal())
+	illegalInst(di);
+      else
+	{
+	  double val = fpRegs_.readDouble(rs1);
+	  vecRegs_.write(vd, 0, groupX8, val);
+	}
+      break;
+    default:
+      illegalInst(di);
+      break;
     }
 }
 

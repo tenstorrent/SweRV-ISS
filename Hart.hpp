@@ -2865,6 +2865,8 @@ namespace WdRiscv
 
     void execVmv_x_s(const DecodedInst*);
     void execVmv_s_x(const DecodedInst*);
+    void execVfmv_f_s(const DecodedInst*);
+    void execVfmv_s_f(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vmv_v_v(unsigned vd, unsigned vs1, unsigned group,
