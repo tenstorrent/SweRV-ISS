@@ -15296,9 +15296,9 @@ doFsqrt(FT f1, bool subnormToZero)
   res = softSqrt(f1);
 #else
   if constexpr (std::is_same<FT, Float16>::value)
-    res = FT{std::sqrt(float(f1))};
+    res = FT::fromFloat(std::sqrt(float(f1)));
   else
-   res = std::sqrt(f1);
+    res = std::sqrt(f1);
 #endif
 
   if (std::isnan(res))
@@ -19806,7 +19806,7 @@ unsignedToFp2x(uint8_t x)
 #ifdef SOFT_FLOAT
   return softToNative(ui32_to_f16(x));
 #else
-  return float(x);
+  return Float16::fromFloat(float(x));
 #endif
 }
 
@@ -19839,7 +19839,7 @@ signedToFp2x(int8_t x)
 #ifdef SOFT_FLOAT
   return softToNative(i32_to_f16(x));
 #else
-  return float(x);
+  return Float16::fromFloat(float(x));
 #endif
 }
 
@@ -20094,7 +20094,7 @@ unsignedToFp(uint16_t x)
 #ifdef SOFT_FLOAT
   return softToNative(ui32_to_f16(x));
 #else
-  return Float16(float(x));
+  return Float16::fromFloat(float(x));
 #endif
 }
 
@@ -20126,7 +20126,7 @@ signedToFp(int16_t x)
 #ifdef SOFT_FLOAT
   return softToNative(i32_to_f16(x));
 #else
-  return Float16(float(x));
+  return Float16::fromFloat(float(x));
 #endif
 }
 
@@ -20137,7 +20137,7 @@ unsignedToFpHalf(uint32_t x)
 #ifdef SOFT_FLOAT
   return softToNative(ui32_to_f16(x));
 #else
-  return Float16(float(x));
+  return Float16::fromFloat(float(x));
 #endif
 }
 
@@ -20158,7 +20158,7 @@ signedToFpHalf(int32_t x)
 #ifdef SOFT_FLOAT
   return softToNative(i32_to_f16(x));
 #else
-  return Float16(float(x));
+  return Float16::fromFloat(float(x));
 #endif
 }
 

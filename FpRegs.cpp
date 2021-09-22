@@ -38,13 +38,13 @@ Float16::toFloat() const
 
   if (isSnan())
     {
-      float x = std::limits_<float>::signaling_nan();
+      float x = std::numeric_limits<float>::signaling_NaN();
       return sign? -x : x;
     }
 
-  if (isQnan())
+  if (isNan())
     {
-      float x = std::limits_<float>::quiet_nan();
+      float x = std::numeric_limits<float>::quiet_NaN();
       return sign? -x : x;
     }
 
@@ -58,7 +58,7 @@ Float16::toFloat() const
       uint32_t sig = sigBits();
       assert(sig != 0);
       uint32_t exp = expBits();
-      unsigned mssb = __bultin_clz(sig);  // Most sig set bit
+      unsigned mssb = __builtin_clz(sig);  // Most sig set bit
       assert(mssb <= 9);
       unsigned shift = 10 - mssb;
       sig = sig & ~(uint32_t(1) << shift);  // Clear most sig bit
@@ -67,7 +67,7 @@ Float16::toFloat() const
       exp = exp - 15 + 127;  // Update bias
       uint32_t val = sign? 1 : 0;
       val = (val << 31) | (exp << 23) | sig;
-      uint32FloatUnion uf{val};
+      Uint32FloatUnion uf{val};
       return uf.f;
     }
 
@@ -77,7 +77,7 @@ Float16::toFloat() const
   exp = exp - 15 + 127;
   uint32_t val = sign? 1 : 0;
   val = (val << 31) | (exp << 23) | sig;
-  uint32FloatUnion uf{val};
+  Uint32FloatUnion uf{val};
   return uf.f;
 
 #endif
@@ -104,7 +104,7 @@ Float16::fromFloat(float val)
 
   if (std::isnan(val))
     {
-      Float16 x = isSnan(val)? Float16::signalingNan() : Float16::quietNan();
+      Float16 x = WdRiscv::isSnan(val)? Float16::signalingNan() : Float16::quietNan();
       return sign? -x : x;
     }
 
@@ -112,7 +112,7 @@ Float16::fromFloat(float val)
     return sign? -Float16{} : Float16{};
 
   // Normalized number. Update exponent for float16 bias.
-  uint32FloatUnion uf{val};
+  Uint32FloatUnion uf{val};
 
   uint32_t sig = (uf.u << 9) >> 9;
   int exp = ((uf.u) >> 23) & 0xff;
@@ -124,12 +124,12 @@ Float16::fromFloat(float val)
       assert(0);
     }
   if (exp >= 0x1f)
-    return sign? -Float16::infinity() : Float16:infinity();
+    return sign? -Float16::infinity() : Float16::infinity();
 
   uint16_t res = sign? 1 : 0;
   res = (res << 15) | uint16_t(exp << 10) | uint16_t(sig >> 13);
 
-  return Float16{res};
+  return Float16::fromBits(res);
 
 #endif
 }

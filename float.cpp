@@ -559,9 +559,9 @@ fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool& invalid)
 
 #ifndef SOFT_FLOAT
   #ifdef __FP_FAST_FMA
-  res = Float16{x.toFloat() * y.toFloat() + z.toFloat()};
+  res = Float16::fromFloat(x.toFloat() * y.toFloat() + z.toFloat());
   #else
-  res = Float16{std::fma(x.toFloat(), y.toFloat(), z.toFloat())};
+  res = Float16::fromFloat(std::fma(x.toFloat(), y.toFloat(), z.toFloat()));
   #endif
 #else
   float16_t tmp = f16_mulAdd(nativeToSoft(x), nativeToSoft(y), nativeToSoft(z));
@@ -2970,7 +2970,7 @@ Hart<URV>::execFadd_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_add(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16{f1.toFloat() + f2.toFloat()};
+  Float16 res = Float16::fromFloat(f1.toFloat() + f2.toFloat());
 #endif
 
   if (res.isNan())
@@ -3005,7 +3005,7 @@ Hart<URV>::execFsub_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_sub(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16{f1.toFloat() - f2.toFloat()};
+  Float16 res = Float16::fromFloat(f1.toFloat() - f2.toFloat());
 #endif
 
   if (res.isNan())
@@ -3040,7 +3040,7 @@ Hart<URV>::execFmul_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_mul(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16{f1.toFloat() * f2.toFloat()};
+  Float16 res = Float16::fromFloat(f1.toFloat() * f2.toFloat());
 #endif
 
   if (res.isNan())
@@ -3075,7 +3075,7 @@ Hart<URV>::execFdiv_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_div(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16{f1.toFloat() / f2.toFloat()};
+  Float16 res = Float16::fromFloat(f1.toFloat() / f2.toFloat());
 #endif
 
   if (res.isNan())
@@ -3106,7 +3106,7 @@ Hart<URV>::execFsqrt_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_sqrt(nativeToSoft(f1)));
 #else
-  Float16 res{std::sqrt(f1.toFloat())};
+  Float16 res = Float16::fromFloat(std::sqrt(f1.toFloat()));
 #endif
 
   if (res.isNan())
@@ -3325,7 +3325,7 @@ Hart<URV>::execFcvt_h_s(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f32_to_f16(nativeToSoft(f1)));
 #else
-  Float16 res{f1};
+  Float16 res = Float16::fromFloat(f1);
 #endif
 
   if (res.isNan())
@@ -3353,7 +3353,7 @@ Hart<URV>::execFcvt_h_d(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f64_to_f16(nativeToSoft(d1)));
 #else
-  Float16 res{float(d1)};
+  Float16 res = Float16::fromFloat(float(d1));
 #endif
 
   if (res.isNan())
@@ -3618,7 +3618,7 @@ Hart<URV>::execFcvt_h_w(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(i32_to_f16(i1));
 #else
-  Float16 res{float(i1)};
+  Float16 res = Float16::fromFloat(float(i1));
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
@@ -3643,7 +3643,7 @@ Hart<URV>::execFcvt_h_wu(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(ui32_to_f16(u1));
 #else
-  Float16 res{float(u1)};
+  Float16 res = Float16::fromFloat(float(u1));
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
@@ -3875,7 +3875,7 @@ Hart<uint64_t>::execFcvt_h_l(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(i64_to_f16(i1));
 #else
-  Float16 res{float(i1)};
+  Float16 res = Float16::fromFloat(float(i1));
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
@@ -3914,7 +3914,7 @@ Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(ui64_to_f16(u1));
 #else
-  Float16 res{float(u1)};
+  Float16 res = Float16::fromFloat(float(u1));
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
