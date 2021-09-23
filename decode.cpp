@@ -710,6 +710,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 8:    return instTable_.getEntry(InstId::vfsgnj_vf);
 	case 9:    return instTable_.getEntry(InstId::vfsgnjn_vf);
 	case 0xa:  return instTable_.getEntry(InstId::vfsgnjx_vf);
+	case 0xe:  return instTable_.getEntry(InstId::vfslide1up_vf);
+	case 0xf:  return instTable_.getEntry(InstId::vfslide1down_vf);
 	case 0x10:
 	  std::swap(op1, op2);
 	  if (op2 == 0) return instTable_.getEntry(InstId::vfmv_s_f);

@@ -6908,6 +6908,146 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
 
 
 template <typename URV>
+void
+Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  unsigned dist = vd > vs1 ? vd - vs1 : vs1 - vd;
+  if (dist*8 < group)
+    {
+      illegalInst(di);  // Source/dest vecs cannot overlap
+      return;
+    }
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  URV amount = 1;
+
+  switch (sew)
+    {
+    case ElementWidth::Byte:
+      illegalInst(di);
+      break;
+
+    case ElementWidth::Half:
+      {
+	Float16 val = fpRegs_.readHalf(rs2);
+	uint16_t replacement = val.bits();
+	vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
+	if (not masked or vecRegs_.isActive(0, 0))
+	  vecRegs_.write(vd, 0, group, replacement);
+      }
+      break;
+
+    case ElementWidth::Word:
+      {
+	vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
+	if (not masked or vecRegs_.isActive(0, 0))
+	  {
+	    Uint32FloatUnion uf(fpRegs_.readSingle(rs2));
+	    vecRegs_.write(vd, 0, group, uf.u);
+	  }
+      }
+      break;
+
+    case ElementWidth::Word2:
+      {
+	vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
+	if (not masked or vecRegs_.isActive(0, 0))
+	  {
+	    Uint64DoubleUnion ud(fpRegs_.readDouble(rs2));
+	    vecRegs_.write(vd, 0, group, ud.u);
+	  }
+      }
+      break;
+
+    default:
+      illegalInst(di);
+      break;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
+{
+  if (not checkFpMaskableInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  unsigned dist = vd > vs1 ? vd - vs1 : vs1 - vd;
+  if (dist*8 < group)
+    {
+      illegalInst(di);  // Source/dest vecs cannot overlap
+      return;
+    }
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  URV amount = 1;
+
+  switch (sew)
+    {
+    case ElementWidth::Byte:
+      illegalInst(di);
+      break;
+
+    case ElementWidth::Half:
+      {
+	Float16 val = fpRegs_.readHalf(rs2);
+	uint16_t replacement = val.bits();
+	vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked);
+	if (not masked or vecRegs_.isActive(0, elems-1))
+	  vecRegs_.write(vd, elems-1, group, replacement);
+      }
+      break;
+
+    case ElementWidth::Word:
+      {
+	vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked);
+	if (not masked or vecRegs_.isActive(0, elems-1))
+	  {
+	    Uint32FloatUnion uf(fpRegs_.readSingle(rs2));
+	    vecRegs_.write(vd, elems-1, group, uf.u);
+	  }
+      }
+      break;
+
+    case ElementWidth::Word2:
+      {
+	vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked);
+	if (not masked or vecRegs_.isActive(0, elems-1))
+	  {
+	    Uint64DoubleUnion ud(fpRegs_.readDouble(rs2));
+	    vecRegs_.write(vd, elems-1, group, ud.u);
+	  }
+      }
+      break;
+
+    default:
+      illegalInst(di);
+      break;
+    }
+}
+
+
+template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,

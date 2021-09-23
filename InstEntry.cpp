@@ -3120,6 +3120,24 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
+      { "vfslide1up.vf", InstId::vfslide1up_vf,
+        0b001110'1'00000'00000'101'00000'1010111,
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::FpReg, OperandMode::Read, rs2Mask,
+      },
+
+      { "vfslide1down.vf", InstId::vfslide1down_vf,
+        0b001111'0'00000'00000'110'00000'1010111,
+        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::VecReg, OperandMode::Read, rs1Mask,
+        OperandType::FpReg, OperandMode::Read, rs2Mask,
+      },
+
       { "vmul.vv", InstId::vmul_vv,
         0b100101'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits

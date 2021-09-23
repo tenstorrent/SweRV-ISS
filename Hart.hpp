@@ -2609,6 +2609,9 @@ namespace WdRiscv
     void execVslidedown_vi(const DecodedInst*);
     void execVslide1down_vx(const DecodedInst*);
 
+    void execVfslide1up_vf(const DecodedInst*);
+    void execVfslide1down_vf(const DecodedInst*);
+
     template<typename ELEM_TYPE>
     void vmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                  unsigned start, unsigned elems, bool masked);

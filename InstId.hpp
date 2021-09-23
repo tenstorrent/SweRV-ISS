@@ -535,6 +535,9 @@ namespace WdRiscv
      vslidedown_vi,
      vslide1down_vx,
 
+     vfslide1up_vf,
+     vfslide1down_vf,
+
      vmul_vv,
      vmul_vx,
      vmulh_vv,

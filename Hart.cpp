@@ -6204,6 +6204,8 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vslidedown_vx,
      &&vslidedown_vi,
      &&vslide1down_vx,
+     &&vfslide1up_vf,
+     &&vfslide1down_vf,
      &&vmul_vv,
      &&vmul_vx,
      &&vmulh_vv,
@@ -8342,6 +8344,14 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vslide1down_vx:
   execVslide1down_vx(di);
+  return;
+
+ vfslide1up_vf:
+  execVfslide1up_vf(di);
+  return;
+
+ vfslide1down_vf:
+  execVfslide1down_vf(di);
   return;
 
  vmul_vv:
