@@ -1878,6 +1878,11 @@ namespace WdRiscv
     // Similar to above but for 1 vector operand instructions.
     bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned groupX8);
 
+    // Check reduction vector operand against the group multiplier. Return true
+    // if operand is a multiple of multiplier and false otherwise. Record group
+    // multiplier for tracing.
+    bool checkRedOpVsEmul(const DecodedInst* di, unsigned op1, unsigned groupX8);
+
     // Similar to above but 3 vector operands and 1st operand is wide.
     bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned op2, unsigned groupX8);

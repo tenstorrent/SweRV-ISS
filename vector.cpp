@@ -562,6 +562,28 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned group
 }
 
 
+template <typename URV>
+inline
+bool
+Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1, unsigned groupX8)
+{
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
+
+  if ((op1 & mask) == 0)
+    {
+      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for scalar operands.
+      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
+      vecRegs_.opsEmul_.at(2) = 1;  // Emul of 1 for scalar operands.
+      return true;
+    }
+
+  // Vector operand not a multiple of emul: illegal.
+  illegalInst(di);
+  return false;
+}
+
+
 /// Return true if destination/source overlap is allowed.
 static
 bool
@@ -577,8 +599,14 @@ checkDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
   if (src >= dest + destGroup or dest >= src + srcGroup)
     return true;  // No overlap.
 
-  // Overlap: ok if source group is >= 1 and overlap in last register of dest.
-  return srcGroupX8 >= 8 and dest + destGroup - 1 == src;
+  // Destination emul > soure emul: Overlap ok if source group is >=
+  // 1 and overlap is at last register in dest.
+  if (destGroupX8 > srcGroupX8)
+    return srcGroupX8 >= 8 and src == dest + destGroup - 1;
+
+  // Destination emul < source emul: Overlap ok if overlap is at
+  // first register in source.
+  return src == dest;
 }
 
 
@@ -627,9 +655,11 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = eg*2;
   unsigned mask2 = eg2 - 1;
 
+  bool overlapOk = checkDestSourceOverlap(op0, groupX8*2, op2, groupX8);
+
   unsigned opw = op0 | op1;
 
-  if ((opw & mask2) == 0 and (op2 & mask) == 0)
+  if (overlapOk and (opw & mask2) == 0 and (op2 & mask) == 0)
     {
       auto& emul =  vecRegs_.opsEmul_;
       emul.at(0) = emul.at(1) = eg2;
@@ -677,9 +707,11 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = eg*2;
   unsigned mask2 = eg2 - 1;
   
+  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, groupX8*2);
+
   unsigned op = op0 | op2;
 
-  if ((op & mask) == 0 and (op1 & mask2) == 0)
+  if (overlapOk and (op & mask) == 0 and (op1 & mask2) == 0)
     {
       auto& emul =  vecRegs_.opsEmul_;
       emul.at(0) = emul.at(2) = eg;
@@ -703,7 +735,9 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = eg*2;
   unsigned mask2 = eg2 - 1;
   
-  if ((op0 & mask) == 0 and (op1 & mask2) == 0)
+  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, groupX8*2);
+
+  if (overlapOk and (op0 & mask) == 0 and (op1 & mask2) == 0)
     {
       auto& emul =  vecRegs_.opsEmul_;
       emul.at(0) = eg;
@@ -5243,8 +5277,7 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5310,8 +5343,7 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5377,8 +5409,7 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5444,8 +5475,7 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5511,8 +5541,7 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5578,8 +5607,7 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5645,8 +5673,7 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5712,8 +5739,7 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5792,8 +5818,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
       return;
     }
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -5830,8 +5855,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -21777,8 +21801,7 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -21849,8 +21872,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -21928,8 +21950,7 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -22006,8 +22027,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -22091,8 +22111,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -22177,8 +22196,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
       return;
     }
 
-  // No constraint on scalar elements (vd and vs2)
-  if (not checkVecOpsVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group))
     return;
 
   typedef ElementWidth EW;
