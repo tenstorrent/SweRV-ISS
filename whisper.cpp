@@ -257,7 +257,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 734;
+  unsigned subversion = 735;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 }
