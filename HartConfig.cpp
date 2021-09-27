@@ -383,8 +383,6 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
           std::cerr << "Warning: Bit corresponding to hart 0 is cleared "
                     << "in reset value of mhartstart CSR -- Bit is ignored\n";
 
-      // Add hart-index to the base-hart-id (which is common to all
-      // the harts in the core).
       if (csrName == "mhartid")
         {
           std::cerr << "CSR mhartid cannot be configured.\n";

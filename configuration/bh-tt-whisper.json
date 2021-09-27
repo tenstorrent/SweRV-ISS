@@ -21,6 +21,9 @@
     "Comment" : "Print memory addres of ld/st instructions in trace log.",
     "print_load_store_address" : "true",
 
+    "Comment" : "2 performance counters implemented (mhpmcount3 and 4), rest (5 to 31) hardwired to 0",
+    "num_mmode_perf_regs" : 2,
+
     "csr" : {
 	"misa" : {
 	    "reset-comment" : "imfv",
@@ -34,22 +37,71 @@
 	    "mask" : "0xffffffff"
 	},
 
-	"hwa_status" : {
-	    "number" : "0x7c3",
+	"mepc" : {
+	    "Comment" : "Hardwired to 0",
 	    "reset" : "0x0",
-	    "mask" : "0xffffffff"
+	    "mask" : "0x0"
 	},
 
-	"hwa_mask" : {
-	    "number" : "0x7c4",
+	"mcause" : {
+	    "Comment" : "Hardwired to 0",
 	    "reset" : "0x0",
-	    "mask" : "0xffffffff"
+	    "mask" : "0x0"
 	},
 
-	"hwa_cfg" : {
-	    "number" : "0x7c5",
+	"mtval" : {
+	    "Comment" : "Hardwired to 0",
 	    "reset" : "0x0",
-	    "mask" : "0xffffffff"
+	    "mask" : "0x0"
+	},
+
+	"tselect" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tdata1" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tdata2" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tdata3" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dcsr" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dpc" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dscratch" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dscratch1" : {
+	    "Comment" : "Hardwired to 0",
+	    "number" : "0x7b3",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
 	},
 
 	"cfg" : {
@@ -58,13 +110,13 @@
 	    "mask" : "0xffffffff"
 	},
 
-	"pmacfg" : {
+	"pmacfg0" : {
 	    "number" : "0x7c1",
 	    "reset" : "0x0",
 	    "mask" : "0xffffffff"
 	},
 
-	"pmacfg" : {
+	"pmacfg1" : {
 	    "number" : "0x7c2",
 	    "reset" : "0x0",
 	    "mask" : "0xffffffff"
@@ -128,25 +180,8 @@
 	    "number" : "0xfc9",
 	    "reset" : "0x0",
 	    "mask" : "0x0"
-	},
-
-	"mepc" : {
-	    "reset" : "0x0",
-	    "mask" : "0x0",
-	    "poke_mask": "0x0"
-	},
-
-	"mcause" : {
-	    "reset" : "0x0",
-	    "mask" : "0x0",
-	    "poke_mask": "0x0"
-	},
-
-	"mtval" : {
-	    "reset" : "0x0",
-	    "mask" : "0x0",
-	    "poke_mask": "0x0"
 	}
+
     },
 
     "vector" : {
