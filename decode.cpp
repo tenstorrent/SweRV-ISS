@@ -869,21 +869,43 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
             }
         }
       else if (lumop == 0x10)
-        {   // fault only on first
-          if (mew == 0)
-            {
-              if (f3 == 0) return instTable_.getEntry(InstId::vle8ff_v);
-              if (f3 == 5) return instTable_.getEntry(InstId::vle16ff_v);
-              if (f3 == 6) return instTable_.getEntry(InstId::vle32ff_v);
-              if (f3 == 7) return instTable_.getEntry(InstId::vle64ff_v);
-            }
-          else
-            {
-              if (f3 == 0) return instTable_.getEntry(InstId::vle128ff_v);
-              if (f3 == 5) return instTable_.getEntry(InstId::vle256ff_v);
-              if (f3 == 6) return instTable_.getEntry(InstId::vle512ff_v);
-              if (f3 == 7) return instTable_.getEntry(InstId::vle1024ff_v);
-            }
+        {
+	  if (nf == 0)
+	    {
+	      // fault only on first
+	      if (mew == 0)
+		{
+		  if (f3 == 0) return instTable_.getEntry(InstId::vle8ff_v);
+		  if (f3 == 5) return instTable_.getEntry(InstId::vle16ff_v);
+		  if (f3 == 6) return instTable_.getEntry(InstId::vle32ff_v);
+		  if (f3 == 7) return instTable_.getEntry(InstId::vle64ff_v);
+		}
+	      else
+		{
+		  if (f3 == 0) return instTable_.getEntry(InstId::vle128ff_v);
+		  if (f3 == 5) return instTable_.getEntry(InstId::vle256ff_v);
+		  if (f3 == 6) return instTable_.getEntry(InstId::vle512ff_v);
+		  if (f3 == 7) return instTable_.getEntry(InstId::vle1024ff_v);
+		}
+	    }
+	  else
+	    {
+	      fieldCount = nf + 1;
+	      if (mew == 0)
+		{
+		  if (f3 == 0) return instTable_.getEntry(InstId::vlsege8ff_v);
+		  if (f3 == 5) return instTable_.getEntry(InstId::vlsege16ff_v);
+		  if (f3 == 6) return instTable_.getEntry(InstId::vlsege32ff_v);
+		  if (f3 == 7) return instTable_.getEntry(InstId::vlsege64ff_v);
+		}
+	      else
+		{
+		  if (f3 == 0) return instTable_.getEntry(InstId::vlsege128ff_v);
+		  if (f3 == 5) return instTable_.getEntry(InstId::vlsege256ff_v);
+		  if (f3 == 6) return instTable_.getEntry(InstId::vlsege512ff_v);
+		  if (f3 == 7) return instTable_.getEntry(InstId::vlsege1024ff_v);
+		}
+	    }
         }
     }
 

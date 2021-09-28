@@ -529,7 +529,8 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       std::string name = di.instEntry()->name();
       if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
 	name = insertFieldCountInName(name, di.vecFieldCount(), 2);
-      else if (id >= InstId::vlsege8_v and id <= InstId::vssege1024_v)
+      else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or
+	       (id >= InstId::vlsege8ff_v and id <= InstId::vlsege1024ff_v))
 	name = insertFieldCountInName(name, di.vecFieldCount(), 5);
       else if (id >= InstId::vlssege8_v and id <= InstId::vsssege1024_v)
 	name = insertFieldCountInName(name, di.vecFieldCount(), 6);

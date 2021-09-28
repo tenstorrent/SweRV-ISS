@@ -15387,6 +15387,78 @@ Hart<URV>::execVsoxsegei1024_v(const DecodedInst* di)
 }
 
 
+template <typename URV>
+void
+Hart<URV>::execVlsege8ff_v(const DecodedInst* di)
+{
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned stride = fieldCount*sizeof(uint8_t);
+  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlsege16ff_v(const DecodedInst* di)
+{
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned stride = fieldCount*sizeof(uint16_t);
+  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlsege32ff_v(const DecodedInst* di)
+{
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned stride = fieldCount*sizeof(uint32_t);
+  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlsege64ff_v(const DecodedInst* di)
+{
+  unsigned fieldCount = di->vecFieldCount();
+  unsigned stride = fieldCount*sizeof(uint64_t);
+  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlsege128ff_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlsege256ff_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlsege512ff_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVlsege1024ff_v(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
 template <typename T>
 static
 T

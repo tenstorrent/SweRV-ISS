@@ -5100,6 +5100,70 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
+      { "vlsege8ff.v", InstId::vlsege8ff_v,
+	0b001000'1'10000'00000'000'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vlsege16ff.v", InstId::vlsege16ff_v,
+        0b001000'1'10000'00000'101'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vlsege32ff.v", InstId::vlsege32ff_v,
+        0b001000'1'10000'00000'110'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vlsege64ff.v", InstId::vlsege64ff_v,
+        0b001000'1'10000'00000'111'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vlsege128ff.v", InstId::vlsege128ff_v,
+        0b001100'1'10000'00000'000'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vlsege256ff.v", InstId::vlsege256ff_v,
+        0b001100'1'10000'00000'101'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vlsege512ff.v", InstId::vlsege512ff_v,
+        0b001100'1'10000'00000'110'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vlsege1024ff.v", InstId::vlsege1024ff_v,
+        0b001100'1'10000'00000'111'00000'0000111,
+        0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
       { "vfadd.vv", InstId::vfadd_vv,
         0b000000'0'00000'00000'001'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits

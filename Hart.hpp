@@ -3184,6 +3184,15 @@ namespace WdRiscv
     void execVsoxsegei512_v(const DecodedInst*);
     void execVsoxsegei1024_v(const DecodedInst*);
 
+    void execVlsege8ff_v(const DecodedInst*);
+    void execVlsege16ff_v(const DecodedInst*);
+    void execVlsege32ff_v(const DecodedInst*);
+    void execVlsege64ff_v(const DecodedInst*);
+    void execVlsege128ff_v(const DecodedInst*);
+    void execVlsege256ff_v(const DecodedInst*);
+    void execVlsege512ff_v(const DecodedInst*);
+    void execVlsege1024ff_v(const DecodedInst*);
+
     template<typename ELEM_TYPE>
     void vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                  unsigned start, unsigned elems, bool masked);

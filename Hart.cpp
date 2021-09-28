@@ -3566,7 +3566,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       // We want to report all the registers in the group.
       unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
       vecReg = vecReg - (vecReg % groupSize);
-      if (instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v)
+      if ((instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v) or
+	  (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v))
 	{
 	  vecReg = di.op0();
 	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
@@ -6447,6 +6448,15 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsoxsegei512_v,
      &&vsoxsegei1024_v,
 
+     &&vlsege8ff_v,
+     &&vlsege16ff_v,
+     &&vlsege32ff_v,
+     &&vlsege64ff_v,
+     &&vlsege128ff_v,
+     &&vlsege256ff_v,
+     &&vlsege512ff_v,
+     &&vlsege1024ff_v,
+
      &&vfadd_vv,
      &&vfadd_vf,
      &&vfsub_vv,
@@ -9276,6 +9286,38 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vsoxsegei1024_v:
   execVsoxsegei1024_v(di);
+  return;
+
+ vlsege8ff_v:
+  execVlsege8ff_v(di);
+  return;
+
+ vlsege16ff_v:
+  execVlsege16ff_v(di);
+  return;
+
+ vlsege32ff_v:
+  execVlsege32ff_v(di);
+  return;
+
+ vlsege64ff_v:
+  execVlsege64ff_v(di);
+  return;
+
+ vlsege128ff_v:
+  execVlsege128ff_v(di);
+  return;
+
+ vlsege256ff_v:
+  execVlsege256ff_v(di);
+  return;
+
+ vlsege512ff_v:
+  execVlsege512ff_v(di);
+  return;
+
+ vlsege1024ff_v:
+  execVlsege1024ff_v(di);
   return;
 
  vfadd_vv:

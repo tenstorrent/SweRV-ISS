@@ -798,6 +798,15 @@ namespace WdRiscv
      vsoxsegei512_v,
      vsoxsegei1024_v,
 
+     vlsege8ff_v,
+     vlsege16ff_v,
+     vlsege32ff_v,
+     vlsege64ff_v,
+     vlsege128ff_v,
+     vlsege256ff_v,
+     vlsege512ff_v,
+     vlsege1024ff_v,
+
      vfadd_vv,
      vfadd_vf,
      vfsub_vv,
