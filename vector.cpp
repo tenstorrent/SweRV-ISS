@@ -13303,8 +13303,8 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
         }
       else
         {
-          if (determineLoadException(rs1, addr, addr, sizeof(elem), secCause) ==
-              ExceptionCause::NONE)
+	  cause = determineLoadException(rs1, addr, addr, sizeof(elem), secCause);
+	  if (cause == ExceptionCause::NONE)
             memory_.read(addr, elem);
         }
 
@@ -13456,7 +13456,8 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       else
         {
           bool forced = false;
-          if (determineStoreException(rs1, URV(addr), addr, elem, secCause, forced) == ExceptionCause::NONE)
+          cause = determineStoreException(rs1, URV(addr), addr, elem, secCause, forced);
+	  if (cause == ExceptionCause::NONE)
 	    {
 	      memory_.write(hartIx_, addr, elem);
 	      if (traceLdSt_)
@@ -13881,8 +13882,8 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
         }
       else
         {
-          if (determineLoadException(rs1, addr, addr, sizeof(elem), secCause) ==
-              ExceptionCause::NONE)
+          cause = determineLoadException(rs1, addr, addr, sizeof(elem), secCause);
+	  if (cause == ExceptionCause::NONE)
             memory_.read(addr, elem);
         }
 
@@ -14452,7 +14453,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
-			 unsigned fieldCount, uint64_t stride)
+			 unsigned fieldCount, uint64_t stride, bool faultFirst)
 {
   vecRegs_.ldStAddr_.clear();
   vecRegs_.stData_.clear();
@@ -14505,18 +14506,19 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      continue;
 	    }
 
-	  auto cause = ExceptionCause::NONE;
-	  auto secCause = SecondaryCause::NONE;
-
 	  ELEM_TYPE elem(0);
-	  if (determineLoadException(rs1, faddr, faddr, sizeof(elem), secCause) == ExceptionCause::NONE)
-            memory_.read(faddr, elem);
+	  auto secCause = SecondaryCause::NONE;
+	  auto cause = ExceptionCause::NONE;
+	  cause = determineLoadException(rs1, faddr, faddr, sizeof(elem), secCause);
 
-	  if (cause != ExceptionCause::NONE)
+	  if (cause == ExceptionCause::NONE)
+            memory_.read(faddr, elem);
+	  else
 	    {
 	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(cause, faddr, secCause);
+	      if (ix == 0 or not faultFirst)
+		initiateLoadException(cause, faddr, secCause);
 	      return;
 	    }
 
@@ -14536,7 +14538,7 @@ Hart<URV>::execVlsege8_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
-  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false);
 }
 
 
@@ -14546,7 +14548,7 @@ Hart<URV>::execVlsege16_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
-  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false);
 }
 
 
@@ -14556,7 +14558,7 @@ Hart<URV>::execVlsege32_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
-  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false);
 }
 
 
@@ -14566,7 +14568,7 @@ Hart<URV>::execVlsege64_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
-  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false);
 }
 
 
@@ -14662,7 +14664,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  auto secCause = SecondaryCause::NONE;
 
 	  bool forced = false;
-	  if (determineStoreException(rs1, URV(faddr), faddr, elem, secCause, forced) == ExceptionCause::NONE)
+	  cause = determineStoreException(rs1, URV(faddr), faddr, elem, secCause, forced);
+	  if (cause == ExceptionCause::NONE)
 	    {
 	      memory_.write(hartIx_, faddr, elem);
 	      if (traceLdSt_)
@@ -14671,8 +14674,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 		  vecRegs_.stData_.push_back(elem);
 		}
 	    }
-
-	  if (cause != ExceptionCause::NONE)
+	  else
 	    {
 	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
@@ -14762,7 +14764,7 @@ Hart<URV>::execVlssege8_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false);
 }
 
 
@@ -14772,7 +14774,7 @@ Hart<URV>::execVlssege16_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false);
 }
 
 
@@ -14782,7 +14784,7 @@ Hart<URV>::execVlssege32_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false);
 }
 
 
@@ -14792,7 +14794,7 @@ Hart<URV>::execVlssege64_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false);
 }
 
 
@@ -14959,11 +14961,9 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	      continue;
 	    }
 
-	  auto cause = ExceptionCause::NONE;
 	  auto secCause = SecondaryCause::NONE;
-
-          if (determineLoadException(rs1, faddr, faddr, elemSize, secCause) ==
-	      ExceptionCause::NONE)
+          auto cause = determineLoadException(rs1, faddr, faddr, elemSize, secCause);
+	  if (cause == ExceptionCause::NONE)
 	    {
 	      if (elemSize == 1)
 		{
@@ -15393,7 +15393,7 @@ Hart<URV>::execVlsege8ff_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
-  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, true);
 }
 
 
@@ -15403,7 +15403,7 @@ Hart<URV>::execVlsege16ff_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
-  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, true);
 }
 
 
@@ -15413,7 +15413,7 @@ Hart<URV>::execVlsege32ff_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
-  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, true);
 }
 
 
@@ -15423,7 +15423,7 @@ Hart<URV>::execVlsege64ff_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
-  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, true);
 }
 
 

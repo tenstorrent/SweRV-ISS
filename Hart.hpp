@@ -3100,7 +3100,7 @@ namespace WdRiscv
 
     template <typename ELEM_TYPE>
     void vectorLoadSeg(const DecodedInst*, ElementWidth, unsigned fields,
-		       uint64_t stride);
+		       uint64_t stride, bool faultOnFirstOnly);
 
     void execVlsege8_v(const DecodedInst*);
     void execVlsege16_v(const DecodedInst*);
