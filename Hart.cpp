@@ -1212,19 +1212,19 @@ printUnsignedHisto(const char* tag, const std::vector<uint64_t>& histo,
     return;
 
   if (histo.at(0))
-    fprintf(file, "    %s  0          %" PRId64 "\n", tag, histo.at(0));
+    fprintf(file, "    %s 0           %" PRId64 "\n", tag, histo.at(0));
   if (histo.at(1))
-    fprintf(file, "    %s  1          %" PRId64 "\n", tag, histo.at(1));
+    fprintf(file, "    %s 1           %" PRId64 "\n", tag, histo.at(1));
   if (histo.at(2))
-    fprintf(file, "    %s  2          %" PRId64 "\n", tag, histo.at(2));
+    fprintf(file, "    %s 2           %" PRId64 "\n", tag, histo.at(2));
   if (histo.at(3))
-    fprintf(file, "    %s  (2,   16]  %" PRId64 "\n", tag, histo.at(3));
+    fprintf(file, "    %s (2,     16] %" PRId64 "\n", tag, histo.at(3));
   if (histo.at(4))
-    fprintf(file, "    %s  (16,  1k]  %" PRId64 "\n", tag, histo.at(4));
+    fprintf(file, "    %s (16,    1k] %" PRId64 "\n", tag, histo.at(4));
   if (histo.at(5))
-    fprintf(file, "    %s  (1k, 64k]  %" PRId64 "\n", tag, histo.at(5));
+    fprintf(file, "    %s (1k,   64k] %" PRId64 "\n", tag, histo.at(5));
   if (histo.at(6))
-    fprintf(file, "    %s  > 64k      %" PRId64 "\n", tag, histo.at(6));
+    fprintf(file, "    %s > 64k       %" PRId64 "\n", tag, histo.at(6));
 }
 
 
