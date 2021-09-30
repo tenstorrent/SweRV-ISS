@@ -26,10 +26,10 @@
 
     "csr" : {
 	"misa" : {
-	    "reset-comment" : "imfv",
-	    "reset" : "0x40201121",
-	    "mask-comment" : "all the bits are writeable/pokeable",
-	    "mask" : "0xffffffff"
+	    "reset-comment" : "imabfv",
+	    "reset" : "0x40201163",
+	    "mask-comment" : "Misa is not writable by CSR instructions",
+	    "mask" : "0x0"
 	},
 
 	"mstatus" : {
