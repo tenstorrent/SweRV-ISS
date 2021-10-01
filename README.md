@@ -34,7 +34,7 @@ simulator. In particular you would need:
    ```
 
 3. The Whisper source code which can be downloaded from 
-   [github.](https://github.com/westerndigitalcorporation/swerv-ISS)
+   [github.](https://github.com/chipsalliance/SweRV-ISS)
 
 4. The g++ compiler version 7.2 or higher to compiler Whisper. The g++
    compiler can be installed from a Linux distribution. Alternatively,
