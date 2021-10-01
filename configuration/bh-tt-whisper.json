@@ -33,8 +33,10 @@
 	},
 
 	"mstatus" : {
-	    "reset" : "0xffffffff",
-	    "mask" : "0xffffffff"
+	    "reset" : "0x0",
+	    "mstatus-comment" : "Per Ashok/Srikanth, bit 31 (SD) hardwired to zero since we do not have context switching.",
+	    "mask" : "0x7fffffff",
+	    "poke_mask" : "0x7fffffff"
 	},
 
 	"mepc" : {
