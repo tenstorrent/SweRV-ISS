@@ -265,14 +265,6 @@ namespace WdRiscv
       return legalConfig(eew, emul);
     }
 
-    /// Return the checksum of the elements of the given register
-    /// between the given element indices inclusive.  We checksum the
-    /// bytes covered by the given index range. The indices are allowed
-    /// to be out of bounds. Indices outside the vector regiter file are
-    /// replaced by zero.
-    uint64_t checksum(uint32_t regIx, uint32_t elemIx0, uint32_t elemIx1,
-                      uint32_t elemWidth) const;
-
     /// Set symbol to the symbolic value of the given numeric group
     /// multiplier (premultiplied by 8). Return true on success and
     /// false if groupX8 is out of bounds.

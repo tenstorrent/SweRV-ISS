@@ -27,7 +27,7 @@
     "csr" : {
 	"misa" : {
 	    "reset-comment" : "imabfv",
-	    "reset" : "0x40201163",
+	    "reset" : "0x40201123",
 	    "mask-comment" : "Misa is not writable by CSR instructions",
 	    "mask" : "0x0"
 	},
