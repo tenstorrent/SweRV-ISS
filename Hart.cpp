@@ -298,7 +298,7 @@ Hart<URV>::processExtensions()
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
   enableVectorMode(flag);
 
-  for (auto ec : { 'b', 'g', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
+  for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
 		  'q', 'r', 't', 'w', 'x', 'y', 'z' } )
     {
       unsigned bit = ec - 'a';
@@ -4294,7 +4294,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
   if (info.isIthOperandWrite(0))
     {
       rdType = info.ithOperandType(0);
-      if (rdType == OperandType::IntReg or rdType == OperandType::FpReg)
+      if (rdType == OperandType::IntReg or rdType == OperandType::FpReg or rdType == OperandType::VecReg)
         {
           prof.destRegFreq_.at(di.op0())++;
           opIx++;
@@ -4303,11 +4303,17 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
               intRegs_.getLastWrittenReg(rd, rdOrigVal);
               assert(rd == di.op0());
             }
-          else
+          else if (rdType == OperandType::FpReg)
             {
               fpRegs_.getLastWrittenReg(rd, frdOrigVal);
               assert(rd == di.op0());
             }
+	  else if (rdType == OperandType::VecReg)
+	    {
+	      unsigned groupX8 = 8;
+	      rd = vecRegs_.getLastWrittenReg(groupX8);
+	      assert(rd == di.op0());
+	    }
         }
     }
 
@@ -4356,6 +4362,12 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 
           srcIx++;
         }
+      else if (info.ithOperandType(i) == OperandType::VecReg)
+	{
+	  uint32_t regIx = di.ithOperand(i);
+	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
+	  srcIx++;
+	}
       else if (info.ithOperandType(i) == OperandType::Imm)
         {
           int32_t imm = di.ithOperand(i);
