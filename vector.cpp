@@ -750,13 +750,6 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 }
 
 
-#ifdef SOFT_FLOAT
-
-
-
-#endif
-
-
 template <typename URV>
 void
 Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
