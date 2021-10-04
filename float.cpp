@@ -633,20 +633,10 @@ Hart<URV>::execFmadd_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = fpRegs_.readSingle(di->op3());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -666,20 +656,10 @@ Hart<URV>::execFmsub_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = -fpRegs_.readSingle(di->op3());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -699,20 +679,10 @@ Hart<URV>::execFnmsub_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = fpRegs_.readSingle(di->op3());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -734,20 +704,10 @@ Hart<URV>::execFnmadd_s(const DecodedInst* di)
   float f2 = fpRegs_.readSingle(di->op2());
   float f3 = -fpRegs_.readSingle(di->op3());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   float res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -766,12 +726,6 @@ Hart<URV>::execFadd_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   float res = softToNative(f32_add(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -780,9 +734,6 @@ Hart<URV>::execFadd_s(const DecodedInst* di)
 
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -801,12 +752,6 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   float res = softToNative(f32_sub(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -815,9 +760,6 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
 
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -836,12 +778,6 @@ Hart<URV>::execFmul_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   float res = softToNative(f32_mul(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -850,9 +786,6 @@ Hart<URV>::execFmul_s(const DecodedInst* di)
 
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -871,12 +804,6 @@ Hart<URV>::execFdiv_s(const DecodedInst* di)
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   float res = softToNative(f32_div(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -885,9 +812,6 @@ Hart<URV>::execFdiv_s(const DecodedInst* di)
 
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -905,9 +829,6 @@ Hart<URV>::execFsqrt_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
 
-  if (subnormToZero_)
-      f1 = subnormalAdjust(f1);
-
 #ifdef SOFT_FLOAT
   float res = softToNative(f32_sqrt(nativeToSoft(f1)));
 #else
@@ -916,9 +837,6 @@ Hart<URV>::execFsqrt_s(const DecodedInst* di)
 
   if (std::isnan(res))
     res = std::numeric_limits<float>::quiet_NaN();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeSingle(di->op0(), res);
 
@@ -2828,20 +2746,10 @@ Hart<URV>::execFmadd_h(const DecodedInst* di)
   Float16 f2 = fpRegs_.readHalf(di->op2());
   Float16 f3 = fpRegs_.readHalf(di->op3());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   Float16 res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -2861,20 +2769,10 @@ Hart<URV>::execFmsub_h(const DecodedInst* di)
   Float16 f2 = fpRegs_.readHalf(di->op2());
   Float16 f3 = fpRegs_.readHalf(di->op3()).negate();
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   Float16 res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -2894,20 +2792,10 @@ Hart<URV>::execFnmsub_h(const DecodedInst* di)
   Float16 f2 = fpRegs_.readHalf(di->op2());
   Float16 f3 = fpRegs_.readHalf(di->op3());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   Float16 res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -2929,20 +2817,10 @@ Hart<URV>::execFnmadd_h(const DecodedInst* di)
   Float16 f2 = fpRegs_.readHalf(di->op2());
   Float16 f3 = fpRegs_.readHalf(di->op3()).negate();
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-      f3 = subnormalAdjust(f3);
-    }
-
   bool invalid = false;
   Float16 res = fusedMultiplyAdd(f1, f2, f3, invalid);
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -2961,12 +2839,6 @@ Hart<URV>::execFadd_h(const DecodedInst* di)
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_add(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -2975,9 +2847,6 @@ Hart<URV>::execFadd_h(const DecodedInst* di)
 
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -2996,12 +2865,6 @@ Hart<URV>::execFsub_h(const DecodedInst* di)
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_sub(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -3010,9 +2873,6 @@ Hart<URV>::execFsub_h(const DecodedInst* di)
 
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -3031,12 +2891,6 @@ Hart<URV>::execFmul_h(const DecodedInst* di)
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_mul(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -3045,9 +2899,6 @@ Hart<URV>::execFmul_h(const DecodedInst* di)
 
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -3066,12 +2917,6 @@ Hart<URV>::execFdiv_h(const DecodedInst* di)
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
 
-  if (subnormToZero_)
-    {
-      f1 = subnormalAdjust(f1);
-      f2 = subnormalAdjust(f2);
-    }
-
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_div(nativeToSoft(f1), nativeToSoft(f2)));
 #else
@@ -3080,9 +2925,6 @@ Hart<URV>::execFdiv_h(const DecodedInst* di)
 
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -3100,9 +2942,6 @@ Hart<URV>::execFsqrt_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
 
-  if (subnormToZero_)
-      f1 = subnormalAdjust(f1);
-
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_sqrt(nativeToSoft(f1)));
 #else
@@ -3111,9 +2950,6 @@ Hart<URV>::execFsqrt_h(const DecodedInst* di)
 
   if (res.isNan())
     res = Float16::quietNan();
-
-  if (subnormToZero_)
-    res = subnormalAdjust(res);
 
   fpRegs_.writeHalf(di->op0(), res);
 

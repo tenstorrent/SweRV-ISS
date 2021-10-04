@@ -1311,12 +1311,6 @@ namespace WdRiscv
     void forceRoundingMode(RoundingMode mode)
     { forcedRounding_ = mode; forceRounding_ = true; }
 
-    /// Force floating point arithmetic operation input/output to zero
-    /// if subnormal when true.  If enabled, this breaks IEEE FP
-    /// specs.
-    void forceSubnormalToZero(bool flag)
-    { subnormToZero_ = flag; }
-
     void enableCsvLog(bool flag)
     { csvTrace_ = flag; }
 
@@ -3742,8 +3736,6 @@ namespace WdRiscv
 
     bool forceRounding_ = false;
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
-
-    bool subnormToZero_ = false;
 
     bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
     bool rva_ = false;           // True if extension A (atomic) enabled.
