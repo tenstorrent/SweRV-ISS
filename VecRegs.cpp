@@ -40,14 +40,6 @@ VecRegs::VecRegs()
   // Worst case we have 3 vector operands.
   opsEmul_.resize(3);
   opsEmul_.assign(opsEmul_.size(), 1);
-
-  // Temporary, for testing. FIX.
-  sew_ = ElementWidth::Word2;
-  sewInBits_ = 64;
-
-  // Temporary, for testing. FIX.
-  elems_ = 2;
-
 }
 
 

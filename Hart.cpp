@@ -532,6 +532,15 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
       dcsrStep_ = (value >> 2) & 1;
       dcsrStepIe_ = (value >> 11) & 1;
     }
+  if (peekCsr(CsrNumber::VTYPE, value))
+    {
+      bool vill = (value >> (8*sizeof(URV) - 1)) & 1;
+      bool ma = (value >> 7) & 1;
+      bool ta = (value >> 6) & 1;
+      GroupMultiplier gm = GroupMultiplier(value & 7);
+      ElementWidth ew = ElementWidth((value >> 3) & 7);
+      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+    }
 
   updateStackChecker();  // Swerv-specific feature.
   wideLdSt_ = false;  // Swerv-specific feature.
@@ -4310,9 +4319,10 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
             }
 	  else if (rdType == OperandType::VecReg)
 	    {
-	      unsigned groupX8 = 8;
-	      rd = vecRegs_.getLastWrittenReg(groupX8);
-	      assert(rd == di.op0());
+	      rd = di.op0();
+	      // unsigned groupX8 = 8;
+	      // rd = vecRegs_.getLastWrittenReg(groupX8); 
+	      // assert(rd == di.op0());    // Does not work for load seg.
 	    }
         }
     }
