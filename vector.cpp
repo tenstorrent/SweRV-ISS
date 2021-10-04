@@ -789,13 +789,15 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
             peekCsr(CsrNumber::VL, elems);  // Keep current value of VL.
           else  // strip mining
             {
-              URV avl = intRegs_.read(rs1);  // Applical vl
+              URV avl = intRegs_.read(rs1);  // Application vectorl length.
               if (avl <= vlmax)
                 elems = avl;
               else if (avl >= 2*vlmax)
                 elems = vlmax;
               else
-                elems = (avl + 1) / 2;
+		// avl > vlmax and < 2*vlmax, spec allows anything between
+		// ceil(avl/2) and vlmax inclusive. We choose vlmax.
+                elems = vlmax;
             }
         }
     }
