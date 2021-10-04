@@ -106,6 +106,13 @@
 	    "mask" : "0x0"
 	},
 
+	"vstart" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : 0,
+	    "mask" : 0,
+	    "poke_mask" : 0
+	},
+
 	"cfg" : {
 	    "number" : "0x7c0",
 	    "reset" : "0x0",
