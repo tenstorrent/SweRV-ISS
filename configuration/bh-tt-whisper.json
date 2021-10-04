@@ -33,10 +33,10 @@
 	},
 
 	"mstatus" : {
-	    "mstatus-comment" : "Per Ashok/Srikanth: Bit 31 (SD) hardwired to zero since no context swithing.",
+	    "mstatus-comment" : "Hardwired to zero.",
 	    "reset" : "0x0",
-	    "mask" : "0xffffffff",
-	    "poke_mask" : "0xffffffff"
+	    "mask" : "0x0",
+	    "poke_mask" : "0x0"
 	},
 
 	"mepc" : {
