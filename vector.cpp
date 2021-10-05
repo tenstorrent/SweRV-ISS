@@ -4278,7 +4278,7 @@ Hart<URV>::execVsll_vi(const DecodedInst* di)
 
   bool msk = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  URV imm = di->op2();  // Unisnged -- zero extended.
+  URV imm = di->op2();  // Unsigned -- zero extended.
 
   unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
