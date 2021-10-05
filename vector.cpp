@@ -14496,14 +14496,13 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   unsigned elemSize = sizeof(ELEM_TYPE);
 
-  // FIX TODO: check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t faddr = addr;  // Field address
+      unsigned dvg = vd + field*eg;   // Destination vector gorup.
 
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      uint64_t faddr = addr + field * elemSize;
+      for (unsigned ix = start; ix < elemCount; ++ix, faddr += stride)
 	{
-	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    {
 	      vecRegs_.touchReg(dvg, groupX8);
@@ -14513,7 +14512,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  ELEM_TYPE elem(0);
 	  auto secCause = SecondaryCause::NONE;
 	  auto cause = ExceptionCause::NONE;
-	  cause = determineLoadException(rs1, faddr, faddr, sizeof(elem), secCause);
+	  cause = determineLoadException(rs1, URV(faddr), faddr, sizeof(elem), secCause);
 
 	  if (cause == ExceptionCause::NONE)
             memory_.read(faddr, elem);
@@ -14649,14 +14648,14 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
       return;
     }
 
-  // FIX TODO: check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t faddr = addr;   // Field address
+      unsigned dvg = vd + field*eg;   // Destination vector gorup.
 
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      uint64_t faddr = addr + field * elemSize;
+
+      for (unsigned ix = start; ix < elemCount; ++ix, faddr += stride)
 	{
-	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    continue;
 
@@ -14947,18 +14946,18 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
       return;
     }
 
-  // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
+      unsigned dvg = vd + field*eg;  // Destination vector grop.
 
-      uint64_t faddr = addr + offset;
-
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      for (unsigned ix = start; ix < elemCount; ++ix)
 	{
-	  unsigned dvg = vd + field*eg;  // Destination vector grop.
+	  uint64_t offset = 0;
+	  if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+	    assert(0);
+
+	  uint64_t faddr = addr + offset + field * elemSize;
+
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    {
 	      vecRegs_.touchReg(dvg, groupX8);
@@ -15117,18 +15116,19 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
       return;
     }
 
-  // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
+      unsigned dvg = vd + field*eg;  // Destination vector grop.
 
-      uint64_t faddr = URV(addr + offset), data = 0;
-
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      for (unsigned ix = start; ix < elemCount; ++ix)
 	{
-	  unsigned dvg = vd + field*eg;  // Source vector grop.
+	  uint64_t offset = 0;
+	  if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+	    assert(0);
+
+	  uint64_t faddr = addr + offset + field * elemSize;
+	  uint64_t data = 0;
+
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    {
 	      vecRegs_.touchReg(dvg, groupX8);
