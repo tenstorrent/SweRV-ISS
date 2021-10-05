@@ -14168,7 +14168,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       uint64_t eaddr = addr + offset;
 
       auto secCause = SecondaryCause::NONE;
-      auto cause = determineLoadException(rs1, eaddr, eaddr, elemSize, secCause);
+      auto cause = determineLoadException(rs1, URV(eaddr), eaddr, elemSize, secCause);
       if (cause == ExceptionCause::NONE)
 	{
 	  if (elemSize == 1)
@@ -14964,31 +14964,32 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  auto secCause = SecondaryCause::NONE;
-          auto cause = determineLoadException(rs1, faddr, faddr, elemSize, secCause);
+	  uint64_t physAddr = 0;
+          auto cause = determineLoadException(rs1, URV(faddr), physAddr, elemSize, secCause);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      if (elemSize == 1)
 		{
 		  uint8_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 2)
 		{
 		  uint16_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 4)
 		{
 		  uint32_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 8)
 		{
 		  uint64_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else
@@ -15003,7 +15004,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  if (traceLdSt_)
-	    vecRegs_.ldStAddr_.push_back(faddr);
+	    vecRegs_.ldStAddr_.push_back(physAddr);
 	}
     }
 }
