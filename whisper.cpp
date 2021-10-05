@@ -1184,7 +1184,8 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
   hart.enableGdb(args.gdb);
   if (args.gdbTcpPort.size()>hart.sysHartIndex())
     hart.setGdbTcpPort(args.gdbTcpPort[hart.sysHartIndex()]);
-  hart.enablePerformanceCounters(args.counters);
+  if (args.counters)
+    hart.enablePerformanceCounters(args.counters);
   if (args.abiNames)
     hart.enableAbiNames(args.abiNames);
 
