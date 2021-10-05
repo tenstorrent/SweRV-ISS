@@ -5191,6 +5191,8 @@ Hart<URV>::vcompress_vm(unsigned vd, unsigned vs1, unsigned vs2,
           else
             errors++;
         }
+      else
+	vecRegs_.touchReg(vd, group);
     }
 
   assert(errors == 0);
