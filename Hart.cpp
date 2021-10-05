@@ -3574,21 +3574,18 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     {
       // We want to report all the registers in the group.
       unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
-      vecReg = vecReg - (vecReg % groupSize);
+      vecReg = di.op0();  // Make sure we have 1st reg in group.
       if ((instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v) or
 	  (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v))
 	{
-	  vecReg = di.op0();
 	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
 	}
       else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
 	{
-	  vecReg = di.op0();
 	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
 	}
       else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
 	{
-	  vecReg = di.op0();
 	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
 	}
 
