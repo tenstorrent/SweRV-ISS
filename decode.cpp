@@ -791,6 +791,11 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           op2 = ((rform.bits.funct7 & 0x3f) << 5 | op2);
           return instTable_.getEntry(InstId::vsetvli);
         }
+      if ((f6 >> 4) == 3)
+	{
+          op2 = ((rform.bits.funct7 & 0xf) << 5 | op2);
+	  return instTable_.getEntry(InstId::vsetivli);
+	}
       if (f6 == 0x20)  return instTable_.getEntry(InstId::vsetvl);
     }
 

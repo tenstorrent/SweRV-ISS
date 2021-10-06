@@ -6109,6 +6109,7 @@ Hart<URV>::execute(const DecodedInst* di)
 
      // vevtor
      &&vsetvli,
+     &&vsetivli,
      &&vsetvl,
      &&vadd_vv,
      &&vadd_vx,
@@ -7925,6 +7926,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vsetvli:
   execVsetvli(di);
+  return;
+
+ vsetivli:
+  execVsetivli(di);
   return;
 
  vsetvl:

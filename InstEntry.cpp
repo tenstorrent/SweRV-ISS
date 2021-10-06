@@ -2120,6 +2120,15 @@ InstTable::setupInstVec()
         OperandType::Imm, OperandMode::None, 0x7ff00000,
       },
 
+      { "vsetivli", InstId::vsetivli,
+        0b110000'0'00000'00000'111'00000'1010111, // Opcode
+        0b110000'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+        OperandType::Imm, OperandMode::None, 0x7ff00000,
+      },
+
       { "vsetvl", InstId::vsetvl,
         0b100000'0'00000'00000'111'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits

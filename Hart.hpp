@@ -2250,6 +2250,7 @@ namespace WdRiscv
 
     void vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
     void execVsetvli(const DecodedInst*);
+    void execVsetivli(const DecodedInst*);
     void execVsetvl(const DecodedInst*);
 
     template<typename ELEM_TYPE>

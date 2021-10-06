@@ -410,6 +410,7 @@ namespace WdRiscv
 
      // vector
      vsetvli,
+     vsetivli,
      vsetvl,
 
      vadd_vv,

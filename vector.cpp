@@ -851,6 +851,55 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
 
 template <typename URV>
 void
+Hart<URV>::execVsetivli(const DecodedInst* di)
+{
+  if (not isVecLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned rd = di->op0();
+  unsigned avl = di->op1();
+  unsigned imm = di->op2();
+  
+  bool ma = (imm >> 7) & 1;  // Mask agnostic
+  bool ta = (imm >> 6) & 1;  // Tail agnostic
+  GroupMultiplier gm = GroupMultiplier(imm & 7);
+  ElementWidth ew = ElementWidth((imm >> 3) & 7);
+
+  bool vill = not vecRegs_.legalConfig(ew, gm);
+
+  // Determine vl
+  URV elems = avl;
+
+  if (vill)
+    {
+      ma = false; ta = false; gm = GroupMultiplier(0); ew = ElementWidth(0);
+      elems = 0;
+    }
+
+  // VL is not writeable: Poke it.
+  csRegs_.poke(CsrNumber::VL, elems);
+  recordCsrWrite(CsrNumber::VL);
+
+  vecRegs_.elemCount(elems);  // Update cached value of VL.
+  intRegs_.write(rd, elems);
+
+  // Pack vtype values and update vtype
+  URV vtype = 0;
+  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 6);
+  vtype |= (URV(vill) << (8*sizeof(URV) - 1));
+  csRegs_.poke(CsrNumber::VTYPE, vtype);
+  recordCsrWrite(CsrNumber::VTYPE);
+
+  // Update cached vtype fields in vecRegs_.
+  vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+}
+
+
+template <typename URV>
+void
 Hart<URV>::execVsetvl(const DecodedInst* di)
 {
   if (not isVecLegal())
