@@ -3901,7 +3901,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	    fputc('j', out);
 	}
     }
-  else if (type == InstType::Fp)
+  else if (type == InstType::Rvf or type == InstType::Rvd)
     fputc('f', out);
   else if (type == InstType::Vector)
     fputc('v', out);
@@ -4151,10 +4151,14 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
     {
       pregs.updateCounters(EventNumber::Mult, prevPerfControl_,
                            lastPriv_);
+      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_,
+                           lastPriv_);
     }
   else if (info.isDivide())
     {
       pregs.updateCounters(EventNumber::Div, prevPerfControl_,
+                           lastPriv_);
+      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_,
                            lastPriv_);
     }
   else if (info.isLoad())
@@ -4229,6 +4233,27 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_,
                              lastPriv_);
     }
+  else if (info.type() == InstType::Rvf)
+    {
+      pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_,
+                           lastPriv_);
+    }
+  else if (info.type() == InstType::Rvd)
+    {
+      pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_,
+                           lastPriv_);
+    }
+  else if (info.type() == InstType::Zfh)
+    {
+      pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_,
+                           lastPriv_);
+    }
+  else if (info.type() == InstType::Vector)
+    {
+      pregs.updateCounters(EventNumber::Vector, prevPerfControl_,
+                           lastPriv_);
+    }
+
 }
 
 
