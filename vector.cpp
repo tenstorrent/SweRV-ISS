@@ -750,13 +750,6 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 }
 
 
-#ifdef SOFT_FLOAT
-
-
-
-#endif
-
-
 template <typename URV>
 void
 Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
@@ -789,7 +782,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
             peekCsr(CsrNumber::VL, elems);  // Keep current value of VL.
           else  // strip mining
             {
-              URV avl = intRegs_.read(rs1);  // Application vectorl length.
+              URV avl = intRegs_.read(rs1);  // Application vector length.
               if (avl <= vlmax)
                 elems = avl;
               else if (avl >= 2*vlmax)
