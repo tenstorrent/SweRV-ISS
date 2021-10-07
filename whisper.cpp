@@ -257,7 +257,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 739;
+  unsigned subversion = 746;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 }
@@ -1180,11 +1180,13 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
       hart.setupPeriodicTimerInterrupts(ticks);
     }
 
-  hart.enableTriggers(args.triggers);
+  if (args.triggers)
+    hart.enableTriggers(args.triggers);
   hart.enableGdb(args.gdb);
   if (args.gdbTcpPort.size()>hart.sysHartIndex())
     hart.setGdbTcpPort(args.gdbTcpPort[hart.sysHartIndex()]);
-  hart.enablePerformanceCounters(args.counters);
+  if (args.counters)
+    hart.enablePerformanceCounters(args.counters);
   if (args.abiNames)
     hart.enableAbiNames(args.abiNames);
 

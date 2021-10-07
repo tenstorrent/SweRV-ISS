@@ -15,6 +15,8 @@
     "enable_zba" : "true",
     "enable_zbb" : "true",
 
+    "enable_performance_counters" : "true",
+
     "Comment" : "Use ABI register names in log file (e.g. sp instead of x2).",
     "abi_names" : "true",
     
@@ -33,10 +35,10 @@
 	},
 
 	"mstatus" : {
-	    "reset" : "0x0",
-	    "mstatus-comment" : "Per Ashok/Srikanth, bit 31 (SD) hardwired to zero since we do not have context switching.",
-	    "mask" : "0x7fffffff",
-	    "poke_mask" : "0x7fffffff"
+	    "mstatus-comment" : "Hardwired to zero except for FS, VS, and SD.",
+	    "reset" : "0x80006600",
+	    "mask" : "0x0",
+	    "poke_mask" : "0x0"
 	},
 
 	"mepc" : {
@@ -104,6 +106,13 @@
 	    "number" : "0x7b3",
 	    "reset" : "0x0",
 	    "mask" : "0x0"
+	},
+
+	"vstart" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : 0,
+	    "mask" : 0,
+	    "poke_mask" : 0
 	},
 
 	"cfg" : {

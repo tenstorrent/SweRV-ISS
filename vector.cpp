@@ -782,13 +782,15 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
             peekCsr(CsrNumber::VL, elems);  // Keep current value of VL.
           else  // strip mining
             {
-              URV avl = intRegs_.read(rs1);  // Applical vl
+              URV avl = intRegs_.read(rs1);  // Application vector length.
               if (avl <= vlmax)
                 elems = avl;
               else if (avl >= 2*vlmax)
                 elems = vlmax;
               else
-                elems = (avl + 1) / 2;
+		// avl > vlmax and < 2*vlmax, spec allows anything between
+		// ceil(avl/2) and vlmax inclusive. We choose vlmax.
+                elems = vlmax;
             }
         }
     }
@@ -837,6 +839,55 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
   
   URV vtypeVal = imm;
   vsetvl(rd, rs1, vtypeVal);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsetivli(const DecodedInst* di)
+{
+  if (not isVecLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned rd = di->op0();
+  unsigned avl = di->op1();
+  unsigned imm = di->op2();
+  
+  bool ma = (imm >> 7) & 1;  // Mask agnostic
+  bool ta = (imm >> 6) & 1;  // Tail agnostic
+  GroupMultiplier gm = GroupMultiplier(imm & 7);
+  ElementWidth ew = ElementWidth((imm >> 3) & 7);
+
+  bool vill = not vecRegs_.legalConfig(ew, gm);
+
+  // Determine vl
+  URV elems = avl;
+
+  if (vill)
+    {
+      ma = false; ta = false; gm = GroupMultiplier(0); ew = ElementWidth(0);
+      elems = 0;
+    }
+
+  // VL is not writeable: Poke it.
+  csRegs_.poke(CsrNumber::VL, elems);
+  recordCsrWrite(CsrNumber::VL);
+
+  vecRegs_.elemCount(elems);  // Update cached value of VL.
+  intRegs_.write(rd, elems);
+
+  // Pack vtype values and update vtype
+  URV vtype = 0;
+  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 6);
+  vtype |= (URV(vill) << (8*sizeof(URV) - 1));
+  csRegs_.poke(CsrNumber::VTYPE, vtype);
+  recordCsrWrite(CsrNumber::VTYPE);
+
+  // Update cached vtype fields in vecRegs_.
+  vecRegs_.updateConfig(ew, gm, ma, ta, vill);
 }
 
 
@@ -4269,7 +4320,7 @@ Hart<URV>::execVsll_vi(const DecodedInst* di)
 
   bool msk = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  URV imm = di->op2();  // Unisnged -- zero extended.
+  URV imm = di->op2();  // Unsigned -- zero extended.
 
   unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
@@ -5182,6 +5233,8 @@ Hart<URV>::vcompress_vm(unsigned vd, unsigned vs1, unsigned vs2,
           else
             errors++;
         }
+      else
+	vecRegs_.touchReg(vd, group);
     }
 
   assert(errors == 0);
@@ -14156,10 +14209,10 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
-      uint64_t eaddr = addr + offset;
+      uint64_t eaddr = URV(addr + offset);
 
       auto secCause = SecondaryCause::NONE;
-      auto cause = determineLoadException(rs1, eaddr, eaddr, elemSize, secCause);
+      auto cause = determineLoadException(rs1, URV(eaddr), eaddr, elemSize, secCause);
       if (cause == ExceptionCause::NONE)
 	{
 	  if (elemSize == 1)
@@ -14313,7 +14366,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
-      uint64_t eaddr = addr + offset, data = 0;
+      uint64_t eaddr = URV(addr + offset), data = 0;
 
       auto secCause = SecondaryCause::NONE;
       auto cause = ExceptionCause::NONE;
@@ -14485,14 +14538,13 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   unsigned elemSize = sizeof(ELEM_TYPE);
 
-  // FIX TODO: check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t faddr = addr;  // Field address
+      unsigned dvg = vd + field*eg;   // Destination vector gorup.
 
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      uint64_t faddr = addr + field * elemSize;
+      for (unsigned ix = start; ix < elemCount; ++ix, faddr += stride)
 	{
-	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    {
 	      vecRegs_.touchReg(dvg, groupX8);
@@ -14502,7 +14554,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  ELEM_TYPE elem(0);
 	  auto secCause = SecondaryCause::NONE;
 	  auto cause = ExceptionCause::NONE;
-	  cause = determineLoadException(rs1, faddr, faddr, sizeof(elem), secCause);
+	  cause = determineLoadException(rs1, URV(faddr), faddr, sizeof(elem), secCause);
 
 	  if (cause == ExceptionCause::NONE)
             memory_.read(faddr, elem);
@@ -14638,14 +14690,14 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
       return;
     }
 
-  // FIX TODO: check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t faddr = addr;   // Field address
+      unsigned dvg = vd + field*eg;   // Destination vector gorup.
 
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      uint64_t faddr = addr + field * elemSize;
+
+      for (unsigned ix = start; ix < elemCount; ++ix, faddr += stride)
 	{
-	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    continue;
 
@@ -14936,18 +14988,18 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
       return;
     }
 
-  // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
+      unsigned dvg = vd + field*eg;  // Destination vector grop.
 
-      uint64_t faddr = addr + offset;
-
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      for (unsigned ix = start; ix < elemCount; ++ix)
 	{
-	  unsigned dvg = vd + field*eg;  // Destination vector grop.
+	  uint64_t offset = 0;
+	  if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+	    assert(0);
+
+	  uint64_t faddr = addr + offset + field * elemSize;
+
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    {
 	      vecRegs_.touchReg(dvg, groupX8);
@@ -14955,31 +15007,32 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  auto secCause = SecondaryCause::NONE;
-          auto cause = determineLoadException(rs1, faddr, faddr, elemSize, secCause);
+	  uint64_t physAddr = URV(faddr);
+          auto cause = determineLoadException(rs1, URV(faddr), physAddr, elemSize, secCause);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      if (elemSize == 1)
 		{
 		  uint8_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 2)
 		{
 		  uint16_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 4)
 		{
 		  uint32_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 8)
 		{
 		  uint64_t x = 0;
-		  memory_.read(faddr, x);
+		  memory_.read(physAddr, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else
@@ -14994,7 +15047,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  if (traceLdSt_)
-	    vecRegs_.ldStAddr_.push_back(faddr);
+	    vecRegs_.ldStAddr_.push_back(physAddr);
 	}
     }
 }
@@ -15105,18 +15158,19 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
       return;
     }
 
-  // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix)
+  for (unsigned field = 0; field < fieldCount; ++field)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
+      unsigned dvg = vd + field*eg;  // Destination vector grop.
 
-      uint64_t faddr = addr + offset, data = 0;
-
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      for (unsigned ix = start; ix < elemCount; ++ix)
 	{
-	  unsigned dvg = vd + field*eg;  // Source vector grop.
+	  uint64_t offset = 0;
+	  if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+	    assert(0);
+
+	  uint64_t faddr = addr + offset + field * elemSize;
+	  uint64_t data = 0;
+
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    {
 	      vecRegs_.touchReg(dvg, groupX8);

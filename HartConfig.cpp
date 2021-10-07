@@ -1062,7 +1062,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Enable debug triggers.
-  tag ="enable_triggers";
+  tag = "enable_triggers";
   if (config_ -> count(tag))
     {
       bool flag = false;
@@ -1073,7 +1073,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Enable performance counters.
-  tag ="enable_performance_counters";
+  tag = "enable_performance_counters";
   if (config_ -> count(tag))
     {
       bool flag = false;

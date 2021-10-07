@@ -545,10 +545,14 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       return;
     }
 
-  if (di.instEntry()->instId() == InstId::vsetvli)
+  if (id == InstId::vsetvli or id == InstId::vsetivli)
     {
-      out << "vsetvli " << hart.intRegName(di.op0()) << ", "
-	  << hart.intRegName(di.op1()) << ", ";
+      out << di.instEntry()->name() << ' ' << hart.intRegName(di.op0()) << ", ";
+      if (id == InstId::vsetivli)
+	out << di.op1();
+      else
+	out << hart.intRegName(di.op1());
+      out << ", ";
       std::string mm = ((di.op2() >> 7) & 1) ? "ma" : "mu";
       std::string tt = ((di.op2() >> 6) & 1) ? "ta" : "tu";
       auto gm = VecRegs::to_string(GroupMultiplier(di.op2() & 7));
@@ -557,7 +561,7 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       return;
     }
 
-  if (di.instEntry()->instId() == InstId::vsetvl)
+  if (id == InstId::vsetvl)
     {
       out << "vsetvl " << hart.intRegName(di.op0()) << ", "
 	  << hart.intRegName(di.op1()) << ", " << hart.intRegName(di.op2());
