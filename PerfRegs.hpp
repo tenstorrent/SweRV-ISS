@@ -195,7 +195,7 @@ namespace WdRiscv
     // Map counter index to enable flag in user mode.
     std::vector<bool> enableUser_;
 
-    // Map counter index to enable flag in user mode.
+    // Map counter index to enable flag in machine mode.
     std::vector<bool> enableMachine_;
 
     // Map an event number to a vector containing the indices of the
