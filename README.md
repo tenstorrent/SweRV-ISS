@@ -475,53 +475,53 @@ valid for load/store). Each entry is an array of 2 integers
 defining the start and end address of a data region.
 
 Example:
+
     "memmap" : { "size" : "0x100000000", "page_size" : 4096,
                  "inst" : [0, "0x20000000"] }
        
 ### num_mmode_perf_regs
-     Number of implemented performance counters. If specified number
-     is n, then CSRs (counters) mhpmcounter3 to mhpmcounter3+n-1 are
-     implemented and the remaining counters are hardwired to
-     zero. Same for the mhpmevent CSRs.
+Number of implemented performance counters. If specified number is n,
+then CSRs (counters) mhpmcounter3 to mhpmcounter3+n-1 are implemented
+and the remaining counters are hardwired to zero. Same for the
+mhpmevent CSRs.
 
 ###  enable_performance_counters
-     Whisper will count events associated with performance counters
-     when this is set to true. Note that pipeline specific events
-     (such as mispredicted branches) are not supported. Synchronous
-     events (such as count retired load insructions) are supported.
+Whisper will count events associated with performance counters when
+this is set to true. Note that pipeline specific events (such as
+mispredicted branches) are not supported. Synchronous events (such as
+count retired load insructions) are supported.
 
 ###  abi_names
-     If set to true then registers are identified by their ABI names
-     in the log file (e.g. ra instead of x1).
+If set to true then registers are identified by their ABI names in the
+log file (e.g. ra instead of x1).
 
 ###  csr
-     The CSR configuration is a map wher each key is a CSR name and
-     the corresponding value is an object with the following fields:
-     "number", "reset", "mask", "poke_mask", "exists", and
-     "shared". Set "exists" to false to mark a non implemented CSR
-     (read/write instructions to such a CSR will trigger illegal
-     instruciton exception). Set "mask" to the write mask of the CSR
-     (zero bits correspond to bits that will not be preserved by write
-     instructions). Set "reset" to reset value of the CSR. Set
-     "shared" to true for CSRs that are shared between harts. The
-     "number" fields should be used to define the number (address) of
-     a non-standard CSR. The poke_mask should be used for the rare
-     cases where poke operation may modify some bits that are not
-     modifiable by CSR write instructions.
+The CSR configuration is a map wher each key is a CSR name and the
+corresponding value is an object with the following fields: "number",
+"reset", "mask", "poke_mask", "exists", and "shared". Set "exists" to
+false to mark a non implemented CSR (read/write instructions to such a
+CSR will trigger illegal instruciton exception). Set "mask" to the
+write mask of the CSR (zero bits correspond to bits that will not be
+preserved by write instructions). Set "reset" to reset value of the
+CSR. Set "shared" to true for CSRs that are shared between harts. The
+"number" fields should be used to define the number (address) of a
+non-standard CSR. The poke_mask should be used for the rare cases
+where poke operation may modify some bits that are not modifiable by
+CSR write instructions.
 
 ###  vector
-     The vector configuration is an object with the following fields:
-       bytes_per_vec: vector size in bytes
-       max_bytes_per_elem: widest supported element size in bytes
+The vector configuration is an object with the following fields:
+* bytes_per_vec: vector size in bytes
+* max_bytes_per_elem: widest supported element size in bytes
 
 ###  reset_vec
-     Defines the PC value after reset
+Defines the PC value after reset
 
 ###  nmi_vec
-     Defines the PC address after a non-maskable-interrupt.
+Defines the PC address after a non-maskable-interrupt.
 
 ###  enable_triggers
-     Enable support for debug triggers.
+Enable support for debug triggers.
 
 # Limitations
 
