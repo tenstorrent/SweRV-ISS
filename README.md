@@ -185,8 +185,10 @@ The following is a brief description of the command line options:
        Select the RISCV options to enable. The currently supported options are
        a (atomic), c (compressed instructions), d (double precision fp), 
        f (single precision fp), i (base integer), m (multiply divide),
-       s (supervisor mode), and u (user mode). By default, only i, m and c
-       are enabled. Note that option i cannot be turned off. Example: --isa imcf
+       s (supervisor mode), u (user mode), and v (vector). By default, only i, m and c
+       are enabled. Note that option i cannot be turned off. Example: "--isa imcf".
+       It is recommended to avoid this option if the configuration of the "misa" CSR is
+       included in the JSON configuration file.
 
     --target program
        Specify target program (ELF file) to load into simulated memory. In newlib
@@ -460,6 +462,9 @@ Here is a sample configuration file:
 
 ### cores
 Number of cores in simulated system.
+
+### xlen
+Integer register size in bits.
 
 ### memmap
 Object defining memory organization. Fields of memap:
