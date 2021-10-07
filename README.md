@@ -433,35 +433,35 @@ be specified using the strings "false", "False", "true", or "True".
 
 Here is a sample configuration file:
 
-   {
-       "xlen" : 32,
-       "enable_zfh" : "true",
-       "enable_zba" : "true",
-       "enable_zbb" : "true",
-       "abi_names" : "true",
-
-       "csr" : {
-           "misa" : {
-               "reset-comment" : "imabfv",
-               "reset" : "0x40201123",
-               "mask-comment" : "Misa is not writable by CSR instructions",
-               "mask" : "0x0"
-            },
-            "mstatus" : {
-               "mstatus-comment" : "Hardwired to zero except for FS, VS, and SD.",
-               "reset" : "0x80006600",
-               "mask" : "0x0",
-               "poke_mask" : "0x0"
-            }
-       }
-   }
+    {
+        "xlen" : 32,
+        "enable_zfh" : "true",
+        "enable_zba" : "true",
+        "enable_zbb" : "true",
+        "abi_names" : "true",
+    
+        "csr" : {
+            "misa" : {
+                "reset-comment" : "imabfv",
+                "reset" : "0x40201123",
+                "mask-comment" : "Misa is not writable by CSR instructions",
+                "mask" : "0x0"
+             },
+             "mstatus" : {
+                "mstatus-comment" : "Hardwired to zero except for FS, VS, and SD.",
+                "reset" : "0x80006600",
+                "mask" : "0x0",
+                "poke_mask" : "0x0"
+             }
+        }
+    }
 
 ## Configuration parameters
 
-  cores
+### cores
      Number of cores in simulated system.
 
-  memmap
+### memmap
      Object defining memory organization. Fields of memap:
        size:
           Field defining physical memory size
@@ -481,23 +481,23 @@ Here is a sample configuration file:
        "memmap" : { "size" : "0x100000000", "page_size" : 4096,
                     "inst" : [0, "0x20000000"] }
        
-  num_mmode_perf_regs
+### num_mmode_perf_regs
      Number of implemented performance counters. If specified number
      is n, then CSRs (counters) mhpmcounter3 to mhpmcounter3+n-1 are
      implemented and the remaining counters are hardwired to
      zero. Same for the mhpmevent CSRs.
 
-  enable_performance_counters
+###  enable_performance_counters
      Whisper will count events associated with performance counters
      when this is set to true. Note that pipeline specific events
      (such as mispredicted branches) are not supported. Synchronous
      events (such as count retired load insructions) are supported.
 
-  abi_names
+###  abi_names
      If set to true then registers are identified by their ABI names
      in the log file (e.g. ra instead of x1).
 
-  csr
+###  csr
      The CSR configuration is a map wher each key is a CSR name and
      the corresponding value is an object with the following fields:
      "number", "reset", "mask", "poke_mask", "exists", and
@@ -512,18 +512,18 @@ Here is a sample configuration file:
      cases where poke operation may modify some bits that are not
      modifiable by CSR write instructions.
 
-  vector
+###  vector
      The vector configuration is an object with the following fields:
        bytes_per_vec: vector size in bytes
        max_bytes_per_elem: widest supported element size in bytes
 
-  reset_vec
+###  reset_vec
      Defines the PC value after reset
 
-  nmi_vec
+###  nmi_vec
      Defines the PC address after a non-maskable-interrupt.
 
-  enable_triggers
+###  enable_triggers
      Enable support for debug triggers.
 
 # Limitations
