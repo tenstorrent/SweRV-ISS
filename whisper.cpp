@@ -1180,7 +1180,8 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
       hart.setupPeriodicTimerInterrupts(ticks);
     }
 
-  hart.enableTriggers(args.triggers);
+  if (args.triggers)
+    hart.enableTriggers(args.triggers);
   hart.enableGdb(args.gdb);
   if (args.gdbTcpPort.size()>hart.sysHartIndex())
     hart.setGdbTcpPort(args.gdbTcpPort[hart.sysHartIndex()]);
