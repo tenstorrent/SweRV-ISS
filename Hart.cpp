@@ -4044,35 +4044,33 @@ template <typename FP_TYPE>
 void
 addToFpHistogram(std::vector<uint64_t>& histo, FP_TYPE val)
 {
-  bool pos = not std::signbit(val);
-  int type = std::fpclassify(val);
+  if (histo.size() < 13)
+    histo.resize(13);
 
-  if (type == FP_INFINITE)
-    {
-      FpKinds kind = pos? FpKinds::PosInf : FpKinds::NegInf;
-      histo.at(unsigned(kind))++;
-    }
-  else if (type == FP_NORMAL)
-    {
-      FpKinds kind = pos? FpKinds::PosNormal : FpKinds::NegNormal;
-      histo.at(unsigned(kind))++;
-    }
-  else if (type == FP_SUBNORMAL)
-    {
-      FpKinds kind = pos? FpKinds::PosSubnormal : FpKinds::NegSubnormal;
-      histo.at(unsigned(kind))++;
-    }
-  else if (type == FP_ZERO)
-    {
-      FpKinds kind = pos? FpKinds::PosZero : FpKinds::NegZero;
-      histo.at(unsigned(kind))++;
-    }
-  else if (type == FP_NAN)
-    {
-      bool signaling = isSnan(val);
-      FpKinds kind = signaling? FpKinds::SignalingNan : FpKinds::QuietNan;
-      histo.at(unsigned(kind))++;
-    }
+  unsigned type = fpClassifyRiscv(val);
+  FpKinds kind = FpKinds::PosNormal;
+
+  if (type == unsigned(FpClassifyMasks::PosInfinity))
+    kind = FpKinds::PosInf;
+  else if (type == unsigned(FpClassifyMasks::NegInfinity))
+    kind = FpKinds::NegInf;
+  else if (type == unsigned(FpClassifyMasks::PosNormal))
+    kind = FpKinds::PosNormal;
+  else if (type == unsigned(FpClassifyMasks::NegNormal))
+    kind = FpKinds::NegNormal;
+  else if (type == unsigned(FpClassifyMasks::PosSubnormal))
+    kind = FpKinds::PosSubnormal;
+  else if (type == unsigned(FpClassifyMasks::NegSubnormal))
+    kind = FpKinds::NegSubnormal;
+  else if (type == unsigned(FpClassifyMasks::PosZero))
+    kind = FpKinds::PosZero;
+  else if (type == unsigned(FpClassifyMasks::NegZero))
+    kind = FpKinds::NegZero;
+  else if (type == unsigned(FpClassifyMasks::SignalingNan))
+    kind = FpKinds::SignalingNan;
+  else if (type == unsigned(FpClassifyMasks::QuietNan))
+    kind = FpKinds::QuietNan;
+  histo.at(unsigned(kind))++;
 }
 
 
@@ -4378,14 +4376,25 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
           if (regIx == rd and rdType == OperandType::FpReg)
             val = frdOrigVal;
 
-          bool sp = fpRegs_.isBoxedSingle(val);
-          if (sp)
+	  FpRegs::FpUnion u{val};
+	  bool done = false;
+	  if (isRvzfh() and fpRegs_.isBoxedHalf(val))
+	    {
+	      Float16 hpVal = u.hp;
+	      addToFpHistogram(prof.srcHisto_.at(srcIx), hpVal);
+	      done = true;
+	    }
+          else if (isRvf())
             {
-              FpRegs::FpUnion u{val};
-              float spVal = u.sp;
-              addToFpHistogram(prof.srcHisto_.at(srcIx), spVal);
+	      if (not isRvd() or fpRegs_.isBoxedSingle(val))
+		{
+		  FpRegs::FpUnion u{val};
+		  float spVal = u.sp;
+		  addToFpHistogram(prof.srcHisto_.at(srcIx), spVal);
+		  done = true;
+		}
             }
-          else
+          if (isRvd() and not done)
             {
               FpRegs::FpUnion u{val};
               double dpVal = u.dp;
