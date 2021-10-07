@@ -459,27 +459,24 @@ Here is a sample configuration file:
 ## Configuration parameters
 
 ### cores
-     Number of cores in simulated system.
+Number of cores in simulated system.
 
 ### memmap
-     Object defining memory organization. Fields of memap:
-       size:
-          Field defining physical memory size
-       page_size:
-          Field defining page size
-       inst:
-          Array of entries defining areas of physical memory where
-	  instruction fetch is legal (if not used, then all of memory
-	  is valid for fetch). Each entry is an array of 2 integers
-	  defining the start and end address of a fetch region.
-       data:
-          Array of entries defining areas of physical memory where
-	  data load/store is legal (if not used, then all of memory is
-	  valid for load/store). Each entry is an array of 2 integers
-	  defining the start and end address of a data region.
-     Example:
-       "memmap" : { "size" : "0x100000000", "page_size" : 4096,
-                    "inst" : [0, "0x20000000"] }
+Object defining memory organization. Fields of memap:
+* size: Field defining physical memory size
+* page_size: Field defining page size
+* inst: Array of entries defining areas of physical memory where
+instruction fetch is legal (if not used, then all of memory is valid
+for fetch). Each entry is an array of 2 integers defining the start
+and end address of a fetch region.
+* data: Array of entries defining areas of physical memory where
+data load/store is legal (if not used, then all of memory is
+valid for load/store). Each entry is an array of 2 integers
+defining the start and end address of a data region.
+
+Example:
+    "memmap" : { "size" : "0x100000000", "page_size" : 4096,
+                 "inst" : [0, "0x20000000"] }
        
 ### num_mmode_perf_regs
      Number of implemented performance counters. If specified number
