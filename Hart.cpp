@@ -496,6 +496,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   intRegs_.reset();
   csRegs_.reset();
+  vecRegs_.reset();
 
   // Suppress resetting memory mapped register on initial resets sent
   // by the test bench. Otherwise, initial resets obliterate memory
@@ -513,6 +514,11 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   // Enable extensions if corresponding bits are set in the MISA CSR.
   processExtensions();
+
+  // If vector extension enabled but vectors not configured, then
+  // configure for 128-bits per regiser and 32-bits per elemement.
+  if (isRvv() and vecRegs_.registerCount() == 0)
+    vecRegs_.config(16 /*bytesPerReg*/, 4 /*bytesPerElem*/);  
   
   perfControl_ = ~uint32_t(0);
   URV value = 0;
