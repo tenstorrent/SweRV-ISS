@@ -432,6 +432,7 @@ indicating false and non-zero indicating true. Alternatively it may
 be specified using the strings "false", "False", "true", or "True".
 
 Here is a sample configuration file:
+
    {
        "xlen" : 32,
        "enable_zfh" : "true",
