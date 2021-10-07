@@ -1062,7 +1062,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Enable debug triggers.
-  tag ="enable_triggers";
+  tag = "enable_triggers";
   if (config_ -> count(tag))
     {
       bool flag = false;
