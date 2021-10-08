@@ -5154,7 +5154,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2,
-                           unsigned group, unsigned start, unsigned elems)
+			   unsigned group, unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
@@ -5163,6 +5163,12 @@ Hart<URV>::vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
       if (vecRegs_.read(vs2, ix, e2Group, e2))
         {
           unsigned vs1Ix = e2;
@@ -5197,6 +5203,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   unsigned widthInBytes = vecRegs_.elementWidthInBytes(sew);
+  bool masked = di->isMasked();
 
   unsigned v2Group = (2*group) / widthInBytes;
 
@@ -5232,10 +5239,10 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrgatherei16_vv<uint8_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Half: vrgatherei16_vv<uint16_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word: vrgatherei16_vv<uint32_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word2: vrgatherei16_vv<uint64_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Byte: vrgatherei16_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half: vrgatherei16_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word: vrgatherei16_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vrgatherei16_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -5887,7 +5894,7 @@ template <typename URV>
 void
 Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5924,7 +5931,7 @@ template <typename URV>
 void
 Hart<URV>::execVwredsum_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;

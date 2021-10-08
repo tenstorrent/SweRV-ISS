@@ -2531,7 +2531,7 @@ namespace WdRiscv
 
     template<typename ELEM_TYPE>
     void vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                         unsigned start, unsigned elems);
+                         unsigned start, unsigned elems, bool masked);
     void execVrgatherei16_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
