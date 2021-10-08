@@ -934,25 +934,32 @@ Hart<URV>::genVec()
   DecodedInst di;
   uint32_t illegal = 0, vector = 0;
 
-  std::string tmp;
-  vecRegs_.updateConfig(ElementWidth::Word, GroupMultiplier::One, false,
-			false, false);
+  std::unordered_set<uint32_t> usedIds;
 
-  for (uint32_t i = 0; i <= 0x1ffffff; ++i)
+  std::string tmp;
+
+  for (auto elemWid : {ElementWidth::Half, ElementWidth::Word})
     {
-      uint32_t code = (i << 7) | vc;
-      URV pc = 0;
-      uint64_t physPc = pc;
-      decode(pc, physPc, code, di);
-      mstatusFs_ = FpFs::Clean;
-      mstatusVs_ = FpFs::Clean;
-      auto instId = di.instEntry()->instId();
-      if (instId == InstId::illegal)
-	++illegal;
-      else if (instId == InstId::vsetvli or instId == InstId::vsetvl)
-	continue;
-      else if (di.instEntry()->isVector())
+      vecRegs_.updateConfig(elemWid, GroupMultiplier::One, false,
+			    false, false);
+      std::cout << "  vsetvli t0, t1, " << ((elemWid == ElementWidth::Half)? "e16" : "e32") << ", m1\n";
+
+      for (uint32_t i = 0; i <= 0x1ffffff; ++i)
 	{
+	  uint32_t code = (i << 7) | vc;
+	  URV pc = 0;
+	  uint64_t physPc = pc;
+	  decode(pc, physPc, code, di);
+	  mstatusFs_ = FpFs::Clean;
+	  mstatusVs_ = FpFs::Clean;
+	  auto instId = di.instEntry()->instId();
+	  if (instId == InstId::illegal)
+	    continue;
+	  else if (instId == InstId::vsetvli or instId == InstId::vsetvl)
+	    continue;
+	  else if (usedIds.find(uint32_t(instId)) != usedIds.end())
+	    continue;
+
 	  pokePc(pc);
 	  pokeMemory(pc, code, false);
 	  execute(&di);
@@ -963,9 +970,71 @@ Hart<URV>::genVec()
 	      vector++;
 	      disassembleInst(di, tmp);
 	      std::cout << "  " << tmp << '\n';
+	      usedIds.insert(uint32_t(instId));
 	    }
 	}
     }
+
+  for (uint32_t i = 0; i <= 0x1fffffff; ++i)
+    {
+      uint32_t code = (i << 7) | 7;
+      unsigned w = (code >> 12) & 7;
+      if (w >= 1 and w <= 4)
+	continue;
+      URV pc = 0;
+      uint64_t physPc = 0;
+      decode(pc, physPc, code, di);
+      mstatusFs_ = FpFs::Clean;
+      mstatusVs_ = FpFs::Clean;
+      auto instId = di.instEntry()->instId();
+      if (instId == InstId::illegal)
+	continue;
+      else if (usedIds.find(uint32_t(instId)) != usedIds.end())
+	continue;
+      pokePc(pc);
+      pokeMemory(pc, code, false);
+      execute(&di);
+      if (exceptionCount_)
+	exceptionCount_ = 0;
+      else
+	{
+	  vector++;
+	  disassembleInst(di, tmp);
+	  std::cout << "  " << tmp << '\n';
+	  usedIds.insert(uint32_t(instId));
+	}
+    }
+
+  for (uint32_t i = 0; i <= 0x1fffffff; ++i)
+    {
+      uint32_t code = (i << 7) | 0x27;
+      unsigned w = (code >> 12) & 7;
+      if (w >= 1 and w <= 4)
+	continue;
+      URV pc = 0;
+      uint64_t physPc = 0;
+      decode(pc, physPc, code, di);
+      mstatusFs_ = FpFs::Clean;
+      mstatusVs_ = FpFs::Clean;
+      auto instId = di.instEntry()->instId();
+      if (instId == InstId::illegal)
+	continue;
+      else if (usedIds.find(uint32_t(instId)) != usedIds.end())
+	continue;
+      pokePc(pc);
+      pokeMemory(pc, code, false);
+      execute(&di);
+      if (exceptionCount_)
+	exceptionCount_ = 0;
+      else
+	{
+	  vector++;
+	  disassembleInst(di, tmp);
+	  std::cout << "  " << tmp << '\n';
+	  usedIds.insert(uint32_t(instId));
+	}
+    }
+
   std::cerr << "Illegal vec count: " << illegal << '\n';
   std::cerr << "Legal vec count: " << vector << '\n';
 }
@@ -6423,18 +6492,18 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsse512_v,
      &&vsse1024_v,
 
-     &&vlxei8_v,
-     &&vlxei16_v,
-     &&vlxei32_v,
-     &&vlxei64_v,
+     &&vloxei8_v,
+     &&vloxei16_v,
+     &&vloxei32_v,
+     &&vloxei64_v,
      &&vluxei8_v,
      &&vluxei16_v,
      &&vluxei32_v,
      &&vluxei64_v,
-     &&vsxei8_v,
-     &&vsxei16_v,
-     &&vsxei32_v,
-     &&vsxei64_v,
+     &&vsoxei8_v,
+     &&vsoxei16_v,
+     &&vsoxei32_v,
+     &&vsoxei64_v,
      &&vsuxei8_v,
      &&vsuxei16_v,
      &&vsuxei32_v,
@@ -9032,20 +9101,20 @@ Hart<URV>::execute(const DecodedInst* di)
   execVsse1024_v(di);
   return;
 
- vlxei8_v:
-  execVlxei8_v(di);
+ vloxei8_v:
+  execVloxei8_v(di);
   return;
 
- vlxei16_v:
-  execVlxei16_v(di);
+ vloxei16_v:
+  execVloxei16_v(di);
   return;
 
- vlxei32_v:
-  execVlxei32_v(di);
+ vloxei32_v:
+  execVloxei32_v(di);
   return;
 
- vlxei64_v:
-  execVlxei64_v(di);
+ vloxei64_v:
+  execVloxei64_v(di);
   return;
 
  vluxei8_v:
@@ -9064,20 +9133,20 @@ Hart<URV>::execute(const DecodedInst* di)
   execVluxei64_v(di);
   return;
 
- vsxei8_v:
-  execVsxei8_v(di);
+ vsoxei8_v:
+  execVsoxei8_v(di);
   return;
 
- vsxei16_v:
-  execVsxei16_v(di);
+ vsoxei16_v:
+  execVsoxei16_v(di);
   return;
 
- vsxei32_v:
-  execVsxei32_v(di);
+ vsoxei32_v:
+  execVsoxei32_v(di);
   return;
 
- vsxei64_v:
-  execVsxei64_v(di);
+ vsoxei64_v:
+  execVsoxei64_v(di);
   return;
 
  vsuxei8_v:

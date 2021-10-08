@@ -984,10 +984,10 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 	{
 	  if (mew == 0)
 	    {
-	      if (f3 == 0) return instTable_.getEntry(InstId::vlxei8_v);
-	      if (f3 == 5) return instTable_.getEntry(InstId::vlxei16_v);
-	      if (f3 == 6) return instTable_.getEntry(InstId::vlxei32_v);
-	      if (f3 == 7) return instTable_.getEntry(InstId::vlxei64_v);
+	      if (f3 == 0) return instTable_.getEntry(InstId::vloxei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vloxei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vloxei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vloxei64_v);
 	    }
 	}
       else
@@ -1140,10 +1140,10 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 	{
 	  if (mew == 0)
 	    {
-	      if (f3 == 0) return instTable_.getEntry(InstId::vsxei8_v);
-	      if (f3 == 5) return instTable_.getEntry(InstId::vsxei16_v);
-	      if (f3 == 6) return instTable_.getEntry(InstId::vsxei32_v);
-	      if (f3 == 7) return instTable_.getEntry(InstId::vsxei64_v);
+	      if (f3 == 0) return instTable_.getEntry(InstId::vsoxei8_v);
+	      if (f3 == 5) return instTable_.getEntry(InstId::vsoxei16_v);
+	      if (f3 == 6) return instTable_.getEntry(InstId::vsoxei32_v);
+	      if (f3 == 7) return instTable_.getEntry(InstId::vsoxei64_v);
 	    }
 	}
       else
