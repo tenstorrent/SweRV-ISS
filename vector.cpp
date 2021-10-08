@@ -5352,7 +5352,7 @@ template <typename URV>
 void
 Hart<URV>::execVredsum_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5418,7 +5418,7 @@ template <typename URV>
 void
 Hart<URV>::execVredand_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5484,7 +5484,7 @@ template <typename URV>
 void
 Hart<URV>::execVredor_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5550,7 +5550,7 @@ template <typename URV>
 void
 Hart<URV>::execVredxor_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5616,7 +5616,7 @@ template <typename URV>
 void
 Hart<URV>::execVredminu_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5682,7 +5682,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmin_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5748,7 +5748,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -5814,7 +5814,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmax_vs(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -10391,7 +10391,7 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vvm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -10597,7 +10597,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -10638,7 +10638,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -10679,7 +10679,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -10721,7 +10721,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
@@ -10762,7 +10762,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkMaskableInst(di))
     {
       illegalInst(di);
       return;
