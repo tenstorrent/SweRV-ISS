@@ -13634,15 +13634,21 @@ Hart<URV>::execVlm_v(const DecodedInst* di)
       return;
     }
 
-  // Change element count to byte count.
+  // Change element count to byte count, elem width to byte, and emul to 1.
   uint32_t elems = vecRegs_.elemCount();
   uint32_t bytes = (elems + 7) / 8;
+  ElementWidth ew = vecRegs_.elemWidth();
+  GroupMultiplier gm = vecRegs_.groupMultiplier();
   vecRegs_.elemCount(bytes);
+  vecRegs_.elemWidth(ElementWidth::Byte);
+  vecRegs_.groupMultiplier(GroupMultiplier::One);
 
   // Do load bytes.
   vectorLoad<uint8_t>(di, ElementWidth::Byte, false);
 
   vecRegs_.elemCount(elems); // Restore elem count.
+  vecRegs_.elemWidth(ew); // Restore elem width.
+  vecRegs_.groupMultiplier(gm); // Restore group multiplier
 }
 
 
@@ -13656,15 +13662,21 @@ Hart<URV>::execVsm_v(const DecodedInst* di)
       return;
     }
 
-  // Change element count to byte count.
+  // Change element count to byte count, element width to byte, and emul to 1.
   uint32_t elems = vecRegs_.elemCount();
   uint32_t bytes = (elems + 7) / 8;
+  ElementWidth ew = vecRegs_.elemWidth();
+  GroupMultiplier gm = vecRegs_.groupMultiplier();
   vecRegs_.elemCount(bytes);
-
+  vecRegs_.elemWidth(ElementWidth::Byte);
+  vecRegs_.groupMultiplier(GroupMultiplier::One);
+  
   // Do store bytes.
   vectorStore<uint8_t>(di, ElementWidth::Byte);
 
   vecRegs_.elemCount(elems); // Restore elem count.
+  vecRegs_.elemWidth(ew); // Restore elem width.
+  vecRegs_.groupMultiplier(gm); // Restore group multiplier
 }
 
 
