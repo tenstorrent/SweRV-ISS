@@ -6453,6 +6453,9 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vse512_v,
      &&vse1024_v,
 
+     &&vlm_v,
+     &&vsm_v,
+
      &&vlre8_v,
      &&vlre16_v,
      &&vlre32_v,
@@ -8955,6 +8958,14 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vse1024_v:
   execVse1024_v(di);
+  return;
+
+ vlm_v:
+  execVlm_v(di);
+  return;
+
+ vsm_v:
+  execVsm_v(di);
   return;
 
  vlre8_v:

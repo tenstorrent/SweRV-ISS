@@ -3023,6 +3023,9 @@ namespace WdRiscv
     void execVse512_v(const DecodedInst*);
     void execVse1024_v(const DecodedInst*);
 
+    void execVlm_v(const DecodedInst*);
+    void execVsm_v(const DecodedInst*);
+
     template <typename ELEM_TYPE>
     void vectorLoadWholeReg(const DecodedInst*, ElementWidth);
 

@@ -873,6 +873,11 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
               if (f3 == 7) return instTable_.getEntry(InstId::vlre1024_v);
             }
         }
+      else if (lumop == 0xb)
+	{
+	  if (nf == 0 and mew == 0 and f3 == 0)
+	    return instTable_.getEntry(InstId::vlm_v);
+	}
       else if (lumop == 0x10)
         {
 	  if (nf == 0)
@@ -1068,6 +1073,11 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 	      return instTable_.getEntry(InstId::illegal);
             }
         }
+      else if (lumop == 0xb)
+	{
+	  if (nf == 0 and mew == 0 and f3 == 0)
+	    return instTable_.getEntry(InstId::vsm_v);
+	}
     }
 
   if (mop == 1)

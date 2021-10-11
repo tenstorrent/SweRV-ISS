@@ -4149,6 +4149,22 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
+      { "vlm.v", InstId::vlm_v,
+        0b000000'0'00000'00000'000'00000'0000111,
+        0b111111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vsm.v", InstId::vsm_v,
+        0b000100'0'00000'00000'111'00000'0100111,
+        0b111111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Read, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
       { "vlre8.v", InstId::vlre8_v,
         0b001000'0'01000'00000'000'00000'0000111,
         0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits

@@ -668,6 +668,9 @@ namespace WdRiscv
      vse512_v,
      vse1024_v,
 
+     vlm_v,
+     vsm_v,
+
      vlre8_v,
      vlre16_v,
      vlre32_v,

@@ -13624,6 +13624,48 @@ Hart<URV>::execVse1024_v(const DecodedInst* di)
 }
 
 
+template <typename URV>
+void
+Hart<URV>::execVlm_v(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Change element count to byte count.
+  uint32_t elems = vecRegs_.elemCount();
+  uint32_t bytes = (elems + 7) / 8;
+  vecRegs_.elemCount(bytes);
+
+  // Do load bytes.
+  vectorLoad<uint8_t>(di, ElementWidth::Byte, false);
+
+  vecRegs_.elemCount(elems); // Restore elem count.
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVsm_v(const DecodedInst* di)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Change element count to byte count.
+  uint32_t elems = vecRegs_.elemCount();
+  uint32_t bytes = (elems + 7) / 8;
+  vecRegs_.elemCount(bytes);
+
+  // Do store bytes.
+  vectorStore<uint8_t>(di, ElementWidth::Byte);
+
+  vecRegs_.elemCount(elems); // Restore elem count.
+}
 
 
 template <typename URV>
