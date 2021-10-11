@@ -6867,13 +6867,6 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned dist = vd > vs1 ? vd - vs1 : vs1 - vd;
-  if (dist*8 < group)
-    {
-      illegalInst(di);  // Source/dest vecs cannot overlap
-      return;
-    }
-
   URV amount = intRegs_.read(rs2);
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
@@ -6908,13 +6901,6 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned dist = vd > vs1 ? vd - vs1 : vs1 - vd;
-  if (dist*8 < group)
-    {
-      illegalInst(di);  // Source/dest vecs cannot overlap
-      return;
-    }
-
   URV amount = imm;
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
@@ -6947,13 +6933,6 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-
-  unsigned dist = vd > vs1 ? vd - vs1 : vs1 - vd;
-  if (dist*8 < group)
-    {
-      illegalInst(di);  // Source/dest vecs cannot overlap
-      return;
-    }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
@@ -7079,13 +7058,6 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-
-  unsigned dist = vd > vs1 ? vd - vs1 : vs1 - vd;
-  if (dist*8 < group)
-    {
-      illegalInst(di);  // Source/dest vecs cannot overlap
-      return;
-    }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
