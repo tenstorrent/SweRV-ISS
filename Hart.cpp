@@ -1994,6 +1994,10 @@ Hart<URV>::fastLoad(uint32_t rd, uint32_t rs1, int32_t imm)
   URV base = intRegs_.read(rs1);
   URV addr = base + SRV(imm);
 
+  ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = addr;
+  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+
   // Unsigned version of LOAD_TYPE
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
@@ -2141,6 +2145,10 @@ bool
 Hart<URV>::fastStore(uint32_t /*rs1*/, URV /*base*/, URV addr,
                      STORE_TYPE storeVal)
 {
+  ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = addr;
+  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+
   if (memory_.write(hartIx_, addr, storeVal))
     {
       if (toHostValid_ and addr == toHost_ and storeVal != 0)
