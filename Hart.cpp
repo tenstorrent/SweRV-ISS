@@ -1852,6 +1852,7 @@ Hart<URV>::determineLoadException(unsigned rs1, URV base, uint64_t& addr,
 				  unsigned ldSize, SecondaryCause& secCause)
 {
   secCause = SecondaryCause::NONE;
+  addr = URV(addr);   // Truncate to 32 bits in 32-bit mode.
 
   // Misaligned load from io section triggers an exception. Crossing
   // dccm to non-dccm causes an exception.
@@ -10982,6 +10983,8 @@ Hart<URV>::determineStoreException(uint32_t rs1, URV base, uint64_t& addr,
 {
   forcedFail = false;
   unsigned stSize = sizeof(STORE_TYPE);
+
+  addr = URV(addr);  // Truncate to 32 bits in 32-bit mode.
 
   // Misaligned store to io section causes an exception. Crossing
   // dccm to non-dccm causes an exception.

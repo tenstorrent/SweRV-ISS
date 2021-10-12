@@ -806,9 +806,10 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
       // VL is not writeable: Poke it.
       csRegs_.poke(CsrNumber::VL, elems);
       recordCsrWrite(CsrNumber::VL);
+      vecRegs_.elemCount(elems);  // Update cached value of VL.
     }
-  vecRegs_.elemCount(elems);  // Update cached value of VL.
 
+  csRegs_.peek(CsrNumber::VL, elems);
   intRegs_.write(rd, elems);
 
   // Pack vtype values and update vtype
@@ -10576,7 +10577,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10617,7 +10618,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10658,7 +10659,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10700,7 +10701,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10741,7 +10742,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -13524,18 +13525,19 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
             {
               uint64_t dword = uint64_t(elem);
               bool forced = false;
-              cause = determineStoreException(rs1, URV(addr), addr, dword, secCause, forced);
+	      uint64_t dwordAddr = URV(addr + n);
+              cause = determineStoreException(rs1, addr, dwordAddr, dword, secCause, forced);
               if (cause != ExceptionCause::NONE)
                 break;
 
-              memory_.write(hartIx_, addr + n, dword);
+              memory_.write(hartIx_, dwordAddr, dword);
               elem >>= 64;
             }
         }
       else
         {
           bool forced = false;
-          cause = determineStoreException(rs1, URV(addr), addr, elem, secCause, forced);
+          cause = determineStoreException(rs1, addr, addr, elem, secCause, forced);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      memory_.write(hartIx_, addr, elem);
