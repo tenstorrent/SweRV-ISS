@@ -247,7 +247,7 @@ namespace WdRiscv
     /// We pre-scale by 8 to avoid division when the multiplier is a
     /// fraction.
     uint32_t groupMultiplierX8() const
-    {return groupX8_; }
+    { return groupX8_; }
 
     /// Return true if double the given element width (eew=2*sew) is
     /// legal with the given group multiplier (prescaled by 8).
@@ -443,6 +443,14 @@ namespace WdRiscv
     /// Set currently configure element count (cached valye of VL).
     void elemCount(uint32_t n)
     { elems_ = n; }
+
+    /// Set the currently configured element width.
+    void elemWidth(ElementWidth ew)
+    { sew_ = ew; }
+
+    /// Set the currently configured group multiplier.
+    void groupMultiplier(GroupMultiplier gm)
+    { group_ = gm; groupX8_ = groupMultiplierX8(gm); }
 
     /// Return true if current vtype configuration is legal. This is a cached
     /// value of VTYPE.VILL.

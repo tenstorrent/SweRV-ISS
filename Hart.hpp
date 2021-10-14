@@ -2525,7 +2525,7 @@ namespace WdRiscv
 
     template<typename ELEM_TYPE>
     void vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                         unsigned start, unsigned elems);
+                         unsigned start, unsigned elems, bool masked);
     void execVrgatherei16_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -3017,6 +3017,9 @@ namespace WdRiscv
     void execVse512_v(const DecodedInst*);
     void execVse1024_v(const DecodedInst*);
 
+    void execVlm_v(const DecodedInst*);
+    void execVsm_v(const DecodedInst*);
+
     template <typename ELEM_TYPE>
     void vectorLoadWholeReg(const DecodedInst*, ElementWidth);
 
@@ -3072,10 +3075,10 @@ namespace WdRiscv
     template <typename ELEM_TYPE>
     void vectorLoadIndexed(const DecodedInst*, ElementWidth);
 
-    void execVlxei8_v(const DecodedInst*);
-    void execVlxei16_v(const DecodedInst*);
-    void execVlxei32_v(const DecodedInst*);
-    void execVlxei64_v(const DecodedInst*);
+    void execVloxei8_v(const DecodedInst*);
+    void execVloxei16_v(const DecodedInst*);
+    void execVloxei32_v(const DecodedInst*);
+    void execVloxei64_v(const DecodedInst*);
     void execVluxei8_v(const DecodedInst*);
     void execVluxei16_v(const DecodedInst*);
     void execVluxei32_v(const DecodedInst*);
@@ -3084,10 +3087,10 @@ namespace WdRiscv
     template <typename ELEM_TYPE>
     void vectorStoreIndexed(const DecodedInst*, ElementWidth);
 
-    void execVsxei8_v(const DecodedInst*);
-    void execVsxei16_v(const DecodedInst*);
-    void execVsxei32_v(const DecodedInst*);
-    void execVsxei64_v(const DecodedInst*);
+    void execVsoxei8_v(const DecodedInst*);
+    void execVsoxei16_v(const DecodedInst*);
+    void execVsoxei32_v(const DecodedInst*);
+    void execVsoxei64_v(const DecodedInst*);
     void execVsuxei8_v(const DecodedInst*);
     void execVsuxei16_v(const DecodedInst*);
     void execVsuxei32_v(const DecodedInst*);

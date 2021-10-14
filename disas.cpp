@@ -539,9 +539,14 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       out << name << " v" << di.op0();
       out << ", ("  << hart.intRegName(di.op1()) << ")";
       if (di.operandCount() == 3)
-	out << ", v" << di.op2();
+	{
+	  if (di.ithOperandType(2) == OperandType::IntReg)
+	    out << ", " << hart.intRegName(di.ithOperand(2));
+	  else
+	    out << ", v" << di.op2();
+	}
       if (di.isMasked())
-	out << ", v0";
+	out << ", v0.t";
       return;
     }
 

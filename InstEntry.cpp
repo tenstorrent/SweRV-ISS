@@ -4149,6 +4149,22 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
 
+      { "vlm.v", InstId::vlm_v,
+        0b000000'0'00000'00000'000'00000'0000111,
+        0b111111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
+      { "vsm.v", InstId::vsm_v,
+        0b000100'0'00000'00000'111'00000'0100111,
+        0b111111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
+        InstType::Vector,
+        OperandType::VecReg, OperandMode::Read, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask,
+      },
+
       { "vlre8.v", InstId::vlre8_v,
         0b001000'0'01000'00000'000'00000'0000111,
         0b000111'0'11111'00000'111'00000'1111111, // Mask of opcode bits
@@ -4315,6 +4331,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vlse16.v", InstId::vlse16_v,
@@ -4323,6 +4340,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vlse32.v", InstId::vlse32_v,
@@ -4331,6 +4349,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vlse64.v", InstId::vlse64_v,
@@ -4339,6 +4358,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vlse128.v", InstId::vlse128_v,
@@ -4347,6 +4367,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vlse256.v", InstId::vlse256_v,
@@ -4355,6 +4376,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vlse512.v", InstId::vlse512_v,
@@ -4363,6 +4385,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vlse1024.v", InstId::vlse1024_v,
@@ -4371,6 +4394,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse8.v", InstId::vsse8_v,
@@ -4379,6 +4403,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse16.v", InstId::vsse16_v,
@@ -4387,6 +4412,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse32.v", InstId::vsse32_v,
@@ -4395,6 +4421,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse64.v", InstId::vsse64_v,
@@ -4403,6 +4430,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse128.v", InstId::vsse128_v,
@@ -4411,6 +4439,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse256.v", InstId::vsse256_v,
@@ -4419,6 +4448,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse512.v", InstId::vsse512_v,
@@ -4427,6 +4457,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
       { "vsse1024.v", InstId::vsse1024_v,
@@ -4435,9 +4466,10 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vlxei8.v", InstId::vlxei8_v,
+      { "vloxei8.v", InstId::vloxei8_v,
         0b000011'0'00000'00000'000'00000'0000111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4446,7 +4478,7 @@ InstTable::setupInstVec()
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vlxei16.v", InstId::vlxei16_v,
+      { "vloxei16.v", InstId::vloxei16_v,
         0b000011'0'00000'00000'101'00000'0000111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4455,7 +4487,7 @@ InstTable::setupInstVec()
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vlxei32.v", InstId::vlxei32_v,
+      { "vloxei32.v", InstId::vloxei32_v,
         0b000011'0'00000'00000'110'00000'0000111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4464,7 +4496,7 @@ InstTable::setupInstVec()
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vlxei64.v", InstId::vlxei64_v,
+      { "vloxei64.v", InstId::vloxei64_v,
         0b000011'0'00000'00000'111'00000'0000111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4509,7 +4541,7 @@ InstTable::setupInstVec()
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vsxei8.v", InstId::vsxei8_v,
+      { "vsoxei8.v", InstId::vsoxei8_v,
         0b000011'0'00000'00000'000'00000'0100111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4518,7 +4550,7 @@ InstTable::setupInstVec()
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vsxei16.v", InstId::vsxei16_v,
+      { "vsoxei16.v", InstId::vsoxei16_v,
         0b000011'0'00000'00000'101'00000'0100111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4527,7 +4559,7 @@ InstTable::setupInstVec()
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vsxei32.v", InstId::vsxei32_v,
+      { "vsoxei32.v", InstId::vsoxei32_v,
         0b000011'0'00000'00000'110'00000'0100111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4536,7 +4568,7 @@ InstTable::setupInstVec()
 	OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vsxei64.v", InstId::vsxei64_v,
+      { "vsoxei64.v", InstId::vsoxei64_v,
         0b000011'0'00000'00000'111'00000'0100111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         InstType::Vector,
@@ -4715,6 +4747,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vlssege16.v", InstId::vlssege16_v,
@@ -4723,6 +4756,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vlssege32.v", InstId::vlssege32_v,
@@ -4731,6 +4765,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vlssege64.v", InstId::vlssege64_v,
@@ -4739,6 +4774,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vlssege128.v", InstId::vlssege128_v,
@@ -4747,6 +4783,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vlssege256.v", InstId::vlssege256_v,
@@ -4755,6 +4792,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vlssege512.v", InstId::vlssege512_v,
@@ -4763,6 +4801,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vlssege1024.v", InstId::vlssege1024_v,
@@ -4771,6 +4810,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege8.v", InstId::vsssege8_v,
@@ -4779,6 +4819,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege16.v", InstId::vsssege16_v,
@@ -4787,6 +4828,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege32.v", InstId::vsssege32_v,
@@ -4795,6 +4837,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege64.v", InstId::vsssege64_v,
@@ -4803,6 +4846,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege128.v", InstId::vsssege128_v,
@@ -4811,6 +4855,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege256.v", InstId::vsssege256_v,
@@ -4819,6 +4864,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege512.v", InstId::vsssege512_v,
@@ -4827,6 +4873,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vsssege1024.v", InstId::vsssege1024_v,
@@ -4835,6 +4882,7 @@ InstTable::setupInstVec()
         InstType::Vector,
         OperandType::VecReg, OperandMode::Read, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "vluxsegei8.v", InstId::vluxsegei8_v,

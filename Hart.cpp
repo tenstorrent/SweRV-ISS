@@ -496,6 +496,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   intRegs_.reset();
   csRegs_.reset();
+  vecRegs_.reset();
 
   // Suppress resetting memory mapped register on initial resets sent
   // by the test bench. Otherwise, initial resets obliterate memory
@@ -513,6 +514,11 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   // Enable extensions if corresponding bits are set in the MISA CSR.
   processExtensions();
+
+  // If vector extension enabled but vectors not configured, then
+  // configure for 128-bits per regiser and 32-bits per elemement.
+  if (isRvv() and vecRegs_.registerCount() == 0)
+    vecRegs_.config(16 /*bytesPerReg*/, 4 /*bytesPerElem*/);  
   
   perfControl_ = ~uint32_t(0);
   URV value = 0;
@@ -1777,6 +1783,7 @@ Hart<URV>::determineLoadException(unsigned rs1, URV base, uint64_t& addr,
 				  unsigned ldSize, SecondaryCause& secCause)
 {
   secCause = SecondaryCause::NONE;
+  addr = URV(addr);   // Truncate to 32 bits in 32-bit mode.
 
   // Misaligned load from io section triggers an exception. Crossing
   // dccm to non-dccm causes an exception.
@@ -1917,6 +1924,10 @@ Hart<URV>::fastLoad(uint32_t rd, uint32_t rs1, int32_t imm)
 {
   URV base = intRegs_.read(rs1);
   URV addr = base + SRV(imm);
+
+  ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = addr;
+  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
 
   // Unsigned version of LOAD_TYPE
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
@@ -2065,6 +2076,10 @@ bool
 Hart<URV>::fastStore(uint32_t /*rs1*/, URV /*base*/, URV addr,
                      STORE_TYPE storeVal)
 {
+  ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr_ = addr;
+  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+
   if (memory_.write(hartIx_, addr, storeVal))
     {
       if (toHostValid_ and addr == toHost_ and storeVal != 0)
@@ -6378,6 +6393,9 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vse512_v,
      &&vse1024_v,
 
+     &&vlm_v,
+     &&vsm_v,
+
      &&vlre8_v,
      &&vlre16_v,
      &&vlre32_v,
@@ -6417,18 +6435,18 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vsse512_v,
      &&vsse1024_v,
 
-     &&vlxei8_v,
-     &&vlxei16_v,
-     &&vlxei32_v,
-     &&vlxei64_v,
+     &&vloxei8_v,
+     &&vloxei16_v,
+     &&vloxei32_v,
+     &&vloxei64_v,
      &&vluxei8_v,
      &&vluxei16_v,
      &&vluxei32_v,
      &&vluxei64_v,
-     &&vsxei8_v,
-     &&vsxei16_v,
-     &&vsxei32_v,
-     &&vsxei64_v,
+     &&vsoxei8_v,
+     &&vsoxei16_v,
+     &&vsoxei32_v,
+     &&vsoxei64_v,
      &&vsuxei8_v,
      &&vsuxei16_v,
      &&vsuxei32_v,
@@ -8882,6 +8900,14 @@ Hart<URV>::execute(const DecodedInst* di)
   execVse1024_v(di);
   return;
 
+ vlm_v:
+  execVlm_v(di);
+  return;
+
+ vsm_v:
+  execVsm_v(di);
+  return;
+
  vlre8_v:
   execVlre8_v(di);
   return;
@@ -9026,20 +9052,20 @@ Hart<URV>::execute(const DecodedInst* di)
   execVsse1024_v(di);
   return;
 
- vlxei8_v:
-  execVlxei8_v(di);
+ vloxei8_v:
+  execVloxei8_v(di);
   return;
 
- vlxei16_v:
-  execVlxei16_v(di);
+ vloxei16_v:
+  execVloxei16_v(di);
   return;
 
- vlxei32_v:
-  execVlxei32_v(di);
+ vloxei32_v:
+  execVloxei32_v(di);
   return;
 
- vlxei64_v:
-  execVlxei64_v(di);
+ vloxei64_v:
+  execVloxei64_v(di);
   return;
 
  vluxei8_v:
@@ -9058,20 +9084,20 @@ Hart<URV>::execute(const DecodedInst* di)
   execVluxei64_v(di);
   return;
 
- vsxei8_v:
-  execVsxei8_v(di);
+ vsoxei8_v:
+  execVsoxei8_v(di);
   return;
 
- vsxei16_v:
-  execVsxei16_v(di);
+ vsoxei16_v:
+  execVsoxei16_v(di);
   return;
 
- vsxei32_v:
-  execVsxei32_v(di);
+ vsoxei32_v:
+  execVsoxei32_v(di);
   return;
 
- vsxei64_v:
-  execVsxei64_v(di);
+ vsoxei64_v:
+  execVsoxei64_v(di);
   return;
 
  vsuxei8_v:
@@ -10896,6 +10922,8 @@ Hart<URV>::determineStoreException(uint32_t rs1, URV base, uint64_t& addr,
 {
   forcedFail = false;
   unsigned stSize = sizeof(STORE_TYPE);
+
+  addr = URV(addr);  // Truncate to 32 bits in 32-bit mode.
 
   // Misaligned store to io section causes an exception. Crossing
   // dccm to non-dccm causes an exception.
