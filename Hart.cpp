@@ -4381,7 +4381,6 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
     return;
 
   misalignedLdSt_ = false;
-  lastBranchTaken_ = false;
 
   if (not instFreq_)
     return;
