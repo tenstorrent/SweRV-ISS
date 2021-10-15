@@ -3912,7 +3912,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	    fputc('r', out);
 	  else if (di.op0() == IntRegNumber::RegRa)
 	    fputc('c', out);
-	  else if (di.ithOperandType(0) == OperandType::Imm)
+	  else
 	    fputc('j', out);
 	}
     }
