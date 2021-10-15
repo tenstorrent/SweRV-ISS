@@ -433,6 +433,8 @@ The value of a boolean parameters may be specified as an integer with 0
 indicating false and non-zero indicating true. Alternatively it may
 be specified using the strings "false", "False", "true", or "True".
 
+Command line options override settings in the configuration file.
+
 Here is a sample configuration file:
 
     {
@@ -504,11 +506,11 @@ log file (e.g. ra instead of x1).
 The CSR configuration is a map wher each key is a CSR name and the
 corresponding value is an object with the following fields: "number",
 "reset", "mask", "poke_mask", "exists", and "shared". Set "exists" to
-false to mark a non implemented CSR (read/write instructions to such a
+"false" to mark a non implemented CSR (read/write instructions to such a
 CSR will trigger illegal instruciton exception). Set "mask" to the
-write mask of the CSR (zero bits correspond to bits that will not be
+write mask of the CSR (zero bits correspond to bits that will be
 preserved by write instructions). Set "reset" to reset value of the
-CSR. Set "shared" to true for CSRs that are shared between harts. The
+CSR. Set "shared" to "true" for CSRs that are shared between harts. The
 "number" fields should be used to define the number (address) of a
 non-standard CSR. The poke_mask should be used for the rare cases
 where poke operation may modify some bits that are not modifiable by
