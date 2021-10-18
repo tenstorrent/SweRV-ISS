@@ -17795,20 +17795,20 @@ Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:  vfnmadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:  vfnmadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vfnmadd_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vfnmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfnmadd_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfnmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
 }
@@ -18077,20 +18077,20 @@ Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:  vfnmsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:  vfnmsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vfnmsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vfnmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfnmsub_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfnmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
 }
@@ -18656,20 +18656,20 @@ Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:  vfnmsac_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:  vfnmsac_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vfnmsac_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vfnmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfnmsac_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfnmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
 }
