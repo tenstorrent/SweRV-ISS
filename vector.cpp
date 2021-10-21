@@ -793,6 +793,9 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
                 elems = vlmax;
             }
         }
+
+      if (elems > vlmax)
+	vill = true;
     }
 
   if (vill)
@@ -807,9 +810,10 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
       csRegs_.poke(CsrNumber::VL, elems);
       recordCsrWrite(CsrNumber::VL);
     }
-  vecRegs_.elemCount(elems);  // Update cached value of VL.
 
+  csRegs_.peek(CsrNumber::VL, elems);
   intRegs_.write(rd, elems);
+  vecRegs_.elemCount(elems);  // Update cached value of VL.
 
   // Pack vtype values and update vtype
   URV vtype = 0;
@@ -865,6 +869,18 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 
   // Determine vl
   URV elems = avl;
+  if (gm == GroupMultiplier::Reserved)
+    vill = true;
+  else
+    {
+      uint32_t gm8 = vecRegs_.groupMultiplierX8(gm);
+      unsigned bitsPerElem = vecRegs_.elementWidthInBits(ew);
+      unsigned vlmax = (gm8*vecRegs_.bitsPerRegister()/bitsPerElem) / 8;
+      if (vlmax == 0)
+        vill = true;
+      else if (elems > vlmax)
+	elems = vlmax;
+    }
 
   if (vill)
     {
