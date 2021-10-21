@@ -18709,7 +18709,7 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest = subnormalAdjust(dest);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);
@@ -18794,7 +18794,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  bool elemInv = false;
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest= subnormalAdjust(dest);
           dest = fusedMultiplyAdd(e1dw, e2dw, dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);
@@ -18880,7 +18880,7 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest = subnormalAdjust(dest);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, -dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);
@@ -18942,6 +18942,8 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
+  if (subnormToZero_)
+    e1 = subnormalAdjust(e1);
   ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
@@ -18964,7 +18966,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 	  bool elemInv = false;
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest = subnormalAdjust(dest);
           dest = fusedMultiplyAdd(-e1dw, e2dw, -dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);
@@ -19049,7 +19051,7 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest = subnormalAdjust(dest);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, -dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);
@@ -19111,6 +19113,8 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
+  if (subnormToZero_)
+    e1 = subnormalAdjust(e1);
   ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
@@ -19133,7 +19137,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 	  bool elemInv = false;
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest = subnormalAdjust(dest);
           dest = fusedMultiplyAdd(e1dw, e2dw, -dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);
@@ -19219,7 +19223,7 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  e1dw = ELEM_TYPE2X(e1);
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest = subnormalAdjust(dest);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);
@@ -19282,6 +19286,8 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
+  if (subnormToZero_)
+    e1 = subnormalAdjust(e1);
   ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
@@ -19304,7 +19310,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 	  bool elemInv = false;
 	  e2dw = ELEM_TYPE2X(e2);
 	  if (subnormToZero_)
-	    subnormalAdjustFmaArgs(e1dw, dest, e2dw);
+	    dest = subnormalAdjust(dest);
           dest = fusedMultiplyAdd(-e1dw, e2dw, dest, elemInv);
 	  if (subnormToZero_)
 	    dest = subnormalAdjust(dest);

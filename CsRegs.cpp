@@ -561,7 +561,7 @@ CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters)
 
   if (errors == 0)
     {
-      mPerfRegs_.config(numCounters, maxEventId_);
+      mPerfRegs_.config(numCounters);
       tiePerfCounters(mPerfRegs_.counters_);
     }
 
@@ -1775,7 +1775,9 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
         event = 0;
     }
   else
-    event = std::min(event, maxEventId_);
+    {
+      ; // event = std::min(event, maxEventId_);
+    }
 
   if (perModeCounterControl_)
     value = (value & ~URV(0xffff)) | event;
