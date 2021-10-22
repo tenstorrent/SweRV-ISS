@@ -1782,6 +1782,8 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
   else
     value = event;
 
+  if (eventRemap_.count(
+
   unsigned counterIx = unsigned(number) - unsigned(CsrNumber::MHPMEVENT3);
   assignEventToCounter(event, counterIx, enableUser, enableMachine);
 

@@ -117,7 +117,13 @@
 
 	"cfg" : {
 	    "number" : "0x7c0",
-	    "reset" : "0x0",
+	    "reset" : "0x20000",
+	    "mask" : "0xffffffff"
+	},
+
+	"vgsrc" : {
+	    "number" : "0x7c6",
+	    "reset" : 0,
 	    "mask" : "0xffffffff"
 	},
 
