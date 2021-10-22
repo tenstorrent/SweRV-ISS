@@ -1775,9 +1775,7 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
         event = 0;
     }
   else
-    {
-      ; // event = std::min(event, maxEventId_);
-    }
+    event = std::min(event, maxEventId_);
 
   if (perModeCounterControl_)
     value = (value & ~URV(0xffff)) | event;
