@@ -140,63 +140,63 @@
 	},
 
 	"tt_cfg_Qstatus" : {
-	    "number" : "0xfc0",
+	    "number" : "0xbc0",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Bstatus" : {
-	    "number" : "0xfc1",
+	    "number" : "0xbc1",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus0" : {
-	    "number" : "0xfc2",
+	    "number" : "0xbc2",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus1" : {
-	    "number" : "0xfc3",
+	    "number" : "0xbc3",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus2" : {
-	    "number" : "0xfc4",
+	    "number" : "0xbc4",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus3" : {
-	    "number" : "0xfc5",
+	    "number" : "0xbc5",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus4" : {
-	    "number" : "0xfc6",
+	    "number" : "0xbc6",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus5" : {
-	    "number" : "0xfc7",
+	    "number" : "0xbc7",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus6" : {
-	    "number" : "0xfc8",
+	    "number" : "0xbc8",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus7" : {
-	    "number" : "0xfc9",
+	    "number" : "0xbc9",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	}
 
     },
