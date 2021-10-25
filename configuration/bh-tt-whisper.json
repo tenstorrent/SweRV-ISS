@@ -201,6 +201,18 @@
 
     },
 
+    "mmode_perf_event_map" : {
+	"None"         : "0x0",
+	"InstCommited" : "0x800000",
+	"MultDiv"      : "0x3000",
+	"Load"         : "0xc00000",
+	"Store"        : "0xd00000",
+	"Bitmanip"     : "0x5000",
+	"FpSingle"     : "0x6000",
+	"FpHalf"       : "0x7000",
+	"Csr"          : "0x1000"
+    },
+ 
     "vector" : {
 	"bytes_per_vec" : 16,
 	"max_bytes_per_elem" : 8

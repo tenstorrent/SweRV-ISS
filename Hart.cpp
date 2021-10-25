@@ -4287,7 +4287,6 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
     }
   else if (info.isCsr() and not hasException_)
     {
-      // 2. Let the counters count.
       if ((id == InstId::csrrw or id == InstId::csrrwi))
 	{
 	  if (op0 == 0)
@@ -4306,6 +4305,8 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_,
                                  lastPriv_);
 	}
+      pregs.updateCounters(EventNumber::Csr, prevPerfControl_,
+			   lastPriv_);
     }
   else if (info.isBranch())
     {
