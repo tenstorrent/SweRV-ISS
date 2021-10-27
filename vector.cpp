@@ -11175,7 +11175,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
     case EW::Half:
       if (not isZfhLegal())
 	illegalInst(di);
-      else
+      else if (vecRegs_.elemCount() > 0)
 	{
 	  Float16 val = fpRegs_.readHalf(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
@@ -11184,7 +11184,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
     case EW::Word:
       if (not isFpLegal())
 	illegalInst(di);
-      else
+      else if (vecRegs_.elemCount() > 0)
 	{
 	  float val = fpRegs_.readSingle(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
@@ -13578,13 +13578,14 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       else
         {
           bool forced = false;
-          cause = determineStoreException(rs1, addr, addr, elem, secCause, forced);
+	  uint64_t eaddr = addr;
+          cause = determineStoreException(rs1, eaddr, eaddr, elem, secCause, forced);
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memory_.write(hartIx_, addr, elem);
+	      memory_.write(hartIx_, eaddr, elem);
 	      if (traceLdSt_)
 		{
-		  vecRegs_.ldStAddr_.push_back(addr);
+		  vecRegs_.ldStAddr_.push_back(eaddr);
 		  vecRegs_.stData_.push_back(elem);
 		}
 	    }
@@ -14235,7 +14236,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	  cause = determineStoreException(rs1, eaddr, eaddr, elem, secCause, force);
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memory_.write(hartIx_, addr, elem);
+	      memory_.write(hartIx_, eaddr, elem);
 	      if (traceLdSt_)
 		{
 		  vecRegs_.ldStAddr_.push_back(eaddr);
