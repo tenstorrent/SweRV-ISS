@@ -2819,15 +2819,16 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  uint32_t imm = di->op2();
+  // Immediate is sign exended and then treated as unsigned.
+  int64_t imm = di->op2As<int32_t>();
 
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vmseq_vx<uint8_t> (vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Half:   vmseq_vx<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word:   vmseq_vx<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word2:  vmseq_vx<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Byte:   vmsle_vx<uint8_t> (vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Half:   vmsle_vx<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word:   vmsle_vx<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word2:  vmsle_vx<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -3013,7 +3014,8 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  URV imm = di->op2();
+  // Immediate is sign exended and then treated as unsigned.
+  int64_t imm = di->op2As<int32_t>();
 
   typedef ElementWidth EW;
   switch (sew)
@@ -11075,12 +11077,25 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vecRegs_.write(vd, 0, groupX8, int8_t(val)); break;
-    case EW::Half: vecRegs_.write(vd, 0, groupX8, int16_t(val)); break;
-    case EW::Word: vecRegs_.write(vd, 0, groupX8, int32_t(val)); break;
-    case EW::Word2: vecRegs_.write(vd, 0, groupX8, int64_t(val)); break;
+    case EW::Byte:
+      if (vecRegs_.elemCount() > 0)
+	vecRegs_.write(vd, 0, groupX8, int8_t(val));
+      break;
+    case EW::Half:
+      if (vecRegs_.elemCount() > 0)
+	vecRegs_.write(vd, 0, groupX8, int16_t(val));
+      break;
+    case EW::Word:
+      if (vecRegs_.elemCount() > 0)
+	vecRegs_.write(vd, 0, groupX8, int32_t(val));
+      break;
+    case EW::Word2:
+      if (vecRegs_.elemCount() > 0)
+	vecRegs_.write(vd, 0, groupX8, int64_t(val));
+      break;
     default:
-      illegalInst(di); break;
+      illegalInst(di);
+      break;
     }
 }
 
