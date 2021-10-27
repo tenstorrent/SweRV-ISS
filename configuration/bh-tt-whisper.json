@@ -203,14 +203,16 @@
 
     "mmode_perf_event_map" : {
 	"None"         : "0x0",
-	"InstCommited" : "0x800000",
-	"MultDiv"      : "0x3000",
-	"Load"         : "0xc00000",
-	"Store"        : "0xd00000",
-	"Bitmanip"     : "0x5000",
-	"FpSingle"     : "0x6000",
-	"FpHalf"       : "0x7000",
-	"Csr"          : "0x1000"
+	"Mult"         : "0x00000e00",
+	"Div"          : "0x00000f00",
+	"Csr"          : "0x00001000",
+	"MultDiv"      : "0x00003000",
+	"Bitmanip"     : "0x00005000",
+	"FpSingle"     : "0x00006000",
+	"FpHalf"       : "0x00007000",
+	"InstCommited" : "0x00800000",
+	"Load"         : "0x00c00000",
+	"Store"        : "0x00d00000"
     },
  
     "vector" : {
