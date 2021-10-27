@@ -13548,10 +13548,8 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
     {
       if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, groupX8);
-	  continue;
-	}
+	continue;
+
       ELEM_TYPE elem = 0;
       if (not vecRegs_.read(vd, ix, groupX8, elem))
         {
@@ -14058,10 +14056,11 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = 0;
-              cause = determineLoadException(rs1, addr, addr, 8, secCause);
+	      uint64_t eaddr = addr + n;
+              cause = determineLoadException(rs1, eaddr, eaddr, 8, secCause);
               if (cause != ExceptionCause::NONE)
                 break;
-              memory_.read(addr + n, dword);
+              memory_.read(eaddr, dword);
               elem <<= 64;
               elem |= dword;
             }
@@ -14203,11 +14202,8 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, groupX8);
-	  continue;
-	}
-      bool exception = false;
+	continue;
+
       ELEM_TYPE elem = 0;
       if (not vecRegs_.read(vd, ix, groupX8, elem))
         {
@@ -14215,29 +14211,44 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
           break;
         }
 
+      auto secCause = SecondaryCause::NONE;
+      auto cause = ExceptionCause::NONE;
+
       if constexpr (sizeof(elem) > 8)
         {
-          for (unsigned n = 0; n < sizeof(elem) and not exception; n += 8)
+          for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = uint64_t(elem);
-              memory_.write(hartIx_, addr + n, dword);
+	      uint64_t eaddr = addr + n;
+	      bool force = false;
+              cause = determineStoreException(rs1, eaddr, eaddr, dword, secCause, force);
+              if (cause != ExceptionCause::NONE)
+                break;
+              memory_.write(hartIx_, eaddr, dword);
               elem >>= 64;
             }
         }
       else
 	{
-	  memory_.write(hartIx_, addr, elem);
-	  if (traceLdSt_)
+	  uint64_t eaddr = addr;
+	  bool force = false;
+	  cause = determineStoreException(rs1, eaddr, eaddr, elem, secCause, force);
+	  if (cause == ExceptionCause::NONE)
 	    {
-	      vecRegs_.ldStAddr_.push_back(addr);
-	      vecRegs_.stData_.push_back(elem);
+	      memory_.write(hartIx_, addr, elem);
+	      if (traceLdSt_)
+		{
+		  vecRegs_.ldStAddr_.push_back(eaddr);
+		  vecRegs_.stData_.push_back(elem);
+		}
 	    }
 	}
 
-      if (exception)
+      if (cause != ExceptionCause::NONE)
         {
           vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+          initiateStoreException(cause, addr, secCause);
           break;
         }
     }
@@ -14521,10 +14532,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, groupX8);
-	  continue;
-	}
+	continue;
 
       uint64_t offset = 0;
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
@@ -15368,10 +15376,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  uint64_t data = 0;
 
 	  if (masked and not vecRegs_.isActive(0, ix))
-	    {
-	      vecRegs_.touchReg(dvg, groupX8);
-	      continue;
-	    }
+	    continue;
 
 	  auto cause = ExceptionCause::NONE;
 	  auto secCause = SecondaryCause::NONE;
