@@ -5172,7 +5172,7 @@ template <typename URV>
 template <typename ELEM_TYPE>
 void
 Hart<URV>::vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2,
-			   unsigned group, unsigned start, unsigned elems, bool masked)
+                           unsigned group, unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
