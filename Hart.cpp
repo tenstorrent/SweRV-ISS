@@ -1443,13 +1443,12 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
 
       fprintf(file, "%s %" PRId64 "\n", entry.name().c_str(), freq);
 
-      auto regCount = intRegCount();
-
       uint64_t count = 0;
       for (auto n : prof.destRegFreq_) count += n;
       if (count)
 	{
 	  fprintf(file, "  +rd");
+	  auto regCount = prof.destRegFreq_.size();
 	  for (unsigned i = 0; i < regCount; ++i)
 	    if (prof.destRegFreq_.at(i))
 	      fprintf(file, " %d:%" PRId64, i, prof.destRegFreq_.at(i));
@@ -1460,9 +1459,11 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
       
       for (unsigned opIx = 0; opIx < entry.operandCount(); ++opIx)
         {
-          if (entry.ithOperandMode(opIx) == OperandMode::Read and
-              (entry.ithOperandType(opIx) == OperandType::IntReg or
-               entry.ithOperandType(opIx) == OperandType::FpReg))
+	  auto mode = entry.ithOperandMode(opIx);
+	  auto type = entry.ithOperandType(opIx);
+          if ((mode == OperandMode::Read or mode == OperandMode::ReadWrite) and
+              (type == OperandType::IntReg or type == OperandType::FpReg or
+	       type == OperandType::CsReg))
             {
               uint64_t count = 0;
               for (auto n : prof.srcRegFreq_.at(srcIx))
@@ -1470,6 +1471,7 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
               if (count)
                 {
                   const auto& regFreq = prof.srcRegFreq_.at(srcIx);
+		  auto regCount = regFreq.size();
                   fprintf(file, "  +rs%d", srcIx + 1);
                   for (unsigned i = 0; i < regCount; ++i)
                     if (regFreq.at(i))
@@ -4407,28 +4409,32 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
   if (info.isIthOperandWrite(0))
     {
       rdType = info.ithOperandType(0);
-      if (rdType == OperandType::IntReg or rdType == OperandType::FpReg or rdType == OperandType::VecReg)
-        {
-          prof.destRegFreq_.at(di.op0())++;
-          opIx++;
-          if (rdType == OperandType::IntReg)
-            {
-              intRegs_.getLastWrittenReg(rd, rdOrigVal);
-              assert(rd == di.op0());
-            }
-          else if (rdType == OperandType::FpReg)
-            {
-              fpRegs_.getLastWrittenReg(rd, frdOrigVal);
-              assert(rd == di.op0());
-            }
-	  else if (rdType == OperandType::VecReg)
-	    {
-	      rd = di.op0();
-	      // unsigned groupX8 = 8;
-	      // rd = vecRegs_.getLastWrittenReg(groupX8); 
-	      // assert(rd == di.op0());    // Does not work for load seg.
-	    }
-        }
+      if (rdType == OperandType::IntReg)
+	{
+	  prof.destRegFreq_.at(di.op0())++; opIx++;
+	  intRegs_.getLastWrittenReg(rd, rdOrigVal);
+	  assert(rd == di.op0());
+	}
+      else if (rdType == OperandType::FpReg)
+	{
+	  prof.destRegFreq_.at(di.op0())++; opIx++;
+	  fpRegs_.getLastWrittenReg(rd, frdOrigVal);
+	  assert(rd == di.op0());
+	}
+      else if (rdType == OperandType::VecReg)
+	{
+	  prof.destRegFreq_.at(di.op0())++; opIx++;
+	  rd = di.op0();
+	  // unsigned groupX8 = 8;
+	  // rd = vecRegs_.getLastWrittenReg(groupX8); 
+	  // assert(rd == di.op0());    // Does not work for load seg.
+	}
+      else if (rdType == OperandType::CsReg)
+	{
+	  if (prof.destRegFreq_.size() <= di.op0())
+	    prof.destRegFreq_.resize(di.op0() + 1);
+	  prof.destRegFreq_.at(di.op0())++; opIx++;
+	}
     }
 
   unsigned maxOperand = 4;  // At most 4 operands (including immediate).
@@ -4492,6 +4498,13 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	  uint32_t regIx = di.ithOperand(i);
 	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
 	  srcIx++;
+	}
+      else if (info.ithOperandType(i) == OperandType::CsReg)
+	{
+	  uint32_t regIx = di.ithOperand(i);
+	  if (prof.srcRegFreq_.at(srcIx).size() <= regIx)
+	    prof.srcRegFreq_.at(srcIx).resize(regIx + 1);
+	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
 	}
       else if (info.ithOperandType(i) == OperandType::Imm)
         {
