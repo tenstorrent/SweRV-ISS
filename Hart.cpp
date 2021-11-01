@@ -5120,7 +5120,7 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim)
+          if (hasLim or doBasicBlocks_)
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -5148,6 +5148,45 @@ Hart<URV>::simpleRun()
 
 
 template <typename URV>
+void
+Hart<URV>::dumpBasicBlocks()
+{
+  if (bbFile_)
+    {
+      fprintf(bbFile_, "T");
+      for (const auto& kv : basicBlocks_)
+	fprintf(bbFile_, ":%ld:%ld ", kv.first, kv.second);
+      fprintf(bbFile_, "\n");
+    }
+  bbInsts_ = 0;
+
+  // Clear basic block stats.
+  for (auto& kv : basicBlocks_)
+    kv.second = 0;
+}
+
+
+template <typename URV>
+void
+Hart<URV>::countBasicBlocks(const DecodedInst* di)
+{
+  if (bbInsts_ >= bbLimit_)
+    dumpBasicBlocks();
+
+  bbInsts_++;
+
+  if (di->instEntry()->isBranch())
+    basicBlocks_[pc_]++;
+  else
+    {
+      auto iter = basicBlocks_.find(pc_);
+      if (iter != basicBlocks_.end())
+	iter->second++;
+    }
+}
+
+
+template <typename URV>
 bool
 Hart<URV>::simpleRunWithLimit()
 {
@@ -5171,7 +5210,13 @@ Hart<URV>::simpleRunWithLimit()
 
       pc_ += di->instSize();
       execute(di);
+
+      if (doBasicBlocks_)
+	countBasicBlocks(di);
     }
+
+  if (doBasicBlocks_)
+    dumpBasicBlocks();
   return true;
 }
 

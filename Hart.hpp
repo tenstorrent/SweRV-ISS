@@ -1327,6 +1327,9 @@ namespace WdRiscv
     void enableCsvLog(bool flag)
     { csvTrace_ = flag; }
 
+    bool configBasicBlocks(FILE* file, uint64_t instCount)
+    { doBasicBlocks_ = true; bbFile_ = file; bbLimit_ = instCount; return true; }
+
     void genVec();
 
   protected:
@@ -3748,6 +3751,9 @@ namespace WdRiscv
     void setPc(URV value)
     { pc_ = value & pcMask_; }
 
+    void countBasicBlocks(const DecodedInst* di);
+    void dumpBasicBlocks();
+
   private:
 
     unsigned hartIx_ = 0;        // Hart ix in system, see sysHartIndex method.
@@ -3982,6 +3988,12 @@ namespace WdRiscv
     // the hart will halt if halt is true and will reset if reset is true.
     // If both halt and reset are true, reset takes precedence.
     std::function<void(Hart<URV>&, bool&, bool&)> preInst_ = nullptr;
+
+    bool doBasicBlocks_ = false;
+    uint64_t bbInsts_ = 0;
+    uint64_t bbLimit_ = 0;
+    std::unordered_map<uint64_t, uint64_t> basicBlocks_; // Map pc to basic-block frequency.
+    FILE* bbFile_ = nullptr;
   };
 }
 
