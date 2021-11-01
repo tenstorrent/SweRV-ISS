@@ -19665,23 +19665,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfeq_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vs1 % eg) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19738,22 +19729,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfeq_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19808,23 +19791,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfne_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vs1 % eg) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19881,22 +19855,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfne_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -19951,23 +19917,14 @@ template <typename URV>
 void
 Hart<URV>::execVmflt_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vs1 % eg) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -20024,22 +19981,14 @@ template <typename URV>
 void
 Hart<URV>::execVmflt_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -20094,23 +20043,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfle_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vs1 % eg) or (vs2 % eg))
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -20167,22 +20107,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfle_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -20238,22 +20170,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfgt_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -20309,22 +20233,14 @@ template <typename URV>
 void
 Hart<URV>::execVmfge_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
-    return;
-
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      illegalInst(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
