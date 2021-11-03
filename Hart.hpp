@@ -1333,8 +1333,6 @@ namespace WdRiscv
     void enableBasicBlocks(FILE* file, uint64_t instCount)
     { bbFile_ = file; bbLimit_ = instCount; }
 
-    void genVec();
-
   protected:
 
     /// Helper to reset: reset floating point related structures.
