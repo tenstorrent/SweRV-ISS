@@ -1667,12 +1667,6 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       return true;
     }
 
-  if (command == "vec")
-    {
-      hart.genVec();
-      return true;
-    }
-
   std::cerr << "No such command: " << line << '\n';
   return false;
 }
