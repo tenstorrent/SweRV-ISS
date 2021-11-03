@@ -1324,9 +1324,12 @@ namespace WdRiscv
     void forceSubnormalToZero(bool flag)
     { subnormToZero_ = flag; }
 
+    /// Enable logging in CSV (comma separated values) format.
     void enableCsvLog(bool flag)
     { csvTrace_ = flag; }
 
+    /// Enable basic block stats if given file is non-null. Print
+    /// stats every instCount instructions.
     void enableBasicBlocks(FILE* file, uint64_t instCount)
     { bbFile_ = file; bbLimit_ = instCount; }
 
@@ -3989,6 +3992,7 @@ namespace WdRiscv
     // If both halt and reset are true, reset takes precedence.
     std::function<void(Hart<URV>&, bool&, bool&)> preInst_ = nullptr;
 
+    // Basic-block stats.
     uint64_t bbInsts_ = 0;
     uint64_t bbLimit_ = ~uint64_t(0);
     std::unordered_map<uint64_t, uint64_t> basicBlocks_; // Map pc to basic-block frequency.

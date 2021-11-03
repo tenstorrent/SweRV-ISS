@@ -4358,7 +4358,6 @@ Hart<URV>::updatePerformanceCountersForCsr(const DecodedInst& di)
 }
 
 
-
 template <typename URV>
 void
 Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
