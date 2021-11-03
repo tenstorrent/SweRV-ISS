@@ -5052,6 +5052,9 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
           if (minstretEnabled())
             ++retiredInsts_;
 
+	  if (bbFile_)
+	    countBasicBlocks(di);
+
 	  if (doStats)
 	    accumulateInstructionStats(*di);
 	  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
@@ -5102,6 +5105,10 @@ Hart<URV>::runUntilAddress(size_t address, FILE* traceFile)
   uint64_t numInsts = instCounter_ - counter0;
 
   reportInstsPerSec(numInsts, elapsed, userStop);
+
+  if (bbFile_)
+    dumpBasicBlocks();
+
   return success;
 }
 
@@ -5120,7 +5127,7 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim or doBasicBlocks_)
+          if (hasLim or bbFile_)
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -5143,6 +5150,9 @@ Hart<URV>::simpleRun()
 
   enableCsrTrace_ = true;
 
+  if (bbFile_)
+    dumpBasicBlocks();
+
   return success;
 }
 
@@ -5155,7 +5165,8 @@ Hart<URV>::dumpBasicBlocks()
     {
       fprintf(bbFile_, "T");
       for (const auto& kv : basicBlocks_)
-	fprintf(bbFile_, ":%ld:%ld ", kv.first, kv.second);
+	if (kv.second)
+	  fprintf(bbFile_, ":%ld:%ld ", kv.first, kv.second);
       fprintf(bbFile_, "\n");
     }
   bbInsts_ = 0;
@@ -5211,12 +5222,10 @@ Hart<URV>::simpleRunWithLimit()
       pc_ += di->instSize();
       execute(di);
 
-      if (doBasicBlocks_)
+      if (bbFile_)
 	countBasicBlocks(di);
     }
 
-  if (doBasicBlocks_)
-    dumpBasicBlocks();
   return true;
 }
 

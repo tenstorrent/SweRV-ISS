@@ -218,6 +218,7 @@
     "vector" : {
 	"bytes_per_vec" : 16,
 	"min_bytes_per_elem" : 1,
+	"Comment" : "Hardware supports 32-bit ELEN plus some widening operations from 32 to 64-bit",
 	"max_bytes_per_elem" : 8
     }
 }

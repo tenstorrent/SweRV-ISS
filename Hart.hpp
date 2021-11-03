@@ -1327,8 +1327,8 @@ namespace WdRiscv
     void enableCsvLog(bool flag)
     { csvTrace_ = flag; }
 
-    bool configBasicBlocks(FILE* file, uint64_t instCount)
-    { doBasicBlocks_ = true; bbFile_ = file; bbLimit_ = instCount; return true; }
+    void enableBasicBlocks(FILE* file, uint64_t instCount)
+    { bbFile_ = file; bbLimit_ = instCount; }
 
     void genVec();
 
@@ -3989,9 +3989,8 @@ namespace WdRiscv
     // If both halt and reset are true, reset takes precedence.
     std::function<void(Hart<URV>&, bool&, bool&)> preInst_ = nullptr;
 
-    bool doBasicBlocks_ = false;
     uint64_t bbInsts_ = 0;
-    uint64_t bbLimit_ = 0;
+    uint64_t bbLimit_ = ~uint64_t(0);
     std::unordered_map<uint64_t, uint64_t> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;
   };
