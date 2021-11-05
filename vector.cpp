@@ -2228,7 +2228,7 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
 
 
 template <typename URV>
-template<typename ELEM_TYPE>
+template <typename ELEM_TYPE>
 void
 Hart<URV>::vmseq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
