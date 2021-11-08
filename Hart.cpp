@@ -4204,7 +4204,9 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_,
                              lastPriv_);
     }
-  else if (info.type() == InstType::Rvf)
+
+  // Some insts (e.g. flw) can be both load/store and FP
+  if (info.type() == InstType::Rvf)
     {
       pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_,
                            lastPriv_);
