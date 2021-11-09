@@ -675,17 +675,17 @@ bool
 Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
 			       unsigned op1, unsigned op2, unsigned groupX8)
 {
+  unsigned wideGroupX8 = 2*groupX8;
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
-
-  unsigned eg2 = eg*2;
+  unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
   // Destination EEW > source EEW, no overlap except in highest destination
   // register and only if source EEW >= 1.
-  bool overlapOk = checkDestSourceOverlap(op0, groupX8*2, op1, groupX8);
+  bool overlapOk = checkDestSourceOverlap(op0, wideGroupX8, op1, groupX8);
   if (op1 != op2)
-    overlapOk = overlapOk and checkDestSourceOverlap(op0, groupX8*2, op2, groupX8);
+    overlapOk = overlapOk and checkDestSourceOverlap(op0, wideGroupX8, op2, groupX8);
 
   unsigned op = op1 | op2;
 
@@ -708,13 +708,13 @@ bool
 Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
 				 unsigned op1, unsigned op2, unsigned groupX8)
 {
+  unsigned wideGroupX8 = 2*groupX8;
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
-
-  unsigned eg2 = eg*2;
+  unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
-  bool overlapOk = checkDestSourceOverlap(op0, groupX8*2, op2, groupX8);
+  bool overlapOk = checkDestSourceOverlap(op0, wideGroupX8, op2, groupX8);
 
   unsigned opw = op0 | op1;
 
@@ -737,8 +737,8 @@ bool
 Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
 				 unsigned op1, unsigned groupX8)
 {
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  unsigned eg2 = eg*2;
+  unsigned wideGroupX8 = 2*groupX8;
+  unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask = eg2 - 1;
   
   unsigned op = op0 | op1;
@@ -761,12 +761,13 @@ bool
 Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 			       unsigned op1, unsigned op2, unsigned groupX8)
 {
+  unsigned wideGroupX8 = 2*groupX8;
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;
-  unsigned eg2 = eg*2;
+  unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, groupX8*2);
+  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, wideGroupX8);
 
   unsigned op = op0 | op2;
 
@@ -789,12 +790,13 @@ bool
 Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 			       unsigned op1, unsigned groupX8)
 {
+  unsigned wideGroupX8 = 2*groupX8;
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;
-  unsigned eg2 = eg*2;
+  unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, groupX8*2);
+  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, wideGroupX8);
 
   if (overlapOk and (op0 & mask) == 0 and (op1 & mask2) == 0)
     {
