@@ -242,7 +242,15 @@ namespace WdRiscv
     unsigned storeSize() const
     { return stSize_; }
 
+    /// Return true if instruction has an explicit rouning mode field.
+    bool hasRoundingMode() const
+    { return hasRm_; }
+
   protected:
+
+    /// Mark instruction as having an rounding mode field.
+    void setHasRoundingMode(bool flag)
+    { hasRm_ = flag; }
 
     /// Mark instruction as having unsigned source operands.
     void setIsUnsigned(bool flag)
@@ -297,6 +305,7 @@ namespace WdRiscv
     bool isBitManip_ = false;  // True if bit manipulation instruction.
     bool isLoad_ = false;
     bool isStore_ = false;
+    bool hasRm_ = false;       // True if inst has an explicit rounding mode 
   };
 
 

@@ -3735,6 +3735,11 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	fprintf(out, "%sf%d=%lx", sep, reg, val64);
       else
 	fprintf(out, "%sf%d=%x", sep, reg, uint32_t(val64));
+
+      // Print incremental flags since FRM is sticky.
+      unsigned fpFlags = fpRegs_.getLastFpFlags(); // Incremental FP flags.
+      if (fpFlags != 0)
+	fprintf(out, ";ff=%x", fpFlags);
       sep = ";";
     }
 
@@ -3823,6 +3828,14 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	    fprintf(out, "%si%x", sep, di.ithOperand(i));
 	  sep = ";";
 	}
+    }
+
+  // Print rounding mode with source operands.
+  if (instEntry->hasRoundingMode())
+    {
+      RoundingMode rm = effectiveRoundingMode(di.roundingMode());
+      fprintf(out, "%srm=%x", sep, unsigned(rm));
+      sep = ";";
     }
 
   // Memory

@@ -121,6 +121,71 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::jalr))   .setBranchToRegister(true);
   instVec_.at(size_t(InstId::c_jr))   .setBranchToRegister(true);
   instVec_.at(size_t(InstId::c_jalr)) .setBranchToRegister(true);
+
+  // Mark floating point instructions with rounding mode field.
+  instVec_.at(size_t(InstId::fmadd_s))   .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fmsub_s))   .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fnmsub_s))  .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fnmadd_s))  .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fadd_s))    .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fsub_s))    .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fmul_s))    .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fdiv_s))    .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fsqrt_s))   .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_w_s))  .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_wu_s)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_s_w))  .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_s_wu)) .setHasRoundingMode(true);
+
+  instVec_.at(size_t(InstId::fcvt_l_s))  .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_lu_s)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_s_l))  .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_s_lu)) .setHasRoundingMode(true);
+
+  instVec_.at(size_t(InstId::fmadd_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fmsub_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fnmsub_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fnmadd_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fadd_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fsub_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fmul_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fdiv_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fsqrt_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_s_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_d_s)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_w_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_wu_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_d_w)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_d_wu)) .setHasRoundingMode(true);
+
+  instVec_.at(size_t(InstId::fcvt_l_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_lu_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_d_l)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_d_lu)) .setHasRoundingMode(true);
+
+  instVec_.at(size_t(InstId::fmadd_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fmsub_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fnmsub_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fnmadd_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fadd_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fsub_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fmul_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fdiv_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fsqrt_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_s_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_d_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_h_s)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_h_d)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_w_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_wu_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_h_w)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_h_wu)) .setHasRoundingMode(true);
+
+  // rv64 + zfh
+  instVec_.at(size_t(InstId::fcvt_l_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_lu_h)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_h_l)) .setHasRoundingMode(true);
+  instVec_.at(size_t(InstId::fcvt_h_lu)) .setHasRoundingMode(true);
 }
 
 
