@@ -248,7 +248,7 @@ namespace WdRiscv
 
   protected:
 
-    /// Mark instruction as having an rounding mode field.
+    /// Mark instruction as having a rounding mode field.
     void setHasRoundingMode(bool flag)
     { hasRm_ = flag; }
 
