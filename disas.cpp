@@ -201,29 +201,6 @@ printCsr(Hart<URV>& hart, std::ostream& stream,	 const DecodedInst& di)
 
 
 /// Helper to disassemble method. Print on the given stream given
-/// instruction which is of the form: inst reg, reg, imm where imm is
-/// a 12 bit constant.
-template <typename URV>
-static
-void
-printRegRegImm12(const Hart<URV>& hart, std::ostream& stream,
-		 const DecodedInst& di)
-{
-  unsigned rd = di.op0(), rs1 = di.op1();
-  int32_t imm = di.op2As<int32_t>();
-
-  stream << std::left << std::setw(8) << di.instEntry()->name() << ' ';
-
-  stream << hart.intRegName(rd) << ", " << hart.intRegName(rs1) << ", ";
-
-  if (imm < 0)
-    stream << "-0x" << std::hex << ((-imm) & 0xfff) << std::dec;
-  else
-    stream << "0x" << std::hex << (imm & 0xfff) << std::dec;
-}
-
-
-/// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form: inst reg, reg, uimm where uimm is
 /// a 12 bit constant.
 template <typename URV>
@@ -556,19 +533,8 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printBranch3(*this, out, di);
       break;
 
-    case InstId::addi:
-    case InstId::slti:
-      printRegRegImm12(*this, out, di);
-      break;
-
     case InstId::sltiu:
       printRegRegUimm12(*this, out, di);
-      break;
-
-    case InstId::xori:
-    case InstId::ori:
-    case InstId::andi:
-      printRegRegImm12(*this, out, di);
       break;
 
     case InstId::csrrw:
@@ -578,10 +544,6 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
     case InstId::csrrsi:
     case InstId::csrrci:
       printCsr(*this, out, di);
-      break;
-
-    case InstId::addiw:
-      printRegRegImm12(*this, out, di);
       break;
 
     case InstId::lr_w:
