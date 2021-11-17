@@ -3920,7 +3920,7 @@ namespace WdRiscv
     int gdbInputFd_ = -1;  // Input file descriptor when running in gdb mode.
 
     InstTable instTable_;
-    std::vector<InstProfile> instProfileVec_; // Instruction frequency
+    InstProfiles instProfs_; // Instruction frequency manager
 
     std::vector<uint64_t> interruptStat_;  // Count of different types of interrupts.
 

@@ -1300,34 +1300,19 @@ template <typename URV>
 void
 Hart<URV>::reportInstructionFrequency(FILE* file) const
 {
-  struct CompareFreq
-  {
-    CompareFreq(const std::vector<InstProfile>& profileVec)
-      : profileVec(profileVec)
-    { }
-
-    bool operator()(size_t a, size_t b) const
-    { return profileVec.at(a).freq_ < profileVec.at(b).freq_; }
-
-    const std::vector<InstProfile>& profileVec;
-  };
-
-  std::vector<size_t> indices(instProfileVec_.size());
-  for (size_t i = 0; i < indices.size(); ++i)
-    indices.at(i) = i;
-  std::sort(indices.begin(), indices.end(), CompareFreq(instProfileVec_));
+  std::vector<size_t> indices;
+  instProfs_.sort(indices);
 
   for (auto profIx : indices)
     {
-      InstId id = InstId(profIx);
-
-      const InstEntry& entry = instTable_.getEntry(id);
-      const InstProfile& prof = instProfileVec_.at(profIx);
-      uint64_t freq = prof.freq_;
-      if (not freq)
+      const InstProfile* profPtr = instProfs_.ithEntry(profIx);
+      if (not profPtr or not profPtr->freq_)
 	continue;
 
-      fprintf(file, "%s %" PRId64 "\n", entry.name().c_str(), freq);
+      const InstProfile& prof = *profPtr;
+      const InstEntry& entry = instTable_.getEntry(prof.id_);
+
+      fprintf(file, "%s %" PRId64 "\n", entry.name().c_str(), prof.freq_);
 
       uint64_t count = 0;
       for (auto n : prof.destRegFreq_) count += n;
@@ -4290,7 +4275,16 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
   if (not instFreq_)
     return;
 
-  InstProfile& prof = instProfileVec_.at(size_t(id));
+  InstProfile* profPtr = nullptr;
+  if (info.isVector())
+    profPtr = instProfs_.find(id, vecRegs_.elemWidth());
+  else
+    profPtr = instProfs_.find(id);
+
+  if (not profPtr)
+    return;
+
+  InstProfile& prof = *profPtr;
 
   prof.freq_++;
   if (lastPriv_ == PrivilegeMode::User)
@@ -9838,22 +9832,7 @@ Hart<URV>::enableInstructionFrequency(bool b)
 {
   instFreq_ = b;
   if (b)
-    {
-      instProfileVec_.resize(size_t(InstId::maxId) + 1);
-
-      auto regCount = intRegCount();
-      for (auto& inst : instProfileVec_)
-	{
-	  inst.destRegFreq_.resize(regCount);
-          inst.srcRegFreq_.resize(3);  // Up to 3 source operands
-          for (auto& vec : inst.srcRegFreq_)
-            vec.resize(regCount);
-
-          inst.srcHisto_.resize(3);  // Up to 3 source historgrams
-          for (auto& vec : inst.srcHisto_)
-            vec.resize(13);  // FIX: avoid magic 13
-	}
-    }
+    instProfs_.configure();
 }
 
 
