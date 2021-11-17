@@ -558,11 +558,11 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::addi:
     case InstId::slti:
-      printRegRegImm12(*this, out, "slti", di);
+      printRegRegImm12(*this, out, di);
       break;
 
     case InstId::sltiu:
-      printRegRegUimm12(*this, out, "sltiu", di);
+      printRegRegUimm12(*this, out, di);
       break;
 
     case InstId::xori:
