@@ -37,7 +37,6 @@ InstProfiles::configure()
   for (unsigned sizeIx = 0; sizeIx < sizeCount; ++sizeIx)
     {
       ElementWidth ew{sizeIx};
-      unsigned width = VecRegs::elementWidthInBits(ew);
       for (unsigned instIx = 0; instIx < instCount; ++instIx)
 	{
 	  InstId id{instIx};
@@ -46,7 +45,7 @@ InstProfiles::configure()
 	  auto& inst = vec_.at(vecIx);
 
 	  inst.id_ = id;
-	  inst.elemWidth_ = width;
+	  inst.elemWidth_ = ew;
 	  inst.destRegFreq_.resize(regCount);
 	  inst.srcRegFreq_.resize(3);  // Up to 3 source operands
 	  for (auto& vec : inst.srcRegFreq_)
