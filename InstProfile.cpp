@@ -81,6 +81,3 @@ InstProfiles::sort(std::vector<size_t>& indices) const
     indices.at(i) = i;
   std::sort(indices.begin(), indices.end(), CompareFreq(vec_));
 }
-
-
-    
