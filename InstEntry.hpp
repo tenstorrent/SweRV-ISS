@@ -335,6 +335,18 @@ namespace WdRiscv
     // Return true if given instance name is present in the table.
     bool hasInfo(const std::string& name) const;
 
+    /// Mark lr as a load instruction and sc as a store for the
+    /// purpose of performance counters if flag is true; otherwise,
+    /// lr and sc are not counted as load/store.
+    void perfCountAtomicLoadStore(bool flag);
+
+    /// Mark floating point load/store instructions as load/store for
+    /// the purpose of performance counters if flag is true;
+    /// otherwise, floating point load/store are not counted.  If flag
+    /// is true, flw will count as both a load instruction and as an
+    /// fp instruction.
+    void perfCountFpLoadStore(bool flag);
+
   private:
 
     // Helper to the constructor.

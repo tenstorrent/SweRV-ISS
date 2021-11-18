@@ -16,6 +16,8 @@
     "enable_zbb" : "true",
 
     "enable_performance_counters" : "true",
+    "perf_count_atomic_load_store" : "true",
+    "perf_count_fp_load_store" : "true",
 
     "Comment" : "Use ABI register names in log file (e.g. sp instead of x2).",
     "abi_names" : "true",

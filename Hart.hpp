@@ -305,6 +305,18 @@ namespace WdRiscv
     void configEventNumber(URV userNumber, EventNumber eventId)
     { csRegs_.mPerfRegs_.configEventNumber(userNumber, eventId); }
 
+    /// Do not consider lr and sc instructions as load/store events for
+    /// performance counter when flag is false. Do consider them when
+    /// flag is true.
+    void perfCountAtomicLoadStore(bool flag)
+    { instTable_.perfCountAtomicLoadStore(flag); }
+
+    /// Do not consider flw,fsw,fld,fsd...c instructions as load/store
+    /// events for performance counter when flag is false. Do consider
+    /// them when flag is true.
+    void perfCountFpLoadStore(bool flag)
+    { instTable_.perfCountFpLoadStore(flag); }
+
     /// Configure vector unit of this hart.
     void configVector(unsigned bytesPerVec, unsigned minBytesPerElem,
 		      unsigned maxBytesPerElem)

@@ -101,6 +101,7 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::c_fsd))   .setStoreSize(8);
   instVec_.at(size_t(InstId::c_sq))    .setStoreSize(16);
   instVec_.at(size_t(InstId::c_sw))    .setStoreSize(4);
+  instVec_.at(size_t(InstId::c_fsw))    .setStoreSize(4);
   instVec_.at(size_t(InstId::c_sd))    .setStoreSize(8);
   instVec_.at(size_t(InstId::c_fsdsp)) .setStoreSize(8);
   instVec_.at(size_t(InstId::c_swsp))  .setStoreSize(4);
@@ -186,6 +187,15 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::fcvt_lu_h)) .setHasRoundingMode(true);
   instVec_.at(size_t(InstId::fcvt_h_l)) .setHasRoundingMode(true);
   instVec_.at(size_t(InstId::fcvt_h_lu)) .setHasRoundingMode(true);
+
+  // For backward compatibility, lr and sc are not counted as load/store
+  // by the performance counters.
+  perfCountAtomicLoadStore(false);
+
+  // For backward compatibility, floating point load store (flw/fsw,
+  // fld/fsd ...)  instructions are not counted as load/store by the
+  // performance counters.
+  perfCountFpLoadStore(false);
 }
 
 
@@ -206,6 +216,37 @@ InstTable::getEntry(const std::string& name) const
     return instVec_.front();
   auto id = iter->second;
   return getEntry(id);
+}
+
+
+void
+InstTable::perfCountAtomicLoadStore(bool flag)
+{
+  instVec_.at(size_t(InstId::lr_w)).isLoad_ = flag;
+  instVec_.at(size_t(InstId::lr_d)).isLoad_ = flag;
+  instVec_.at(size_t(InstId::sc_w)).isStore_ = flag;
+  instVec_.at(size_t(InstId::sc_d)).isStore_ = flag;
+}
+
+
+void
+InstTable::perfCountFpLoadStore(bool flag)
+{
+  instVec_.at(size_t(InstId::flh))     .isLoad_ = flag;
+  instVec_.at(size_t(InstId::flw))     .isLoad_ = flag;
+  instVec_.at(size_t(InstId::fld))     .isLoad_ = flag;
+  instVec_.at(size_t(InstId::c_fld))   .isLoad_ = flag;
+  instVec_.at(size_t(InstId::c_flw))   .isLoad_ = flag;
+  instVec_.at(size_t(InstId::c_fldsp)) .isLoad_ = flag;
+  instVec_.at(size_t(InstId::c_flwsp)) .isLoad_ = flag;
+
+  instVec_.at(size_t(InstId::fsh))     .isStore_ = flag;
+  instVec_.at(size_t(InstId::fsw))     .isStore_ = flag;
+  instVec_.at(size_t(InstId::fsd))     .isStore_ = flag;
+  instVec_.at(size_t(InstId::c_fsd))   .isStore_ = flag;
+  instVec_.at(size_t(InstId::c_fsw))   .isStore_ = flag;
+  instVec_.at(size_t(InstId::c_fsdsp)) .isStore_ = flag;
+  instVec_.at(size_t(InstId::c_fswsp)) .isStore_ = flag;
 }
 
 
