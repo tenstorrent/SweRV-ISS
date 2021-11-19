@@ -24,6 +24,13 @@
 using namespace WdRiscv;
 
 
+inline bool
+isPowerOf2(uint64_t x)
+{
+  return x != 0 and (x & (x-1)) == 0;
+}
+
+
 HartConfig::HartConfig()
 {
   config_ = new nlohmann::json();
@@ -823,17 +830,12 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
                     << bytesPerVec << '\n';
           errors++;
         }
-      else
-        {
-          unsigned l2BytesPerVec = std::log2(bytesPerVec);
-          unsigned p2BytesPerVec = uint32_t(1) << l2BytesPerVec;
-          if (p2BytesPerVec != bytesPerVec)
-            {
-              std::cerr << "Error: Config file bytes_per_vec ("
-                        << bytesPerVec << ") is not a power of 2\n";
-              errors++;
-            }
-        }
+      else if (not isPowerOf2(bytesPerVec))
+	{
+	  std::cerr << "Error: Config file bytes_per_vec ("
+		    << bytesPerVec << ") is not a power of 2\n";
+	  errors++;
+	}
     }
 
   std::vector<unsigned> bytesPerElem = { 1, 1 };
@@ -846,7 +848,8 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 	{
 	  if (ix > 0)
 	    {
-	      std::cerr << "Error: Missing " << tag << " tag in vector section of config file\n";
+	      std::cerr << "Error: Missing " << tag
+			<< " tag in vector section of config file\n";
 	      errors++;
 	    }
 	  continue;
@@ -862,9 +865,7 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         }
       else
         {
-          unsigned l2BytesPerElem = std::log2(bytes);
-          unsigned p2BytesPerElem = uint32_t(1) << l2BytesPerElem;
-          if (p2BytesPerElem != bytes)
+          if (not isPowerOf2(bytes))
             {
               std::cerr << "Error: Config file " << tag << " ("
                         << bytes << ") is not a power of 2\n";
@@ -1088,6 +1089,28 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.setAmoInCacheableOnly(flag);
       else
         errors++;
+    }
+
+  // Reservation size in bytes for the load-reserve (LR) instruction.
+  // Default is 4 for rv32 and 8 for rv64. A reservation size smaller
+  // than default has no effect.
+  tag = "reservation_bytes";
+  if (config_ -> count(tag))
+    {
+      unsigned resBytes = sizeof(URV);
+      if (getJsonUnsigned(tag, config_ ->at(tag), resBytes))
+	{
+	  if (isPowerOf2(resBytes))
+	    hart.configReservationSize(resBytes);
+	  else
+	    {
+	      std::cerr << "Error: Config file reservation_bytes ("
+		    << resBytes << ") is not a power of 2\n";
+	      errors++;
+	    }
+	}
+      else
+	errors++;
     }
 
   // Wide (64-bit) load/store. WDC special.

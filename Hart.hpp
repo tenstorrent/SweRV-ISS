@@ -322,6 +322,11 @@ namespace WdRiscv
 		      unsigned maxBytesPerElem)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem); }
 
+    /// Configure the load-reserve reservation size in bytes.
+    /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
+    void configReservationSize(unsigned size)
+    { lrResSize_ = size; }
+      
     /// Get the values of the three components of the given debug
     /// trigger. Return true on success and false if trigger is out of
     /// bounds.
@@ -3857,6 +3862,7 @@ namespace WdRiscv
     uint64_t lrSuccess_ = 0;  // Counte of successful LR (reservaton acquired).
     uint64_t scCount_ = 0;    // Count of dispatched store-conditional instructions.
     uint64_t scSuccess_ = 0;  // Counte of successful SC (store accomplished).
+    unsigned lrResSize_ = sizeof(URV); // LR reservation size.
     bool forceAccessFail_ = false;  // Force load/store access fault.
     bool forceFetchFail_ = false;   // Force fetch access fault.
     bool fastInterrupts_ = false;

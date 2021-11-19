@@ -21,23 +21,21 @@
 
 using namespace WdRiscv;
 
+inline bool
+isPowerOf2(uint64_t x)
+{
+  return x != 0 and (x & (x-1)) == 0;
+}
+
 
 Cache::Cache(uint64_t totalSize, unsigned lineSize, unsigned setSize)
   : size_(totalSize), lineSize_(lineSize), setSize_(setSize)
 {
-  unsigned logSize = static_cast<unsigned>(std::log2(totalSize));
-  uint64_t p2Size = uint64_t(1) << logSize;
-  assert(p2Size == totalSize);
+  assert(isPowerOf2(totalSize));
+  assert(isPowerOf2(setSize));
+  assert(isPowerOf2(lineSize));
 
-  unsigned logSetCount = static_cast<unsigned>(std::log2(setSize));
-  unsigned p2SetCount = unsigned(1) << logSetCount;
-  assert(p2SetCount == setSize);
-
-  unsigned logLineSize = static_cast<unsigned>(std::log2(lineSize));
-  unsigned p2LineSize = unsigned(1) << logLineSize;
-  assert(p2LineSize == lineSize);
-
-  lineNumberShift_ = logLineSize;
+  lineNumberShift_ = std::log2(lineSize);
 
   assert(totalSize >= lineSize);
 
@@ -45,9 +43,7 @@ Cache::Cache(uint64_t totalSize, unsigned lineSize, unsigned setSize)
   assert(lineCount >= setSize);
 
   uint64_t count = lineCount / setSize;
-  unsigned logCount = static_cast<unsigned>(std::log2(count));
-  uint64_t p2Count = uint64_t(1) << logCount;
-  assert(p2Count == count);
+  assert(isPowerOf2(count));
 
   setIndexMask_ = count - 1;
 
