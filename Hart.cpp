@@ -2603,6 +2603,9 @@ template <typename URV>
 void
 Hart<URV>::illegalInst(const DecodedInst* di)
 {
+  if (triggerTripped_)
+    return;
+
   uint32_t inst = di->inst();
   if (isCompressedInst(inst))
     inst = inst & 0xffff;
@@ -2718,11 +2721,8 @@ void
 Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info,
 			     SecondaryCause secCause)
 {
-  if (triggerTripped_)
-    return;
-
   // Check if stuck because of lack of exception handler. Disable if
-  // you want the stuck behavior.
+  // you do want the stuck behavior.
   if (true)
     {
       if (instCounter_ == counterAtLastIllegal_ + 1)
