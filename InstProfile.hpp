@@ -29,7 +29,7 @@ namespace WdRiscv
     uint64_t user_ = 0;       // Number of times exeuted in user mode.
     uint64_t supervisor_ = 0; // Number of times exeuted in supervisor mode.
     uint64_t machine_ = 0;    // Number of times exeuted in machine mode.
-    uint64_t elemWidth_ = 8;  // For vector instructions.
+    ElementWidth elemWidth_ = ElementWidth::Byte;  // For vector instructions.
 
     // One entry per integer register: Count of times register was used
     // by instruction as destination register.
@@ -65,8 +65,9 @@ namespace WdRiscv
 
     InstProfile* find(InstId id, ElementWidth width)
     {
+      unsigned base = unsigned(InstId::maxId) + 1;
       unsigned multiplier = unsigned(width);
-      size_t ix = size_t(id)*multiplier;
+      size_t ix = base*multiplier + size_t(id);
       return ix < vec_.size()? &vec_.at(ix) : nullptr;
     }
 
@@ -90,3 +91,4 @@ namespace WdRiscv
 
 
     
+

@@ -87,6 +87,7 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::c_lwsp))  .setLoadSize(4);
   instVec_.at(size_t(InstId::c_flwsp)) .setLoadSize(4);
   instVec_.at(size_t(InstId::c_ldsp))  .setLoadSize(8);
+  instVec_.at(size_t(InstId::load64))  .setLoadSize(8);
 
   // Set data size of store instructions.
   instVec_.at(size_t(InstId::sb))      .setStoreSize(1);
@@ -107,6 +108,7 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::c_swsp))  .setStoreSize(4);
   instVec_.at(size_t(InstId::c_fswsp)) .setStoreSize(4);
   instVec_.at(size_t(InstId::c_sdsp))  .setStoreSize(8);
+  instVec_.at(size_t(InstId::store64)) .setStoreSize(8);
 
   // Mark conditional branch instructions.
   instVec_.at(size_t(InstId::beq))    .setConditionalBranch(true);
@@ -222,31 +224,31 @@ InstTable::getEntry(const std::string& name) const
 void
 InstTable::perfCountAtomicLoadStore(bool flag)
 {
-  instVec_.at(size_t(InstId::lr_w)).isLoad_ = flag;
-  instVec_.at(size_t(InstId::lr_d)).isLoad_ = flag;
-  instVec_.at(size_t(InstId::sc_w)).isStore_ = flag;
-  instVec_.at(size_t(InstId::sc_d)).isStore_ = flag;
+  instVec_.at(size_t(InstId::lr_w)).isPerfLoad_  = flag;
+  instVec_.at(size_t(InstId::lr_d)).isPerfLoad_  = flag;
+  instVec_.at(size_t(InstId::sc_w)).isPerfStore_ = flag;
+  instVec_.at(size_t(InstId::sc_d)).isPerfStore_ = flag;
 }
 
 
 void
 InstTable::perfCountFpLoadStore(bool flag)
 {
-  instVec_.at(size_t(InstId::flh))     .isLoad_ = flag;
-  instVec_.at(size_t(InstId::flw))     .isLoad_ = flag;
-  instVec_.at(size_t(InstId::fld))     .isLoad_ = flag;
-  instVec_.at(size_t(InstId::c_fld))   .isLoad_ = flag;
-  instVec_.at(size_t(InstId::c_flw))   .isLoad_ = flag;
-  instVec_.at(size_t(InstId::c_fldsp)) .isLoad_ = flag;
-  instVec_.at(size_t(InstId::c_flwsp)) .isLoad_ = flag;
+  instVec_.at(size_t(InstId::flh))     .isPerfLoad_ = flag;
+  instVec_.at(size_t(InstId::flw))     .isPerfLoad_ = flag;
+  instVec_.at(size_t(InstId::fld))     .isPerfLoad_ = flag;
+  instVec_.at(size_t(InstId::c_fld))   .isPerfLoad_ = flag;
+  instVec_.at(size_t(InstId::c_flw))   .isPerfLoad_ = flag;
+  instVec_.at(size_t(InstId::c_fldsp)) .isPerfLoad_ = flag;
+  instVec_.at(size_t(InstId::c_flwsp)) .isPerfLoad_ = flag;
 
-  instVec_.at(size_t(InstId::fsh))     .isStore_ = flag;
-  instVec_.at(size_t(InstId::fsw))     .isStore_ = flag;
-  instVec_.at(size_t(InstId::fsd))     .isStore_ = flag;
-  instVec_.at(size_t(InstId::c_fsd))   .isStore_ = flag;
-  instVec_.at(size_t(InstId::c_fsw))   .isStore_ = flag;
-  instVec_.at(size_t(InstId::c_fsdsp)) .isStore_ = flag;
-  instVec_.at(size_t(InstId::c_fswsp)) .isStore_ = flag;
+  instVec_.at(size_t(InstId::fsh))     .isPerfStore_ = flag;
+  instVec_.at(size_t(InstId::fsw))     .isPerfStore_ = flag;
+  instVec_.at(size_t(InstId::fsd))     .isPerfStore_ = flag;
+  instVec_.at(size_t(InstId::c_fsd))   .isPerfStore_ = flag;
+  instVec_.at(size_t(InstId::c_fsw))   .isPerfStore_ = flag;
+  instVec_.at(size_t(InstId::c_fsdsp)) .isPerfStore_ = flag;
+  instVec_.at(size_t(InstId::c_fswsp)) .isPerfStore_ = flag;
 }
 
 

@@ -1312,7 +1312,9 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
       const InstProfile& prof = *profPtr;
       const InstEntry& entry = instTable_.getEntry(prof.id_);
 
-      fprintf(file, "%s %" PRId64 "\n", entry.name().c_str(), prof.freq_);
+      std::string instr = entry.isVector()? entry.name() + "." + VecRegs::to_string(prof.elemWidth_) : entry.name();
+
+      fprintf(file, "%s %" PRId64 "\n", instr.c_str(), prof.freq_);
 
       uint64_t count = 0;
       for (auto n : prof.destRegFreq_) count += n;
@@ -4131,7 +4133,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_,
                            lastPriv_);
     }
-  else if (info.isLoad())
+  else if (info.isPerfLoad())
     {
       pregs.updateCounters(EventNumber::Load, prevPerfControl_,
                            lastPriv_);
@@ -4142,7 +4144,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	pregs.updateCounters(EventNumber::BusLoad, prevPerfControl_,
                              lastPriv_);
     }
-  else if (info.isStore())
+  else if (info.isPerfStore())
     {
       pregs.updateCounters(EventNumber::Store, prevPerfControl_,
                            lastPriv_);
@@ -4390,9 +4392,67 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
         }
       else if (info.ithOperandType(i) == OperandType::VecReg)
 	{
-	  uint32_t regIx = di.ithOperand(i);
-	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
-	  srcIx++;
+          uint32_t regIx = di.ithOperand(i);
+          prof.srcRegFreq_.at(srcIx).at(regIx)++;
+
+          switch (vecRegs_.elemWidth())
+            {
+              case ElementWidth::Byte:
+                {
+                  int8_t val;
+                  size_t numElem = ((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3);
+                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                    {
+                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+                        std::cerr << "Error in vector config" << '\n';
+                      else
+                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                    }
+                  break;
+                }
+              case ElementWidth::Half:
+                {
+                  int16_t val;
+                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 1);
+                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                    {
+                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+                        std::cerr << "Error in vector config" << '\n';
+                      else
+                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                    }
+                  break;
+                }
+              case ElementWidth::Word:
+                {
+                  int32_t val;
+                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 2);
+                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                    {
+                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+                        std::cerr << "Error in vector config" << '\n';
+                      else
+                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                    }
+                  break;
+                }
+              case ElementWidth::Word2:
+                {
+                  int64_t val;
+                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 3);
+                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                    {
+                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+                        std::cerr << "Error in vector config" << '\n';
+                      else
+                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                    }
+                  break;
+                }
+              default:
+                break;
+            }
+          srcIx++;
 	}
       else if (info.ithOperandType(i) == OperandType::CsReg)
 	{
