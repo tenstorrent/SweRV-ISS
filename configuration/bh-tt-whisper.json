@@ -26,6 +26,11 @@
     "Comment" : "2 performance counters implemented (mhpmcount3 and 4), rest (5 to 31) hardwired to 0",
     "num_mmode_perf_regs" : 2,
 
+    "memmap" : {
+	"Comment": "Instruction fetch allowed only in 0x80000000 to 0x801fffff",
+	"inst": [ ["0x80000000", "0x801fffff"] ]
+    },
+
     "csr" : {
 	"misa" : {
 	    "reset-comment" : "imabfv",
