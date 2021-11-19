@@ -2722,7 +2722,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info,
 			     SecondaryCause secCause)
 {
   // Check if stuck because of lack of exception handler. Disable if
-  // you do want stuck behavior.
+  // you do want the stuck behavior.
   if (true)
     {
       if (instCounter_ == counterAtLastIllegal_ + 1)
@@ -2736,6 +2736,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info,
 			      "64 consecutive illegal instructions",
 			      0, 0);
 	}
+
       counterAtLastIllegal_ = instCounter_;
     }
 
