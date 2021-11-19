@@ -1090,6 +1090,19 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  // Reservation size in bytes for the load-reserve (LR) instruction.
+  // Default is 4 for rv32 and 8 for rv64. A reservation size smaller
+  // than default has no effect.
+  tag = "reservation_size";
+  if (config_ -> count(tag))
+    {
+      unsigned resSize = sizeof(URV);
+      if (getJsonUnsigned(tag, config_ ->at(tag), resSize))
+	hart.configReservationSize(resSize);
+      else
+	errors++;
+    }
+
   // Wide (64-bit) load/store. WDC special.
   tag = "enable_wide_load_store";
   if (config_ -> count(tag))
