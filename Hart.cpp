@@ -4133,7 +4133,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_,
                            lastPriv_);
     }
-  else if (info.isLoad())
+  else if (info.isPerfLoad())
     {
       pregs.updateCounters(EventNumber::Load, prevPerfControl_,
                            lastPriv_);
@@ -4144,7 +4144,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 	pregs.updateCounters(EventNumber::BusLoad, prevPerfControl_,
                              lastPriv_);
     }
-  else if (info.isStore())
+  else if (info.isPerfStore())
     {
       pregs.updateCounters(EventNumber::Store, prevPerfControl_,
                            lastPriv_);
