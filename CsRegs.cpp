@@ -172,9 +172,6 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 {
   supervisorModeEnabled_ = flag;
 
-  if (not flag)
-    return;
-
   for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SEDELEG, CsrNumber::SIDELEG,
                       CsrNumber::STVEC, CsrNumber::SIE, CsrNumber::STVEC,
                       CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
@@ -188,9 +185,12 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
                     << std::hex << URV(csrn) << " undefined\n";
           assert(0);
         }
-      else if (not csr->isImplemented())
-        csr->setImplemented(true);
+      else
+        csr->setImplemented(flag);
     }
+
+  if (not flag)
+    return;
 
   typedef InterruptCause IC;
 
@@ -219,6 +219,46 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
       mask = csr->getPokeMask();
       csr->setPokeMask(mask | extra);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableRvf(bool flag)
+{
+  for (auto csrn : { CsrNumber::FCSR, CsrNumber::FFLAGS, CsrNumber::FRM } )
+    {
+      auto csr = findCsr(csrn);
+      if (not csr)
+        {
+          std::cerr << "Error: enableRvf: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+          assert(0);
+        }
+      else if (not csr->isImplemented())
+        csr->setImplemented(flag);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableVectorMode(bool flag)
+{
+  for (auto csrn : { CsrNumber::VSTART, CsrNumber::VXSAT, CsrNumber::VXRM,
+		     CsrNumber::VCSR, CsrNumber::VL, CsrNumber::VTYPE,
+		     CsrNumber::VLENB } )
+    {
+      auto csr = findCsr(csrn);
+      if (not csr)
+        {
+          std::cerr << "Error: enableVectorMode: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+          assert(0);
+        }
+      else
+        csr->setImplemented(flag);
     }
 }
 
@@ -521,7 +561,7 @@ CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters)
 
   if (errors == 0)
     {
-      mPerfRegs_.config(numCounters, maxEventId_);
+      mPerfRegs_.config(numCounters);
       tiePerfCounters(mPerfRegs_.counters_);
     }
 
@@ -845,11 +885,11 @@ CsRegs<URV>::defineMachineRegs()
   // Machine status setup.
 
   // mstatus
-  //           S R        T T T M S M X  F  M  R  S M R S U M R S U
-  //           D E        S W V X U P S  S  P  E  P P E P P I E I I
-  //             S        R   M R M R       P  S  P I S I I E S E E
+  //           S R        T T T M S M X  F  M  V  S M R S U M R S U
+  //           D E        S W V X U P S  S  P  S  P P E P P I E I I
+  //             S        R   M R M R       P     P I S I I E S E E
   //                                V               E   E E
-  URV mask = 0b0'00000000'1'1'1'1'1'1'11'11'11'00'1'1'0'1'0'1'0'1'0;
+  URV mask = 0b0'00000000'1'1'1'1'1'1'11'11'11'11'1'1'0'1'0'1'0'1'0;
   URV val = 0;
   if (not rv32_)
     {
@@ -1265,8 +1305,9 @@ CsRegs<URV>::defineVectorRegs()
   defineCsr("vstart", CsrNumber::VSTART, !mand, !imp, 0, 0, 0);
   defineCsr("vxsat",  CsrNumber::VXSAT,  !mand, !imp, 0, 1, 1);  // 1 bit
   defineCsr("vxrm",   CsrNumber::VXRM,   !mand, !imp, 0, 3, 3);  // 2 bits
-  defineCsr("VCSR",   CsrNumber::VCSR,   !mand, !imp, 0, 7, 7);  // 3 bits
-  defineCsr("vl",     CsrNumber::VL,     !mand, !imp, 0, 0, 0);
+  defineCsr("vcsr",   CsrNumber::VCSR,   !mand, !imp, 0, 7, 7);  // 3 bits
+  URV pokeMask = ~URV(0);
+  defineCsr("vl",     CsrNumber::VL,     !mand, !imp, 0, 0, pokeMask);
 
   uint64_t mask = 0x800000ff;
   if (not rv32_)

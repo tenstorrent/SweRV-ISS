@@ -366,6 +366,13 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
             }
         }
 
+      if (not csr)
+	{
+	  std::cerr << "A CSR number must be provided in configuration of non-standard CSR "
+		    << csrName << '\n';
+	  errors++;
+	  continue;
+	}
       bool exists0 = csr->isImplemented(), isDebug0 = csr->isDebug();
       bool shared0 = csr->isShared();
       URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
@@ -376,8 +383,6 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
           std::cerr << "Warning: Bit corresponding to hart 0 is cleared "
                     << "in reset value of mhartstart CSR -- Bit is ignored\n";
 
-      // Add hart-index to the base-hart-id (which is common to all
-      // the harts in the core).
       if (csrName == "mhartid")
         {
           std::cerr << "CSR mhartid cannot be configured.\n";
@@ -663,6 +668,58 @@ applyTriggerConfig(Hart<URV>& hart, const nlohmann::json& config)
 template <typename URV>
 static
 bool
+applyPerfEventMap(Hart<URV>& hart, const nlohmann::json& config)
+{
+  const char* tag = "mmode_perf_event_map";
+  if (not config.count(tag))
+    return true;
+
+  auto& perfMap = config.at(tag);
+  if (not perfMap.is_object())
+    {
+      std::cerr << "Invalid " << tag << " entry in config file (expecting an object)\n";
+      return false;
+    }
+
+  std::unordered_set<URV> eventNumbers;
+
+  unsigned errors = 0;
+  for (auto it = perfMap.begin(); it != perfMap.end(); ++it)
+    {
+      const std::string& eventName = it.key();
+      const auto& valObj = it.value();
+      std::string path = std::string(tag) + "." + eventName;
+      URV value = 0;
+      if (not getJsonUnsigned(path, valObj,  value))
+	{
+	  errors++;
+	  continue;
+	}
+
+      EventNumber eventId = EventNumber::None;
+      if (not PerfRegs::findEvent(eventName, eventId))
+	{
+	  std::cerr << "No such performance event: " << eventName << '\n';
+	  errors++;
+	  continue;
+	}
+      
+      if (eventNumbers.count(value))
+	{
+	  std::cerr << "Event number " << value << " associaged with more than one event in mmode_perf_event_map in config file.\n";
+	  errors++;
+	}
+      hart.configEventNumber(value, eventId);
+      eventNumbers.insert(value);
+    }
+
+  return errors == 0;
+}
+
+
+template <typename URV>
+static
+bool
 applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
                 bool userMode, bool /*verbose*/)
 {
@@ -731,6 +788,9 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
       hart.configPerfEvents(eventsVec);
     }
 
+  if (not applyPerfEventMap(hart, config))
+    errors++;
+
   return errors == 0;
 }
 
@@ -776,38 +836,47 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         }
     }
 
-  unsigned bytesPerElem = 0;
-  tag = "max_bytes_per_elem";
-  if (not vconf.count(tag))
+  std::vector<unsigned> bytesPerElem = { 1, 1 };
+  std::vector<const char*>  tags = { "min_bytes_per_elem", "max_bytes_per_elem" };
+  for (size_t ix = 0; ix < tags.size(); ++ix)
     {
-      std::cerr << "Error: Missing " << tag << " tag in vector section of config file\n";
-      errors++;
-    }
-  else
-    {
-      if (not getJsonUnsigned(tag, vconf.at(tag), bytesPerElem))
+      unsigned bytes = 0;
+      tag = tags.at(ix);
+      if (not vconf.count(tag))
+	{
+	  if (ix > 0)
+	    {
+	      std::cerr << "Error: Missing " << tag << " tag in vector section of config file\n";
+	      errors++;
+	    }
+	  continue;
+	}
+
+      if (not getJsonUnsigned(tag, vconf.at(tag), bytes))
         errors++;
-      else if (bytesPerElem == 0 or bytesPerElem > bytesPerVec)
+      else if (bytes == 0 or bytes > bytesPerVec)
         {
-          std::cerr << "Error: Invalid config file max_bytes_per_elem number: "
-                    << bytesPerElem << '\n';
+          std::cerr << "Error: Invalid config file " << tag << "  number: "
+                    << bytes << '\n';
           errors++;
         }
       else
         {
-          unsigned l2BytesPerElem = std::log2(bytesPerElem);
+          unsigned l2BytesPerElem = std::log2(bytes);
           unsigned p2BytesPerElem = uint32_t(1) << l2BytesPerElem;
-          if (p2BytesPerElem != bytesPerElem)
+          if (p2BytesPerElem != bytes)
             {
-              std::cerr << "Error: Config file max_bytes_per_elem ("
-                        << bytesPerElem << ") is not a power of 2\n";
+              std::cerr << "Error: Config file " << tag << " ("
+                        << bytes << ") is not a power of 2\n";
               errors++;
             }
+	  else
+	    bytesPerElem.at(ix) = bytes;
         }
     }
 
   if (errors == 0)
-    hart.configVector(bytesPerVec, bytesPerElem);
+    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1));
 
   return errors == 0;
 }
@@ -988,6 +1057,17 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  // Print memory address of load/store instruction in trace log.
+  tag = "print_load_store_address";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.setTraceLoadStore(flag);
+      else
+        errors++;
+    }
+
   // Atomic instructions illegal outside of DCCM.
   tag = "amo_illegal_outside_dccm";
   if (config_ -> count(tag))
@@ -1046,7 +1126,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Enable debug triggers.
-  tag ="enable_triggers";
+  tag = "enable_triggers";
   if (config_ -> count(tag))
     {
       bool flag = false;
@@ -1057,12 +1137,32 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Enable performance counters.
-  tag ="enable_performance_counters";
+  tag = "enable_performance_counters";
   if (config_ -> count(tag))
     {
       bool flag = false;
       if (getJsonBoolean(tag, config_ ->at(tag), flag))
         hart.enablePerformanceCounters(flag);
+      else
+        errors++;
+    }
+
+  tag = "perf_count_atomic_load_store";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ ->at(tag), flag))
+        hart.perfCountAtomicLoadStore(flag);
+      else
+        errors++;
+    }
+
+  tag = "perf_count_fp_load_store";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ ->at(tag), flag))
+        hart.perfCountFpLoadStore(flag);
       else
         errors++;
     }
@@ -1230,6 +1330,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  tag = "enable_zfh";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableZfh(flag);
+      else
+        errors++;
+    }
+
   tag = "load_queue_size";
   if (config_ -> count(tag))
     {
@@ -1359,22 +1469,30 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	}
     }
 
+  tag = "enable_csv_log";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+	errors++;
+      else
+	hart.enableCsvLog(flag);
+    }
+
   return errors == 0;
 }
 
 
 template<typename URV>
 bool
-HartConfig::configHarts(System<URV>& system, const std::string& isaString,
+HartConfig::configHarts(System<URV>& system, bool userMode,
                         bool verbose) const
 {
-  bool user = this->userModeEnabled();
-
-  user = user or (isaString.find("uU") != std::string::npos);
+  userMode = userMode or this->userModeEnabled();
 
   // Apply JSON configuration.
   for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyConfig(*system.ithHart(i), user, verbose))
+    if (not applyConfig(*system.ithHart(i), userMode, verbose))
       return false;
 
   return finalizeCsrConfig(system);
@@ -2041,12 +2159,10 @@ template bool
 HartConfig::applyConfig<uint64_t>(Hart<uint64_t>&, bool, bool) const;
 
 template bool
-HartConfig::configHarts<uint32_t>(System<uint32_t>&, const std::string&,
-                                  bool) const;
+HartConfig::configHarts<uint32_t>(System<uint32_t>&, bool, bool) const;
 
 template bool
-HartConfig::configHarts<uint64_t>(System<uint64_t>&, const std::string&,
-                                  bool) const;
+HartConfig::configHarts<uint64_t>(System<uint64_t>&, bool, bool) const;
 
 template bool
 HartConfig::configMemory(System<uint32_t>&, bool, bool, bool) const;
