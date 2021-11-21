@@ -25,7 +25,7 @@
 #include "softfloat-util.hpp"
 
 
-// make_unsigned/make_signed do work on our types -- compensate.
+// make_unsigned/make_signed do not work on our types -- compensate.
 namespace std
 {
   template <>
