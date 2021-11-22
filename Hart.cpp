@@ -2606,21 +2606,6 @@ Hart<URV>::illegalInst(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
-  // Check if stuck because of lack of illegal instruction exception handler.
-  if (instCounter_ == counterAtLastIllegal_ + 1)
-    consecutiveIllegalCount_++;
-  else
-    consecutiveIllegalCount_ = 0;
-
-  if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
-    {
-      throw CoreException(CoreException::Stop,
-			  "64 consecutive illegal instructions",
-			  0, 0);
-    }
-
-  counterAtLastIllegal_ = instCounter_;
-
   uint32_t inst = di->inst();
   if (isCompressedInst(inst))
     inst = inst & 0xffff;
@@ -2736,6 +2721,25 @@ void
 Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info,
 			     SecondaryCause secCause)
 {
+  // Check if stuck because of lack of exception handler. Disable if
+  // you do want the stuck behavior.
+  if (true)
+    {
+      if (instCounter_ == counterAtLastIllegal_ + 1)
+	consecutiveIllegalCount_++;
+      else
+	consecutiveIllegalCount_ = 0;
+
+      if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
+	{
+	  throw CoreException(CoreException::Stop,
+			      "64 consecutive illegal instructions",
+			      0, 0);
+	}
+
+      counterAtLastIllegal_ = instCounter_;
+    }
+
   bool interrupt = false;
   exceptionCount_++;
   hasException_ = true;

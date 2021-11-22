@@ -29,6 +29,13 @@
 using namespace WdRiscv;
 
 
+inline bool
+isPowerOf2(uint64_t x)
+{
+  return x != 0 and (x & (x-1)) == 0;
+}
+
+
 Memory::Memory(size_t size, size_t pageSize, size_t regionSize)
   : size_(size), data_(nullptr), pageSize_(pageSize), reservations_(1),
     lastWriteData_(1), pmaMgr_(size)
@@ -37,18 +44,14 @@ Memory::Memory(size_t size, size_t pageSize, size_t regionSize)
   assert(regionSize >= pageSize);
   assert(pageSize >= 64);
 
-  unsigned logPageSize = static_cast<unsigned>(std::log2(pageSize_));
-  unsigned p2PageSize = unsigned(1) << logPageSize;
-  assert(p2PageSize == pageSize);
+  assert(isPowerOf2(pageSize));
 
-  pageShift_ = logPageSize;
+  pageShift_ = static_cast<unsigned>(std::log2(pageSize_));
 
   pageCount_ = size_ / pageSize_;
   assert(pageCount_ * pageSize_ == size_);
 
-  size_t logRegionSize = static_cast<size_t>(std::log2(regionSize));
-  size_t p2RegionSize = size_t(1) << logRegionSize;
-  assert(p2RegionSize == regionSize);
+  assert(isPowerOf2(regionSize));
 
   size_t pagesInRegion = regionSize_ / pageSize_;
   size_t multiple = pagesInRegion * pageSize_;
@@ -1160,9 +1163,7 @@ Memory::configureCache(uint64_t size, unsigned lineSize, unsigned setSize)
       std::cerr << "Bad cache size: " << size << '\n';
       return false;
     }
-  unsigned logSize = static_cast<unsigned>(std::log2(size));
-  uint64_t p2Size = uint64_t(1) << logSize;
-  if (p2Size != size)
+  if (not isPowerOf2(size))
     {
       std::cerr << "Cache size not a power of 2: " << size << '\n';
       return false;
@@ -1178,9 +1179,7 @@ Memory::configureCache(uint64_t size, unsigned lineSize, unsigned setSize)
       std::cerr << "Bad cache associativity: " << setSize << '\n';
       return false;
     }
-  unsigned logSetSize = static_cast<unsigned>(std::log2(setSize));
-  unsigned p2SetSize = unsigned(1) << logSetSize;
-  if (p2SetSize != setSize)
+  if (not isPowerOf2(setSize))
     {
       std::cerr << "Cache associtivy is not a power of 2: " << setSize << '\n';
       return false;
@@ -1196,9 +1195,7 @@ Memory::configureCache(uint64_t size, unsigned lineSize, unsigned setSize)
       std::cerr << "Bad cache line size: " << lineSize << '\n';
       return false;
     }
-  unsigned logLineSize = static_cast<unsigned>(std::log2(lineSize));
-  unsigned p2LineSize = unsigned(1) << logLineSize;
-  if (p2LineSize != lineSize)
+  if (not isPowerOf2(lineSize))
     {
       std::cerr << "Cache line size is not a power of 2: " << lineSize << '\n';
       return false;

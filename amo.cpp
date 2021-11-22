@@ -308,7 +308,18 @@ Hart<URV>::execLr_w(const DecodedInst* di)
   uint64_t physAddr = 0;
   if (not loadReserve<int32_t>(di->op0(), di->op1(), physAddr))
     return;
-  memory_.makeLr(hartIx_, physAddr, 4 /*size*/);
+
+  unsigned size = 4;
+  uint64_t resAddr = physAddr; 
+  if (lrResSize_ > size)
+    {
+      // Snap reservation address to the closest smaller muliple of
+      // the reservation size (assumed to be a power of 2).
+      size = lrResSize_;
+      resAddr &= ~uint64_t(size - 1);
+    }
+
+  memory_.makeLr(hartIx_, resAddr, size);
   lrSuccess_++;
 }
 
@@ -796,7 +807,18 @@ Hart<URV>::execLr_d(const DecodedInst* di)
   uint64_t physAddr = 0;
   if (not loadReserve<int64_t>(di->op0(), di->op1(), physAddr))
     return;
-  memory_.makeLr(hartIx_, physAddr, 8 /*size*/);
+
+  unsigned size = 8;
+  uint64_t resAddr = physAddr; 
+  if (lrResSize_ > size)
+    {
+      // Snap reservation address to the closest smaller muliple of
+      // the reservation size (assumed to be a power of 2).
+      size = lrResSize_;
+      resAddr &= ~uint64_t(size - 1);
+    }
+
+  memory_.makeLr(hartIx_, resAddr, size);
   lrSuccess_++;
 }
 
