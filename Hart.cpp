@@ -10032,8 +10032,14 @@ Hart<URV>::execBlt(const DecodedInst* di)
   SRV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 < v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	illegalInst(di);  // Target must be word aligned if C is off.
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10045,8 +10051,14 @@ Hart<URV>::execBltu(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 < v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	illegalInst(di);  // Target must be word aligned if C is off.
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10058,8 +10070,14 @@ Hart<URV>::execBge(const DecodedInst* di)
   SRV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 >= v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	illegalInst(di);  // Target must be word aligned if C is off.
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10071,8 +10089,14 @@ Hart<URV>::execBgeu(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 >= v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	illegalInst(di);  // Target must be word aligned if C is off.
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10082,9 +10106,16 @@ void
 Hart<URV>::execJalr(const DecodedInst* di)
 {
   URV temp = pc_;  // pc has the address of the instruction after jalr
-  setPc(intRegs_.read(di->op1()) + di->op2As<SRV>());
-  intRegs_.write(di->op0(), temp);
-  lastBranchTaken_ = true;
+
+  URV nextPc = (intRegs_.read(di->op1()) + di->op2As<SRV>()) & ~URV(1);
+  if (not isRvc() and (nextPc & 3))
+    illegalInst(di);  // Target must be word aligned if C is off.
+  else
+    {
+      setPc(nextPc);
+      intRegs_.write(di->op0(), temp);
+      lastBranchTaken_ = true;
+    }
 }
 
 
@@ -10092,9 +10123,15 @@ template <typename URV>
 void
 Hart<URV>::execJal(const DecodedInst* di)
 {
-  intRegs_.write(di->op0(), pc_);
-  setPc(currPc_ + SRV(int32_t(di->op1())));
-  lastBranchTaken_ = true;
+  URV nextPc = (currPc_ + SRV(int32_t(di->op1()))) & ~URV(1);
+  if (not isRvc() and (nextPc & 3))
+    illegalInst(di);  // Target must be word aligned if C is off.
+  else
+    {
+      intRegs_.write(di->op0(), pc_);
+      setPc(nextPc);
+      lastBranchTaken_ = true;
+    }
 }
 
 

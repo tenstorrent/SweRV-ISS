@@ -122,6 +122,18 @@
 	    "poke_mask" : 0
 	},
 
+	"cycle" : {
+	    "exists" : "false"
+	},
+
+	"instret" : {
+	    "exists" : "false"
+	},
+
+	"time" : {
+	    "exists" : "false"
+	},
+
 	"cfg" : {
 	    "number" : "0x7c0",
 	    "reset" : "0x20000",
