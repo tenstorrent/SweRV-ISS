@@ -934,8 +934,18 @@ Hart<URV>::execBeq(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 != v2)
     return;
-  setPc(currPc_ + di->op2As<SRV>());
-  lastBranchTaken_ = true;
+
+  URV nextPc = currPc_ + di->op2As<SRV>();
+  if (not isRvc() and (nextPc & 3))
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
+  else
+    {
+      setPc(nextPc);
+      lastBranchTaken_ = true;
+    }
 }
 
 
@@ -947,8 +957,18 @@ Hart<URV>::execBne(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 == v2)
     return;
-  setPc(currPc_ + di->op2As<SRV>());
-  lastBranchTaken_ = true;
+
+  URV nextPc = currPc_ + di->op2As<SRV>();
+  if (not isRvc() and (nextPc & 3))
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
+  else
+    {
+      setPc(nextPc);
+      lastBranchTaken_ = true;
+    }
 }
 
 
@@ -10034,7 +10054,10 @@ Hart<URV>::execBlt(const DecodedInst* di)
     {
       URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
       if (not isRvc() and (nextPc & 3))
-	illegalInst(di);  // Target must be word aligned if C is off.
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
       else
 	{
 	  setPc(nextPc);
@@ -10053,7 +10076,10 @@ Hart<URV>::execBltu(const DecodedInst* di)
     {
       URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
       if (not isRvc() and (nextPc & 3))
-	illegalInst(di);  // Target must be word aligned if C is off.
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
       else
 	{
 	  setPc(nextPc);
@@ -10072,7 +10098,10 @@ Hart<URV>::execBge(const DecodedInst* di)
     {
       URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
       if (not isRvc() and (nextPc & 3))
-	illegalInst(di);  // Target must be word aligned if C is off.
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
       else
 	{
 	  setPc(nextPc);
@@ -10091,7 +10120,10 @@ Hart<URV>::execBgeu(const DecodedInst* di)
     {
       URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
       if (not isRvc() and (nextPc & 3))
-	illegalInst(di);  // Target must be word aligned if C is off.
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
       else
 	{
 	  setPc(nextPc);
@@ -10109,7 +10141,10 @@ Hart<URV>::execJalr(const DecodedInst* di)
 
   URV nextPc = (intRegs_.read(di->op1()) + di->op2As<SRV>()) & ~URV(1);
   if (not isRvc() and (nextPc & 3))
-    illegalInst(di);  // Target must be word aligned if C is off.
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
   else
     {
       setPc(nextPc);
@@ -10125,7 +10160,10 @@ Hart<URV>::execJal(const DecodedInst* di)
 {
   URV nextPc = (currPc_ + SRV(int32_t(di->op1()))) & ~URV(1);
   if (not isRvc() and (nextPc & 3))
-    illegalInst(di);  // Target must be word aligned if C is off.
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
   else
     {
       intRegs_.write(di->op0(), pc_);
