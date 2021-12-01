@@ -2239,8 +2239,8 @@ Hart<URV>::readInst(size_t address, uint32_t& inst)
   assert((address & 3) == 0);
   if (storeTargets_.find((address>>2)) != storeTargets_.end())
     {
-      std::cerr << "Self modifying code\n";
-      assert(0 && "Self modifying code");
+      std::cerr << "Self modifying code at 0x" << std::hex << address
+		<< std::dec << '\n';
     }
 
   return true;
@@ -2521,7 +2521,11 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
             }
         }
 
-      assert(storeTargets_.find((addr>>2)) == storeTargets_.end());
+      if (storeTargets_.find((addr>>2)) != storeTargets_.end())
+	{
+	  std::cerr << "Self modifying code at 0x" << std::hex << addr
+		    << std::dec << "\n";
+	}
       return true;
     }
 

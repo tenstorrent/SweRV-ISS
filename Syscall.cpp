@@ -837,6 +837,20 @@ Syscall<URV>::emulate()
 	return rc < 0 ? SRV(-errno) : rc;
       }
 
+    case 34:       // mkdirat
+      {
+	int fd = effectiveFd(SRV(a0));
+	uint64_t rvPath = a1;
+	mode_t mode = a2;
+	char path[1024];
+        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+          return SRV(-EINVAL);
+
+	errno = 0;
+	int rc = mkdirat(fd, path, mode);
+	return rc < 0 ? SRV(-errno) : rc;
+      }
+
     case 35:       // unlinkat
       {
 	int fd = effectiveFd(SRV(a0));
@@ -1042,7 +1056,8 @@ Syscall<URV>::emulate()
 
 	if (rc < 0)
           {
-            perror("fstatat error: ");
+            // perror("fstatat error: ");
+	    // fprintf(stderr, "fstatat path: %s\n", path);
             return SRV(-errno);
           }
 
