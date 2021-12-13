@@ -2339,9 +2339,17 @@ Hart<URV>::configMemoryFetch(const std::vector< std::pair<URV,URV> >& windows)
           continue;
 	}
 
+      if (window.first > memSize or window.second > memSize)
+	{
+	  cerr << "Inst fetch area (0x" << std::hex << window.first << " to 0x"
+	       << window.second << ") is not completely within memory bounds (0"
+	       << " to 0x" << (memSize-1) << std::dec << ")\n";
+	}
+
       // Clip window to memory size.
       size_t addr = window.first, end = window.second;
-      addr = std::min(memorySize(), addr);
+      addr = std::min(memSize, addr);
+      end = std::min(memSize, end);
 
       // Clip window against regions with iccm. Mark what remains as
       // accessible.
@@ -2405,9 +2413,17 @@ Hart<URV>::configMemoryDataAccess(const std::vector< std::pair<URV,URV> >& windo
           continue;
 	}
 
+      if (window.first > memSize or window.second > memSize)
+	{
+	  cerr << "Data access area (0x" << std::hex << window.first << " to 0x"
+	       << window.second << ") is not completely within memory bounds (0"
+	       << " to 0x" << (memSize-1) << std::dec << ")\n";
+	}
+
       // Clip window to memory size.
       size_t addr = window.first, end = window.second;
-      addr = std::min(memorySize(), addr);
+      addr = std::min(memSize, addr);
+      end = std::min(memSize, end);
 
       // Clip window against regions with dccm/pic. Mark what remains
       // as accessible.
