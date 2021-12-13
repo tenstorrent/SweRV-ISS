@@ -350,7 +350,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
   tlbEntry.exec_ = pte.exec();
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
-
+  tlbEntry.levels_ = 1+ii;
   return ExceptionCause::NONE;
 }
 
@@ -433,7 +433,8 @@ VirtMem::printPageTable(std::ostream& os) const
     printEntries<Pte48, Va48>(os, addr, path);
   else
     os << "Unsupported virtual memory mode\n";
-
+  os << "TLB:\n";
+  tlb_.printTlb(os);
   os.flags(flags);
 }
 
