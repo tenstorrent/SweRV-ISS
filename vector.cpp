@@ -25,7 +25,7 @@
 #include "softfloat-util.hpp"
 
 
-// make_unsigned/make_signed do work on our types -- compensate.
+// make_unsigned/make_signed do not work on our types -- compensate.
 namespace std
 {
   template <>
@@ -14747,7 +14747,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  ELEM_TYPE elem(0);
 	  auto secCause = SecondaryCause::NONE;
 	  auto cause = ExceptionCause::NONE;
-	  cause = determineLoadException(rs1, faddr, faddr, sizeof(elem), secCause);
+	  cause = determineLoadException(rs1, URV(faddr), faddr, sizeof(elem), secCause);
 
 	  if (cause == ExceptionCause::NONE)
             memory_.read(faddr, elem);
