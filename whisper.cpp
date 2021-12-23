@@ -1776,8 +1776,7 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 /// is changed to meet expectation.
 static
 bool
-checkAndRepairMemoryParams(size_t& memSize, size_t& pageSize,
-                           size_t& regionSize)
+checkAndRepairMemoryParams(size_t& memSize, size_t& pageSize)
 {
   bool ok = true;
 
@@ -1796,37 +1795,6 @@ checkAndRepairMemoryParams(size_t& memSize, size_t& pageSize,
     {
       std::cerr << "Page size (" << pageSize << ") is less than 64. Using 64.\n";
       pageSize = 64;
-      ok = false;
-    }
-
-  size_t logRegionSize = static_cast<size_t>(std::log2(regionSize));
-  size_t p2RegionSize = size_t(1) << logRegionSize;
-  if (p2RegionSize != regionSize)
-    {
-      std::cerr << "Memory region size (0x" << std::hex << regionSize << ") "
-		<< "is not a power of 2 -- using 0x" << p2RegionSize << '\n'
-		<< std::dec;
-      regionSize = p2RegionSize;
-      ok = false;
-    }
-
-  if (regionSize < pageSize)
-    {
-      std::cerr << "Memory region size (0x" << std::hex << regionSize << ") "
-		<< "smaller than page size (0x" << pageSize << ") -- "
-		<< "using page size\n" << std::dec;
-      regionSize = pageSize;
-      ok = false;
-    }
-
-  size_t pagesInRegion = regionSize / pageSize;
-  size_t multiple = pagesInRegion * pageSize;
-  if (multiple != regionSize)
-    {
-      std::cerr << "Memory region size (0x" << std::hex << regionSize << ") "
-		<< "is not a multiple of page size (0x" << pageSize << ") -- "
-		<< "using 0x" << multiple << " as region size\n" << std::dec;
-      regionSize = multiple;
       ok = false;
     }
 
@@ -1905,14 +1873,13 @@ session(const Args& args, const HartConfig& config)
   unsigned hartsPerCore = 1;
   unsigned coreCount = 1;
   size_t pageSize = 4*1024;
-  size_t regionSize = 256*1024*1024;
   size_t memorySize = size_t(1) << 32;  // 4 gigs
 
   if (not getPrimaryConfigParameters(args, config, hartsPerCore, coreCount,
                                      pageSize, memorySize))
     return false;
 
-  checkAndRepairMemoryParams(memorySize, pageSize, regionSize);
+  checkAndRepairMemoryParams(memorySize, pageSize);
 
   // Create cores & harts.
   unsigned hartIdOffset = hartsPerCore;
