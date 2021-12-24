@@ -1593,6 +1593,23 @@ HartConfig::getHartIdOffset(unsigned& offset) const
 
 
 bool
+HartConfig::getIsa(std::string& isa) const
+{
+  std::string tag = "isa";
+  if (not config_ -> count(tag))
+    return false;
+
+  auto item = config_ -> at(tag);
+  if (item.is_string())
+    {
+      isa = item.get<std::string>();
+      return true;
+    }
+  return false;
+}
+
+
+bool
 HartConfig::getMemorySize(size_t& memSize) const
 {
   if (not config_ -> count("memmap"))
