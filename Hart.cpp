@@ -93,7 +93,8 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
     fpRegs_(32), vecRegs_(), syscall_(*this),
     pmpManager_(memory.size(), 1024*1024),
-    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16 /* FIX: TLB size*/)
+    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16 /* FIX: TLB size*/),
+    isa_()
 {
   regionHasLocalMem_.resize(16);
   regionHasLocalDataMem_.resize(16);
@@ -263,22 +264,28 @@ Hart<URV>::processExtensions()
   URV value = 0;
   peekCsr(CsrNumber::MISA, value);
 
-  rva_ = value & 1;   // Atomic ('a') option.
+  rva_ = (value & 1) and isa_.isEnabled(Isa::Extension::A);   // Atomic
 
-  rvc_ = value & (URV(1) << ('c' - 'a'));  // Compress option.
+  rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
+  rvc_ = rvc_ and isa_.isEnabled(Isa::Extension::C);
 
   bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
+  flag = flag and isa_.isEnabled(Isa::Extension::F);
   enableRvf(flag);
 
   // D requires F and is enabled only if F is enabled.
   flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
   if (flag and not rvf_)
-    std::cerr << "Bit 3 (d) is set in the MISA register but f "
-	      << "extension (bit 5) is not enabled -- ignored\n";
-  else
-    enableRvd(flag);
+    {
+      std::cerr << "Bit 3 (d) is set in the MISA register but f "
+		<< "extension (bit 5) is not enabled -- ignored\n";
+      flag = false;
+    }
+  flag = flag and isa_.isEnabled(Isa::Extension::D);
+  enableRvd(flag);
 
   rve_ = value & (URV(1) << ('e' - 'a'));
+  rve_ = rve_ and isa_.isEnabled(Isa::Extension::E);
   if (rve_)
     intRegs_.regs_.resize(16);
 
@@ -288,6 +295,7 @@ Hart<URV>::processExtensions()
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
   rvm_ = value & (URV(1) << ('m' - 'a'));
+  rvm_ = rvm_ and isa_.isEnabled(Isa::Extension::M);
 
   flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
   enableSupervisorMode(flag);
@@ -296,6 +304,7 @@ Hart<URV>::processExtensions()
   enableUserMode(flag);
 
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
+  flag = flag and isa_.isEnabled(Isa::Extension::V);
   enableVectorMode(flag);
 
   for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
@@ -3291,6 +3300,18 @@ Hart<URV>::defineCsr(const std::string& name, CsrNumber num,
   auto c = csRegs_.defineCsr(name, num, mandatory, implemented, resetVal,
 			     mask, pokeMask, isDebug, quiet);
   return c != nullptr;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::applyIsaStrings(const std::vector<std::string>& strings)
+{
+  bool result = true;
+  for (const auto& str : strings)
+    result = isa_.applyIsaString(str) and result;
+  reset();  // re-process misa with new isa setting
+  return result;
 }
 
 

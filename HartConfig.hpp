@@ -99,6 +99,10 @@ namespace WdRiscv
     /// starting with the start id associated with that core.
     bool getHartIdOffset(unsigned& offset) const;
 
+    /// Set isa to the value of the isa tag (instruction set archietcture)
+    /// in the JSON config file. Example: "isa" : "rv32im"
+    bool getIsa(std::string& isa) const;
+
     /// Return true if the reset value of the MISA CSR has the user
     /// extension enabled. Return false if MISA CSR is not present in
     /// this configuration or if user extension is not enabled.

@@ -1,6 +1,8 @@
 {
     "xlen" : 32,
 
+    "isa" : "rv32imafvzfh",
+
     "Comment" : "Rounding mode is forced to round-to-nearest-even regardless of FRM CSR.",
     "force_rounding_mode" : "rne",
 
