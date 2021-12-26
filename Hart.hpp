@@ -259,7 +259,7 @@ namespace WdRiscv
     }
 
     /// Enable the extensions defined by the given strings.
-    bool applyIsaStrings(const std::vector<std::string>& strings);
+    bool configIsa(const std::vector<std::string>& strings);
 
     /// Enable/disable load-data debug triggerring (disabled by default).
     void configLoadDataTrigger(bool flag)

@@ -999,7 +999,7 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
   if (not applyZisaStrings(args.zisa, hart))
     errors++;
 
-  if (not hart.applyIsaStrings(isaVec))
+  if (not hart.configIsa(isaVec))
     errors++;
 
   if (clib)  // Linux or newlib enabled.

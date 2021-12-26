@@ -3292,11 +3292,11 @@ Hart<URV>::defineCsr(const std::string& name, CsrNumber num,
 
 template <typename URV>
 bool
-Hart<URV>::applyIsaStrings(const std::vector<std::string>& strings)
+Hart<URV>::configIsa(const std::vector<std::string>& strings)
 {
   bool result = true;
   for (const auto& str : strings)
-    result = isa_.applyIsaString(str) and result;
+    result = isa_.configIsa(str) and result;
   reset();  // re-process misa with new isa setting
   return result;
 }
