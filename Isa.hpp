@@ -73,9 +73,12 @@ namespace WdRiscv
     /// versions. Return true on success. Return false if extension
     /// string is not valid or if an extension or extension version is
     /// not supported. Sample ISA string: rv32i2p0_m2p0
-    bool applyIsaString(const std::string& isa);
+    bool configIsa(const std::string& isa);
 
   protected:
+
+    /// Helper to configIsa.
+    bool applyIsaString(const std::string& isa);
 
     /// Return integer value underlying extension enum.
     unsigned extIx(Extension ext) const

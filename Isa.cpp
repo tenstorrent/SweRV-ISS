@@ -198,6 +198,13 @@ extractExtension(const std::string& isa, size_t& i, std::string& extension)
 	extension.push_back(isa.at(i++));
       return true;
     }
+  if (isa.at(i) >= 'a' and isa.at(i) < 'z')
+    {
+      extension.push_back(isa.at(i));
+      if (i+1 < len and std::isdigit(isa.at(i+1)))
+	++i;
+      return true;
+    }
   return false;
 }
 
@@ -232,6 +239,17 @@ extractVersion(const std::string& isa, size_t& i, std::string& version,
 
 
 bool
+Isa::configIsa(const std::string& isa)
+{
+  if (applyIsaString(isa))
+    return true;
+
+  std::cerr << "Invalid ISA: " << isa << '\n';
+  return false;
+}
+  
+    
+bool
 Isa::applyIsaString(const std::string& isaStr)
 {
   std::string isa = isaStr;
@@ -245,73 +263,67 @@ Isa::applyIsaString(const std::string& isaStr)
       return false;
     }
 
-  bool hasZ = false, good = true;
+  bool hasZ = false;
   
-  for (size_t i = 0; i < isa.size() and good; ++i)
+  for (size_t i = 0; i < isa.size(); ++i)
     {
       std::string extension, version, subversion;
 
       char c = isa.at(i);
-      if (c == '_')  { good = i > 0; continue; }
-      if (c == 'z')
+      if (c == '_')
 	{
 	  if (i == 0)
-	    good = false;  // 1st extension cannot be a z extension.
-	  else if (hasZ and i > 0 and isa.at(i-1) != '_')
-	    good = false;  // Z extensions must be separated with _.
+	    return false;
+	  continue;
+	}
+      else if (c == 'z')
+	{
+	  // First extension cannot be a z. Z exts must be separated with _.
+	  if (i == 0 or ((hasZ and isa.at(i-1) != '_')))
+	    return false;  // 1st extension cannot be a z extension.
 	  hasZ = true;
-	  good = good and extractExtension(isa, i, extension);
 	}
       else if (c >= 'a' and c < 'z')
 	{
 	  if (hasZ)
-	    good = false;  // Cannot have a non-z extension after a z-extension
-	  else
-	    {
-	      extension = isa.substr(i, 1);
-	      if (i+1 < isa.size() and std::isdigit(isa.at(i+1)))
-		i++;
-	    }
+	    return false; // Cannot have a regular exension after z.
 	}
       else
-	good = false;  // Bad characer
+	return false;  // Bad character
       
-      if (good)
+      if (not extractExtension(isa, i, extension))
+	return false;
+
+      assert(not extension.empty());
+      if (not extractVersion(isa, i, version, subversion))
+	return false;
+
+      Extension ext = stringToExtension(extension);
+      if (ext == Extension::None)
 	{
-	  assert(not extension.empty());
-	  good = extractVersion(isa, i, version, subversion);
-	  if (good)
-	    {
-	      Extension ext = stringToExtension(extension);
-	      if (ext == Extension::None)
-		{
-		  std::cerr << "Unknown extension: " << extension
-			    << " -- ignored\n";
-		  continue;
-		}
-	      if (good)
-		enable(ext, true);
-	      if (good and not version.empty())
-		{
-		  unsigned v = atoi(version.c_str());
-		  unsigned s = 0;
-		  if (not subversion.empty())
-		    s = atoi(subversion.c_str());
-		  if (not selectVersion(ext, v, s))
-		    {
-		      std::cerr << "Version " << version << "." << subversion
-				<< " of extension " << extension << " is not "
-				<< "supported -- using default\n";
-		      getDefaultVersion(ext, v, s);
-		      selectVersion(ext, v, s);
-		    }
-		}
-	    }
+	  std::cerr << "Unknown extension: " << extension
+		    << " -- ignored\n";
+	  continue;
+	}
+
+      enable(ext, true);
+
+      if (version.empty())
+	continue;
+
+      unsigned v = atoi(version.c_str());
+      unsigned s = 0;
+      if (not subversion.empty())
+	s = atoi(subversion.c_str());
+      if (not selectVersion(ext, v, s))
+	{
+	  getDefaultVersion(ext, v, s);
+	  selectVersion(ext, v, s);
+	  std::cerr << "Version " << version << "." << subversion
+		    << " of extension " << extension << " is not "
+		    << "supported -- using default\n";
 	}
     }
 
-  if (not good)
-    std::cerr << "Invalid ISA: " << isa << '\n';
-
-  return good;
+  return true;
 }
