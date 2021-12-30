@@ -316,6 +316,17 @@ Hart<URV>::processExtensions()
 		  << "register but extension is not supported "
 		  << "-- ignored\n";
     }
+
+  if (isa_.isEnabled(Isa::Extension::Zba))
+    enableRvzba(true);
+  if (isa_.isEnabled(Isa::Extension::Zbb))
+    enableRvzbb(true);
+  if (isa_.isEnabled(Isa::Extension::Zbc))
+    enableRvzbc(true);
+  if (isa_.isEnabled(Isa::Extension::Zbs))
+    enableRvzbs(true);
+  if (isa_.isEnabled(Isa::Extension::Zfh))
+    enableZfh(true);
 }
 
 
