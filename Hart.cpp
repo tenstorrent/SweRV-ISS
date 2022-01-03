@@ -93,7 +93,8 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
     fpRegs_(32), vecRegs_(), syscall_(*this),
     pmpManager_(memory.size(), 1024*1024),
-    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16 /* FIX: TLB size*/)
+    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16 /* FIX: TLB size*/),
+    isa_()
 {
   regionHasLocalMem_.resize(16);
   regionHasLocalDataMem_.resize(16);
@@ -263,22 +264,28 @@ Hart<URV>::processExtensions()
   URV value = 0;
   peekCsr(CsrNumber::MISA, value);
 
-  rva_ = value & 1;   // Atomic ('a') option.
+  rva_ = (value & 1) and isa_.isEnabled(Isa::Extension::A);   // Atomic
 
-  rvc_ = value & (URV(1) << ('c' - 'a'));  // Compress option.
+  rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
+  rvc_ = rvc_ and isa_.isEnabled(Isa::Extension::C);
 
   bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
+  flag = flag and isa_.isEnabled(Isa::Extension::F);
   enableRvf(flag);
 
   // D requires F and is enabled only if F is enabled.
   flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
   if (flag and not rvf_)
-    std::cerr << "Bit 3 (d) is set in the MISA register but f "
-	      << "extension (bit 5) is not enabled -- ignored\n";
-  else
-    enableRvd(flag);
+    {
+      std::cerr << "Bit 3 (d) is set in the MISA register but f "
+		<< "extension (bit 5) is not enabled -- ignored\n";
+      flag = false;
+    }
+  flag = flag and isa_.isEnabled(Isa::Extension::D);
+  enableRvd(flag);
 
   rve_ = value & (URV(1) << ('e' - 'a'));
+  rve_ = rve_ and isa_.isEnabled(Isa::Extension::E);
   if (rve_)
     intRegs_.regs_.resize(16);
 
@@ -288,6 +295,7 @@ Hart<URV>::processExtensions()
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
   rvm_ = value & (URV(1) << ('m' - 'a'));
+  rvm_ = rvm_ and isa_.isEnabled(Isa::Extension::M);
 
   flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
   enableSupervisorMode(flag);
@@ -296,6 +304,7 @@ Hart<URV>::processExtensions()
   enableUserMode(flag);
 
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
+  flag = flag and isa_.isEnabled(Isa::Extension::V);
   enableVectorMode(flag);
 
   for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
@@ -307,6 +316,17 @@ Hart<URV>::processExtensions()
 		  << "register but extension is not supported "
 		  << "-- ignored\n";
     }
+
+  if (isa_.isEnabled(Isa::Extension::Zba))
+    enableRvzba(true);
+  if (isa_.isEnabled(Isa::Extension::Zbb))
+    enableRvzbb(true);
+  if (isa_.isEnabled(Isa::Extension::Zbc))
+    enableRvzbc(true);
+  if (isa_.isEnabled(Isa::Extension::Zbs))
+    enableRvzbs(true);
+  if (isa_.isEnabled(Isa::Extension::Zfh))
+    enableZfh(true);
 }
 
 
@@ -934,8 +954,18 @@ Hart<URV>::execBeq(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 != v2)
     return;
-  setPc(currPc_ + di->op2As<SRV>());
-  lastBranchTaken_ = true;
+
+  URV nextPc = currPc_ + di->op2As<SRV>();
+  if (not isRvc() and (nextPc & 3))
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
+  else
+    {
+      setPc(nextPc);
+      lastBranchTaken_ = true;
+    }
 }
 
 
@@ -947,8 +977,18 @@ Hart<URV>::execBne(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 == v2)
     return;
-  setPc(currPc_ + di->op2As<SRV>());
-  lastBranchTaken_ = true;
+
+  URV nextPc = currPc_ + di->op2As<SRV>();
+  if (not isRvc() and (nextPc & 3))
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
+  else
+    {
+      setPc(nextPc);
+      lastBranchTaken_ = true;
+    }
 }
 
 
@@ -2319,9 +2359,17 @@ Hart<URV>::configMemoryFetch(const std::vector< std::pair<URV,URV> >& windows)
           continue;
 	}
 
+      if (window.first > memSize or window.second > memSize)
+	{
+	  cerr << "Inst fetch area (0x" << std::hex << window.first << " to 0x"
+	       << window.second << ") is not completely within memory bounds (0"
+	       << " to 0x" << (memSize-1) << std::dec << ")\n";
+	}
+
       // Clip window to memory size.
       size_t addr = window.first, end = window.second;
-      addr = std::min(memorySize(), addr);
+      addr = std::min(memSize, addr);
+      end = std::min(memSize, end);
 
       // Clip window against regions with iccm. Mark what remains as
       // accessible.
@@ -2385,9 +2433,17 @@ Hart<URV>::configMemoryDataAccess(const std::vector< std::pair<URV,URV> >& windo
           continue;
 	}
 
+      if (window.first > memSize or window.second > memSize)
+	{
+	  cerr << "Data access area (0x" << std::hex << window.first << " to 0x"
+	       << window.second << ") is not completely within memory bounds (0"
+	       << " to 0x" << (memSize-1) << std::dec << ")\n";
+	}
+
       // Clip window to memory size.
       size_t addr = window.first, end = window.second;
-      addr = std::min(memorySize(), addr);
+      addr = std::min(memSize, addr);
+      end = std::min(memSize, end);
 
       // Clip window against regions with dccm/pic. Mark what remains
       // as accessible.
@@ -3242,6 +3298,18 @@ Hart<URV>::defineCsr(const std::string& name, CsrNumber num,
   auto c = csRegs_.defineCsr(name, num, mandatory, implemented, resetVal,
 			     mask, pokeMask, isDebug, quiet);
   return c != nullptr;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::configIsa(const std::vector<std::string>& strings)
+{
+  bool result = true;
+  for (const auto& str : strings)
+    result = isa_.configIsa(str) and result;
+  reset();  // re-process misa with new isa setting
+  return result;
 }
 
 
@@ -10032,8 +10100,17 @@ Hart<URV>::execBlt(const DecodedInst* di)
   SRV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 < v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10045,8 +10122,17 @@ Hart<URV>::execBltu(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 < v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10058,8 +10144,17 @@ Hart<URV>::execBge(const DecodedInst* di)
   SRV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 >= v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10071,8 +10166,17 @@ Hart<URV>::execBgeu(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op0()),  v2 = intRegs_.read(di->op1());
   if (v1 >= v2)
     {
-      setPc(currPc_ + di->op2As<SRV>());
-      lastBranchTaken_ = true;
+      URV nextPc = (currPc_ + di->op2As<SRV>()) & ~URV(1);
+      if (not isRvc() and (nextPc & 3))
+	{
+	  // Target must be word aligned if C is off.
+	  initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+	}
+      else
+	{
+	  setPc(nextPc);
+	  lastBranchTaken_ = true;
+	}
     }
 }
 
@@ -10082,9 +10186,19 @@ void
 Hart<URV>::execJalr(const DecodedInst* di)
 {
   URV temp = pc_;  // pc has the address of the instruction after jalr
-  setPc(intRegs_.read(di->op1()) + di->op2As<SRV>());
-  intRegs_.write(di->op0(), temp);
-  lastBranchTaken_ = true;
+
+  URV nextPc = (intRegs_.read(di->op1()) + di->op2As<SRV>()) & ~URV(1);
+  if (not isRvc() and (nextPc & 3))
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
+  else
+    {
+      setPc(nextPc);
+      intRegs_.write(di->op0(), temp);
+      lastBranchTaken_ = true;
+    }
 }
 
 
@@ -10092,9 +10206,18 @@ template <typename URV>
 void
 Hart<URV>::execJal(const DecodedInst* di)
 {
-  intRegs_.write(di->op0(), pc_);
-  setPc(currPc_ + SRV(int32_t(di->op1())));
-  lastBranchTaken_ = true;
+  URV nextPc = (currPc_ + SRV(int32_t(di->op1()))) & ~URV(1);
+  if (not isRvc() and (nextPc & 3))
+    {
+      // Target must be word aligned if C is off.
+      initiateException(ExceptionCause::INST_ADDR_MISAL, currPc_, nextPc);
+    }
+  else
+    {
+      intRegs_.write(di->op0(), pc_);
+      setPc(nextPc);
+      lastBranchTaken_ = true;
+    }
 }
 
 

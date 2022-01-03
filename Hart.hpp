@@ -34,6 +34,7 @@
 #include "Syscall.hpp"
 #include "PmpManager.hpp"
 #include "VirtMem.hpp"
+#include "Isa.hpp"
 
 namespace WdRiscv
 {
@@ -257,6 +258,9 @@ namespace WdRiscv
 				   wm1, wm2, wm3, pm1, pm2, pm3);
     }
 
+    /// Enable the extensions defined by the given strings.
+    bool configIsa(const std::vector<std::string>& strings);
+
     /// Enable/disable load-data debug triggerring (disabled by default).
     void configLoadDataTrigger(bool flag)
     { csRegs_.configLoadDataTrigger(flag); }
@@ -357,7 +361,7 @@ namespace WdRiscv
     /// Reset this hart. Reset all CSRs to their initial value. Reset all
     /// integer registers to zero. Reset PC to the reset-pc as
     /// defined by defineResetPc (default is zero).
-    void reset(bool resetMemoryMappedRegister = false);
+    void reset(bool resetMemoryMappedRegisters = false);
 
     /// Run fetch-decode-execute loop. If a stop address (see
     /// setStopAddress) is defined, stop when the program counter
@@ -3986,6 +3990,7 @@ namespace WdRiscv
     std::vector<PmaOverride> pmaOverrideVec_;
 
     VirtMem virtMem_;
+    Isa isa_;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

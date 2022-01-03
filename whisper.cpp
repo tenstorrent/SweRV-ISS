@@ -767,89 +767,6 @@ applyZisaStrings(const StringVec& zisa, Hart<URV>& hart)
 }
 
 
-template<typename URV>
-static
-bool
-applyIsaStrings(const StringVec& isaStrings, Hart<URV>& hart)
-{
-  if (isaStrings.empty())
-    return true;
-
-  URV isa = 0;
-  unsigned errors = 0;
-
-  for (const auto& isaStr : isaStrings)
-    {
-      if (isaStr.empty())
-	continue;
-
-      char c = isaStr.at(0);
-      switch(c)
-	{
-	case 'a':
-	case 'c':
-	case 'd':
-        case 'e':
-	case 'f':
-	case 'i':
-	case 'm':
-	case 's':
-	case 'u':
-        case 'v':
-	  isa |= URV(1) << (c -  'a');
-	  break;
-
-	case 'b':
-	  std::cerr << "Warning: Extension \"" << c << "\" is not supported.\n";
-	  break;
-
-        case 'g':  // Enable a, d, f, and m
-          isa |= 0x1 | 0x8 | 0x20 | 0x1000;
-          break;
-
-	case 'z':
-	  if (not applyZisaString(isaStr, hart))
-	    errors++;
-	  break;
-	  
-	default:
-	  std::cerr << "Error: Extension \"" << c << "\" is not supported.\n";
-	  errors++;
-	  break;
-	}
-    }
-
-  if (not (isa & (URV(1) << ('i' - 'a'))))
-    {
-      std::cerr << "Extension \"i\" implicitly enabled\n";
-      isa |= URV(1) << ('i' -  'a');
-    }
-
-  if (isa & (URV(1) << ('d' - 'a')))
-    if (not (isa & (URV(1) << ('f' - 'a'))))
-      std::cerr << "Warning Extension \"d\" enabled without \"f\"\n";
-
-  // Set the xlen bits: 1 for 32-bits and 2 for 64.
-  URV xlen = sizeof(URV) == 4? 1 : 2;
-  isa |= xlen << (8*sizeof(URV) - 2);
-
-  bool resetMemoryMappedRegs = false;
-
-  URV mask = 0, pokeMask = 0;
-  bool implemented = true, isDebug = false, shared = true;
-  if (not hart.configCsr("misa", implemented, isa, mask, pokeMask, isDebug,
-                         shared))
-    {
-      std::cerr << "Failed to configure MISA CSR\n";
-      errors++;
-    }
-  else
-    hart.reset(resetMemoryMappedRegs); // Apply effects of new misa value.
-
-  return errors == 0;
-}
-
-
 /// Enable linux or newlib based on the symbols in the ELF files.
 /// Return true if either is enabled.
 template<typename URV>
@@ -1078,10 +995,11 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
 	isaVec.push_back(std::string(1, c));
     }
 
-  if (not applyIsaStrings(isaVec, hart))
-      errors++;
-
+  // TODO FIX remote --zisa  remove applyZisaStrings
   if (not applyZisaStrings(args.zisa, hart))
+    errors++;
+
+  if (not hart.configIsa(isaVec))
     errors++;
 
   if (clib)  // Linux or newlib enabled.
@@ -1600,98 +1518,26 @@ snapshotRun(System<URV>& system, FILE* traceFile,
 
 static
 bool
-extractOptVersion(const std::string& isa, size_t& i, std::string& opt)
+determineIsa(const HartConfig& config, const Args& args, std::string& isa)
 {
-  while (i+1 < isa.size() and std::isdigit(isa.at(i+1)))
-    opt.push_back(isa.at(++i));
-  if (std::isdigit(opt.back()))
-    {
-      if (i+1 < isa.size() and isa.at(i+1) == 'p')
-	{
-	  opt.push_back(isa.at(++i));
-	  while (i+1 < isa.size() and std::isdigit(isa.at(i+1)))
-	    opt.push_back(isa.at(++i));
-	  if (opt.back() == 'p')
-	    return false;
-	}
-    }
-  return true;
-}
-
-
-static
-bool
-determineIsa(const Args& args, StringVec& isaVec)
-{
-  isaVec.clear();
+  isa.clear();
 
   if (not args.isa.empty() and args.elfisa)
     std::cerr << "Warning: Both --isa and --elfisa present: Using --isa\n";
 
-  std::string isa = args.isa;
+  isa = args.isa;
 
   if (isa.empty() and args.elfisa)
     if (not getElfFilesIsaString(args, isa))
       return false;
 
   if (isa.empty())
-    return true;
-
-  // Xlen part of isa is processed in determineRegisterWidth
-  if (boost::starts_with(isa, "rv32") or boost::starts_with(isa, "rv64"))
-    isa = isa.substr(4);
-  else if (boost::starts_with(isa, "rv") and isa.size() > 2 and std::isdigit(isa.at(2)))
     {
-      std::cerr << "Unsupported ISA: " << isa << '\n';
-      return false;
+      // No command line ISA. Use config file.
+      config.getIsa(isa);
     }
 
-  bool hasZ = false, good = true;
-  
-  for (size_t i = 0; i < isa.size() and good; ++i)
-    {
-      char c = isa.at(i);
-      if (c == '_')  { good = i > 0; continue; }
-      if (c == 'z')
-	{
-	  if (i == 0)
-	    good = false;
-	  else if (hasZ and i > 0 and isa.at(i-1) != '_')
-	    good = false;
-	  else if (i+3 > isa.size())
-	    good = false;
-	  else if (std::isdigit(i+1) or std::isdigit(i+2))
-	    good = false;
-	  else
-	    {
-	      hasZ = true;
-	      std::string opt = isa.substr(i, 3);
-	      i += 2;
-	      good = extractOptVersion(isa, i, opt);
-	      if (good)
-		isaVec.push_back(opt);
-	    }
-	}
-      else if (c >= 'a' and c < 'z')
-	{
-	  if (hasZ)
-	    good = false;
-	  else
-	    {
-	      std::string opt = isa.substr(i, 1);
-	      good = extractOptVersion(isa, i, opt);
-	      if (good)
-		isaVec.push_back(opt);
-	    }
-	}
-      else
-	good = false;
-    }
-
-  if (not good)
-    std::cerr << "Invalid ISA: " << isa << '\n';
-
-  return good;
+  return true;
 }
 
 
@@ -1700,11 +1546,12 @@ determineIsa(const Args& args, StringVec& isaVec)
 template <typename URV>
 static
 bool
-sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
+sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
+	   const std::string& isa)
 {
   StringVec isaVec;
-  if (not determineIsa(args, isaVec))
-    return false;
+  if (not isa.empty())
+    isaVec.push_back(isa);
 
   for (unsigned i = 0; i < system.hartCount(); ++i)
     if (not applyCmdLineArgs(args, isaVec, *system.ithHart(i), system))
@@ -1776,8 +1623,7 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 /// is changed to meet expectation.
 static
 bool
-checkAndRepairMemoryParams(size_t& memSize, size_t& pageSize,
-                           size_t& regionSize)
+checkAndRepairMemoryParams(size_t& memSize, size_t& pageSize)
 {
   bool ok = true;
 
@@ -1796,37 +1642,6 @@ checkAndRepairMemoryParams(size_t& memSize, size_t& pageSize,
     {
       std::cerr << "Page size (" << pageSize << ") is less than 64. Using 64.\n";
       pageSize = 64;
-      ok = false;
-    }
-
-  size_t logRegionSize = static_cast<size_t>(std::log2(regionSize));
-  size_t p2RegionSize = size_t(1) << logRegionSize;
-  if (p2RegionSize != regionSize)
-    {
-      std::cerr << "Memory region size (0x" << std::hex << regionSize << ") "
-		<< "is not a power of 2 -- using 0x" << p2RegionSize << '\n'
-		<< std::dec;
-      regionSize = p2RegionSize;
-      ok = false;
-    }
-
-  if (regionSize < pageSize)
-    {
-      std::cerr << "Memory region size (0x" << std::hex << regionSize << ") "
-		<< "smaller than page size (0x" << pageSize << ") -- "
-		<< "using page size\n" << std::dec;
-      regionSize = pageSize;
-      ok = false;
-    }
-
-  size_t pagesInRegion = regionSize / pageSize;
-  size_t multiple = pagesInRegion * pageSize;
-  if (multiple != regionSize)
-    {
-      std::cerr << "Memory region size (0x" << std::hex << regionSize << ") "
-		<< "is not a multiple of page size (0x" << pageSize << ") -- "
-		<< "using 0x" << multiple << " as region size\n" << std::dec;
-      regionSize = multiple;
       ok = false;
     }
 
@@ -1905,14 +1720,13 @@ session(const Args& args, const HartConfig& config)
   unsigned hartsPerCore = 1;
   unsigned coreCount = 1;
   size_t pageSize = 4*1024;
-  size_t regionSize = 256*1024*1024;
   size_t memorySize = size_t(1) << 32;  // 4 gigs
 
   if (not getPrimaryConfigParameters(args, config, hartsPerCore, coreCount,
                                      pageSize, memorySize))
     return false;
 
-  checkAndRepairMemoryParams(memorySize, pageSize, regionSize);
+  checkAndRepairMemoryParams(memorySize, pageSize);
 
   // Create cores & harts.
   unsigned hartIdOffset = hartsPerCore;
@@ -1960,7 +1774,11 @@ session(const Args& args, const HartConfig& config)
       hart.reset();
     }
 
-  bool result = sessionRun(system, args, traceFile, commandLog);
+  std::string isa;
+  if (not determineIsa(config, args, isa))
+    return false;
+
+  bool result = sessionRun(system, args, traceFile, commandLog, isa);
 
   auto& hart0 = *system.ithHart(0);
   if (not args.instFreqFile.empty())

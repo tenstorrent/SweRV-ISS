@@ -34,6 +34,7 @@ namespace WdRiscv
     bool exec_ = false;      // Execute Access.
     bool accessed_ = false;
     bool dirty_ = false;
+    uint8_t levels_ = 3;
   };
 
 
@@ -59,6 +60,12 @@ namespace WdRiscv
             }
       return nullptr;
     }
+
+    /// print TLB content
+    void printTlb(std::ostream& ost) const;
+
+    /// print TLB entry
+    void printEntry(std::ostream& ost, const TlbEntry& te) const;
 
     /// Insert a TLB entry for the given translation parameters. If TLB is full
     /// the contents of the  least recently accessed slot are replaced by the
