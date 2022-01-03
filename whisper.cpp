@@ -995,7 +995,7 @@ applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV
 	isaVec.push_back(std::string(1, c));
     }
 
-  // TODO FIX remote --zisa  remove applyZisaStrings
+  // TODO FIX : remove --zisa  remove applyZisaStrings
   if (not applyZisaStrings(args.zisa, hart))
     errors++;
 
