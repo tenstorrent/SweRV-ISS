@@ -18,11 +18,11 @@ Isa::Isa()
   infoVec_.at(extIx(Extension::I)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(Extension::M)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(Extension::V)) = Info{ {{1,0}}, {1,0} };
-  infoVec_.at(extIx(Extension::Zba)) = Info{ {{0,0}}, {0,0} };
-  infoVec_.at(extIx(Extension::Zbb)) = Info{ {{0,0}}, {0,0} };
-  infoVec_.at(extIx(Extension::Zbc)) = Info{ {{0,0}}, {0,0} };
-  infoVec_.at(extIx(Extension::Zbs)) = Info{ {{0,0}}, {0,0} };
-  infoVec_.at(extIx(Extension::Zfh)) = Info{ {{0,0}}, {0,0} };
+  infoVec_.at(extIx(Extension::Zba)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(Extension::Zbb)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(Extension::Zbc)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(Extension::Zbs)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(Extension::Zfh)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(Extension::Zlsseg)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(Extension::I)).enabled = true; // I always enabled.
