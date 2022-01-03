@@ -182,13 +182,12 @@ The following is a brief description of the command line options:
        Specify register width (32 or 64), defaults to 32.
 
     --isa string
-       Select the RISCV options to enable. The currently supported options are
-       a (atomic), c (compressed instructions), d (double precision fp), 
+       Select the RISCV extensions to enable. The currently supported options are
+       a (atomic), c (compressed instructions), d (double precision fp),
        f (single precision fp), i (base integer), m (multiply divide),
-       s (supervisor mode), u (user mode), and v (vector). By default, only i, m and c
-       are enabled. Note that option i cannot be turned off. Example: "--isa imcf".
-       It is recommended to avoid this option if the configuration of the "misa" CSR is
-       included in the JSON configuration file.
+       s (supervisor mode), u (user mode), and v). By default, only i, m and
+       c are enabled. Canonical ISA strings with versioned ectension are supported.
+       Examples: --isa imacf, --isa rv32i2p0_m2p0_f2p0_v1p0_zfh0p1
 
     --target program
        Specify target program (ELF file) to load into simulated memory. In newlib
