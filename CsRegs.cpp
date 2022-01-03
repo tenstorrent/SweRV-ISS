@@ -151,7 +151,7 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
       auto mcsr = getImplementedCsr(CsrNumber(unsigned(number) + 0x200));
       auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
       if (mcsr and deleg)
-        value = mcsr->read() & (csr->getReadMask() | deleg->read());
+        value = mcsr->read() & (csr->getReadMask() & deleg->read());
       else
         value = csr->read();
       return true;
