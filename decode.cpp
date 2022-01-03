@@ -77,7 +77,7 @@ Hart<URV>::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	}
       if (top5==8 and op2==0)   return instTable_.getEntry(InstId::fcvt_d_s);
       if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_d_h);
-      if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_d);
+      if (top5==0xb and op2==0) return instTable_.getEntry(InstId::fsqrt_d);
       if (top5 == 0x14)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_d);
@@ -136,7 +136,7 @@ Hart<URV>::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	}
       if (top5==8 and op2==1)   return instTable_.getEntry(InstId::fcvt_s_d);
       if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_s_h);
-      if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_s);
+      if (top5==0xb and op2==0) return instTable_.getEntry(InstId::fsqrt_s);
       if (top5 == 0x14)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_s);
@@ -1180,6 +1180,9 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
   uint16_t quadrant = inst & 0x3;
   uint16_t funct3 =  uint16_t(inst >> 13);    // Bits 15 14 and 13
 
+  unsigned version = 0;
+  isa_.getVersion(Isa::Extension::C, version);
+
   op0 = 0; op1 = 0; op2 = 0;
 
   if (quadrant == 0)
@@ -1414,7 +1417,10 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	{
 	  CiFormInst cif(inst);
 	  unsigned rd = cif.bits.rd;
-	  // rd == 0 is legal per Andrew Watterman
+	  if (version < 2)
+	    ; // rd == 0 is legal per Andrew Watterman
+	  else if (rd == 0)
+	    return instTable_.getEntry(InstId::illegal);
 	  op0 = rd; op1 = RegSp; op2 = cif.lwspImmed();
 	  return instTable_.getEntry(InstId::c_lwsp);
 	}
@@ -1426,6 +1432,8 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	  if (isRv64())
 	    {
 	      op0 = rd; op1 = RegSp; op2 = cif.ldspImmed();
+	      if (rd == 0)
+		return instTable_.getEntry(InstId::illegal);
 	      return instTable_.getEntry(InstId::c_ldsp);
 	    }
 	  if (isRvf())
@@ -2306,7 +2314,7 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           {
             if (top5 == 0)    return instTable_.getEntry(InstId::amoadd_w);
             if (top5 == 1)    return instTable_.getEntry(InstId::amoswap_w);
-            if (top5 == 2)    return instTable_.getEntry(InstId::lr_w);
+            if (top5 == 2 and op2==0)    return instTable_.getEntry(InstId::lr_w);
             if (top5 == 3)    return instTable_.getEntry(InstId::sc_w);
             if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_w);
             if (top5 == 8)    return instTable_.getEntry(InstId::amoor_w);
@@ -2320,7 +2328,7 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           {
             if (top5 == 0)    return instTable_.getEntry(InstId::amoadd_d);
             if (top5 == 1)    return instTable_.getEntry(InstId::amoswap_d);
-            if (top5 == 2)    return instTable_.getEntry(InstId::lr_d);
+            if (top5 == 2 and op2 == 0)    return instTable_.getEntry(InstId::lr_d);
             if (top5 == 3)    return instTable_.getEntry(InstId::sc_d);
             if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_d);
             if (top5 == 8)    return instTable_.getEntry(InstId::amoor_d);
@@ -2582,11 +2590,11 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                       return instTable_.getEntry(InstId::sfence_vma);
                     }
 		}
-	      else if (op2 == 0x102)
+	      else if (op2 == 0x102 and op0 == 0 and op1 == 0)
 		return instTable_.getEntry(InstId::sret);
-	      else if (op2 == 0x302)
+	      else if (op2 == 0x302 and op0 == 0 and op1 == 0)
 		return instTable_.getEntry(InstId::mret);
-	      else if (op2 == 0x105)
+	      else if (op2 == 0x105 and op0 == 0 and op1 == 0)
 		return instTable_.getEntry(InstId::wfi);
 	    }
 	    break;
