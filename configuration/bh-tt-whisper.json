@@ -1,7 +1,7 @@
 {
     "xlen" : 32,
 
-    "isa" : "rv32imafvzfh",
+    "isa" : "rv32imafvzfh_zba_zbb",
 
     "Comment" : "Rounding mode is forced to round-to-nearest-even regardless of FRM CSR.",
     "force_rounding_mode" : "rne",
@@ -11,11 +11,6 @@
 
     "Comment" : "Replace subnormal floating point results with zero.",
     "force_subnormal_to_zero" : "true",
-
-    "enable_zfh" : "true",
-
-    "enable_zba" : "true",
-    "enable_zbb" : "true",
 
     "enable_performance_counters" : "true",
     "perf_count_atomic_load_store" : "true",
