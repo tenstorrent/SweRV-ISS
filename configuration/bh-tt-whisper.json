@@ -10,6 +10,8 @@
     "Comment" : "Replace subnormal floating point results with zero.",
     "force_subnormal_to_zero" : "true",
 
+    "isa" : "rv32imafvzfh",
+
     "enable_zfh" : "true",
 
     "enable_zba" : "true",

@@ -767,56 +767,49 @@ applyZisaStrings(const StringVec& zisa, Hart<URV>& hart)
 }
 
 
-/// Enable linux or newlib based on the symbols in the ELF files.
-/// Return true if either is enabled.
-template<typename URV>
 static
-bool
-enableNewlibOrLinuxFromElf(const Args& args, Hart<URV>& hart)
+void
+checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
 {
-  bool newlib = args.newlib, linux = args.linux;
   if (args.raw)
     {
-      if (newlib or linux)
+      if (args.newlib or args.linux)
 	std::cerr << "Raw mode not comptible with newlib/linux. Sticking"
 		  << " with raw mode.\n";
-      return false;
+      return;
     }
+
+  newlib = args.newlib;
+  linux = args.linux;
 
   if (linux or newlib)
-    ;  // Emulation preference already set by user.
-  else
+    return;  // Emulation preference already set by user.
+
+  for (auto target : args.expandedTargets)
     {
-      // At this point ELF files have not been loaded: Cannot use
-      // hart.findElfSymbol.
-      for (auto target : args.expandedTargets)
-	{
-	  auto elfPath = target.at(0);
-	  if (not linux)
-	    linux = Memory::isSymbolInElfFile(elfPath, "__libc_csu_init");
+      auto elfPath = target.at(0);
+      if (not linux)
+	linux = Memory::isSymbolInElfFile(elfPath, "__libc_csu_init");
 
-	  if (not newlib)
-	    newlib = Memory::isSymbolInElfFile(elfPath, "__call_exitprocs");
-	}
+      if (not newlib)
+	newlib = Memory::isSymbolInElfFile(elfPath, "__call_exitprocs");
 
-      if (args.verbose and linux)
-	std::cerr << "Deteced linux symbol in ELF\n";
-
-      if (args.verbose and newlib)
-	std::cerr << "Deteced newlib symbol in ELF\n";
-
-      if (newlib and linux)
-	{
-	  std::cerr << "Fishy: Both newlib and linux symbols present in "
-		    << "ELF file(s). Doing linux emulation.\n";
-	  newlib = false;
-	}
+      if (linux and newlib)
+	break;
     }
 
-  hart.enableNewlib(newlib);
-  hart.enableLinux(linux);
+  if (linux and args.verbose)
+    std::cerr << "Detected linux symbol in ELF\n";
 
-  return newlib or linux;
+  if (newlib and args. verbose)
+    std::cerr << "Detected newlib symbol in ELF\n";
+
+  if (newlib and linux)
+    {
+      std::cerr << "Fishy: Both newlib and linux symbols present in "
+		<< "ELF file(s). Doing linux emulation.\n";
+      newlib = false;
+    }
 }
 
 
@@ -976,30 +969,12 @@ getIsaStringFromCsr(const Hart<URV>& hart)
 template<typename URV>
 static
 bool
-applyCmdLineArgs(const Args& args, StringVec isaVec, Hart<URV>& hart, System<URV>& system)
+applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool clib)
 {
   unsigned errors = 0;
 
-  // Handle linux/newlib adjusting stack if needed.
-  bool clib = enableNewlibOrLinuxFromElf(args, hart);
-
-  if (clib and isaVec.empty() and not args.raw)
-    {
-      if (args.verbose)
-        std::cerr << "Adding a/c/m/f/d extensions for newlib/linux\n";
-      std::string isa = getIsaStringFromCsr(hart);
-      for (auto c : std::string("icmafd"))
-	if (isa.find(c) == std::string::npos)
-	  isa += c;
-      for (auto c : isa)
-	isaVec.push_back(std::string(1, c));
-    }
-
-  // TODO FIX remote --zisa  remove applyZisaStrings
+  // TODO FIX : remove --zisa  remove applyZisaStrings
   if (not applyZisaStrings(args.zisa, hart))
-    errors++;
-
-  if (not hart.configIsa(isaVec))
     errors++;
 
   if (clib)  // Linux or newlib enabled.
@@ -1518,7 +1493,7 @@ snapshotRun(System<URV>& system, FILE* traceFile,
 
 static
 bool
-determineIsa(const HartConfig& config, const Args& args, std::string& isa)
+determineIsa(const HartConfig& config, const Args& args, bool clib, std::string& isa)
 {
   isa.clear();
 
@@ -1537,6 +1512,13 @@ determineIsa(const HartConfig& config, const Args& args, std::string& isa)
       config.getIsa(isa);
     }
 
+  if (isa.empty() and clib)
+    {
+      if (args.verbose)
+        std::cerr << "No ISA specfied, using a/c/m/f/d extensions for newlib/linux\n";
+      isa = "imcafd";
+    }
+
   return true;
 }
 
@@ -1547,14 +1529,10 @@ template <typename URV>
 static
 bool
 sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
-	   const std::string& isa)
+	   bool clib)
 {
-  StringVec isaVec;
-  if (not isa.empty())
-    isaVec.push_back(isa);
-
   for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyCmdLineArgs(args, isaVec, *system.ithHart(i), system))
+    if (not applyCmdLineArgs(args, *system.ithHart(i), system, clib))
       if (not args.interactive)
 	return false;
 
@@ -1765,20 +1743,30 @@ session(const Args& args, const HartConfig& config)
   if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile))
     return false;
 
+  bool newlib = false, linux = false;
+  checkForNewlibOrLinux(args, newlib, linux);
+  bool clib = newlib or linux;
+  bool updateMisa = clib and not config.hasCsrConfig("misa");
+
+  std::string isa;
+  if (not determineIsa(config, args, clib, isa))
+    return false;
+
   for (unsigned i = 0; i < system.hartCount(); ++i)
     {
       auto& hart = *system.ithHart(i);
       hart.setConsoleOutput(consoleOut);
       if (bblockFile)
 	hart.enableBasicBlocks(bblockFile, args.bblockInsts);
+      hart.enableNewlib(newlib);
+      hart.enableLinux(linux);
+      if (not isa.empty())
+	if (not hart.configIsa(isa, updateMisa))
+	  return false;
       hart.reset();
     }
 
-  std::string isa;
-  if (not determineIsa(config, args, isa))
-    return false;
-
-  bool result = sessionRun(system, args, traceFile, commandLog, isa);
+  bool result = sessionRun(system, args, traceFile, commandLog, clib);
 
   auto& hart0 = *system.ithHart(0);
   if (not args.instFreqFile.empty())

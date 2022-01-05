@@ -2190,6 +2190,23 @@ HartConfig::getMisaReset(uint64_t& val) const
 }
 
 
+bool
+HartConfig::hasCsrConfig(const std::string& csrName) const
+{
+  if (not config_ -> count("csr"))
+    return false;  // No csr section
+
+  const auto& csrs = config_ -> at("csr");
+  if (not csrs.is_object())
+    return false;  // No csr section in this config.
+
+  if (not csrs.count(csrName))
+    return false;  // Target csr not present in csr section
+
+  return true;
+}
+
+
 // Instantiate tempate member functions
 
 template bool
