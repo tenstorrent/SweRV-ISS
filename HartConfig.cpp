@@ -1358,7 +1358,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       bool flag = false;
       if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableZfh(flag);
+        hart.enableRvzfh(flag);
       else
         errors++;
     }
