@@ -122,11 +122,15 @@ namespace WdRiscv
     template<typename URV>
     bool finalizeCsrConfig(System<URV>& system) const;
 
+    /// Return true if this object has a configuration for the
+    /// given CSR.
+    bool hasCsrConfig(const std::string& csrName) const;
+
   protected:
 
     /// Set val to the reset value of the MISA CSR returning true on
     /// success and false if no such entry in this config or if entry
-    /// has the wrong value type. This is a heler to userModeEnabled
+    /// has the wrong value type. This is a helper to userModeEnabled
     /// and supervisorModeEnabeld.
     bool getMisaReset(uint64_t& val) const;
 

@@ -3316,13 +3316,42 @@ Hart<URV>::defineCsr(const std::string& name, CsrNumber num,
 
 template <typename URV>
 bool
-Hart<URV>::configIsa(const std::vector<std::string>& strings)
+Hart<URV>::configIsa(const std::string& isa, bool updateMisa)
 {
-  bool result = true;
-  for (const auto& str : strings)
-    result = isa_.configIsa(str) and result;
-  reset();  // re-process misa with new isa setting
-  return result;
+  if (not isa_.configIsa(isa))
+    return false;
+
+  if (updateMisa)
+    {
+      Csr<URV>* csr = this->findCsr("misa");
+      if (not csr)
+	return false;
+
+      URV misaReset = csr->getResetValue();
+      if (isa_.isEnabled(Isa::Extension::A))
+	misaReset |= URV(1);
+      if (isa_.isEnabled(Isa::Extension::B))
+	misaReset |= URV(2);
+      if (isa_.isEnabled(Isa::Extension::C))
+	misaReset |= URV(4);
+      if (isa_.isEnabled(Isa::Extension::D))
+	misaReset |= URV(8);
+      if (isa_.isEnabled(Isa::Extension::F))
+	misaReset |= URV(32);
+      if (isa_.isEnabled(Isa::Extension::M))
+	misaReset |= URV(0x1000);
+      if (isa_.isEnabled(Isa::Extension::V))
+	misaReset |= URV(0x20000);
+  
+      URV mask = 0, pokeMask = 0;
+      bool implemented = true, isDebug = false, shared = true;
+
+      if (not this->configCsr("misa", implemented, misaReset, mask, pokeMask,
+			      isDebug, shared))
+	return false;
+    }
+
+  return true;
 }
 
 
