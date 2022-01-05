@@ -258,8 +258,11 @@ namespace WdRiscv
 				   wm1, wm2, wm3, pm1, pm2, pm3);
     }
 
-    /// Enable the extensions defined by the given strings.
-    bool configIsa(const std::vector<std::string>& strings);
+    /// Enable the extensions defined by the given string. If
+    /// updateMisa is true then the MISA CSR reset value is updated to
+    /// enable the extensions defined by the given string (this is done
+    /// for linux/newlib emulation).
+    bool configIsa(const std::string& string, bool updateMisa);
 
     /// Enable/disable load-data debug triggerring (disabled by default).
     void configLoadDataTrigger(bool flag)
