@@ -739,7 +739,7 @@ applyZisaString(const std::string& zisa, Hart<URV>& hart)
       std::cerr << "ISA option zbmini is deprecated. Using zbb and zbs.\n";
     }
   else if (boost::starts_with(ext, "fh"))
-    hart.enableZfh(true);
+    hart.enableRvzfh(true);
   else
     {
       std::cerr << "No such Z extension: " << zisa << '\n';
