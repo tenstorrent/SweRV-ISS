@@ -1417,9 +1417,7 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	{
 	  CiFormInst cif(inst);
 	  unsigned rd = cif.bits.rd;
-	  if (version < 2)
-	    ; // rd == 0 is legal per Andrew Watterman
-	  else if (rd == 0)
+	  if (rd == 0)
 	    return instTable_.getEntry(InstId::illegal);
 	  op0 = rd; op1 = RegSp; op2 = cif.lwspImmed();
 	  return instTable_.getEntry(InstId::c_lwsp);
@@ -1784,7 +1782,8 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 	{
 	  CiFormInst cif(inst);
 	  unsigned rd = cif.bits.rd;
-	  // rd == 0 is legal per Andrew Watterman
+	  if (rd == 0)
+	    return expanded; // Illegal
 	  op0 = rd; op1 = RegSp; op2 = cif.lwspImmed();
 	  encodeLw(op0, op1, op2, expanded);
           return expanded;
