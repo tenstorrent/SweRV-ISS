@@ -60,7 +60,7 @@ namespace WdRiscv
 
     /// Configure memory.
     template<typename URV>
-    bool configMemory(System<URV>& system, bool iccmRw, bool unmappedElfOf,
+    bool configMemory(System<URV>& system, bool iccmRw, bool unmappedElfOk,
                       bool verbose) const;
 
     /// Apply the memory configuration in this object. Helper to configMemory.

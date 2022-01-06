@@ -837,7 +837,7 @@ namespace WdRiscv
     { rvzbt_ = flag; }
 
     /// Enable/disable the half-precision floating point extension.
-    void enableZfh(bool flag)
+    void enableRvzfh(bool flag)
     { rvzfh_ = flag; }
 
     /// Put this hart in debug mode setting the DCSR cause field to
