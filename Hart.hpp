@@ -2163,6 +2163,8 @@ namespace WdRiscv
     void execFcvt_h_lu(const DecodedInst*);
 
     // atomic
+    template <typename OP>
+    void execAmo32Op(const DecodedInst*, OP op);
     void execAmoadd_w(const DecodedInst*);
     void execAmoswap_w(const DecodedInst*);
     void execLr_w(const DecodedInst*);
@@ -2176,6 +2178,8 @@ namespace WdRiscv
     void execAmomaxu_w(const DecodedInst*);
 
     // atmomic + rv64
+    template <typename OP>
+    void execAmo64Op(const DecodedInst*, OP op);
     void execAmoadd_d(const DecodedInst*);
     void execAmoswap_d(const DecodedInst*);
     void execLr_d(const DecodedInst*);
