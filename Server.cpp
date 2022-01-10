@@ -779,97 +779,6 @@ Server<URV>::stepCommand(const WhisperMessage& req,
 }
 
 
-// Server mode exception command.
-template <typename URV>
-bool
-Server<URV>::exceptionCommand(const WhisperMessage& req, 
-			      WhisperMessage& reply,
-			      std::string& text)
-{
-  reply = req;
-
-  if (not checkHart(req, "exception", reply))
-    return false;
-
-  uint32_t hartId = req.hart;
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    return false;
-  auto& hart = *hartPtr;
-
-  std::ostringstream oss;
-
-  bool ok = true;
-  URV addr = static_cast<URV>(req.address);
-  if (addr != req.address)
-    std::cerr << "Error: Address too large (" << std::hex << req.address
-	      << ") in exception command.\n" << std::dec;
-
-  WhisperExceptionType expType = WhisperExceptionType(req.value);
-  switch (expType)
-    {
-    case InstAccessFault:
-      hart.postInstAccessFault(addr);
-      oss << "exception inst " << addr;
-      break;
-
-    case DataAccessFault:
-      hart.postDataAccessFault(addr, SecondaryCause::LOAD_ACC_DOUBLE_ECC);
-      oss << "exception data " << addr;
-      break;
-
-    case ImpreciseStoreFault:
-      {
-        unsigned count = 0;
-        ok = hart.applyStoreException(addr, count);
-        reply.value = count;
-      }
-      oss << "exception store 0x" << std::hex << addr << std::dec;
-      break;
-
-    case ImpreciseLoadFault:
-      {
-	unsigned tag = reply.flags;  // Tempoary.
-        unsigned count = 0;
-        ok = hart.applyLoadException(addr, tag, count);
-	reply.value = count;
-        oss << "exception load 0x" << std::hex << addr << std::dec << ' '
-            << tag;
-      }
-      break;
-
-    case NonMaskableInterrupt:
-      if (hart.isNmiEnabled())
-        hart.setPendingNmi(NmiCause(addr));
-      oss << "exception nmi 0x" << std::hex << addr << std::dec;
-      break;
-
-    case PreciseLoadFault:
-      oss << "exception precise_load 0x" << std::hex << addr << std::dec;
-      hart.postDataAccessFault(addr, SecondaryCause::LOAD_ACC_PRECISE);
-      ok = false;
-      break;
-
-    case PreciseStoreFault:
-      hart.postDataAccessFault(addr, SecondaryCause::STORE_ACC_PRECISE);
-      oss << "exception precise_store 0x" << std::hex << addr << std::dec;
-      ok = false;
-      break;
-
-    default:
-      oss << "exception ? 0x" << std::hex << addr << std::dec;
-      ok = false;
-      break;
-    }
-
-  if (not ok)
-    reply.type = Invalid;
-
-  text = oss.str();
-  return ok;
-}
-
-
 /// Dump all registers contents in tracefile.
 template <typename URV>
 static void
@@ -1026,16 +935,6 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 	      }
 	      break;
 
-	    case Exception:
-	      {
-                std::string text;
-		exceptionCommand(msg, reply, text);
-		if (commandLog)
-		  fprintf(commandLog, "hart=%d %s # ts=%s\n", hartId,
-			  text.c_str(), timeStamp.c_str());
-	      }
-	      break;
-
 	    case EnterDebug:
               {
                 bool force = msg.flags;
@@ -1054,28 +953,6 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
                 fprintf(commandLog, "hart=%d exit_debug # ts=%s\n", hartId,
                         timeStamp.c_str());
 	      break;
-
-	    case LoadFinished:
-              {
-                URV addr = static_cast<URV>(msg.address);
-                unsigned tag = msg.flags;
-                if (checkHart(msg, "load_finished", reply))
-                  {
-                    if (addr != msg.address)
-                      std::cerr << "Error: Address too large (" << std::hex
-                                << msg.address << ") in load finished command.\n"
-                                << std::dec;
-                    unsigned matchCount = 0;
-                    hart.applyLoadFinished(addr, tag, matchCount);
-                    reply.value = matchCount;
-                  }
-                if (commandLog)
-                  fprintf(commandLog, "hart=%d load_finished 0x%0*" PRIx64 " %d # ts=%s\n",
-                          hartId,
-                          ( (sizeof(URV) == 4) ? 8 : 16 ), uint64_t(addr),
-                          tag, timeStamp.c_str());
-              }
-              break;
 
             case CancelDiv:
               if (checkHart(msg, "cancel_div", reply))

@@ -34,7 +34,6 @@ CsRegs<URV>::CsRegs()
   defineUserRegs();
   defineDebugRegs();
   defineVectorRegs();
-  defineNonStandardRegs();
 }
 
 
@@ -391,22 +390,6 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
     {
       MstatusFields<URV> fields(csr->read());
       interruptEnable_ = fields.bits_.MIE;
-    }
-
-  // Writing MDEAU unlocks mdseac.
-  if (number == CsrNumber::MDEAU)
-    lockMdseac(false);
-
-  // Writing MEIVT changes the base address in MEIHAP.
-  if (number == CsrNumber::MEIVT)
-    {
-      value = (value >> 10) << 10;  // Clear least sig 10 bits keeping base.
-      size_t meihapIx = size_t(CsrNumber::MEIHAP);
-      URV meihap = regs_.at(meihapIx).read();
-      meihap &= 0x3ff;  // Clear base address bits.
-      meihap |= value;  // Copy base address bits from MEIVT.
-      regs_.at(meihapIx).poke(meihap);
-      recordWrite(CsrNumber::MEIHAP);
     }
 
   // Writing mcounteren/scounteren changes accessibility of the
@@ -1319,38 +1302,6 @@ CsRegs<URV>::defineVectorRegs()
 
 
 template <typename URV>
-void
-CsRegs<URV>::defineNonStandardRegs()
-{
-  return;
-  URV rom = 0;        // Read-only mask: no bit writeable.
-  URV wam = ~URV(0);  // Write-all mask: all bits writeable.
-
-  bool mand = true; // Mandatory.
-  bool imp = true;  // Implemented.
-
-  using Csrn = CsrNumber;
-
-  // mdseac is read-only to CSR insts but is modifiable with poke.
-  defineCsr("mdseac", Csrn::MDSEAC,   !mand, imp, 0, rom, wam);
-
-  // mdeau is write-only, it unlocks mdseac when written, it always
-  // reads zero.
-  defineCsr("mdeau",  Csrn::MDEAU,    !mand, imp, 0, rom, rom);
-
-  // Least sig 10 bits of interrupt vector table (meivt) are read only.
-  URV mask = (~URV(0)) << 10;
-  defineCsr("meivt",  Csrn::MEIVT,    !mand, imp, 0, mask, mask);
-
-  // None of the bits are writeable by CSR instructions. All but least
-  // sig 2 bis are modifiable.
-  defineCsr("meihap", Csrn::MEIHAP,   !mand, imp, 0, rom, ~URV(3));
-
-  defineCsr("mscause",  Csrn::MSCAUSE, !mand, !imp, 0, wam, wam);
-}
-
-
-template <typename URV>
 bool
 CsRegs<URV>::peek(CsrNumber number, URV& value) const
 {
@@ -1468,21 +1419,6 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
     {
       MstatusFields<URV> fields(csr->read());
       interruptEnable_ = fields.bits_.MIE;
-    }
-
-  // Poking MDEAU unlocks mdseac.
-  if (number == CsrNumber::MDEAU)
-    lockMdseac(false);
-
-  // Poking MEIVT changes the base address in MEIHAP.
-  if (number == CsrNumber::MEIVT)
-    {
-      value = (value >> 10) << 10;  // Clear least sig 10 bits keeping base.
-      size_t meihapIx = size_t(CsrNumber::MEIHAP);
-      URV meihap = regs_.at(meihapIx).read();
-      meihap &= 0x3ff;  // Clear base address bits.
-      meihap |= value;  // Copy base address bits from MEIVT.
-      regs_.at(meihapIx).poke(meihap);
     }
 
   // Poking mcounteren/scounteren changes accessibility of the

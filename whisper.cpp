@@ -1093,9 +1093,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
   if (args.abiNames)
     hart.enableAbiNames(args.abiNames);
 
-  if (args.fastExt)
-    hart.enableFastInterrupts(args.fastExt);
-
   // Apply register initialization.
   if (not applyCmdLineRegInit(args, hart))
     errors++;
@@ -1554,7 +1551,6 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
         {
           auto& hart = *system.ithHart(i);
           hart.enableLoadErrorRollback(false);
-          hart.enableBenchLoadExceptions(false);
         }
     }
 

@@ -1113,28 +1113,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	errors++;
     }
 
-  // Wide (64-bit) load/store. WDC special.
-  tag = "enable_wide_load_store";
-  if (config_ -> count(tag))
-    {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableWideLoadStore(flag);
-      else
-        errors++;
-    }
-
-  // Bus barrier. WDC special.
-  tag = "enable_bus_barrier";
-  if (config_ -> count(tag))
-    {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableBusBarrier(flag);
-      else
-        errors++;
-    }
-
   // Ld/st instructions trigger misaligned exception if base address
   // (value in rs1) and effective address refer to regions of
   // different types.
@@ -1209,19 +1187,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       if (getJsonBoolean(tag, config_ -> at(tag), flag))
         {
           hart.enableLoadErrorRollback(flag);
-          hart.enableBenchLoadExceptions(flag);
         }
-      else
-        errors++;
-    }
-
-  // Enable fast interrupts.
-  tag = "fast_interrupt_redirect";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableFastInterrupts(flag);
       else
         errors++;
     }
@@ -1359,24 +1325,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       bool flag = false;
       if (getJsonBoolean(tag, config_ -> at(tag), flag))
         hart.enableRvzfh(flag);
-      else
-        errors++;
-    }
-
-  tag = "load_queue_size";
-  if (config_ -> count(tag))
-    {
-      unsigned lqs = 0;
-      if (getJsonUnsigned(tag, config_ -> at(tag), lqs))
-        {
-          if (lqs > 64)
-            {
-              std::cerr << "Config file load queue size (" << lqs << ") too large"
-                        << " -- using 64.\n";
-              lqs = 64;
-            }
-          hart.setLoadQueueSize(lqs);
-        }
       else
         errors++;
     }

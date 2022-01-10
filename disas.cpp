@@ -750,14 +750,6 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printRdRs1Rs3Imm(*this, out, "fsriw", di);
       break;
 
-    case InstId::load64:
-      printLdSt(*this, out, di);
-      break;
-
-    case InstId::store64:
-      printLdSt(*this, out, di);
-      break;
-
     default:
       if (di.instEntry()->isAtomic())
 	printAmo(*this, out, di);

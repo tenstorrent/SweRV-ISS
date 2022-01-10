@@ -86,16 +86,6 @@ namespace WdRiscv
 			   const std::vector<std::string>& tokens,
 			   std::ifstream& stream);
 
-    /// Helper to interact: "exception" command. Associate an
-    /// exception with the first subsequently executed instruction.
-    bool exceptionCommand(Hart<URV>&, const std::string& line,
-			  const std::vector<std::string>& tokens);
-
-    /// Helper to interact: "load_finished" command. Mark an non-blocking
-    /// load instruction as completed.
-    bool loadFinishedCommand(Hart<URV>&, const std::string& line,
-			     const std::vector<std::string>& tokens);
-
     /// Helper to interact: "dump_memory" command.
     bool dumpMemoryCommand(const std::string& line,
                            const std::vector<std::string>& tokens);
