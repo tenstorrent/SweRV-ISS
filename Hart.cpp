@@ -2136,6 +2136,13 @@ Hart<URV>::store(uint32_t rs1, URV base, URV virtAddr, STORE_TYPE storeVal)
   if (wideLdSt_)
     return wideStore(addr, storeVal);
 
+  if (addr >= clintStart_ and addr <= clintLimit_)
+    {
+      URV val = storeVal;
+      processClintWrite(addr, stSize, val);
+      storeVal = val;
+    }
+
   if (memory_.write(hartIx_, addr, storeVal))
     {
       memory_.invalidateOtherHartLr(hartIx_, addr, stSize);
@@ -2163,9 +2170,6 @@ Hart<URV>::store(uint32_t rs1, URV base, URV virtAddr, STORE_TYPE storeVal)
           return true;
 	}
 
-      if (addr >= clintStart_ and addr <= clintLimit_)
-        processClintWrite(addr, stSize, storeVal);
-
       return true;
     }
 
@@ -2178,19 +2182,22 @@ Hart<URV>::store(uint32_t rs1, URV base, URV virtAddr, STORE_TYPE storeVal)
 
 template <typename URV>
 void
-Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV storeVal)
+Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
 {
   if (clintTimerAddrToHart_)
     {
       auto hart = clintTimerAddrToHart_(addr);
-      if (hart)
-        {
-          hart->alarmLimit_ = storeVal;
-          URV mipVal = hart->csRegs_.peekMip();
-          mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-          hart->pokeCsr(CsrNumber::MIP, mipVal);
-          return;
-        }
+      if (not hart)
+	{
+	  storeVal = 0;
+	  return;
+	}
+
+      hart->alarmLimit_ = storeVal;
+      URV mipVal = hart->csRegs_.peekMip();
+      mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+      hart->pokeCsr(CsrNumber::MIP, mipVal);
+      return;
     }
 
   if (addr == 0x200bff8)
@@ -2203,13 +2210,15 @@ Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV storeVal)
     {
       auto hart = clintSoftAddrToHart_(addr);
       if (not hart)
-        return;  // Address is not in the software-interrupt memory mapped locations.
+	{
+	  storeVal = 0;
+	  return;  // Address is not in range of harts in system.
+	}
 
       if (stSize != 4)
         return;  // Must be sw
 
-      if ((storeVal >> 1) != 0)
-        return;  // Must write 0 or 1.
+      storeVal = storeVal & 1;  // Only bit zero is implemented.
 
       URV mipVal = csRegs_.peekMip();
       if (storeVal)

@@ -1875,8 +1875,11 @@ namespace WdRiscv
     /// Called to check if a clint memory mapped register is written.
     /// Clear/set software-interrupt bit in the MIP CSR of
     /// corresponding hart if all the conditions are met. Set timer
-    /// limit if timer-limit regiser is written.
-    void processClintWrite(size_t addr, unsigned stSize, URV stVal);
+    /// limit if timer-limit regiser is written. Update stVal: if location
+    /// is outside the range of valid harts, set stVal to zero.  If it is
+    /// in the software interrupt range then keep it least sig bit and zero
+    /// the rest.
+    void processClintWrite(size_t addr, unsigned stSize, URV& stVal);
 
     /// Mask to extract shift amount from a integer register value to use
     /// in shift instructions. This returns 0x1f in 32-bit more and 0x3f
