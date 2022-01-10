@@ -137,14 +137,6 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
 			      const std::vector<std::string>& tokens,
 			      FILE* traceFile)
 {
-  if (not hart.isStarted())
-    {
-      // WD special.
-      std::cerr << "Cannot step a non-started hart: Consider writing "
-                << "the mhartstart CSR\n";
-      return false;
-    }
-
   if (tokens.size() == 1)
     {
       hart.singleStep(traceFile);
@@ -1266,16 +1258,6 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
     }
 
   Hart<URV>& hart = *hartPtr;
-
-  if (not hart.isStarted())
-    {
-      if (command != "peek" and command != "poke" and command != "reset")
-        {
-          std::cerr << "Error: Command " << command << " received for a "
-                    << "non-started hart.\n";
-          return false;
-        }
-    }
 
   // After the first step/run/until command, a reset command will reset
   // the memory mapped registers.

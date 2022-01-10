@@ -688,7 +688,7 @@ Server<URV>::checkHartId(const WhisperMessage& req, WhisperMessage& reply)
 
 template <typename URV>
 bool
-Server<URV>::checkHart(const WhisperMessage& req, const std::string& command,
+Server<URV>::checkHart(const WhisperMessage& req, const std::string& /*command*/,
                        WhisperMessage& reply)
 {
   if (not checkHartId(req, reply))
@@ -698,15 +698,6 @@ Server<URV>::checkHart(const WhisperMessage& req, const std::string& command,
   auto hartPtr = system_.findHartByHartId(hartId);
   if (not hartPtr)
     return false;
-
-  auto& hart = *hartPtr;
-  if (not hart.isStarted())
-    {
-      std::cerr << "Error: Command " << command
-                << " received for a non-started hart\n";
-      reply.type = Invalid;
-      return false;
-    }
 
   return true;
 }

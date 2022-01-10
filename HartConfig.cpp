@@ -1862,48 +1862,6 @@ defineMpicbaddrSideEffects(System<URV>& system)
 }
 
 
-/// Associate callbacks with write/poke of mhartstart to start harts
-/// when corresponding bits are set in that CSR.
-template <typename URV>
-void
-defineMhartstartSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mhartstart");
-      if (not csrPtr)
-        continue;
-      auto csrNum = csrPtr->getNumber();
-
-      auto post = [&system] (Csr<URV>&, URV val) -> void {
-                    // Start harts corresponding to set bits
-                    for (unsigned ii = 0; ii < system.hartCount(); ++ii)
-                      {
-                        auto ht = system.ithHart(ii);
-                        URV id = ht->sysHartIndex();
-                        if (val & (URV(1) << id))
-                          ht->setStarted(true);
-                      }
-                  };
-
-      auto pre = [&system, csrNum] (Csr<URV>&, URV& val) -> void {
-                   // Implement write-one semantics. We let hart 0 do
-                   // the shared CSR value change.
-                   auto ht = system.ithHart(0);
-                   URV prev = 0;
-                   ht->peekCsr(csrNum, prev);
-                   val |= prev;
-                 };
-
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-      csrPtr->registerPrePoke(pre);
-      csrPtr->registerPreWrite(pre);
-    }
-}
-
-
 /// Associate callback with write/poke of mnmipdel to deletage
 /// non-maskable-interrupts to harts.
 template <typename URV>
@@ -2101,7 +2059,6 @@ HartConfig::finalizeCsrConfig(System<URV>& system) const
 
   // The following are WD non-standard CSRs. We implement their
   // actions by associating callbacks with the write/poke CSR methods.
-  defineMhartstartSideEffects(system);
   defineMnmipdelSideEffects(system);
   defineMpicbaddrSideEffects(system);
   defineMpmcSideEffects(system);

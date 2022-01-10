@@ -1051,18 +1051,6 @@ namespace WdRiscv
     /// Copy memory region configuration from other processor.
     void copyMemRegionConfig(const Hart<URV>& other);
 
-    /// Return true if hart was put in run state after reset. Hart 0
-    /// is automatically in run state after reset. If mhartstart CSR
-    /// exists, then each remaining hart must be explicitly started by
-    /// hart 0 by writing to the corresponding bit in that CSR. This
-    /// is special for WD.
-    bool isStarted()
-    { return hartStarted_; }
-
-    /// Mark this hart as started.
-    void setStarted(bool flag)
-    { hartStarted_ = flag; }
-
     /// Return the index of this hart within the system. Harts are
     /// assigned indices 0 to m*n - 1 where m is the number of cores
     /// and n is the number of harts per core.
@@ -3685,7 +3673,6 @@ namespace WdRiscv
   private:
 
     unsigned hartIx_ = 0;        // Hart ix in system, see sysHartIndex method.
-    std::atomic<bool> hartStarted_ = true;    // True if hart is running. WD special.
     Memory& memory_;
     IntRegs<URV> intRegs_;       // Integer register file.
     CsRegs<URV> csRegs_;         // Control and status registers.

@@ -564,21 +564,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
-  hartStarted_ = true;
-
-  // If mhartstart exists then use its bits to decide which hart has
-  // started.
-  if (hartIx_ != 0)
-    {
-      auto csr = findCsr("mhartstart");
-      if (csr)
-        {
-          URV value = 0;
-          csRegs_.read(csr->getNumber(), PrivilegeMode::Machine, value);
-          hartStarted_ = ((URV(1) << hartIx_) & value) != 0;
-        }
-    }
-
   resetFloat();
 
   // Update cached values of mstatus.mpp and mstatus.mprv and mstatus.fs.
@@ -1306,7 +1291,7 @@ Hart<URV>::reportLrScStat(FILE* file) const
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineMisalLoadException(URV addr, unsigned accessSize) const
+Hart<URV>::determineMisalLoadException(URV /*addr*/, unsigned /*accessSize*/) const
 {
   if (not misalDataOk_)
     return ExceptionCause::LOAD_ADDR_MISAL;
@@ -9344,7 +9329,7 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 
 template <typename URV>
 void
-Hart<URV>::enterDebugMode(URV pc, bool force)
+Hart<URV>::enterDebugMode(URV pc, bool /*force*/)
 {
   if (forceAccessFail_)
     {
