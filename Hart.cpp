@@ -399,12 +399,12 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
   locked = config & 0x80;
   mode = getModeFromPmpconfigByte(config);
 
-  if (type == Pmp::Type::Off)
-    return true;   // Entry is off.
-
   URV pmpVal = 0;
   if (not peekCsr(csrn, pmpVal))
     return false;   // Unimplemented PMPADDR reg.  Should not happen.
+
+  if (type == Pmp::Type::Off)
+    return true;   // Entry is off.
 
   unsigned pmpG = csRegs_.getPmpG();
 
