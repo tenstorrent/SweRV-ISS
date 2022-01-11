@@ -890,7 +890,7 @@ CsRegs<URV>::defineMachineRegs()
   //             S        R   M R M R       P     P I S I I E S E E
   //                                V               E   E E
   URV mask = 0b0'00000000'1'1'1'1'1'1'11'11'11'11'1'1'0'1'0'1'0'1'0;
-  URV val = 0;
+  URV val =  0b0'00000000'0'0'0'0'0'0'00'00'11'00'0'0'0'0'0'0'0'0'0;
   if (not rv32_)
     {
       mask |= uint64_t(0b0000) << 32;  // Mask for SXL and UXL (currently not writable).

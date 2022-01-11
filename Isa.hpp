@@ -11,7 +11,7 @@ namespace WdRiscv
   {
   public:
 
-    enum class Extension : unsigned { A, B, C, D, E, F, I, M, V,
+    enum class Extension : unsigned { A, B, C, D, E, F, I, M, S, U, V,
       Zba, Zbb, Zbc, Zbs, Zfh, Zlsseg, None };
 
     Isa();

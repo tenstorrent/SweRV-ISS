@@ -17,6 +17,8 @@ Isa::Isa()
   infoVec_.at(extIx(Extension::F)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(Extension::I)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(Extension::M)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(Extension::S)) = Info{ {{1,2}}, {1,2} };
+  infoVec_.at(extIx(Extension::U)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(Extension::V)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(Extension::Zba)) = Info{ {{0,93}}, {0,93} };
   infoVec_.at(extIx(Extension::Zbb)) = Info{ {{0,93}}, {0,93} };
@@ -35,6 +37,8 @@ Isa::Isa()
   stringToExt_["f"] = Extension::F;
   stringToExt_["i"] = Extension::I;
   stringToExt_["m"] = Extension::M;
+  stringToExt_["s"] = Extension::S;
+  stringToExt_["u"] = Extension::U;
   stringToExt_["v"] = Extension::V;
   stringToExt_["zba"] = Extension::Zba;
   stringToExt_["zbb"] = Extension::Zbb;
