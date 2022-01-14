@@ -49,8 +49,10 @@ namespace WdRiscv
 
     ~Cache();
 
-    /// Insert line overlapping given address into the cahce.
-    void insert(uint64_t addr)
+    /// Insert line overlapping given address into the cahce.  Return
+    /// true on a hit (line already in cache) and false otherwise
+    /// (line inserted in cache).
+    bool insert(uint64_t addr)
     {
       uint64_t lineNumber = getLineNumber(addr);
       uint64_t setIndex = getSetIndex(lineNumber);
@@ -59,6 +61,7 @@ namespace WdRiscv
 
       // Find line number or oldest entry.
       size_t bestIx = 0;
+      bool hit = false;
       for (size_t ix = 0; ix < lines.size(); ++ix)
         {
           auto& entry = lines[ix];
@@ -66,6 +69,7 @@ namespace WdRiscv
             {
               hits_++;
               bestIx = ix;
+	      hit = true;
               break;
             }
           if (not entry.valid() or entry.time_ < lines[bestIx].time_)
@@ -73,6 +77,7 @@ namespace WdRiscv
         }
       lines[bestIx].tag_ = lineNumber;
       lines[bestIx].time_ = time_++;
+      return hit;
     }
 
     /// Invalidate line overlapping given address.
@@ -121,11 +126,16 @@ namespace WdRiscv
     /// success and fase on failure.
     bool loadSnapshot(const std::string& path);
 
-  protected:
-
     /// Return the line number corresponding to the given address.
     uint64_t getLineNumber(uint64_t addr) const
     { return addr >> lineNumberShift_; }
+
+    /// Return the line-size-aligned address corresponding to the
+    /// given address.
+    uint64_t alignToLine(uint64_t addr) const
+    { return (addr >> lineNumberShift_) << lineNumberShift_; }
+
+  protected:
 
     /// Cache is organized as an array of sets. Return the index of the
     /// set corresponding to the given line number.
