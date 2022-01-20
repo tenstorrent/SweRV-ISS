@@ -143,7 +143,7 @@ namespace WdRiscv
 	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pma_;
 
-      return Pma{};  // Return a no-access PMA.
+      return defaultPma_;  // rwx amo rsrv idempotent
     }
 
     /// Define a physical memory attribute region. Regions must be defined
@@ -216,5 +216,7 @@ namespace WdRiscv
 
     std::vector<Region> regions_;
     std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
+
+    Pma defaultPma_{Pma::Attrib::Default};
   };
 }
