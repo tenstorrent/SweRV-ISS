@@ -403,11 +403,6 @@ namespace WdRiscv
      fsrw,
      fsriw,
 
-     // Custom instructions
-     load64,
-     store64,
-     bbarrier,
-
      // vector
      vsetvli,
      vsetivli,

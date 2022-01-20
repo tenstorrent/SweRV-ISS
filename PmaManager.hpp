@@ -37,17 +37,17 @@ namespace WdRiscv
     enum Attrib
       {
        None = 0, Read = 1, Write = 2, Exec = 4,
-       Idempotent = 8, Atomic = 16, Iccm = 32,
-       Dccm = 64, MemMapped = 128,
-       ReadWrite = Read | Write,
+       Idempotent = 8, Amo = 16, Iccm = 32,
+       Dccm = 64, MemMapped = 128, Rsrv = 256,
+       Io = 512,
        Mapped = Exec | Read | Write,
-       Default = Mapped | Idempotent | Atomic
+       Default = Read | Write | Exec | Idempotent | Amo | Rsrv
       };
 
     /// Default constructor: No access allowed. No-dccm, no-iccm,
     /// no-mmr, no-atomic.
     Pma(Attrib a = None)
-      : attrib_(a), word_(false)
+      : attrib_(a)
     { }
 
     /// Return true if mapped.
@@ -85,8 +85,8 @@ namespace WdRiscv
     { return attrib_ & Exec; }
 
     /// Return true in region where atomic instructions are allowed.
-    bool isAtomic() const
-    { return attrib_ & Atomic; }
+    bool isAmo() const
+    { return attrib_ & Amo; }
 
     /// Return true if this object has the same attributes as the
     /// given object.
@@ -98,11 +98,24 @@ namespace WdRiscv
     bool operator!= (const Pma& other) const
     { return attrib_ != other.attrib_; }
 
+    /// Enable given attribute in this PMA. Enabling None has no effect.
+    void enable(Attrib a)
+    { attrib_ |= a; }
+
+    /// Disable given attribute in this PMA. Disabling None has no effect.
+    void disable(Attrib a)
+    { attrib_ &= ~a; }
+
+    /// Convert given string to a Pma object. Return true on success
+    /// return false if string does not contain a valid attribute names.
+    /// Valid names: none, read, write, execute, idempotent, amo, iccm,
+    /// dccm, mem_mapped, rsrv, io.
+    static bool stringToAttrib(const std::string& str, Attrib& attrib);
+
   private:
 
-    unsigned attrib_ : 8;
-    bool word_       : 8;     // True if word granularity otherwise section.
-  } __attribute__((packed));
+    uint32_t attrib_;
+  };
 
 
   /// Physical memory attribute manager. One per memory. Shared
@@ -118,36 +131,34 @@ namespace WdRiscv
     PmaManager(uint64_t memorySize, uint64_t sectionSize = 32*1024);
 
     /// Return the physical memory attribute associated with the
-    /// word-aligned word designated by the given address. Return an
-    /// unmapped attribute if the given address is out of memory
+    /// word-aligned address covering the given address. Return
+    /// an unmapped attribute if the given address is out of memory
     /// range.
     Pma getPma(uint64_t addr) const
     {
-      uint64_t ix = getSectionIx(addr);
-      if (ix >= sectionPmas_.size())
-        return Pma();
-      Pma pma = sectionPmas_[ix];
-      if (pma.word_)
-        {
-          addr = (addr >> 2);  // Get word index.
-          pma = wordPmas_.at(addr);
-        }
-      return pma;
+      addr = (addr >> 2) << 2; // Make double-word aligned.
+
+      // Search regions in order. Return first matching.
+      for (auto& region : regions_)
+	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	  return region.pma_;
+
+      return Pma{};  // Return a no-access PMA.
     }
 
-    /// Enable given attribute in word-aligned words overlapping given
-    /// region.
-    void enable(uint64_t addr0, uint64_t addr1, Pma::Attrib attrib);
+    /// Define a physical memory attribute region. Regions must be defined
+    /// in order.
+    bool defineRegion(uint64_t firstAddr, uint64_t lastAddr, Pma pma)
+    {
+      Region region{firstAddr, lastAddr, pma};
+      regions_.push_back(region);
+      return true;
+    }
 
-    /// Disable given attribute in word-aligned words overlapping given
-    /// region.
-    void disable(uint64_t addr0, uint64_t addr1, Pma::Attrib attrib);
-
-    /// Set attribute of word-aligned words overlapping given region.
-    void setAttribute(uint64_t addr0, uint64_t addr1, Pma::Attrib attrib);
-
-    /// Associate a mask with the word-aligned word at the given address.
-    void setMemMappedMask(uint64_t addr, uint32_t mask);
+    /// Associate a mask with the word-aligned word at the given
+    /// address. Return true on success and flase if given address is
+    /// not in a memory mapped region.
+    bool setMemMappedMask(uint64_t addr, uint32_t mask);
 
     /// Return mask associated with the word-aligned word at the given
     /// address.  Return 0xffffffff if no mask was ever associated
@@ -163,47 +174,16 @@ namespace WdRiscv
     bool isAddrMemMapped(size_t addr) const
     { Pma pma = getPma(addr); return pma.isMemMappedReg(); }
 
-    /// Change the base address of the memory mapped register area to
-    /// the given new base. Return true on success and false if new
-    /// base cannot accomodate the size of the memory mapped area (new
-    /// base too close to end of memory).
-    bool changeMemMappedBase(uint64_t newBase);
-
   protected:
-
-    /// Internally, for a user specified region, we associate a pma
-    /// object with each section of that region where the first/last
-    /// address is aligned with the first/last address of a
-    /// section. For a region where the first/last address is not
-    /// section-aligned we associate a pma object with each word
-    /// before/after the first/last section aligned address.
 
     /// Reset (to zero) all memory mapped registers.
     void resetMemMapped()
-    { memMappedRegs_.assign(memMappedRegs_.size(), 0); }
-
-    /// Bool an aread for memory mapped registers. Size is in bytes.
-    /// Size must be a multiple of 4.
-    bool defineMemMappedArea(uint64_t base, uint64_t size);
+    { for (auto& kv  : memMappedRegs_) kv.second.value_ = 0; }
 
     /// Set value to the value of the memory mapped regiser at addr
     /// returning true if addr is valid. Return false if addr is not word
     /// aligned or is outside of the memory-mapped-regiser area.
     bool readRegister(uint64_t addr, uint32_t& value) const;
-
-    /// Set value to the value of the memory mapped regiser byte at
-    /// addr returning true if addr is valid. Return false if addr is
-    /// is outside of the memory-mapped-regiser area.
-    bool readRegisterByte(uint64_t addr, uint8_t& value) const
-    {
-      uint32_t word = 0;
-      uint64_t wordAddr = (addr >> 2) << 2;
-      if (not readRegister(wordAddr, word))
-        return false;
-      unsigned byteInWord = addr & 3;
-      value = (word >> (byteInWord*8)) & 0xff;
-      return true;
-    }
 
     /// Set the value of the memory mapped regiser at addr to the
     /// given value returning true if addr is valid. Return false if
@@ -219,31 +199,22 @@ namespace WdRiscv
     /// vlaue unmodified.
     bool writeRegisterByte(uint64_t addr, uint8_t value);
 
-    /// Return start address of section containing given address.
-    uint64_t getSectionStartAddr(uint64_t addr) const
-    { return (addr >> sectionShift_) << sectionShift_; }
-
   private:
 
-    /// Fracture attribute of section overlapping given address into word
-    /// attributes.
-    void fracture(uint64_t addr);
+    struct Region
+    {
+      uint64_t firstAddr_ = 0;
+      uint64_t lastAddr_ = 0;
+      Pma pma_;
+    };
+    
+    struct MemMappedReg
+    {
+      uint32_t value_ = 0;
+      uint32_t mask_ = ~uint32_t(0);
+    };
 
-    /// Return the section number corresponding to the given address.
-    uint64_t getSectionIx(uint64_t addr) const
-    { return addr >> sectionShift_; }
-
-  private:
-
-    std::vector<Pma> sectionPmas_;
-    std::unordered_map<uint64_t, Pma> wordPmas_; // Map word index to pma.
-    uint64_t memSize_;
-    uint64_t sectionSize_ = 32*1024;
-    unsigned sectionShift_ = 15;
-
-    uint64_t memMappedBase_ = 0;
-    uint64_t memMappedSize_ = 0;
-    std::vector<uint32_t> memMappedMasks_;  // One entry per register.
-    std::vector<uint32_t> memMappedRegs_;  // One entry per register.
+    std::vector<Region> regions_;
+    std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
   };
 }

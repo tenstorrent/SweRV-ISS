@@ -82,63 +82,6 @@ namespace WdRiscv
     };
 
 
-  /// Secondary exception cause values (WD special).
-  enum class SecondaryCause : uint32_t
-    {
-      NONE = 0,
-
-      // Cause = INST_ACC_FAULT
-      INST_DOUBLE_ECC = 1,
-      INST_LOCAL_UNMAPPED = 2,
-      INST_MEM_PROTECTION = 3,
-      INST_PMP = 8,
-      INST_PRECISE = 9,  // precise bus error
-      INST_OUT_OF_BOUNDS = 0xb,
-
-      // Cause = BREAKP
-      TRIGGER_HIT = 1,
-      BREAKP = 2,
-
-      // Cause = LOAD_ADDR_MISAL
-      LOAD_MISAL_IO = 1,
-      LOAD_MISAL_REGION_CROSS = 2,
-
-      // Cause = LOAD_ACC_FAULT
-      LOAD_ACC_DOUBLE_ECC = 1,
-      LOAD_ACC_LOCAL_UNMAPPED = 2,
-      LOAD_ACC_STACK_CHECK = 0xa,
-      LOAD_ACC_MEM_PROTECTION = 3,
-      LOAD_ACC_64BIT = 4,
-      LOAD_ACC_REGION_PREDICTION = 5,
-      LOAD_ACC_PIC = 6,
-      LOAD_ACC_AMO = 7,
-      LOAD_ACC_PMP = 8,
-      LOAD_ACC_PRECISE = 9,  // precise bus error
-      LOAD_ACC_OUT_OF_BOUNDS = 0xb,
-      LOAD_ACC_AMO_UNCACHED = 0xc,
-
-      // Cause = STORE_ADDR_MISAL
-      STORE_MISAL_IO = 1,
-      STORE_MISAL_REGION_CROSS = 0x2,
-
-      // Cause = STORE_ACC_FAULT
-      STORE_ACC_DOUBLE_ECC = 1,
-      STORE_ACC_LOCAL_UNMAPPED = 2,
-      STORE_ACC_MEM_PROTECTION = 3,
-      STORE_ACC_64BIT = 4,
-      STORE_ACC_REGION_PREDICTION = 5,
-      STORE_ACC_PIC = 6,
-      STORE_ACC_AMO = 7,
-      STORE_ACC_PMP = 8,
-      STORE_ACC_PRECISE = 9,
-      STORE_ACC_STACK_CHECK = 0xa,
-      STORE_ACC_OUT_OF_BOUNDS = 0xb,
-      STORE_ACC_AMO_UNCACHED = 0xc,
-
-      MAX_CAUSE = INST_OUT_OF_BOUNDS
-    };
-
-
   /// Reason for entering debug mode (value stored in cause field
   /// of dcsr)
   enum class DebugModeCause

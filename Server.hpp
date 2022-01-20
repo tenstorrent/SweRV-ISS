@@ -47,10 +47,6 @@ namespace WdRiscv
 		     WhisperMessage& reply,
 		     FILE* traceFile);
 
-    /// Server mode exception command.
-    bool exceptionCommand(const WhisperMessage& req, WhisperMessage& reply,
-			  std::string& text);
-
     /// Server mode loop: Receive command and send reply till a quit
     /// command is received. Return true on successful termination (quit
     /// received). Return false otherwise.

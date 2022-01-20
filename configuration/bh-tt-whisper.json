@@ -27,7 +27,19 @@
 
     "memmap" : {
 	"Comment": "Instruction fetch valid only in 0x80000000 to 0x801fffff",
-	"inst" : [ [ "0x80000000", "0x801fffff" ] ]
+	"inst" : [ [ "0x80000000", "0x801fffff" ] ],
+	"pma" : [
+	    {
+		"Comment": "Instruction fetch valid only in this range",
+		"low" : "0x80000000",  "high" : "0x801fffff",
+		"attribs" : [ "read", "write", "exec", "amo", "rsrv" ]
+	    },
+	    {
+		"Comment": "Remaining address range is for data ld/st",
+		"low" : "0x0",  "high" : "0xffffffff",
+		"attribs" : [ "read", "write", "amo", "rsrv" ]
+	    }
+	]
     },
 
     "csr" : {

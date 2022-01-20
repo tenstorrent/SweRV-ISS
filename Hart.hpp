@@ -657,37 +657,9 @@ namespace WdRiscv
     uint64_t getInstructionCount() const 
     { return instCounter_; }
 
-    /// Define instruction closed coupled memory (in core instruction memory).
-    bool defineIccm(size_t addr, size_t size);
-
-    /// Define data closed coupled memory (in core data memory).
-    bool defineDccm(size_t addr, size_t size);
-
-    /// Define an area of memory mapped registers.
-    bool defineMemoryMappedRegisterArea(size_t addr, size_t size);
-
     /// Define a memory mapped register. Address must be within an
     /// area already defined using defineMemoryMappedRegisterArea.
     bool defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask);
-
-    /// Called after memory is configured to refine memory access to
-    /// sections of regions containing ICCM, DCCM or PIC-registers.
-    void finishCcmConfig(bool iccmRw)
-    { memory_.finishCcmConfig(iccmRw); }
-
-    /// Turn off all fetch access (except in ICCM regions) then turn
-    /// it on only in the pages overlapping the given address windows.
-    /// Return true on success and false on failure (invalid window
-    /// entry).  Do nothing returning true if the windows vector is
-    /// empty.
-    bool configMemoryFetch(const std::vector< std::pair<URV,URV> >& windows);
-
-    /// Turn off all data access (except in DCCM/PIC regions) then
-    /// turn it on only in the pages overlapping the given address
-    /// windows. Return true on success and false on failure (invalid
-    /// window entry). Do nothing returning true if the windows vector
-    /// is empty.
-    bool configMemoryDataAccess(const std::vector< std::pair<URV,URV> >& windows);
 
     /// Direct this hart to take an instruction access fault exception
     /// within the next singleStep invocation.
@@ -698,7 +670,7 @@ namespace WdRiscv
     /// the subsequent singleStep invocation executing a load/store
     /// instruction or take an NMI (double-bit-ecc) within the
     /// subsequent interrupt if fast-interrupt is enabled.
-    void postDataAccessFault(URV offset, SecondaryCause cause);
+    void postDataAccessFault(URV offset);
 
     /// Enable printing of load/store data address in instruction
     /// trace mode.
@@ -729,44 +701,8 @@ namespace WdRiscv
     void getTriggerChange(URV trigger, bool& t1, bool& t2, bool& t3) const
     { csRegs_.getTriggerChange(trigger, t1, t2, t3); }
 
-    /// Apply an imprecise store exception at given address. Return
-    /// true if address is found exactly once in the store
-    /// queue. Return false otherwise. Save the given address in
-    /// mdseac. Set matchCount to the number of entries in the store
-    /// queue that match the given address.
-    bool applyStoreException(URV address, unsigned& matchCount);
-
-    /// Apply an imprecise load exception at given address. Return
-    /// true if address is found exactly once in the pending load
-    /// queue. Return false otherwise. Save the given address in
-    /// mdseac. Set matchCount to the number of entries in the store
-    /// queue that match the given address.
-    bool applyLoadException(URV address, unsigned tag, unsigned& matchCount);
-
-    /// This supports the test-bench. Mark load-queue entry matching
-    /// given address as completed and remove it from the queue. Set
-    /// match count to 1 if matching entry is found and zero
-    /// otherwise. Return true if matching entry found. The testbench
-    /// will invoke this only for loads where the destination register
-    /// is updated.
-    bool applyLoadFinished(URV address, unsigned tag, unsigned& matchCount);
-
-    /// Enable processing of imprecise load exceptions from test-bench.
-    void enableBenchLoadExceptions(bool flag)
-    { loadQueueEnabled_ = flag; }
-
-    /// Set load queue size (used when load exceptions are enabled).
-    void setLoadQueueSize(unsigned size)
-    { maxLoadQueueSize_ = size; }
-
     /// Enable collection of instruction frequencies.
     void enableInstructionFrequency(bool b);
-
-    /// Enable expedited dispatch of external interrupt handler: Instead of
-    /// setting pc to the external interrupt handler, we set it to the
-    /// specific entry associated with the external interrupt id.
-    void enableFastInterrupts(bool b)
-    { fastInterrupts_ = b; }
 
     /// Enable/disable the zba (bit manipulation base) extension. When
     /// disabled all the instructions in zba extension result in an
@@ -1087,18 +1023,6 @@ namespace WdRiscv
     /// Copy memory region configuration from other processor.
     void copyMemRegionConfig(const Hart<URV>& other);
 
-    /// Return true if hart was put in run state after reset. Hart 0
-    /// is automatically in run state after reset. If mhartstart CSR
-    /// exists, then each remaining hart must be explicitly started by
-    /// hart 0 by writing to the corresponding bit in that CSR. This
-    /// is special for WD.
-    bool isStarted()
-    { return hartStarted_; }
-
-    /// Mark this hart as started.
-    void setStarted(bool flag)
-    { hartStarted_ = flag; }
-
     /// Return the index of this hart within the system. Harts are
     /// assigned indices 0 to m*n - 1 where m is the number of cores
     /// and n is the number of harts per core.
@@ -1203,10 +1127,6 @@ namespace WdRiscv
     void enableMisalignedData(bool flag)
     { misalDataOk_ = flag; }
 
-    /// Change the base address of the memory-mapped-register area.
-    bool changeMemMappedBase(uint64_t newBase)
-    { return memory_.pmaMgr_.changeMemMappedBase(newBase); }
-
     /// Return current privilege mode.
     PrivilegeMode privilegeMode() const
     { return privMode_; }
@@ -1304,13 +1224,17 @@ namespace WdRiscv
       return true;
     }
 
-    /// Enable disable wide load/store mode (64-bit on 32-bit machine).
-    void enableWideLoadStore(bool flag)
-    { enableWideLdSt_ = flag; }
+    /// Define physical memory attribute region. Region addresses are between
+    /// low and high inclusive. To define a 1024-byte region at address zero
+    /// we would set low to zero and high to 1023.
+    bool definePmaRegion(uint64_t low, uint64_t high, Pma pma)
+    { return memory_.pmaMgr_.defineRegion(low, high, pma); }
 
-    /// Enable bbarrier (bus barrier) custom instruction.
-    void enableBusBarrier(bool flag)
-    { enableBbarrier_ = flag; }
+    /// Associate a mask with the word-aligned word at the given
+    /// address. Return true on success and flase if given address is
+    /// not in a memory mapped region.
+    bool setMemMappedMask(uint64_t addr, uint32_t mask)
+    { return memory_.pmaMgr_.setMemMappedMask(addr, mask); }
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to
@@ -1527,27 +1451,19 @@ namespace WdRiscv
 			   uint64_t& counter, bool beforeTiming);
 
     /// Helper to load. Return NONE if no exception.
-    ExceptionCause determineMisalLoadException(URV addr, unsigned accessSize,
-                                               SecondaryCause& secCause) const;
+    ExceptionCause determineMisalLoadException(URV addr, unsigned ldSize) const;
 
     /// Helper to load. Return NONE if no exception.
-    ExceptionCause determineMisalStoreException(URV addr, unsigned accessSize,
-                                                SecondaryCause& secCause) const;
+    ExceptionCause determineMisalStoreException(URV addr, unsigned stSize) const;
+
 
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateLoadException(ExceptionCause cause, URV addr,
-			       SecondaryCause secCause);
+    void initiateLoadException(ExceptionCause cause, URV addr);
 
     /// Helper to store methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateStoreException(ExceptionCause cause, URV addr,
-				SecondaryCause secCause);
-
-    /// Helper to load methods: Return true if base and effective
-    /// address fall in regions of different types (with respect to io
-    /// and cacheability).
-    bool effectiveAndBaseAddrMismatch(URV base, URV addr);
+    void initiateStoreException(ExceptionCause cause, URV addr);
 
     /// Helper to lb, lh, lw and ld. Load type should be int_8, int16_t
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
@@ -1565,27 +1481,26 @@ namespace WdRiscv
     /// taking any exception). If supervisor mode is enabled, and
     /// address translation is successful, then addr is changed to the
     /// translated physical address.
-    ExceptionCause determineLoadException(unsigned rs1, URV base, uint64_t& addr,
-					  unsigned ldSize, SecondaryCause& secCause);
+    ExceptionCause determineLoadException(uint64_t& addr, unsigned ldSize);
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
     /// Return true if store is successful. Return false if an exception
     /// or a trigger is encountered.
     template<typename STORE_TYPE>
-    bool store(uint32_t rs1, URV base, URV addr, STORE_TYPE value);
+    bool store(URV addr, STORE_TYPE value);
 
     /// For use by performance model. 
     template<typename STORE_TYPE>
-    bool fastStore(uint32_t rs1, URV base, URV addr, STORE_TYPE value);
+    bool fastStore(URV addr, STORE_TYPE value);
 
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
     template<typename STORE_TYPE>
-    ExceptionCause determineStoreException(uint32_t rs1, URV base, uint64_t& addr,
+    ExceptionCause determineStoreException(uint64_t& addr,
 					   STORE_TYPE& storeVal,
-                                           SecondaryCause& secCause, bool& forced);
+                                           bool& forced);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
@@ -1599,28 +1514,7 @@ namespace WdRiscv
     /// Return true if store is successful. Return false otherwise
     /// (exception or trigger or condition failed).
     template<typename STORE_TYPE>
-    bool storeConditional(unsigned rs1, URV addr, STORE_TYPE value);
-
-    /// Do a 64-bit wide load in one transaction. This is swerv
-    /// specfic.
-    bool wideLoad(unsigned rd, URV addr);
-
-    /// Do a 64-bit wide store in one transaction. This is swerv
-    /// specfic.
-    bool wideStore(URV addr, URV storeVal);
-
-    /// Helper to load methods. Check loads performed with stack
-    /// pointer.  Return true if referenced bytes are all between the
-    /// stack bottom and the stack pointer value excluding the stack
-    /// pointer value.  Initiate an exception and return false
-    /// otherwise.
-    bool checkStackLoad(URV base, URV addr, unsigned loadSize);
-
-    /// Helper to store methods. Check stores performed with stack
-    /// pointer. Return true if referenced bytes are all between the
-    /// stack bottom and the stack top excluding the stack top and
-    /// false otherwise.
-    bool checkStackStore(URV base, URV addr, unsigned storeSize);
+    bool storeConditional(URV addr, STORE_TYPE value);
 
     /// Helper to CSR instructions: return true if given CSR is
     /// writebale and false otherwise.
@@ -1736,17 +1630,10 @@ namespace WdRiscv
     void printInstCsvTrace(const DecodedInst& di, FILE* out);
 
     /// Start a synchronous exceptions.
-    void initiateException(ExceptionCause cause, URV pc, URV info,
-			   SecondaryCause secCause = SecondaryCause::NONE);
+    void initiateException(ExceptionCause cause, URV pc, URV info);
 
     /// Start an asynchronous exception (interrupt).
     void initiateInterrupt(InterruptCause cause, URV pc);
-
-    /// Start an asynchronous exception (interrupt) directly from the
-    /// interrupt handler associated with the interrupt id. Return
-    /// true on success. Return false if there is an error while
-    /// accessing the table of interrupt handler addresses.
-    void initiateFastInterrupt(InterruptCause cause, URV pc);
 
     /// Start a non-maskable interrupt.
     void initiateNmi(URV cause, URV pc);
@@ -1802,8 +1689,7 @@ namespace WdRiscv
     /// exception or the instruction to resume after asynchronous
     /// exception is handled). The info value holds additional
     /// information about an exception.
-    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info,
-		      URV secCause);
+    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info);
 
     /// Illegal instruction. Initiate an illegal instruction trap.
     /// This is used for one of the following:
@@ -1833,28 +1719,24 @@ namespace WdRiscv
     /// it is out of DCCM range in DCCM-only mode. If successful, the
     /// given virtual addr is replaced by the translated physical
     /// address.
-    ExceptionCause validateAmoAddr(uint32_t rs1, uint64_t& addr, unsigned accessSize,
-                                   SecondaryCause& secCause);
+    ExceptionCause validateAmoAddr(uint64_t& addr, unsigned accessSize);
 
     /// Do the load value part of a word-sized AMO instruction. Return
     /// true on success putting the loaded value in val. Return false
     /// if a trigger tripped or an exception took place in which case
     /// val is not modified. The loaded word is sign extended to fill
     /// the URV value (this is relevant for rv64).
-    bool amoLoad32(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& val);
+    bool amoLoad32(uint32_t rs1, URV& val);
 
     /// Do the load value part of a double-word-sized AMO
     /// instruction. Return true on success putting the loaded value
     /// in val. Return false if a trigger tripped or an exception took
     /// place in which case val is not modified.
-    bool amoLoad64(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& val);
+    bool amoLoad64(uint32_t rs1, URV& val);
 
     /// Invalidate cache entries overlapping the bytes written by a
     /// store.
     void invalidateDecodeCache(URV addr, unsigned storeSize);
-
-    /// Update stack checker parameters after a write/poke to a CSR.
-    void updateStackChecker();
 
     /// Helper to shift/bit execute instruction with immediate
     /// operands: Signal an illegal instruction if immediate value is
@@ -2294,11 +2176,6 @@ namespace WdRiscv
     void execFslw(const DecodedInst*);
     void execFsrw(const DecodedInst*);
     void execFsriw(const DecodedInst*);
-
-    // Custom insts
-    void execLoad64(const DecodedInst*);
-    void execStore64(const DecodedInst*);
-    void execBbarrier(const DecodedInst*);
 
     void vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
     void execVsetvli(const DecodedInst*);
@@ -3762,16 +3639,6 @@ namespace WdRiscv
       bool cacheable_;
     };
 
-    void putInLoadQueue(unsigned size, size_t addr, unsigned regIx,
-			uint64_t prevData, bool isWide = false,
-                        bool fp = false);
-
-    void removeFromLoadQueue(unsigned regIx, bool isDiv, bool fp = false);
-
-    void invalidateInLoadQueue(unsigned regIx, bool isDiv, bool fp = false);
-
-    void loadQueueCommit(const DecodedInst&);
-
     /// Save snapshot of registers (PC, integer, floating point, CSR) into file
     bool saveSnapshotRegs(const std::string& path);
 
@@ -3789,7 +3656,6 @@ namespace WdRiscv
   private:
 
     unsigned hartIx_ = 0;        // Hart ix in system, see sysHartIndex method.
-    std::atomic<bool> hartStarted_ = true;    // True if hart is running. WD special.
     Memory& memory_;
     IntRegs<URV> intRegs_;       // Integer register file.
     CsRegs<URV> csRegs_;         // Control and status registers.
@@ -3887,8 +3753,6 @@ namespace WdRiscv
     unsigned lrResSize_ = sizeof(URV); // LR reservation size.
     bool forceAccessFail_ = false;  // Force load/store access fault.
     bool forceFetchFail_ = false;   // Force fetch access fault.
-    bool fastInterrupts_ = false;
-    SecondaryCause forcedCause_ = SecondaryCause::NONE;
     URV forceAccessFailOffset_ = 0;
     URV forceFetchFailOffset_ = 0;
     uint64_t forceAccessFailMark_ = 0; // Instruction at which forced fail is seen.
@@ -3913,12 +3777,6 @@ namespace WdRiscv
     uint64_t ldStPhysAddr_ = 0;
     bool ldStAddrValid_ = false;    // True if ldStAddr_ valid.
 
-    // We keep track of the last committed 8 loads so that we can
-    // revert in the case of an imprecise load exception.
-    std::vector<LoadInfo> loadQueue_;
-    unsigned maxLoadQueueSize_ = 16;
-    bool loadQueueEnabled_ = false;
-
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
 
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
@@ -3940,15 +3798,6 @@ namespace WdRiscv
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
 
-    // Stack access control.
-    bool checkStackAccess_ = false;
-    URV stackMax_ = ~URV(0);
-    URV stackMin_ = 0;
-
-    bool enableWideLdSt_ = false;   // True if wide (64-bit) ld/st enabled.
-    bool wideLdSt_ = false;         // True if executing wide ld/st instrution.
-    bool enableBbarrier_ = false;
-
     int gdbInputFd_ = -1;  // Input file descriptor when running in gdb mode.
 
     InstTable instTable_;
@@ -3956,8 +3805,8 @@ namespace WdRiscv
 
     std::vector<uint64_t> interruptStat_;  // Count of different types of interrupts.
 
-    // Indexed by exception cause. Each entry is indexed by secondary cause.
-    std::vector<std::vector<uint64_t>> exceptionStat_;
+    // Indexed by exception cause.
+    std::vector<uint64_t> exceptionStat_;
 
     // Ith entry is true if ith region has iccm/dccm/pic.
     std::vector<bool> regionHasLocalMem_;
