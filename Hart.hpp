@@ -657,37 +657,9 @@ namespace WdRiscv
     uint64_t getInstructionCount() const 
     { return instCounter_; }
 
-    /// Define instruction closed coupled memory (in core instruction memory).
-    bool defineIccm(size_t addr, size_t size);
-
-    /// Define data closed coupled memory (in core data memory).
-    bool defineDccm(size_t addr, size_t size);
-
-    /// Define an area of memory mapped registers.
-    bool defineMemoryMappedRegisterArea(size_t addr, size_t size);
-
     /// Define a memory mapped register. Address must be within an
     /// area already defined using defineMemoryMappedRegisterArea.
     bool defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask);
-
-    /// Called after memory is configured to refine memory access to
-    /// sections of regions containing ICCM, DCCM or PIC-registers.
-    void finishCcmConfig(bool iccmRw)
-    { memory_.finishCcmConfig(iccmRw); }
-
-    /// Turn off all fetch access (except in ICCM regions) then turn
-    /// it on only in the pages overlapping the given address windows.
-    /// Return true on success and false on failure (invalid window
-    /// entry).  Do nothing returning true if the windows vector is
-    /// empty.
-    bool configMemoryFetch(const std::vector< std::pair<URV,URV> >& windows);
-
-    /// Turn off all data access (except in DCCM/PIC regions) then
-    /// turn it on only in the pages overlapping the given address
-    /// windows. Return true on success and false on failure (invalid
-    /// window entry). Do nothing returning true if the windows vector
-    /// is empty.
-    bool configMemoryDataAccess(const std::vector< std::pair<URV,URV> >& windows);
 
     /// Direct this hart to take an instruction access fault exception
     /// within the next singleStep invocation.
@@ -1155,10 +1127,6 @@ namespace WdRiscv
     void enableMisalignedData(bool flag)
     { misalDataOk_ = flag; }
 
-    /// Change the base address of the memory-mapped-register area.
-    bool changeMemMappedBase(uint64_t newBase)
-    { return memory_.pmaMgr_.changeMemMappedBase(newBase); }
-
     /// Return current privilege mode.
     PrivilegeMode privilegeMode() const
     { return privMode_; }
@@ -1255,6 +1223,18 @@ namespace WdRiscv
       pmaOverrideVec_.at(ix) = PmaOverride(start, end, idempotent, cacheable);
       return true;
     }
+
+    /// Define physical memory attribute region. Region addresses are between
+    /// low and high inclusive. To define a 1024-byte region at address zero
+    /// we would set low to zero and high to 1023.
+    bool definePmaRegion(uint64_t low, uint64_t high, Pma pma)
+    { return memory_.pmaMgr_.defineRegion(low, high, pma); }
+
+    /// Associate a mask with the word-aligned word at the given
+    /// address. Return true on success and flase if given address is
+    /// not in a memory mapped region.
+    bool setMemMappedMask(uint64_t addr, uint32_t mask)
+    { return memory_.pmaMgr_.setMemMappedMask(addr, mask); }
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to

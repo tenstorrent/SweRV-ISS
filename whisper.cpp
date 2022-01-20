@@ -230,7 +230,6 @@ struct Args
   bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
   bool fastExt = false;    // True if fast external interrupt dispatch enabled.
   bool unmappedElfOk = false;
-  bool iccmRw = false;
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
@@ -548,8 +547,6 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "with a sequence of pairs of double words designating addresses and "
          "corresponding values. A zero/zero pair will indicate the end of "
          "sequence.")
-        ("iccmrw", po::bool_switch(&args.iccmRw),
-         "Temporary switch to make ICCM region available to ld/st isntructions.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
          "Terminate multi-threaded run when any hart finishes (default is to wait "
          "for all harts.)")
@@ -1715,7 +1712,7 @@ session(const Args& args, const HartConfig& config)
       return false;
 
   // Configure memory.
-  if (not config.configMemory(system, args.iccmRw, args.unmappedElfOk, args.verbose))
+  if (not config.configMemory(system, args.unmappedElfOk))
     return false;
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()

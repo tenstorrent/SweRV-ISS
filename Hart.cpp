@@ -1498,9 +1498,7 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
 
       // Check for load-data-trigger. Load-data-trigger does not apply
       // to io/region unless address is in local memory. Don't ask.
-      if (hasActiveTrigger() and
-          (isAddrIdempotent(addr) or
-           isAddrMemMapped(addr) or isAddrInDccm(addr)))
+      if (hasActiveTrigger())
         {
           TriggerTiming timing = TriggerTiming::Before;
           bool isLoad = true;
@@ -1757,212 +1755,9 @@ Hart<URV>::readInst(size_t address, uint32_t& inst)
 
 template <typename URV>
 bool
-Hart<URV>::defineIccm(size_t addr, size_t size)
-{
-  bool trim = this->findCsr("mpicbaddr") == nullptr;
-
-  bool ok = memory_.defineIccm(addr, size, trim);
-  if (ok and trim)
-    {
-      size_t region = memory_.getRegionIndex(addr);
-      regionHasLocalMem_.at(region) = true;
-      regionHasLocalInstMem_.at(region) = true;
-    }
-  return ok;
-}
-    
-
-template <typename URV>
-bool
-Hart<URV>::defineDccm(size_t addr, size_t size)
-{
-  bool trim = this->findCsr("mpicbaddr") == nullptr;
-
-  bool ok = memory_.defineDccm(addr, size, trim);
-  if (ok and trim)
-    {
-      size_t region = memory_.getRegionIndex(addr);
-      regionHasLocalMem_.at(region) = true;
-      regionHasLocalDataMem_.at(region) = true;
-      regionHasDccm_.at(region) = true;
-    }
-  return ok;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::defineMemoryMappedRegisterArea(size_t addr, size_t size)
-{
-  // If mpicbaddr CSR is present, then nothing special is done for 256
-  // MB region containing memory-mapped-registers. Otherwise, region
-  // is marked non accessible except for memory-mapped-register area.
-  bool trim = this->findCsr("mpicbaddr") == nullptr;
-
-  bool ok = memory_.defineMemoryMappedRegisterArea(addr, size, trim);
-  if (ok and trim)
-    {
-      size_t region = memory_.getRegionIndex(addr);
-      regionHasLocalMem_.at(region) = true;
-      regionHasLocalDataMem_.at(region) = true;
-      regionHasMemMappedRegs_.at(region) = true;
-    }
-  return ok;
-}
-
-
-template <typename URV>
-bool
 Hart<URV>::defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask)
 {
   return memory_.defineMemoryMappedRegisterWriteMask(addr, mask);
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::configMemoryFetch(const std::vector< std::pair<URV,URV> >& windows)
-{
-  using std::cerr;
-
-  size_t regSize = regionSize(), memSize = memorySize();
-  if (windows.empty() or memSize == 0 or regSize == 0)
-    return true;
-
-  unsigned errors = 0;
-
-  // Mark all pages in non-iccm regions as non executable.
-  for (size_t start = 0; start < memSize; start += regSize)
-    {
-      size_t end = std::min(start + regSize, memSize);
-      size_t region = memory_.getRegionIndex(start);
-      if (not regionHasLocalInstMem_.at(region))
-        {
-          Pma::Attrib attr = Pma::Attrib(Pma::Exec);
-          memory_.pmaMgr_.disable(start, end - 1, attr);
-        }
-    }
-
-  // Mark pages in configuration windows as executable except when
-  // they fall in iccm regions.
-  for (auto window : windows)
-    {
-      if (window.first > window.second)
-	{
-	  cerr << "Invalid memory range in inst fetch configuration: 0x"
-	       << std::hex << window.first << " to 0x" << window.second
-	       << '\n' << std::dec;
-	  errors++;
-          continue;
-	}
-
-      if (window.first > memSize or window.second > memSize)
-	{
-	  cerr << "Inst fetch area (0x" << std::hex << window.first << " to 0x"
-	       << window.second << ") is not completely within memory bounds (0"
-	       << " to 0x" << (memSize-1) << std::dec << ")\n";
-	}
-
-      // Clip window to memory size.
-      size_t addr = window.first, end = window.second;
-      addr = std::min(memSize, addr);
-      end = std::min(memSize, end);
-
-      // Clip window against regions with iccm. Mark what remains as
-      // accessible.
-      while (addr < end)
-        {
-          size_t region = memory_.getRegionIndex(addr);
-          if (regionHasLocalInstMem_.at(region))
-            {
-              addr += regSize;
-              continue;
-            }
-
-          Pma::Attrib attr = Pma::Attrib(Pma::Exec);
-          size_t addr2 = std::min(addr + regSize, end);
-          memory_.pmaMgr_.enable(addr, addr2 - 1, attr);
-          if (addr2 == end)
-            break;
-          addr = addr2;
-	}
-    }
-
-  return errors == 0;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::configMemoryDataAccess(const std::vector< std::pair<URV,URV> >& windows)
-{
-  using std::cerr;
-
-  size_t regSize = regionSize(), memSize = memorySize();
-  if (windows.empty() or memSize == 0 or regSize == 0)
-    return true;
-
-  unsigned errors = 0;
-
-  // Mark memory in non-dccm/pic regions as non-read non-write.
-  for (size_t start = 0; start < memSize; start += regSize)
-    {
-      size_t end = std::min(start + regSize, memSize);
-      size_t region = memory_.getRegionIndex(start);
-      if (not regionHasLocalDataMem_.at(region))
-        {
-          Pma::Attrib attr = Pma::Attrib(Pma::Read | Pma::Write);
-          memory_.pmaMgr_.disable(start, end - 1, attr);
-        }
-    }
-  
-
-  // Mark pages in configuration windows as accessible except when
-  // they fall in dccm/pic regions.
-  for (auto window : windows)
-    {
-      if (window.first > window.second)
-	{
-	  cerr << "Invalid memory range in data access configuration: 0x"
-	       << std::hex << window.first << " to 0x" << window.second
-	       << '\n' << std::dec;
-	  errors++;
-          continue;
-	}
-
-      if (window.first > memSize or window.second > memSize)
-	{
-	  cerr << "Data access area (0x" << std::hex << window.first << " to 0x"
-	       << window.second << ") is not completely within memory bounds (0"
-	       << " to 0x" << (memSize-1) << std::dec << ")\n";
-	}
-
-      // Clip window to memory size.
-      size_t addr = window.first, end = window.second;
-      addr = std::min(memSize, addr);
-      end = std::min(memSize, end);
-
-      // Clip window against regions with dccm/pic. Mark what remains
-      // as accessible.
-      while (addr < end)
-        {
-          size_t region = memory_.getRegionIndex(addr);
-          if (regionHasLocalDataMem_.at(region))
-            {
-              addr += regSize;
-              continue;
-            }
-
-          Pma::Attrib attr = Pma::Attrib(Pma::Read | Pma::Write);
-          size_t addr2 = std::min(addr + regSize, end);
-          memory_.pmaMgr_.enable(addr, addr2 - 1, attr);
-          if (addr2 == end)
-            break;
-          addr = addr2;
-	}
-    }
-
-  return errors == 0;
 }
 
 
@@ -10424,7 +10219,6 @@ Hart<URV>::determineStoreException(uint64_t& addr, STORE_TYPE& storeVal,
   if (isAddrMemMapped(addr))
     if (privMode_ != PrivilegeMode::Machine)
       return ExceptionCause::STORE_ACC_FAULT;
-
 
   // Physical memory protection.
   if (pmpEnabled_)
