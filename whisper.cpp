@@ -230,7 +230,6 @@ struct Args
   bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
   bool fastExt = false;    // True if fast external interrupt dispatch enabled.
   bool unmappedElfOk = false;
-  bool iccmRw = false;
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
@@ -259,7 +258,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 746;
+  unsigned subversion = 777;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 }
@@ -548,8 +547,6 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "with a sequence of pairs of double words designating addresses and "
          "corresponding values. A zero/zero pair will indicate the end of "
          "sequence.")
-        ("iccmrw", po::bool_switch(&args.iccmRw),
-         "Temporary switch to make ICCM region available to ld/st isntructions.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
          "Terminate multi-threaded run when any hart finishes (default is to wait "
          "for all harts.)")
@@ -1093,9 +1090,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
   if (args.abiNames)
     hart.enableAbiNames(args.abiNames);
 
-  if (args.fastExt)
-    hart.enableFastInterrupts(args.fastExt);
-
   // Apply register initialization.
   if (not applyCmdLineRegInit(args, hart))
     errors++;
@@ -1390,18 +1384,11 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll)
 
   std::atomic<bool> result = true;
   std::atomic<unsigned> finished = 0;  // Count of finished threads. 
-  std::atomic<bool> hart0Done = false;
 
-  auto threadFunc = [&traceFile, &result, &finished, &hart0Done] (Hart<URV>* hart) {
-                      // In multi-hart system, wait till hart is started by hart0.
-                      while (not hart->isStarted())
-                        if (hart0Done)
-                          return;  // We are not going to be started.
+  auto threadFunc = [&traceFile, &result, &finished] (Hart<URV>* hart) {
 		      bool r = hart->run(traceFile);
 		      result = result and r;
                       finished++;
-                      if (hart->sysHartIndex() == 0)
-                        hart0Done = true;
 		    };
 
   for (unsigned i = 0; i < system.hartCount(); ++i)
@@ -1554,7 +1541,6 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
         {
           auto& hart = *system.ithHart(i);
           hart.enableLoadErrorRollback(false);
-          hart.enableBenchLoadExceptions(false);
         }
     }
 
@@ -1726,7 +1712,7 @@ session(const Args& args, const HartConfig& config)
       return false;
 
   // Configure memory.
-  if (not config.configMemory(system, args.iccmRw, args.unmappedElfOk, args.verbose))
+  if (not config.configMemory(system, args.unmappedElfOk))
     return false;
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()

@@ -182,13 +182,19 @@ The following is a brief description of the command line options:
        Specify register width (32 or 64), defaults to 32.
 
     --isa string
-       Select the RISCV options to enable. The currently supported options are
-       a (atomic), c (compressed instructions), d (double precision fp), 
+       Select the RISCV extensions to enable. The currently supported options are
+       a (atomic), c (compressed instructions), d (double precision fp),
        f (single precision fp), i (base integer), m (multiply divide),
+<<<<<<< HEAD
        s (supervisor mode), u (user mode), and v (vector). By default, only i, m and c
        are enabled. Note that option i cannot be turned off. Example: "--isa imcf".
        It is recommended to avoid this option if the configuration of the "misa" CSR is
        included in the JSON configuration file.
+=======
+       s (supervisor mode), u (user mode), and v). By default, only i, m and
+       c are enabled. Canonical ISA strings with versioned ectension are supported.
+       Examples: --isa imacf, --isa rv32i2p0_m2p0_f2p0_v1p0_zfh0p1
+>>>>>>> black-hole
 
     --target program
        Specify target program (ELF file) to load into simulated memory. In newlib
@@ -519,8 +525,20 @@ CSR write instructions.
 ###  vector
 The vector configuration is an object with the following fields:
 * bytes_per_vec: vector size in bytes
+<<<<<<< HEAD
 * min_bytes_per_elem: narrowest suppoted element size in bytes
 * max_bytes_per_elem: widest supported element size in bytes
+=======
+* min_bytes_per_elem: narrowest suppoted element size in bytes (default 1).
+* max_bytes_per_elem: widest supported element size in bytes (no default).
+
+Example:
+
+    "vector" : {
+       "bytes_per_vec" : 16,
+       "max_bytes_per_elem" : 8
+    }
+>>>>>>> black-hole
 
 ###  reset_vec
 Defines the PC value after reset

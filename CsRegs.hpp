@@ -302,22 +302,6 @@ namespace WdRiscv
       VTYPE    = 0xc21,
       VLENB    = 0xc22,
 
-      // Non-standard registers.
-      MRAC     = 0x7c0,
-      MDSEAC   = 0xfc0,
-      MDEAU    = 0xbc0,
-
-      MEIVT    = 0xbc8, // Ext int vector table reg 
-      MEIHAP   = 0xfc8, // Ext int handler address pointer reg
-
-      MSPCBA   = 0x7f4, // Stack pointer checker base address
-      MSPCTA   = 0x7f5, // Stack pointer checker top address
-      MSPCC    = 0x7f6, // Stack pointer checker control
-
-      MDBHD   = 0xbc7,  // D-Bus 64-bit high data
-
-      MSCAUSE  = 0x7ff, // Secondary exception cause
-
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
     };
@@ -894,9 +878,6 @@ namespace WdRiscv
 
     /// Helper to construtor. Define vector CSRs
     void defineVectorRegs();
-
-    /// Helper to construtor. Define non-standard CSRs
-    void defineNonStandardRegs();
 
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.

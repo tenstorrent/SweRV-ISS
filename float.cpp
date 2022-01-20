@@ -452,13 +452,9 @@ Hart<URV>::execFlw(const DecodedInst* di)
   uint64_t addr = virtAddr;
   unsigned ldSize = 4;
 
-  auto secCause = SecondaryCause::NONE;
   auto cause = ExceptionCause::NONE;
 
 #ifndef FAST_SLOPPY
-  if (loadQueueEnabled_)
-    removeFromLoadQueue(rs1, false);
-
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
@@ -468,11 +464,11 @@ Hart<URV>::execFlw(const DecodedInst* di)
 	return;
     }
 
-  cause = determineLoadException(rs1, base, addr, ldSize, secCause);
+  cause = determineLoadException(addr, ldSize);
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr, secCause);
+        initiateLoadException(cause, virtAddr);
       return;
     }
   ldStPhysAddr_ = addr;
@@ -481,12 +477,6 @@ Hart<URV>::execFlw(const DecodedInst* di)
   uint32_t word = 0;
   if (memory_.read(addr, word))
     {
-      if (loadQueueEnabled_)
-        {
-          uint64_t prevRdVal = 0;
-          peekFpReg(rd, prevRdVal);
-          putInLoadQueue(ldSize, addr, rd, prevRdVal, false /*wide*/, true /*fp*/);
-        }
       Uint32FloatUnion ufu(word);
       fpRegs_.writeSingle(rd, ufu.f);
       markFsDirty();
@@ -494,11 +484,7 @@ Hart<URV>::execFlw(const DecodedInst* di)
     }
 
   cause = ExceptionCause::LOAD_ACC_FAULT;
-  secCause = SecondaryCause::LOAD_ACC_MEM_PROTECTION;
-  if (isAddrMemMapped(addr))
-    secCause = SecondaryCause::LOAD_ACC_PIC;
-
-  initiateLoadException(cause, virtAddr, secCause);
+  initiateLoadException(cause, virtAddr);
 }
 
 
@@ -521,7 +507,7 @@ Hart<URV>::execFsw(const DecodedInst* di)
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint64_t val = fpRegs_.readBitsRaw(rs2);
 
-  store<uint32_t>(rs1, base, addr, uint32_t(val));
+  store<uint32_t>(addr, uint32_t(val));
 }
 
 
@@ -1612,13 +1598,9 @@ Hart<URV>::execFld(const DecodedInst* di)
   unsigned ldSize = 8;
   uint64_t addr = virtAddr;
 
-  auto secCause = SecondaryCause::NONE;
   auto cause = ExceptionCause::NONE;
 
 #ifndef FAST_SLOPPY
-  if (loadQueueEnabled_)
-    removeFromLoadQueue(rs1, false);
-
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
@@ -1628,11 +1610,11 @@ Hart<URV>::execFld(const DecodedInst* di)
 	return;
     }
 
-  cause = determineLoadException(rs1, base, addr, ldSize, secCause);
+  cause = determineLoadException(addr, ldSize);
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr, secCause);
+        initiateLoadException(cause, virtAddr);
       return;
     }
   ldStPhysAddr_ = addr;
@@ -1641,26 +1623,15 @@ Hart<URV>::execFld(const DecodedInst* di)
   uint64_t val64 = 0;
   if (memory_.read(addr, val64))
     {
-      if (loadQueueEnabled_)
-        {
-          uint64_t prevRdVal = 0;
-          peekFpReg(rd, prevRdVal);
-          putInLoadQueue(ldSize, addr, rd, prevRdVal, false /*wide*/, true /*fp*/);
-        }
-
       Uint64DoubleUnion udu{val64};
-      fpRegs_.writeDouble(di->op0(), udu.d);
+      fpRegs_.writeDouble(rd, udu.d);
 
       markFsDirty();
       return;
     }
 
   cause = ExceptionCause::LOAD_ACC_FAULT;
-  secCause = SecondaryCause::LOAD_ACC_MEM_PROTECTION;
-  if (isAddrMemMapped(addr))
-    secCause = SecondaryCause::LOAD_ACC_PIC;
-
-  initiateLoadException(cause, virtAddr, secCause);
+  initiateLoadException(cause, virtAddr);
 }
 
 
@@ -1683,7 +1654,7 @@ Hart<URV>::execFsd(const DecodedInst* di)
 
   Uint64DoubleUnion udu{val};
 
-  store<uint64_t>(rs1, base, addr, udu.u);
+  store<uint64_t>(addr, udu.u);
 }
 
 
@@ -2662,13 +2633,9 @@ Hart<URV>::execFlh(const DecodedInst* di)
   uint64_t addr = virtAddr;
   unsigned ldSize = 2;
 
-  auto secCause = SecondaryCause::NONE;
   auto cause = ExceptionCause::NONE;
 
 #ifndef FAST_SLOPPY
-  if (loadQueueEnabled_)
-    removeFromLoadQueue(rs1, false);
-
   if (hasActiveTrigger())
     {
       if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
@@ -2678,11 +2645,11 @@ Hart<URV>::execFlh(const DecodedInst* di)
 	return;
     }
 
-  cause = determineLoadException(rs1, base, addr, ldSize, secCause);
+  cause = determineLoadException(addr, ldSize);
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr, secCause);
+        initiateLoadException(cause, virtAddr);
       return;
     }
   ldStPhysAddr_ = addr;
@@ -2691,12 +2658,6 @@ Hart<URV>::execFlh(const DecodedInst* di)
   uint16_t half = 0;
   if (memory_.read(addr, half))
     {
-      if (loadQueueEnabled_)
-        {
-          uint64_t prevRdVal = 0;
-          peekFpReg(rd, prevRdVal);
-          putInLoadQueue(ldSize, addr, rd, prevRdVal, false /*wide*/, true /*fp*/);
-        }
       Float16 f16 = Float16::fromBits(half);
       fpRegs_.writeHalf(rd, f16);
       markFsDirty();
@@ -2704,11 +2665,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
     }
 
   cause = ExceptionCause::LOAD_ACC_FAULT;
-  secCause = SecondaryCause::LOAD_ACC_MEM_PROTECTION;
-  if (isAddrMemMapped(addr))
-    secCause = SecondaryCause::LOAD_ACC_PIC;
-
-  initiateLoadException(cause, virtAddr, secCause);
+  initiateLoadException(cause, virtAddr);
 }
 
 
@@ -2731,7 +2688,7 @@ Hart<URV>::execFsh(const DecodedInst* di)
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint16_t val = fpRegs_.readBitsRaw(rs2);
 
-  store<uint16_t>(rs1, base, addr, val);
+  store<uint16_t>(addr, val);
 }
 
 
@@ -3763,3 +3720,7 @@ Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
 
 template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;
+
+template unsigned WdRiscv::fpClassifyRiscv<float>(float);
+template unsigned WdRiscv::fpClassifyRiscv<double>(double);
+template unsigned WdRiscv::fpClassifyRiscv<Float16>(Float16);

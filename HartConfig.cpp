@@ -449,140 +449,6 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 template <typename URV>
 static
 bool
-applyMemMappedRegConfig(Hart<URV>& hart, const nlohmann::json& config)
-{
-  if (not config.count("memory_mapped_registers"))
-    return true;  // Nothing to apply.
-
-  const auto& mmr = config.at("memory_mapped_registers");
-
-  unsigned errors = 0;
-
-
-  // Define memory-mapped-register region.
-  uint64_t addr = 0, size = 0;
-  if (getJsonUnsigned("address", mmr.at("address"), addr) and
-      getJsonUnsigned("size", mmr.at("size"), size))
-    {
-      if (not hart.defineMemoryMappedRegisterArea(addr, size))
-        return false;
-    }
-  else
-    errors++;
-
-  // Start by giving all registers in region a default mask.
-  size_t possibleRegCount = size / 4;
-  if (mmr.count("default_mask"))
-    {
-      uint32_t mask = 0;
-      if (getJsonUnsigned("default_mask", mmr.at("default_mask"), mask))
-        for (size_t ix = 0; ix < possibleRegCount; ++ix)
-          hart.defineMemoryMappedRegisterWriteMask(addr + ix*4, mask);
-      else
-        errors++;
-    }
-
-  if (not mmr.count("registers"))
-    return true;
-
-  const auto& regs = mmr.at("registers");
-  if (not regs.is_object())
-    {
-      std::cerr << "Invalid memory_mapped_registers.registers entry "
-                << "in config file (expecting an object)\n";
-      return false;
-    }
-
-  for (auto it = regs.begin(); it != regs.end(); ++it)
-    {
-      const std::string& name = it.key();
-      const auto& conf = it.value();
-
-      if (not conf.count("count") or not conf.count("address") or
-          not conf.count("mask"))
-        {
-          std::cerr << "Register entry \"" << name << "\"under "
-                    << "memory_mapped_registers must have count/address/mask\n";
-          errors++;
-          continue;
-        }
-      URV count = 0, mask = 0, addr = 0;
-      if (getJsonUnsigned("count", conf.at("count"), count) and
-          getJsonUnsigned("mask", conf.at("mask"), mask) and
-          getJsonUnsigned("address", conf.at("address"), addr))
-        {
-          for (URV ix = 0; ix < count; ++ix)
-            if (not hart.defineMemoryMappedRegisterWriteMask(addr + ix*4, mask))
-              errors++;
-        }
-      else
-        errors++;
-    }
-
-  return errors == 0;
-}
-
-
-template <typename URV>
-static
-bool
-applyIccmConfig(Hart<URV>& hart, const nlohmann::json& config)
-{
-  if (not config.count("iccm"))
-    return true;
-
-  const auto& iccm = config.at("iccm");
-  if (iccm.count("region") and iccm.count("size") and iccm.count("offset"))
-    {
-      size_t region = 0, size = 0, offset = 0;
-      if (getJsonUnsigned("iccm.region", iccm.at("region"), region) and
-          getJsonUnsigned("iccm.size",   iccm.at("size"), size) and
-          getJsonUnsigned("iccm.offset", iccm.at("offset"), offset))
-        {
-          size_t addr = region*hart.regionSize() + offset;
-          return hart.defineIccm(addr, size);
-        }
-      else
-        return false;
-    }
-
-  std::cerr << "The ICCM entry in the configuration file must contain "
-            << "a region, offset and a size entry.\n";
-  return false;
-}
-
-
-template <typename URV>
-static
-bool
-applyDccmConfig(Hart<URV>& hart, const nlohmann::json& config)
-{
-  if (not config.count("dccm"))
-    return true;
-
-  const auto& dccm = config.at("dccm");
-  if (dccm.count("region") and dccm.count("size") and dccm.count("offset"))
-    {
-      size_t region = 0, size = 0, offset = 0;
-      if (getJsonUnsigned("dccm.region", dccm.at("region"), region) and
-          getJsonUnsigned("dccm.size",   dccm.at("size"), size) and
-          getJsonUnsigned("dccm.offset", dccm.at("offset"), offset))
-        {
-          size_t addr = region*hart.regionSize() + offset;
-          return hart.defineDccm(addr, size);
-        }
-      return false;
-    }
-
-  std::cerr << "The DCCM entry in the configuration file must contain "
-            << "a region, offset and a size entry.\n";
-  return false;
-}
-
-
-template <typename URV>
-static
-bool
 applyTriggerConfig(Hart<URV>& hart, const nlohmann::json& config)
 {
   if (not config.count("triggers"))
@@ -883,50 +749,48 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 }
 
 
-template <typename URV>
+/// Collect the physical memory attributes from the given json object
+/// (tagged "attribs") and add them to the given Pma object.  Return
+/// true on success and false on failure. Path is the hierarchical
+/// name of the condig object in the JSON configuration file.
+/// Sample JSON input parse in this functions:
+///     "attribs" : [ "read", "write", "exec", "amo", "rsrv" ]
 static
 bool
-applyInstMemConfig(Hart<URV>& hart, const nlohmann::json& config)
+getConfigPma(const std::string& path, const nlohmann::json& attribs, Pma& pma)
 {
   using std::cerr;
 
-  if (not config.is_array())
+  if (not attribs.is_array())
     {
-      cerr << "Invalid inst entry in config file memmap (execpting an array)\n";
+      cerr << "Error: Invalid \"attribs\" entry in configuraion item " << path
+	   << " -- expecting an array\n";
       return false;
     }
 
-  // Pairs of addresses in which inst fetch is allowed.
-  std::vector<std::pair<URV,URV>> windows;
-
   unsigned errors = 0;
-  unsigned ix = 0;
-  for (auto it = config.begin(); it != config.end(); ++it, ++ix)
+
+  for (auto& attrib : attribs)
     {
-      const auto& addrPair = *it;
-      if (not addrPair.is_array() or addrPair.size() != 2)
+      if (not attrib.is_string())
 	{
-	  cerr << "Invalid address range in config file memap inst ("
-	       << "expecting an array of 2 numbers at index " << ix << ")\n";
-	  ++errors;
-	  break;
+	  cerr << "Error: Invalid item value in config item " << (path + ".attribs")
+	       << " -- expecting a string\n";
+	  errors++;
+	  continue;
 	}
 
-      std::vector<URV> vec;
-      if (not getJsonUnsignedVec("memmap.inst", addrPair, vec))
-        errors++;
-      else if (vec.size() != 2)
-	errors++;
+      Pma::Attrib attr = Pma::Attrib::None;
+      std::string valueStr = attrib.get<std::string>();
+      if (not Pma::stringToAttrib(valueStr, attr))
+	{
+	  cerr << "Error: Invalid value in config item (" << valueStr << ") "
+	       << (path + ".attribs") << '\n';
+	  errors++;
+	}
       else
-	{
-	  auto p = std::make_pair(vec.at(0), vec.at(1));
-	  windows.push_back(p);
-	}
+	pma.enable(attr);
     }
-
-  if (not errors and not windows.empty())
-    if (not hart.configMemoryFetch(windows))
-      errors++;
 
   return errors == 0;
 }
@@ -935,47 +799,133 @@ applyInstMemConfig(Hart<URV>& hart, const nlohmann::json& config)
 template <typename URV>
 static
 bool
-applyDataMemConfig(Hart<URV>& hart, const nlohmann::json& config)
+processMemMappedMasks(Hart<URV>& hart, const std::string& path, const nlohmann::json& masks,
+		      uint64_t low, uint64_t high)
+{
+  // Parse an array of entries, each entry is an array containing low
+  // address, high address, and maks.
+  unsigned ix = 0;
+  unsigned errors = 0;
+  for (auto maskIter = masks.begin(); maskIter != masks.end(); ++maskIter, ++ix)
+    {
+      const auto& entry = *maskIter;
+      std::string entryPath = path + ".masks[" + std::to_string(ix) + "]";
+      std::vector<uint64_t> vec;
+      if (not getJsonUnsignedVec(entryPath, entry, vec))
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (vec.size() != 3)
+	{
+	  std::cerr << "Error: Expecting 3 values for config item "
+		    << entryPath << '\n';
+	  errors++;
+	  continue;
+	}
+
+      bool ok = vec.at(0) >= low and vec.at(0) <= high;
+      ok = ok and vec.at(1) >= low and vec.at(1) <= high;
+      if (not ok)
+	{
+	  std::cerr << "Error: Mask address out of PMA region bounds for config item "
+		    << entryPath << '\n';
+	  errors++;
+	  continue;
+	}
+
+      uint32_t mask = vec.at(2);
+      for (uint64_t addr = vec.at(0); addr <= vec.at(1); addr += 4)
+	if (not hart.setMemMappedMask(addr, mask))
+	  {
+	    std::cerr << "Error: Failed to configure mask for config item "
+		      << entryPath << " at addres 0x" << std::hex << addr
+		      << std::dec << '\n';
+	    errors++;
+	  }
+    }
+
+  return errors == 0;
+}
+
+
+template <typename URV>
+static
+bool
+applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 {
   using std::cerr;
 
   if (not config.is_array())
     {
-      cerr << "Invalid data entry in config file memmap (execpting an array)\n";
+      cerr << "Error: Invalid memmap.pma entry in config file memmap (execpting an array)\n";
       return false;
     }
-
-  // Pairs of addresses in which data access is allowed.
-  std::vector<std::pair<URV,URV>> windows;
 
   unsigned errors = 0;
   unsigned ix = 0;
   for (auto it = config.begin(); it != config.end(); ++it, ++ix)
     {
-      const auto& addrPair = *it;
-      if (not addrPair.is_array() or addrPair.size() != 2)
+      std::string path = std::string("memmap.pma[") + std::to_string(ix) + "]";
+
+      const auto& item = *it;
+      if (not item.is_object())
 	{
-	  cerr << "Invalid address range in config file memap data ("
-	       << "expecting an array of 2 numbers at index " << ix << ")\n";
-	  ++errors;
-	  break;
+	  cerr << "Error: Configuration item at" << path << " is not an object\n";
+	  errors++;
+	  continue;
 	}
 
-      std::vector<URV> vec;
-      if (not getJsonUnsignedVec("memmap.data", addrPair, vec))
-        errors++;
-      if (vec.size() != 2)
-	errors++;
+      unsigned itemErrors = 0;
+
+      std::string tag = "low";
+      uint64_t low = 0;
+      if (not item.count(tag))
+	{
+	  cerr << "Error: Missing entry \"low\" in configuration item " << path << "\n";
+	  itemErrors++;
+	}
+      else if (not getJsonUnsigned(path + "." + tag, item.at(tag), low))
+	itemErrors++;
+
+      tag = "high";
+      uint64_t high = 0;
+      if (not item.count(tag))
+	{
+	  cerr << "Error: Missing entry \"high\" in configuration item " << path << "\n";
+	  itemErrors++;
+	}
+      else if (not getJsonUnsigned(path + "." + tag, item.at(tag), high))
+	itemErrors++;
+
+      tag = "attribs";
+      if (not item.count(tag))
+	{
+	  cerr << "Error: Missing entry \"attribs\" in configuration item " << path << "\n";
+	  itemErrors++;
+	}
       else
 	{
-	  auto p = std::make_pair(vec.at(0), vec.at(1));
-	  windows.push_back(p);
+	  Pma pma;
+	  if (not getConfigPma(path, item.at(tag), pma))
+	    itemErrors++;
+	  if (not itemErrors)
+	    {
+	      if (not hart.definePmaRegion(low, high, pma))
+		itemErrors++;
+	      else if (pma.isMemMappedReg())
+		{
+		  tag = "masks";
+		  if (item.count(tag))
+		    if (not processMemMappedMasks(hart, path, item.at(tag), low, high))
+		      itemErrors++;
+		}
+	    }
 	}
-    }
 
-  if (not errors and not windows.empty())
-    if (not hart.configMemoryDataAccess(windows))
-      errors++;
+      errors += itemErrors;
+    }
 
   return errors == 0;
 }
@@ -983,35 +933,25 @@ applyDataMemConfig(Hart<URV>& hart, const nlohmann::json& config)
 
 template<typename URV>
 bool
-HartConfig::applyMemoryConfig(Hart<URV>& hart, bool iccmRw, bool /*verbose*/) const
+HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 {
   unsigned errors = 0;
-  if (not applyIccmConfig(hart, *config_))
-    errors++;
-
-  if (not applyDccmConfig(hart, *config_))
-    errors++;
-
-  if (not applyMemMappedRegConfig(hart, *config_))
-    errors++;
-
-  if (config_ -> count("iccmrw"))
-    if (not getJsonBoolean("iccmrw", config_ ->at("iccmrw"), iccmRw))
-      errors++;
-
-  hart.finishCcmConfig(iccmRw);
 
   if (config_ -> count("memmap"))
     {
       // Apply memory protection windows.
-      const auto& memmap = config_ -> at("memmap");
+      const auto& memMap = config_ -> at("memmap");
       std::string tag = "inst";
-      if (memmap.count(tag))
-	if (not applyInstMemConfig(hart, memmap.at(tag)))
-	  errors++;
+      if (memMap.count(tag))
+	std::cerr << "Configuration memmap.data no longer supported -- ignored\n";
+
       tag = "data";
-      if (memmap.count(tag))
-	if (not applyDataMemConfig(hart, memmap.at(tag)))
+      if (memMap.count(tag))
+	std::cerr << "Configuration memmap.data no longer supported -- ignored\n";
+
+      tag = "pma";
+      if (memMap.count(tag))
+	if (not applyPmaConfig(hart, memMap.at(tag)))
 	  errors++;
     }
 
@@ -1113,28 +1053,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	errors++;
     }
 
-  // Wide (64-bit) load/store. WDC special.
-  tag = "enable_wide_load_store";
-  if (config_ -> count(tag))
-    {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableWideLoadStore(flag);
-      else
-        errors++;
-    }
-
-  // Bus barrier. WDC special.
-  tag = "enable_bus_barrier";
-  if (config_ -> count(tag))
-    {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableBusBarrier(flag);
-      else
-        errors++;
-    }
-
   // Ld/st instructions trigger misaligned exception if base address
   // (value in rs1) and effective address refer to regions of
   // different types.
@@ -1209,19 +1127,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       if (getJsonBoolean(tag, config_ -> at(tag), flag))
         {
           hart.enableLoadErrorRollback(flag);
-          hart.enableBenchLoadExceptions(flag);
         }
-      else
-        errors++;
-    }
-
-  // Enable fast interrupts.
-  tag = "fast_interrupt_redirect";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableFastInterrupts(flag);
       else
         errors++;
     }
@@ -1359,24 +1265,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       bool flag = false;
       if (getJsonBoolean(tag, config_ -> at(tag), flag))
         hart.enableRvzfh(flag);
-      else
-        errors++;
-    }
-
-  tag = "load_queue_size";
-  if (config_ -> count(tag))
-    {
-      unsigned lqs = 0;
-      if (getJsonUnsigned(tag, config_ -> at(tag), lqs))
-        {
-          if (lqs > 64)
-            {
-              std::cerr << "Config file load queue size (" << lqs << ") too large"
-                        << " -- using 64.\n";
-              lqs = 64;
-            }
-          hart.setLoadQueueSize(lqs);
-        }
       else
         errors++;
     }
@@ -1524,13 +1412,12 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 
 template<typename URV>
 bool
-HartConfig::configMemory(System<URV>& system, bool iccmRw, bool unmappedElfOk,
-                         bool verbose) const
+HartConfig::configMemory(System<URV>& system, bool unmappedElfOk) const
 {
   system.checkUnmappedElf(not unmappedElfOk);
 
   auto& hart0 = *system.ithHart(0);
-  if (not applyMemoryConfig(hart0, iccmRw, verbose))
+  if (not applyMemoryConfig(hart0))
     return false;
 
   for (unsigned i = 1; i < system.hartCount(); ++i)
@@ -1881,71 +1768,6 @@ defineMdacSideEffects(System<URV>& system)
 }
 
 
-/// Associate callbacks with write/poke of the mpicbaddr (pic base
-/// address csr).
-template <typename URV>
-void
-defineMpicbaddrSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mpicbaddr");
-      if (not csrPtr)
-        continue;
-
-      auto post = [hart] (Csr<URV>&, URV val) -> void {
-                    hart->changeMemMappedBase(val);
-                  };
-
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-    }
-}
-
-
-/// Associate callbacks with write/poke of mhartstart to start harts
-/// when corresponding bits are set in that CSR.
-template <typename URV>
-void
-defineMhartstartSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mhartstart");
-      if (not csrPtr)
-        continue;
-      auto csrNum = csrPtr->getNumber();
-
-      auto post = [&system] (Csr<URV>&, URV val) -> void {
-                    // Start harts corresponding to set bits
-                    for (unsigned ii = 0; ii < system.hartCount(); ++ii)
-                      {
-                        auto ht = system.ithHart(ii);
-                        URV id = ht->sysHartIndex();
-                        if (val & (URV(1) << id))
-                          ht->setStarted(true);
-                      }
-                  };
-
-      auto pre = [&system, csrNum] (Csr<URV>&, URV& val) -> void {
-                   // Implement write-one semantics. We let hart 0 do
-                   // the shared CSR value change.
-                   auto ht = system.ithHart(0);
-                   URV prev = 0;
-                   ht->peekCsr(csrNum, prev);
-                   val |= prev;
-                 };
-
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-      csrPtr->registerPrePoke(pre);
-      csrPtr->registerPreWrite(pre);
-    }
-}
-
-
 /// Associate callback with write/poke of mnmipdel to deletage
 /// non-maskable-interrupts to harts.
 template <typename URV>
@@ -2143,9 +1965,7 @@ HartConfig::finalizeCsrConfig(System<URV>& system) const
 
   // The following are WD non-standard CSRs. We implement their
   // actions by associating callbacks with the write/poke CSR methods.
-  defineMhartstartSideEffects(system);
   defineMnmipdelSideEffects(system);
-  defineMpicbaddrSideEffects(system);
   defineMpmcSideEffects(system);
   defineMgpmcSideEffects(system);
   defineMacoSideEffects(system);
@@ -2222,17 +2042,17 @@ template bool
 HartConfig::configHarts<uint64_t>(System<uint64_t>&, bool, bool) const;
 
 template bool
-HartConfig::configMemory(System<uint32_t>&, bool, bool, bool) const;
+HartConfig::configMemory(System<uint32_t>&, bool) const;
 
 template bool
-HartConfig::configMemory(System<uint64_t>&, bool, bool, bool) const;
+HartConfig::configMemory(System<uint64_t>&, bool) const;
 
 
 template bool
-HartConfig::applyMemoryConfig<uint32_t>(Hart<uint32_t>&, bool, bool) const;
+HartConfig::applyMemoryConfig<uint32_t>(Hart<uint32_t>&) const;
 
 template bool
-HartConfig::applyMemoryConfig<uint64_t>(Hart<uint64_t>&, bool, bool) const;
+HartConfig::applyMemoryConfig<uint64_t>(Hart<uint64_t>&) const;
 
 template bool
 HartConfig::finalizeCsrConfig<uint32_t>(System<uint32_t>&) const;
