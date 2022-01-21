@@ -1515,14 +1515,8 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 template <typename URV>
 static
 bool
-sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
-	   bool clib)
+sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 {
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyCmdLineArgs(args, *system.ithHart(i), system, clib))
-      if (not args.interactive)
-	return false;
-
   // In server/interactive modes: enable triggers and performance counters.
   bool serverMode = not args.serverFile.empty();
   if (serverMode or args.interactive)
@@ -1750,9 +1744,13 @@ session(const Args& args, const HartConfig& config)
 	if (not hart.configIsa(isa, updateMisa))
 	  return false;
       hart.reset();
+
+      if (not applyCmdLineArgs(args, *system.ithHart(i), system, clib))
+	if (not args.interactive)
+	  return false;
     }
 
-  bool result = sessionRun(system, args, traceFile, commandLog, clib);
+  bool result = sessionRun(system, args, traceFile, commandLog);
 
   auto& hart0 = *system.ithHart(0);
   if (not args.instFreqFile.empty())
