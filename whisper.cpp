@@ -200,7 +200,7 @@ struct Args
   std::optional<uint64_t> snapshotPeriod;
   std::optional<uint64_t> alarmInterval;
   std::optional<uint64_t> swInterrupt;  // Sotware interrupt mem mapped address
-  std::optional<uint64_t> clint;  // Clint mem mapped address
+  std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
   std::optional<uint64_t> syscallSlam;
 
   unsigned regWidth = 32;
@@ -983,7 +983,8 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
   if (args.consoleIoSym)
     hart.setConsoleIoSymbol(*args.consoleIoSym);
 
-  // Load ELF files.
+  // Load ELF files. Entry point of first file sets the start PC uness in raw mode.
+  bool firstElf = true;
   for (const auto& target : args.expandedTargets)
     {
       const auto& elfFile = target.front();
@@ -991,9 +992,13 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
 	std::cerr << "Loading ELF file " << elfFile << '\n';
       size_t entryPoint = 0;
       if (hart.loadElfFile(elfFile, entryPoint))
-	hart.pokePc(URV(entryPoint));
+	{
+	  if (firstElf and not args.raw)
+	    hart.pokePc(URV(entryPoint));
+	}
       else
 	errors++;
+      firstElf = false;
     }
 
   // Load HEX files.

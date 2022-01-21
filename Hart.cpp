@@ -621,8 +621,6 @@ Hart<URV>::loadElfFile(const std::string& file, size_t& entryPoint)
   if (not memory_.loadElfFile(file, registerWidth, entryPoint, end))
     return false;
 
-  this->pokePc(URV(entryPoint));
-
   ElfSymbol sym;
 
   if (not toHostSym_.empty() and this->findElfSymbol(toHostSym_, sym))
