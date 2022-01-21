@@ -66,6 +66,10 @@ namespace WdRiscv
     template<typename URV>
     bool applyMemoryConfig(Hart<URV>&) const;
     
+    template<typename URV>
+    bool configClint(System<URV>&, Hart<URV>&, uint64_t clintStart,
+		     uint64_t clintLimit, uint64_t timerAddr) const;
+
     /// Set xeln to the register width configuration held in this
     /// object returning true on success and false if this object does
     /// not contain a register width (xlen) configuration.

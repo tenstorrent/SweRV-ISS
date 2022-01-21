@@ -966,7 +966,8 @@ getIsaStringFromCsr(const Hart<URV>& hart)
 template<typename URV>
 static
 bool
-applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool clib)
+applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
+		 const HartConfig& config, bool clib)
 {
   unsigned errors = 0;
 
@@ -1050,15 +1051,15 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
     {
       uint64_t swAddr = *args.clint;
       uint64_t timerAddr = swAddr + 0x4000;
-      uint64_t clintLimit = swAddr + 0x40000000 - 1;
-      configureClint(hart, system, swAddr, clintLimit, timerAddr);
+      uint64_t clintLimit = swAddr + 0x8000 - 1;
+      config.configClint(system, hart, swAddr, clintLimit, timerAddr);
     }
   else if (args.swInterrupt)
     {
       uint64_t swAddr = *args.swInterrupt;
       uint64_t timerAddr = swAddr + 0x4000;
       uint64_t clintLimit = swAddr + system.hartCount() * 4 - 1;
-      configureClint(hart, system, swAddr, clintLimit, timerAddr);
+      config.configClint(system, hart, swAddr, clintLimit, timerAddr);
     }
 
   if (args.syscallSlam)
@@ -1520,14 +1521,8 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 template <typename URV>
 static
 bool
-sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
-	   bool clib)
+sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 {
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyCmdLineArgs(args, *system.ithHart(i), system, clib))
-      if (not args.interactive)
-	return false;
-
   // In server/interactive modes: enable triggers and performance counters.
   bool serverMode = not args.serverFile.empty();
   if (serverMode or args.interactive)
@@ -1755,9 +1750,13 @@ session(const Args& args, const HartConfig& config)
 	if (not hart.configIsa(isa, updateMisa))
 	  return false;
       hart.reset();
+
+      if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
+	if (not args.interactive)
+	  return false;
     }
 
-  bool result = sessionRun(system, args, traceFile, commandLog, clib);
+  bool result = sessionRun(system, args, traceFile, commandLog);
 
   auto& hart0 = *system.ithHart(0);
   if (not args.instFreqFile.empty())

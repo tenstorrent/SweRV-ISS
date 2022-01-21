@@ -961,6 +961,43 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 
 template<typename URV>
 bool
+HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
+			uint64_t clintStart, uint64_t clintLimit,
+			uint64_t timerAddr) const
+{
+  // Define callback to associate a memory mapped software interrupt
+  // location to its corresponding hart so that when such a location
+  // is written the software interrupt bit is set/cleared in the MIP
+  // register of that hart.
+  uint64_t swAddr = clintStart;
+  auto swAddrToHart = [swAddr, &system](URV addr) -> Hart<URV>* {
+    uint64_t addr2 = swAddr + system.hartCount()*4; // 1 word per hart
+    if (addr >= swAddr and addr < addr2)
+      {
+        size_t ix = (addr - swAddr) / 4;
+        return system.ithHart(ix).get();
+      }
+    return nullptr;
+  };
+
+  // Same for timer limit addresses.
+  auto timerAddrToHart = [timerAddr, &system](URV addr) -> Hart<URV>* {
+    uint64_t addr2 = timerAddr + system.hartCount()*8; // 1 double word per hart
+    if (addr >= timerAddr and addr < addr2)
+      {
+        size_t ix = (addr - timerAddr) / 8;
+        return system.ithHart(ix).get();
+      }
+    return nullptr;
+  };
+
+  hart.configClint(clintStart, clintLimit, swAddrToHart, timerAddrToHart);
+  return true;
+}
+
+
+template<typename URV>
+bool
 HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 {
   unsigned errors = 0;
@@ -1051,19 +1088,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	}
       else
 	errors++;
-    }
-
-  // Ld/st instructions trigger misaligned exception if base address
-  // (value in rs1) and effective address refer to regions of
-  // different types.
-  tag = "effective_address_compatible_with_base";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.setEaCompatibleWithBase(flag);
-      else
-        errors++;
     }
 
   // Enable debug triggers.
@@ -1403,8 +1427,34 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 
   // Apply JSON configuration.
   for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyConfig(*system.ithHart(i), userMode, verbose))
-      return false;
+    {
+      Hart<URV>& hart = *system.ithHart(i);
+      if (not applyConfig(hart, userMode, verbose))
+	return false;
+
+      std::string tag = "clint";
+      if (config_ -> count(tag))
+	{
+	  uint64_t addr = 0;
+	  if (getJsonUnsigned(tag, config_ ->at(tag), addr))
+	    {
+	      if ((addr & 7) != 0)
+		{
+		  std::cerr << "Error: Config file clint address (0x" << std::hex
+			    << addr << std::dec << ") is not a multiple of 8\n";
+		  return false;
+		}
+	      else
+		{
+		  uint64_t clintStart = addr, clintEnd = addr + 0x8000 -1;
+		  uint64_t timerAddr = addr + 0x4000;
+		  configClint(system, hart, clintStart, clintEnd, timerAddr);
+		}
+	    }
+	  else
+	    return false;
+	}
+    }
 
   return finalizeCsrConfig(system);
 }
@@ -1419,9 +1469,6 @@ HartConfig::configMemory(System<URV>& system, bool unmappedElfOk) const
   auto& hart0 = *system.ithHart(0);
   if (not applyMemoryConfig(hart0))
     return false;
-
-  for (unsigned i = 1; i < system.hartCount(); ++i)
-    system.ithHart(i)->copyMemRegionConfig(hart0);
 
   return true;
 }
@@ -1655,66 +1702,6 @@ defineMacoSideEffects(System<URV>& system)
         }
 
       hart->definePmaOverrideRegions(macoIx);
-    }
-}
-
-
-/// Associate callbacks with write/poke of the mrac CSR. Mrac is
-/// memory region accss control CSR which defines which regions are
-/// cacahble/idempotent.
-template <typename URV>
-void
-defineMracSideEffects(System<URV>& system)
-{
-  unsigned count = 0; // Count of mrac definitions.
-
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mrac");
-      if (not csrPtr)
-        continue;
-
-      count++;
-
-      auto pre = [] (Csr<URV>&, URV& val) -> void {
-                   // A value of 0b11 (io/cacheable) for the ith
-                   // region is invalid: Make it 0b10
-                   // (io/non-cacheable).
-                   URV mask = 0b11;
-                   unsigned xlen = sizeof(URV) * 8; // FIX.
-                   for (unsigned i = 0; i < xlen; i += 2)
-                     {
-                       if ((val & mask) == mask)
-                         val = (val & ~mask) | (0b10 << i);
-                       mask = mask << 2;
-                     }
-                 };
-
-      // Mrac is shared between harts. If one hart writes it, all
-      // harts must be updated.
-      auto post = [&system] (Csr<URV>&, URV val) -> void {
-                    for (unsigned hix = 0; hix < system.hartCount(); ++hix)
-                      {
-                        auto ht = system.ithHart(hix);
-                        for (unsigned region = 0; region < 16; ++region)
-                          {
-                            unsigned bit = (val >> (region*2 + 1)) & 1;
-                            ht->markRegionIdempotent(region, bit == 0);
-                          }
-                      }
-                  };
-
-      csrPtr->registerPrePoke(pre);
-      csrPtr->registerPreWrite(pre);
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-    }
-
-  if (count and sizeof(URV) == 8)
-    {
-      std::cerr << "Warning: mrac CSR is defined with rv32. This is likely "
-                << "a mistake. Only least significant 32 bits will be used.\n";
     }
 }
 
@@ -1969,7 +1956,6 @@ HartConfig::finalizeCsrConfig(System<URV>& system) const
   defineMpmcSideEffects(system);
   defineMgpmcSideEffects(system);
   defineMacoSideEffects(system);
-  defineMracSideEffects(system);
   defineMdacSideEffects(system);
 
   // Define callback to react to write/poke to mcountinhibit CSR.
@@ -2060,15 +2046,22 @@ HartConfig::finalizeCsrConfig<uint32_t>(System<uint32_t>&) const;
 template bool
 HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
 
-
-template
-void
+template void
 unpackMacoValue<uint32_t>(uint32_t value, uint32_t mask, bool rv32,
                           uint64_t& start, uint64_t& end, bool& idempotent,
                           bool& cacheable);
 
-template
-void
+template void
 unpackMacoValue<uint64_t>(uint64_t value, uint64_t mask, bool rv32,
                           uint64_t& start, uint64_t& end, bool& idempotent,
                           bool& cacheable);
+
+template bool
+HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
+				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t timerAddr) const;
+
+template bool
+HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
+				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t timerAddr) const;

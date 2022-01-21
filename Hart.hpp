@@ -1020,9 +1020,6 @@ namespace WdRiscv
     size_t getMemorySize() const
     { return memory_.size(); }
 
-    /// Copy memory region configuration from other processor.
-    void copyMemRegionConfig(const Hart<URV>& other);
-
     /// Return the index of this hart within the system. Harts are
     /// assigned indices 0 to m*n - 1 where m is the number of cores
     /// and n is the number of harts per core.
@@ -1247,11 +1244,7 @@ namespace WdRiscv
                                 Pmp::Mode& mode, bool& locked,
                                 uint64_t& low, uint64_t& high) const;
 
-    /// Mark the 256MB region with the given region index as
-    /// idempotent/non-idempotent according to flag.
-    void markRegionIdempotent(unsigned regionIx, bool flag);
 
-    /// Define address at which to slam memory changes resulting from
     /// an emulated system call. If addr is zero, no slamming is done.
     void defineSyscallSlam(URV addr)
     { syscallSlam_ = addr; }
@@ -3800,23 +3793,8 @@ namespace WdRiscv
     // Indexed by exception cause.
     std::vector<uint64_t> exceptionStat_;
 
-    // Ith entry is true if ith region has iccm/dccm/pic.
-    std::vector<bool> regionHasLocalMem_;
-
-    // Ith entry is true if ith region has dccm/pic.
-    std::vector<bool> regionHasLocalDataMem_;
-
-    // Ith entry is true if ith region has dccm/pic.
-    std::vector<bool> regionHasLocalInstMem_;
-
-    // Ith entry is true if ith region has dccm.
-    std::vector<bool> regionHasDccm_;
-
     // Ith entry is true if ith region has pic
     std::vector<bool> regionHasMemMappedRegs_;
-
-    // Ith entry is true if ith region is idempotent.
-    std::vector<bool> regionIsIdempotent_;
 
     // Decoded instruction cache.
     std::vector<DecodedInst> decodeCache_;

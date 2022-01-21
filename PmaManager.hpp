@@ -39,7 +39,7 @@ namespace WdRiscv
        None = 0, Read = 1, Write = 2, Exec = 4,
        Idempotent = 8, Amo = 16, Iccm = 32,
        Dccm = 64, MemMapped = 128, Rsrv = 256,
-       Io = 512,
+       Io = 512, Cacheable = 1024,
        Mapped = Exec | Read | Write,
        Default = Read | Write | Exec | Idempotent | Amo | Rsrv
       };
@@ -71,6 +71,10 @@ namespace WdRiscv
     /// Return true if in idempotent region.
     bool isIdempotent() const
     { return attrib_ & Idempotent; }
+
+    /// Return true if in cacheable region.
+    bool isCacheable() const
+    { return attrib_ & Cacheable; }
 
     /// Return true if in readable (ld instructions allowed) region.
     bool isRead() const
