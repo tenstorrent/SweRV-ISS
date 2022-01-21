@@ -147,7 +147,7 @@ namespace WdRiscv
 	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pma_;
 
-      return defaultPma_;
+      return defaultPma_;  // rwx amo rsrv idempotent
     }
 
     /// Define a physical memory attribute region. Regions must be defined
