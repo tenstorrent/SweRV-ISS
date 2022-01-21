@@ -34,7 +34,8 @@ Pma::stringToAttrib(const std::string& str, Pma::Attrib& attrib)
     { "dccm", Pma::Dccm },
     { "mem_mapped", Pma::MemMapped },
     { "rsrv", Pma::Rsrv },
-    { "Io", Pma::Io }
+    { "io", Pma::Io },
+    { "cacheable", Pma::Cacheable }
   };
 
   auto iter = stringToAttrib.find(str);

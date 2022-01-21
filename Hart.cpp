@@ -96,13 +96,6 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
     virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16 /* FIX: TLB size*/),
     isa_()
 {
-  regionHasLocalMem_.resize(16);
-  regionHasLocalDataMem_.resize(16);
-  regionHasDccm_.resize(16);
-  regionHasMemMappedRegs_.resize(16);
-  regionHasLocalInstMem_.resize(16);
-  regionIsIdempotent_.resize(16);
-
   decodeCacheSize_ = 128*1024;  // Must be a power of 2.
   decodeCacheMask_ = decodeCacheSize_ - 1;
   decodeCache_.resize(decodeCacheSize_);
@@ -905,8 +898,8 @@ Hart<URV>::isAddrIdempotent(size_t addr) const
   if (hasDefaultIdempotent_)
     return defaultIdempotent_;
 
-  unsigned region = unsigned(addr >> (sizeof(URV)*8 - 4));
-  return regionIsIdempotent_.at(region) or regionHasLocalMem_.at(region);
+  Pma pma = memory_.pmaMgr_.getPma(addr);
+  return pma.isIdempotent();
 }
 
 
@@ -925,15 +918,6 @@ Hart<URV>::isAddrCacheable(size_t addr) const
     return defaultCacheable_;
 
   return false;
-}
-
-
-template <typename URV>
-void
-Hart<URV>::markRegionIdempotent(unsigned region, bool flag)
-{
-  if (region < regionIsIdempotent_.size())
-    regionIsIdempotent_.at(region) = flag;
 }
 
 
@@ -3957,18 +3941,6 @@ Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
     }
 
   return enteredDebug;
-}
-
-
-template <typename URV>
-void
-Hart<URV>::copyMemRegionConfig(const Hart<URV>& other)
-{
-  regionHasLocalMem_ = other.regionHasLocalMem_;
-  regionHasLocalDataMem_ = other.regionHasLocalDataMem_;
-  regionHasDccm_ = other.regionHasDccm_;
-  regionHasMemMappedRegs_ = other.regionHasMemMappedRegs_;
-  regionHasLocalInstMem_ = other.regionHasLocalInstMem_;
 }
 
 
