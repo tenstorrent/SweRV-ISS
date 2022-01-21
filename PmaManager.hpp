@@ -88,6 +88,10 @@ namespace WdRiscv
     bool isAmo() const
     { return attrib_ & Amo; }
 
+    /// Return true in region where lr/sc are allowed.
+    bool isRsrv() const
+    { return attrib_ & Rsrv; }
+
     /// Return true if this object has the same attributes as the
     /// given object.
     bool operator== (const Pma& other) const

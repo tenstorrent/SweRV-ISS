@@ -44,20 +44,25 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
       cause = determineStoreException(addr, storeVal, forcedFail);
     }
 
-  if (cause == ExceptionCause::STORE_ADDR_MISAL and
-      misalAtomicCauseAccessFault_)
-    cause = ExceptionCause::STORE_ACC_FAULT;
+  if (cause == ExceptionCause::STORE_ADDR_MISAL)
+    {
+      if (misalAtomicCauseAccessFault_)
+	return ExceptionCause::STORE_ACC_FAULT;
+      return cause;
+    }
 
   // Check if invalid unless cacheable.
   if (amoInCacheableOnly_ and not isAddrCacheable(addr))
-    if (cause == ExceptionCause::NONE)
-      cause = ExceptionCause::STORE_ACC_FAULT;
+    return ExceptionCause::STORE_ACC_FAULT;
 
   // Address must be word aligned for word access and double-word
   // aligned for double-word access.
-  bool fail = (addr & mask) != 0;
-  if (fail)
-    cause = ExceptionCause::STORE_ACC_FAULT;
+  if ((addr & mask) != 0)
+    return ExceptionCause::STORE_ACC_FAULT;
+
+  Pma pma = memory_.pmaMgr_.getPma(addr);
+  if (not pma.isAmo())
+    return ExceptionCause::STORE_ACC_FAULT;
 
   return cause;
 }
@@ -202,6 +207,8 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
   if ((addr & (ldSize - 1)) != 0)
     fail = true;
 
+  fail = fail or not memory_.pmaMgr_.getPma(addr).isRsrv();
+
   if (fail)
     {
       // AMO secondary cause has priority over ECC.
@@ -322,6 +329,9 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
           cause = ExceptionCause::STORE_ACC_FAULT;
         }
     }
+
+  if (not memory_.pmaMgr_.getPma(addr).isRsrv() and cause == ExceptionCause::NONE)
+    cause = ExceptionCause::STORE_ACC_FAULT;
 
   // If no exception: consider store-data  trigger
   if (cause == ExceptionCause::NONE and hasTrig)
