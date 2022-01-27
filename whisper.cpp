@@ -613,7 +613,7 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 {
   bool ok = true;
 
-  URV hartId = hart.sysHartIndex();
+  URV hartIx = hart.sysHartIndex();
 
   for (const auto& regInit : args.regInits)
     {
@@ -634,13 +634,13 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
       const std::string& regVal = tokens.at(1);
 
       bool specificHart = false;
-      unsigned id = 0;
+      unsigned ix = 0;
       size_t colonIx = regName.find(':');
       if (colonIx != std::string::npos)
 	{
 	  std::string hartStr = regName.substr(0, colonIx);
 	  regName = regName.substr(colonIx + 1);
-	  if (not parseCmdLineNumber("hart", hartStr, id))
+	  if (not parseCmdLineNumber("hart", hartStr, ix))
 	    {
 	      std::cerr << "Invalid command line register initialization: "
 			<< regInit << '\n';
@@ -657,7 +657,7 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 	  continue;
 	}
 
-      if (specificHart and id != hartId)
+      if (specificHart and ix != hartIx)
 	continue;
 
       if (unsigned reg = 0; hart.findIntReg(regName, reg))
