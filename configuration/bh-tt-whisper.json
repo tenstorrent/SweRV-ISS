@@ -12,7 +12,6 @@
     "Comment" : "Replace subnormal floating point results with zero.",
     "force_subnormal_to_zero" : "true",
 
-<<<<<<< HEAD
     "isa" : "rv32imafvzfh",
 
     "enable_zfh" : "true",
@@ -20,8 +19,6 @@
     "enable_zba" : "true",
     "enable_zbb" : "true",
 
-=======
->>>>>>> black-hole
     "enable_performance_counters" : "true",
     "perf_count_atomic_load_store" : "true",
     "perf_count_fp_load_store" : "true",
@@ -36,10 +33,6 @@
     "num_mmode_perf_regs" : 2,
 
     "memmap" : {
-<<<<<<< HEAD
-	"Comment": "Instruction fetch allowed only in 0x80000000 to 0x801fffff",
-	"inst": [ ["0x80000000", "0x801fffff"] ]
-=======
 	"Comment": "Instruction fetch valid only in 0x80000000 to 0x801fffff",
 	"inst" : [ [ "0x80000000", "0x801fffff" ] ],
 	"pma" : [
@@ -54,7 +47,6 @@
 		"attribs" : [ "read", "write", "amo", "rsrv", "idempotent" ]
 	    }
 	]
->>>>>>> black-hole
     },
 
     "csr" : {

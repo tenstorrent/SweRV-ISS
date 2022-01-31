@@ -36,8 +36,30 @@ namespace TTMcm
 
   struct McmInstr
   {
-    std::array<MemoryOp*, 4> memOps_ = { nullptr, nullptr, nullptr, nullptr };
+    // memOps contains indices into an array of MemoryOp items.
+    std::array<uint32_t, 4> memOps_ = {
+      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    };
+    uint64_t physAddr_ = 0;
+    uint64_t data_ = 0;
     uint32_t tag_ = 0;
+    uint8_t size_ = 0;
+
+    unsigned maxMemOpCount() const
+    { return sizeof(memOps_) / sizeof(memOps_[0]); }
+
+    unsigned countMemOps() const
+    {
+      unsigned count = 0;
+      for (auto x : memOps_)
+	{
+	  if (x != ~uint32_t(0))
+	    count++;
+	  else
+	    break;
+	}
+      return count;
+    }
   };
 
 
@@ -59,21 +81,22 @@ namespace TTMcm
     /// from which to obtain forwarded data may not yet have appeared.
     /// Return true on success.  Return false if load is exernal but
     /// corresponding memory is not readable.
-    bool earlyRead(unsigned HartId, uint64_t time, uint64_t instrTag,
-		   uint64_t physAddr, unsigned size, uint64_t rtlData,
-		   bool internal);
-
+    bool readOp(unsigned HartId, uint64_t time, uint64_t instrTag,
+		uint64_t physAddr, unsigned size, uint64_t rtlData,
+		bool internal);
+    
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where all
-    /// write are complete are marked complete. Return true on success.
-    bool mergeBufferWrite(uint64_t time, uint64_t physAddr, unsigned size,
+    /// writes are complete are marked complete. Return true on success.
+    bool mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
+			  unsigned size,
 			  const std::vector<uint8_t>& referenceData);
 
     /// Insert a write operation for the given instruction into the
     /// merge buffer removing it from the store buffer. Return true on
     /// success. Return false if no such operation is in the store
     /// buffer.
-    bool mergeBufferInsert(unsigned hartId, uint64_t instrTag,
+    bool mergeBufferInsert(unsigned hartId, uint64_t time, uint64_t instrTag,
 			   uint64_t physAddr, unsigned size,
 			   uint64_t rtlData);
 
@@ -82,21 +105,26 @@ namespace TTMcm
     bool cancelRead(unsigned hartId, uint64_t instTag);
 
     /// This is called when an instruction is retired.
-    bool commit(unsigned HartId, uint64_t instrTag);
+    bool commit(unsigned hartId, uint64_t time, uint64_t instrTag);
 
   protected:
 
-    bool findInstr(unsigned hartId, uint32_t tag, McmInstr& instr);
+    McmInstr* findInstr(unsigned hartIx, uint32_t tag);
+
+    McmInstr* findOrAddInstr(unsigned hartIx, uint32_t tag);
 
   private:
 
     typedef std::vector<McmInstr> McmInstrVec;
+    typedef std::vector<MemoryOp> MemoryOpVec;
 
-    std::vector<MemoryOp> memOps_;  // Memory ops.
+    MemoryOpVec memOps_;  // Memory ops.
     std::vector<McmInstrVec> hartInstrVecs_; // One vector per hart.
+    std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
 
     WdRiscv::System<URV>& system_;
     uint64_t time_ = 0;
+    unsigned lineSize_ = 64; // Cache/merge buffer line size.
   };
 
 }
