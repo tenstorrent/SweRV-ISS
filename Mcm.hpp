@@ -44,6 +44,7 @@ namespace TTMcm
     uint64_t data_ = 0;
     uint32_t tag_ = 0;
     uint8_t size_ = 0;
+    bool retired_ = false;
 
     unsigned maxMemOpCount() const
     { return sizeof(memOps_) / sizeof(memOps_[0]); }
@@ -108,6 +109,11 @@ namespace TTMcm
     bool commit(unsigned hartId, uint64_t time, uint64_t instrTag);
 
   protected:
+
+    bool checkRtlWrite(unsigned hartId, uint64_t time,
+		       const McmInstr& instr, const MemoryOp& op);
+
+    bool updateTime(const char* method, uint64_t time);
 
     McmInstr* findInstr(unsigned hartIx, uint32_t tag);
 
