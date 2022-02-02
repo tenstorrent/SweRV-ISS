@@ -1402,6 +1402,7 @@ Hart<URV>::fastLoad(uint32_t rd, uint32_t rs1, int32_t imm)
   ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = addr;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+  ldStSize_ = sizeof(LOAD_TYPE);
 
   // Unsigned version of LOAD_TYPE
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
@@ -1434,11 +1435,11 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
 
   URV base = intRegs_.read(rs1);
   uint64_t virtAddr = base + SRV(imm);
-  unsigned ldSize = sizeof(LOAD_TYPE);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+  ldStSize_ = sizeof(LOAD_TYPE);
 
   if (hasActiveTrigger())
     {
@@ -1451,7 +1452,7 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
   uint64_t addr = virtAddr;
-  auto cause = determineLoadException(addr, ldSize);
+  auto cause = determineLoadException(addr, ldStSize_);
   if (cause != ExceptionCause::NONE)
     {
       if (triggerTripped_)
@@ -1537,6 +1538,7 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
   ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = addr;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+  ldStSize_ = sizeof(STORE_TYPE);
 
   if (memory_.write(hartIx_, addr, storeVal))
     {
@@ -1568,6 +1570,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+  ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
   // ld/st access or misaligned exceptions.
@@ -1603,27 +1606,25 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       return false;
     }
 
-  unsigned stSize = sizeof(STORE_TYPE);
-
   if (addr >= clintStart_ and addr <= clintLimit_)
     {
       URV val = storeVal;
-      processClintWrite(addr, stSize, val);
+      processClintWrite(addr, ldStSize_, val);
       storeVal = val;
     }
 
   if (addr >= clintStart_ and addr <= clintLimit_)
     {
       URV val = storeVal;
-      processClintWrite(addr, stSize, val);
+      processClintWrite(addr, ldStSize_, val);
       storeVal = val;
     }
 
   if (memory_.write(hartIx_, addr, storeVal))
     {
-      memory_.invalidateOtherHartLr(hartIx_, addr, stSize);
+      memory_.invalidateOtherHartLr(hartIx_, addr, ldStSize_);
 
-      invalidateDecodeCache(virtAddr, stSize);
+      invalidateDecodeCache(virtAddr, ldStSize_);
 
       // If we write to special location, end the simulation.
       if (toHostValid_ and addr == toHost_ and storeVal != 0)

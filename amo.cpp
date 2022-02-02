@@ -76,6 +76,7 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
+  ldStSize_ = 4;
   ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
 
   if (hasActiveTrigger())
@@ -119,6 +120,7 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
+  ldStSize_ = 8;
   ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
 
   if (hasActiveTrigger())
@@ -163,6 +165,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
+  ldStSize_ = sizeof(LOAD_TYPE);
   ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
 
   if (hasActiveTrigger())
@@ -283,6 +286,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
+  ldStSize_ = sizeof(STORE_TYPE);
   ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
 
   // ld/st-address or instruction-address triggers have priority over
