@@ -65,7 +65,7 @@ Mcm<URV>::readOp(unsigned hartId, uint64_t time, uint64_t instrTag,
   op.instrTag_ = instrTag;
   op.hartIx_ = hartIx;
   op.size_ = size;
-  op.read_ = true;
+  op.isRead_ = true;
   op.internal_ = internal;
 
   if (not internal)
@@ -101,32 +101,17 @@ Mcm<URV>::readOp(unsigned hartId, uint64_t time, uint64_t instrTag,
 		    << '\n';
 	  return false;
 	}
-      if (op.rtlData_ != op.data_)
-	{
-	  std::cerr << "Error: RTL/whisper read mismatch time=" << time
-		    << " hart-id=" << hartId << " instr-tag=0x" << std::hex
-		    << instrTag << " addr=0x" << std::hex << physAddr
-		    << " size=" << size << " rtl=0x" << op.rtlData_
-		    << " whisper=0x" << op.data_ << std::dec << '\n';
-	  return false;
-	}
     }
 
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
-  if (not instr)
+  if (instr)
     {
-      assert(0);
-      return false;
+      if (instr->isCanceled())
+	op.cancel();
+      instr->addMemOp(memOps_.size());
     }
-
-  unsigned opCount = instr->countMemOps();
-  if (opCount >= instr->maxMemOpCount())
-    {
-      assert(0);
-      return false;
-    }
-
-  instr->memOps_[opCount] = memOps_.size();
+  else
+    assert(0);
   memOps_.push_back(op);
   
   return true;
@@ -194,7 +179,7 @@ Mcm<URV>::mergeBufferInsert(unsigned hartId, uint64_t time, uint64_t instrTag,
   op.instrTag_ = instrTag;
   op.hartIx_ = hartIx;
   op.size_ = size;
-  op.read_ = false;
+  op.isRead_ = false;
   op.internal_ = false;
 
   hartPendingWrites_.at(hartIx).push_back(op);
@@ -213,20 +198,22 @@ Mcm<URV>::mergeBufferInsert(unsigned hartId, uint64_t time, uint64_t instrTag,
 
 template <typename URV>
 bool
-Mcm<URV>::commit(unsigned hartId, uint64_t time, uint64_t tag)
+Mcm<URV>::retire(unsigned hartId, uint64_t time, uint64_t tag)
 {
-  if (not updateTime("Mcm::commit", time))
+  if (not updateTime("Mcm::retire", time))
     return false;
 
   auto hartPtr = system_.findHartByHartId(hartId);
   if (not hartPtr)
     {
-      std::cerr << "Error: Mcm::commit: Invalid hart id: " << hartId << '\n';
+      std::cerr << "Error: Mcm::retire: Invalid hart id: " << hartId << '\n';
       return false;
     }
 
   unsigned hartIx = hartPtr->sysHartIndex();
   assert(hartIx < hartInstrVecs_.size());
+
+  cancelNonRetired(hartIx, tag);
 
   McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (not instr)
@@ -237,21 +224,54 @@ Mcm<URV>::commit(unsigned hartId, uint64_t time, uint64_t tag)
 
   if (instr->retired_)
     {
-      std::cerr << "Mcm::commit: Error: Instruction tag " << tag
-		<< " committed multiple times\n";
+      std::cerr << "Mcm::retire: Error: Instruction tag " << tag
+		<< " retired multiple times\n";
       return false;
     }
   instr->retired_ = true;
 
   // If instruction is a store, save corresponding address and written data.
   uint64_t addr = 0, value = 0;
-  unsigned size = hartPtr->lastMemory(addr, value);
-  if (size)
+  unsigned ldStSize = hartPtr->lastLdStSize();
+  if (ldStSize)
     {
-      instr->size_ = size;
-      instr->physAddr_ = addr;
-      instr->data_ = value;
+      instr->size_ = ldStSize;
+      instr->physAddr_ = hartPtr->lastLdStAddress();
+      unsigned stSize = hartPtr->lastMemory(addr, value);
+      if (stSize)
+	{
+	  instr->data_ = value;
+	  instr->isStore_ = true;
+	}
     }
+
+  // Check read operations of instruction.
+  for (auto opIx : instr->memOps_)
+    {
+      if (opIx >= memOps_.size())
+	continue;
+      const auto& op = memOps_.at(opIx);
+      if (op.isRead_)
+	{
+	  if (op.internal_)
+	    {
+	      assert(0 and "Implement forwarding.");
+	    }
+	  else
+	    {
+	      if (op.rtlData_ != op.data_)
+		{
+		  std::cerr << "Error: RTL/whisper read mismatch time=" << time
+			    << " hart-id=" << hartId << " instr-tag=0x" << std::hex
+			    << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
+			    << " size=" << op.size_ << " rtl=0x" << op.rtlData_
+			    << " whisper=0x" << op.data_ << std::dec << '\n';
+		  return false;
+		}
+	    }
+	}
+    }
+
   return true;
 }
 
@@ -259,13 +279,12 @@ Mcm<URV>::commit(unsigned hartId, uint64_t time, uint64_t tag)
 template <typename URV>
 bool
 Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
-			   unsigned size,
 			   const std::vector<uint8_t>& rtlData)
 {
   if (not updateTime("Mcm::mergeBufferWrite", time))
     return false;
 
-  assert(size == lineSize_);
+  assert(rtlData.size() == lineSize_);
 
   auto hartPtr = system_.findHartByHartId(hartId);
   if (not hartPtr)
@@ -277,7 +296,7 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
   // Read our memory. Apply pending writes. Compare to reference. Commit to
   // our memory.
   assert((physAddr % lineSize_) == 0);
-  assert(rtlData.size() == size);
+  assert(rtlData.size() == lineSize_);
 
   unsigned hartIx = hartPtr->sysHartIndex();
   assert(hartIx < hartPendingWrites_.size());
@@ -286,16 +305,31 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
 
   uint64_t lineEnd = physAddr + lineSize_;
 
+  // Collect pending-writes matching merge buffer address in coveredWrites
+  // removing them from the pending-write vector.
+  size_t pendingSize = 0;  // Pending size after removal of matchign writes
   auto& writesVec = hartPendingWrites_.at(hartIx);
-  for (auto& write : writesVec)
+  for (size_t i = 0; i < writesVec.size(); ++i)
     {
+      auto& write = writesVec.at(i);
       if (write.physAddr_ >= physAddr and write.physAddr_ < lineEnd)
 	{
 	  write.time_ = time;
 	  assert(write.physAddr_ + write.size_  <= lineEnd);
+	  McmInstr* instr = findOrAddInstr(hartIx, write.instrTag_);
+	  assert(instr);
+	  assert(not instr->isCanceled());
+	  instr->addMemOp(memOps_.size());
 	  memOps_.push_back(write);
 	  coveredWrites.push_back(write);
 	}
+      else
+	{
+	  if (i != pendingSize)
+	    writesVec.at(pendingSize) = writesVec.at(i);
+	  pendingSize++;
+	}
+      writesVec.resize(pendingSize);
     }
 
   std::sort(coveredWrites.begin(), coveredWrites.end(),
@@ -325,6 +359,7 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
     hartPtr->pokeMemory(physAddr + i, line.at(i), true);
   
   // Compare our line to RTL line.
+  bool result = true;
   assert(line.size() == rtlData.size());
   auto iterPair = std::mismatch(line.begin(), line.end(), rtlData.begin());
   if (iterPair.first != line.end())
@@ -334,12 +369,28 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
 		<< " hart-id=" << hartId << " addr=0x" << std::hex
 		<< (physAddr + offset) << " rtl=0x" << rtlData.at(offset)
 		<< " whisper=0x" << line.at(offset) << std::dec << '\n';
-      return false;
+      result = false;
     }
 
-  // FIX TODO : Move pending writes to their corresponding instructions.
+  return result;
+}
 
-  return true;
+
+template <typename URV>
+void
+Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
+{
+  auto& vec = hartInstrVecs_.at(hartIx);
+  if (vec.empty())
+    return;
+
+  instrTag += 1;  // To count backward.
+
+  if (instrTag > vec.size())
+    instrTag = vec.size();
+
+  while (instrTag and not vec.at(instrTag-1).retired_)
+    cancelInstr(vec.at(--instrTag));
 }
 
 
@@ -369,7 +420,7 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, uint64_t time,
 
 
 // FIX TODO When a write is seen, check its data against instruction
-// if instruction is already committed.
+// if instruction is already retired.
 
 template class TTMcm::Mcm<uint32_t>;
 template class TTMcm::Mcm<uint64_t>;

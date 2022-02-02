@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <array>
+#include <algorithm>
+#include <cassert>
 
 
 namespace WdRiscv
@@ -19,47 +21,48 @@ namespace WdRiscv
 namespace TTMcm
 {
 
+  typedef uint32_t McmInstrIx;
+  typedef uint32_t MemoryOpIx;
+
   struct MemoryOp
   {
     uint64_t time_ = 0;
     uint64_t physAddr_ = 0;
     uint64_t data_ = 0;
     uint64_t rtlData_ = 0;
-    uint32_t instrTag_ = 0;
+    McmInstrIx instrTag_ = 0;
     uint8_t hartIx_ = 0;
     uint8_t size_ = 0;
-    bool read_ = false;
+    bool isRead_ = false;
     bool internal_ = false;
     bool failRead_ = false;
+    bool canceled_ = false;
+
+    bool isCanceled() const { return canceled_; }
+    void cancel() { canceled_ = true; }
   };
 
 
   struct McmInstr
   {
     // memOps contains indices into an array of MemoryOp items.
-    std::array<uint32_t, 4> memOps_ = {
-      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
-    };
-    uint64_t physAddr_ = 0;
-    uint64_t data_ = 0;
-    uint32_t tag_ = 0;
-    uint8_t size_ = 0;
+    std::vector<MemoryOpIx> memOps_;
+    uint64_t physAddr_ = 0;   // Data address for ld/store instruction.
+    uint64_t data_ = 0;       // Data for load/sore instructions.
+    McmInstrIx tag_ = 0;
+    uint8_t size_ = 0;        // Data size for load/store insructions.
     bool retired_ = false;
+    bool canceled_ = false;
+    bool isStore_ = false;
 
-    unsigned maxMemOpCount() const
-    { return sizeof(memOps_) / sizeof(memOps_[0]); }
+    bool isCanceled() const { return canceled_; }
 
-    unsigned countMemOps() const
+    void cancel() { canceled_ = true; }
+
+    void addMemOp(MemoryOpIx memOpIx)
     {
-      unsigned count = 0;
-      for (auto x : memOps_)
-	{
-	  if (x != ~uint32_t(0))
-	    count++;
-	  else
-	    break;
-	}
-      return count;
+      assert(std::find(memOps_.begin(), memOps_.end(), memOpIx) == memOps_.end());
+      memOps_.push_back(memOpIx);
     }
   };
 
@@ -90,8 +93,7 @@ namespace TTMcm
     /// transactions are marked completed. Write instructions where all
     /// writes are complete are marked complete. Return true on success.
     bool mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
-			  unsigned size,
-			  const std::vector<uint8_t>& referenceData);
+			  const std::vector<uint8_t>& rtlData);
 
     /// Insert a write operation for the given instruction into the
     /// merge buffer removing it from the store buffer. Return true on
@@ -106,18 +108,31 @@ namespace TTMcm
     bool cancelRead(unsigned hartId, uint64_t instTag);
 
     /// This is called when an instruction is retired.
-    bool commit(unsigned hartId, uint64_t time, uint64_t instrTag);
+    bool retire(unsigned hartId, uint64_t time, uint64_t instrTag);
 
   protected:
+
+    void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
     bool checkRtlWrite(unsigned hartId, uint64_t time,
 		       const McmInstr& instr, const MemoryOp& op);
 
     bool updateTime(const char* method, uint64_t time);
 
-    McmInstr* findInstr(unsigned hartIx, uint32_t tag);
+    McmInstr* findInstr(unsigned hartIx, McmInstrIx tag);
 
-    McmInstr* findOrAddInstr(unsigned hartIx, uint32_t tag);
+    McmInstr* findOrAddInstr(unsigned hartIx, McmInstrIx tag);
+
+    void cancelInstr(McmInstr& instr)
+    {
+      assert(not instr.isCanceled());
+      instr.cancel();
+      for (auto memIx : instr.memOps_)
+	{
+	  assert(not memOps_.at(memIx).isCanceled());
+	  memOps_.at(memIx).cancel();
+	}
+    }
 
   private:
 
