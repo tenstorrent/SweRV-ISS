@@ -630,9 +630,15 @@ namespace WdRiscv
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
 
-    /// Return data address of last executed ld/st instruction.
+    /// Return data address of last executed ld/st instruction. Return 0
+    /// if last instruction was not a ld/st.
     URV lastLdStAddress() const
-    { return ldStAddr_; }
+    { return ldStAddrValid_? ldStAddr_ : 0; }
+
+    /// Return the size of the last ld/st instruction or 0 if last
+    /// instruction was not a ld/st.
+    unsigned lastLdStSize() const
+    { return ldStAddrValid_? ldStSize_ : 0; }
 
     /// Read instruction at given address. Return true on success and
     /// false if address is out of memory bounds.
@@ -3769,6 +3775,7 @@ namespace WdRiscv
     URV ldStAddr_ = 0;              // Address of data of most recent ld/st inst.
     uint64_t ldStPhysAddr_ = 0;
     bool ldStAddrValid_ = false;    // True if ldStAddr_ valid.
+    unsigned ldStSize_ = 0;
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
 
