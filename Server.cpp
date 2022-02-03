@@ -641,7 +641,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 
   // Collect memory change.
   uint64_t memAddr = 0, memVal = 0;
-  unsigned size = hart.lastMemory(memAddr, memVal);
+  unsigned size = hart.lastStore(memAddr, memVal);
   if (size)
     {
       WhisperMessage msg(0, Change, 'm', memAddr, memVal);
@@ -765,7 +765,6 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   reply.flags |= (fpFlags << 16);
 #endif
 
-  hart.clearTraceData();
   return true;
 }
 

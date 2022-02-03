@@ -1401,7 +1401,6 @@ Hart<URV>::fastLoad(uint32_t rd, uint32_t rs1, int32_t imm)
 
   ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = addr;
-  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
   ldStSize_ = sizeof(LOAD_TYPE);
 
   // Unsigned version of LOAD_TYPE
@@ -1438,7 +1437,6 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
-  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
   ldStSize_ = sizeof(LOAD_TYPE);
 
   if (hasActiveTrigger())
@@ -1537,11 +1535,17 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
 {
   ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = addr;
-  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
   ldStSize_ = sizeof(STORE_TYPE);
+  ldStData_ = storeVal;
+
+  STORE_TYPE prev = 0;
+  memory_.peek(addr, prev, false /*usePma*/);
+  ldStPrevData_ = prev;
 
   if (memory_.write(hartIx_, addr, storeVal))
     {
+      ldStWrite_ = true;
+
       if (toHostValid_ and addr == toHost_ and storeVal != 0)
 	{
 	  throw CoreException(CoreException::Stop, "write to to-host",
@@ -1569,7 +1573,6 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
-  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
   ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
@@ -1599,9 +1602,6 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
   if (cause != ExceptionCause::NONE)
     {
-      // For the bench: A precise error does write external memory.
-      if (forceAccessFail_ and memory_.isDataAddressExternal(addr))
-        memory_.write(hartIx_, addr, storeVal);
       initiateStoreException(cause, virtAddr);
       return false;
     }
@@ -1620,10 +1620,18 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       storeVal = val;
     }
 
+  STORE_TYPE temp = 0;
+  memory_.peek(addr, temp, false /*usePma*/);
+  ldStPrevData_ = temp;
+
   if (memory_.write(hartIx_, addr, storeVal))
     {
-      memory_.invalidateOtherHartLr(hartIx_, addr, ldStSize_);
+      ldStWrite_ = true;
 
+      memory_.peek(addr, temp, false /*usePma*/);
+      ldStData_ = temp;
+
+      memory_.invalidateOtherHartLr(hartIx_, addr, ldStSize_);
       invalidateDecodeCache(virtAddr, ldStSize_);
 
       // If we write to special location, end the simulation.
@@ -2733,7 +2741,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 
   if (traceLdSt_)
     {
-      if (ldStAddrValid_)
+      if (ldStSize_)
 	{
 	  std::ostringstream oss;
 	  oss << "0x" << std::hex << ldStAddr_;
@@ -2823,23 +2831,12 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Process memory diff.
-  uint64_t address = 0;
-  uint64_t memValue = 0;
-  unsigned writeSize = memory_.getLastWriteNewValue(hartIx_, address, memValue);
-  if (writeSize > 0)
+  if (ldStWrite_)
     {
       if (pending)
 	fprintf(out, "  +\n");
-
-      if (sizeof(URV) == 4 and writeSize == 8)  // wide store
-        {
-          fprintf(out, "#%ld %d %08x %8s m %08x %016lx  %s",
-                  tag, hartIx_, uint32_t(currPc_), instBuff, uint32_t(address),
-                  memValue, tmp.c_str());
-        }
-      else
-        formatInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff, 'm',
-                             URV(address), URV(memValue), tmp.c_str());
+      formatInstTrace<URV>(out, tag, hartIx_, currPc_, instBuff, 'm',
+			   URV(ldStPhysAddr_), URV(ldStData_), tmp.c_str());
       pending = true;
     }
 
@@ -3090,13 +3087,13 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Memory
   fputc(',', out);
   bool load = false, store = false;
-  if (ldStAddrValid_)
+  if (ldStSize_)
     {
       fprintf(out, "%lx", uint64_t(ldStAddr_));
       if (ldStPhysAddr_ != ldStAddr_)
 	fprintf(out, ":%lx", ldStPhysAddr_);
       uint64_t addr = 0, val = 0;
-      if (lastMemory(addr, val))
+      if (lastStore(addr, val))
 	{
 	  store = true;
 	  fprintf(out, "=%lx", val);
@@ -3407,10 +3404,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       if (misalignedLdSt_)
 	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_,
                              lastPriv_);
-      size_t addr = 0;
-      uint64_t value = 0;
-      memory_.getLastWriteOldValue(hartIx_, addr, value);
-      if (isDataAddressExternal(addr))
+      if (isDataAddressExternal(ldStAddr_))
 	pregs.updateCounters(EventNumber::BusStore, prevPerfControl_,
                              lastPriv_);
     }
@@ -3894,14 +3888,6 @@ Hart<URV>::lastCsr(std::vector<CsrNumber>& csrs,
 
 
 template <typename URV>
-unsigned
-Hart<URV>::lastMemory(uint64_t& address, uint64_t& value) const
-{
-  return memory_.getLastWriteNewValue(hartIx_, address, value);
-}
-
-
-template <typename URV>
 void
 handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd);
 
@@ -4168,7 +4154,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
     {
       if (userStop)
         break;
-      clearTraceData();
+      resetExecInfo();
 
       if (enableGdb_ and ++gdbCount >= gdbLimit)
         {
@@ -4200,11 +4186,6 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 	{
           uint32_t inst = 0;
 	  currPc_ = pc_;
-
-	  ldStAddrValid_ = false;
-	  triggerTripped_ = false;
-	  hasInterrupt_ = hasException_ = false;
-          lastPriv_ = privMode_;
 
 	  ++instCounter_;
 
@@ -4722,11 +4703,7 @@ Hart<URV>::singleStep(FILE* traceFile)
       uint32_t inst = 0;
       currPc_ = pc_;
 
-      ldStAddrValid_ = false;
-      triggerTripped_ = false;
-      hasException_ = hasInterrupt_ = false;
-      ebreakInstDebug_ = false;
-      lastPriv_ = privMode_;
+      resetExecInfo();
 
       ++instCounter_;
 
@@ -5022,18 +4999,18 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
       record.fpRegValue = newFpValue;
     }
 
-  record.memSize = memory_.getLastWriteNewValue(hartIx_, record.memAddr,
-                                                record.memValue);
-
-  size_t addr = 0;
-  uint64_t value = 0;
-  size_t byteCount = memory_.getLastWriteOldValue(hartIx_, addr, value);
-  for (size_t i = 0; i < byteCount; ++i)
+  if (ldStWrite_)
     {
-      uint8_t byte = value & 0xff;
-      memory_.poke(addr, byte);
-      addr++;
-      value = value >> 8;
+      record.memSize = ldStSize_;
+      record.memAddr = ldStPhysAddr_;
+      record.memValue = ldStData_;
+      uint64_t addr = ldStPhysAddr_;
+      uint64_t value = ldStPrevData_;
+      for (size_t i = 0; i < ldStSize_; ++i, ++addr)
+	{
+	  memory_.poke(addr, uint8_t(value));
+	  value = value >> 8;
+	}
     }
 
   std::vector<CsrNumber> csrNums;

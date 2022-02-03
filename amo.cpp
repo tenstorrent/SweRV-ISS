@@ -77,7 +77,6 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
   ldStSize_ = 4;
-  ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
 
   if (hasActiveTrigger())
     {
@@ -121,7 +120,6 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
   ldStSize_ = 8;
-  ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
 
   if (hasActiveTrigger())
     {
@@ -166,7 +164,6 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
   ldStSize_ = sizeof(LOAD_TYPE);
-  ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
 
   if (hasActiveTrigger())
     {
@@ -287,7 +284,6 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
-  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
 
   // ld/st-address or instruction-address triggers have priority over
   // ld/st access or misaligned exceptions.
@@ -354,8 +350,14 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (not memory_.hasLr(hartIx_, addr, sizeof(storeVal)))
     return false;
 
+  STORE_TYPE prev = 0;
+  memory_.peek(addr, prev, false /*usePma*/);
+  ldStData_ = storeVal;
+  ldStPrevData_ = prev;
+
   if (memory_.write(hartIx_, addr, storeVal))
     {
+      ldStWrite_ = true;
       invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
 
       // If we write to special location, end the simulation.

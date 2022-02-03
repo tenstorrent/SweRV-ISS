@@ -208,7 +208,6 @@ namespace WdRiscv
       lwd.size_ = sizeof(T);
       lwd.addr_ = address;
       lwd.value_ = value;
-      lwd.prevValue_ = *(reinterpret_cast<T*>(data_ + address));
       *(reinterpret_cast<T*>(data_ + address)) = value;
 
       return true;
@@ -241,7 +240,6 @@ namespace WdRiscv
   #ifdef MEM_CALLBACKS
       uint64_t val = 0;
       readCallback_(address, sizeof(T), val);
-      lwd.prevValue_ = val;
       val = value;
       if (not writeCallback_(address, sizeof(T), val))
         {
@@ -249,7 +247,6 @@ namespace WdRiscv
           return false;
         }
   #else
-      lwd.prevValue_ = *(reinterpret_cast<T*>(data_ + address));
       *(reinterpret_cast<T*>(data_ + address)) = value;
   #endif
 
@@ -478,39 +475,6 @@ namespace WdRiscv
     /// and external memory are written.
     bool specialInitializeByte(size_t address, uint8_t value);
 
-    /// Set addr to the address of the last write and value to the
-    /// corresponding value and return the size of that write. Return
-    /// 0 if no write since the most recent clearLastWriteInfo in
-    /// which case addr and value are not modified.
-    unsigned getLastWriteNewValue(unsigned sysHartIx, uint64_t& addr,
-                                  uint64_t& value) const
-    {
-      const auto& lwd = lastWriteData_.at(sysHartIx);
-      if (lwd.size_)
-	{
-	  addr = lwd.addr_;
-	  value = lwd.value_;
-	}
-      return lwd.size_;
-    }
-
-    /// Set addr to the address of the last write and value to the
-    /// corresponding previous value (value before last write) and
-    /// return the size of that write. Return 0 if no write since the
-    /// most recent clearLastWriteInfo in which case addr and value
-    /// are not modified.
-    unsigned getLastWriteOldValue(unsigned sysHartIx, size_t& addr,
-                                  uint64_t& value) const
-    {
-      auto& lwd = lastWriteData_.at(sysHartIx);
-      if (lwd.size_)
-	{
-	  addr = lwd.addr_;
-	  value = lwd.value_;
-	}
-      return lwd.size_;
-    }
-
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
     {
@@ -577,17 +541,12 @@ namespace WdRiscv
     /// Write a memory mapped register.
     bool writeRegister(unsigned sysHartIx, size_t addr, uint32_t value)
     {
-      uint32_t prev = 0;
-      if (not readRegister(addr, prev))
-        return false;
-
       value = doRegisterMasking(addr, value);
 
       if (not pmaMgr_.writeRegister(addr, value))
         return false;
 
       auto& lwd = lastWriteData_.at(sysHartIx);
-      lwd.prevValue_ = prev;
       lwd.size_ = 4;
       lwd.addr_ = addr;
       lwd.value_ = value;
@@ -702,7 +661,6 @@ namespace WdRiscv
       unsigned size_ = 0;
       size_t addr_ = 0;
       uint64_t value_ = 0;
-      uint64_t prevValue_ = 0;
     };
 
     size_t size_;        // Size of memory in bytes.

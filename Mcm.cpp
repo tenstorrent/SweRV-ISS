@@ -232,17 +232,13 @@ Mcm<URV>::retire(unsigned hartId, uint64_t time, uint64_t tag)
 
   // If instruction is a store, save corresponding address and written data.
   uint64_t addr = 0, value = 0;
-  unsigned ldStSize = hartPtr->lastLdStSize();
-  if (ldStSize)
+  unsigned stSize = hartPtr->lastStore(addr, value);
+  if (stSize)
     {
-      instr->size_ = ldStSize;
-      instr->physAddr_ = hartPtr->lastLdStAddress();
-      unsigned stSize = hartPtr->lastMemory(addr, value);
-      if (stSize)
-	{
-	  instr->data_ = value;
-	  instr->isStore_ = true;
-	}
+      instr->size_ = stSize;
+      instr->physAddr_ = addr;
+      instr->data_ = value;
+      instr->isStore_ = true;
     }
 
   // Check read operations of instruction.
