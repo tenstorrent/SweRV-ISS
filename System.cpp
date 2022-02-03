@@ -15,6 +15,7 @@
 #include "Hart.hpp"
 #include "Core.hpp"
 #include "System.hpp"
+#include "Mcm.hpp"
 
 using namespace WdRiscv;
 
@@ -25,6 +26,8 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                     size_t pageSize)
   : hartCount_(coreCount * hartsPerCore), hartsPerCore_(hartsPerCore)
 {
+  TTMcm::Mcm mcm(*this);
+
   cores_.resize(coreCount);
 
   memory_ = std::make_shared<Memory>(memSize, pageSize);

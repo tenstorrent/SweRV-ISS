@@ -2702,11 +2702,17 @@ Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
   if (not out)
     return;
 
-  DecodedInst di;
-  uint64_t physPc = pc_;
-  decode(pc_, physPc, inst, di);
-
-  printDecodedInstTrace(di, tag, tmp, out);
+  uint32_t ix = (currPc_ >> 1) & decodeCacheMask_;
+  DecodedInst* dip = &decodeCache_[ix];
+  if (dip->isValid() and dip->address() == currPc_)
+    printDecodedInstTrace(*dip, tag, tmp, out);
+  else
+    {
+      DecodedInst di;
+      uint64_t physPc = currPc_;
+      decode(currPc_, physPc, inst, di);
+      printDecodedInstTrace(di, tag, tmp, out);
+    }
 }
 
 
