@@ -1613,13 +1613,6 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       storeVal = val;
     }
 
-  if (addr >= clintStart_ and addr <= clintLimit_)
-    {
-      URV val = storeVal;
-      processClintWrite(addr, ldStSize_, val);
-      storeVal = val;
-    }
-
   STORE_TYPE temp = 0;
   memory_.peek(addr, temp, false /*usePma*/);
   ldStPrevData_ = temp;
