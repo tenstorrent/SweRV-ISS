@@ -620,12 +620,19 @@ namespace WdRiscv
     void lastCsr(std::vector<CsrNumber>& csrs,
 		 std::vector<unsigned>& triggers) const;
 
-    /// Support for tracing: Set address and value to the memory
-    /// location changed by the last instruction. Return the size
-    /// of the change or zero if the last instruction did not change
-    /// memory in which case address and value are not modified.
-    /// Returned size is one of 0, 1, 2, 4, or 8.
-    unsigned lastMemory(uint64_t& addr, uint64_t& value) const;
+    /// Support for tracing: Set address and value to the physical
+    /// memory location changed by the last instruction and return the
+    /// number of bytes written. Return 0 leaving addr and value
+    /// unmodified if last instruction did not write memory (not a
+    /// store or store got trapped).
+    unsigned lastStore(uint64_t& addr, uint64_t& value) const
+    {
+      if (not ldStWrite_)
+	return 0;
+      addr = ldStPhysAddr_;
+      value = ldStData_;
+      return ldStSize_;
+    }
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
@@ -633,12 +640,12 @@ namespace WdRiscv
     /// Return data address of last executed ld/st instruction. Return 0
     /// if last instruction was not a ld/st.
     URV lastLdStAddress() const
-    { return ldStAddrValid_? ldStAddr_ : 0; }
+    { return ldStSize_? ldStAddr_ : 0; }
 
     /// Return the size of the last ld/st instruction or 0 if last
     /// instruction was not a ld/st.
     unsigned lastLdStSize() const
-    { return ldStAddrValid_? ldStSize_ : 0; }
+    { return ldStSize_; }
 
     /// Read instruction at given address. Return true on success and
     /// false if address is out of memory bounds.
@@ -3649,6 +3656,18 @@ namespace WdRiscv
     void setPc(URV value)
     { pc_ = value & pcMask_; }
 
+    // Clear information changed by instruction execution.
+    inline
+    void resetExecInfo()
+    {
+      triggerTripped_ = hasInterrupt_ = hasException_ = false;
+      ebreakInstDebug_ = false;
+      ldStSize_ = 0;
+      lastPriv_ = privMode_;
+      ldStWrite_ = false;
+      clearTraceData();
+    }
+
     void countBasicBlocks(const DecodedInst* di);
     void dumpBasicBlocks();
 
@@ -3772,10 +3791,12 @@ namespace WdRiscv
     uint32_t prevPerfControl_ = ~0; // Value before current instruction.
 
     bool traceLdSt_ = false;        // Trace addr of ld/st insts if true.
-    URV ldStAddr_ = 0;              // Address of data of most recent ld/st inst.
+    URV ldStAddr_ = 0;              // Addr of data of most recent ld/st inst.
     uint64_t ldStPhysAddr_ = 0;
-    bool ldStAddrValid_ = false;    // True if ldStAddr_ valid.
-    unsigned ldStSize_ = 0;
+    unsigned ldStSize_ = 0;         // Non-zero if ld/st.
+    uint64_t ldStData_ = 0;         // For tracing
+    uint64_t ldStPrevData_ = 0;
+    bool ldStWrite_ = false;        // Ture if memory written by last store.
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
 

@@ -140,7 +140,6 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
   if (tokens.size() == 1)
     {
       hart.singleStep(traceFile);
-      hart.clearTraceData();
       return true;
     }
 
@@ -154,7 +153,6 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
   for (uint64_t i = 0; i < count; ++i)
     {
       hart.singleStep(traceFile);
-      hart.clearTraceData();
     }
 
   return true;
