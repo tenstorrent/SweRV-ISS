@@ -16,6 +16,7 @@
 #include <fstream>
 #include <sstream>
 #include <thread>
+#include <optional>
 #include <atomic>
 #if defined(__cpp_lib_filesystem)
   #include <filesystem>
