@@ -55,6 +55,8 @@ namespace TTMcm
     bool canceled_ = false;
     bool isStore_ = false;
 
+    bool isRetired() const { return retired_; }
+
     bool isCanceled() const { return canceled_; }
 
     void cancel() { canceled_ = true; }
@@ -112,10 +114,18 @@ namespace TTMcm
 
   protected:
 
+    /// Forward from a store to a read op. Return true on succss.
+    /// Return false if instr is not retired, is canceled, is not
+    /// a store, is amo or does not match range address of op.
+    bool forwardTo(const McmInstr& instr, MemoryOp& op);
+
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
-    bool checkRtlWrite(unsigned hartId, uint64_t time,
-		       const McmInstr& instr, const MemoryOp& op);
+    bool checkRtlWrite(unsigned hartId, const McmInstr& instr,
+		       const MemoryOp& op);
+
+    bool checkRtlRead(unsigned hartId, const McmInstr& instr,
+		      const MemoryOp& op);
 
     bool updateTime(const char* method, uint64_t time);
 
