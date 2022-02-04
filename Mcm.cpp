@@ -190,7 +190,7 @@ Mcm<URV>::mergeBufferInsert(unsigned hartId, uint64_t time, uint64_t instrTag,
   if (not instr)
     return false;
   if (instr->retired_)
-    return checkRtlWrite(hartId, time, *instr, op);
+    return checkRtlWrite(hartId, *instr, op);
 
   return true;
 }
@@ -246,26 +246,28 @@ Mcm<URV>::retire(unsigned hartId, uint64_t time, uint64_t tag)
     {
       if (opIx >= memOps_.size())
 	continue;
-      const auto& op = memOps_.at(opIx);
-      if (op.isRead_)
+      auto& op = memOps_.at(opIx);
+      if (not op.isRead_)
+	continue;
+
+      if (op.internal_)
 	{
-	  if (op.internal_)
+	  bool match = false;
+	  const auto& instrVec = hartInstrVecs_.at(hartIx);
+	  for (McmInstrIx ix = tag; ix > 0 and not match; --ix)
+	    match = forwardTo(instrVec.at(ix-1), op);
+	  if (not match)
 	    {
-	      assert(0 and "Implement forwarding.");
-	    }
-	  else
-	    {
-	      if (op.rtlData_ != op.data_)
-		{
-		  std::cerr << "Error: RTL/whisper read mismatch time=" << time
-			    << " hart-id=" << hartId << " instr-tag=0x" << std::hex
-			    << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
-			    << " size=" << op.size_ << " rtl=0x" << op.rtlData_
-			    << " whisper=0x" << op.data_ << std::dec << '\n';
-		  return false;
-		}
+	      std::cerr << "Error: Internal read does not match any prevous store"
+			<< " time=" << op.time_ << " hart-id=" << hartId
+			<< " instr-tag=0x" << std::hex << tag << " addr=0x"
+			<< op.physAddr_ << std::dec << '\n';
+	      return false;
 	    }
 	}
+
+      if (not checkRtlRead(hartId, *instr, op))
+	return false;
     }
 
   return true;
@@ -373,6 +375,26 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
 
 
 template <typename URV>
+bool
+Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& op)
+{
+  if (instr.isCanceled() or not instr.isRetired() or not instr.isStore_)
+    return false;
+  if (op.physAddr_ < instr.physAddr_ or
+      op.physAddr_ + op.size_ > instr.physAddr_ + instr.size_ or
+      op.size_ > instr.size_)
+    return false;
+
+  uint64_t data = (instr.data_ >> (instr.size_ - op.size_)*8); // right justify
+  unsigned shift = (sizeof(data) - op.size_)*8;
+  data = (data << shift) >> shift;  // Keep op.size_ bytes.
+  op.data_ = data;
+
+  return true;
+}
+
+
+template <typename URV>
 void
 Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
 {
@@ -392,8 +414,28 @@ Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
 
 template <typename URV>
 bool
-Mcm<URV>::checkRtlWrite(unsigned hartId, uint64_t time,
-			const McmInstr& instr, const MemoryOp& op)
+Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
+		       const MemoryOp& op)
+{
+  assert(instr.size_ > 0);
+  assert(op.size_ <= instr.size_);
+  if (op.rtlData_ != op.data_)
+    {
+      std::cerr << "Error: RTL/whisper read mismatch time=" << op.time_
+		<< " hart-id=" << hartId << " instr-tag=0x" << std::hex
+		<< op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
+		<< " size=" << op.size_ << " rtl=0x" << op.rtlData_
+		<< " whisper=0x" << op.data_ << std::dec << '\n';
+      return false;
+    }
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
+			const MemoryOp& op)
 {
   assert(instr.size_ > 0);
   assert(op.size_ <= instr.size_);
@@ -406,7 +448,7 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, uint64_t time,
   if (data == op.rtlData_)
     return true;
 
-  std::cerr << "Error: RTL/whisper write mismatch time=" << time
+  std::cerr << "Error: RTL/whisper write mismatch time=" << op.time_
 	    << " hart-id=" << hartId << " instr-tag=0x" << std::hex
 	    << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
 	    << " size=" << op.size_ << " rtl=0x" << op.rtlData_
