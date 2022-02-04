@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <type_traits>
 #include <cassert>
+#include <string>
 #include "trapEnums.hpp"
 
 
