@@ -114,10 +114,13 @@ namespace TTMcm
 
   protected:
 
-    /// Forward from a store to a read op. Return true on succss.
-    /// Return false if instr is not retired, is canceled, is not
-    /// a store, is amo or does not match range address of op.
-    bool forwardTo(const McmInstr& instr, MemoryOp& op);
+    /// Forward from a store to a read op. Return true on success.
+    /// Return false if instr is not retired, is canceled, is not a
+    /// store, is amo or does not match range address of op.  Mask is
+    /// the mask of bits of op to be updated by the forward (bypass)
+    /// operartion and is updated (bits cleared) if some parts of op,
+    /// covered by the mask, are successfully updated.
+    bool forwardTo(const McmInstr& instr, MemoryOp& op, uint64_t& mask);
 
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 

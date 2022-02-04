@@ -252,13 +252,13 @@ Mcm<URV>::retire(unsigned hartId, uint64_t time, uint64_t tag)
 
       if (op.internal_)
 	{
-	  bool match = false;
+	  uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
 	  const auto& instrVec = hartInstrVecs_.at(hartIx);
-	  for (McmInstrIx ix = tag; ix > 0 and not match; --ix)
-	    match = forwardTo(instrVec.at(ix-1), op);
-	  if (not match)
+	  for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
+	    forwardTo(instrVec.at(ix-1), op, mask);
+	  if (mask != 0)
 	    {
-	      std::cerr << "Error: Internal read does not match any prevous store"
+	      std::cerr << "Error: Internal read does not forward from preceeding stores"
 			<< " time=" << op.time_ << " hart-id=" << hartId
 			<< " instr-tag=0x" << std::hex << tag << " addr=0x"
 			<< op.physAddr_ << std::dec << '\n';
@@ -376,21 +376,63 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
 
 template <typename URV>
 bool
-Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& op)
+Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
 {
+  if (mask == 0)
+    return true;  // No bits left to forward.
+
   if (instr.isCanceled() or not instr.isRetired() or not instr.isStore_)
     return false;
-  if (op.physAddr_ < instr.physAddr_ or
-      op.physAddr_ + op.size_ > instr.physAddr_ + instr.size_ or
-      op.size_ > instr.size_)
-    return false;
 
-  uint64_t data = (instr.data_ >> (instr.size_ - op.size_)*8); // right justify
-  unsigned shift = (sizeof(data) - op.size_)*8;
-  data = (data << shift) >> shift;  // Keep op.size_ bytes.
-  op.data_ = data;
+  uint64_t rol = readOp.physAddr_, roh = readOp.physAddr_ + readOp.size_ - 1;
+  uint64_t il = instr.physAddr_, ih = instr.physAddr_ + instr.size_;
+  if (roh < il or rol > ih)
+    return false;  // no overlap
 
-  return true;
+  // Check all write ops of instruction.
+  for (const auto wopIx : instr.memOps_)
+    {
+      if (wopIx >= memOps_.size())
+	continue;
+
+      const auto& wop = memOps_.at(wopIx);
+      if (wop.isRead_)
+	continue;  // Should not happen.
+
+      if (wop.time_ > readOp.time_)
+	continue;  // Write op left core before read. Cannot forward.
+      
+      uint64_t wol = wop.physAddr_, woh = wop.physAddr_ + wop.size_ - 1;
+      if (roh < wol or rol < woh)
+	return false;  // no overlap
+
+      // Align write data with read op address.
+      uint64_t data = wop.data_;
+      uint64_t wmask = (~uint64_t(0)) >> ((8 - wop.size_) * 8);
+      if (wop.physAddr_ <= readOp.physAddr_)
+	{
+	  unsigned shift = (readOp.physAddr_ - wop.physAddr_) * 8;
+	  data = data << shift;
+	  wmask = wmask << shift;
+	}
+      else
+	{
+	  unsigned shift = (wop.physAddr_ - readOp.physAddr_) * 8;
+	  data = data >> shift;
+	  wmask = wmask >> shift;
+	}
+
+      uint64_t effMask = mask & wmask;
+      if (effMask == 0)
+	continue;  // Overlapped parts already forwarded.
+	
+      readOp.data_ = (readOp.data_ & ~effMask) | (data & effMask);
+      mask = mask & ~effMask;
+      if (mask == 0)
+	return true;
+    }
+
+  return mask == 0;
 }
 
 
