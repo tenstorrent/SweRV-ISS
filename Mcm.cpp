@@ -3,17 +3,18 @@
 #include "System.hpp"
 #include "Hart.hpp"
 
-using namespace TTMcm;
 using namespace WdRiscv;
+
 
 template <typename URV>
 Mcm<URV>::Mcm(System<URV>& system)
   : system_(system)
 {
-  memOps_.reserve(200000);
+  sysMemOps_.reserve(200000);
   hartInstrVecs_.resize(system.hartCount());
   for (auto& vec : hartInstrVecs_)
     vec.reserve(200000);
+  currentInstrTag_.resize(system.hartCount());
 }
 
 
@@ -108,11 +109,11 @@ Mcm<URV>::readOp(unsigned hartId, uint64_t time, uint64_t instrTag,
     {
       if (instr->isCanceled())
 	op.cancel();
-      instr->addMemOp(memOps_.size());
+      instr->addMemOp(sysMemOps_.size());
     }
   else
     assert(0);
-  memOps_.push_back(op);
+  sysMemOps_.push_back(op);
   
   return true;
 }
@@ -241,12 +242,13 @@ Mcm<URV>::retire(unsigned hartId, uint64_t time, uint64_t tag)
       instr->isStore_ = true;
     }
 
-  // Check read operations of instruction.
+  // Check read operations of instruction comparing RTL values to
+  // meory model (whisper) values.
   for (auto opIx : instr->memOps_)
     {
-      if (opIx >= memOps_.size())
+      if (opIx >= sysMemOps_.size())
 	continue;
-      auto& op = memOps_.at(opIx);
+      auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
 
@@ -317,8 +319,8 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
 	  McmInstr* instr = findOrAddInstr(hartIx, write.instrTag_);
 	  assert(instr);
 	  assert(not instr->isCanceled());
-	  instr->addMemOp(memOps_.size());
-	  memOps_.push_back(write);
+	  instr->addMemOp(sysMemOps_.size());
+	  sysMemOps_.push_back(write);
 	  coveredWrites.push_back(write);
 	}
       else
@@ -392,10 +394,10 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
   // Check all write ops of instruction.
   for (const auto wopIx : instr.memOps_)
     {
-      if (wopIx >= memOps_.size())
+      if (wopIx >= sysMemOps_.size())
 	continue;
 
-      const auto& wop = memOps_.at(wopIx);
+      const auto& wop = sysMemOps_.at(wopIx);
       if (wop.isRead_)
 	continue;  // Should not happen.
 
@@ -499,8 +501,92 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 }
 
 
+template <typename URV>
+bool
+Mcm<URV>::setCurrentInstruction(unsigned hartId, uint64_t tag)
+{
+  auto hartPtr = system_.findHartByHartId(hartId);
+  if (not hartPtr)
+    return false;
+
+  unsigned hartIx = hartPtr->sysHartIndex();
+  currentInstrTag_.at(hartIx) = tag;
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::getCurrentLoadValue(unsigned hartId, uint64_t addr,
+			      unsigned size, uint64_t& value)
+{
+  value = 0;
+  if (size == 0 or size > 8)
+    {
+      assert(0);
+      return false;
+    }
+
+  auto hartPtr = system_.findHartByHartId(hartId);
+  if (not hartPtr)
+    return false;
+
+  unsigned hartIx = hartPtr->sysHartIndex();
+  uint64_t tag = currentInstrTag_.at(hartIx);
+
+  McmInstr* instr = findInstr(hartIx, tag);
+  if (not instr or instr->isCanceled())
+    return false;
+
+  // We expect Mcm::retire to be called after this method is called.
+  if (instr->isRetired())
+    return false;
+
+  instr->size_ = size;
+  instr->physAddr_ = addr;
+
+  // Merge read operation values. TODO FIX : Check that merged values cover
+  // required bytes.
+  uint64_t mergeMask = 0;
+  uint64_t merged = 0;
+  for (auto opIx : instr->memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_)
+	continue;
+      uint64_t opVal = op.data_;
+      uint64_t mask = ~uint64_t(0);
+      if (op.physAddr_ <= addr)
+	{
+	  uint64_t offset = addr -op.physAddr_;
+	  if (offset > 8)
+	    offset = 8;
+	  opVal >>= offset*8;
+	  mask >>= offset*8;
+	}
+      else
+	{
+	  uint64_t offset = op.physAddr_ - addr;
+	  if (offset > 8)
+	    offset = 8;
+	  opVal <<= offset*8;
+	  mask <<= offset*8;
+	}
+      merged |= (opVal & mask);
+    }
+
+  unsigned unused = (8 - size)*8;  // Unused upper bits of value.
+  value = (merged << unused) >> unused;
+
+  return true;
+}
+  
+
+
 // FIX TODO When a write is seen, check its data against instruction
 // if instruction is already retired.
 
-template class TTMcm::Mcm<uint32_t>;
-template class TTMcm::Mcm<uint64_t>;
+template class WdRiscv::Mcm<uint32_t>;
+template class WdRiscv::Mcm<uint64_t>;

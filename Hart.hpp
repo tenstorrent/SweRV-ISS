@@ -39,6 +39,9 @@
 namespace WdRiscv
 {
 
+  template <typename URV>
+  class Mcm;
+
   /// Thrown by the simulator when a stop (store to to-host) is seen
   /// or when the target program reaches the exit system call.
   class CoreException : public std::exception
@@ -3885,6 +3888,7 @@ namespace WdRiscv
     std::unordered_map<uint64_t, uint64_t> basicBlocks_; // Map pc to basic-block frequency.
     std::unordered_set<uint64_t> storeTargets_;
     FILE* bbFile_ = nullptr;
+    Mcm<URV>* mcm_ = nullptr;
   };
 }
 
