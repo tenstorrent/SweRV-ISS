@@ -29,6 +29,9 @@ namespace WdRiscv
   template <typename URV>
   class Core;
 
+  template <typename URV>
+  class Mcm;
+
 
   /// Model a system consisting of n cores with m-harts per core and a
   /// memory. The harts in the system are indexed from 0 to n*m -

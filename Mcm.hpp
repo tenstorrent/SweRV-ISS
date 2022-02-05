@@ -15,11 +15,6 @@ namespace WdRiscv
   class Hart;
 
   class DecodedInst;
-}
-
-
-namespace TTMcm
-{
 
   typedef uint32_t McmInstrIx;
   typedef uint32_t MemoryOpIx;
@@ -112,6 +107,13 @@ namespace TTMcm
     /// This is called when an instruction is retired.
     bool retire(unsigned hartId, uint64_t time, uint64_t instrTag);
 
+    bool setCurrentInstruction(unsigned hartId, uint64_t instrTag);
+
+    /// Return the load value of the current target instruction
+    /// (set with setCurrentInstruction).
+    bool getCurrentLoadValue(unsigned hartId, uint64_t addr, unsigned size,
+			     uint64_t& value);
+
   protected:
 
     /// Forward from a store to a read op. Return true on success.
@@ -142,8 +144,8 @@ namespace TTMcm
       instr.cancel();
       for (auto memIx : instr.memOps_)
 	{
-	  assert(not memOps_.at(memIx).isCanceled());
-	  memOps_.at(memIx).cancel();
+	  assert(not sysMemOps_.at(memIx).isCanceled());
+	  sysMemOps_.at(memIx).cancel();
 	}
     }
 
@@ -152,13 +154,15 @@ namespace TTMcm
     typedef std::vector<McmInstr> McmInstrVec;
     typedef std::vector<MemoryOp> MemoryOpVec;
 
-    MemoryOpVec memOps_;  // Memory ops.
+    MemoryOpVec sysMemOps_;  // Memory ops of all cores.
     std::vector<McmInstrVec> hartInstrVecs_; // One vector per hart.
     std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
 
     WdRiscv::System<URV>& system_;
     uint64_t time_ = 0;
     unsigned lineSize_ = 64; // Cache/merge buffer line size.
+
+    std::vector<McmInstrIx> currentInstrTag_;
   };
 
 }

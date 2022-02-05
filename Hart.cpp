@@ -51,8 +51,9 @@
 
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
-#include "Hart.hpp"
 #include "System.hpp"
+#include "Hart.hpp"
+#include "Mcm.hpp"
 
 #ifndef SO_REUSEPORT
 #define SO_REUSEPORT SO_REUSEADDR
@@ -1468,43 +1469,50 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
       return true;
     }
 
-  ULT uval = 0;
-  if (memory_.read(addr, uval))
+  ULT narrow = 0;   // Unsigned narrow loaded value
+  URV value = 0;  // loaded value expanded to register width
+  if (addr >= clintStart_ and addr <= clintLimit_ and addr == 0x200bff8)
     {
-      URV value;
-      if constexpr (std::is_same<ULT, LOAD_TYPE>::value)
-        value = uval;  // Loading an unsinged.
-      else
-        value = SRV(LOAD_TYPE(uval)); // Loading signed: Sign extend.
-
-      // Check for load-data-trigger. Load-data-trigger does not apply
-      // to io/region unless address is in local memory. Don't ask.
-      if (hasActiveTrigger())
-        {
-          TriggerTiming timing = TriggerTiming::Before;
-          bool isLoad = true;
-          if (ldStDataTriggerHit(uval, timing, isLoad, privMode_,
-                                 isInterruptEnabled()))
-            triggerTripped_ = true;
-        }
-
-      if (addr >= clintStart_ and addr <= clintLimit_ and addr == 0x200bff8)
-        {
-          value = instCounter_;
-        }
-
-      if (not triggerTripped_)
-        {
-          intRegs_.write(rd, value);
-          return true;  // Success.
-        }
+      narrow = instCounter_;  // Fake time: use instruction count
+    }
+  else
+    {
+      bool hasMcmVal = false;
+      if (mcm_)
+	{
+	  URV hartId = 0; peekCsr(CsrNumber::MISA, value);
+	  uint64_t mcmVal = 0;
+	  if (mcm_->getCurrentLoadValue(hartId, addr, ldStSize_, mcmVal))
+	    {
+	      narrow = mcmVal;
+	      hasMcmVal = true;
+	    }
+	}
+      if (not hasMcmVal and not memory_.read(addr, narrow))
+	{
+	  assert(0);
+	  return false;
+	}
     }
 
+  value = narrow;
+  if (not std::is_same<ULT, LOAD_TYPE>::value)
+    value = SRV(LOAD_TYPE(narrow)); // Loading signed: Sign extend.
+
+  // Check for load-data-trigger.
+  if (hasActiveTrigger())
+    {
+      TriggerTiming timing = TriggerTiming::Before;
+      bool isLoad = true;
+      if (ldStDataTriggerHit(narrow, timing, isLoad, privMode_,
+			     isInterruptEnabled()))
+	triggerTripped_ = true;
+    }
   if (triggerTripped_)
     return false;
 
-  assert(0);
-  return false;
+  intRegs_.write(rd, value);
+  return true;  // Success.
 #endif
 }
 
