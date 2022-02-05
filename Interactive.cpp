@@ -1426,6 +1426,33 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       return true;
     }
 
+  if (command == "mread" or command == "memory_model_read")
+    {
+      if (not mReadCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", outLine.c_str());
+      return true;
+    }
+
+  if (command == "mbufwrite" or command == "merge_buffer_write")
+    {
+      if (not mbWriteCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", outLine.c_str());
+      return true;
+    }
+
+  if (command == "mbufinsert" or command == "merge_buffer_insert")
+    {
+      if (not mbInsertCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", outLine.c_str());
+      return true;
+    }
+
   if (command == "h" or command == "?" or command == "help")
     {
       helpCommand(tokens);
@@ -1502,6 +1529,41 @@ Interactive<URV>::replayCommand(unsigned& currentHartId,
   std::cerr << "Invalid command: " << line << '\n';
   std::cerr << "Expecting: replay, replay <count>, or replay step <count>\n";
   return false;    
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
+			       const std::vector<std::string>& tokens)
+{
+  // Format: [hart=<number>] [time=<number>] mread a=<physical-address> [s=<size>] [d=<rtl-data>] [l=<internal>|<éxternal>
+  assert(0);
+  return false;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
+				 const std::vector<std::string>& tokens)
+{
+  // Format: mbwrite <physical-address> <rtl-data>
+  // Data is up to 64 hex digits with least significant digit
+  // (rightmost) corresponding to smallest address.
+  assert(0);
+  return false;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
+				  const std::vector<std::string>& tokens)
+{
+  // Format: mbinsert <physical-address> <size> <rtl-data>
+  assert(0);
+  return false;
 }
 
 

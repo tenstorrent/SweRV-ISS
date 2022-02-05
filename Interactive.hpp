@@ -101,6 +101,18 @@ namespace WdRiscv
 		       FILE* traceFile, FILE* commandLog,
 		       std::ifstream& replayStream, bool& done);
 
+    bool mReadCommand(Hart<URV>& hart, const std::string& line,
+		     const std::vector<std::string>& tokens);
+
+    bool mWriteCommand(Hart<URV>& hart, const std::string& line,
+		       const std::vector<std::string>& tokens);
+
+    bool mbWriteCommand(Hart<URV>& hart, const std::string& line,
+			const std::vector<std::string>& tokens);
+
+    bool mbInsertCommand(Hart<URV>& hart, const std::string& line,
+			 const std::vector<std::string>& tokens);
+
     static void peekAllFpRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllIntRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllCsrs(Hart<URV>& hart, std::ostream& out);
