@@ -95,11 +95,22 @@ namespace WdRiscv
 
     /// Helper to interact: "replay" command. Replay one or more
     /// commands from the replay file.
-    bool replayCommand(unsigned& currentHartId,
-		       const std::string& line,
+    bool replayCommand(const std::string& line,
 		       const std::vector<std::string>& tokens,
 		       FILE* traceFile, FILE* commandLog,
 		       std::ifstream& replayStream, bool& done);
+
+    bool mReadCommand(Hart<URV>& hart, const std::string& line,
+		     const std::vector<std::string>& tokens);
+
+    bool mWriteCommand(Hart<URV>& hart, const std::string& line,
+		       const std::vector<std::string>& tokens);
+
+    bool mbWriteCommand(Hart<URV>& hart, const std::string& line,
+			const std::vector<std::string>& tokens);
+
+    bool mbInsertCommand(Hart<URV>& hart, const std::string& line,
+			 const std::vector<std::string>& tokens);
 
     static void peekAllFpRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllIntRegs(Hart<URV>& hart, std::ostream& out);
@@ -109,10 +120,17 @@ namespace WdRiscv
   protected:
 
     /// Helper to interact. Execute a user command.
-    bool executeLine(unsigned& currentHartId,
-		     const std::string& inLine, FILE* traceFile,
+    bool executeLine(const std::string& inLine, FILE* traceFile,
 		     FILE* commandLog,
 		     std::ifstream& replayStream, bool& done);
+
+    typedef std::unordered_map<std::string, std::string> StringMap;
+
+    /// Process time=<number>, and/or hart=<number>
+    /// tokens present in an interactive command. Update time_,
+    /// and/or hart_ accordingly. Return true on success and
+    /// false on error.
+    bool processKeywords(const StringMap& strMap);
 
   private:
 
@@ -120,6 +138,9 @@ namespace WdRiscv
 
     // Initial resets do not reset memory mapped registers.
     bool resetMemoryMappedRegs_ = false;
+
+    uint64_t time_ = 0;
+    uint64_t hartId_ = 0;
   };
 
 }

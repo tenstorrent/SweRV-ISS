@@ -79,7 +79,7 @@ namespace WdRiscv
     /// an immediate compare becuase the instruction may later be canceled).
     /// If the the read is internal we defer it till the corresponding
     /// instruction is retired because some of the store instructions
-    /// from which to obtain forwarded data may not yet have appeared.
+    /// from which to obtain forwarded data may not have yet appeared.
     /// Return true on success.  Return false if load is exernal but
     /// corresponding memory is not readable.
     bool readOp(unsigned HartId, uint64_t time, uint64_t instrTag,

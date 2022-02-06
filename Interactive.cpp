@@ -933,47 +933,32 @@ Interactive<URV>::dumpMemoryCommand(const std::string& line,
 }
 
 
-/// If tokens contain a string of the form hart=<id> then remove that
-/// token from tokens and set hartId to <id> returning true. Return
-/// false if no hart=<id> token is found or if there is an error (<id>
-/// is not an integer value) in which case error is set to true.
+/// Remove from the token vector tokens of the form key=value
+/// and put them in the given map (which maps a key to a value).
 static
-bool
-getCommandHartId(std::vector<std::string>& tokens, unsigned& hartId,
-		 bool& error)
+void
+extractKeywords(std::vector<std::string>& tokens,
+		std::unordered_map<std::string,std::string>& strMap)
 {
-  error = false;
-  if (tokens.empty())
-    return false;
-
-  bool hasHart = false;
-
-  // Remaining tokens after removal of hart=<id> tokens.
-  std::vector<std::string> rest;
-
-  for (const auto& token : tokens)
+  size_t newSize = 0;
+  for (size_t i = 0; i < tokens.size(); ++i)
     {
-      if (boost::starts_with(token, "hart="))
+      const auto& token = tokens.at(i);
+      auto pos = token.find('=');
+      if (pos != std::string::npos)
 	{
-	  std::string value = token.substr(strlen("hart="));
-	  try
-	    {
-	      hartId = boost::lexical_cast<unsigned>(value);
-	      hasHart = true;
-	    }
-	  catch(...)
-	    {
-	      std::cerr << "Bad hart id: " << value << '\n';
-	      error = true;
-	      return false;
-	    }
+	  auto key = token.substr(0, pos);
+	  auto value = token.substr(pos + 1);
+	  strMap[key] = value;
 	}
       else
-	rest.push_back(token);
+	{
+	  if (newSize < i)
+	    tokens.at(newSize) = token;
+	  newSize++;
+	}
     }
-
-  tokens = rest;
-  return hasHart;
+  tokens.resize(newSize);
 }
 
 
@@ -1192,11 +1177,47 @@ Interactive<URV>::helpCommand(const std::vector<std::string>& tokens)
 }
 
 
+template <typename URV>
+bool
+Interactive<URV>::processKeywords(const StringMap& strMap)
+{
+  unsigned errors = 0;
+  for (const auto& kv : strMap)
+    {
+      const auto& key = kv.first;
+      const auto& valueStr = kv.second;
+      
+      if (key == "hart" or key == "h")
+	{
+	  uint64_t val = 0;
+	  if (not parseCmdLineNumber(key, valueStr, val))
+	    errors++;
+	  hartId_ = val;
+	}
+      else if (key == "time" or key == "t")
+	{
+	  uint64_t val = 0;
+	  if (not parseCmdLineNumber(key, valueStr, val))
+	    errors++;
+	  time_ = val;
+	}
+      else
+	{
+	  if (key.empty())
+	    std::cerr << "Empty key -- ignored\n";
+	  else
+	    std::cerr << "Unknown key: " << key << "  -- ignored\n";
+	}
+    }
+
+  return errors == 0;
+}
+  
+
 /// Command line interpreter: Execute a command line.
 template <typename URV>
 bool
-Interactive<URV>::executeLine(unsigned& currentHartId,
-			      const std::string& inLine, FILE* traceFile,
+Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 			      FILE* commandLog,
 			      std::ifstream& replayStream, bool& done)
 {
@@ -1219,39 +1240,35 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
   if (tokens.empty())
     return true;
 
-  std::string outLine;   // Line to print on command log.
+  StringMap strMap;
+  extractKeywords(tokens, strMap);
 
-  // Recover hart id (if any) removing hart=<id> token from tokens.
-  unsigned hartId = 0;
-  bool error = false;
-  bool hasHart = getCommandHartId(tokens, hartId, error);
-  if (error)
-    return false;
+  bool ok = processKeywords(strMap);
 
-  if (hasHart)
+  if (tokens.empty())
     {
-      outLine = line;
-      currentHartId = hartId;
-    }
-  else
-    {
-      hartId = currentHartId;
-      outLine = std::string("hart=") + std::to_string(hartId) + " " + line;
+      if (ok and commandLog and not strMap.empty())
+	fprintf(commandLog, "%s\n", line.c_str());
+      return ok;
     }
 
+  // If there is a quit command ececute it regardless of errors.
   const std::string& command = tokens.front();
   if (command == "q" or command == "quit")
     {
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       done = true;
       return true;
     }
 
-  auto hartPtr = system_.findHartByHartId(hartId);
+  if (not ok)
+    return false;
+
+  auto hartPtr = system_.findHartByHartId(hartId_);
   if (not hartPtr)
     {
-      std::cerr << "Hart id out of bounds: " << hartId << '\n';
+      std::cerr << "Hart id out of bounds: " << hartId_ << '\n';
       return false;
     }
 
@@ -1266,7 +1283,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
     {
       bool success = hart.run(traceFile);
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return success;
     }
 
@@ -1275,7 +1292,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not untilCommand(hart, line, tokens, traceFile))
 	return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1289,7 +1306,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not stepCommand(hart, line, tokens, traceFile))
 	return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1297,8 +1314,8 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
     {
       if (not peekCommand(hart, line, tokens, std::cout))
 	return false;
-       if (commandLog)
-	 fprintf(commandLog, "%s\n", outLine.c_str());
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
        return true;
     }
 
@@ -1307,7 +1324,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not pokeCommand(hart, line, tokens))
 	return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1316,7 +1333,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not disassCommand(hart, line, tokens))
 	return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1325,7 +1342,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not elfCommand(hart, line, tokens))
 	return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1334,7 +1351,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not hexCommand(hart, line, tokens))
 	return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1343,7 +1360,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not resetCommand(hart, line, tokens))
 	return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1355,7 +1372,12 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
           return false;
       hart.enterDebugMode(hart.peekPc(), force);
       if (commandLog)
-	fprintf(commandLog, "%s %s\n", outLine.c_str(), force? "true" : "false");
+	{
+	  fprintf(commandLog, "%s", line.c_str());
+	  if (tokens.size() == 1)
+	    fprintf(commandLog, " false");
+	  fprintf(commandLog, "\n");
+	}
       return true;
     }
 
@@ -1363,7 +1385,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
     {
       hart.exitDebugMode();
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1372,7 +1394,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not hart.cancelLastDiv())
         std::cerr << "Warning: Unexpected cancel_div\n";
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1380,7 +1402,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
     {
       hart.cancelLr();
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1399,7 +1421,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
 	  return false;
 	}
       bool replayDone = false;
-      if (not replayCommand(currentHartId, line, tokens, traceFile, commandLog,
+      if (not replayCommand(line, tokens, traceFile, commandLog,
 			    replayStream, replayDone))
 	return false;
       return true;
@@ -1422,7 +1444,34 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
       if (not dumpMemoryCommand(line, tokens))
         return false;
       if (commandLog)
-	fprintf(commandLog, "%s\n", outLine.c_str());
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "mread" or command == "memory_model_read")
+    {
+      if (not mReadCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "mbufwrite" or command == "merge_buffer_write")
+    {
+      if (not mbWriteCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "mbufinsert" or command == "merge_buffer_insert")
+    {
+      if (not mbInsertCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 
@@ -1440,8 +1489,7 @@ Interactive<URV>::executeLine(unsigned& currentHartId,
 /// Interactive "replay" command.
 template <typename URV>
 bool
-Interactive<URV>::replayCommand(unsigned& currentHartId,
-				const std::string& line,
+Interactive<URV>::replayCommand(const std::string& line,
 				const std::vector<std::string>& tokens,
 				FILE* traceFile, FILE* commandLog,
 				std::ifstream& replayStream, bool& done)
@@ -1459,7 +1507,7 @@ Interactive<URV>::replayCommand(unsigned& currentHartId,
       while (count < maxCount  and  not done  and
 	     std::getline(replayStream, replayLine))
 	{
-	  if (not executeLine(currentHartId, replayLine, traceFile,
+	  if (not executeLine(replayLine, traceFile,
 			      commandLog, replayStream, done))
 	    return false;
 	  count++;
@@ -1483,7 +1531,7 @@ Interactive<URV>::replayCommand(unsigned& currentHartId,
       while (count < maxCount  and  not done   and
 	     std::getline(replayStream, replayLine))
 	{
-	  if (not executeLine(currentHartId, replayLine, traceFile,
+	  if (not executeLine(replayLine, traceFile,
 			      commandLog, replayStream, done))
 	    return false;
 
@@ -1507,12 +1555,47 @@ Interactive<URV>::replayCommand(unsigned& currentHartId,
 
 template <typename URV>
 bool
+Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
+			       const std::vector<std::string>& tokens)
+{
+  // Format: [hart=<number>] [time=<number>] mread a=<physical-address> [s=<size>] [d=<rtl-data>] [l=<internal>|<éxternal>
+  assert(0);
+  return false;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
+				 const std::vector<std::string>& tokens)
+{
+  // Format: mbwrite <physical-address> <rtl-data>
+  // Data is up to 64 hex digits with least significant digit
+  // (rightmost) corresponding to smallest address.
+  assert(0);
+  return false;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
+				  const std::vector<std::string>& tokens)
+{
+  // Format: mbinsert <physical-address> <size> <rtl-data>
+  assert(0);
+  return false;
+}
+
+
+template <typename URV>
+bool
 Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
 {
   linenoise::SetHistoryMaxLen(1024);
 
   uint64_t errors = 0;
-  unsigned currentHartId = 0;
+  hartId_ = 0;
   std::string replayFile;
   std::ifstream replayStream;
 
@@ -1523,7 +1606,7 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
     {
       URV value = 0;
       if (hartPtr->peekCsr(CsrNumber::MHARTID, value))
-        currentHartId = value;
+        hartId_ = value;
     }
 
   bool done = false;
@@ -1541,7 +1624,7 @@ Interactive<URV>::interact(FILE* traceFile, FILE* commandLog)
 
       linenoise::AddHistory(line.c_str());
 
-      if (not executeLine(currentHartId, line, traceFile, commandLog,
+      if (not executeLine(line, traceFile, commandLog,
 			  replayStream, done))
 	errors++;
     }
