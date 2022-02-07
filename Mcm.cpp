@@ -149,21 +149,14 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
 
 template <typename URV>
 bool
-Mcm<URV>::mergeBufferInsert(unsigned hartId, uint64_t time, uint64_t instrTag,
+Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 			    uint64_t physAddr, unsigned size,
 			    uint64_t rtlData)
 {
   if (not updateTime("Mcm::mergeBufferInsert", time))
     return false;
 
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    {
-      std::cerr << "Error: Mcm::readOp: Invalid hart id: " << hartId << '\n';
-      return false;
-    }
-
-  unsigned hartIx = hartPtr->sysHartIndex();
+  unsigned hartIx = hart.sysHartIndex();
   assert(hartIx < hartInstrVecs_.size());
 
   MemoryOp op = {};
@@ -184,7 +177,11 @@ Mcm<URV>::mergeBufferInsert(unsigned hartId, uint64_t time, uint64_t instrTag,
   if (not instr)
     return false;
   if (instr->retired_)
-    return checkRtlWrite(hartId, *instr, op);
+    {
+      URV hartId = 0;
+      hart.peekCsr(CsrNumber::MHARTID, hartId);
+      return checkRtlWrite(hartId, *instr, op);
+    }
 
   return true;
 }

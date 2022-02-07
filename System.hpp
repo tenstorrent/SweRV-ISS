@@ -147,6 +147,9 @@ namespace WdRiscv
     bool mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t addr,
 		    const std::vector<uint8_t>& data);
 
+    bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		     uint64_t addr, unsigned size, uint64_t data);
+
   private:
 
     unsigned hartCount_;

@@ -117,5 +117,16 @@ System<URV>::mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t addr,
 }
 
 
+template <typename URV>
+bool
+System<URV>::mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
+			 uint64_t addr, unsigned size, uint64_t data)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->mergeBufferInsert(hart, time, tag, addr, size, data);
+}
+
+
 template class WdRiscv::System<uint32_t>;
 template class WdRiscv::System<uint64_t>;
