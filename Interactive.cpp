@@ -968,7 +968,9 @@ void
 printInteractiveHelp()
 {
   using std::cout;
-  cout << "The argument hart=<id> may be used with any command.\n";
+  cout << "The arguments hart=<id> and.or time=<tine> may be used with any command\n";
+  cout << "to select a hart and specify event time (relevant to memory model)\n";
+  cout << "They presist until explicitly changed.\n\n";
   cout << "help [<command>]\n";
   cout << "  Print help for given command or for all commands if no command given.\n\n";
   cout << "run\n";
@@ -1023,6 +1025,18 @@ printInteractiveHelp()
   cout << "exception data [<offset>]\n";
   cout << "  Take a data access fault on the subsequent load/store instruction executed\n";
   cout << "  by a step command. The offset value is currently not used.\n\n";
+  cout << "mread tag addr size data i|e\n";
+  cout << "  Perform a memory model (out of order) read for load/amo instruction with\n";
+  cout << "  given tag. Data is the RTL data to be compared with whisper data\n";
+  cout << "  when instruction is later retired. The whisper data is obtained\n";
+  cout << "  forwarding from preceding instructions if 'i' is present; otherwise,\n";
+  cout << "  it is obtained from memory.\n\n";
+  cout << "mbwrite addr data\n";
+  cout << "  Perform a memory model merge-buffer-write for given address. Given\n";
+  cout << "  data (hexadecimal string) is from a different model (RTL) and is compared\n";
+  cout << "  to whisper data. Addr should be a multiple of cache-line size. Hex\n";
+  cout << "  string length should be twice the cache-line size with leftmost 2 digits\n";
+  cout << "  corresponding to byte with smallest address in line.\n\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
@@ -1457,7 +1471,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
-  if (command == "mbufwrite" or command == "merge_buffer_write")
+  if (command == "mbwrite" or command == "merge_buffer_write")
     {
       if (not mbWriteCommand(hart, line, tokens))
 	return false;
@@ -1466,7 +1480,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
-  if (command == "mbufinsert" or command == "merge_buffer_insert")
+  if (command == "mbinsert" or command == "merge_buffer_insert")
     {
       if (not mbInsertCommand(hart, line, tokens))
 	return false;
