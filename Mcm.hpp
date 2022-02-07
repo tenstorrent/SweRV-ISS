@@ -96,7 +96,7 @@ namespace WdRiscv
     /// merge buffer removing it from the store buffer. Return true on
     /// success. Return false if no such operation is in the store
     /// buffer.
-    bool mergeBufferInsert(unsigned hartId, uint64_t time, uint64_t instrTag,
+    bool mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 			   uint64_t physAddr, unsigned size,
 			   uint64_t rtlData);
 

@@ -1658,9 +1658,7 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
 	data.back() |= digit;
     }
 		     
-  system_.mcmMbWrite(hart, this->time_, addr, data);
-  
-  return false;
+  return system_.mcmMbWrite(hart, this->time_, addr, data);
 }
 
 
@@ -1669,9 +1667,36 @@ bool
 Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
 				  const std::vector<std::string>& tokens)
 {
-  // Format: mbinsert <physical-address> <size> <rtl-data>
-  assert(0);
-  return false;
+  // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
+  if (tokens.size() != 5)
+    {
+      std::cerr << "Invalid mbwrite command: " << line << '\n';
+      std::cerr << "  Expecting: mbinsert <addr> size> <data>\n";
+      return false;
+    }
+
+  uint64_t tag = 0;
+  if (not parseCmdLineNumber("instruction-tag", tokens.at(1), tag))
+    return false;
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(2), addr))
+    return false;
+
+  uint64_t size = 0;
+  if (not parseCmdLineNumber("size", tokens.at(3), size))
+    return false;
+  if (size > 8 or size == 0)
+    {
+      std::cerr << "Invalid size: << " << size << " -- Expecting 1 to 8\n";
+      return false;
+    }
+
+  uint64_t data = 0;
+  if (not parseCmdLineNumber("data", tokens.at(4), data))
+    return false;
+
+  return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
 }
 
 
