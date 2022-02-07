@@ -69,7 +69,7 @@ namespace WdRiscv
   {
   public:
 
-    Mcm(WdRiscv::System<URV>&);
+    Mcm(WdRiscv::System<URV>&, unsigned mergeBufferSize);
 
     ~Mcm();
 

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
 #include "Hart.hpp"
 #include "Core.hpp"
 #include "System.hpp"
@@ -26,8 +27,6 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                     size_t pageSize)
   : hartCount_(coreCount * hartsPerCore), hartsPerCore_(hartsPerCore)
 {
-  Mcm<URV> mcm(*this);
-
   cores_.resize(coreCount);
 
   memory_ = std::make_shared<Memory>(memSize, pageSize);
@@ -72,6 +71,9 @@ System<URV>::~System()
 {
   delete sparseMem_;
   sparseMem_ = nullptr;
+
+  delete mcm_;
+  mcm_ = nullptr;
 }
 
 
@@ -91,6 +93,21 @@ System<URV>::writeAccessedMemory(const std::string& path) const
   if (not sparseMem_)
     return false;
   return sparseMem_->writeHexFile(path);
+}
+
+
+template <typename URV>
+void
+System<URV>::enableMcm(unsigned mergeBufferSize)
+{
+  if (mcm_)
+    {
+      std::cerr << "System::enableMcm: Already enabled\n";
+      return;
+    }
+
+  // FIX check mergeBufferSize.
+  mcm_ = new Mcm(*this, mergeBufferSize);
 }
 
 

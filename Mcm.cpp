@@ -7,8 +7,8 @@ using namespace WdRiscv;
 
 
 template <typename URV>
-Mcm<URV>::Mcm(System<URV>& system)
-  : system_(system)
+Mcm<URV>::Mcm(System<URV>& system, unsigned mergeBufferSize)
+  : system_(system), lineSize_(mergeBufferSize)
 {
   sysMemOps_.reserve(200000);
   hartInstrVecs_.resize(system.hartCount());
