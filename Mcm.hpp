@@ -82,14 +82,14 @@ namespace WdRiscv
     /// from which to obtain forwarded data may not have yet appeared.
     /// Return true on success.  Return false if load is exernal but
     /// corresponding memory is not readable.
-    bool readOp(unsigned HartId, uint64_t time, uint64_t instrTag,
+    bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		uint64_t physAddr, unsigned size, uint64_t rtlData,
 		bool internal);
     
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where all
     /// writes are complete are marked complete. Return true on success.
-    bool mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
+    bool mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 			  const std::vector<uint8_t>& rtlData);
 
     /// Insert a write operation for the given instruction into the
@@ -113,6 +113,9 @@ namespace WdRiscv
     /// (set with setCurrentInstruction).
     bool getCurrentLoadValue(unsigned hartId, uint64_t addr, unsigned size,
 			     uint64_t& value);
+
+    unsigned mergeBufferLineSize() const
+    { return lineSize_; }
 
   protected:
 

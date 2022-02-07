@@ -42,21 +42,14 @@ Mcm<URV>::updateTime(const char* method, uint64_t time)
 
 template <typename URV>
 bool
-Mcm<URV>::readOp(unsigned hartId, uint64_t time, uint64_t instrTag,
+Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		 uint64_t physAddr, unsigned size, uint64_t rtlData,
 		 bool internal)
 {
   if (not updateTime("Mcm::readOp", time))
     return false;
 
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    {
-      std::cerr << "Error: Mcm::readOp: Invalid hart id: " << hartId << '\n';
-      return false;
-    }
-
-  unsigned hartIx = hartPtr->sysHartIndex();
+  unsigned hartIx = hart.sysHartIndex();
   assert(hartIx < hartInstrVecs_.size());
 
   MemoryOp op = {};
@@ -74,25 +67,25 @@ Mcm<URV>::readOp(unsigned hartId, uint64_t time, uint64_t instrTag,
       if (size == 1)
 	{
 	  uint8_t val = 0;
-	  op.failRead_ = not hartPtr->peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
 	  op.data_ = val;
 	}
       else if (size == 2)
 	{
 	  uint16_t val = 0;
-	  op.failRead_ = not hartPtr->peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
 	  op.data_ = val;
 	}
       else if (size == 4)
 	{
 	  uint32_t val = 0;
-	  op.failRead_ = not hartPtr->peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
 	  op.data_ = val;
 	}
       else if (size == 8)
 	{
 	  uint64_t val = 0;
-	  op.failRead_ = not hartPtr->peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
 	  op.data_ = val;
 	}
       else
@@ -278,7 +271,7 @@ Mcm<URV>::retire(unsigned hartId, uint64_t time, uint64_t tag)
 
 template <typename URV>
 bool
-Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
+Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 			   const std::vector<uint8_t>& rtlData)
 {
   if (not updateTime("Mcm::mergeBufferWrite", time))
@@ -286,19 +279,12 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
 
   assert(rtlData.size() == lineSize_);
 
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    {
-      std::cerr << "Error: Mcm::mergeBufferWrite: Invalid hart id: " << hartId << '\n';
-      return false;
-    }
-
   // Read our memory. Apply pending writes. Compare to reference. Commit to
   // our memory.
   assert((physAddr % lineSize_) == 0);
   assert(rtlData.size() == lineSize_);
 
-  unsigned hartIx = hartPtr->sysHartIndex();
+  unsigned hartIx = hart.sysHartIndex();
   assert(hartIx < hartPendingWrites_.size());
 
   std::vector<MemoryOp> coveredWrites;
@@ -341,7 +327,7 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
   for (unsigned i = 0; i < lineSize_; ++i)
     {
       uint8_t byte = 0;
-      if (not hartPtr->peekMemory(physAddr + i, byte, true /*usePma*/))
+      if (not hart.peekMemory(physAddr + i, byte, true /*usePma*/))
 	assert(0);
       line.at(i) = byte;
     }
@@ -356,7 +342,7 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
     }
 
   for (unsigned i = 0; i < lineSize_; ++i)
-    hartPtr->pokeMemory(physAddr + i, line.at(i), true);
+    hart.pokeMemory(physAddr + i, line.at(i), true);
   
   // Compare our line to RTL line.
   bool result = true;
@@ -364,6 +350,9 @@ Mcm<URV>::mergeBufferWrite(unsigned hartId, uint64_t time, uint64_t physAddr,
   auto iterPair = std::mismatch(line.begin(), line.end(), rtlData.begin());
   if (iterPair.first != line.end())
     {
+      URV hartId = 0;
+      hart.peekCsr(CsrNumber::MHARTID, hartId);
+
       size_t offset = iterPair.first - line.begin();
       std::cerr << "Error: Mismatch on merge buffer write time=" << time
 		<< " hart-id=" << hartId << " addr=0x" << std::hex
