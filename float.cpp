@@ -440,49 +440,19 @@ Hart<URV>::execFlw(const DecodedInst* di)
       return;
     }
 
-  uint32_t rd = di->op0(), rs1 = di->op1();
-  SRV imm = di->op2As<SRV>();
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
 
-  URV base = intRegs_.read(rs1);
-  URV virtAddr = base + imm;
-
-  ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
-  ldStSize_ = 4;
-  uint64_t addr = virtAddr;
-
-  auto cause = ExceptionCause::NONE;
-
-#ifndef FAST_SLOPPY
-  if (hasActiveTrigger())
+  uint64_t data = 0;
+  if (load<uint32_t>(virtAddr, data))
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
-			     privMode_, isInterruptEnabled()))
-	triggerTripped_ = true;
-      if (triggerTripped_)
-	return;
-    }
-
-  cause = determineLoadException(addr, ldStSize_);
-  if (cause != ExceptionCause::NONE)
-    {
-      if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr);
-      return;
-    }
-  ldStPhysAddr_ = addr;
-#endif
-
-  uint32_t word = 0;
-  if (memory_.read(addr, word))
-    {
-      Uint32FloatUnion ufu(word);
-      fpRegs_.writeSingle(rd, ufu.f);
+      Uint32FloatUnion ufu{uint32_t(data)};
+      fpRegs_.writeSingle(di->op0(), ufu.f);
       markFsDirty();
       return;
     }
 
-  cause = ExceptionCause::LOAD_ACC_FAULT;
+  auto cause = ExceptionCause::LOAD_ACC_FAULT;
   initiateLoadException(cause, virtAddr);
 }
 
@@ -1667,50 +1637,20 @@ Hart<URV>::execFld(const DecodedInst* di)
       return;
     }
 
-  uint32_t rd = di->op0(), rs1 = di->op1();
-  SRV imm = di->op2As<SRV>();
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
 
-  URV base = intRegs_.read(rs1);
-  URV virtAddr = base + imm;
-
-  ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
-  ldStSize_ = 8;
-  uint64_t addr = virtAddr;
-
-  auto cause = ExceptionCause::NONE;
-
-#ifndef FAST_SLOPPY
-  if (hasActiveTrigger())
+  uint64_t data = 0;
+  if (load<uint64_t>(virtAddr, data))
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
-			     privMode_, isInterruptEnabled()))
-	triggerTripped_ = true;
-      if (triggerTripped_)
-	return;
-    }
-
-  cause = determineLoadException(addr, ldStSize_);
-  if (cause != ExceptionCause::NONE)
-    {
-      if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr);
-      return;
-    }
-  ldStPhysAddr_ = addr;
-#endif
-
-  uint64_t val64 = 0;
-  if (memory_.read(addr, val64))
-    {
-      Uint64DoubleUnion udu{val64};
-      fpRegs_.writeDouble(rd, udu.d);
+      Uint64DoubleUnion udu{data};
+      fpRegs_.writeDouble(di->op0(), udu.d);
 
       markFsDirty();
       return;
     }
 
-  cause = ExceptionCause::LOAD_ACC_FAULT;
+  auto cause = ExceptionCause::LOAD_ACC_FAULT;
   initiateLoadException(cause, virtAddr);
 }
 
@@ -2693,57 +2633,25 @@ template<typename URV>
 void
 Hart<URV>::execFlh(const DecodedInst* di)
 {
-  // TBD TODO: refactor with flw and fld
-
   if (not isZfhLegal())
     {
       illegalInst(di);
       return;
     }
 
-  uint32_t rd = di->op0(), rs1 = di->op1();
-  SRV imm = di->op2As<SRV>();
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
 
-  URV base = intRegs_.read(rs1);
-  URV virtAddr = base + imm;
-
-  ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
-  ldStSize_ = 2;
-  uint64_t addr = virtAddr;
-
-  auto cause = ExceptionCause::NONE;
-
-#ifndef FAST_SLOPPY
-  if (hasActiveTrigger())
+  uint64_t data = 0;
+  if (load<uint16_t>(virtAddr, data))
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
-			     privMode_, isInterruptEnabled()))
-	triggerTripped_ = true;
-      if (triggerTripped_)
-	return;
-    }
-
-  cause = determineLoadException(addr, ldStSize_);
-  if (cause != ExceptionCause::NONE)
-    {
-      if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr);
-      return;
-    }
-  ldStPhysAddr_ = addr;
-#endif
-
-  uint16_t half = 0;
-  if (memory_.read(addr, half))
-    {
-      Float16 f16 = Float16::fromBits(half);
-      fpRegs_.writeHalf(rd, f16);
+      Float16 f16 = Float16::fromBits(data);
+      fpRegs_.writeHalf(di->op0(), f16);
       markFsDirty();
       return;
     }
 
-  cause = ExceptionCause::LOAD_ACC_FAULT;
+  auto cause = ExceptionCause::LOAD_ACC_FAULT;
   initiateLoadException(cause, virtAddr);
 }
 

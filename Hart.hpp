@@ -1478,9 +1478,11 @@ namespace WdRiscv
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
     /// etc... for lbu, lhu, etc...
     /// Return true if the load is successful. Return false if an exception
-    /// or a trigger is encoutered.
+    /// or a trigger is encoutered. On succes loadd value (sign extended for
+    /// signed type) is placed in value. Updating the destination register is
+    /// the resposibilty of the caller.
     template<typename LOAD_TYPE>
-    bool load(uint32_t rd, uint32_t rs1, int32_t imm);
+    bool load(uint64_t virtAddr, uint64_t& value);
 
     /// For use by performance model. 
     template<typename LOAD_TYPE>

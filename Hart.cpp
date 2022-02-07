@@ -1427,14 +1427,11 @@ template <typename URV>
 template <typename LOAD_TYPE>
 inline
 bool
-Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
+Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 {
 #ifdef FAST_SLOPPY
-  return fastLoad<LOAD_TYPE>(rd, rs1, imm);
+  return fastLoad<LOAD_TYPE>(virtAddr, data);
 #else
-
-  URV base = intRegs_.read(rs1);
-  uint64_t virtAddr = base + SRV(imm);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
@@ -1465,12 +1462,11 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
   if (conIoValid_ and addr == conIo_ and enableConIn_ and not triggerTripped_)
     {
       SRV val = fgetc(stdin);
-      intRegs_.write(rd, val);
+      data = val;
       return true;
     }
 
   ULT narrow = 0;   // Unsigned narrow loaded value
-  URV value = 0;  // loaded value expanded to register width
   if (addr >= clintStart_ and addr <= clintLimit_ and addr == 0x200bff8)
     {
       narrow = instCounter_;  // Fake time: use instruction count
@@ -1480,7 +1476,7 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
       bool hasMcmVal = false;
       if (mcm_)
 	{
-	  URV hartId = 0; peekCsr(CsrNumber::MISA, value);
+	  URV hartId = 0; peekCsr(CsrNumber::MISA, hartId);
 	  uint64_t mcmVal = 0;
 	  if (mcm_->getCurrentLoadValue(hartId, addr, ldStSize_, mcmVal))
 	    {
@@ -1495,9 +1491,9 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
 	}
     }
 
-  value = narrow;
+  data = narrow;
   if (not std::is_same<ULT, LOAD_TYPE>::value)
-    value = SRV(LOAD_TYPE(narrow)); // Loading signed: Sign extend.
+    data = int64_t(LOAD_TYPE(narrow)); // Loading signed: Sign extend.
 
   // Check for load-data-trigger.
   if (hasActiveTrigger())
@@ -1511,7 +1507,6 @@ Hart<URV>::load(uint32_t rd, uint32_t rs1, int32_t imm)
   if (triggerTripped_)
     return false;
 
-  intRegs_.write(rd, value);
   return true;  // Success.
 #endif
 }
@@ -1522,7 +1517,12 @@ inline
 void
 Hart<URV>::execLw(const DecodedInst* di)
 {
-  load<int32_t>(di->op0(), di->op1(), di->op2As<int32_t>());
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
+
+  uint64_t data = 0;
+  if (load<int32_t>(virtAddr, data))
+    intRegs_.write(di->op0(), data);
 }
 
 
@@ -1531,7 +1531,12 @@ inline
 void
 Hart<URV>::execLh(const DecodedInst* di)
 {
-  load<int16_t>(di->op0(), di->op1(), di->op2As<int32_t>());
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
+
+  uint64_t data = 0;
+  if (load<int16_t>(virtAddr, data))
+    intRegs_.write(di->op0(), data);
 }
 
 
@@ -10121,7 +10126,12 @@ template <typename URV>
 void
 Hart<URV>::execLb(const DecodedInst* di)
 {
-  load<int8_t>(di->op0(), di->op1(), di->op2As<int32_t>());
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
+
+  uint64_t data = 0;
+  if (load<int8_t>(virtAddr, data))
+    intRegs_.write(di->op0(), data);
 }
 
 
@@ -10129,7 +10139,12 @@ template <typename URV>
 void
 Hart<URV>::execLbu(const DecodedInst* di)
 {
-  load<uint8_t>(di->op0(), di->op1(), di->op2As<int32_t>());
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
+
+  uint64_t data = 0;
+  if (load<uint8_t>(virtAddr, data))
+    intRegs_.write(di->op0(), data);
 }
 
 
@@ -10137,7 +10152,12 @@ template <typename URV>
 void
 Hart<URV>::execLhu(const DecodedInst* di)
 {
-  load<uint16_t>(di->op0(), di->op1(), di->op2As<int32_t>());
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
+
+  uint64_t data = 0;
+  if (load<uint16_t>(virtAddr, data))
+    intRegs_.write(di->op0(), data);
 }
 
 
@@ -10483,7 +10503,13 @@ Hart<URV>::execLwu(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  load<uint32_t>(di->op0(), di->op1(), di->op2As<int32_t>());
+
+  URV base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
+
+  uint64_t data = 0;
+  if (load<uint32_t>(virtAddr, data))
+    intRegs_.write(di->op0(), data);
 }
 
 
@@ -10504,7 +10530,12 @@ Hart<uint64_t>::execLd(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  load<uint64_t>(di->op0(), di->op1(), di->op2As<int32_t>());
+  uint64_t base = intRegs_.read(di->op1());
+  uint64_t virtAddr = base + di->op2As<int32_t>();
+
+  uint64_t data = 0;
+  if (load<uint64_t>(virtAddr, data))
+    intRegs_.write(di->op0(), data);
 }
 
 
@@ -10854,6 +10885,31 @@ Hart<URV>::markVsDirty()
 
   updateCachedMstatusFields();
 }
+
+
+template
+bool
+WdRiscv::Hart<uint32_t>::load<uint16_t>(uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::load<uint32_t>(uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::load<uint64_t>(uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint16_t>(uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint32_t>(uint64_t, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint64_t>(uint64_t, uint64_t&);
 
 
 template
