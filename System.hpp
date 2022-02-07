@@ -141,6 +141,12 @@ namespace WdRiscv
     /// contents of accessed pages.
     bool writeAccessedMemory(const std::string& path) const;
 
+    bool mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+		 unsigned size, uint64_t data, bool internal);
+
+    bool mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t addr,
+		    const std::vector<uint8_t>& data);
+
   private:
 
     unsigned hartCount_;
@@ -151,5 +157,6 @@ namespace WdRiscv
     std::unordered_map<URV, unsigned> hartIdToIndex_;
     std::shared_ptr<Memory> memory_ = nullptr;
     SparseMem* sparseMem_ = nullptr;
+    Mcm<URV>* mcm_ = nullptr;
   };
 }

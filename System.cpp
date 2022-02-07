@@ -94,5 +94,28 @@ System<URV>::writeAccessedMemory(const std::string& path) const
 }
 
 
+template <typename URV>
+bool
+System<URV>::mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		     uint64_t addr, unsigned size, uint64_t data,
+		     bool internal)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->readOp(hart, time, tag, addr, size, data, internal);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t addr,
+		    const std::vector<uint8_t>& data)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->mergeBufferWrite(hart, time, addr, data);
+}
+
+
 template class WdRiscv::System<uint32_t>;
 template class WdRiscv::System<uint64_t>;

@@ -1558,9 +1558,44 @@ bool
 Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
-  // Format: [hart=<number>] [time=<number>] mread a=<physical-address> [s=<size>] [d=<rtl-data>] [l=<internal>|<éxternal>
-  assert(0);
-  return false;
+  // Format: [hart=<number>] [time=<number>] mread <instruction-tag> <physical-address> <size> <rtl-data> <i>|<é>
+  if (tokens.size() != 6)
+    {
+      std::cerr << "Invalid mread command: " << line << '\n';
+      std::cerr << "  Expecting: mread <tag> <addr> <size> <data> <i>|<e>\n";
+      return false;
+    }
+
+  uint64_t tag = 0;
+  if (not parseCmdLineNumber("instruction-tag", tokens.at(1), tag))
+    return false;
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(2), addr))
+    return false;
+
+  uint64_t size = 0;
+  if (not parseCmdLineNumber("size", tokens.at(3), size))
+    return false;
+  if (size > 8 or size == 0)
+    {
+      std::cerr << "Invalid size: << " << size << " -- Expecting 1 to 8\n";
+      return false;
+    }
+
+  uint64_t data = 0;
+  if (not parseCmdLineNumber("data", tokens.at(4), data))
+    return false;
+
+  const auto& ie = tokens.at(5);
+  if (ie.empty() or (ie.at(0) != 'i' and ie.at(0) != 'e'))
+    {
+      std::cerr << "Invalid internal/external token: '" << ie << "' -- expecting  'i' or 'e'\n";
+      return false;
+    }
+  bool internal = ie.at(0) == 'i';
+
+  return system_.mcmRead(hart, this->time_, tag, addr, size, data, internal);
 }
 
 
@@ -1570,9 +1605,61 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
 				 const std::vector<std::string>& tokens)
 {
   // Format: mbwrite <physical-address> <rtl-data>
-  // Data is up to 64 hex digits with least significant digit
-  // (rightmost) corresponding to smallest address.
-  assert(0);
+  // Data is up to 64 bytes (each byte is 2 hex digits) with most significant
+  // byte (leftmost two hex digits) corresponding to smallest address.
+  if (tokens.size() != 2)
+    {
+      std::cerr << "Invalid mbwrite command: " << line << '\n';
+      std::cerr << "  Expecting: mbwrite <addr> <data>\n";
+      return false;
+    }
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(1), addr))
+    return false;
+
+  std::vector<uint8_t> data;
+  const std::string& hexDigits = tokens.at(2);
+
+  size_t len = hexDigits.size();
+  size_t offset = 0;
+  if (len >= 2 and hexDigits.at(0) == '0' and hexDigits.at(1) == 'x')
+    offset += 2;
+
+  unsigned lineSize = 64;  // FIX : get from system
+  if (len - offset > lineSize*2)
+    {
+      std::cerr << "Too many digits in data string. Expecting " << lineSize*2
+		<< '\n';
+      return false;
+    }
+
+  if (((len - offset) & 1) == 1)
+    std::cerr << "Warning: Hex digit count is not even\n";
+
+  if ((len - offset) < lineSize*2)
+    std::cerr << "Warning: Hex digit count is smaller than twice the merge buffer line size\n";
+
+  for (size_t i = offset ; i < len; ++i)
+    {
+      uint8_t digit = hexDigits.at(i);
+      if (digit >= '0' and digit <= '9')
+	digit -= '0';
+      else if (digit >= 'a' and digit <= 'f')
+	digit = 10 + (digit - 'a');
+      else
+	{
+	  std::cerr << "Invalid hex digit: '" << digit << "'\n";
+	  return false;
+	}
+      if ( (i & 1) == 0)  // Even byte
+	data.push_back(digit << 4);
+      else
+	data.back() |= digit;
+    }
+		     
+  system_.mcmMbWrite(hart, this->time_, addr, data);
+  
   return false;
 }
 
