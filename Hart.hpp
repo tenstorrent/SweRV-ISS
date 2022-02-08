@@ -1486,7 +1486,7 @@ namespace WdRiscv
 
     /// For use by performance model. 
     template<typename LOAD_TYPE>
-    bool fastLoad(uint32_t rd, uint32_t rs1, int32_t imm);
+    bool fastLoad(uint64_t virtAddr, uint64_t& value);
 
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and

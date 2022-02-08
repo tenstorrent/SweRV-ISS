@@ -1395,15 +1395,8 @@ template <typename URV>
 template <typename LOAD_TYPE>
 inline
 bool
-Hart<URV>::fastLoad(uint32_t rd, uint32_t rs1, int32_t imm)
+Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
 {
-  URV base = intRegs_.read(rs1);
-  URV addr = base + SRV(imm);
-
-  ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr_ = addr;
-  ldStSize_ = sizeof(LOAD_TYPE);
-
   // Unsigned version of LOAD_TYPE
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
@@ -1415,8 +1408,6 @@ Hart<URV>::fastLoad(uint32_t rd, uint32_t rs1, int32_t imm)
         value = uval;
       else
         value = SRV(LOAD_TYPE(uval)); // Sign extend.
-
-      intRegs_.write(rd, value);
       return true;  // Success.
     }
   return false;
@@ -1429,13 +1420,13 @@ inline
 bool
 Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 {
-#ifdef FAST_SLOPPY
-  return fastLoad<LOAD_TYPE>(virtAddr, data);
-#else
-
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
   ldStSize_ = sizeof(LOAD_TYPE);
+
+#ifdef FAST_SLOPPY
+  return fastLoad<LOAD_TYPE>(virtAddr, data);
+#else
 
   if (hasActiveTrigger())
     {
@@ -1579,7 +1570,7 @@ bool
 Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 {
 #ifdef FAST_SLOPPY
-  return fastStore(rs1, base, virtAddr, storeVal);
+  return fastStore(virtAddr, storeVal);
 #else
 
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
@@ -1630,37 +1621,44 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   memory_.peek(addr, temp, false /*usePma*/);
   ldStPrevData_ = temp;
 
+  // If we write to special location, end the simulation.
+  if (toHostValid_ and addr == toHost_ and storeVal != 0)
+    {
+      ldStWrite_ = true;
+      ldStData_ = storeVal;
+      memory_.write(hartIx_, addr, storeVal);
+      throw CoreException(CoreException::Stop, "write to to-host",
+			  toHost_, storeVal);
+    }
+
+  // If addr is special location, then write to console.
+  if (conIoValid_ and addr == conIo_)
+    {
+      if (consoleOut_)
+	{
+	  fputc(storeVal, consoleOut_);
+	  if (storeVal == '\n')
+	    fflush(consoleOut_);
+	}
+      return true;
+    }
+
+  memory_.invalidateOtherHartLr(hartIx_, addr, ldStSize_);
+  invalidateDecodeCache(virtAddr, ldStSize_);
+
+  if (mcm_)
+    {
+      ldStWrite_ = true;
+      ldStData_ = storeVal;  // FIX: Incorrect for masked mem-mapped-regs.
+      return true;  // Memory updated when merge buffer is written.
+    }
+
   if (memory_.write(hartIx_, addr, storeVal))
     {
       ldStWrite_ = true;
-
       memory_.peek(addr, temp, false /*usePma*/);
       ldStData_ = temp;
-
-      memory_.invalidateOtherHartLr(hartIx_, addr, ldStSize_);
-      invalidateDecodeCache(virtAddr, ldStSize_);
-
       storeTargets_.insert(addr >> 2);
-
-      // If we write to special location, end the simulation.
-      if (toHostValid_ and addr == toHost_ and storeVal != 0)
-	{
-	  throw CoreException(CoreException::Stop, "write to to-host",
-			      toHost_, storeVal);
-	}
-
-      // If addr is special location, then write to console.
-      if (conIoValid_ and addr == conIo_)
-        {
-          if (consoleOut_)
-            {
-              fputc(storeVal, consoleOut_);
-              if (storeVal == '\n')
-                fflush(consoleOut_);
-            }
-          return true;
-	}
-
       return true;
     }
 
