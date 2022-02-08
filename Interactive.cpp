@@ -150,9 +150,24 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
   if (count == 0)
     return true;
 
+  uint64_t tag = 0;
+  bool hasTag = false;
+  if (tokens.size() == 3)
+    {
+      if (not parseCmdLineNumber("instruction-tag", tokens.at(2), tag))
+	return false;
+      hasTag = true;
+    }
+
   for (uint64_t i = 0; i < count; ++i)
     {
+      if (hasTag)
+	system_.mcmSetCurrentInstruction(hart, tag);
+
       hart.singleStep(traceFile);
+
+      if (hasTag)
+	system_.mcmRetire(hart, this->time_, tag++);
     }
 
   return true;

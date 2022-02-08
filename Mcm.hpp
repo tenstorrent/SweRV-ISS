@@ -105,13 +105,13 @@ namespace WdRiscv
     bool cancelRead(unsigned hartId, uint64_t instTag);
 
     /// This is called when an instruction is retired.
-    bool retire(unsigned hartId, uint64_t time, uint64_t instrTag);
+    bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag);
 
-    bool setCurrentInstruction(unsigned hartId, uint64_t instrTag);
+    bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
 
     /// Return the load value of the current target instruction
     /// (set with setCurrentInstruction).
-    bool getCurrentLoadValue(unsigned hartId, uint64_t addr, unsigned size,
+    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t addr, unsigned size,
 			     uint64_t& value);
 
     unsigned mergeBufferLineSize() const
@@ -126,6 +126,10 @@ namespace WdRiscv
     /// operartion and is updated (bits cleared) if some parts of op,
     /// covered by the mask, are successfully updated.
     bool forwardTo(const McmInstr& instr, MemoryOp& op, uint64_t& mask);
+
+    /// Forward to the given read op from the stores of the returned
+    /// instructions ahead of tag.
+    bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
 
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
