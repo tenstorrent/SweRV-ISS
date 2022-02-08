@@ -1290,6 +1290,10 @@ namespace WdRiscv
     void enableBasicBlocks(FILE* file, uint64_t instCount)
     { bbFile_ = file; bbLimit_ = instCount; }
 
+    /// Enable memory consistency model.
+    void setMcm(Mcm<URV>* mcm)
+    { mcm_ = mcm; }
+
   protected:
 
     /// Helper to reset: reset floating point related structures.

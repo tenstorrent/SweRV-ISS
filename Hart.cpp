@@ -1467,9 +1467,8 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
       bool hasMcmVal = false;
       if (mcm_)
 	{
-	  URV hartId = 0; peekCsr(CsrNumber::MISA, hartId);
 	  uint64_t mcmVal = 0;
-	  if (mcm_->getCurrentLoadValue(hartId, addr, ldStSize_, mcmVal))
+	  if (mcm_->getCurrentLoadValue(*this, addr, ldStSize_, mcmVal))
 	    {
 	      narrow = mcmVal;
 	      hasMcmVal = true;
