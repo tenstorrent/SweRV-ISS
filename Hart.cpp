@@ -1624,6 +1624,8 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   // If we write to special location, end the simulation.
   if (toHostValid_ and addr == toHost_ and storeVal != 0)
     {
+      ldStWrite_ = true;
+      ldStData_ = storeVal;
       memory_.write(hartIx_, addr, storeVal);
       throw CoreException(CoreException::Stop, "write to to-host",
 			  toHost_, storeVal);
