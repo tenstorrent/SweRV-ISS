@@ -70,25 +70,25 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       if (size == 1)
 	{
 	  uint8_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
 	  op.data_ = val;
 	}
       else if (size == 2)
 	{
 	  uint16_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
 	  op.data_ = val;
 	}
       else if (size == 4)
 	{
 	  uint32_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
 	  op.data_ = val;
 	}
       else if (size == 8)
 	{
 	  uint64_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, size, val);
+	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
 	  op.data_ = val;
 	}
       else
@@ -409,8 +409,6 @@ Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
   auto& vec = hartInstrVecs_.at(hartIx);
   if (vec.empty())
     return;
-
-  instrTag += 1;  // To count backward.
 
   if (instrTag > vec.size())
     instrTag = vec.size();
