@@ -11,9 +11,12 @@ Mcm<URV>::Mcm(System<URV>& system, unsigned mergeBufferSize)
   : system_(system), lineSize_(mergeBufferSize)
 {
   sysMemOps_.reserve(200000);
+
   hartInstrVecs_.resize(system.hartCount());
   for (auto& vec : hartInstrVecs_)
     vec.reserve(200000);
+
+  hartPendingWrites_.resize(system.hartCount());
   currentInstrTag_.resize(system.hartCount());
 }
 
@@ -254,12 +257,11 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   if (not updateTime("Mcm::mergeBufferWrite", time))
     return false;
 
-  assert(rtlData.size() == lineSize_);
+  assert(rtlData.size() <= lineSize_);
 
   // Read our memory. Apply pending writes. Compare to reference. Commit to
   // our memory.
   assert((physAddr % lineSize_) == 0);
-  assert(rtlData.size() == lineSize_);
 
   unsigned hartIx = hart.sysHartIndex();
   assert(hartIx < hartPendingWrites_.size());
@@ -315,7 +317,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       assert(write.physAddr_ + write.size_ <= lineEnd);
       unsigned ix = write.physAddr_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
-	line.at(ix+i) = ((uint8_t*) write.rtlData_)[i];
+	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
     }
 
   for (unsigned i = 0; i < lineSize_; ++i)
@@ -323,18 +325,18 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   
   // Compare our line to RTL line.
   bool result = true;
-  assert(line.size() == rtlData.size());
-  auto iterPair = std::mismatch(line.begin(), line.end(), rtlData.begin());
-  if (iterPair.first != line.end())
+  assert(rtlData.size() <= line.size());
+  auto iterPair = std::mismatch(rtlData.begin(), rtlData.end(), line.begin());
+  if (iterPair.first != rtlData.end())
     {
       URV hartId = 0;
       hart.peekCsr(CsrNumber::MHARTID, hartId);
 
-      size_t offset = iterPair.first - line.begin();
+      size_t offset = iterPair.first - rtlData.begin();
       std::cerr << "Error: Mismatch on merge buffer write time=" << time
 		<< " hart-id=" << hartId << " addr=0x" << std::hex
-		<< (physAddr + offset) << " rtl=0x" << rtlData.at(offset)
-		<< " whisper=0x" << line.at(offset) << std::dec << '\n';
+		<< (physAddr + offset) << " rtl=0x" << unsigned(rtlData.at(offset))
+		<< " whisper=0x" << unsigned(line.at(offset)) << std::dec << '\n';
       result = false;
     }
 

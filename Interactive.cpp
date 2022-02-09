@@ -1636,7 +1636,7 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
   // Format: mbwrite <physical-address> <rtl-data>
   // Data is up to 64 bytes (each byte is 2 hex digits) with most significant
   // byte (leftmost two hex digits) corresponding to smallest address.
-  if (tokens.size() != 2)
+  if (tokens.size() != 3)
     {
       std::cerr << "Invalid mbwrite command: " << line << '\n';
       std::cerr << "  Expecting: mbwrite <addr> <data>\n";
@@ -1699,7 +1699,7 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
   // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
   if (tokens.size() != 5)
     {
-      std::cerr << "Invalid mbwrite command: " << line << '\n';
+      std::cerr << "Invalid minsert command: " << line << '\n';
       std::cerr << "  Expecting: mbinsert <addr> size> <data>\n";
       return false;
     }
