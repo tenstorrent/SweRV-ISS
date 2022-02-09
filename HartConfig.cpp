@@ -1456,6 +1456,21 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 	}
     }
 
+  unsigned mbLineSize = 64;
+  std::string tag = "merge_buffer_line_size";
+  if (config_ -> count(tag))
+    if (not getJsonUnsigned(tag, config_ -> at(tag), mbLineSize))
+      return false;
+
+  tag = "enable_memory_consistency";
+  bool enableMcm = false;
+  if (config_ -> count(tag))
+    if (not getJsonBoolean(tag, config_ -> at(tag), enableMcm))
+      return false;
+
+  if (enableMcm and not system.enableMcm(mbLineSize))
+    return false;
+
   return finalizeCsrConfig(system);
 }
 
