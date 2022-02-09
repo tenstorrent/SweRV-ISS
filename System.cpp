@@ -21,6 +21,13 @@
 using namespace WdRiscv;
 
 
+inline bool
+isPowerOf2(uint64_t x)
+{
+  return x != 0 and (x & (x-1)) == 0;
+}
+
+
 template <typename URV>
 System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                     unsigned hartIdOffset, size_t memSize,
@@ -97,20 +104,29 @@ System<URV>::writeAccessedMemory(const std::string& path) const
 
 
 template <typename URV>
-void
-System<URV>::enableMcm(unsigned mergeBufferSize)
+bool
+System<URV>::enableMcm(unsigned mbLineSize)
 {
   if (mcm_)
     {
+      assert(mcm_->mergeBufferLineSize() == mbLineSize);
       std::cerr << "System::enableMcm: Already enabled\n";
-      return;
+      return true;
     }
 
-  // FIX check mergeBufferSize.
-  mcm_ = new Mcm(*this, mergeBufferSize);
+  if (mbLineSize == 0 or not isPowerOf2(mbLineSize) or mbLineSize > 512)
+    {
+      std::cerr << "Error: Invalide merge buffer line size: "
+		<< mbLineSize << '\n';
+      return false;
+    }
+
+  mcm_ = new Mcm(*this, mbLineSize);
 
   for (auto hart :  sysHarts_)
     hart->setMcm(mcm_);
+
+  return true;
 }
 
 
