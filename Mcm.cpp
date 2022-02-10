@@ -340,6 +340,19 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       result = false;
     }
 
+  for (size_t i = 0; i < coveredWrites.size(); ++i)
+    {
+      auto tag = coveredWrites.at(i).instrTag_;
+      if (i > 0 and tag == coveredWrites.at(i-1).instrTag_)
+	continue;
+      auto instr = findInstr(hartIx, tag);
+      assert(instr != nullptr);
+      if (checkStoreComplete(*instr))
+	instr->complete_ = true;
+      if (not ppoRule1(hart, *instr))
+	result = false;
+    }
+
   return result;
 }
 
@@ -407,11 +420,9 @@ void
 Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
 {
   auto& vec = hartInstrVecs_.at(hartIx);
-  if (vec.empty())
-    return;
 
   if (instrTag > vec.size())
-    instrTag = vec.size();
+    vec.resize(instrTag);
 
   while (instrTag and not vec.at(instrTag-1).retired_)
     cancelInstr(vec.at(--instrTag));
@@ -460,6 +471,48 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 	    << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
 	    << " whisper=0x" << data << std::dec << '\n';
   return false;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
+{
+  if (instr.isCanceled() or not instr.isStore_)
+    return false;
+
+  uint64_t mergeMask = 0;
+  for (auto opIx : instr.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	continue;
+
+      uint64_t mask = ~uint64_t(0);
+      if (op.physAddr_ <= instr.physAddr_)
+	{
+	  uint64_t offset = instr.physAddr_ - op.physAddr_;
+	  if (offset > 8)
+	    offset = 8;
+	  mask >>= offset*8;
+	}
+      else
+	{
+	  uint64_t offset = op.physAddr_ - instr.physAddr_;
+	  if (offset > 8)
+	    offset = 8;
+	  mask <<= offset*8;
+	}
+      mergeMask |= mask;
+    }
+
+  unsigned unused = (8 - instr.size_)*8;  // Unused upper bits of value.
+  mergeMask = (mergeMask << unused) >> unused;
+
+  uint64_t expectedMask = (~uint64_t(0) << unused) >> unused;
+  return mergeMask == expectedMask;
 }
 
 
@@ -549,6 +602,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
       std::cerr << "Error: Read ops do not cover all the bytes of load instruction tag=0x" << std::hex << tag << std::dec << '\n';
       return false;
     }
+  else
+    instr->complete_ = true;
 
   return true;
 }
@@ -581,8 +636,44 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
   return true;
 }
 
-// FIX TODO When a write is seen, check its data against instruction
-// if instruction is already retired.
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Check ppo rule 1 for all the write operations asociated with
+  // the given store instruction B.
+  
+  if (not instrB.complete_)
+    return true;  // We will try again when B is complete.
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag-1);
+      if (instrA.isCanceled())
+	continue;
+      assert(instrA.isRetired());
+
+      if (not instrA.isMemory() or not instrA.overlaps(instrB))
+	continue;
+
+      if (isBeforeInMemoryTime(instrA, instrB))
+	continue;
+
+      std::cerr << "Error: PPO rule 1 failed: hart-id=" << hartId << " tag1="
+		<< instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+      return false;
+    }
+
+  return true;
+}
+
 
 template class WdRiscv::Mcm<uint32_t>;
 template class WdRiscv::Mcm<uint64_t>;

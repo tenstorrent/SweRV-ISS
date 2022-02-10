@@ -48,7 +48,11 @@ namespace WdRiscv
     uint8_t size_ = 0;        // Data size for load/store insructions.
     bool retired_ = false;
     bool canceled_ = false;
+    bool isLoad_ = false;
     bool isStore_ = false;
+    bool complete_ = false;
+
+    bool isMemory() const { return isLoad_ or isStore_; }
 
     bool isRetired() const { return retired_; }
 
@@ -60,6 +64,16 @@ namespace WdRiscv
     {
       assert(std::find(memOps_.begin(), memOps_.end(), memOpIx) == memOps_.end());
       memOps_.push_back(memOpIx);
+    }
+
+    bool overlaps(const McmInstr& other) const
+    {
+      assert(size_ > 0 and other.size_ > 0);
+      if (physAddr_ == other.physAddr_)
+	return true;
+      if (physAddr_ < other.physAddr_)
+	return other.physAddr_ - physAddr_ < size_;
+      return physAddr_ - other.physAddr_ < other.size_;
     }
   };
 
@@ -117,6 +131,46 @@ namespace WdRiscv
     unsigned mergeBufferLineSize() const
     { return lineSize_; }
 
+    bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
+
+    uint64_t latestOpTime(const McmInstr& instr) const
+    {
+      assert(instr.complete_);
+      uint64_t time = 0;
+      for (auto opIx : instr.memOps_)
+	if (opIx < sysMemOps_.size())
+	  time = std::max(time, sysMemOps_.at(opIx).time_);
+      return time;
+    }
+
+    uint64_t earliestOpTime(const McmInstr& instr) const
+    {
+      assert(instr.complete_);
+      uint64_t time = ~uint64_t(0);
+      for (auto opIx : instr.memOps_)
+	if (opIx < sysMemOps_.size())
+	  time = std::min(time, sysMemOps_.at(opIx).time_);
+      return time;
+    }
+
+    bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const
+    {
+      if (a.complete_ and not b.complete_)
+	return true;
+      if (not a.complete_ and b.complete_)
+	return false;
+      if (not a.complete_ and not b.complete_)
+	{
+	  assert(0);
+	  return false;
+	}
+      uint64_t aTime = latestOpTime(a);
+      uint64_t bTime = earliestOpTime(a);
+      if (a.isStore_ and b.isStore_ and aTime == bTime)
+	return a.tag_ < b.tag_;
+      return aTime < bTime;
+    }
+
   protected:
 
     /// Forward from a store to a read op. Return true on success.
@@ -130,6 +184,8 @@ namespace WdRiscv
     /// Forward to the given read op from the stores of the returned
     /// instructions ahead of tag.
     bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
+
+    bool checkStoreComplete(const McmInstr& instr) const;
 
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
