@@ -1244,12 +1244,21 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 		<< "' for output.\n";
       return false;
     }
-  hart.reportInstructionFrequency(outFile);
-  hart.reportTrapStat(outFile);
-  fprintf(outFile, "\n");
-  hart.reportPmpStat(outFile);
-  fprintf(outFile, "\n");
-  hart.reportLrScStat(outFile);
+
+  const std::string sfx = ".json";
+  if (outPath.size() > sfx.size() and not outPath.compare(outPath.size() - sfx.size(), sfx.size(), sfx))
+    {
+      hart.reportInstructionFrequency(outFile, true);
+    }
+  else
+    {
+      hart.reportInstructionFrequency(outFile, false);
+      hart.reportTrapStat(outFile);
+      fprintf(outFile, "\n");
+      hart.reportPmpStat(outFile);
+      fprintf(outFile, "\n");
+      hart.reportLrScStat(outFile);
+    }
 
   fclose(outFile);
   return true;

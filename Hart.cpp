@@ -54,6 +54,7 @@
 #include "System.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
+#include "third_party/nlohmann/json.hpp"
 
 #ifndef SO_REUSEPORT
 #define SO_REUSEPORT SO_REUSEADDR
@@ -247,7 +248,7 @@ Hart<URV>::countImplementedPmpRegisters() const
 
   return count;
 }
-      
+
 
 template <typename URV>
 void
@@ -1047,13 +1048,15 @@ printFpHisto(const char* tag, const std::vector<uint64_t>& histo, FILE* file)
 
 template <typename URV>
 void
-Hart<URV>::reportInstructionFrequency(FILE* file) const
+Hart<URV>::reportInstructionFrequency(FILE* file, bool json) const
 {
+  nlohmann::json j;
   std::vector<size_t> indices;
   instProfs_.sort(indices);
 
   for (auto profIx : indices)
     {
+      nlohmann::json record;
       const InstProfile* profPtr = instProfs_.ithEntry(profIx);
       if (not profPtr or not profPtr->freq_)
 	continue;
@@ -1061,24 +1064,35 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
       const InstProfile& prof = *profPtr;
       const InstEntry& entry = instTable_.getEntry(prof.id_);
 
-      std::string instr = entry.isVector()? entry.name() + "." + VecRegs::to_string(prof.elemWidth_) : entry.name();
+      std::string instr = entry.isVector() ? entry.name() + "." + VecRegs::to_string(prof.elemWidth_) : entry.name();
 
-      fprintf(file, "%s %" PRId64 "\n", instr.c_str(), prof.freq_);
+      if (json)
+        {
+          record += nlohmann::json::object_t::value_type("group", "instruction");
+          record += nlohmann::json::object_t::value_type("symbol", instr);
+          record["attr"] += nlohmann::json::object_t::value_type("type", entry.typeToString());
+          record["attr"] += nlohmann::json::object_t::value_type("opcode", entry.code());
+          record += nlohmann::json::object_t::value_type("count", prof.freq_);
+        }
+      else
+        fprintf(file, "%s %" PRId64 "\n", instr.c_str(), prof.freq_);
 
       uint64_t count = 0;
       for (auto n : prof.destRegFreq_) count += n;
       if (count)
 	{
-	  fprintf(file, "  +rd");
+          if (not json)
+            fprintf(file, "  +rd");
 	  auto regCount = prof.destRegFreq_.size();
 	  for (unsigned i = 0; i < regCount; ++i)
-	    if (prof.destRegFreq_.at(i))
-	      fprintf(file, " %d:%" PRId64, i, prof.destRegFreq_.at(i));
-	  fprintf(file, "\n");
+	    if (prof.destRegFreq_.at(i) and not json)
+              fprintf(file, " %d:%" PRId64, i, prof.destRegFreq_.at(i));
+          if (not json)
+            fprintf(file, "\n");
 	}
 
       unsigned srcIx = 0;
-      
+
       for (unsigned opIx = 0; opIx < entry.operandCount(); ++opIx)
         {
 	  auto mode = entry.ithOperandMode(opIx);
@@ -1093,39 +1107,53 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
                 {
                   const auto& regFreq = prof.srcRegFreq_.at(srcIx);
 		  auto regCount = regFreq.size();
-                  fprintf(file, "  +rs%d", srcIx + 1);
+                  if (not json)
+                    fprintf(file, "  +rs%d", srcIx + 1);
                   for (unsigned i = 0; i < regCount; ++i)
-                    if (regFreq.at(i))
+                    if (regFreq.at(i) and not json)
                       fprintf(file, " %d:%" PRId64, i, regFreq.at(i));
-                  fprintf(file, "\n");
+                  if (not json)
+                    fprintf(file, "\n");
 
                   const auto& histo = prof.srcHisto_.at(srcIx);
                   std::string tag = std::string("+hist") + std::to_string(srcIx + 1);
-                  if (entry.ithOperandType(opIx) == OperandType::FpReg)
-                    printFpHisto(tag.c_str(), histo, file);
-                  else if (entry.isUnsigned())
-                    printUnsignedHisto(tag.c_str(), histo, file);
-                  else
-                    printSignedHisto(tag.c_str(), histo, file);
+                  if (not json)
+                    {
+                      if (entry.ithOperandType(opIx) == OperandType::FpReg)
+                        printFpHisto(tag.c_str(), histo, file);
+                      else if (entry.isUnsigned())
+                        printUnsignedHisto(tag.c_str(), histo, file);
+                      else
+                        printSignedHisto(tag.c_str(), histo, file);
+                    }
                 }
 
               srcIx++;
             }
 	}
 
-      if (prof.hasImm_)
+      if (prof.hasImm_ and not json)
 	{
 	  fprintf(file, "  +imm  min:%d max:%d\n", prof.minImm_, prof.maxImm_);
 	  printSignedHisto("+hist ", prof.srcHisto_.back(), file);
 	}
 
-      if (prof.user_)
+      if (prof.user_ and not json)
         fprintf(file, "  +user %" PRIu64 "\n", prof.user_);
-      if (prof.supervisor_)
+      if (prof.supervisor_ and not json)
         fprintf(file, "  +supervisor %" PRIu64 "\n", prof.supervisor_);
-      if (prof.machine_)
+      if (prof.machine_ and not json)
         fprintf(file, "  +machine %" PRIu64 "\n", prof.machine_);
+
+      if (json)
+        j += record;
     }
+
+    if (json)
+      {
+        std::string dumped = j.dump(2);
+        fprintf(file, dumped.c_str());
+      }
 }
 
 
@@ -3646,67 +3674,59 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
         }
       else if (info.ithOperandType(i) == OperandType::VecReg)
 	{
-          uint32_t regIx = di.ithOperand(i);
-          prof.srcRegFreq_.at(srcIx).at(regIx)++;
+         uint32_t regIx = di.ithOperand(i);
+         prof.srcRegFreq_.at(srcIx).at(regIx)++;
 
-          switch (vecRegs_.elemWidth())
-            {
-              case ElementWidth::Byte:
-                {
-                  int8_t val;
-                  size_t numElem = ((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3);
-                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
-                    {
-                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-                        std::cerr << "Error in vector config" << '\n';
-                      else
-                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
-                    }
-                  break;
-                }
-              case ElementWidth::Half:
-                {
-                  int16_t val;
-                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 1);
-                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
-                    {
-                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-                        std::cerr << "Error in vector config" << '\n';
-                      else
-                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
-                    }
-                  break;
-                }
-              case ElementWidth::Word:
-                {
-                  int32_t val;
-                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 2);
-                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
-                    {
-                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-                        std::cerr << "Error in vector config" << '\n';
-                      else
-                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
-                    }
-                  break;
-                }
-              case ElementWidth::Word2:
-                {
-                  int64_t val;
-                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 3);
-                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
-                    {
-                      if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-                        std::cerr << "Error in vector config" << '\n';
-                      else
-                        addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
-                    }
-                  break;
-                }
-              default:
-                break;
-            }
-          srcIx++;
+         switch (vecRegs_.elemWidth())
+           {
+             case ElementWidth::Byte:
+               {
+                 int8_t val;
+                 size_t numElem = ((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3);
+                 for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                   {
+                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                   }
+                 break;
+               }
+             case ElementWidth::Half:
+               {
+                 int16_t val;
+                 size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 1);
+                 for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                   {
+                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                   }
+                 break;
+               }
+             case ElementWidth::Word:
+               {
+                 int32_t val;
+                 size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 2);
+                 for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                   {
+                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                   }
+                 break;
+               }
+             case ElementWidth::Word2:
+               {
+                 int64_t val;
+                 size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 3);
+                 for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
+                   {
+                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
+                   }
+                 break;
+               }
+             default:
+               break;
+           }
+         srcIx++;
 	}
       else if (info.ithOperandType(i) == OperandType::CsReg)
 	{

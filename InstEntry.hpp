@@ -263,6 +263,37 @@ namespace WdRiscv
     bool hasRoundingMode() const
     { return hasRm_; }
 
+    /// Return string value of InstType (for json)
+    std::string typeToString() const
+      {
+        switch (type_)
+          { 
+            case InstType::Load: return "Load";
+            case InstType::Store: return "Store";
+            case InstType::Multiply: return "Multiply";
+            case InstType::Divide: return "Divide";
+            case InstType::Branch: return "Branch";
+            case InstType::Int: return "Int";
+            case InstType::Rvf: return "Rvf";
+            case InstType::Rvd: return "Rvd";
+            case InstType::Csr: return "Csr";
+            case InstType::Atomic: return "Atomic";
+            case InstType::Vector: return "Vector";
+            case InstType::Zba: return "Zba";
+            case InstType::Zbb: return "Zbb";
+            case InstType::Zbc: return "Zbc";
+            case InstType::Zbe: return "Zbe";
+            case InstType::Zbf: return "Zbf";
+            case InstType::Zbm: return "Zbm";
+            case InstType::Zbp: return "Zbp";
+            case InstType::Zbr: return "Zbr";
+            case InstType::Zbs: return "Zbs";
+            case InstType::Zbt: return "Zbt";
+            case InstType::Zfh: return "Zfh";
+            default: return "Invalid";
+          }
+      }
+
   protected:
 
     /// Mark instruction as having a rounding mode field.
