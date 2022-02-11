@@ -822,7 +822,7 @@ namespace WdRiscv
     { loadErrorRollback_ = flag; }
 
     /// Print collected instruction frequency to the given file.
-    void reportInstructionFrequency(FILE* file) const;
+    void reportInstructionFrequency(FILE* file, bool json) const;
 
     /// Print collected trap stats to the given file.
     void reportTrapStat(FILE* file) const;

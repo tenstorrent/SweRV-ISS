@@ -121,7 +121,7 @@ System<URV>::enableMcm(unsigned mbLineSize)
       return false;
     }
 
-  mcm_ = new Mcm(*this, mbLineSize);
+  mcm_ = new Mcm<URV>(*this, mbLineSize);
 
   for (auto hart :  sysHarts_)
     hart->setMcm(mcm_);
