@@ -44,7 +44,8 @@ namespace WdRiscv
     /// Default contructor: Define an invalid object.
     DecodedInst()
       : addr_(0), physAddr_(0), inst_(0), size_(0), entry_(nullptr), op0_(0),
-	op1_(0), op2_(0), op3_(0), valid_(false), masked_(false), vecFields_(0)
+	op1_(0), op2_(0), op3_(0), valid_(false), masked_(false), vecFields_(0),
+	acquire_(false), release_(false)
     { values_[0] = values_[1] = values_[2] = values_[3] = 0; }
 
     /// Constructor.
@@ -52,7 +53,8 @@ namespace WdRiscv
 		uint32_t op0, uint32_t op1, uint32_t op2, uint32_t op3)
       : addr_(addr), physAddr_(0), inst_(inst), size_(instructionSize(inst)),
 	entry_(entry), op0_(op0), op1_(op1), op2_(op2), op3_(op3),
-	valid_(entry != nullptr), masked_(false), vecFields_(0)
+	valid_(entry != nullptr), masked_(false), vecFields_(0),
+	acquire_(false), release_(false)
     { values_[0] = values_[1] = values_[2] = values_[3] = 0; }
 
     /// Return instruction size in bytes.
@@ -183,6 +185,16 @@ namespace WdRiscv
     unsigned vecFieldCount() const
     { return vecFields_; }
 
+    /// Return true if instruction has the acquire flag set. Non-atomic
+    /// instructions always return false.
+    bool hasAcquire() const
+    { return acquire_; }
+
+    /// Return true if instruction has the release flag set. Non-atomic
+    /// instructions always return false.
+    bool hasRelease() const
+    { return release_; }
+
   protected:
 
     friend class Hart<uint32_t>;
@@ -215,6 +227,12 @@ namespace WdRiscv
     void setVecFieldCount(uint32_t count)
     { vecFields_ = count; }
 
+    void setAcquire(bool flag)
+    { acquire_ = flag; }
+
+    void setRelease(bool flag)
+    { release_ = flag; }
+
     void reset(uint64_t addr, uint64_t physAddr, uint32_t inst,
 	       const InstEntry* entry,
 	       uint32_t op0, uint32_t op1, uint32_t op2, uint32_t op3)
@@ -244,6 +262,8 @@ namespace WdRiscv
     bool valid_;
     bool masked_;     // For vector instructions.
     uint8_t vecFields_;   // For vector ld/st instructions.
+    bool acquire_;    // Atomic instruction acquire flag.
+    bool release_;    // Atomic instruction release flag.
   };
 
 

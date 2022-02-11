@@ -35,12 +35,23 @@ Hart<URV>::decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& di)
 
   di.reset(addr, physAddr, inst, &entry, op0, op1, op2, op3);
 
-  // Set the mask bit for vector instructions.
-  if (di.instEntry() and di.instEntry()->isVector())
+  // Set the mask bit for vector instructions.  Set acuire/release bits
+  // for atomic instructions.
+  if (di.instEntry())
     {
-      bool masked = ((inst >> 25) & 1) == 0;  // Bit 25 of instruction
-      di.setMasked(masked);
-      di.setVecFieldCount(op3);
+      if (di.instEntry()->isVector())
+	{
+	  bool masked = ((inst >> 25) & 1) == 0;  // Bit 25 of instruction
+	  di.setMasked(masked);
+	  di.setVecFieldCount(op3);
+	}
+      else if (di.instEntry()->isAtomic())
+	{
+	  bool acquire = (inst >> 26) & 1;
+	  bool release = (inst >> 25) & 1;
+	  di.setAcquire(acquire);
+	  di.setRelease(release);
+	}
     }
 }
 
