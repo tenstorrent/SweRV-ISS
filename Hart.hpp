@@ -3674,6 +3674,7 @@ namespace WdRiscv
       ldStSize_ = 0;
       lastPriv_ = privMode_;
       ldStWrite_ = false;
+      ldStAtomic_ = false;
       clearTraceData();
     }
 
@@ -3802,10 +3803,11 @@ namespace WdRiscv
     bool traceLdSt_ = false;        // Trace addr of ld/st insts if true.
     URV ldStAddr_ = 0;              // Addr of data of most recent ld/st inst.
     uint64_t ldStPhysAddr_ = 0;
-    unsigned ldStSize_ = 0;         // Non-zero if ld/st.
+    unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing
     uint64_t ldStPrevData_ = 0;
-    bool ldStWrite_ = false;        // Ture if memory written by last store.
+    bool ldStWrite_ = false;        // True if memory written by last store.
+    bool ldStAtomic_ = false;       // True if amo or lr/sc
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
 
