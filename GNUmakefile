@@ -48,9 +48,9 @@ EXTRA_LIBS += -lws2_32
 endif
 
 ifdef SOFT_FLOAT
-override CPPFLAGS += -I$(PWD)/softfloat/source/include
+override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include
 override CPPFLAGS += -DSOFT_FLOAT
-soft_float_build := $(wildcard $(PWD)/softfloat/build/RISCV-GCC)
+soft_float_build := $(wildcard $(PWD)/third_party/softfloat/build/RISCV-GCC)
 soft_float_lib := $(soft_float_build)/softfloat.a
 endif
 
@@ -83,7 +83,7 @@ RM := rm -rf
 OFLAGS := -O3
 
 # Include paths.
-IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I.
+IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I. -Ithird_party
 
 # Command to compile .cpp files.
 ifeq (CYGWIN_NT-10.0,$(shell uname -s))

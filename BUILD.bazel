@@ -1,0 +1,24 @@
+hdrs = [
+    "HartConfig.hpp",
+    "WhisperMessage.h",
+    "Hart.hpp",
+    "Core.hpp",
+    "System.hpp",
+    "Server.hpp",
+    "Interactive.hpp",
+]
+
+cc_library(
+    name     = "rvcore",
+    srcs     = glob(include = ["*.cpp", "*.hpp"], exclude = hdrs),
+    hdrs     = hdrs,
+    deps     = ["//third_party:nlohmann", "//third_party:elfio"],
+    linkopts = ["-lstdc++fs", "-lpthread", "-lz"],
+)
+
+cc_binary(
+    name     = "whisper",
+    srcs     = ["whisper.cpp"],
+    deps     = [":rvcore"],
+    linkopts = ["-lboost_program_options", "-lstdc++fs"],
+)
