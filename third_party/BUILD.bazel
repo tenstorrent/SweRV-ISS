@@ -1,0 +1,16 @@
+
+cc_library(
+    name = "nlohmann",
+    hdrs = glob(["nlohmann/*.hpp", ]),
+    srcs = glob(["nlohmann/**/*.hpp"]),
+    includes = ['.'],
+    visibility = ['//:__pkg__'],
+)
+
+cc_library(
+    name = "elfio",
+    hdrs = glob(["elfio/elfio.hpp", ]),
+    srcs = glob(include = ["elfio/*.hpp"], exclude = ["elfio/elfio.hpp"]),
+    includes = ['.'],
+    visibility = ['//:__pkg__'],
+)
