@@ -162,12 +162,14 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
   for (uint64_t i = 0; i < count; ++i)
     {
       if (hasTag)
-	system_.mcmSetCurrentInstruction(hart, tag);
-
-      hart.singleStep(traceFile);
-
-      if (hasTag)
-	system_.mcmRetire(hart, this->time_, tag++);
+	{
+	  system_.mcmSetCurrentInstruction(hart, tag);
+	  DecodedInst di;
+	  hart.singleStep(di, traceFile);
+	  system_.mcmRetire(hart, this->time_, tag++);
+	}
+      else
+	hart.singleStep(traceFile);
     }
 
   return true;
