@@ -1058,13 +1058,20 @@ Hart<URV>::reportInstructionFrequency(FILE* file, bool json) const
     {
       nlohmann::json record;
       const InstProfile* profPtr = instProfs_.ithEntry(profIx);
-      if (not profPtr or not profPtr->freq_)
+      if (not profPtr or (not profPtr->freq_ and not json))
 	continue;
 
       const InstProfile& prof = *profPtr;
       const InstEntry& entry = instTable_.getEntry(prof.id_);
 
-      std::string instr = entry.isVector() ? entry.name() + "." + VecRegs::to_string(prof.elemWidth_) : entry.name();
+      std::string instr;
+      // Don't collect non-vector repeats
+      if (entry.isVector())
+        instr = entry.name() + "." + VecRegs::to_string(prof.elemWidth_);
+      else if (prof.elemWidth_ == ElementWidth::Byte)
+        instr = entry.name();
+      else
+        continue;
 
       if (json)
         {
