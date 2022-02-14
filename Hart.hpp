@@ -382,6 +382,10 @@ namespace WdRiscv
     /// tracing information related to the executed instruction.
     void singleStep(FILE* file = nullptr);
 
+    /// Same as above but decoded istruction information is placed
+    /// in given di object.
+    void singleStep(DecodedInst& di, FILE* file = nullptr);
+
     /// Determine the effect of instruction fetching and discarding n
     /// bytes (where n is the instruction size of the given
     /// instruction) from memory and then executing the given

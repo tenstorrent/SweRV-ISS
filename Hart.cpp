@@ -4716,6 +4716,15 @@ template <typename URV>
 void
 Hart<URV>::singleStep(FILE* traceFile)
 {
+  DecodedInst di;
+  singleStep(di, traceFile);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
+{
   std::string instStr;
 
   // Single step is mostly used for follow-me mode where we want to
@@ -4738,7 +4747,6 @@ Hart<URV>::singleStep(FILE* traceFile)
       if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
         return;
 
-      DecodedInst di;
       decode(pc_, physPc, inst, di);
 
       // Increment pc and execute instruction
