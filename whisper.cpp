@@ -50,6 +50,8 @@ typedef int socklen_t;
 #include "System.hpp"
 #include "Server.hpp"
 #include "Interactive.hpp"
+#include "third_party/nlohmann/json.hpp"
+#include "ArchInfo.hpp"
 
 
 using namespace WdRiscv;
@@ -171,6 +173,7 @@ struct Args
   std::string consoleOutFile;  // Console io output file.
   std::string serverFile;      // File in which to write server host and port.
   std::string instFreqFile;    // Instruction frequency file.
+  std::string archInfoFile;    // Architectural coverage definition file (JSON).
   std::string configFile;      // Configuration (JSON) file.
   std::string bblockFile;      // Basci block file.
   std::string isa;
@@ -474,6 +477,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 			" gdb will work with stdio (default -1).")
 	("profileinst", po::value(&args.instFreqFile),
 	 "Report instruction frequency to file.")
+        ("archinfo", po::value(&args.archInfoFile),
+         "Dump instruction table using definition.")
 	("setreg", po::value(&args.regInits)->multitoken(),
 	 "Initialize registers. Apply to all harts unless specific prefix "
 	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
@@ -1245,20 +1250,12 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
       return false;
     }
 
-  const std::string sfx = ".json";
-  if (outPath.size() > sfx.size() and not outPath.compare(outPath.size() - sfx.size(), sfx.size(), sfx))
-    {
-      hart.reportInstructionFrequency(outFile, true);
-    }
-  else
-    {
-      hart.reportInstructionFrequency(outFile, false);
-      hart.reportTrapStat(outFile);
-      fprintf(outFile, "\n");
-      hart.reportPmpStat(outFile);
-      fprintf(outFile, "\n");
-      hart.reportLrScStat(outFile);
-    }
+  hart.reportInstructionFrequency(outFile);
+  hart.reportTrapStat(outFile);
+  fprintf(outFile, "\n");
+  hart.reportPmpStat(outFile);
+  fprintf(outFile, "\n");
+  hart.reportLrScStat(outFile);
 
   fclose(outFile);
   return true;
@@ -1692,6 +1689,40 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
 }
 
 
+/// Static dump of ISA information, program run not needed
+template<typename URV>
+static
+bool
+staticDump(Hart<URV>& hart, const std::string infoPath)
+{
+  nlohmann::json j;
+  ArchInfo<URV> info(infoPath);
+  InstTable table;
+
+  for (auto& entry : table.getInstVec())
+    {
+      nlohmann::json record;
+      if (info.createInfoInst(hart, record, entry))
+        j += record;
+    }
+
+  nlohmann::json user;
+  if (info.createInfoMode(hart, user, PrivilegeMode::User))
+    j += user;
+
+  nlohmann::json supervisor;
+  if (info.createInfoMode(hart, supervisor, PrivilegeMode::Supervisor))
+    j += supervisor;
+
+  nlohmann::json machine;
+  if (info.createInfoMode(hart, machine, PrivilegeMode::Machine))
+    j += machine;
+
+  std::cout << j.dump(2) << '\n';
+  return true;
+}
+
+
 template <typename URV>
 static
 bool
@@ -1733,7 +1764,7 @@ session(const Args& args, const HartConfig& config)
     return false;
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
-      and not args.interactive)
+      and not args.interactive and args.archInfoFile.empty())
     {
       std::cerr << "No program file specified.\n";
       return false;
@@ -1771,6 +1802,12 @@ session(const Args& args, const HartConfig& config)
       if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
 	if (not args.interactive)
 	  return false;
+    }
+
+  // Static analysis of ISA, do not run program
+  if (not args.archInfoFile.empty())
+    {
+      return staticDump(*system.ithHart(0), args.archInfoFile);
     }
 
   bool result = sessionRun(system, args, traceFile, commandLog);

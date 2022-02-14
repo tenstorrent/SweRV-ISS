@@ -1048,17 +1048,15 @@ printFpHisto(const char* tag, const std::vector<uint64_t>& histo, FILE* file)
 
 template <typename URV>
 void
-Hart<URV>::reportInstructionFrequency(FILE* file, bool json) const
+Hart<URV>::reportInstructionFrequency(FILE* file) const
 {
-  nlohmann::json j;
   std::vector<size_t> indices;
   instProfs_.sort(indices);
 
   for (auto profIx : indices)
     {
-      nlohmann::json record;
       const InstProfile* profPtr = instProfs_.ithEntry(profIx);
-      if (not profPtr or (not profPtr->freq_ and not json))
+      if (not profPtr or not profPtr->freq_)
 	continue;
 
       const InstProfile& prof = *profPtr;
@@ -1073,29 +1071,18 @@ Hart<URV>::reportInstructionFrequency(FILE* file, bool json) const
       else
         continue;
 
-      if (json)
-        {
-          record += nlohmann::json::object_t::value_type("group", "instruction");
-          record += nlohmann::json::object_t::value_type("symbol", instr);
-          record["attr"] += nlohmann::json::object_t::value_type("type", entry.typeToString());
-          record["attr"] += nlohmann::json::object_t::value_type("opcode", entry.code());
-          record += nlohmann::json::object_t::value_type("count", prof.freq_);
-        }
-      else
-        fprintf(file, "%s %" PRId64 "\n", instr.c_str(), prof.freq_);
+      fprintf(file, "%s %" PRId64 "\n", instr.c_str(), prof.freq_);
 
       uint64_t count = 0;
       for (auto n : prof.destRegFreq_) count += n;
       if (count)
 	{
-          if (not json)
-            fprintf(file, "  +rd");
+          fprintf(file, "  +rd");
 	  auto regCount = prof.destRegFreq_.size();
 	  for (unsigned i = 0; i < regCount; ++i)
-	    if (prof.destRegFreq_.at(i) and not json)
+	    if (prof.destRegFreq_.at(i))
               fprintf(file, " %d:%" PRId64, i, prof.destRegFreq_.at(i));
-          if (not json)
-            fprintf(file, "\n");
+          fprintf(file, "\n");
 	}
 
       unsigned srcIx = 0;
@@ -1114,53 +1101,39 @@ Hart<URV>::reportInstructionFrequency(FILE* file, bool json) const
                 {
                   const auto& regFreq = prof.srcRegFreq_.at(srcIx);
 		  auto regCount = regFreq.size();
-                  if (not json)
-                    fprintf(file, "  +rs%d", srcIx + 1);
+                  fprintf(file, "  +rs%d", srcIx + 1);
                   for (unsigned i = 0; i < regCount; ++i)
-                    if (regFreq.at(i) and not json)
+                    if (regFreq.at(i))
                       fprintf(file, " %d:%" PRId64, i, regFreq.at(i));
-                  if (not json)
-                    fprintf(file, "\n");
+                  fprintf(file, "\n");
 
                   const auto& histo = prof.srcHisto_.at(srcIx);
                   std::string tag = std::string("+hist") + std::to_string(srcIx + 1);
-                  if (not json)
-                    {
-                      if (entry.ithOperandType(opIx) == OperandType::FpReg)
-                        printFpHisto(tag.c_str(), histo, file);
-                      else if (entry.isUnsigned())
-                        printUnsignedHisto(tag.c_str(), histo, file);
-                      else
-                        printSignedHisto(tag.c_str(), histo, file);
-                    }
+                  if (entry.ithOperandType(opIx) == OperandType::FpReg)
+                    printFpHisto(tag.c_str(), histo, file);
+                  else if (entry.isUnsigned())
+                    printUnsignedHisto(tag.c_str(), histo, file);
+                  else
+                    printSignedHisto(tag.c_str(), histo, file);
                 }
 
               srcIx++;
             }
 	}
 
-      if (prof.hasImm_ and not json)
+      if (prof.hasImm_)
 	{
 	  fprintf(file, "  +imm  min:%d max:%d\n", prof.minImm_, prof.maxImm_);
 	  printSignedHisto("+hist ", prof.srcHisto_.back(), file);
 	}
 
-      if (prof.user_ and not json)
+      if (prof.user_)
         fprintf(file, "  +user %" PRIu64 "\n", prof.user_);
-      if (prof.supervisor_ and not json)
+      if (prof.supervisor_)
         fprintf(file, "  +supervisor %" PRIu64 "\n", prof.supervisor_);
-      if (prof.machine_ and not json)
+      if (prof.machine_)
         fprintf(file, "  +machine %" PRIu64 "\n", prof.machine_);
-
-      if (json)
-        j += record;
     }
-
-    if (json)
-      {
-        std::string dumped = j.dump(2);
-        fprintf(file, dumped.c_str());
-      }
 }
 
 
