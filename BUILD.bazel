@@ -10,7 +10,7 @@ hdrs = [
 
 cc_library(
     name     = "rvcore",
-    srcs     = glob(include = ["*.cpp", "*.hpp"], exclude = hdrs),
+    srcs     = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
     hdrs     = hdrs,
     deps     = ["//third_party:nlohmann", "//third_party:elfio"],
     linkopts = ["-lstdc++fs", "-lpthread", "-lz"],
