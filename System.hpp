@@ -32,6 +32,7 @@ namespace WdRiscv
   template <typename URV>
   class Mcm;
 
+  class DecodedInst;
 
   /// Model a system consisting of n cores with m-harts per core and a
   /// memory. The harts in the system are indexed from 0 to n*m -
@@ -157,7 +158,8 @@ namespace WdRiscv
     bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		     uint64_t addr, unsigned size, uint64_t data);
 
-    bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag);
+    bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		   const DecodedInst& di);
 
     bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
 
