@@ -166,7 +166,9 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
 	  system_.mcmSetCurrentInstruction(hart, tag);
 	  DecodedInst di;
 	  hart.singleStep(di, traceFile);
-	  system_.mcmRetire(hart, this->time_, tag++);
+	  if (not di.isValid())
+	    assert(hart.lastInstructionTrapped());
+	  system_.mcmRetire(hart, this->time_, tag++, di);
 	}
       else
 	hart.singleStep(traceFile);

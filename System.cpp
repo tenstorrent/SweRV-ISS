@@ -166,11 +166,12 @@ System<URV>::mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
 template <typename URV>
 bool
-System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag)
+System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		       const DecodedInst& di)
 {
   if (not mcm_)
     return false;
-  return mcm_->retire(hart, time, tag);
+  return mcm_->retire(hart, time, tag, di);
 }
 
 template <typename URV>

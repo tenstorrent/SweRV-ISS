@@ -4,6 +4,7 @@
 #include <array>
 #include <algorithm>
 #include <cassert>
+#include "DecodedInst.hpp"
 
 
 namespace WdRiscv
@@ -46,6 +47,7 @@ namespace WdRiscv
     uint64_t data_ = 0;       // Data for load/sore instructions.
     McmInstrIx tag_ = 0;
     uint8_t size_ = 0;        // Data size for load/store insructions.
+    DecodedInst di_;
     bool retired_ = false;
     bool canceled_ = false;
     bool isLoad_ = false;
@@ -119,7 +121,8 @@ namespace WdRiscv
     bool cancelRead(unsigned hartId, uint64_t instTag);
 
     /// This is called when an instruction is retired.
-    bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag);
+    bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
+		const DecodedInst& di);
 
     bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
 
@@ -132,6 +135,8 @@ namespace WdRiscv
     { return lineSize_; }
 
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
+
+    bool ppoRule3(Hart<URV>& hart, const McmInstr& instr) const;
 
     uint64_t latestOpTime(const McmInstr& instr) const
     {
@@ -186,6 +191,9 @@ namespace WdRiscv
     bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
 
     bool checkStoreComplete(const McmInstr& instr) const;
+
+    void clearMaskBitsForWrite(const McmInstr& storeInstr,
+			       const McmInstr& target, uint64_t mask) const;
 
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 

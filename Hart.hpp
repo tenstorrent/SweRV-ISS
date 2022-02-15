@@ -618,6 +618,11 @@ namespace WdRiscv
     /// it no FP register was written.
     int lastFpReg() const;
 
+    /// Return true if the last executed instruction triggered a trap
+    /// (had an exception or encouted an interrupt).
+    bool lastInstructionTrapped() const
+    { return hasException_ or hasInterrupt_; }
+
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
     /// last instruction. CSRs modified as a side effect (e.g. mcycle

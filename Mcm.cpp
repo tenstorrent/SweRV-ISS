@@ -192,7 +192,8 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
 template <typename URV>
 bool
-Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag)
+Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		 const DecodedInst& di)
 {
   if (not updateTime("Mcm::retire", time))
     return false;
@@ -215,7 +216,15 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag)
 		<< " retired multiple times\n";
       return false;
     }
+
+  if (not di.isValid())
+    {
+      cancelInstr(*instr);
+      return true;
+    }
+
   instr->retired_ = true;
+  instr->di_ = di;
 
   // If instruction is a store, save corresponding address and written data.
   uint64_t addr = 0, value = 0;
@@ -244,6 +253,10 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag)
       if (not checkRtlRead(hartId, *instr, op))
 	return false;
     }
+
+  // Check PPO rule 3.
+  if (not ppoRule3(hart, *instr))
+    return false;
 
   return true;
 }
@@ -475,6 +488,50 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 
 
 template <typename URV>
+void
+Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
+				const McmInstr& target, uint64_t mask) const
+{
+  /// Clear in the given mask, bits corresponding to the target instruction
+  /// bytes covered by the given store instruction writes.
+  uint64_t storeMask = 0; // Mask of bits written by store.
+  for (auto opIx : storeInstr.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	continue;
+
+      if (op.time_ > latestOpTime(target))
+	continue;  // Write op too late to affect target instruction.
+
+      uint64_t opMask = ~uint64_t(0);
+      if (op.physAddr_ <= target.physAddr_)
+	{
+	  uint64_t offset = target.physAddr_ - op.physAddr_;
+	  if (offset > 8)
+	    offset = 8;
+	  opMask >>= offset*8;
+	}
+      else
+	{
+	  uint64_t offset = op.physAddr_ - target.physAddr_;
+	  if (offset > 8)
+	    offset = 8;
+	  opMask <<= offset*8;
+	}
+      storeMask |= mask;
+    }
+
+  unsigned unused = (8 - storeInstr.size_)*8;  // Unwritten upper bits of store.
+  storeMask = (storeMask << unused) >> unused;
+
+  mask &= storeMask;
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 {
@@ -669,6 +726,71 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       std::cerr << "Error: PPO rule 1 failed: hart-id=" << hartId << " tag1="
 		<< instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
       return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 3: A is a write resulting from an AMO/SC instructions, A and
+  // B have overlapping addresses, B loads data from A.
+ 
+  assert(instrB.di_.isValid());
+
+  // Instruction B must be a load/amo instruction.
+  const InstEntry* instEntry = instrB.di_.instEntry();
+  if (instEntry->isStore())
+    return true;  // NA: store instruction.
+
+  if (not instEntry->isLoad() and not instEntry->isAtomic())
+    return true;  // NA: must be load/amo.
+
+  if (not instrB.complete_)
+    return true;  // We will try again when B is complete.
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  using std::cerr;
+
+  uint64_t mask = ~uint64_t(0);  // Bites of B not-written by preceeding non-atomic stores.
+  unsigned shift = (8 - instrB.size_) * 8;
+  mask = (mask << shift) >> shift;
+
+  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag-1);
+      if (instrA.isCanceled())
+	continue;
+      assert(instrA.isRetired());
+
+      if (not instrA.isStore_ or not instrA.overlaps(instrB))
+	continue;
+
+      // If A is not atomic remove from mask the bytes of B that are
+      // covered by A. Done when all bytes of B are covered.
+      assert(instrA.di_.isValid());
+      if (not instrA.di_.instEntry()->isAtomic())
+	{
+	  clearMaskBitsForWrite(instrA, instrB, mask);
+	  if (mask == 0)
+	    return true;
+	}
+      else if (not isBeforeInMemoryTime(instrA, instrB))
+	{
+	  cerr << "Error: PPO rule 3 failed: hart-id=" << hartId << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
+	       << latestOpTime(instrA) << " time2=" << earliestOpTime(instrB)
+	       << '\n';
+	  return false;
+	}
     }
 
   return true;
