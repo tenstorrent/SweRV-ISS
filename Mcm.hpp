@@ -76,8 +76,8 @@ namespace WdRiscv
       if (physAddr_ < other.physAddr_)
 	return other.physAddr_ - physAddr_ < size_;
       return physAddr_ - other.physAddr_ < other.size_;
-
     }
+
     bool overlaps(const MemoryOp& op) const
     {
       assert(size_ > 0 and op.size_ > 0);
