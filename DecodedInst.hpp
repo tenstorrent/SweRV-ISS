@@ -44,8 +44,7 @@ namespace WdRiscv
     /// Default contructor: Define an invalid object.
     DecodedInst()
       : addr_(0), physAddr_(0), inst_(0), size_(0), entry_(nullptr), op0_(0),
-	op1_(0), op2_(0), op3_(0), valid_(false), masked_(false), vecFields_(0),
-	acquire_(false), release_(false)
+	op1_(0), op2_(0), op3_(0), valid_(false), masked_(false), vecFields_(0)
     { values_[0] = values_[1] = values_[2] = values_[3] = 0; }
 
     /// Constructor.
@@ -53,8 +52,7 @@ namespace WdRiscv
 		uint32_t op0, uint32_t op1, uint32_t op2, uint32_t op3)
       : addr_(addr), physAddr_(0), inst_(inst), size_(instructionSize(inst)),
 	entry_(entry), op0_(op0), op1_(op1), op2_(op2), op3_(op3),
-	valid_(entry != nullptr), masked_(false), vecFields_(0),
-	acquire_(false), release_(false)
+	valid_(entry != nullptr), masked_(false), vecFields_(0)
     { values_[0] = values_[1] = values_[2] = values_[3] = 0; }
 
     /// Return instruction size in bytes.
@@ -148,14 +146,56 @@ namespace WdRiscv
     { return RoundingMode((inst_ >> 12) & 7); }
 
     /// Relevant to atomic instructions: Return true if acquire bit is
-    /// set.
+    /// set in an atomic instruction.
     bool isAtomicAcquire() const
-    { return (inst_ >> 26) & 1; }
+    { return entry_ and entry_->isAtomic() and ((inst_ >> 26) & 1); }
 
     /// Relevant to atomic instructions: Return true if release bit is
-    /// set.
+    /// set in an atomic instrution.
     bool isAtomicRelease() const
-    { return (inst_ >> 25) & 1; }
+    { return entry_ and entry_->isAtomic() and ((inst_ >> 25) & 1); }
+
+    /// Return true if this a fence instruction (not fence.tso).
+    bool isFence() const
+    { return entry_ and entry_->instId() == InstId::fence and
+	(inst_ >> 28) == 0; }
+
+    /// Relevant to fence instruction. Return true if this a fence.tso.
+    bool isFenceTso() const
+    { return entry_ and entry_->instId() == InstId::fence and
+	(inst_ >> 28) == 8; }
+
+    /// Predecessor read bit of fence instruction.
+    bool isFencePredRead() const
+    { return isFence() and ((inst_ >> 25) & 1); }
+
+    /// Predecessor write bit of fence instruction.
+    bool isFencePredWrite() const
+    { return isFence() and ((inst_ >> 24) & 1); }
+
+    /// Predecessor input (io read) bit of fence instruction.
+    bool isFencePredInput() const
+    { return isFence() and ((inst_ >> 27) & 1); }
+
+    /// Predecessor output (io write) bit of fence instruction.
+    bool isFencePredOutput() const
+    { return isFence() and ((inst_ >> 26) & 1); }
+
+    /// Successor read bit of fence instruction.
+    bool isFenceSuccRead() const
+    { return isFence() and ((inst_ >> 21) & 1); }
+
+    /// Successor write bit of fence instruction.
+    bool isFenceSuccWrite() const
+    { return isFence() and ((inst_ >> 20) & 1); }
+
+    /// Successor input (io read) bit of fence instruction.
+    bool isFenceSuccInput() const
+    { return isFence() and ((inst_ >> 23) & 1); }
+
+    /// Successor output (io write) bit of fence instruction.
+    bool isFenceSuccOutput() const
+    { return isFence() and ((inst_ >> 22) & 1); }
 
     /// Associate a value with each operand by fetching
     /// registers. After this method, the value of an immediate
@@ -184,16 +224,6 @@ namespace WdRiscv
     /// if this is not a vector ld/st.
     unsigned vecFieldCount() const
     { return vecFields_; }
-
-    /// Return true if instruction has the acquire flag set. Non-atomic
-    /// instructions always return false.
-    bool hasAcquire() const
-    { return acquire_; }
-
-    /// Return true if instruction has the release flag set. Non-atomic
-    /// instructions always return false.
-    bool hasRelease() const
-    { return release_; }
 
   protected:
 
@@ -227,12 +257,6 @@ namespace WdRiscv
     void setVecFieldCount(uint32_t count)
     { vecFields_ = count; }
 
-    void setAcquire(bool flag)
-    { acquire_ = flag; }
-
-    void setRelease(bool flag)
-    { release_ = flag; }
-
     void reset(uint64_t addr, uint64_t physAddr, uint32_t inst,
 	       const InstEntry* entry,
 	       uint32_t op0, uint32_t op1, uint32_t op2, uint32_t op3)
@@ -262,8 +286,6 @@ namespace WdRiscv
     bool valid_;
     bool masked_;     // For vector instructions.
     uint8_t vecFields_;   // For vector ld/st instructions.
-    bool acquire_;    // Atomic instruction acquire flag.
-    bool release_;    // Atomic instruction release flag.
   };
 
 

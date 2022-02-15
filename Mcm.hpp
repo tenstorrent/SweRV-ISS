@@ -87,7 +87,6 @@ namespace WdRiscv
 	return op.physAddr_ - physAddr_ < size_;
       return physAddr_ - op.physAddr_ < op.size_;
     }
-
   };
 
 
@@ -200,6 +199,10 @@ namespace WdRiscv
     /// Forward to the given read op from the stores of the returned
     /// instructions ahead of tag.
     bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
+
+
+    bool instrHasRead(const McmInstr& instr) const;
+    bool instrHasWrite(const McmInstr& instr) const;
 
     bool checkStoreComplete(const McmInstr& instr) const;
 

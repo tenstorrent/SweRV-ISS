@@ -195,6 +195,8 @@ bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		 const DecodedInst& di)
 {
+  using std::cerr;
+
   if (not updateTime("Mcm::retire", time))
     return false;
 
@@ -212,14 +214,14 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (instr->retired_)
     {
-      std::cerr << "Mcm::retire: Error: Instruction tag " << tag
-		<< " retired multiple times\n";
+      cerr << "Mcm::retire: Error: Instruction tag=" << tag
+	   << " retired multiple times\n";
       return false;
     }
 
   if (not di.isValid())
     {
-      cancelInstr(*instr);
+      cancelInstr(*instr);  // Instruction took a trap.
       return true;
     }
 
@@ -241,7 +243,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   hart.peekCsr(CsrNumber::MHARTID, hartId);
 
   // Check read operations of instruction comparing RTL values to
-  // meory model (whisper) values.
+  // memory model (whisper) values.
   for (auto opIx : instr->memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -252,6 +254,24 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
       if (not checkRtlRead(hartId, *instr, op))
 	return false;
+    }
+
+  // Amo sanity check.
+  if (di.instEntry()->isAmo())
+    {
+      // Must have a read.  Must not have a write.
+      if (not instrHasRead(*instr))
+	{
+	  cerr << "Error: Amo instruction tag=" << tag
+	       << " retired before read op.\n";
+	  return false;
+	}
+      if (instrHasWrite(*instr))
+	{
+	  cerr << "Error: Amo instruction tag=" << tag
+	       << " retired after read op.\n";
+	  return false;
+	}
     }
 
   // Check PPO rule 3.
@@ -691,6 +711,38 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       return false;
     }
   return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::instrHasRead(const McmInstr& instr) const
+{
+  for (auto opIx : instr.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	return true;
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::instrHasWrite(const McmInstr& instr) const
+{
+  for (auto opIx : instr.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_)
+	return true;
+    }
+  return false;
 }
 
 

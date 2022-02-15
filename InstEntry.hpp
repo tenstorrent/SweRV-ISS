@@ -228,6 +228,19 @@ namespace WdRiscv
     bool isAtomic() const
     { return type_ == InstType::Atomic; }
 
+    /// Return true if this a load-reserve.
+    bool isLr() const
+    { return id_ == InstId::lr_w or id_ == InstId::lr_d; }
+
+    /// Return true if this a store-conditional.
+    bool isSc() const
+    { return id_ == InstId::sc_w or id_ == InstId::sc_d; }
+
+    /// Return true if this is an amo instruction (lr/sc are atomic
+    /// but not amo).
+    bool isAmo() const
+    { return isAtomic() and not isLr() and not isSc(); }
+
     /// Return true if this is an vector instruction.
     bool isVector() const
     { return type_ == InstType::Vector; }
