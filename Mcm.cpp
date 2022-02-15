@@ -195,6 +195,8 @@ bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		 const DecodedInst& di)
 {
+  using std::cerr;
+
   if (not updateTime("Mcm::retire", time))
     return false;
 
@@ -212,8 +214,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (instr->retired_)
     {
-      std::cerr << "Mcm::retire: Error: Instruction tag " << tag
-		<< " retired multiple times\n";
+      cerr << "Mcm::retire: Error: Instruction tag=" << tag
+	   << " retired multiple times\n";
       return false;
     }
 
@@ -260,12 +262,14 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       // Must have a read.  Must not have a write.
       if (not instrHasRead(*instr))
 	{
-	  std::cerr << "Error: Amo instruction retired before read op.\n";
+	  cerr << "Error: Amo instruction tag=" << tag
+	       << " retired before read op.\n";
 	  return false;
 	}
       if (instrHasWrite(*instr))
 	{
-	  std::cerr << "Error: Amo instruction retired after read op.\n";
+	  cerr << "Error: Amo instruction tag=" << tag
+	       << " retired after read op.\n";
 	  return false;
 	}
     }

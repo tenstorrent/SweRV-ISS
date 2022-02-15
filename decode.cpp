@@ -45,13 +45,6 @@ Hart<URV>::decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& di)
 	  di.setMasked(masked);
 	  di.setVecFieldCount(op3);
 	}
-      else if (di.instEntry()->isAtomic())
-	{
-	  bool acquire = (inst >> 26) & 1;
-	  bool release = (inst >> 25) & 1;
-	  di.setAcquire(acquire);
-	  di.setRelease(release);
-	}
     }
 }
 

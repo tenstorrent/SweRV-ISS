@@ -270,6 +270,36 @@ printBranch2(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
 }
 
 
+template <typename URV>
+static
+void
+printFence(const Hart<URV>& /*hart*/, std::ostream& stream,
+	   const DecodedInst& di)
+{
+  if (di.isFenceTso())
+    {
+      stream << "fence.tso";
+      return;
+    }
+
+  stream << std::left << std::setw(8) << di.instEntry()->name() << ' ';
+
+  std::string pred, succ;
+
+  if (di.isFencePredRead())   pred += "r";
+  if (di.isFencePredWrite())  pred += "w";
+  if (di.isFencePredInput())  pred += "i";
+  if (di.isFencePredOutput()) pred += "o";
+  
+  if (di.isFenceSuccRead())   succ += "r";
+  if (di.isFenceSuccWrite())  succ += "w";
+  if (di.isFenceSuccInput())  succ += "i";
+  if (di.isFenceSuccOutput()) succ += "o";
+
+  stream << pred << ", " << succ;
+}
+
+
 /// Helper to disassemble method.
 template <typename URV>
 static
@@ -516,6 +546,10 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printBranch3(*this, out, di);
       break;
 
+    case InstId::fence:
+      printFence(*this, out, di);
+      break;
+      
     case InstId::csrrw:
     case InstId::csrrs:
     case InstId::csrrc:
