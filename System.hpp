@@ -149,6 +149,9 @@ namespace WdRiscv
     /// used after execution has started.
     bool enableMcm(unsigned mergeBufferSize);
 
+    unsigned mergeBufferSize() const
+    { return mbSize_; }
+
     bool mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
 		 unsigned size, uint64_t data, bool internal);
 
@@ -174,5 +177,6 @@ namespace WdRiscv
     std::shared_ptr<Memory> memory_ = nullptr;
     SparseMem* sparseMem_ = nullptr;
     Mcm<URV>* mcm_ = nullptr;
+    unsigned mbSize_ = 64;  // Merge buffer size.
   };
 }

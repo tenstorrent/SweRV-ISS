@@ -1659,7 +1659,7 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
   if (len >= 2 and hexDigits.at(0) == '0' and hexDigits.at(1) == 'x')
     offset += 2;
 
-  unsigned lineSize = 64;  // FIX : get from system
+  unsigned lineSize = system_.mergeBufferSize();
   if (len - offset > lineSize*2)
     {
       std::cerr << "Too many digits in data string. Expecting " << lineSize*2

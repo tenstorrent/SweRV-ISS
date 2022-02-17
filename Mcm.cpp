@@ -278,7 +278,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	}
     }
 
-  // Check PPO rule 3.
+  // Check PPO rule 2.
   if (not ppoRule2(hart, *instr))
     return false;
 
