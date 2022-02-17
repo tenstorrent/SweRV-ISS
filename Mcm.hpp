@@ -206,6 +206,8 @@ namespace WdRiscv
     bool instrHasRead(const McmInstr& instr) const;
     bool instrHasWrite(const McmInstr& instr) const;
 
+    bool checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const;
+
     bool checkStoreComplete(const McmInstr& instr) const;
 
     void clearMaskBitsForWrite(const McmInstr& storeInstr,

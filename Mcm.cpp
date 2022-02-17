@@ -566,6 +566,41 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
 }
 
 
+/// An external read op should not be able to forward
+template <typename URV>
+bool
+Mcm<URV>::checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const
+{
+  assert(not op.isCanceled() and not op.failRead_);
+  assert(not op.internal_);
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  assert(op.instrTag_ < instrVec.size());
+
+  for (auto tag = op.instrTag_; tag > 0; --tag)
+    {
+      const auto& prev = instrVec.at(tag);
+      if (not prev.isStore_ or not prev.overlaps(op))
+	continue;
+      bool fail = not prev.complete_ or latestOpTime(prev) >= op.time_;
+      if (fail)
+	{
+	  cerr << "Error: External read op must forward from store: hart-id="
+	       << hartId << " op-time=" << op.time_ << " op-instr-tag="
+	       << op.instrTag_ << " store-tag=" << prev.tag_ << '\n';
+	  return false;
+	}
+
+      // TBD FIX : Once op is covered by store instructions return true.
+    }
+  return true;
+}
+
+
 template <typename URV>
 bool
 Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
@@ -661,8 +696,12 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
       instr->isLoad_ = true;
 
       if (op.internal_)
-	if (not forwardToRead(hart, tag, op))
-	  return false;
+	{
+	  if (not forwardToRead(hart, tag, op))
+	    return false;
+	}
+      else if (not checkExternalRead(hart, op))
+	return false;
 
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
@@ -884,7 +923,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 		{
 		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hartId
 		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
-		       << " intrmediate store at time=" << op.time_ << '\n';
+		       << " intermediate store at time=" << op.time_ << '\n';
 		  return false;
 		}
 	    }
