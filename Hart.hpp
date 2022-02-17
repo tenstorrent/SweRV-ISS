@@ -1526,7 +1526,7 @@ namespace WdRiscv
     /// physAddr is set to the result of the virtual to physical
     /// translation of the referenced memory address.
     template<typename LOAD_TYPE>
-    bool loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr);
+    bool loadReserve(uint32_t rd, uint32_t rs1);
 
     /// Helper to execSc. Store type must be uint32_t, or uint64_t.
     /// Return true if store is successful. Return false otherwise

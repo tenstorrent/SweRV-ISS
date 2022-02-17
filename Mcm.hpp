@@ -146,6 +146,8 @@ namespace WdRiscv
 
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule2(Hart<URV>& hart, const McmInstr& instr) const;
+
     bool ppoRule3(Hart<URV>& hart, const McmInstr& instr) const;
 
     uint64_t latestOpTime(const McmInstr& instr) const
@@ -180,7 +182,7 @@ namespace WdRiscv
 	  return false;
 	}
       uint64_t aTime = latestOpTime(a);
-      uint64_t bTime = earliestOpTime(a);
+      uint64_t bTime = earliestOpTime(b);
       if (a.isStore_ and b.isStore_ and aTime == bTime)
 	return a.tag_ < b.tag_;
       return aTime < bTime;

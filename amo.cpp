@@ -21,6 +21,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "System.hpp"
+#include "Mcm.hpp"
 
 using namespace WdRiscv;
 
@@ -86,10 +87,8 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 	triggerTripped_ = true;
     }
 
-  unsigned ldSize = 4;
-
   uint64_t addr = virtAddr;
-  auto cause = validateAmoAddr(addr, ldSize);
+  auto cause = validateAmoAddr(addr, ldStSize_);
   ldStPhysAddr_ = addr;
 
   if (cause != ExceptionCause::NONE)
@@ -100,15 +99,26 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
     }
 
   uint32_t uval = 0;
-  if (memory_.read(addr, uval))
+
+  bool hasMcmVal = false;
+  if (mcm_)
     {
-      value = SRV(int32_t(uval)); // Sign extend.
-      return true;  // Success.
+      uint64_t mcmVal = 0;
+      if (mcm_->getCurrentLoadValue(*this, addr, ldStSize_, mcmVal))
+	{
+	  uval = mcmVal;
+	  hasMcmVal = true;
+	}
     }
 
-  cause = ExceptionCause::STORE_ACC_FAULT;
-  initiateLoadException(cause, virtAddr);
-  return false;
+  if (not hasMcmVal and not memory_.read(addr, uval))
+    {
+      assert(0);
+      return false;
+    }
+
+  value = SRV(int32_t(uval)); // Sign extend.
+  return true;  // Success.
 }
 
 
@@ -130,10 +140,8 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
 	triggerTripped_ = true;
     }
 
-  unsigned ldSize = 8;
-
   uint64_t addr = virtAddr;
-  auto cause = validateAmoAddr(addr, ldSize);
+  auto cause = validateAmoAddr(addr, ldStSize_);
   ldStPhysAddr_ = addr;
 
   if (cause != ExceptionCause::NONE)
@@ -144,22 +152,23 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
     }
 
   uint64_t uval = 0;
-  if (memory_.read(addr, uval))
+  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, addr, ldStSize_, uval);
+
+  if (not hasMcm and not memory_.read(addr, uval))
     {
-      value = SRV(int64_t(uval)); // Sign extend.
-      return true;  // Success.
+      assert(0);
+      return false;
     }
 
-  cause = ExceptionCause::STORE_ACC_FAULT;
-  initiateLoadException(cause, virtAddr);
-  return false;
+  value = uval;
+  return true;  // Success.
 }
 
 
 template <typename URV>
 template <typename LOAD_TYPE>
 bool
-Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
+Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 {
   URV virtAddr = intRegs_.read(rs1);
 
@@ -229,9 +238,20 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
     }
 
   ULT uval = 0;
-  if (not memory_.read(addr, uval))
-    {  // Should never happen.
-      initiateLoadException(cause, virtAddr);
+  bool hasMcmVal = false;
+  if (mcm_)
+    {
+      uint64_t mcmVal = 0;
+      if (mcm_->getCurrentLoadValue(*this, addr, ldStSize_, mcmVal))
+	{
+	  uval = mcmVal;
+	  hasMcmVal = true;
+	}
+    }
+
+  if (not hasMcmVal and not memory_.read(addr, uval))
+    {
+      assert(0);
       return false;
     }      
 
@@ -241,7 +261,6 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
 
   intRegs_.write(rd, value);
 
-  physAddr = addr;
   return true;
 }
 
@@ -259,12 +278,11 @@ Hart<URV>::execLr_w(const DecodedInst* di)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   lrCount_++;
-  uint64_t physAddr = 0;
-  if (not loadReserve<int32_t>(di->op0(), di->op1(), physAddr))
+  if (not loadReserve<int32_t>(di->op0(), di->op1()))
     return;
 
   unsigned size = 4;
-  uint64_t resAddr = physAddr; 
+  uint64_t resAddr = ldStPhysAddr_; 
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of
@@ -559,12 +577,11 @@ Hart<URV>::execLr_d(const DecodedInst* di)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   lrCount_++;
-  uint64_t physAddr = 0;
-  if (not loadReserve<int64_t>(di->op0(), di->op1(), physAddr))
+  if (not loadReserve<int64_t>(di->op0(), di->op1()))
     return;
 
   unsigned size = 8;
-  uint64_t resAddr = physAddr; 
+  uint64_t resAddr = ldStPhysAddr_; 
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of
