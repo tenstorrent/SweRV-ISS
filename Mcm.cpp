@@ -19,6 +19,8 @@ Mcm<URV>::Mcm(System<URV>& system, unsigned mergeBufferSize)
 
   hartPendingWrites_.resize(system.hartCount());
   currentInstrTag_.resize(system.hartCount());
+
+  hartRegTimes_.resize(system.hartCount());
 }
 
 

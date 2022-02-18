@@ -248,6 +248,7 @@ namespace WdRiscv
 
     typedef std::vector<McmInstr> McmInstrVec;
     typedef std::vector<MemoryOp> MemoryOpVec;
+    typedef std::vector<uint64_t> RegTimeVec; // Map register index to time.
 
     MemoryOpVec sysMemOps_;  // Memory ops of all cores.
     std::vector<McmInstrVec> hartInstrVecs_; // One vector per hart.
@@ -258,6 +259,8 @@ namespace WdRiscv
     unsigned lineSize_ = 64; // Cache/merge buffer line size.
 
     std::vector<McmInstrIx> currentInstrTag_;
+
+    std::vector<RegTimeVec> hartRegTimes_;  // On vector per hart.
   };
 
 }
