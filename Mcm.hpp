@@ -150,6 +150,8 @@ namespace WdRiscv
 
     bool ppoRule3(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule5(Hart<URV>& hart, const McmInstr& instr) const;
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       assert(instr.complete_);
@@ -205,6 +207,8 @@ namespace WdRiscv
 
     bool instrHasRead(const McmInstr& instr) const;
     bool instrHasWrite(const McmInstr& instr) const;
+
+    bool checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const;
 
     bool checkStoreComplete(const McmInstr& instr) const;
 

@@ -276,14 +276,16 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	       << " retired after read op.\n";
 	  return false;
 	}
+      instr->isStore_ = true;  // AMO is both load and store.
     }
 
-  // Check PPO rule 3.
   if (not ppoRule2(hart, *instr))
     return false;
 
-  // Check PPO rule 3.
   if (not ppoRule3(hart, *instr))
+    return false;
+
+  if (not ppoRule5(hart, *instr))
     return false;
 
   return true;
@@ -538,9 +540,6 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
       if (op.isRead_)
 	continue;
 
-      if (op.time_ > latestOpTime(target))
-	continue;  // Write op too late to affect target instruction.
-
       uint64_t opMask = ~uint64_t(0);
       if (op.physAddr_ <= target.physAddr_)
 	{
@@ -563,6 +562,41 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
   storeMask = (storeMask << unused) >> unused;
 
   mask &= storeMask;
+}
+
+
+/// An external read op should not be able to forward
+template <typename URV>
+bool
+Mcm<URV>::checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const
+{
+  assert(not op.isCanceled() and not op.failRead_);
+  assert(not op.internal_);
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  assert(op.instrTag_ < instrVec.size());
+
+  for (auto tag = op.instrTag_; tag > 0; --tag)
+    {
+      const auto& prev = instrVec.at(tag);
+      if (not prev.isStore_ or not prev.overlaps(op))
+	continue;
+      bool fail = not prev.complete_ or latestOpTime(prev) >= op.time_;
+      if (fail)
+	{
+	  cerr << "Error: External read op must forward from store: hart-id="
+	       << hartId << " op-time=" << op.time_ << " op-instr-tag="
+	       << op.instrTag_ << " store-tag=" << prev.tag_ << '\n';
+	  return false;
+	}
+
+      // TBD FIX : Once op is covered by store instructions return true.
+    }
+  return true;
 }
 
 
@@ -650,6 +684,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
   // Merge read operation values.
   uint64_t mergeMask = 0;
   uint64_t merged = 0;
+  bool ok = true;
   for (auto opIx : instr->memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -661,8 +696,12 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
       instr->isLoad_ = true;
 
       if (op.internal_)
-	if (not forwardToRead(hart, tag, op))
-	  return false;
+	{
+	  if (not forwardToRead(hart, tag, op))
+	    ok = false;
+	}
+      else if (not checkExternalRead(hart, op))
+	ok = false;
 
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
@@ -695,12 +734,12 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
     {
       cerr << "Error: Read ops do not cover all the bytes of load instruction"
 	   << " tag=0x" << std::hex << tag << std::dec << '\n';
-      return false;
+      ok = false;
     }
-  else
-    instr->complete_ = true;
 
-  return true;
+  instr->complete_ = true;  // FIX : Only for non-io
+
+  return ok;
 }
   
 
@@ -884,7 +923,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 		{
 		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hartId
 		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
-		       << " intrmediate store at time=" << op.time_ << '\n';
+		       << " intermediate store at time=" << op.time_ << '\n';
 		  return false;
 		}
 	    }
@@ -950,6 +989,54 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
 	       << latestOpTime(instrA) << " time2=" << earliestOpTime(instrB)
 	       << '\n';
+	  return false;
+	}
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 5: A has an acquire annotation
+
+  if (not instrB.isMemory())
+    return true;
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag-1);
+      if (instrA.isCanceled())
+	continue;
+      assert(instrA.isRetired());
+      if (not instrA.isMemory())
+	continue;
+      assert(instrA.di_.isValid());
+      if (not instrA.di_.isAtomicAcquire())
+	continue;
+
+      bool fail = false;
+      if (instrA.di_.instEntry()->isAmo())
+	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
+      else if (not instrA.complete_)
+	fail = true; // Incomplete store might finish after B
+      else if (not instrB.memOps_.empty() and
+	       instrB.memOps_.front() < instrA.memOps_.back())
+	fail = true;  // A finishes after B
+
+      if (fail)
+	{
+	  cerr << "Error: PPO rule 5 failed: hart-id=" << hartId << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
 	  return false;
 	}
     }
