@@ -291,6 +291,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (not ppoRule6(hart, *instr))
     return false;
 
+  if (not ppoRule8(hart, *instr))
+    return false;
+
   return true;
 }
 
@@ -507,6 +510,13 @@ bool
 Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 			const MemoryOp& op)
 {
+  if (instr.size_ == 0)
+    {
+      cerr << "Error: Merge buffer insert for a non-store instruction: "
+	   << "Hart-id=" << hartId << " time=" << time_ << " tag=" << instr.tag_
+	   << '\n';
+      return false;
+    }
   assert(instr.size_ > 0);
   assert(op.size_ <= instr.size_);
   uint64_t data = instr.data_;
@@ -1094,6 +1104,61 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 	  return false;
 	}
     }
+
+  return true;
+}
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 5: B is a store-conditional, A is a load-reserve paired with B.
+
+  assert(not instrB.isCanceled());
+  if (not instrB.isMemory())
+    return true;
+  assert(instrB.di_.isValid());
+  if (not instrB.di_.instEntry()->isSc())
+    return true;
+
+  uint64_t addr = 0, value = 0;
+  if (not hart.lastStore(addr, value))
+    return true;  // Score conditional was not successful.
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag-1);
+      if (instrA.isCanceled())
+	continue;
+      assert(instrA.isRetired());
+      assert(instrA.di_.isValid());
+      if (not instrA.di_.instEntry()->isLr())
+	continue;
+
+      bool fail = false;
+      if (not instrA.complete_)
+	fail = true;
+      else if (not instrB.memOps_.empty() and
+	       earliestOpTime(instrB) <= latestOpTime(instrA))
+	fail = true;  // A finishes after B
+
+      if (fail)
+	{
+	  cerr << "Error: PPO rule 8 failed: hart-id=" << hartId << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
+	}
+
+      return true;
+    }
+
+  std::cerr << "Error: PPO rule 8: Could not find LR instruction paired with SC at tag=" << instrB.tag_ << '\n';
 
   return true;
 }

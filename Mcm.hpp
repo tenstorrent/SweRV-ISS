@@ -154,6 +154,8 @@ namespace WdRiscv
 
     bool ppoRule6(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule8(Hart<URV>& hart, const McmInstr& instr) const;
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       assert(instr.complete_);
