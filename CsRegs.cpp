@@ -882,7 +882,7 @@ CsRegs<URV>::defineMachineRegs()
   URV pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
 
   defineCsr("mstatus", Csrn::MSTATUS, mand, imp, val, mask, pokeMask);
-  defineCsr("misa", Csrn::MISA, mand,  imp, 0x40001104, rom, rom);
+  defineCsr("misa", Csrn::MISA, mand,  imp, 0x40001105, rom, rom);
 
   // Bits corresponding to user-level interrupts are hardwired to zero
   // in medeleg. If N extension is enabled, we will flip those bits
