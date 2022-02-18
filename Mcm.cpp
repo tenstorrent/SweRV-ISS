@@ -288,6 +288,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (not ppoRule5(hart, *instr))
     return false;
 
+  if (not ppoRule6(hart, *instr))
+    return false;
+
   return true;
 }
 
@@ -1003,6 +1006,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 {
   // Rule 5: A has an acquire annotation
 
+  assert(not instrB.isCanceled());
   if (not instrB.isMemory())
     return true;
 
@@ -1044,6 +1048,55 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   return true;
 }
 
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 5: B has a release annotation
+
+  assert(not instrB.isCanceled());
+  if (not instrB.isMemory())
+    return true;
+  assert(instrB.di_.isValid());
+  if (not instrB.di_.isAtomicRelease())
+    return true;
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag-1);
+      if (instrA.isCanceled())
+	continue;
+      assert(instrA.isRetired());
+      if (not instrA.isMemory())
+	continue;
+      assert(instrA.di_.isValid());
+
+      bool fail = false;
+      if (instrA.di_.instEntry()->isAmo())
+	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
+      else if (not instrA.complete_)
+	fail = true; // Incomplete store might finish after B
+      else if (not instrB.memOps_.empty() and
+	       instrB.memOps_.front() < instrA.memOps_.back())
+	fail = true;  // A finishes after B
+
+      if (fail)
+	{
+	  cerr << "Error: PPO rule 6 failed: hart-id=" << hartId << " tag1="
+	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
+	}
+    }
+
+  return true;
+}
 
 template class WdRiscv::Mcm<uint32_t>;
 template class WdRiscv::Mcm<uint64_t>;
