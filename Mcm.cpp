@@ -1034,7 +1034,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
       else if (not instrA.complete_)
 	fail = true; // Incomplete store might finish after B
       else if (not instrB.memOps_.empty() and
-	       instrB.memOps_.front() < instrA.memOps_.back())
+	       earliestOpTime(instrB) <= latestOpTime(instrA))
 	fail = true;  // A finishes after B
 
       if (fail)
@@ -1084,7 +1084,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       else if (not instrA.complete_)
 	fail = true; // Incomplete store might finish after B
       else if (not instrB.memOps_.empty() and
-	       instrB.memOps_.front() < instrA.memOps_.back())
+	       earliestOpTime(instrB) <= latestOpTime(instrA))
 	fail = true;  // A finishes after B
 
       if (fail)
