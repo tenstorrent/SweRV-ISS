@@ -1048,7 +1048,7 @@ namespace WdRiscv
     /// Return the index of this hart within the system. Harts are
     /// assigned indices 0 to m*n - 1 where m is the number of cores
     /// and n is the number of harts per core.
-    unsigned sysHartIndex()
+    unsigned sysHartIndex() const
     { return hartIx_; }
 
     /// Tie the shared CSRs in this hart to the corresponding CSRs in
