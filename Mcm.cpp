@@ -324,8 +324,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->di_ = di;
 
-  updateDependencies(hart, *instr);
-
   // If instruction is a store, save corresponding address and written data.
   uint64_t addr = 0, value = 0;
   unsigned stSize = hart.lastStore(addr, value);
@@ -351,7 +349,10 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	continue;
 
       if (not checkRtlRead(hartId, *instr, op))
-	return false;
+	{
+	  updateDependencies(hart, *instr);
+	  return false;
+	}
     }
 
   // Amo sanity check.
@@ -362,6 +363,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	{
 	  cerr << "Error: Amo instruction tag=" << tag
 	       << " retired before read op.\n";
+	  updateDependencies(hart, *instr);
 	  return false;
 	}
       if (instrHasWrite(*instr))
@@ -373,25 +375,17 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->isStore_ = true;  // AMO is both load and store.
     }
 
-  if (not ppoRule2(hart, *instr))
-    return false;
+  bool ok = ppoRule2(hart, *instr);
+  ok = ppoRule3(hart, *instr) and ok;
+  ok = ppoRule5(hart, *instr) and ok;
+  ok = ppoRule6(hart, *instr) and ok;
+  ok = ppoRule8(hart, *instr) and ok;
+  ok = ppoRule9(hart, *instr) and ok;
+  ok = ppoRule10(hart, *instr) and ok;
 
-  if (not ppoRule3(hart, *instr))
-    return false;
+  updateDependencies(hart, *instr);
 
-  if (not ppoRule5(hart, *instr))
-    return false;
-
-  if (not ppoRule6(hart, *instr))
-    return false;
-
-  if (not ppoRule8(hart, *instr))
-    return false;
-
-  if (not ppoRule9(hart, *instr))
-    return false;
-
-  return true;
+  return ok;
 }
 
 
@@ -1293,6 +1287,49 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
 
       cerr << "Error: PPO rule 9 failed: hart-id=" << hartId << " tag1="
 	   << hartRegProducers_.at(hartIx).at(addrReg)
+	   << " tag2=" << instrB.tag_ << '\n';
+      return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 9: B has a syntactic data dependency on A
+
+  assert(not instrB.isCanceled());
+  if (not instrB.isMemory())
+    return true;
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& di = instrB.di_;
+  const auto instEntry = di.instEntry();
+  unsigned dataReg = 0;
+  if (instEntry->isAmo())
+    dataReg = di.op2();
+  else if (instEntry->isStore())
+    dataReg = di.op0();
+  else
+    return true;
+
+  uint64_t time = hartRegTimes_.at(hartIx).at(dataReg);
+
+  for (auto opIx : instrB.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      if (sysMemOps_.at(opIx).time_ > time)
+	continue;
+
+      cerr << "Error: PPO rule 10 failed: hart-id=" << hartId << " tag1="
+	   << hartRegProducers_.at(hartIx).at(dataReg)
 	   << " tag2=" << instrB.tag_ << '\n';
       return false;
     }
