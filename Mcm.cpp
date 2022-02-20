@@ -187,6 +187,15 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       di.ithOperand(0) == 0)
     return; // Destination is x0.
   
+  if (instEntry->isSc())
+    {
+      URV val = 0;
+      if (not hart.peekIntReg(di.op0(), val))
+	assert(0);
+      if (val == 1)
+	return;  // store-conditional failed.
+    }
+
   uint64_t time = 0;
   uint64_t tag = 0;
 
