@@ -160,6 +160,8 @@ namespace WdRiscv
 
     bool ppoRule10(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule11(Hart<URV>& hart, const McmInstr& instr) const;
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       assert(instr.complete_);
@@ -276,6 +278,11 @@ namespace WdRiscv
 
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
     std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
+
+    // Dependency time of most recent branch in program order or 0 if
+    // branch does not depend on a prior memory instruction.
+    std::vector<uint64_t> hartBranchTimes_;
+    std::vector<uint64_t> hartBranchProducers_;
   };
 
 }
