@@ -214,6 +214,11 @@ namespace WdRiscv
     /// instructions ahead of tag.
     bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
 
+    /// Determine the source and destination registers of the given
+    /// instruction.
+    void identifyRegisters(const DecodedInst& di,
+			   std::vector<unsigned>& sourceRegs,
+			   std::vector<unsigned>& destRegs);
 
     bool instrHasRead(const McmInstr& instr) const;
     bool instrHasWrite(const McmInstr& instr) const;

@@ -209,73 +209,37 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  tag = instr.tag_;
 	}
 
-  InstId id = instEntry->instId();
-  bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
-		   id == InstId::csrrsi or id == InstId::csrrci)
-		  and di.op1() == 0);
-
-  // TBD FIX : add implied FP dependencies for FCSR and FFLAGS
-
   if (instEntry->isBranch())
     hartBranchTimes_.at(hartIx) = 0;
 
-  // Collect source and destination operands.
-  std::array<unsigned, 2> dests;
-  unsigned destCount = 0, sourceCount = 0;;
-  for (unsigned i = 0; i < di.operandCount(); ++i)
-    {
-      bool isDest = instEntry->isIthOperandWrite(i);
-      bool isSource = instEntry->isIthOperandRead(i);
-      if (not isDest and not isSource)
-	continue;
-	
-      size_t regIx = 0;
-      switch(di.ithOperandType(i))
-	{
-	case OperandType::IntReg:
-	  regIx = di.ithOperand(i);
-	  if (regIx == 0)
-	    continue;  // x0
-	  break;
-	case OperandType::FpReg:
-	  regIx = di.ithOperand(i) + fpRegOffset_;
-	  break;
-	case OperandType::CsReg:
-	  regIx = di.ithOperand(i) + csRegOffset_;
-	  if (isSource and skipCsr)
-	    continue;
-	  break;
-	case OperandType::VecReg:   // FIX: Not yet supported.
-	case OperandType::Imm:
-	case OperandType::None:
-	  continue;
-	}
+  std::vector<unsigned> sourceRegs, destRegs;
+  identifyRegisters(di, sourceRegs, destRegs);
 
-      if (isSource)
+  bool first = true; // first branch source
+  for (auto regIx : sourceRegs)
+    {
+      if (regTimeVec.at(regIx) > time)
 	{
-	  if (regTimeVec.at(regIx) > time)
-	    {
-	      time = regTimeVec.at(regIx);
-	      tag = regProducer.at(regIx);
-	    }
-	  if (instEntry->isBranch())
-	    if (sourceCount == 0 or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
-	      {
-		hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
-		hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
-	      }
-	  sourceCount++;
+	  time = regTimeVec.at(regIx);
+	  tag = regProducer.at(regIx);
 	}
-      if (isDest)
-	dests.at(destCount++) = regIx;
+      if (instEntry->isBranch())
+	if (first or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
+	  {
+	    first = false;
+	    hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
+	    hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
+	  }
     }
 
-  for (unsigned i = 0; i < destCount; ++i)
-    if (time > regTimeVec.at(dests.at(i)))
-      {
-	regTimeVec.at(dests.at(i)) = time;
-	regProducer.at(dests.at(i)) = tag;
-      }
+  for (auto regIx : destRegs)
+    {
+      if (time > regTimeVec.at(regIx))
+	{
+	  regTimeVec.at(regIx) = time;
+	  regProducer.at(regIx) = tag;
+	}
+    }
 }
 
 
@@ -918,6 +882,70 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       return false;
     }
   return true;
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::identifyRegisters(const DecodedInst& di,
+			    std::vector<unsigned>& sourceRegs,
+			    std::vector<unsigned>& destRegs)
+{
+  sourceRegs.clear();
+  destRegs.clear();
+
+  if (not di.isValid())
+    return;
+
+  const auto entry = di.instEntry();
+  assert(entry);
+
+  if (entry->hasRoundingMode() and di.roundingMode() == RoundingMode::Dynamic)
+    {
+      sourceRegs.push_back(unsigned(CsrNumber::FRM) + csRegOffset_);
+      sourceRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
+    }
+
+  // FIX TBD: add FFLAGS and FCSR as dest regs for FP instructions.
+
+  auto id = entry->instId();
+  bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
+		   id == InstId::csrrsi or id == InstId::csrrci)
+		  and di.op1() == 0);
+
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      bool isDest = entry->isIthOperandWrite(i);
+      bool isSource = entry->isIthOperandRead(i);
+      if (not isDest and not isSource)
+	continue;
+	
+      size_t regIx = 0;
+      switch(di.ithOperandType(i))
+	{
+	case OperandType::IntReg:
+	  regIx = di.ithOperand(i);
+	  if (regIx == 0)
+	    continue;  // x0
+	  break;
+	case OperandType::FpReg:
+	  regIx = di.ithOperand(i) + fpRegOffset_;
+	  break;
+	case OperandType::CsReg:
+	  regIx = di.ithOperand(i) + csRegOffset_;
+	  if (isSource and skipCsr)
+	    continue;
+	  break;
+	case OperandType::VecReg:   // FIX: Not yet supported.
+	case OperandType::Imm:
+	case OperandType::None:
+	  continue;
+	}
+      if (isDest)
+	destRegs.push_back(regIx);
+      if (isSource)
+	sourceRegs.push_back(regIx);
+    }
 }
 
 
