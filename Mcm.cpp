@@ -209,7 +209,11 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  tag = instr.tag_;
 	}
 
-  // TBD FIX : filter out CSR dependencies with rd=x0
+  InstId id = instEntry->instId();
+  bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
+		   id == InstId::csrrsi or id == InstId::csrrci)
+		  and di.op1() == 0);
+
   // TBD FIX : add implied FP dependencies for FCSR and FFLAGS
 
   if (instEntry->isBranch())
@@ -230,20 +234,23 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	{
 	case OperandType::IntReg:
 	  regIx = di.ithOperand(i);
+	  if (regIx == 0)
+	    continue;  // x0
 	  break;
 	case OperandType::FpReg:
 	  regIx = di.ithOperand(i) + fpRegOffset_;
 	  break;
 	case OperandType::CsReg:
 	  regIx = di.ithOperand(i) + csRegOffset_;
+	  if (isSource and skipCsr)
+	    continue;
 	  break;
 	case OperandType::VecReg:   // FIX: Not yet supported.
 	case OperandType::Imm:
 	case OperandType::None:
 	  continue;
 	}
-      if (regIx == 0)
-	continue;  // x0
+
       if (isSource)
 	{
 	  if (regTimeVec.at(regIx) > time)
