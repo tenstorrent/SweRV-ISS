@@ -184,8 +184,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     return;
 
   const auto instEntry = di.instEntry();
-  if (not instEntry->isIthOperandWrite(0))
-    return; // No destination register.
+
   if (instEntry->ithOperandType(0) == OperandType::IntReg and
       di.ithOperand(0) == 0)
     return; // Destination is x0.
@@ -218,7 +217,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   // Collect source and destination operands.
   std::array<unsigned, 2> dests;
-  unsigned destCount = 0;
+  unsigned destCount = 0, sourceCount = 0;;
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
       bool isDest = instEntry->isIthOperandWrite(i);
@@ -253,11 +252,12 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	      tag = regProducer.at(regIx);
 	    }
 	  if (instEntry->isBranch())
-	    if (regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
+	    if (destCount == 0 or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
 	      {
 		hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
 		hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
 	      }
+	  sourceCount++;
 	}
       if (isDest)
 	dests.at(destCount++) = regIx;
@@ -1381,16 +1381,19 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   uint64_t time = hartBranchTimes_.at(hartIx);
+  auto producerTag = hartBranchProducers_.at(hartIx);
 
-  for (auto opIx : instrB.memOps_)
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  if (producerTag >= instrVec.size())
+    return true;
+  const auto& producer = instrVec.at(producerTag);
+  if (not producer.di_.isValid())
+    return true;
+
+  if (isBeforeInMemoryTime(instrB, producer))
     {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      if (sysMemOps_.at(opIx).time_ > time)
-	continue;
-
       cerr << "Error: PPO rule 11 failed: hart-id=" << hartId << " tag1="
-	   << hartBranchProducers_.at(hartIx) << " tag2=" << instrB.tag_ << '\n';
+	   << producerTag << " tag2=" << instrB.tag_ << '\n';
       return false;
     }
 
