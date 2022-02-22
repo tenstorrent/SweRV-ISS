@@ -189,6 +189,9 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       di.ithOperand(0) == 0)
     return; // Destination is x0.
   
+  uint64_t time = 0;
+  uint64_t tag = 0;
+
   if (instEntry->isSc())
     {
       URV val = 0;
@@ -197,9 +200,6 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       if (val == 1)
 	return;  // store-conditional failed.
     }
-
-  uint64_t time = 0;
-  uint64_t tag = 0;
 
   for (const auto& opIx : instr.memOps_)
     if (opIx < sysMemOps_.size())
@@ -252,7 +252,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	      tag = regProducer.at(regIx);
 	    }
 	  if (instEntry->isBranch())
-	    if (destCount == 0 or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
+	    if (sourceCount == 0 or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
 	      {
 		hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
 		hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
@@ -895,7 +895,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       if (not di.instEntry()->isAtomic())
 	continue;
 
-      cerr << "Error: Internal read forwards from an amo instruction"
+      cerr << "Error: Internal read forwards from an atomic instruction"
 	   << " time=" << op.time_ << " hart-id=" << hartId
 	   << " instr-tag=0x" << std::hex << tag << " addr=0x"
 	   << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
@@ -1380,7 +1380,6 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instEntry->isStore() and not instEntry->isAmo())
     return true;
 
-  uint64_t time = hartBranchTimes_.at(hartIx);
   auto producerTag = hartBranchProducers_.at(hartIx);
 
   const auto& instrVec = hartInstrVecs_.at(hartIx);
@@ -1390,7 +1389,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   if (not producer.di_.isValid())
     return true;
 
-  if (isBeforeInMemoryTime(instrB, producer))
+  if (not producer.complete_ or isBeforeInMemoryTime(instrB, producer))
     {
       cerr << "Error: PPO rule 11 failed: hart-id=" << hartId << " tag1="
 	   << producerTag << " tag2=" << instrB.tag_ << '\n';
