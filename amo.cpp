@@ -376,22 +376,26 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   memory_.peek(addr, prev, false /*usePma*/);
   ldStData_ = storeVal;
   ldStPrevData_ = prev;
+  ldStWrite_ = true;
 
-  if (memory_.write(hartIx_, addr, storeVal))
+  // If we write to special location, end the simulation.
+  if (toHostValid_ and addr == toHost_ and storeVal != 0)
     {
-      ldStWrite_ = true;
-      invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
-
-      // If we write to special location, end the simulation.
-      if (toHostValid_ and addr == toHost_ and storeVal != 0)
-        throw CoreException(CoreException::Stop, "write to to-host",
-                            toHost_, storeVal);
-      return true;
+      if (not memory_.write(hartIx_, addr, storeVal))
+	assert(0);
+      throw CoreException(CoreException::Stop, "write to to-host",
+			  toHost_, storeVal);
     }
 
-  // Should never happen.
-  initiateStoreException(ExceptionCause::STORE_ACC_FAULT, virtAddr);
-  return false;
+  if (mcm_)
+    return true;  // Memory updated when merge buffer is written.
+
+  if (not memory_.write(hartIx_, addr, storeVal))
+    assert(0);
+
+  invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
+
+  return true;
 }
 
 

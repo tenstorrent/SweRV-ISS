@@ -19,6 +19,17 @@ Mcm<URV>::Mcm(System<URV>& system, unsigned mergeBufferSize)
 
   hartPendingWrites_.resize(system.hartCount());
   currentInstrTag_.resize(system.hartCount());
+
+  hartRegTimes_.resize(system.hartCount());
+  for (auto& vec : hartRegTimes_)
+    vec.resize(totalRegCount_);
+
+  hartRegProducers_.resize(system.hartCount());
+  for (auto& vec : hartRegProducers_)
+    vec.resize(totalRegCount_);
+
+  hartBranchTimes_.resize(system.hartCount());
+  hartBranchProducers_.resize(system.hartCount());
 }
 
 
@@ -157,6 +168,111 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
 
 
 template <typename URV>
+void
+Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
+{
+  assert(not instr.canceled_);
+  assert(instr.retired_);
+
+  unsigned hartIx = hart.sysHartIndex();
+  auto& regTimeVec = hartRegTimes_.at(hartIx);
+  auto& regProducer = hartRegProducers_.at(hartIx);
+
+  const DecodedInst& di = instr.di_;
+  assert(di.isValid());
+  if (di.operandCount() == 0)
+    return;
+
+  const auto instEntry = di.instEntry();
+
+  if (instEntry->ithOperandType(0) == OperandType::IntReg and
+      di.ithOperand(0) == 0)
+    return; // Destination is x0.
+  
+  if (instEntry->isSc())
+    {
+      URV val = 0;
+      if (not hart.peekIntReg(di.op0(), val))
+	assert(0);
+      if (val == 1)
+	return;  // store-conditional failed.
+    }
+
+  uint64_t time = 0;
+  uint64_t tag = 0;
+
+  for (const auto& opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      if (sysMemOps_.at(opIx).time_ > time)
+	{
+	  time = sysMemOps_.at(opIx).time_;
+	  tag = instr.tag_;
+	}
+
+  // TBD FIX : filter out CSR dependencies with rd=x0
+  // TBD FIX : add implied FP dependencies for FCSR and FFLAGS
+
+  if (instEntry->isBranch())
+    hartBranchTimes_.at(hartIx) = 0;
+
+  // Collect source and destination operands.
+  std::array<unsigned, 2> dests;
+  unsigned destCount = 0, sourceCount = 0;;
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      bool isDest = instEntry->isIthOperandWrite(i);
+      bool isSource = instEntry->isIthOperandRead(i);
+      if (not isDest and not isSource)
+	continue;
+	
+      size_t regIx = 0;
+      switch(di.ithOperandType(i))
+	{
+	case OperandType::IntReg:
+	  regIx = di.ithOperand(i);
+	  break;
+	case OperandType::FpReg:
+	  regIx = di.ithOperand(i) + fpRegOffset_;
+	  break;
+	case OperandType::CsReg:
+	  regIx = di.ithOperand(i) + csRegOffset_;
+	  break;
+	case OperandType::VecReg:   // FIX: Not yet supported.
+	case OperandType::Imm:
+	case OperandType::None:
+	  continue;
+	}
+      if (regIx == 0)
+	continue;  // x0
+      if (isSource)
+	{
+	  if (regTimeVec.at(regIx) > time)
+	    {
+	      time = regTimeVec.at(regIx);
+	      tag = regProducer.at(regIx);
+	    }
+	  if (instEntry->isBranch())
+	    if (destCount == 0 or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
+	      {
+		hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
+		hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
+	      }
+	  sourceCount++;
+	}
+      if (isDest)
+	dests.at(destCount++) = regIx;
+    }
+
+  for (unsigned i = 0; i < destCount; ++i)
+    if (time > regTimeVec.at(dests.at(i)))
+      {
+	regTimeVec.at(dests.at(i)) = time;
+	regProducer.at(dests.at(i)) = tag;
+      }
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 			    uint64_t physAddr, unsigned size,
@@ -257,7 +373,10 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	continue;
 
       if (not checkRtlRead(hartId, *instr, op))
-	return false;
+	{
+	  updateDependencies(hart, *instr);
+	  return false;
+	}
     }
 
   // Amo sanity check.
@@ -268,6 +387,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	{
 	  cerr << "Error: Amo instruction tag=" << tag
 	       << " retired before read op.\n";
+	  updateDependencies(hart, *instr);
 	  return false;
 	}
       if (instrHasWrite(*instr))
@@ -279,22 +399,18 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->isStore_ = true;  // AMO is both load and store.
     }
 
-  if (not ppoRule2(hart, *instr))
-    return false;
+  bool ok = ppoRule2(hart, *instr);
+  ok = ppoRule3(hart, *instr) and ok;
+  ok = ppoRule5(hart, *instr) and ok;
+  ok = ppoRule6(hart, *instr) and ok;
+  ok = ppoRule8(hart, *instr) and ok;
+  ok = ppoRule9(hart, *instr) and ok;
+  ok = ppoRule10(hart, *instr) and ok;
+  ok = ppoRule11(hart, *instr) and ok;
 
-  if (not ppoRule3(hart, *instr))
-    return false;
+  updateDependencies(hart, *instr);
 
-  if (not ppoRule5(hart, *instr))
-    return false;
-
-  if (not ppoRule6(hart, *instr))
-    return false;
-
-  if (not ppoRule8(hart, *instr))
-    return false;
-
-  return true;
+  return ok;
 }
 
 
@@ -1063,7 +1179,7 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // Rule 5: B has a release annotation
+  // Rule 6: B has a release annotation
 
   assert(not instrB.isCanceled());
   if (not instrB.isMemory())
@@ -1108,11 +1224,12 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   return true;
 }
 
+
 template <typename URV>
 bool
 Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // Rule 5: B is a store-conditional, A is a load-reserve paired with B.
+  // Rule 8: B is a store-conditional, A is a load-reserve paired with B.
 
   assert(not instrB.isCanceled());
   if (not instrB.isMemory())
@@ -1162,6 +1279,127 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 
   return true;
 }
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 9: B has a syntactic address dependency on A
+
+  assert(not instrB.isCanceled());
+  if (not instrB.isMemory())
+    return true;
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& di = instrB.di_;
+  const auto instEntry = di.instEntry();
+  unsigned addrReg = 0;
+  if (instEntry->isLoad() or instEntry->isStore() or instEntry->isAmo())
+    addrReg = di.op1();
+
+  uint64_t time = hartRegTimes_.at(hartIx).at(addrReg);
+
+  for (auto opIx : instrB.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      if (sysMemOps_.at(opIx).time_ > time)
+	continue;
+
+      cerr << "Error: PPO rule 9 failed: hart-id=" << hartId << " tag1="
+	   << hartRegProducers_.at(hartIx).at(addrReg)
+	   << " tag2=" << instrB.tag_ << '\n';
+      return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 10: B has a syntactic data dependency on A
+
+  assert(not instrB.isCanceled());
+  if (not instrB.isMemory())
+    return true;
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& di = instrB.di_;
+  const auto instEntry = di.instEntry();
+  unsigned dataReg = 0;
+  if (instEntry->isAmo())
+    dataReg = di.op2();
+  else if (instEntry->isStore())
+    dataReg = di.op0();
+  else
+    return true;
+
+  uint64_t time = hartRegTimes_.at(hartIx).at(dataReg);
+
+  for (auto opIx : instrB.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      if (sysMemOps_.at(opIx).time_ > time)
+	continue;
+
+      cerr << "Error: PPO rule 10 failed: hart-id=" << hartId << " tag1="
+	   << hartRegProducers_.at(hartIx).at(dataReg)
+	   << " tag2=" << instrB.tag_ << '\n';
+      return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 11: B is a store with a control dependency on A
+
+  assert(not instrB.isCanceled());
+
+  unsigned hartIx = hart.sysHartIndex();
+  URV hartId = 0;
+  hart.peekCsr(CsrNumber::MHARTID, hartId);
+
+  const auto& di = instrB.di_;
+  const auto instEntry = di.instEntry();
+  if (not instEntry->isStore() and not instEntry->isAmo())
+    return true;
+
+  uint64_t time = hartBranchTimes_.at(hartIx);
+  auto producerTag = hartBranchProducers_.at(hartIx);
+
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  if (producerTag >= instrVec.size())
+    return true;
+  const auto& producer = instrVec.at(producerTag);
+  if (not producer.di_.isValid())
+    return true;
+
+  if (isBeforeInMemoryTime(instrB, producer))
+    {
+      cerr << "Error: PPO rule 11 failed: hart-id=" << hartId << " tag1="
+	   << producerTag << " tag2=" << instrB.tag_ << '\n';
+      return false;
+    }
+
+  return true;
+}
+
 
 template class WdRiscv::Mcm<uint32_t>;
 template class WdRiscv::Mcm<uint64_t>;

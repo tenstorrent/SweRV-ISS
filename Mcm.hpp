@@ -156,6 +156,12 @@ namespace WdRiscv
 
     bool ppoRule8(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule9(Hart<URV>& hart, const McmInstr& instr) const;
+
+    bool ppoRule10(Hart<URV>& hart, const McmInstr& instr) const;
+
+    bool ppoRule11(Hart<URV>& hart, const McmInstr& instr) const;
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       assert(instr.complete_);
@@ -244,10 +250,21 @@ namespace WdRiscv
 	}
     }
 
+    void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
+
   private:
+
+    const unsigned intRegOffset_ = 0;
+    const unsigned fpRegOffset_ = 32;
+    const unsigned csRegOffset_ = 64;
+    const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
+      
 
     typedef std::vector<McmInstr> McmInstrVec;
     typedef std::vector<MemoryOp> MemoryOpVec;
+
+    typedef std::vector<uint64_t> RegTimeVec; // Map reg index to time.
+    typedef std::vector<uint64_t> RegProducer; // Map reg index to instr tag.
 
     MemoryOpVec sysMemOps_;  // Memory ops of all cores.
     std::vector<McmInstrVec> hartInstrVecs_; // One vector per hart.
@@ -258,6 +275,14 @@ namespace WdRiscv
     unsigned lineSize_ = 64; // Cache/merge buffer line size.
 
     std::vector<McmInstrIx> currentInstrTag_;
+
+    std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
+    std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
+
+    // Dependency time of most recent branch in program order or 0 if
+    // branch does not depend on a prior memory instruction.
+    std::vector<uint64_t> hartBranchTimes_;
+    std::vector<uint64_t> hartBranchProducers_;
   };
 
 }
