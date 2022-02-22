@@ -188,6 +188,30 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::fcvt_h_l)) .setHasRoundingMode(true);
   instVec_.at(size_t(InstId::fcvt_h_lu)) .setHasRoundingMode(true);
 
+  // Mark floating point instruction that modify FFLAGS.
+  for (unsigned i = unsigned(InstId::flw); i <= unsigned(InstId::fcvt_h_lu); ++i)
+    instVec_.at(i).setModifiesFflags(true);
+
+  for (auto id : { InstId::flw, InstId::fsw, InstId::fsgnj_s, InstId::fsgnjn_s,
+		  InstId::fsgnjx_s, InstId::fmv_x_w, InstId::fclass_s,
+		  InstId::fmv_w_x, InstId::fcvt_l_s, InstId::fcvt_lu_s,
+		  InstId::fcvt_s_l, InstId::fcvt_s_lu } )
+    instVec_.at(unsigned(id)).setModifiesFflags(false);
+
+  for (auto id : { InstId::fld, InstId::fsd, InstId::fsgnj_d, InstId::fsgnjn_d,
+		  InstId::fsgnjx_d, InstId::fmv_x_d, InstId::fclass_d,
+		  InstId::fmv_d_x, InstId::fcvt_d_w, InstId::fcvt_d_wu,
+		  InstId::fcvt_l_d, InstId::fcvt_lu_d,
+		  InstId::fcvt_d_l, InstId::fcvt_d_lu } )
+    instVec_.at(unsigned(id)).setModifiesFflags(false);
+
+  for (auto id : { InstId::flh, InstId::fsh, InstId::fsgnj_h, InstId::fsgnjn_h,
+		  InstId::fsgnjx_h, InstId::fmv_x_h, InstId::fclass_h,
+		  InstId::fmv_h_x, InstId::fcvt_h_w, InstId::fcvt_d_wu,
+		  InstId::fcvt_l_h, InstId::fcvt_lu_h,
+		  InstId::fcvt_d_h } )
+    instVec_.at(unsigned(id)).setModifiesFflags(false);
+
   // For backward compatibility, lr and sc are not counted as load/store
   // by the performance counters.
   perfCountAtomicLoadStore(false);

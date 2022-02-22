@@ -901,12 +901,10 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
   assert(entry);
 
   if (entry->hasRoundingMode() and di.roundingMode() == RoundingMode::Dynamic)
-    {
-      sourceRegs.push_back(unsigned(CsrNumber::FRM) + csRegOffset_);
-      sourceRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
-    }
+    sourceRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
 
-  // FIX TBD: add FFLAGS and FCSR as dest regs for FP instructions.
+  if (entry->modifiesFflags())
+    destRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
 
   auto id = entry->instId();
   bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
@@ -932,15 +930,22 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
 	  regIx = di.ithOperand(i) + fpRegOffset_;
 	  break;
 	case OperandType::CsReg:
-	  regIx = di.ithOperand(i) + csRegOffset_;
 	  if (isSource and skipCsr)
 	    continue;
+	  else
+	    {
+	      CsrNumber csr{di.ithOperand(i)};
+	      if (csr == CsrNumber::FFLAGS or csr == CsrNumber::FRM)
+		csr = CsrNumber::FCSR;
+	      regIx = unsigned(csr) + csRegOffset_;
+	    }
 	  break;
 	case OperandType::VecReg:   // FIX: Not yet supported.
 	case OperandType::Imm:
 	case OperandType::None:
 	  continue;
 	}
+
       if (isDest)
 	destRegs.push_back(regIx);
       if (isSource)
