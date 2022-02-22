@@ -189,6 +189,9 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       di.ithOperand(0) == 0)
     return; // Destination is x0.
   
+  uint64_t time = 0;
+  uint64_t tag = 0;
+
   if (instEntry->isSc())
     {
       URV val = 0;
@@ -198,9 +201,6 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	return;  // store-conditional failed.
     }
 
-  uint64_t time = 0;
-  uint64_t tag = 0;
-
   for (const auto& opIx : instr.memOps_)
     if (opIx < sysMemOps_.size())
       if (sysMemOps_.at(opIx).time_ > time)
@@ -209,66 +209,37 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  tag = instr.tag_;
 	}
 
-  // TBD FIX : filter out CSR dependencies with rd=x0
-  // TBD FIX : add implied FP dependencies for FCSR and FFLAGS
-
   if (instEntry->isBranch())
     hartBranchTimes_.at(hartIx) = 0;
 
-  // Collect source and destination operands.
-  std::array<unsigned, 2> dests;
-  unsigned destCount = 0, sourceCount = 0;;
-  for (unsigned i = 0; i < di.operandCount(); ++i)
+  std::vector<unsigned> sourceRegs, destRegs;
+  identifyRegisters(di, sourceRegs, destRegs);
+
+  bool first = true; // first branch source
+  for (auto regIx : sourceRegs)
     {
-      bool isDest = instEntry->isIthOperandWrite(i);
-      bool isSource = instEntry->isIthOperandRead(i);
-      if (not isDest and not isSource)
-	continue;
-	
-      size_t regIx = 0;
-      switch(di.ithOperandType(i))
+      if (regTimeVec.at(regIx) > time)
 	{
-	case OperandType::IntReg:
-	  regIx = di.ithOperand(i);
-	  break;
-	case OperandType::FpReg:
-	  regIx = di.ithOperand(i) + fpRegOffset_;
-	  break;
-	case OperandType::CsReg:
-	  regIx = di.ithOperand(i) + csRegOffset_;
-	  break;
-	case OperandType::VecReg:   // FIX: Not yet supported.
-	case OperandType::Imm:
-	case OperandType::None:
-	  continue;
+	  time = regTimeVec.at(regIx);
+	  tag = regProducer.at(regIx);
 	}
-      if (regIx == 0)
-	continue;  // x0
-      if (isSource)
-	{
-	  if (regTimeVec.at(regIx) > time)
-	    {
-	      time = regTimeVec.at(regIx);
-	      tag = regProducer.at(regIx);
-	    }
-	  if (instEntry->isBranch())
-	    if (destCount == 0 or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
-	      {
-		hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
-		hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
-	      }
-	  sourceCount++;
-	}
-      if (isDest)
-	dests.at(destCount++) = regIx;
+      if (instEntry->isBranch())
+	if (first or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
+	  {
+	    first = false;
+	    hartBranchTimes_.at(hartIx) = regTimeVec.at(regIx);
+	    hartBranchProducers_.at(hartIx) = regProducer.at(regIx);
+	  }
     }
 
-  for (unsigned i = 0; i < destCount; ++i)
-    if (time > regTimeVec.at(dests.at(i)))
-      {
-	regTimeVec.at(dests.at(i)) = time;
-	regProducer.at(dests.at(i)) = tag;
-      }
+  for (auto regIx : destRegs)
+    {
+      if (time > regTimeVec.at(regIx))
+	{
+	  regTimeVec.at(regIx) = time;
+	  regProducer.at(regIx) = tag;
+	}
+    }
 }
 
 
@@ -895,7 +866,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       if (not di.instEntry()->isAtomic())
 	continue;
 
-      cerr << "Error: Internal read forwards from an amo instruction"
+      cerr << "Error: Internal read forwards from an atomic instruction"
 	   << " time=" << op.time_ << " hart-id=" << hartId
 	   << " instr-tag=0x" << std::hex << tag << " addr=0x"
 	   << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
@@ -911,6 +882,75 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       return false;
     }
   return true;
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::identifyRegisters(const DecodedInst& di,
+			    std::vector<unsigned>& sourceRegs,
+			    std::vector<unsigned>& destRegs)
+{
+  sourceRegs.clear();
+  destRegs.clear();
+
+  if (not di.isValid())
+    return;
+
+  const auto entry = di.instEntry();
+  assert(entry);
+
+  if (entry->hasRoundingMode() and di.roundingMode() == RoundingMode::Dynamic)
+    sourceRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
+
+  if (entry->modifiesFflags())
+    destRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
+
+  auto id = entry->instId();
+  bool skipCsr = ((id == InstId::csrrs or id == InstId::csrrc or
+		   id == InstId::csrrsi or id == InstId::csrrci)
+		  and di.op1() == 0);
+
+  for (unsigned i = 0; i < di.operandCount(); ++i)
+    {
+      bool isDest = entry->isIthOperandWrite(i);
+      bool isSource = entry->isIthOperandRead(i);
+      if (not isDest and not isSource)
+	continue;
+	
+      size_t regIx = 0;
+      switch(di.ithOperandType(i))
+	{
+	case OperandType::IntReg:
+	  regIx = di.ithOperand(i);
+	  if (regIx == 0)
+	    continue;  // x0
+	  break;
+	case OperandType::FpReg:
+	  regIx = di.ithOperand(i) + fpRegOffset_;
+	  break;
+	case OperandType::CsReg:
+	  if (isSource and skipCsr)
+	    continue;
+	  else
+	    {
+	      CsrNumber csr{di.ithOperand(i)};
+	      if (csr == CsrNumber::FFLAGS or csr == CsrNumber::FRM)
+		csr = CsrNumber::FCSR;
+	      regIx = unsigned(csr) + csRegOffset_;
+	    }
+	  break;
+	case OperandType::VecReg:   // FIX: Not yet supported.
+	case OperandType::Imm:
+	case OperandType::None:
+	  continue;
+	}
+
+      if (isDest)
+	destRegs.push_back(regIx);
+      if (isSource)
+	sourceRegs.push_back(regIx);
+    }
 }
 
 
@@ -1380,7 +1420,6 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instEntry->isStore() and not instEntry->isAmo())
     return true;
 
-  uint64_t time = hartBranchTimes_.at(hartIx);
   auto producerTag = hartBranchProducers_.at(hartIx);
 
   const auto& instrVec = hartInstrVecs_.at(hartIx);
@@ -1390,7 +1429,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   if (not producer.di_.isValid())
     return true;
 
-  if (isBeforeInMemoryTime(instrB, producer))
+  if (not producer.complete_ or isBeforeInMemoryTime(instrB, producer))
     {
       cerr << "Error: PPO rule 11 failed: hart-id=" << hartId << " tag1="
 	   << producerTag << " tag2=" << instrB.tag_ << '\n';

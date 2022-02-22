@@ -276,6 +276,10 @@ namespace WdRiscv
     bool hasRoundingMode() const
     { return hasRm_; }
 
+    /// Return true if instruction writes FFLAGS CSR.
+    bool modifiesFflags() const
+    { return modifiesFflags_; }
+
     /// Return string value of InstType (for json)
     std::string typeToString() const
       {
@@ -312,6 +316,10 @@ namespace WdRiscv
     /// Mark instruction as having a rounding mode field.
     void setHasRoundingMode(bool flag)
     { hasRm_ = flag; }
+
+    /// Mark instruction as modifying FFLAGS.
+    void setModifiesFflags(bool flag)
+    { modifiesFflags_ = flag; }
 
     /// Mark instruction as having unsigned source operands.
     void setIsUnsigned(bool flag)
@@ -369,6 +377,7 @@ namespace WdRiscv
     bool isPerfLoad_ = false;  // True if perf counters view instr as load.
     bool isPerfStore_ = false; // True if perf counters view instr as store.
     bool hasRm_ = false;       // True if instr has an explicit rounding mode 
+    bool modifiesFflags_ = false; // True if instr modifed FFLAGS.
   };
 
 
