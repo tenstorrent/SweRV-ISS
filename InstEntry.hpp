@@ -284,33 +284,6 @@ namespace WdRiscv
     bool modifiesFflags() const
     { return modifiesFflags_; }
 
-    /// Return string value of RvExtension (for json)
-    std::string typeToString() const
-      {
-        switch (ext_)
-          { 
-            case RvExtension::M:      return "Rvm";
-            case RvExtension::I:      return "Rvi";
-            case RvExtension::F:      return "Rvf";
-            case RvExtension::D:      return "Rvd";
-            case RvExtension::A:      return "Rva";
-            case RvExtension::V:      return "Rvv";
-            case RvExtension::Zba:    return "Zba";
-            case RvExtension::Zbb:    return "Zbb";
-            case RvExtension::Zbc:    return "Zbc";
-            case RvExtension::Zbe:    return "Zbe";
-            case RvExtension::Zbf:    return "Zbf";
-            case RvExtension::Zbm:    return "Zbm";
-            case RvExtension::Zbp:    return "Zbp";
-            case RvExtension::Zbr:    return "Zbr";
-            case RvExtension::Zbs:    return "Zbs";
-            case RvExtension::Zbt:    return "Zbt";
-            case RvExtension::Zfh:    return "Zfh";
-	    case RvExtension::Zlsseg: return "Zlsseg";
-            default: return "Invalid";
-          }
-      }
-
   protected:
 
     /// Mark instruction as having a rounding mode field.
@@ -418,6 +391,10 @@ namespace WdRiscv
     /// is true, flw will count as both a load instruction and as an
     /// fp instruction.
     void perfCountFpLoadStore(bool flag);
+
+    /// Return the instruction vector table.
+    std::vector<InstEntry> getInstVec()
+    { return instVec_; }
 
   private:
 

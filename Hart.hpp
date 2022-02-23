@@ -831,7 +831,7 @@ namespace WdRiscv
     { loadErrorRollback_ = flag; }
 
     /// Print collected instruction frequency to the given file.
-    void reportInstructionFrequency(FILE* file, bool json) const;
+    void reportInstructionFrequency(FILE* file) const;
 
     /// Print collected trap stats to the given file.
     void reportTrapStat(FILE* file) const;
@@ -919,6 +919,11 @@ namespace WdRiscv
     /// Return true if given data (ld/st) address is external to the hart.
     bool isDataAddressExternal(size_t addr) const
     { return memory_.isDataAddressExternal(addr); }
+
+    /// Return true if given extension is statically enabled (enabled my
+    /// --isa but may be turned off by the MSTATUS/MISA CSRs).
+    bool hasIsaExtension(RvExtension ext) const
+    { return isa_.isEnabled(ext); }
 
     /// Return true if rv32f (single precision floating point)
     /// extension is enabled in this hart.
