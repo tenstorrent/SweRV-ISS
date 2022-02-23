@@ -1910,9 +1910,6 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 
   if (isCompressedInst(inst))
     {
-      // return decode16(inst, op0, op1, op2);
-      if (not isRvc())
-	inst = 0; // All zeros: illegal 16-bit instruction.
       return decode16(uint16_t(inst), op0, op1, op2);
     }
 

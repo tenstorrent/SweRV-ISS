@@ -257,13 +257,13 @@ Hart<URV>::processExtensions()
   URV value = 0;
   peekCsr(CsrNumber::MISA, value);
 
-  rva_ = (value & 1) and isa_.isEnabled(Isa::Extension::A);   // Atomic
+  rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
 
   rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
-  rvc_ = rvc_ and isa_.isEnabled(Isa::Extension::C);
+  rvc_ = rvc_ and isa_.isEnabled(RvExtension::C);
 
   bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
-  flag = flag and isa_.isEnabled(Isa::Extension::F);
+  flag = flag and isa_.isEnabled(RvExtension::F);
   enableRvf(flag);
 
   // D requires F and is enabled only if F is enabled.
@@ -274,11 +274,11 @@ Hart<URV>::processExtensions()
 		<< "extension (bit 5) is not enabled -- ignored\n";
       flag = false;
     }
-  flag = flag and isa_.isEnabled(Isa::Extension::D);
+  flag = flag and isa_.isEnabled(RvExtension::D);
   enableRvd(flag);
 
   rve_ = value & (URV(1) << ('e' - 'a'));
-  rve_ = rve_ and isa_.isEnabled(Isa::Extension::E);
+  rve_ = rve_ and isa_.isEnabled(RvExtension::E);
   if (rve_)
     intRegs_.regs_.resize(16);
 
@@ -288,7 +288,7 @@ Hart<URV>::processExtensions()
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
   rvm_ = value & (URV(1) << ('m' - 'a'));
-  rvm_ = rvm_ and isa_.isEnabled(Isa::Extension::M);
+  rvm_ = rvm_ and isa_.isEnabled(RvExtension::M);
 
   flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
   enableSupervisorMode(flag);
@@ -297,7 +297,7 @@ Hart<URV>::processExtensions()
   enableUserMode(flag);
 
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
-  flag = flag and isa_.isEnabled(Isa::Extension::V);
+  flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorMode(flag);
 
   for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
@@ -310,15 +310,15 @@ Hart<URV>::processExtensions()
 		  << "-- ignored\n";
     }
 
-  if (isa_.isEnabled(Isa::Extension::Zba))
+  if (isa_.isEnabled(RvExtension::Zba))
     enableRvzba(true);
-  if (isa_.isEnabled(Isa::Extension::Zbb))
+  if (isa_.isEnabled(RvExtension::Zbb))
     enableRvzbb(true);
-  if (isa_.isEnabled(Isa::Extension::Zbc))
+  if (isa_.isEnabled(RvExtension::Zbc))
     enableRvzbc(true);
-  if (isa_.isEnabled(Isa::Extension::Zbs))
+  if (isa_.isEnabled(RvExtension::Zbs))
     enableRvzbs(true);
-  if (isa_.isEnabled(Isa::Extension::Zfh))
+  if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
 }
 
@@ -2518,19 +2518,19 @@ Hart<URV>::configIsa(const std::string& isa, bool updateMisa)
 	return false;
 
       URV misaReset = csr->getResetValue();
-      if (isa_.isEnabled(Isa::Extension::A))
+      if (isa_.isEnabled(RvExtension::A))
 	misaReset |= URV(1);
-      if (isa_.isEnabled(Isa::Extension::B))
+      if (isa_.isEnabled(RvExtension::B))
 	misaReset |= URV(2);
-      if (isa_.isEnabled(Isa::Extension::C))
+      if (isa_.isEnabled(RvExtension::C))
 	misaReset |= URV(4);
-      if (isa_.isEnabled(Isa::Extension::D))
+      if (isa_.isEnabled(RvExtension::D))
 	misaReset |= URV(8);
-      if (isa_.isEnabled(Isa::Extension::F))
+      if (isa_.isEnabled(RvExtension::F))
 	misaReset |= URV(32);
-      if (isa_.isEnabled(Isa::Extension::M))
+      if (isa_.isEnabled(RvExtension::M))
 	misaReset |= URV(0x1000);
-      if (isa_.isEnabled(Isa::Extension::V))
+      if (isa_.isEnabled(RvExtension::V))
 	misaReset |= URV(0x20000);
   
       URV mask = 0, pokeMask = 0;
@@ -3154,7 +3154,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Instruction information.
   fputc(',', out);
-  InstType type = instEntry->type();
+  RvExtension type = instEntry->extension();
   if (load)
     fputc('l', out);
   else if (store)
@@ -3174,11 +3174,11 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	    fputc('j', out);
 	}
     }
-  else if (type == InstType::Rvf or type == InstType::Rvd)
+  else if (type == RvExtension::F or type == RvExtension::D or type == RvExtension::Zfh)
     fputc('f', out);
-  else if (type == InstType::Vector)
+  else if (type == RvExtension::V)
     fputc('v', out);
-  else if (type == InstType::Atomic)
+  else if (type == RvExtension::A)
     fputc('a', out);
 
 
@@ -3390,7 +3390,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
     pregs.updateCounters(EventNumber::Inst32Commited, prevPerfControl_,
                          lastPriv_);
 
-  if (info.type() == InstType::Int)
+  if (info.extension() == RvExtension::I)
     {
       if (id == InstId::ebreak or id == InstId::c_ebreak)
 	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_,
@@ -3497,22 +3497,22 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
     }
 
   // Some insts (e.g. flw) can be both load/store and FP
-  if (info.type() == InstType::Rvf)
+  if (info.extension() == RvExtension::F)
     {
       pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_,
                            lastPriv_);
     }
-  else if (info.type() == InstType::Rvd)
+  else if (info.extension() == RvExtension::D)
     {
       pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_,
                            lastPriv_);
     }
-  else if (info.type() == InstType::Zfh)
+  else if (info.extension() == RvExtension::Zfh)
     {
       pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_,
                            lastPriv_);
     }
-  else if (info.type() == InstType::Vector)
+  else if (info.extension() == RvExtension::V)
     {
       pregs.updateCounters(EventNumber::Vector, prevPerfControl_,
                            lastPriv_);
@@ -6711,189 +6711,187 @@ Hart<URV>::execute(const DecodedInst* di)
   return;
 
  c_addi4spn:
-  execAddi(di);
+  if (not isRvc()) illegalInst(di); else execAddi(di);
   return;
 
  c_fld:
-  execFld(di);
+  if (not isRvc()) illegalInst(di); else execFld(di);
   return;
 
  c_lq:
-  illegalInst(di);
+  if (not isRvc()) illegalInst(di); else illegalInst(di);
   return;
 
  c_lw:
-  execLw(di);
+  if (not isRvc()) illegalInst(di); else execLw(di);
   return;
 
  c_flw:
-  execFlw(di);
+  if (not isRvc()) illegalInst(di); else execFlw(di);
   return;
 
  c_ld:
-  execLd(di);
+  if (not isRvc()) illegalInst(di); else execLd(di);
   return;
 
  c_fsd:
-  execFsd(di);
+  if (not isRvc()) illegalInst(di); else execFsd(di);
   return;
 
  c_sq:
-  illegalInst(di);
+  if (not isRvc()) illegalInst(di); else illegalInst(di);
   return;
 
  c_sw:
-  execSw(di);
+  if (not isRvc()) illegalInst(di); else execSw(di);
   return;
 
  c_fsw:
-  execFsw(di);
+  if (not isRvc()) illegalInst(di); else execFsw(di);
   return;
 
  c_sd:
-  execSd(di);
+  if (not isRvc()) illegalInst(di); else execSd(di);
   return;
 
  c_addi:
-  execAddi(di);
+  if (not isRvc()) illegalInst(di); else execAddi(di);
   return;
 
  c_jal:
-  execJal(di);
+  if (not isRvc()) illegalInst(di); else execJal(di);
   return;
 
  c_li:
-  // execAddi(di);
-  intRegs_.write(di->op0(), di->op2As<SRV>());
+  if (not isRvc()) illegalInst(di); else execAddi(di);
   return;
 
  c_addi16sp:
-  execAddi(di);
+  if (not isRvc()) illegalInst(di); else execAddi(di);
   return;
 
  c_lui:
-  execLui(di);
+  if (not isRvc()) illegalInst(di); else execLui(di);
   return;
 
  c_srli:
-  execSrli(di);
+  if (not isRvc()) illegalInst(di); else execSrli(di);
   return;
 
  c_srli64:
-  execSrli(di);
+  if (not isRvc()) illegalInst(di); else execSrli(di);
   return;
 
  c_srai:
-  execSrai(di);
+  if (not isRvc()) illegalInst(di); else execSrai(di);
   return;
 
  c_srai64:
-  execSrai(di);
+  if (not isRvc()) illegalInst(di); else execSrai(di);
   return;
 
  c_andi:
-  execAndi(di);
+  if (not isRvc()) illegalInst(di); else execAndi(di);
   return;
 
  c_sub:
-  execSub(di);
+  if (not isRvc()) illegalInst(di); else execSub(di);
   return;
 
  c_xor:
-  execXor(di);
+  if (not isRvc()) illegalInst(di); else execXor(di);
   return;
 
  c_or:
-  execOr(di);
+  if (not isRvc()) illegalInst(di); else execOr(di);
   return;
 
  c_and:
-  execAnd(di);
+  if (not isRvc()) illegalInst(di); else execAnd(di);
   return;
 
  c_subw:
-  execSubw(di);
+  if (not isRvc()) illegalInst(di); else execSubw(di);
   return;
 
  c_addw:
-  execAddw(di);
+  if (not isRvc()) illegalInst(di); else execAddw(di);
   return;
 
  c_j:
-  execJal(di);
+  if (not isRvc()) illegalInst(di); else execJal(di);
   return;
 
  c_beqz:
-  execBeq(di);
+  if (not isRvc()) illegalInst(di); else execBeq(di);
   return;
 
  c_bnez:
-  execBne(di);
+  if (not isRvc()) illegalInst(di); else execBne(di);
   return;
 
  c_slli:
-  execSlli(di);
+  if (not isRvc()) illegalInst(di); else execSlli(di);
   return;
 
  c_slli64:
-  execSlli(di);
+  if (not isRvc()) illegalInst(di); else execSlli(di);
   return;
 
  c_fldsp:
-  execFld(di);
+  if (not isRvc()) illegalInst(di); else execFld(di);
   return;
 
  c_lwsp:
-  execLw(di);
+  if (not isRvc()) illegalInst(di); else execLw(di);
   return;
 
  c_flwsp:
-  execFlw(di);
+  if (not isRvc()) illegalInst(di); else execFlw(di);
   return;
 
  c_ldsp:
-  execLd(di);
+  if (not isRvc()) illegalInst(di); else execLd(di);
   return;
 
  c_jr:
-  execJalr(di);
+  if (not isRvc()) illegalInst(di); else execJalr(di);
   return;
 
  c_mv:
-  intRegs_.write(di->op0(), intRegs_.read(di->op2()));
-  //execAdd(di);
+  if (not isRvc()) illegalInst(di); else execAdd(di);
   return;
 
  c_ebreak:
-  execEbreak(di);
+  if (not isRvc()) illegalInst(di); else execEbreak(di);
   return;
 
  c_jalr:
-  execJalr(di);
+  if (not isRvc()) illegalInst(di); else execJalr(di);
   return;
 
  c_add:
-  execAdd(di);
+  if (not isRvc()) illegalInst(di); else execAdd(di);
   return;
 
  c_fsdsp:
-  execFsd(di);
+  if (not isRvc()) illegalInst(di); else execFsd(di);
   return;
 
  c_swsp:
-  execSw(di);
+  if (not isRvc()) illegalInst(di); else execSw(di);
   return;
 
  c_fswsp:
-  execFsw(di);
+  if (not isRvc()) illegalInst(di); else execFsw(di);
   return;
 
  c_addiw:
-  execAddiw(di);
+  if (not isRvc()) illegalInst(di); else execAddiw(di);
   return;
 
  c_sdsp:
-  execSd(di);
+  if (not isRvc()) illegalInst(di); else execSd(di);
   return;
 
  clz:
