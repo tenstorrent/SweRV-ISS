@@ -1533,6 +1533,13 @@ static
 bool
 sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 {
+  // if (args.instructionInfo)
+  // {
+  //    auto hart = system.ithHart(0);
+  //    hart->dumpInstructionTable();
+  //    return true;
+  // }
+
   // In server/interactive modes: enable triggers and performance counters.
   bool serverMode = not args.serverFile.empty();
   if (serverMode or args.interactive)

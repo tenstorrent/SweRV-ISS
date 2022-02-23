@@ -7,67 +7,67 @@ using namespace WdRiscv;
 
 Isa::Isa()
 {
-  infoVec_.resize(extIx(Extension::None) + 1);
+  infoVec_.resize(extIx(RvExtension::None) + 1);
 
-  infoVec_.at(extIx(Extension::A)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(Extension::B)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(Extension::C)) = Info{ {{1,0}, {2,0}}, {1,0} };
-  infoVec_.at(extIx(Extension::D)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(Extension::E)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(Extension::F)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(Extension::I)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(Extension::M)) = Info{ {{2,0}}, {2,0} };
-  infoVec_.at(extIx(Extension::S)) = Info{ {{1,2}}, {1,2} };
-  infoVec_.at(extIx(Extension::U)) = Info{ {{1,0}}, {1,0} };
-  infoVec_.at(extIx(Extension::V)) = Info{ {{1,0}}, {1,0} };
-  infoVec_.at(extIx(Extension::Zba)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(Extension::Zbb)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(Extension::Zbc)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(Extension::Zbs)) = Info{ {{0,93}}, {0,93} };
-  infoVec_.at(extIx(Extension::Zfh)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(Extension::Zlsseg)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::A)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::B)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(RvExtension::C)) = Info{ {{1,0}, {2,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::D)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::E)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::F)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::I)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::M)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::S)) = Info{ {{1,2}}, {1,2} };
+  infoVec_.at(extIx(RvExtension::U)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::V)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zba)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(RvExtension::Zbb)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(RvExtension::Zbc)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(RvExtension::Zbs)) = Info{ {{0,93}}, {0,93} };
+  infoVec_.at(extIx(RvExtension::Zfh)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zlsseg)) = Info{ {{1,0}}, {1,0} };
 
-  infoVec_.at(extIx(Extension::I)).enabled = true; // I always enabled.
+  infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 
-  stringToExt_["a"] = Extension::A;
-  stringToExt_["b"] = Extension::B;
-  stringToExt_["c"] = Extension::C;
-  stringToExt_["d"] = Extension::D;
-  stringToExt_["e"] = Extension::E;
-  stringToExt_["f"] = Extension::F;
-  stringToExt_["i"] = Extension::I;
-  stringToExt_["m"] = Extension::M;
-  stringToExt_["s"] = Extension::S;
-  stringToExt_["u"] = Extension::U;
-  stringToExt_["v"] = Extension::V;
-  stringToExt_["zba"] = Extension::Zba;
-  stringToExt_["zbb"] = Extension::Zbb;
-  stringToExt_["zbc"] = Extension::Zbc;
-  stringToExt_["zbs"] = Extension::Zbs;
-  stringToExt_["zfh"] = Extension::Zfh;
-  stringToExt_["zlssegh"] = Extension::Zlsseg;
+  stringToExt_["a"] = RvExtension::A;
+  stringToExt_["b"] = RvExtension::B;
+  stringToExt_["c"] = RvExtension::C;
+  stringToExt_["d"] = RvExtension::D;
+  stringToExt_["e"] = RvExtension::E;
+  stringToExt_["f"] = RvExtension::F;
+  stringToExt_["i"] = RvExtension::I;
+  stringToExt_["m"] = RvExtension::M;
+  stringToExt_["s"] = RvExtension::S;
+  stringToExt_["u"] = RvExtension::U;
+  stringToExt_["v"] = RvExtension::V;
+  stringToExt_["zba"] = RvExtension::Zba;
+  stringToExt_["zbb"] = RvExtension::Zbb;
+  stringToExt_["zbc"] = RvExtension::Zbc;
+  stringToExt_["zbs"] = RvExtension::Zbs;
+  stringToExt_["zfh"] = RvExtension::Zfh;
+  stringToExt_["zlssegh"] = RvExtension::Zlsseg;
 
-  extToString_.resize(extIx(Extension::None));
-  extToString_.at(extIx(Extension::A)) = "a";
-  extToString_.at(extIx(Extension::B)) = "b";
-  extToString_.at(extIx(Extension::C)) = "c";
-  extToString_.at(extIx(Extension::D)) = "d";
-  extToString_.at(extIx(Extension::E)) = "e";
-  extToString_.at(extIx(Extension::F)) = "f";
-  extToString_.at(extIx(Extension::I)) = "i";
-  extToString_.at(extIx(Extension::M)) = "m";
-  extToString_.at(extIx(Extension::V)) = "v";
-  extToString_.at(extIx(Extension::Zba)) = "zba";
-  extToString_.at(extIx(Extension::Zbb)) = "zbb";
-  extToString_.at(extIx(Extension::Zbc)) = "zbc";
-  extToString_.at(extIx(Extension::Zbs)) = "zbs";
-  extToString_.at(extIx(Extension::Zfh)) = "zfh";
-  extToString_.at(extIx(Extension::Zlsseg)) = "zlssegh";
+  extToString_.resize(extIx(RvExtension::None));
+  extToString_.at(extIx(RvExtension::A)) = "a";
+  extToString_.at(extIx(RvExtension::B)) = "b";
+  extToString_.at(extIx(RvExtension::C)) = "c";
+  extToString_.at(extIx(RvExtension::D)) = "d";
+  extToString_.at(extIx(RvExtension::E)) = "e";
+  extToString_.at(extIx(RvExtension::F)) = "f";
+  extToString_.at(extIx(RvExtension::I)) = "i";
+  extToString_.at(extIx(RvExtension::M)) = "m";
+  extToString_.at(extIx(RvExtension::V)) = "v";
+  extToString_.at(extIx(RvExtension::Zba)) = "zba";
+  extToString_.at(extIx(RvExtension::Zbb)) = "zbb";
+  extToString_.at(extIx(RvExtension::Zbc)) = "zbc";
+  extToString_.at(extIx(RvExtension::Zbs)) = "zbs";
+  extToString_.at(extIx(RvExtension::Zfh)) = "zfh";
+  extToString_.at(extIx(RvExtension::Zlsseg)) = "zlssegh";
 }
 
 
 bool
-Isa::selectVersion(Extension ext, unsigned version, unsigned subversion)
+Isa::selectVersion(RvExtension ext, unsigned version, unsigned subversion)
 {
   unsigned ix = extIx(ext);
   if (ix >= infoVec_.size())
@@ -91,7 +91,7 @@ Isa::selectVersion(Extension ext, unsigned version, unsigned subversion)
 
 
 bool
-Isa::isSupported(Extension ext) const
+Isa::isSupported(RvExtension ext) const
 {
   unsigned ix = extIx(ext);
   if (ix >= infoVec_.size())
@@ -103,7 +103,7 @@ Isa::isSupported(Extension ext) const
 
 
 bool
-Isa::isSupported(Extension ext, unsigned version, unsigned subversion) const
+Isa::isSupported(RvExtension ext, unsigned version, unsigned subversion) const
 {
   unsigned ix = extIx(ext);
   if (ix >= infoVec_.size())
@@ -122,7 +122,7 @@ Isa::isSupported(Extension ext, unsigned version, unsigned subversion) const
 
 
 bool
-Isa::getDefaultVersion(Extension ext, unsigned& version, unsigned& subversion) const
+Isa::getDefaultVersion(RvExtension ext, unsigned& version, unsigned& subversion) const
 {
   unsigned ix = extIx(ext);
   if (ix >= infoVec_.size())
@@ -140,7 +140,7 @@ Isa::getDefaultVersion(Extension ext, unsigned& version, unsigned& subversion) c
 
 
 bool
-Isa::getVersion(Extension ext, unsigned& version) const
+Isa::getVersion(RvExtension ext, unsigned& version) const
 {
   unsigned ix = extIx(ext);
   if (ix >= infoVec_.size())
@@ -156,7 +156,7 @@ Isa::getVersion(Extension ext, unsigned& version) const
 
 
 bool
-Isa::getVersion(Extension ext, unsigned& version, unsigned& subversion) const
+Isa::getVersion(RvExtension ext, unsigned& version, unsigned& subversion) const
 {
   unsigned ix = extIx(ext);
   if (ix >= infoVec_.size())
@@ -172,18 +172,18 @@ Isa::getVersion(Extension ext, unsigned& version, unsigned& subversion) const
 }
 
 
-Isa::Extension
+RvExtension
 Isa::stringToExtension(const std::string& str) const
 {
   const auto iter = stringToExt_.find(str);
   if (iter == stringToExt_.end())
-    return Extension::None;
+    return RvExtension::None;
   return iter->second;
 }
 
 
 std::string
-Isa::extensionToString(Extension ext) const
+Isa::extensionToString(RvExtension ext) const
 {
   unsigned ix = extIx(ext);
   return ix < extToString_.size()? extToString_.at(ix) : "";
@@ -302,8 +302,8 @@ Isa::applyIsaString(const std::string& isaStr)
       if (not extractVersion(isa, i, version, subversion))
 	return false;
 
-      Extension ext = stringToExtension(extension);
-      if (ext == Extension::None)
+      RvExtension ext = stringToExtension(extension);
+      if (ext == RvExtension::None)
 	{
 	  std::cerr << "Unknown extension: " << extension
 		    << " -- ignored\n";

@@ -18,6 +18,7 @@
 #include <string>
 #include <unordered_map>
 #include "InstId.hpp"
+#include "Isa.hpp"
 
 
 namespace WdRiscv
@@ -25,9 +26,6 @@ namespace WdRiscv
 
   enum class OperandType { IntReg, FpReg, CsReg, VecReg, Imm, None };
   enum class OperandMode { Read, Write, ReadWrite, None };
-  enum class InstType { Load, Store, Multiply, Divide, Branch, Int, Rvf, Rvd,
-                        Csr, Atomic, Vector, Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
-                        Zbr, Zbs, Zbt, Zfh };
 
   /// Return true if given instruction is a 4-byte instruction.
   inline bool
@@ -74,7 +72,7 @@ namespace WdRiscv
     // Constructor.
     InstEntry(std::string name = "", InstId id = InstId::illegal,
 	     uint32_t code = 0, uint32_t mask = ~0,
-	     InstType type = InstType::Int,
+	     RvExtension ext = RvExtension::I,
 	     OperandType op0Type = OperandType::None,
 	     OperandMode op0Mode = OperandMode::None,
 	     uint32_t op0Mask = 0,
@@ -179,9 +177,11 @@ namespace WdRiscv
       return ithOperandMode(i) == OperandMode::Read;
     }
 
-    /// Return the instruction type.
-    InstType type() const
-    { return type_; }
+    /// Return the extension containing this instruction. Compressed
+    /// insructions (e.g. c.fld) return the secondary extension (RvExtension::D
+    /// for c.fld).
+    RvExtension extension() const
+    { return ext_; }
 
     /// Return true if this is a load instruction (lb, lh, flw, lr ...)
     bool isLoad() const
@@ -205,28 +205,32 @@ namespace WdRiscv
 
     /// Return true if this is a branch instruction (beq, jal, ...)
     bool isBranch() const
-    { return type_ == InstType::Branch; }
+    { return id_ >= InstId::jal and id_ <= InstId::bgeu; }
 
     /// Return true if this is a multiply instruction (mul, mulh, ...)
     bool isMultiply() const
-    { return type_ == InstType::Multiply; }
+    { return ext_ == RvExtension::M and not isDivide(); }
 
     /// Return true if this is a divide instruction (div, rem, ...)
     bool isDivide() const
-    { return type_ == InstType::Divide; }
+    { return isDiv_; }
 
     /// Return true if a floating point instruction (fadd.s, fadd.d ...)
     bool isFp() const
-    { return type_ == InstType::Rvf or type_ == InstType::Rvd or
-	type_ == InstType::Zfh; }
+    { return ext_ == RvExtension::F or ext_ == RvExtension::D or
+	ext_ == RvExtension::Zfh; }
 
     /// Return true if this is a CSR instruction.
     bool isCsr() const
-    { return type_ == InstType::Csr; }
+    { return id_ >= InstId::csrrw and id_ <= InstId::csrrci; }
 
     /// Return true if this is an atomic instruction.
     bool isAtomic() const
-    { return type_ == InstType::Atomic; }
+    { return ext_ == RvExtension::A; }
+
+    /// Return true if this a compressed instruction.
+    bool isCompressed() const
+    { return isCompressedInst(code_); }
 
     /// Return true if this a load-reserve.
     bool isLr() const
@@ -243,7 +247,7 @@ namespace WdRiscv
 
     /// Return true if this is an vector instruction.
     bool isVector() const
-    { return type_ == InstType::Vector; }
+    { return ext_ == RvExtension::V; }
 
     /// Return true if source operands have unsigned integer values.
     bool isUnsigned() const
@@ -280,33 +284,29 @@ namespace WdRiscv
     bool modifiesFflags() const
     { return modifiesFflags_; }
 
-    /// Return string value of InstType (for json)
+    /// Return string value of RvExtension (for json)
     std::string typeToString() const
       {
-        switch (type_)
+        switch (ext_)
           { 
-            case InstType::Load: return "Load";
-            case InstType::Store: return "Store";
-            case InstType::Multiply: return "Multiply";
-            case InstType::Divide: return "Divide";
-            case InstType::Branch: return "Branch";
-            case InstType::Int: return "Int";
-            case InstType::Rvf: return "Rvf";
-            case InstType::Rvd: return "Rvd";
-            case InstType::Csr: return "Csr";
-            case InstType::Atomic: return "Atomic";
-            case InstType::Vector: return "Vector";
-            case InstType::Zba: return "Zba";
-            case InstType::Zbb: return "Zbb";
-            case InstType::Zbc: return "Zbc";
-            case InstType::Zbe: return "Zbe";
-            case InstType::Zbf: return "Zbf";
-            case InstType::Zbm: return "Zbm";
-            case InstType::Zbp: return "Zbp";
-            case InstType::Zbr: return "Zbr";
-            case InstType::Zbs: return "Zbs";
-            case InstType::Zbt: return "Zbt";
-            case InstType::Zfh: return "Zfh";
+            case RvExtension::M:      return "Rvm";
+            case RvExtension::I:      return "Rvi";
+            case RvExtension::F:      return "Rvf";
+            case RvExtension::D:      return "Rvd";
+            case RvExtension::A:      return "Rva";
+            case RvExtension::V:      return "Rvv";
+            case RvExtension::Zba:    return "Zba";
+            case RvExtension::Zbb:    return "Zbb";
+            case RvExtension::Zbc:    return "Zbc";
+            case RvExtension::Zbe:    return "Zbe";
+            case RvExtension::Zbf:    return "Zbf";
+            case RvExtension::Zbm:    return "Zbm";
+            case RvExtension::Zbp:    return "Zbp";
+            case RvExtension::Zbr:    return "Zbr";
+            case RvExtension::Zbs:    return "Zbs";
+            case RvExtension::Zbt:    return "Zbt";
+            case RvExtension::Zfh:    return "Zfh";
+	    case RvExtension::Zlsseg: return "Zlsseg";
             default: return "Invalid";
           }
       }
@@ -325,6 +325,10 @@ namespace WdRiscv
     void setIsUnsigned(bool flag)
     { isUns_ = flag; }
 
+    /// Mark instruction as a divide/remainder instruction.
+    void setIsDivide(bool flag)
+    { isDiv_ = flag; }
+    
     /// Set the size of load instructions.
     void setLoadSize(unsigned size)
     { ldSize_ = size; isLoad_ = true; isPerfLoad_ = true; }
@@ -348,7 +352,7 @@ namespace WdRiscv
     uint32_t code_;      // Code with all operand bits set to zero.
     uint32_t codeMask_;  // Bit corresponding to code bits are 1. Bits
 
-    InstType type_ = InstType::Int;
+    RvExtension ext_ = RvExtension::I;
 
     uint32_t op0Mask_;
     uint32_t op1Mask_;
@@ -376,8 +380,9 @@ namespace WdRiscv
     bool isStore_ = false;
     bool isPerfLoad_ = false;  // True if perf counters view instr as load.
     bool isPerfStore_ = false; // True if perf counters view instr as store.
-    bool hasRm_ = false;       // True if instr has an explicit rounding mode 
+    bool hasRm_ = false;       // True if instr has an explicit rounding mode .
     bool modifiesFflags_ = false; // True if instr modifed FFLAGS.
+    bool isDiv_ = false;       // True for integer divide or remainder instr.
   };
 
 
