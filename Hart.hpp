@@ -920,6 +920,11 @@ namespace WdRiscv
     bool isDataAddressExternal(size_t addr) const
     { return memory_.isDataAddressExternal(addr); }
 
+    /// Return true if given extension is statically enabled (enabled my
+    /// --isa but may be turned off by the MSTATUS/MISA CSRs).
+    bool hasIsaExtension(RvExtension ext) const
+    { return isa_.isEnabled(ext); }
+
     /// Return true if rv32f (single precision floating point)
     /// extension is enabled in this hart.
     bool isRvf() const
