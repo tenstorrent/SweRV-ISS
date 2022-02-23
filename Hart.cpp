@@ -1178,26 +1178,17 @@ Hart<URV>::reportTrapStat(FILE* file) const
         continue;
       switch(cause)
         {
-        case InterruptCause::U_SOFTWARE:
-          fprintf(file, "  + U_SOFTWARE  : %" PRIu64 "\n", count);
-          break;
         case InterruptCause::S_SOFTWARE:
           fprintf(file, "  + S_SOFTWARE  : %" PRIu64 "\n", count);
           break;
         case InterruptCause::M_SOFTWARE:
           fprintf(file, "  + M_SOFTWARE  : %" PRIu64 "\n", count);
           break;
-        case InterruptCause::U_TIMER   :
-          fprintf(file, "  + U_TIMER     : %" PRIu64 "\n", count);
-          break;
         case InterruptCause::S_TIMER   :
           fprintf(file, "  + S_TIMER     : %" PRIu64 "\n", count);
           break;
         case InterruptCause::M_TIMER   :
           fprintf(file, "  + M_TIMER     : %" PRIu64 "\n", count);
-          break;
-        case InterruptCause::U_EXTERNAL:
-          fprintf(file, "  + U_EXTERNAL  : %" PRIu64 "\n", count);
           break;
         case InterruptCause::S_EXTERNAL:
           fprintf(file, "  + S_EXTERNAL  : %" PRIu64 "\n", count);
@@ -4613,22 +4604,6 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
                     or privMode_ < PrivilegeMode::Supervisor);
       if (check)
         for (auto ic : { IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
-          {
-            URV mask = URV(1) << unsigned(ic);
-            if (mie & mask & mip)
-              {
-                cause = ic;
-                return true;
-              }
-          }
-    }
-
-  // User mode interrupts: UIE enabled and user-mode.
-  if (isRvu())
-    {
-      bool check = fields.bits_.UIE and privMode_ == PrivilegeMode::User;
-      if (check)
-        for (auto ic : { IC::U_EXTERNAL, IC::U_SOFTWARE, IC::U_TIMER } )
           {
             URV mask = URV(1) << unsigned(ic);
             if (mie & mask & mip)
