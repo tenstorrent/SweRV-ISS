@@ -253,7 +253,6 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     return false;
 
   unsigned hartIx = hart.sysHartIndex();
-  assert(hartIx < hartInstrVecs_.size());
 
   MemoryOp op = {};
   op.time_ = time;
@@ -273,11 +272,7 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   if (not instr)
     return false;
   if (instr->retired_)
-    {
-      URV hartId = 0;
-      hart.peekCsr(CsrNumber::MHARTID, hartId);
-      return checkRtlWrite(hartId, *instr, op);
-    }
+    return checkRtlWrite(hart.hartId(), *instr, op);
 
   return true;
 }
@@ -292,7 +287,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
     return false;
 
   unsigned hartIx = hart.sysHartIndex();
-  assert(hartIx < hartInstrVecs_.size());
 
   cancelNonRetired(hartIx, tag);
 
@@ -330,8 +324,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->isStore_ = true;
     }
 
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
+  URV hartId = hart.hartId();
 
   // Check read operations of instruction comparing RTL values to
   // memory model (whisper) values.
@@ -400,7 +393,6 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   assert((physAddr % lineSize_) == 0);
 
   unsigned hartIx = hart.sysHartIndex();
-  assert(hartIx < hartPendingWrites_.size());
 
   std::vector<MemoryOp> coveredWrites;
 
@@ -465,12 +457,9 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   auto iterPair = std::mismatch(rtlData.begin(), rtlData.end(), line.begin());
   if (iterPair.first != rtlData.end())
     {
-      URV hartId = 0;
-      hart.peekCsr(CsrNumber::MHARTID, hartId);
-
       size_t offset = iterPair.first - rtlData.begin();
       cerr << "Error: Mismatch on merge buffer write time=" << time
-	   << " hart-id=" << hartId << " addr=0x" << std::hex
+	   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
 	   << (physAddr + offset) << " rtl=0x" << unsigned(rtlData.at(offset))
 	   << " whisper=0x" << unsigned(line.at(offset)) << std::dec << '\n';
       result = false;
@@ -673,11 +662,7 @@ Mcm<URV>::checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const
   assert(not op.isCanceled() and not op.failRead_);
   assert(not op.internal_);
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
   assert(op.instrTag_ < instrVec.size());
 
   for (auto tag = op.instrTag_; tag > 0; --tag)
@@ -689,7 +674,7 @@ Mcm<URV>::checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const
       if (fail)
 	{
 	  cerr << "Error: External read op must forward from store: hart-id="
-	       << hartId << " op-time=" << op.time_ << " op-instr-tag="
+	       << hart.hartId() << " op-time=" << op.time_ << " op-instr-tag="
 	       << op.instrTag_ << " store-tag=" << prev.tag_ << '\n';
 	  return false;
 	}
@@ -746,8 +731,7 @@ template <typename URV>
 bool
 Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 {
-  unsigned hartIx = hart.sysHartIndex();
-  currentInstrTag_.at(hartIx) = tag;
+  currentInstrTag_.at(hart.sysHartIndex()) = tag;
   return true;
 }
 
@@ -850,12 +834,8 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
   if (not op.internal_)
     return false;
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
   for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
     {
       const auto& instr = instrVec.at(ix-1);
@@ -867,7 +847,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	continue;
 
       cerr << "Error: Internal read forwards from an atomic instruction"
-	   << " time=" << op.time_ << " hart-id=" << hartId
+	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
 	   << " instr-tag=0x" << std::hex << tag << " addr=0x"
 	   << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
       return false;
@@ -876,7 +856,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
   if (mask != 0)
     {
       cerr << "Error: Internal read does not forward from preceeding stores"
-	   << " time=" << op.time_ << " hart-id=" << hartId
+	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
 	   << " instr-tag=0x" << std::hex << tag << " addr=0x"
 	   << op.physAddr_ << std::dec << '\n';
       return false;
@@ -996,11 +976,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
@@ -1015,7 +991,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       if (isBeforeInMemoryTime(instrA, instrB))
 	continue;
 
-      cerr << "Error: PPO rule 1 failed: hart-id=" << hartId << " tag1="
+      cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
 	   << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
       return false;
     }
@@ -1037,9 +1013,6 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   // Instruction B must be a load/amo instruction.
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
-
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
@@ -1090,7 +1063,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 		opMask <<= (op.physAddr_- instrB.physAddr_)*8;
 	      if ((opMask & mask) != 0)
 		{
-		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hartId
+		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
 		       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
 		       << " intermediate store at time=" << op.time_ << '\n';
 		  return false;
@@ -1123,11 +1096,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   uint64_t mask = ~uint64_t(0);  // Bits of B not-written by preceeding non-atomic stores.
   unsigned shift = (8 - instrB.size_) * 8;
@@ -1154,7 +1123,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	}
       else if (not isBeforeInMemoryTime(instrA, instrB))
 	{
-	  cerr << "Error: PPO rule 3 failed: hart-id=" << hartId << " tag1="
+	  cerr << "Error: PPO rule 3 failed: hart-id=" << hart.hartId() << " tag1="
 	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
 	       << latestOpTime(instrA) << " time2=" << earliestOpTime(instrB)
 	       << '\n';
@@ -1176,11 +1145,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
@@ -1205,8 +1170,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
       if (fail)
 	{
-	  cerr << "Error: PPO rule 5 failed: hart-id=" << hartId << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  cerr << "Error: PPO rule 5 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
 	  return false;
 	}
     }
@@ -1222,17 +1187,11 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   // Rule 6: B has a release annotation
 
   assert(not instrB.isCanceled());
-  if (not instrB.isMemory())
-    return true;
   assert(instrB.di_.isValid());
-  if (not instrB.di_.isAtomicRelease())
+  if (not instrB.isMemory() or not instrB.di_.isAtomicRelease())
     return true;
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
@@ -1255,8 +1214,8 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 
       if (fail)
 	{
-	  cerr << "Error: PPO rule 6 failed: hart-id=" << hartId << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  cerr << "Error: PPO rule 6 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
 	  return false;
 	}
     }
@@ -1282,11 +1241,7 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
   if (not hart.lastStore(addr, value))
     return true;  // Score conditional was not successful.
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
-  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
@@ -1307,8 +1262,8 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 
       if (fail)
 	{
-	  cerr << "Error: PPO rule 8 failed: hart-id=" << hartId << " tag1="
-	       << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  cerr << "Error: PPO rule 8 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
 	  return false;
 	}
 
@@ -1331,17 +1286,13 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
-  unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
-
   const auto& di = instrB.di_;
   const auto instEntry = di.instEntry();
   unsigned addrReg = 0;
   if (instEntry->isLoad() or instEntry->isStore() or instEntry->isAmo())
     addrReg = di.op1();
 
-  uint64_t time = hartRegTimes_.at(hartIx).at(addrReg);
+  uint64_t time = hartRegTimes_.at(hart.sysHartIndex()).at(addrReg);
 
   for (auto opIx : instrB.memOps_)
     {
@@ -1350,8 +1301,8 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
       if (sysMemOps_.at(opIx).time_ > time)
 	continue;
 
-      cerr << "Error: PPO rule 9 failed: hart-id=" << hartId << " tag1="
-	   << hartRegProducers_.at(hartIx).at(addrReg)
+      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
+	   << hartRegProducers_.at(hart.sysHartIndex()).at(addrReg)
 	   << " tag2=" << instrB.tag_ << '\n';
       return false;
     }
@@ -1371,8 +1322,6 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
 
   const auto& di = instrB.di_;
   const auto instEntry = di.instEntry();
@@ -1393,7 +1342,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
       if (sysMemOps_.at(opIx).time_ > time)
 	continue;
 
-      cerr << "Error: PPO rule 10 failed: hart-id=" << hartId << " tag1="
+      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId() << " tag1="
 	   << hartRegProducers_.at(hartIx).at(dataReg)
 	   << " tag2=" << instrB.tag_ << '\n';
       return false;
@@ -1412,8 +1361,6 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
   assert(not instrB.isCanceled());
 
   unsigned hartIx = hart.sysHartIndex();
-  URV hartId = 0;
-  hart.peekCsr(CsrNumber::MHARTID, hartId);
 
   const auto& di = instrB.di_;
   const auto instEntry = di.instEntry();
@@ -1431,7 +1378,7 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (not producer.complete_ or isBeforeInMemoryTime(instrB, producer))
     {
-      cerr << "Error: PPO rule 11 failed: hart-id=" << hartId << " tag1="
+      cerr << "Error: PPO rule 11 failed: hart-id=" << hart.hartId() << " tag1="
 	   << producerTag << " tag2=" << instrB.tag_ << '\n';
       return false;
     }
