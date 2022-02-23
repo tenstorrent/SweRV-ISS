@@ -50,27 +50,9 @@ template <typename URV>
 bool
 ArchInfo<URV>::createInfoInst(Hart<URV>& hart, nlohmann::json& record, InstEntry entry)
 {
-  bool disable = false;
-  disable = (entry.extension() == RvExtension::F and not hart.isRvf());
-  disable = (entry.extension() == RvExtension::Zfh and not hart.isRvzfh()) or disable;
-  disable = (entry.extension() == RvExtension::D and not hart.isRvd()) or disable;
-  disable = (entry.extension() == RvExtension::E and not hart.isRve()) or disable;
-  disable = (entry.extension() == RvExtension::M and not hart.isRvm()) or disable;
-  // Compressed extension currently denoted with others exts (I, F, D, etc)
-  disable = (entry.name().find("c.") == 0 and not hart.isRvc()) or disable;
-  disable = (entry.extension() == RvExtension::A and not hart.isRva()) or disable;
-  disable = (entry.extension() == RvExtension::V and not hart.isRvv()) or disable;
-  disable = (entry.extension() == RvExtension::Zba and not hart.isRvzba()) or disable;
-  disable = (entry.extension() == RvExtension::Zbb and not hart.isRvzbb()) or disable;
-  disable = (entry.extension() == RvExtension::Zbc and not hart.isRvzbc()) or disable;
-  disable = (entry.extension() == RvExtension::Zbe and not hart.isRvzbe()) or disable;
-  disable = (entry.extension() == RvExtension::Zbf and not hart.isRvzbf()) or disable;
-  disable = (entry.extension() == RvExtension::Zbm and not hart.isRvzbm()) or disable;
-  disable = (entry.extension() == RvExtension::Zbp and not hart.isRvzbp()) or disable;
-  disable = (entry.extension() == RvExtension::Zbr and not hart.isRvzbr()) or disable;
-  disable = (entry.extension() == RvExtension::Zbs and not hart.isRvzbs()) or disable;
-  disable = (entry.extension() == RvExtension::Zbt and not hart.isRvzbt()) or disable;
-  disable = (entry.extension() == RvExtension::None or disable);
+  bool disable = not hart.hasIsaExtension(entry.extension());
+  if (entry.isCompressed())
+    disable = disable and not hart.hasIsaExtension(RvExtension::C);
 
   unsigned encoding = entry.code() & entries_.at(ArchEntryName::Opcode).mask;
   if (not symbols_.count(encoding) and not disable)
