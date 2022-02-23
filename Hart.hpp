@@ -1051,6 +1051,14 @@ namespace WdRiscv
     unsigned sysHartIndex() const
     { return hartIx_; }
 
+    /// Return the value of the MHARTID CSR.
+    URV hartId() const
+    {
+      URV id = 0;
+      peekCsr(CsrNumber::MHARTID, id);
+      return id;
+    }
+
     /// Tie the shared CSRs in this hart to the corresponding CSRs in
     /// the target hart making them share the same location for their
     /// value.
