@@ -188,18 +188,28 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   if (instEntry->ithOperandType(0) == OperandType::IntReg and
       di.ithOperand(0) == 0)
     return; // Destination is x0.
-  
-  uint64_t time = 0;
-  uint64_t tag = 0;
 
+  uint64_t time = 0, tag = 0;
+
+  bool hasDep = true;
   if (instEntry->isSc())
     {
       URV val = 0;
-      if (not hart.peekIntReg(di.op0(), val))
-	assert(0);
+      hart.peekIntReg(di.op0(), val);
       if (val == 1)
 	return;  // store-conditional failed.
+      if (instr.memOps_.size() == 0)
+	{
+	  tag = instr.tag_;
+	  time = ~uint64_t(0);
+	}
     }
+  else if (instEntry->isStore())
+    return;   // No destination register.
+  else if (instEntry->isLoad() or instEntry->isAmo())
+    hasDep = false;
+  else if (instEntry->isBranch() and not instEntry->isConditionalBranch())
+    hasDep = false;
 
   for (const auto& opIx : instr.memOps_)
     if (opIx < sysMemOps_.size())
@@ -218,7 +228,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   bool first = true; // first branch source
   for (auto regIx : sourceRegs)
     {
-      if (regTimeVec.at(regIx) > time)
+      if (hasDep and regTimeVec.at(regIx) > time)
 	{
 	  time = regTimeVec.at(regIx);
 	  tag = regProducer.at(regIx);
@@ -465,6 +475,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       result = false;
     }
 
+  auto& instrVec = hartInstrVecs_.at(hartIx);
+
   for (size_t i = 0; i < coveredWrites.size(); ++i)
     {
       auto tag = coveredWrites.at(i).instrTag_;
@@ -476,6 +488,13 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	instr->complete_ = true;
       if (not ppoRule1(hart, *instr))
 	result = false;
+      if (instr->retired_ and instr->di_.instEntry()->isSc())
+	{
+	  assert(instr->complete_);
+	  for (uint64_t tag = instr->tag_ + 1; tag < instrVec.size(); ++tag)
+	    if (instrVec.at(tag).retired_)
+	      updateDependencies(hart, instrVec.at(tag));
+	}
     }
 
   return result;
