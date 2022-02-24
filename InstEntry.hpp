@@ -168,6 +168,14 @@ namespace WdRiscv
       return ithOperandMode(i) == OperandMode::Read;
     }
 
+    /// Return true if ith operand is an integer register and is a destination.
+    bool isIthOperandIntRegDest(unsigned i) const
+    {
+      if (ithOperandType(i) != OperandType::IntReg)
+	return false;
+      return ithOperandMode(i) == OperandMode::Write;
+    }
+
     /// Return true if ith operand is a floating point register and is
     /// a source.
     bool isIthOperandFpRegSource(unsigned i) const
