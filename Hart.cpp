@@ -2964,7 +2964,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (not traceHeaderPrinted_)
     {
       traceHeaderPrinted_ = true;
-      fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly\n");
+      fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid\n");
     }
 
   // Program counter.
@@ -3179,6 +3179,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   disassembleInst(di, tmp);
   std::replace(tmp.begin(), tmp.end(), ',', ';');
   fputs(tmp.c_str(), out);
+
+  // Hart Id.
+  fprintf(out, ",%lx", sysHartIndex());
   fputc('\n', out);
 }
 
