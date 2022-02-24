@@ -291,12 +291,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   cancelNonRetired(hartIx, tag);
 
   McmInstr* instr = findOrAddInstr(hartIx, tag);
-  if (not instr)
-    {
-      assert(0);
-      return false;
-    }
-
   if (instr->retired_)
     {
       cerr << "Mcm::retire: Error: Instruction tag=" << tag
@@ -365,6 +359,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   bool ok = ppoRule2(hart, *instr);
   ok = ppoRule3(hart, *instr) and ok;
+  ok = ppoRule4(hart, *instr) and ok;
   ok = ppoRule5(hart, *instr) and ok;
   ok = ppoRule6(hart, *instr) and ok;
   ok = ppoRule8(hart, *instr) and ok;
@@ -422,8 +417,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	    writesVec.at(pendingSize) = writesVec.at(i);
 	  pendingSize++;
 	}
-      writesVec.resize(pendingSize);
     }
+  writesVec.resize(pendingSize);
 
   std::sort(coveredWrites.begin(), coveredWrites.end(),
 	    [](const MemoryOp& a, const MemoryOp& b) {
@@ -1136,6 +1131,48 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	       << instrA.tag_ << " tag2=" << instrB.tag_ << " time1="
 	       << latestOpTime(instrA) << " time2=" << earliestOpTime(instrB)
 	       << '\n';
+	  return false;
+	}
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
+{
+  // Rule 4: There is a fence that orders A before B.
+
+  assert(instr.retired_ and instr.di_.isValid());
+  if (instr.di_.instEntry()->instId() != InstId::fence)
+    return true;
+
+  // In the future we will become smarter.  For now, all memory
+  // operations of preceeding (in prog order) instructions must be
+  // finished. No memory operation of succeeding instruction (in prog
+  // order) can exist.
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  for (uint64_t i = sysMemOps_.size(); i > 0; --i)
+    {
+      const auto& op = sysMemOps_.at(i-1);
+      if (op.isCanceled() or op.hartIx_ != hartIx)
+	continue;
+      if (op.time_ < time_ and op.instrTag_ > instr.tag_)
+	{
+	  cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instr.tag_ << " tag2=" << op.instrTag_
+	       << " time1=" << time_ << " time2=" << op.time_ << '\n';
+	  return false;
+	}
+      if (op.time_ > time_ and op.instrTag_ < instr.tag_)
+	{
+	  cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << op.instrTag_ << " tag2=" << instr.tag_
+	       << " time1=" << op.time_ << " time2=" << time_ << '\n';
 	  return false;
 	}
     }

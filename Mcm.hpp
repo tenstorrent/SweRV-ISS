@@ -150,6 +150,8 @@ namespace WdRiscv
 
     bool ppoRule3(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule4(Hart<URV>& hart, const McmInstr& instr) const;
+
     bool ppoRule5(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool ppoRule6(Hart<URV>& hart, const McmInstr& instr) const;
