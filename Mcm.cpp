@@ -112,20 +112,15 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
     }
 
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
-  if (instr)
-    {
-      bool io = false;  // FIX  get io from PMA of address.
-      if (instr->isCanceled())
-	op.cancel();
-      else if (instr->isRetired() and not io)
-	{
-	  cerr << "Warning: Read op time=" << op.time_ << " occurs after "
-	       << "instruction retires tag=" << instr->tag_ << '\n';
-	}
-      instr->addMemOp(sysMemOps_.size());
-    }
-  else
-    assert(0);
+
+  bool io = false;  // FIX  get io from PMA of address.
+  if (instr->isCanceled())
+    op.cancel();
+  else if (instr->isRetired() and not io)
+    cerr << "Warning: Read op time=" << op.time_ << " occurs after "
+	 << "instruction retires tag=" << instr->tag_ << '\n';
+
+  instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
   
   return true;
@@ -171,7 +166,6 @@ template <typename URV>
 void
 Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 {
-  assert(not instr.canceled_);
   assert(instr.retired_);
 
   unsigned hartIx = hart.sysHartIndex();
@@ -185,8 +179,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   const auto instEntry = di.instEntry();
 
-  if (instEntry->ithOperandType(0) == OperandType::IntReg and
-      di.ithOperand(0) == 0)
+  if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
     return; // Destination is x0.
 
   uint64_t time = 0, tag = 0;
@@ -201,23 +194,22 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       if (instr.memOps_.size() == 0)
 	{
 	  tag = instr.tag_;
-	  time = ~uint64_t(0);
+	  time = ~uint64_t(0); // Will be updated when SC drains to memory.
 	}
     }
   else if (instEntry->isStore())
     return;   // No destination register.
   else if (instEntry->isLoad() or instEntry->isAmo())
     hasDep = false;
-  else if (instEntry->isBranch() and not instEntry->isConditionalBranch())
+  else if (instEntry->isBranch())
     hasDep = false;
 
   for (const auto& opIx : instr.memOps_)
-    if (opIx < sysMemOps_.size())
-      if (sysMemOps_.at(opIx).time_ > time)
-	{
-	  time = sysMemOps_.at(opIx).time_;
-	  tag = instr.tag_;
-	}
+    if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ > time)
+      {
+	time = sysMemOps_.at(opIx).time_;
+	tag = instr.tag_;
+      }
 
   if (instEntry->isBranch())
     hartBranchTimes_.at(hartIx) = 0;
@@ -243,13 +235,11 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     }
 
   for (auto regIx : destRegs)
-    {
-      if (time > regTimeVec.at(regIx))
-	{
-	  regTimeVec.at(regIx) = time;
-	  regProducer.at(regIx) = tag;
-	}
-    }
+    if (time > regTimeVec.at(regIx))
+      {
+	regTimeVec.at(regIx) = time;
+	regProducer.at(regIx) = tag;
+      }
 }
 
 
