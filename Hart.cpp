@@ -3181,7 +3181,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   fputs(tmp.c_str(), out);
 
   // Hart Id.
-  fprintf(out, ",%lx", sysHartIndex());
+  fprintf(out, ",%x", sysHartIndex());
   fputc('\n', out);
 }
 
