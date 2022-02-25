@@ -193,6 +193,36 @@ namespace WdRiscv
       // Supervisor Protection and Translation 
       SATP = 0x180,
 
+      // Hypervisor registers
+      HSTATUS = 0x600,
+      HEDELEG = 0x602,
+      HIDELEE = 0x603,
+      HIE = 0x604,
+      HCOUNTEREN = 0x606,
+      HGEIE = 0x607,
+      HTVAL = 0x643,
+      HIP = 0x644,
+      HVIP = 0x645,  
+      htinst = 0x64A,
+      HGEIP = 0xE12,
+      HENVCFG = 0x60A,
+      HENVCFGH = 0x61A,
+      HGATP = 0x680,
+      HCONTEXT = 0x6A8,
+      HTIMEDELTA = 0x605,
+      HTIMEDELTAH = 0x615,
+
+      // Virtual supervisor
+      VSSTATUS = 0x200,
+      VSIE = 0x204,
+      VSTVEC = 0x205,
+      VSSCRATCH = 0x240,
+      VSEPC = 0x241,
+      VSCAUSE = 0x242,
+      VSTVAL = 0x243,
+      VSIP = 0x244,
+      VSATP = 0x280,
+
       // User mode registers.
 
       // User trap setup.
