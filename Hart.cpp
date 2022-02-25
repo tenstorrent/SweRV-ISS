@@ -5085,6 +5085,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&or_,
      &&and_,
      &&fence,
+     &&fence_tso,
      &&fencei,
      &&ecall,
      &&ebreak,
@@ -6031,6 +6032,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  fence:
   execFence(di);
+  return;
+
+ fence_tso:
+  execFence_tso(di);
   return;
 
  fencei:
@@ -9455,6 +9460,13 @@ Hart<URV>::execAnd(const DecodedInst* di)
 template <typename URV>
 void
 Hart<URV>::execFence(const DecodedInst*)
+{
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFence_tso(const DecodedInst*)
 {
 }
 

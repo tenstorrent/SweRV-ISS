@@ -2086,11 +2086,10 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	    if (funct3 == 0)
 	      {
 		if (iform.top4() == 0)
-		  {
-		    op0 = iform.pred();
-		    op1 = iform.succ();
-		    return instTable_.getEntry(InstId::fence);
-		  }
+		  return instTable_.getEntry(InstId::fence);
+		if (iform.top4() == 8)
+		  return instTable_.getEntry(InstId::fence_tso);
+		return instTable_.getEntry(InstId::illegal);
 	      }
 	    else if (funct3 == 1)
 	      {

@@ -157,13 +157,11 @@ namespace WdRiscv
 
     /// Return true if this a fence instruction (not fence.tso).
     bool isFence() const
-    { return entry_ and entry_->instId() == InstId::fence and
-	(inst_ >> 28) == 0; }
+    { return entry_ and entry_->instId() == InstId::fence; }
 
-    /// Relevant to fence instruction. Return true if this a fence.tso.
+    /// Return true if this a fence.tso instruction (not fence).
     bool isFenceTso() const
-    { return entry_ and entry_->instId() == InstId::fence and
-	(inst_ >> 28) == 8; }
+    { return entry_ and entry_->instId() == InstId::fence_tso; }
 
     /// Predecessor read bit of fence instruction.
     bool isFencePredRead() const

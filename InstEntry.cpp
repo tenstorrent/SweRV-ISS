@@ -528,7 +528,12 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "fence", InstId::fence, 0x000f, 0x0000707f,
+      { "fence", InstId::fence, 0x000f, 0xf000707f,
+	RvExtension::I,
+	OperandType::Imm, OperandMode::None, 0x0f000000,
+	OperandType::Imm, OperandMode::None, 0x00f00000 },
+
+      { "fence.tso", InstId::fence_tso, 0x800000f, 0xf000707f,
 	RvExtension::I,
 	OperandType::Imm, OperandMode::None, 0x0f000000,
 	OperandType::Imm, OperandMode::None, 0x00f00000 },
