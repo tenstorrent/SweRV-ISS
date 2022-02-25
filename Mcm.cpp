@@ -122,8 +122,17 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
+
+  bool result = true;
+  if (checkLoadComplete(*instr))
+    {
+      instr->complete_ = true;
+      if (instr->retired_)
+	if (not ppoRule3(hart, *instr))
+	  result = false;
+    }
   
-  return true;
+  return result;
 }
 
 
@@ -470,9 +479,11 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       auto instr = findInstr(hartIx, tag);
       assert(instr != nullptr);
       if (checkStoreComplete(*instr))
-	instr->complete_ = true;
-      if (not ppoRule1(hart, *instr))
-	result = false;
+	{
+	  instr->complete_ = true;
+	  if (not ppoRule1(hart, *instr))
+	    result = false;
+	}
       if (instr->retired_ and instr->di_.instEntry()->isSc())
 	{
 	  assert(instr->complete_);
@@ -703,6 +714,48 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	continue;
       auto& op = sysMemOps_.at(opIx);
       if (op.isRead_)
+	continue;
+
+      uint64_t mask = ~uint64_t(0);
+      if (op.physAddr_ <= instr.physAddr_)
+	{
+	  uint64_t offset = instr.physAddr_ - op.physAddr_;
+	  if (offset > 8)
+	    offset = 8;
+	  mask >>= offset*8;
+	}
+      else
+	{
+	  uint64_t offset = op.physAddr_ - instr.physAddr_;
+	  if (offset > 8)
+	    offset = 8;
+	  mask <<= offset*8;
+	}
+      mergeMask |= mask;
+    }
+
+  unsigned unused = (8 - instr.size_)*8;  // Unused upper bits of value.
+  mergeMask = (mergeMask << unused) >> unused;
+
+  uint64_t expectedMask = (~uint64_t(0) << unused) >> unused;
+  return mergeMask == expectedMask;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
+{
+  if (instr.isCanceled() or instr.isStore_)
+    return false;
+
+  uint64_t mergeMask = 0;
+  for (auto opIx : instr.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_)
 	continue;
 
       uint64_t mask = ~uint64_t(0);

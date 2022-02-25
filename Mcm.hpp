@@ -229,6 +229,8 @@ namespace WdRiscv
 
     bool checkStoreComplete(const McmInstr& instr) const;
 
+    bool checkLoadComplete(const McmInstr& instr) const;
+
     void clearMaskBitsForWrite(const McmInstr& storeInstr,
 			       const McmInstr& target, uint64_t mask) const;
 
