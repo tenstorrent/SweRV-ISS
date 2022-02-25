@@ -1149,10 +1149,16 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
   if (instr.di_.instEntry()->instId() != InstId::fence)
     return true;
 
-  // In the future we will become smarter.  For now, all memory
+  bool predRead = instr.di_.isFencePredRead();
+  bool predWrite = instr.di_.isFencePredWrite();
+  bool succRead = instr.di_.isFenceSuccRead();
+  bool succWrite = instr.di_.isFenceSuccWrite();
+
+  // In the future we will become smarter. For now, all memory
   // operations of preceeding (in prog order) instructions must be
   // finished. No memory operation of succeeding instruction (in prog
-  // order) can exist.
+  // order) can exist. In the future we will filter out speculative
+  // operations.
 
   unsigned hartIx = hart.sysHartIndex();
 
@@ -1161,20 +1167,24 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
       const auto& op = sysMemOps_.at(i-1);
       if (op.isCanceled() or op.hartIx_ != hartIx)
 	continue;
-      if (op.time_ < time_ and op.instrTag_ > instr.tag_)
-	{
-	  cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
-	       << " tag1=" << instr.tag_ << " tag2=" << op.instrTag_
-	       << " time1=" << time_ << " time2=" << op.time_ << '\n';
-	  return false;
-	}
-      if (op.time_ > time_ and op.instrTag_ < instr.tag_)
-	{
-	  cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
-	       << " tag1=" << op.instrTag_ << " tag2=" << instr.tag_
-	       << " time1=" << op.time_ << " time2=" << time_ << '\n';
-	  return false;
-	}
+
+      if ((predRead and op.isRead_) or (predWrite and not op.isRead_))
+	if (op.time_ < time_ and op.instrTag_ > instr.tag_)
+	  {
+	    cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+		 << " tag1=" << instr.tag_ << " tag2=" << op.instrTag_
+		 << " time1=" << time_ << " time2=" << op.time_ << '\n';
+	    return false;
+	  }
+
+      if ((succRead and op.isRead_) or (succWrite and not op.isRead_))
+	if (op.time_ > time_ and op.instrTag_ < instr.tag_)
+	  {
+	    cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+		 << " tag1=" << op.instrTag_ << " tag2=" << instr.tag_
+		 << " time1=" << op.time_ << " time2=" << time_ << '\n';
+	    return false;
+	  }
     }
 
   return true;
