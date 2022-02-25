@@ -276,12 +276,6 @@ void
 printFence(const Hart<URV>& /*hart*/, std::ostream& stream,
 	   const DecodedInst& di)
 {
-  if (di.isFenceTso())
-    {
-      stream << "fence.tso";
-      return;
-    }
-
   stream << std::left << std::setw(8) << di.instEntry()->name() << ' ';
 
   std::string pred, succ;
@@ -296,7 +290,8 @@ printFence(const Hart<URV>& /*hart*/, std::ostream& stream,
   if (di.isFenceSuccInput())  succ += "i";
   if (di.isFenceSuccOutput()) succ += "o";
 
-  stream << pred << ", " << succ;
+  if (not pred.empty() or not succ.empty())
+    stream << pred << ", " << succ;
 }
 
 
@@ -546,6 +541,7 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printBranch3(*this, out, di);
       break;
 
+    case InstId::fence_tso:
     case InstId::fence:
       printFence(*this, out, di);
       break;

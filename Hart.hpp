@@ -1917,6 +1917,7 @@ namespace WdRiscv
     void execAnd(const DecodedInst*);
 
     void execFence(const DecodedInst*);
+    void execFence_tso(const DecodedInst*);
     void execFencei(const DecodedInst*);
 
     void execEcall(const DecodedInst*);
