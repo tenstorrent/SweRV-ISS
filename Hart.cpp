@@ -2748,7 +2748,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Serialize to avoid jumbled output.
-  std::lock_guard<std::mutex> guard(printInstTraceMutex);
+  // std::lock_guard<std::mutex> guard(printInstTraceMutex);
 
   disassembleInst(di, tmp);
   if (hasInterrupt_)
@@ -4144,6 +4144,10 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
 }
 
 
+// We want amo instructions to print in the same order as executed.
+static std::mutex execMutex;
+
+
 template <typename URV>
 bool
 Hart<URV>::untilAddress(size_t address, FILE* traceFile)
@@ -4194,6 +4198,9 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 
       try
 	{
+	  // This avoid interleaving of amo execution and tracing.
+	  std::lock_guard<std::mutex> lock(execMutex);
+      
           uint32_t inst = 0;
 	  currPc_ = pc_;
 
