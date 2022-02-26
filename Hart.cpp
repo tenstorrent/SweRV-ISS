@@ -2748,7 +2748,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Serialize to avoid jumbled output.
-  // std::lock_guard<std::mutex> guard(printInstTraceMutex);
+  std::lock_guard<std::mutex> guard(printInstTraceMutex);
 
   disassembleInst(di, tmp);
   if (hasInterrupt_)
