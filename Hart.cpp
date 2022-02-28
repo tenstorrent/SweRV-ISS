@@ -346,24 +346,18 @@ Hart<URV>::updateMemoryProtection()
   const unsigned count = 16;
   unsigned impCount = 0;  // Count of implemented PMP registers
 
-  // Process the pmp entries in reverse order (since they are supposed to
-  // be checked in first to last priority). Apply memory protection to
-  // the range defined by each entry allowing lower numbered entries to
-  // over-ride higher numberd ones.
   for (unsigned ix = 0; ix < count; ++ix)
     {
-      unsigned pmpIx = count - ix - 1;
-
       uint64_t low = 0, high = 0;
       Pmp::Type type = Pmp::Type::Off;
       Pmp::Mode mode = Pmp::Mode::None;
       bool locked = false;
 
-      if (unpackMemoryProtection(pmpIx, type, mode, locked, low, high))
+      if (unpackMemoryProtection(ix, type, mode, locked, low, high))
         {
           impCount++;
           if (type != Pmp::Type::Off)
-            pmpManager_.setMode(low, high, type, mode, pmpIx, locked);
+            pmpManager_.defineRegion(low, high, type, mode, ix, locked);
         }
     }
 

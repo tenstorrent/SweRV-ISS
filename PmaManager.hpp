@@ -144,7 +144,7 @@ namespace WdRiscv
     /// range.
     Pma getPma(uint64_t addr) const
     {
-      addr = (addr >> 2) << 2; // Make double-word aligned.
+      addr = (addr >> 2) << 2; // Make word aligned.
 
       // Search regions in order. Return first matching.
       for (auto& region : regions_)

@@ -21,24 +21,8 @@
 using namespace WdRiscv;
 
 
-PmpManager::PmpManager(uint64_t memSize, uint64_t sectionSize)
-  : memSize_(memSize), sectionSize_(sectionSize), accessCount_(16),
-    typeCount_(Pmp::Type::_Count)
+PmpManager::PmpManager(uint64_t /*memSize*/, uint64_t /*sectionSize*/)
 {
-  assert(memSize >= sectionSize);
-  assert(sectionSize >= 64);
-
-  uint64_t logSectionSize = static_cast<uint64_t>(std::log2(sectionSize_));
-  uint64_t p2SectionSize = uint64_t(1) << logSectionSize;
-  assert(p2SectionSize == sectionSize_);
-  sectionShift_ = logSectionSize;
-
-  uint64_t sectionCount = memSize_ / sectionSize_;
-  assert(sectionCount * sectionSize_ == memSize_);
-
-  // Mark memory as no access (machine mode still has access because
-  // it is not checked).
-  sectionPmps_.resize(sectionCount, Pmp::None);
 }
 
 
@@ -50,48 +34,20 @@ PmpManager::~PmpManager()
 void
 PmpManager::reset()
 {
-  for (auto& entry : sectionPmps_)
-    entry = Pmp(Pmp::None);
-  wordPmps_.clear();
+  regions_.clear();
 }
 
 
 void
-PmpManager::setMode(uint64_t a0, uint64_t a1, Pmp::Type type, Pmp::Mode mode,
-                    unsigned pmpIx, bool lock)
+PmpManager::defineRegion(uint64_t a0, uint64_t a1, Pmp::Type type,
+			 Pmp::Mode mode, unsigned pmpIx, bool lock)
 {
-  if (a1 >= memSize_)
-    a1 = memSize_ - 1;
-
   a0 = (a0 >> 2) << 2;   // Make word aligned.
   a1 = (a1 >> 2) << 2;   // Make word aligned.
 
-  while (a0 <= a1)
-    {
-      uint64_t p0 = getSectionStartAddr(a0);
-      uint64_t p1 = getSectionStartAddr(a1);
-
-      bool doWord = (a0 != p0) or (p0 == p1 and (a1 - a0 + 4 != sectionSize_));
-      Pmp prev = getPmp(a0);
-      doWord = doWord or prev.word_;
-
-      Pmp pmp(mode, pmpIx, lock, type);
-
-      if (doWord)
-        {
-          fracture(a0);
-          pmp.word_ = true;
-          uint64_t last = std::min(a1, p0 + sectionSize_ - 4);
-          for ( ; a0 <= last; a0 += 4)
-            wordPmps_[a0>>2] = pmp;
-        }
-      else
-        {
-          uint64_t sectionIx = getSectionIx(p0);
-          sectionPmps_.at(sectionIx) = pmp;
-          a0 += sectionSize_;
-        }
-    }
+  Pmp pmp(mode, pmpIx, lock, type);
+  Region region{a0, a1, pmp};
+  regions_.push_back(region);
 }
 
 
