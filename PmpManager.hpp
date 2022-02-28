@@ -47,8 +47,7 @@ namespace WdRiscv
     /// Default constructor: No access allowed.
     Pmp(Mode m = None, unsigned pmpIx = 0, bool locked = false,
         Type type = Type::Off)
-      : mode_(m), type_(type), locked_(locked), pmpFree_(false),
-        pmpIx_(pmpIx)
+      : mode_(m), type_(type), locked_(locked), pmpIx_(pmpIx)
     { }
 
     /// Return true if read (i.e. load instructions) access allowed 
@@ -56,7 +55,7 @@ namespace WdRiscv
     {
       if (mprv)
         mode = prevMode;
-      bool check = (mode != PrivilegeMode::Machine) or locked_ or pmpFree_;
+      bool check = (mode != PrivilegeMode::Machine) or locked_;
       return check ? mode_ & Read : true;
     }
 
@@ -105,7 +104,6 @@ namespace WdRiscv
     uint8_t mode_ = 0;
     Type type_      : 8;
     bool locked_    : 1;
-    bool pmpFree_   : 1;  // Not covered by any pmp register.
     unsigned pmpIx_ : 5;  // Index of corresponding pmp register.
   } __attribute__((packed));
 
