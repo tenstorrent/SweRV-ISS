@@ -58,6 +58,9 @@ ifdef MEM_CALLBACKS
 override CPPFLAGS += -DMEM_CALLBACKS
 endif
 
+ifdef FAST_SLOPPY
+override CPPFLAGS += -DFAST_SLOPPY
+endif
 
 # Add External Library location paths here
 LINK_DIRS := $(addprefix -L,$(BOOST_LIB_DIR))

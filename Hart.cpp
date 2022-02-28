@@ -1396,7 +1396,6 @@ Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
   ULT uval = 0;
   if (memory_.read(addr, uval))
     {
-      URV value;
       if constexpr (std::is_same<ULT, LOAD_TYPE>::value)
         value = uval;
       else
