@@ -1420,12 +1420,12 @@ InstTable::setupInstVec()
       // Privileged
       { "mret", InstId::mret, 0x30200073, 0xffffffff, RvExtension::I },
       { "uret", InstId::uret, 0x00200073, 0xffffffff, RvExtension::I },
-      { "sret", InstId::sret, 0x10200073, 0xffffffff, RvExtension::I },
+      { "sret", InstId::sret, 0x10200073, 0xffffffff, RvExtension::S },
       { "wfi", InstId::wfi, 0x10500073, 0xffffffff, RvExtension::I },
 
       // Supervisor
       { "sfence.vma", InstId::sfence_vma, 0x12000073, 0xfe00707f,
-        RvExtension::I,
+        RvExtension::S,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask
       },
