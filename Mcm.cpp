@@ -1081,11 +1081,9 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
-      if (instrA.isCanceled())
+      if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
       assert(instrA.isRetired());
-      if (not instrA.isMemory())
-	continue;
 
       if (not instrA.overlaps(instrB))
 	continue;
@@ -1259,11 +1257,9 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
-      if (instrA.isCanceled())
+      if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
       assert(instrA.isRetired());
-      if (not instrA.isMemory())
-	continue;
       assert(instrA.di_.isValid());
       if (not instrA.di_.isAtomicAcquire())
 	continue;
@@ -1305,11 +1301,9 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
-      if (instrA.isCanceled())
+      if (instrA.isCanceled() or not instrA.isMemory())
 	continue;
       assert(instrA.isRetired());
-      if (not instrA.isMemory())
-	continue;
       assert(instrA.di_.isValid());
 
       bool fail = false;
