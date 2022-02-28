@@ -48,7 +48,7 @@ namespace WdRiscv
     Pmp(Mode m = None, unsigned pmpIx = 0, bool locked = false,
         Type type = Type::Off)
       : mode_(m), type_(type), locked_(locked), pmpFree_(false),
-        pmpIx_(pmpIx), word_(false)
+        pmpIx_(pmpIx)
     { }
 
     /// Return true if read (i.e. load instructions) access allowed 
@@ -107,7 +107,6 @@ namespace WdRiscv
     bool locked_    : 1;
     bool pmpFree_   : 1;  // Not covered by any pmp register.
     unsigned pmpIx_ : 5;  // Index of corresponding pmp register.
-    bool word_      : 1;
   } __attribute__((packed));
 
 
@@ -138,44 +137,34 @@ namespace WdRiscv
     /// of memory range.
     Pmp getPmp(uint64_t addr) const
     {
-      uint64_t ix = getSectionIx(addr);
-      if (ix >= sectionPmps_.size())
-        return Pmp();
-      Pmp pmp = sectionPmps_[ix];
-      if (pmp.word_)
-        {
-          addr = (addr >> 2);  // Get word index.
-          pmp = wordPmps_.at(addr);
-        }
-      return pmp;
+      addr = (addr >> 2) << 2;
+      for (auto& region : regions_)
+	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	  return region.pmp_;
+      return Pmp();
     }
 
     /// Similar to getPmp but it also updates the access count associated with
     /// each PMP entry.
     inline Pmp accessPmp(uint64_t addr) const
     {
-      uint64_t ix = getSectionIx(addr);
-      if (ix >= sectionPmps_.size())
-        return Pmp();
-      Pmp pmp = sectionPmps_[ix];
-      if (pmp.word_)
-        {
-          addr = (addr >> 2);  // Get word index.
-          pmp = wordPmps_.at(addr);
-        }
-      accessCount_.at(pmp.pmpIndex())++;
-      typeCount_.at(pmp.type_)++;
-      return pmp;
+      addr = (addr >> 2) << 2;
+      for (auto& region : regions_)
+	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	  {
+	    auto pmp = region.pmp_;
+	    auto ix = pmp.pmpIndex();
+	    accessCount_.at(ix)++;
+	    typeCount_.at(ix)++;
+	    return pmp;
+	  }
+      return Pmp();
     }
 
     /// Set access mode of word-aligned words overlapping given region
     /// for user/supervisor.
-    void setMode(uint64_t addr0, uint64_t addr1, Pmp::Type type, Pmp::Mode mode,
-                 unsigned pmpIx, bool locked);
-
-    /// Return start address of section containing given address.
-    uint64_t getSectionStartAddr(uint64_t addr) const
-    { return (addr >> sectionShift_) << sectionShift_; }
+    void defineRegion(uint64_t addr0, uint64_t addr1, Pmp::Type type,
+		      Pmp::Mode mode, unsigned pmpIx, bool locked);
 
     /// Print statistics on the given stream.
     bool printStats(std::ostream& out) const;
@@ -185,43 +174,14 @@ namespace WdRiscv
 
   private:
 
-    /// Internally, for a user specified region, we associate a pmp
-    /// object with each section of that region where the first/last
-    /// address is aligned with the first/last address of a
-    /// section. For a region where the first/last address is not
-    /// section-aligned we associate a pmp object with each word
-    /// before/after the first/last section aligned address.
-
-    /// Fracture attribute of section overlapping given address into
-    /// word attributes.
-    void fracture(uint64_t addr)
+    struct Region
     {
-      uint64_t sectionIx = getSectionIx(addr);
-      if (sectionIx > sectionPmps_.size())
-        return;
+      uint64_t firstAddr_ = 0;
+      uint64_t lastAddr_ = 0;
+      Pmp pmp_;
+    };
 
-      Pmp pmp = sectionPmps_.at(sectionIx);
-      if (pmp.word_)
-        return;
-      pmp.word_= true;
-      sectionPmps_.at(sectionIx) = pmp;
-
-      uint64_t words = sectionSize_ / 4;
-      uint64_t wordIx = (sectionIx*sectionSize_) >> 2;
-      for (uint64_t i = 0; i < words; ++i, wordIx++)
-        wordPmps_[wordIx] = pmp;
-    }
-
-    uint64_t getSectionIx(uint64_t addr) const
-    { return addr >> sectionShift_; }
-
-  private:
-
-    std::vector<Pmp> sectionPmps_;
-    std::unordered_map<uint64_t, Pmp> wordPmps_; // Map word index to pmp.
-    uint64_t memSize_;
-    uint64_t sectionSize_ = 32*1024;
-    unsigned sectionShift_ = 15;
+    std::vector<Region> regions_;
     mutable std::vector<uint64_t> accessCount_;  // PMP entry access count.
     mutable std::vector<uint64_t> typeCount_;  // PMP type access count.
   };
