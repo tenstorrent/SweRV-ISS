@@ -83,11 +83,19 @@ deserializeMessage(const char buffer[], size_t bufferLen,
   p += sizeof(x);
 
   uint32_t part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.rank = uint64_t(part) << 32;
+  msg.instrTag = uint64_t(part) << 32;
   p += sizeof(part);
 
   part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.rank |= part;
+  msg.instrTag |= part;
+  p += sizeof(part);
+
+  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
+  msg.time = uint64_t(part) << 32;
+  p += sizeof(part);
+
+  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
+  msg.time |= part;
   p += sizeof(part);
 
   part = ntohl(* reinterpret_cast<const uint32_t*> (p));
@@ -143,12 +151,22 @@ serializeMessage(const WhisperMessage& msg, char buffer[],
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
 
-  uint32_t part = static_cast<uint32_t>(msg.rank >> 32);
+  uint32_t part = static_cast<uint32_t>(msg.instrTag >> 32);
   x = htonl(part);
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
 
-  part = (msg.rank) & 0xffffffff;
+  part = (msg.instrTag) & 0xffffffff;
+  x = htonl(part);
+  memcpy(p, &x, sizeof(x));
+  p += sizeof(x);
+
+  part = static_cast<uint32_t>(msg.time >> 32);
+  x = htonl(part);
+  memcpy(p, &x, sizeof(x));
+  p += sizeof(x);
+
+  part = (msg.time) & 0xffffffff;
   x = htonl(part);
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
@@ -810,7 +828,7 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 
       if (checkHartId(msg, reply))
 	{
-          std::string timeStamp = std::to_string(msg.rank);
+          std::string timeStamp = std::to_string(msg.time);
 
           uint32_t hartId = msg.hart;
           auto hartPtr = system_.findHartByHartId(hartId);
