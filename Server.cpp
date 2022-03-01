@@ -79,6 +79,10 @@ deserializeMessage(const char buffer[], size_t bufferLen,
   p += sizeof(x);
 
   x = ntohl(* reinterpret_cast<const uint32_t*> (p));
+  msg.size = x;
+  p += sizeof(x);
+
+  x = ntohl(* reinterpret_cast<const uint32_t*> (p));
   msg.flags = x;
   p += sizeof(x);
 
@@ -144,6 +148,10 @@ serializeMessage(const WhisperMessage& msg, char buffer[],
   p += sizeof(x);
 
   x = htonl(msg.resource);
+  memcpy(p, &x, sizeof(x));
+  p += sizeof(x);
+
+  x = htonl(msg.size);
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
 
@@ -986,6 +994,51 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
                 fprintf(commandLog, "hart=%d dump_memory %s # ts=%s\n",
                         hartId, msg.buffer, timeStamp.c_str());
               break;
+
+	    case McmRead:
+	      if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
+				      msg.size, msg.value, msg.flags))
+		reply.type = Invalid;
+	      if (commandLog)
+		fprintf(commandLog, "hart=%d time=%ld mread %ld 0x%lx %d 0x%lx %s\n",
+			hartId, msg.time, msg.instrTag, msg.address, msg.size,
+			msg.value, msg.flags? "e" : "i");
+	      break;
+
+	    case McmInsert:
+	      if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
+					  msg.address, msg.size, msg.value))
+		reply.type = Invalid;
+	      if (commandLog)
+		fprintf(commandLog, "hart=%d time=%ld mbinsert %ld 0x%lx %d 0x%lx\n",
+			hartId, msg.time, msg.instrTag, msg.address, msg.size,
+			msg.value);
+	      break;
+
+	    case McmWrite:
+	      if (msg.size > sizeof(msg.buffer))
+		{
+		  std::cerr << "Error: Server command: McmWrite data size too large: " << msg.size << '\n';
+		  reply.type = Invalid;
+		}
+	      else
+		{
+		  std::vector<uint8_t> data(msg.size);
+		  for (size_t i = 0; i < msg.size; ++i)
+		    data[i] = msg.buffer[i];
+		  if (not system_.mcmMbWrite(hart, msg.time, msg.address, data))
+		    reply.type = Invalid;
+
+		  if (commandLog)
+		    {
+		      fprintf(commandLog, "hart=%d time=%ld, mbwrite 0x%lx 0x",
+			      hartId, msg.time, msg.address);
+		      for (uint8_t item :  data)
+			fprintf(commandLog, "%02x", item);
+		      fprintf(commandLog, "\n");
+		    }
+		}
+	      break;
 
 	    default:
               std::cerr << "Unknown command\n";
