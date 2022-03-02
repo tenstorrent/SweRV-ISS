@@ -478,16 +478,16 @@ Each entry is an object with a "low" and "high" addresses and an
 Example:
 
     "memmap" : { "size" : "0x100000000", "page_size" : 4096,
-	"pma" : [
-	    {
-		"low" : "0x80000000",  "high" : "0x801fffff",
-		"attribs" : [ "read", "write", "exec", "amo", "rsrv", "idempotent" ]
-	    },
-	    {
-		"low" : "0x0",  "high" : "0xffffffff",
-		"attribs" : [ "read", "write", "amo", "rsrv", "idempotent" ]
-	    }
-	]
+        "pma" : [
+            {
+                "low" : "0x80000000",  "high" : "0x801fffff",
+                "attribs" : [ "read", "write", "exec", "amo", "rsrv", "idempotent" ]
+            },
+            {
+                "low" : "0x0",  "high" : "0xffffffff",
+                "attribs" : [ "read", "write", "amo", "rsrv", "idempotent" ]
+            }
+        ]
     }
 
        
