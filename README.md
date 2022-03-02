@@ -471,19 +471,25 @@ Integer register size in bits.
 Object defining memory organization. Fields of memap:
 * size: Field defining physical memory size
 * page_size: Field defining page size
-* inst: Array of entries defining areas of physical memory where
-instruction fetch is legal (if not used, then all of memory is valid
-for fetch). Each entry is an array of 2 integers defining the start
-and end address of a fetch region.
-* data: Array of entries defining areas of physical memory where
-data load/store is legal (if not used, then all of memory is
-valid for load/store). Each entry is an array of 2 integers
-defining the start and end address of a data region.
+* pma: Array of entries defining physical memory attributes.
+Each entry is an object with a "low" and "high" addresses and an
+"attribs" array defining the memory attributes.
 
 Example:
 
     "memmap" : { "size" : "0x100000000", "page_size" : 4096,
-                 "inst" : [0, "0x20000000"] }
+	"pma" : [
+	    {
+		"low" : "0x80000000",  "high" : "0x801fffff",
+		"attribs" : [ "read", "write", "exec", "amo", "rsrv", "idempotent" ]
+	    },
+	    {
+		"low" : "0x0",  "high" : "0xffffffff",
+		"attribs" : [ "read", "write", "amo", "rsrv", "idempotent" ]
+	    }
+	]
+    }
+
        
 ### num_mmode_perf_regs
 Number of implemented performance counters. If specified number is n,
