@@ -955,6 +955,65 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 	  errors++;
     }
 
+  if (config_ -> count("cache"))
+    {
+      std::vector<unsigned> values;
+      const auto& cache = config_ -> at("cache");
+      for (auto item : { "size", "line_size", "set_count" } )
+	{
+	  if (not cache.count(item))
+	    {
+	      std::cerr << "Error: Missing " << item  << " tag in cache entry "
+			<< "in JSON configuration file.\n";
+	      errors++;
+	      continue;
+	    }
+
+	  unsigned value = 0;
+	  std::string path = std::string("cache.") + item;
+	  if (not getJsonUnsigned(path, cache.at(item), value))
+	    {
+	      errors++;
+	      continue;
+	    }
+	  if (not isPowerOf2(value))
+	    {
+	      std::cerr << "Error: Config file entry " << path
+			<< " is not a power of 2: " << value << '\n';
+	      errors++;
+	      continue;
+	    }
+	  values.push_back(value);
+	}
+
+      if (values.size() == 3)
+	{
+	  bool good = true;
+	  if (values.at(0) < 32 or values.at(0) > 64*1024*1024)
+	    {
+	      std::cerr << "Error: Invalid cache size in config file: "
+			<< values.at(0) << '\n';
+	      good = false;
+	    }
+	  if (values.at(1) < 4 or values.at(1) > values.at(0))
+	    {
+	      std::cerr << "Error: Invalid cache line-size in config file: "
+			<< values.at(1) << '\n';
+	      good = false;
+	    }
+	  if (values.at(2) < 1 or values.at(2) > 32)
+	    {
+	      std::cerr << "Error: Invalid cache set-count in config file: "
+			<< values.at(2) << '\n';
+	      good = false;
+	    }
+	  if (good)
+	    good = hart.configureCache(values.at(0), values.at(1), values.at(2));
+	  if (not good)
+	    errors++;
+	}
+    }
+
   return errors == 0;
 }
 
