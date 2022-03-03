@@ -196,7 +196,7 @@ namespace WdRiscv
       // Hypervisor registers
       HSTATUS = 0x600,
       HEDELEG = 0x602,
-      HIDELEE = 0x603,
+      HIDELEG = 0x603,
       HIE = 0x604,
       HCOUNTEREN = 0x606,
       HGEIE = 0x607,
@@ -206,7 +206,7 @@ namespace WdRiscv
       htinst = 0x64A,
       HGEIP = 0xE12,
       HENVCFG = 0x60A,
-      HENVCFGH = 0x61A,
+      HENVVCFGH = 0x61A,
       HGATP = 0x680,
       HCONTEXT = 0x6A8,
       HTIMEDELTA = 0x605,
