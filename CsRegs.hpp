@@ -203,10 +203,10 @@ namespace WdRiscv
       HTVAL = 0x643,
       HIP = 0x644,
       HVIP = 0x645,  
-      htinst = 0x64A,
+      HTINST = 0x64A,
       HGEIP = 0xE12,
       HENVCFG = 0x60A,
-      HENVVCFGH = 0x61A,
+      HENVCFGH = 0x61A,
       HGATP = 0x680,
       HCONTEXT = 0x6A8,
       HTIMEDELTA = 0x605,
@@ -902,6 +902,9 @@ namespace WdRiscv
 
     /// Helper to construtor. Define user-mode CSRs
     void defineUserRegs();
+
+    /// Helper to constructor. Define hypervisor CSRs.
+    void defineHypervisorRegs();
 
     /// Helper to construtor. Define debug-mode CSRs
     void defineDebugRegs();

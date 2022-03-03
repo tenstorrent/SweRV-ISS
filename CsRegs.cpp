@@ -32,6 +32,7 @@ CsRegs<URV>::CsRegs()
   defineMachineRegs();
   defineSupervisorRegs();
   defineUserRegs();
+  defineHypervisorRegs();
   defineDebugRegs();
   defineVectorRegs();
 }
@@ -1192,6 +1193,37 @@ CsRegs<URV>::defineUserRegs()
       csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
       defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineHypervisorRegs()
+{
+  bool mand = true;    // Mandatory.
+  bool imp  = true;    // Implemented.
+  URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
+
+  using Csrn = CsrNumber;
+
+  defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, 0, wam, wam);
+  defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, wam, wam);
+  defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, wam, wam);
+  defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, wam, wam);
+  defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
+  defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
+  defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, wam, wam);
+  defineCsr("htval",       Csrn::HTVAL,       !mand, !imp, 0, wam, wam);
+  defineCsr("hip",         Csrn::HIP,         !mand, !imp, 0, wam, wam);
+  defineCsr("hvip",        Csrn::HVIP,        !mand, !imp, 0, wam, wam);
+  defineCsr("htinst",      Csrn::HTINST,      !mand, !imp, 0, wam, wam);
+  defineCsr("hgeip",       Csrn::HGEIP,       !mand, !imp, 0, wam, wam);
+  defineCsr("henvcfg",     Csrn::HENVCFG,     !mand, !imp, 0, wam, wam);
+  defineCsr("henvcfgh",    Csrn::HENVCFGH,    !mand, !imp, 0, wam, wam);
+  defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, wam, wam);
+  defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
+  defineCsr("htimedelta",  Csrn::HTIMEDELTA,  !mand, !imp, 0, wam, wam);
+  defineCsr("htimedeltah", Csrn::HTIMEDELTAH, !mand, !imp, 0, wam, wam);
 }
 
 
