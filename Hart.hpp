@@ -3917,7 +3917,6 @@ namespace WdRiscv
     uint64_t bbInsts_ = 0;
     uint64_t bbLimit_ = ~uint64_t(0);
     std::unordered_map<uint64_t, uint64_t> basicBlocks_; // Map pc to basic-block frequency.
-    std::unordered_set<uint64_t> storeTargets_;
     FILE* bbFile_ = nullptr;
     Mcm<URV>* mcm_ = nullptr;
   };

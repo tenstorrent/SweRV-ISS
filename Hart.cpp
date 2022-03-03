@@ -1649,7 +1649,6 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       ldStWrite_ = true;
       memory_.peek(addr, temp, false /*usePma*/);
       ldStData_ = temp;
-      storeTargets_.insert(addr >> 2);
       return true;
     }
 
@@ -1745,12 +1744,6 @@ Hart<URV>::readInst(size_t address, uint32_t& inst)
       inst |= (uint32_t(high) << 16);
     }
 
-  if (storeTargets_.find((address>>2)) != storeTargets_.end())
-    {
-      std::cerr << "Self modifying code at 0x" << std::hex << address
-		<< std::dec << '\n';
-    }
-
   return true;
 }
 
@@ -1829,11 +1822,6 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
             }
         }
 
-      if (storeTargets_.find((addr>>2)) != storeTargets_.end())
-	{
-	  std::cerr << "Self modifying code at 0x" << std::hex << addr
-		    << std::dec << "\n";
-	}
       return true;
     }
 
