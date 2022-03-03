@@ -903,6 +903,9 @@ namespace WdRiscv
     /// Helper to construtor. Define user-mode CSRs
     void defineUserRegs();
 
+    /// Helper to constructor. Define hypervisor CSRs.
+    void defineHypervisorRegs();
+
     /// Helper to construtor. Define debug-mode CSRs
     void defineDebugRegs();
 
