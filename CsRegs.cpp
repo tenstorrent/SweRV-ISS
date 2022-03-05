@@ -1211,7 +1211,6 @@ CsRegs<URV>::defineHypervisorRegs()
   defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, wam, wam);
   defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, wam, wam);
   defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
-  defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
   defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, wam, wam);
   defineCsr("htval",       Csrn::HTVAL,       !mand, !imp, 0, wam, wam);
   defineCsr("hip",         Csrn::HIP,         !mand, !imp, 0, wam, wam);
