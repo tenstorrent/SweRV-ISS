@@ -225,6 +225,16 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         return pageFaultType(read, write, exec);
       cause = pageTableWalk<Pte48, Va48>(va, priv, read, write, exec, pa, tmpTlbEntry);
     }
+  else if (mode_ == Sv57)
+    {
+      // Part 1 of address translation: Bits 63-57 muse equal bit 56
+      uint64_t mask = (va >> 56) & 1;
+      if (mask)
+        mask = 0x3f;  // Least sig 7 bits set
+      if ((va >> 57) != mask)
+        return pageFaultType(read, write, exec);
+      cause = pageTableWalk<Pte57, Va57>(va, priv, read, write, exec, pa, tmpTlbEntry);
+    }
   else
     assert(0 and "Unspupported virtual memory mode.");
 
