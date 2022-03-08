@@ -68,6 +68,7 @@ namespace WdRiscv
       // Find line number or oldest entry.
       size_t bestIx = 0;
       bool hit = false;
+      bool hasEmpty = false; // True if an empty line is found
       for (size_t ix = 0; ix < lines.size(); ++ix)
         {
           auto& entry = lines[ix];
@@ -78,8 +79,13 @@ namespace WdRiscv
 	      hit = true;
               break;
             }
-          if (not entry.valid() or entry.time_ < lines[bestIx].time_)
-            bestIx = ix;
+          if (not entry.valid())
+	    {
+	      bestIx = ix;
+	      hasEmpty = true;
+	    }
+	  else if (not hasEmpty and entry.time_ < lines[bestIx].time_)
+	    bestIx = ix;
         }
       lines[bestIx].tag_ = lineNumber;
       lines[bestIx].time_ = time_++;
