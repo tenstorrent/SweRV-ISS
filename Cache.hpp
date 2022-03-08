@@ -44,8 +44,14 @@ namespace WdRiscv
     ///
     /// Typical total-size: 2*1024*1024  (2 MB)
     /// Typical line-size: 64 bytes
-    /// Typical set-size: 16 (16-way set associative)
-    Cache(uint64_t totalSize, unsigned lineSize, unsigned setCount);
+    /// Typical set-size: 8 (8-way set associative)
+    ///
+    /// Cache consists of l lines (l = size/lineSize) organized in s
+    /// sets (s = l/setSize) each set contains setSize lines. An
+    /// address is mapped to a memory-line ml (ml = address/lineSize)
+    /// which is mapped to a set index (ml % s), then all the lines in
+    /// that set are searched for that memory-line.
+    Cache(uint64_t totalSize, unsigned lineSize, unsigned setSize);
 
     ~Cache();
 
@@ -153,12 +159,11 @@ namespace WdRiscv
       void invalidate() { tag_ = ~uint64_t(0); }
     };
 
-    /// Lines in set: Map a line address to an access time.
-    //typedef std::unordered_map<uint64_t, uint64_t> LineToTime;
+    /// Cache lines in a set.
     typedef std::vector<Entry> LinesInSet;
 
-    /// Map a set index (line-address modulo secCount) to a line-to-time
-    /// map.
+    /// Map a set index (memory-line-address modulo setCount) to
+    /// the corresponding set of lines,
     std::vector<LinesInSet> linesPerSet_;
 
     uint64_t size_ = 0;

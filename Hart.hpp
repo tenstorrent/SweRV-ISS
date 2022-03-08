@@ -1172,9 +1172,14 @@ namespace WdRiscv
     /// and false if the sizes are not powers of 2 or if any of them
     /// is zero, or if they are too large (more than 64 MB for cache
     /// size, more than 1024 for line size, and more than 64 for
-    /// associativity). This has no impact on functionality.
+    /// associativity). This has no impact on functionality.  Cache
+    /// consists of l lines (l = size/lineSize) organized in s sets (s
+    /// = l/setSize) each set contains setSize lines.  An address is
+    /// mapped to a memory-line ml (ml = address/lineSize) which is
+    /// mapped to a set index (ml % s), then all the lines in that set
+    /// are searched for that memory-line.
     bool configureCache(uint64_t size, unsigned lineSize,
-                        unsigned setAssociativity);
+                        unsigned setSize);
 
     /// Delete currently configured cache.
     void deleteCache();
