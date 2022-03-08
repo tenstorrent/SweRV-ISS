@@ -210,6 +210,9 @@ namespace WdRiscv
       lwd.value_ = value;
       *(reinterpret_cast<T*>(data_ + address)) = value;
 
+      if (cache_)
+	cache_->insert(address);
+
       return true;
 #else
 
@@ -249,6 +252,9 @@ namespace WdRiscv
   #else
       *(reinterpret_cast<T*>(data_ + address)) = value;
   #endif
+
+      if (cache_)
+	cache_->insert(address);
 
       return true;
 #endif
