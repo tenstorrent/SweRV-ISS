@@ -959,7 +959,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
     {
       std::vector<unsigned> values;
       const auto& cache = config_ -> at("cache");
-      for (auto item : { "size", "line_size", "set_count" } )
+      for (auto item : { "size", "line_size", "set_size" } )
 	{
 	  if (not cache.count(item))
 	    {
@@ -1003,7 +1003,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 	    }
 	  if (values.at(2) < 1 or values.at(2) > 32)
 	    {
-	      std::cerr << "Error: Invalid cache set-count in config file: "
+	      std::cerr << "Error: Invalid cache set-size in config file: "
 			<< values.at(2) << '\n';
 	      good = false;
 	    }
