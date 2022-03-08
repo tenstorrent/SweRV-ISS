@@ -55,7 +55,7 @@ namespace WdRiscv
 
     ~Cache();
 
-    /// Insert line overlapping given address into the cahce.  Return
+    /// Insert line overlapping given address into the cache. Return
     /// true on a hit (line already in cache) and false otherwise
     /// (line inserted in cache).
     bool insert(uint64_t addr)
@@ -87,6 +87,7 @@ namespace WdRiscv
 	  else if (not hasEmpty and entry.time_ < lines[bestIx].time_)
 	    bestIx = ix;
         }
+
       lines[bestIx].tag_ = lineNumber;
       lines[bestIx].time_ = time_++;
       return hit;
@@ -166,6 +167,7 @@ namespace WdRiscv
     };
 
     /// Cache lines in a set.
+    
     typedef std::vector<Entry> LinesInSet;
 
     /// Map a set index (memory-line-address modulo setCount) to
