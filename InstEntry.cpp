@@ -123,6 +123,10 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::c_jr))   .setBranchToRegister(true);
   instVec_.at(size_t(InstId::c_jalr)) .setBranchToRegister(true);
 
+  // Mark other branch instructions.
+  instVec_.at(size_t(InstId::jal))    .setBranch(true);
+  instVec_.at(size_t(InstId::c_j))    .setBranch(true);
+
   // Mark divide instructions.
   instVec_.at(size_t(InstId::div))    .setIsDivide(true);
   instVec_.at(size_t(InstId::divu))   .setIsDivide(true);
