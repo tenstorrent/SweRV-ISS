@@ -167,7 +167,6 @@ namespace WdRiscv
     };
 
     /// Cache lines in a set.
-    
     typedef std::vector<Entry> LinesInSet;
 
     /// Map a set index (memory-line-address modulo setCount) to
