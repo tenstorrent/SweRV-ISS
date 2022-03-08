@@ -213,7 +213,7 @@ namespace WdRiscv
 
     /// Return true if this is a branch instruction (beq, jal, ...)
     bool isBranch() const
-    { return id_ >= InstId::jal and id_ <= InstId::bgeu; }
+    { return isBranch_; }
 
     /// Return true if this is a multiply instruction (mul, mulh, ...)
     bool isMultiply() const
@@ -320,11 +320,15 @@ namespace WdRiscv
 
     /// Mark as a conditional branch instruction.
     void setConditionalBranch(bool flag)
-    { isCond_ = flag; }
+    { isBranch_ = flag; isCond_ = flag; }
 
     /// Mark as a branch to register instruction.
     void setBranchToRegister(bool flag)
-    { isRegBranch_ = flag; }
+    { isBranch_ = flag; isRegBranch_ = flag; }
+
+    /// Mark as a branch insruction.
+    void setBranch(bool flag)
+    { isBranch_ = flag; }
 
   private:
 
@@ -354,6 +358,7 @@ namespace WdRiscv
     unsigned ldSize_ = 0;      // Load size: Zero for non-load.
     unsigned stSize_ = 0;      // Store size: Zero for non-store.
     bool isUns_ = false;       // True if source operands are unsigned.
+    bool isBranch_ = false;    // True if a branch instruction.
     bool isCond_ = false;      // True if conditional branch.
     bool isRegBranch_ = false; // True if branch to register.
     bool isBitManip_ = false;  // True if bit manipulation instruction.
