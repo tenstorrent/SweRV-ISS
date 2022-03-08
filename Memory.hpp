@@ -152,8 +152,8 @@ namespace WdRiscv
           value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
 
-          if (cache_)
-            cache_->insert(address);
+          // if (cache_)
+          //   cache_->insert(address);
 	  return true;
 	}
       return false;
