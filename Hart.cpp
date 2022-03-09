@@ -3112,7 +3112,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Instruction information.
   fputc(',', out);
   RvExtension type = instEntry->extension();
-  if (load)
+  if (type == RvExtension::A)
+    fputc('a', out);
+  else if (load)
     fputc('l', out);
   else if (store)
     fputc('s', out);
@@ -3135,9 +3137,6 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     fputc('f', out);
   else if (type == RvExtension::V)
     fputc('v', out);
-  else if (type == RvExtension::A)
-    fputc('a', out);
-
 
   // Privilege mode.
   if      (lastPriv_ == PrivilegeMode::Machine)    fputs(",m", out);
