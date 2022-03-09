@@ -989,7 +989,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
       if (values.size() == 3)
 	{
 	  bool good = true;
-	  if (values.at(0) < 32 or values.at(0) > 64*1024*1024)
+	  if (values.at(0) < 32 or values.at(0) > 128*1024*1024)
 	    {
 	      std::cerr << "Error: Invalid cache size in config file: "
 			<< values.at(0) << '\n';
