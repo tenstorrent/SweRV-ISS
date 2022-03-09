@@ -122,7 +122,13 @@ namespace WdRiscv
 #endif
 
       if (cache_)
-        cache_->insert(address);
+	{
+	  cache_->insert(address);
+	  if (address & (sizeof(T) - 1))  // If misaligned
+	    if (cache_->getLineNumber(address) != cache_->getLineNumber(address + sizeof(T) - 1))
+	      cache_->insert(address + sizeof(T) - 1);
+	}
+
       return true;
     }
 
@@ -209,11 +215,6 @@ namespace WdRiscv
       lwd.addr_ = address;
       lwd.value_ = value;
       *(reinterpret_cast<T*>(data_ + address)) = value;
-
-      if (cache_)
-	cache_->insert(address);
-
-      return true;
 #else
 
       Pma pma1 = pmaMgr_.getPma(address);
@@ -253,11 +254,16 @@ namespace WdRiscv
       *(reinterpret_cast<T*>(data_ + address)) = value;
   #endif
 
+#endif
       if (cache_)
-	cache_->insert(address);
+	{
+	  cache_->insert(address);
+	  if (address & (sizeof(T) - 1))  // If misaligned
+	    if (cache_->getLineNumber(address) != cache_->getLineNumber(address + sizeof(T) - 1))
+	      cache_->insert(address + sizeof(T) - 1);
+	}
 
       return true;
-#endif
     }
 
     /// Write half-word (2 bytes) to given address. Return true on
