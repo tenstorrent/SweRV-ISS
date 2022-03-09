@@ -1006,7 +1006,7 @@ Memory::configureCache(uint64_t size, unsigned lineSize, unsigned setSize)
       std::cerr << "Cache size not a power of 2: " << size << '\n';
       return false;
     }
-  if (size > 64L*1024L*1024L)
+  if (size > 128L*1024L*1024L)
     {
       std::cerr << "Cache size too large: " << size << '\n';
       return false;
