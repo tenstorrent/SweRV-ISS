@@ -265,6 +265,12 @@ namespace WdRiscv
       return legalConfig(eew, emul);
     }
 
+    /// Set ix to the number of the register corresponding to the
+    /// given name returning true on success and false if no such
+    /// register.  For example, if name is "v2" then ix will be set to
+    /// 2.
+    bool findReg(const std::string& name, unsigned& ix) const;
+
     /// Set symbol to the symbolic value of the given numeric group
     /// multiplier (premultiplied by 8). Return true on success and
     /// false if groupX8 is out of bounds.

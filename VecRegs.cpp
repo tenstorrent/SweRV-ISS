@@ -166,3 +166,23 @@ VecRegs::reset()
   lastWrittenReg_ = -1;
   lastGroupX8_ = 8;
 }
+
+
+bool
+VecRegs::findReg(const std::string& name, unsigned& ix) const
+{
+  if (name.empty())
+    return false;
+
+  std::string numStr = name;
+  if (numStr.at(0) == 'v')
+    numStr = numStr.substr(1);
+
+  char* end = nullptr;
+  unsigned n = strtoul(numStr.c_str(), &end, 10);
+  if (end and *end)
+    return false;
+
+  ix = n;
+  return true;
+}

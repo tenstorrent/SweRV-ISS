@@ -100,6 +100,54 @@ parseCmdLineBool(const std::string& option, const std::string& str, bool& val)
 }
 
 
+static
+bool
+parseCmdLineVecData(const std::string& option,
+		    const std::string& valStr,
+		    std::vector<uint8_t>& val)
+{
+  val.clear();
+
+  if (not (boost::starts_with(valStr, "0x") or boost::starts_with(valStr, "0X")))
+    {
+      std::cerr << "Value of vector " << option << " must begin with 0x: "
+		<< valStr << '\n';
+      return false;
+    }
+
+  std::string trimmed = valStr.substr(2); // Remove leading 0x
+  if (trimmed.empty())
+    {
+      std::cerr << "Empty value for vector " << option << ": "
+		<< valStr << '\n';
+      return false;
+    }
+
+  if ((trimmed.size() & 1) != 0)
+    {
+      std::cerr << "Value for vector " << option << " must have an even"
+		<< " number of hex digits: " << valStr << '\n';
+      return false;
+    }
+
+  for (size_t i = 0; i < trimmed.size(); i += 2)
+    {
+      std::string byteStr = trimmed.substr(i, 2);
+      char* end = nullptr;
+      unsigned value = strtoul(byteStr.c_str(), &end, 16);
+      if (end and *end)
+	{
+	  std::cerr << "Invalid hex digit(s) in vector " << option << ": "
+		    << byteStr << '\n';
+	  return false;
+	}
+      val.push_back(value);
+    }
+
+  return true;
+}
+
+
 template <typename URV>
 Interactive<URV>::Interactive(System<URV>& system)
   : system_(system)
@@ -189,6 +237,24 @@ Interactive<URV>::peekAllFpRegs(Hart<URV>& hart, std::ostream& out)
 	{
 	  out << "f" << i << ": "
               << (boost::format("0x%016x") % val) << '\n';
+	}
+    }
+}
+
+
+template <typename URV>
+void
+Interactive<URV>::peekAllVecRegs(Hart<URV>& hart, std::ostream& out)
+{
+  for (unsigned i = 0; i < hart.vecRegCount(); ++i)
+    {
+      std::vector<uint8_t> val;
+      if (hart.peekVecReg(i, val))
+	{
+	  out << "v" << i << ": 0x";
+	  for (unsigned byte : val)
+	    out << (boost::format("%02x") % byte);
+	  out << '\n';
 	}
     }
 }
@@ -416,11 +482,13 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
     {
       std::cerr << "Invalid peek command: " << line << '\n';
       std::cerr << "Expecting: peek <item> <addr>  or  peek pc  or  peek all\n";
-      std::cerr << "  Item is one of r, f, c, t , pc, or m for integer, floating point,\n";
-      std::cerr << "  CSR, trigger register, program counter, or memory location respectively\n";
+      std::cerr << "  Item is one of r, f, c, v, t , pc, or m for integer, floating point,\n";
+      std::cerr << "  CSR, vector, trigger register, program counter, or memory location respectively\n";
 
       std::cerr << "  example:  peek r x3\n";
+      std::cerr << "  example:  peek f f4\n";
       std::cerr << "  example:  peek c mtval\n";
+      std::cerr << "  example:  peek v v2\n";
       std::cerr << "  example:  peek m 0x4096\n";
       std::cerr << "  example:  peek t 0\n";
       std::cerr << "  example:  peek pc\n";
@@ -440,11 +508,18 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       peekAllIntRegs(hart, out);
       out << "\n";
 
+      peekAllFpRegs(hart, out);
+      out << "\n";
+
+      peekAllVecRegs(hart, out);
+      out << "\n";
+
       peekAllCsrs(hart, out);
       out << "\n";
 
       peekAllTriggers(hart, out);
       return true;
+
     }
 
   if (resource == "pc")
@@ -564,6 +639,40 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       return false;
     }
 
+  if (resource == "v")
+    {
+      if (not hart.isRvv())
+	{
+	  std::cerr << "Vector extension is no enabled\n";
+	  return false;
+	}
+
+      if (addrStr == "all")
+	{
+	  peekAllVecRegs(hart, out);
+	  return true;
+	}
+
+      unsigned vecReg = 0;
+      if (not hart.findVecReg(addrStr, vecReg))
+	{
+	  std::cerr << "No such vector register: " << addrStr << '\n';
+	  return false;
+	}
+      std::vector<uint8_t> data;
+      if (hart.peekVecReg(vecReg, data))
+	{
+	  // Print data in reverse order (most significant byte first).
+	  out << "0x";
+	  for (unsigned byte : data)
+	    out << (boost::format("%02x") % byte);
+	  out << '\n';
+	  return true;
+	}
+      std::cerr << "Failed to read vector register: " << addrStr << '\n';
+      return false;
+    }
+
   if (resource == "t")
     {
       if (addrStr == "all")
@@ -609,6 +718,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
     }
 
   const std::string& resource = tokens.at(1);
+
   uint64_t value = 0;
 
   if (resource == "pc")
@@ -632,8 +742,18 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
   const std::string& addrStr = tokens.at(2);
   const std::string& valueStr = tokens.at(3);
 
-  if (not parseCmdLineNumber("poke", valueStr, value))
-    return false;
+  std::vector<uint8_t> vecVal;
+
+  if (resource == "v")
+    {
+      if (not parseCmdLineVecData("poke", valueStr, vecVal))
+	return false;
+    }
+  else
+    {
+      if (not parseCmdLineNumber("poke", valueStr, value))
+	return false;
+    }
 
   if (resource == "r")
     {
@@ -662,6 +782,21 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	}
 
       std::cerr << "No such FP register " << addrStr << '\n';
+      return false;
+    }
+
+  if (resource == "v")
+    {
+      unsigned vecReg = 0;
+      if (hart.findVecReg(addrStr, vecReg))
+	{
+	  if (hart.pokeVecReg(vecReg, vecVal))
+	    return true;
+	  std::cerr << "Failed to write vec register " << addrStr << '\n';
+	  return false;
+	}
+
+      std::cerr << "No such vector register " << addrStr << '\n';
       return false;
     }
 
@@ -999,7 +1134,7 @@ printInteractiveHelp()
   cout << "step [<n>]\n";
   cout << "  Execute n instructions (1 if n is missing).\n\n";
   cout << "peek <res> <addr>\n";
-  cout << "  Print value of resource res (one of r, f, c, m) and address addr.\n";
+  cout << "  Print value of resource res (one of r, f, c, v, m) and address addr.\n";
   cout << "  For memory (m) up to 2 addresses may be provided to define a range\n";
   cout << "  of memory locations to be printed; also, an optional filename after\n";
   cout << "  the two addresses writes the command output to that file.\n";
@@ -1114,17 +1249,20 @@ Interactive<URV>::helpCommand(const std::vector<std::string>& tokens)
       cout << "peek <res> <addr>\n"
 	   << "peek pc\n"
 	   << "  Show contents of given resource having given address. Possible\n"
-	   << "  resources are r, f, c, or m for integer, floating-point,\n"
-	   << "  control-and-status register or for memory respectively.\n"
+	   << "  resources are r, f, c, v, or m for integer, floating-point,\n"
+	   << "  control-and-status, vector register, or for memory respectively.\n"
 	   << "  Addr stands for a register number, register name or memory\n"
 	   << "  address. If resource is memory (m), then an additional address\n"
 	   << "  may be provided to define a range of memory locations to be\n"
 	   << "  display and an optional filename after 2nd address may be\n"
-           << "  provided to write memory contents to a file.  Examples\n"
+           << "  provided to write memory contents to a file. Vector register values\n"
+	   << "  are printed just like intger register (most significant byte first).\n"
+	   << "  Examples:\n"
 	   << "    peek pc\n"
 	   << "    peek r t0\n"
 	   << "    peek r x12\n"
 	   << "    peek c mtval\n"
+	   << "    peek v v2\n"
 	   << "    peek m 0x80000000\n"
 	   << "    peek m 0x80000000 0x80000010\n"
       	   << "    peek m 0x80000000 0x80000010 out\n";
@@ -1136,10 +1274,11 @@ Interactive<URV>::helpCommand(const std::vector<std::string>& tokens)
       cout << "poke <res> <addr> <value>\n"
 	   << "poke pc <value>\n"
 	   << "  Set the contents of given resource having given address to the\n"
-	   << "  given value. Possible resources are r, f, c, or m for integer,\n"
-	   << "  floating-point, control-and-status register or for memory\n"
+	   << "  given value. Possible resources are r, f, c, v, or m for integer,\n"
+	   << "  floating-point, control-and-status, vector register or for memory\n"
 	   << "  respectively. Addr stands for a register number, register name\n"
-	   << "  or memory address.  Examples:\n"
+	   << "  or memory address. Vector Register poke values are expected in most\n"
+	   << "  significant byte first order. Examples:\n"
 	   << "    poke r t0 0\n"
 	   << "    poke r x12 0x44\n"
 	   << "    poke c mtval 0xff\n"

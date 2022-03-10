@@ -2358,6 +2358,53 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
 
 
 template <typename URV>
+bool
+Hart<URV>::peekVecReg(unsigned ix, std::vector<uint8_t>& value) const
+{
+  if (not isRvv())
+    return false;
+
+  if (ix > vecRegs_.size())
+    return false;
+
+  const uint8_t* data = vecRegs_.getVecData(ix);
+  unsigned byteCount = vecRegs_.bytesPerRegister();
+  value.resize(byteCount);
+
+  for (unsigned i = 0; i < byteCount; ++i)
+    value.at(i) = data[byteCount - 1 - i];
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::pokeVecReg(unsigned ix, const std::vector<uint8_t>& val)
+{
+  if (not isRvv() or ix > vecRegs_.size() or val.empty())
+    return false;
+
+  uint8_t* regData = vecRegs_.getVecData(ix);
+  if (not regData)
+    return false;
+
+  // Bytes in val are in reverse order (most signficant first).
+  std::vector<uint8_t> data = val;
+  std::reverse(data.begin(), data.end());
+
+  uint32_t count = vecRegs_.bytesPerRegister();
+  for (uint32_t i = 0; i < count; ++i)
+    {
+      uint8_t byte = i < data.size() ? data.at(i) : 0;
+      regData[i] = byte;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
 URV
 Hart<URV>::peekPc() const
 {
@@ -2398,6 +2445,9 @@ Hart<URV>::findFpReg(const std::string& name, unsigned& num) const
   if (not isRvf())
     return false;   // Floating point extension not enabled.
 
+  if (fpRegs_.findReg(name, num))
+    return true;
+
   if (name.empty())
     return false;
 
@@ -2419,6 +2469,16 @@ Hart<URV>::findFpReg(const std::string& name, unsigned& num) const
   return false;
 }
 
+
+template <typename URV>
+bool
+Hart<URV>::findVecReg(const std::string& name, unsigned& num) const
+{
+  if (not isRvv())
+    return false;
+
+  return vecRegs_.findReg(name, num);
+}
 
 
 template <typename URV>

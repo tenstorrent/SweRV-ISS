@@ -147,6 +147,11 @@ namespace WdRiscv
     size_t fpRegCount() const
     { return isRvf()? fpRegs_.size() : 0; }
 
+    /// Return count of vector registers. Return zero if extension v
+    /// is not enabled.
+    size_t vecRegCount() const
+    { return isRvv()? vecRegs_.size() : 0; }
+
     /// Return size of memory in bytes.
     size_t memorySize() const
     { return memory_.size(); }
@@ -215,6 +220,17 @@ namespace WdRiscv
     /// bound.
     bool pokeCsr(CsrNumber csr, URV val);
 
+    /// Put in value the bytes of the given vector register (most
+    /// significant byte first). Return true on success, return false
+    /// if reg is out of bounds.
+    bool peekVecReg(unsigned reg, std::vector<uint8_t>& value) const;
+
+    /// Put the bytes of the value in the given vector regiser.
+    /// The first byte in value should be the most significant.
+    /// If value is smaller than vector regiser size, it is padded
+    /// with zeros on the most-significant side.
+    bool pokeVecReg(unsigned reg, const std::vector<uint8_t>& value);
+
     /// Find the integer register with the given name (which may
     /// represent an integer or a symbolic name). Set num to the
     /// number of the corresponding register if found. Return true on
@@ -225,6 +241,9 @@ namespace WdRiscv
     /// number of the corresponding register if found. Return true on
     /// success and false if no such register.
     bool findFpReg(const std::string& name, unsigned& num) const;
+
+    /// Find vector register by name. See findFpReg.
+    bool findVecReg(const std::string& name, unsigned& num) const;
 
     /// Find the control and status register with the given name
     /// (which may represent an integer or a symbolic name). Return
