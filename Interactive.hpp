@@ -114,6 +114,7 @@ namespace WdRiscv
 
     static void peekAllFpRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllIntRegs(Hart<URV>& hart, std::ostream& out);
+    static void peekAllVecRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllCsrs(Hart<URV>& hart, std::ostream& out);
     static void peekAllTriggers(Hart<URV>& hart, std::ostream& out);
 
