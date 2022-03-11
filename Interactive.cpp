@@ -1188,9 +1188,9 @@ printInteractiveHelp()
   cout << "mbwrite addr data\n";
   cout << "  Perform a memory model merge-buffer-write for given address. Given\n";
   cout << "  data (hexadecimal string) is from a different model (RTL) and is compared\n";
-  cout << "  to whisper data. Addr should be a multiple of cache-line size. Hex\n";
-  cout << "  string length should be twice the cache-line size with leftmost 2 digits\n";
-  cout << "  corresponding to byte with smallest address in line.\n\n";
+  cout << "  to whisper data. Addr should be a multiple of cache-line size. If hex\n";
+  cout << "  string is smaller than twice the cache-line size, it will be padded with\n";
+  cout << "  zeros on the most signficant side.\n\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
@@ -1779,8 +1779,8 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
 				 const std::vector<std::string>& tokens)
 {
   // Format: mbwrite <physical-address> <rtl-data>
-  // Data is up to 64 bytes (each byte is 2 hex digits) with most significant
-  // byte (leftmost two hex digits) corresponding to smallest address.
+  // Data is up to 64 bytes (each byte is 2 hex digits) with least significant
+  // byte (rightmost two hex digits) corresponding to smallest address.
   if (tokens.size() != 3)
     {
       std::cerr << "Invalid mbwrite command: " << line << '\n';
@@ -1793,43 +1793,47 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
     return false;
 
   std::vector<uint8_t> data;
-  const std::string& hexDigits = tokens.at(2);
+  std::string hexDigits = tokens.at(2);
 
-  size_t len = hexDigits.size();
-  size_t offset = 0;
-  if (len >= 2 and hexDigits.at(0) == '0' and hexDigits.at(1) == 'x')
-    offset += 2;
-
-  unsigned lineSize = system_.mergeBufferSize();
-  if (len - offset > lineSize*2)
+  if (not (boost::starts_with(hexDigits, "0x") or
+	   boost::starts_with(hexDigits, "0X")))
     {
-      std::cerr << "Too many digits in data string. Expecting " << lineSize*2
-		<< '\n';
+      std::cerr << "Error: mbwrite data must begin with 0x:" << hexDigits << '\n';
+      return false;
+    }
+  hexDigits = hexDigits.substr(2);
+
+  if ((hexDigits.size() & 1) == 1)
+    {
+      std::cerr << "Error: mbwrite hex digit count must be even\n";
       return false;
     }
 
-  if (((len - offset) & 1) == 1)
-    std::cerr << "Warning: Hex digit count is not even\n";
-
-  if ((len - offset) < lineSize*2)
-    std::cerr << "Warning: Hex digit count is smaller than twice the merge buffer line size\n";
-
-  for (size_t i = offset ; i < len; ++i)
+  for (size_t i = 0; i < hexDigits.size(); i += 2)
     {
-      uint8_t digit = hexDigits.at(i);
-      if (digit >= '0' and digit <= '9')
-	digit -= '0';
-      else if (digit >= 'a' and digit <= 'f')
-	digit = 10 + (digit - 'a');
-      else
+      std::string byteStr = hexDigits.substr(i, 2);
+      char* end = nullptr;
+      unsigned value = strtoul(byteStr.c_str(), &end, 16);
+      if (end and *end)
 	{
-	  std::cerr << "Invalid hex digit: '" << digit << "'\n";
+	  std::cerr << "Error: Invalid hex digit(s) in mbwrite data: "
+		    << byteStr << '\n';
 	  return false;
 	}
-      if ( (i & 1) == 0)  // Even byte
-	data.push_back(digit << 4);
-      else
-	data.back() |= digit;
+      data.push_back(value);
+    }
+
+  unsigned lineSize = system_.mergeBufferSize();
+  std::reverse(data.begin(), data.end()); // Least sig byte now first
+  if (data.size() > lineSize)
+    {
+      std::cerr << "Mbwrite data too long -- truncating\n";
+      data.resize(lineSize);
+    }
+  else if (data.size() < lineSize)
+    {
+      std::cerr << "Mbwrite data too short -- padding\n";
+      data.resize(lineSize);
     }
 		     
   return system_.mcmMbWrite(hart, this->time_, addr, data);
