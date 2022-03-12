@@ -49,7 +49,8 @@ Pma::stringToAttrib(const std::string& str, Pma::Attrib& attrib)
   return false;
 }
 
-PmaManager::PmaManager(uint64_t /*memSize*/, uint64_t /*sectionSize*/)
+PmaManager::PmaManager(uint64_t memSize, uint64_t /*sectionSize*/)
+  : memSize_(memSize)
 {
 }
 

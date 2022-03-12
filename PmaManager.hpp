@@ -151,6 +151,8 @@ namespace WdRiscv
 	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pma_;
 
+      if (addr >= memSize_)
+	return noAccessPma_;
       return defaultPma_;  // rwx amo rsrv idempotent
     }
 
@@ -226,5 +228,7 @@ namespace WdRiscv
     std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
 
     Pma defaultPma_{Pma::Attrib::Default};
+    Pma noAccessPma_{Pma::Attrib::None};
+    uint64_t memSize_ = 0;
   };
 }

@@ -522,9 +522,15 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   // If vector extension enabled but vectors not configured, then
   // configure for 128-bits per regiser and 32-bits per elemement.
-  if (isRvv() and vecRegs_.registerCount() == 0)
-    vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/, 4 /*maxBytesPerElem*/);
-  
+  if (isRvv())
+    {
+      if (vecRegs_.registerCount() == 0)
+	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
+			4 /*maxBytesPerElem*/);
+      unsigned bytesPerReg = vecRegs_.bytesPerRegister();
+      csRegs_.configCsr("vlenb", true, bytesPerReg, 0, 0, false, false);
+    }
+
   perfControl_ = ~uint32_t(0);
   URV value = 0;
   if (peekCsr(CsrNumber::MCOUNTINHIBIT, value))
