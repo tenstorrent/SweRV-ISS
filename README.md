@@ -558,7 +558,12 @@ Example:
     }
 
 ###  reset_vec
-Defines the PC value after reset
+Defines the program counter (PC) value after reset. The ELF file
+entry point will supersede the reset_vec value unless --raw is
+used. The value of the --startpc option will supersede both the
+reset_vec and the ELF file entry point. In interactive mode, a reset
+command will change the program counter to the value of reset_vec.
+
 
 ###  nmi_vec
 Defines the PC address after a non-maskable-interrupt.
