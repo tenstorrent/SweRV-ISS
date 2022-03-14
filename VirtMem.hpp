@@ -75,7 +75,11 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    /// Page based memory type. NA for Sv32.
     uint32_t pbmt() const   { return 0; }
+
+    /// Naturally aligned power of 2 translation. NA for Sv32.
+    bool hasNapot() const  { return false; }
 
     uint32_t ppn(int i) const
     {
@@ -151,7 +155,11 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    /// Page based memory type.
     uint32_t pbmt() const   { return bits_.pbmt_; }
+
+    /// Naturally aligned power of 2 translation.
+    bool hasNapot() const  { return bits_.n_; }
 
     uint64_t ppn(int i) const
     {
@@ -233,7 +241,11 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    /// Page based memory type.
     uint32_t pbmt() const   { return bits_.pbmt_; }
+
+    /// Naturally aligned power of 2 translation.
+    bool hasNapot() const  { return bits_.n_; }
 
     uint64_t ppn(int i) const
     {
@@ -320,7 +332,11 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    /// Page based memory type.
     uint32_t pbmt() const   { return bits_.pbmt_; }
+
+    /// Naturally aligned power of 2 translation.
+    bool hasNapot() const  { return bits_.n_; }
 
     uint64_t ppn(int i) const
     {
