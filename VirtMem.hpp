@@ -75,6 +75,8 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    uint32_t pbmt() const   { return 0; }
+
     uint32_t ppn(int i) const
     {
       if (i == 0) return ppn0();
@@ -106,7 +108,9 @@ namespace WdRiscv
     unsigned ppn0_     : 9;   // Physical page num
     unsigned ppn1_     : 9;   // Physical page num
     unsigned ppn2_     : 26;  // Physical page num
-    unsigned res_      : 10;  // Reserved
+    unsigned res_      : 7;   // Reserved
+    unsigned pbmt_     : 2;   // Page based memory type
+    unsigned n_        : 1;
   } __attribute((packed));
 
 
@@ -147,6 +151,8 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    uint32_t pbmt() const   { return bits_.pbmt_; }
+
     uint64_t ppn(int i) const
     {
       if (i == 0) { return ppn0(); }
@@ -182,7 +188,9 @@ namespace WdRiscv
     unsigned ppn1_     : 9;   // Physical page num
     unsigned ppn2_     : 9;   // Physical page num
     unsigned ppn3_     : 17;  // Physical page num
-    unsigned res_      : 10;  // Reserved
+    unsigned res_      : 7;   // Reserved
+    unsigned pbmt_     : 2;   // Page based memory type
+    unsigned n_        : 1;
   } __attribute__((packed));
 
 
@@ -225,6 +233,8 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    uint32_t pbmt() const   { return bits_.pbmt_; }
+
     uint64_t ppn(int i) const
     {
       if (i == 0) { return ppn0(); }
@@ -263,7 +273,9 @@ namespace WdRiscv
     unsigned ppn2_     : 9;   // Physical page num
     unsigned ppn3_     : 9;   // Physical page num
     unsigned ppn4_     : 8;   // Physical page num
-    unsigned res_      : 10;  // Reserved
+    unsigned res_      : 7;   // Reserved
+    unsigned pbmt_     : 2;   // Page based memory type.
+    unsigned n_        : 1;
   } __attribute__((packed));
 
 
@@ -307,6 +319,8 @@ namespace WdRiscv
     uint32_t levels() const { return 5; }
 
     uint32_t size() const   { return sizeof(data_); }
+
+    uint32_t pbmt() const   { return bits_.pbmt_; }
 
     uint64_t ppn(int i) const
     {
