@@ -467,13 +467,18 @@ Number of cores in simulated system.
 ### xlen
 Integer register size in bits.
 
+### isa
+Enable instruction set architecture (isa) features.
+Example:
+   "isa" : "rv32imaf"
+
 ### memmap
 Object defining memory organization. Fields of memap:
 * size: Field defining physical memory size
 * page_size: Field defining page size
 * pma: Array of entries defining physical memory attributes.
 Each entry is an object with a "low" and "high" addresses and an
-"attribs" array defining the memory attributes.
+"attribs" array defining the physical memory attributes.
 
 Example:
 
@@ -503,9 +508,27 @@ this is set to true. Note that pipeline specific events (such as
 mispredicted branches) are not supported. Synchronous events (such as
 count retired load insructions) are supported.
 
+###  enable_zba
+When set to true, this enables the the zba bit-manipulation
+extension. Similary, enable_zbb, enable_zbc, and enable_zbs can be
+used to enable the corresponding bit-manipulation extension.
+
+###  enable_zfh
+When set to true, this enables the half-precision (16-bit) floating point
+extension.
+
 ###  abi_names
 If set to true then registers are identified by their ABI names in the
 log file (e.g. ra instead of x1).
+
+###  enable_misaligned_data
+If set to false then a misaligend data access by a load/store
+instructions will trigger an exception.
+
+###  physical_memory_protection_grain
+Define the G value of the physical memory protection grain. This is
+the log base 2 of the grain minus 2.  The default is G=0 (implying a
+grain of 4).
 
 ###  csr
 The CSR configuration is a map wher each key is a CSR name and the
