@@ -298,6 +298,8 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
     }
 
   // 6.  pte.read_ or pte.exec_ : leaf pte
+  if (pte.pbmt() != 0)
+    return pageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
   if (privMode == PrivilegeMode::User and not pte.user())
     return pageFaultType(read, write, exec);
   if (privMode == PrivilegeMode::Supervisor and pte.user() and
