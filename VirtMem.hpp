@@ -581,6 +581,11 @@ namespace WdRiscv
     ExceptionCause pageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
                                  bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
+    /// Same as above but for version 1.12 of spec.
+    template <typename PTE, typename VA>
+    ExceptionCause pageTableWalk1p12(uint64_t va, PrivilegeMode pm, bool read, bool write,
+				     bool exec, uint64_t& pa, TlbEntry& tlbEntry);
+
     /// Helper to translate method.
     ExceptionCause pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode pm, bool read,
                                           bool write, bool exec, uint64_t& pa);

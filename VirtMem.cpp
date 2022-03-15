@@ -367,6 +367,128 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 }
 
 
+template<typename PTE, typename VA>
+ExceptionCause
+VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, bool write,
+			   bool exec, uint64_t& pa, TlbEntry& tlbEntry)
+{
+  // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
+  uint64_t root = pageTableRootPage_ * pageSize_;
+
+  PTE pte(0);
+  const unsigned levels = pte.levels();
+  const unsigned pteSize = pte.size();
+  int ii = levels - 1;
+
+  VA va(address);
+
+  while (true)
+    {
+      // 2.
+      uint64_t pteAddr = root + va.vpn(ii)*pteSize;
+
+      // Check PMP. The privMode here is the effective one that
+      // already accounts for MPRV.
+      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+      if (not pmp.isRead(privMode, privMode, false))
+        return accessFaultType(read, write, exec);
+
+      if (! memory_.read(pteAddr, pte.data_))
+        return pageFaultType(read, write, exec);
+
+      // 3.
+      if (not pte.valid() or (not pte.read() and pte.write()))
+        return pageFaultType(read, write, exec);
+
+      // 4.
+      if (not pte.read() and not pte.exec())
+        {  // pte is a pointer to the next level
+          ii = ii - 1;
+          if (ii < 0)
+            return pageFaultType(read, write, exec);
+          root = pte.ppn() * pageSize_;
+          continue;  // goto 2.
+        }
+
+      // 5.  pte.read_ or pte.exec_ : leaf pte
+      if (pte.pbmt() != 0)
+	return pageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+      if (privMode == PrivilegeMode::User and not pte.user())
+	return pageFaultType(read, write, exec);
+      if (privMode == PrivilegeMode::Supervisor and pte.user() and
+	  not supervisorOk_)
+	return pageFaultType(read, write, exec);
+
+      bool pteRead = pte.read() or (execReadable_ and pte.exec());
+      if ((read and not pteRead) or (write and not pte.write()) or
+	  (exec and not pte.exec()))
+	return pageFaultType(read, write, exec);
+
+      // 6.
+      for (int j = 0; j < ii; ++j)
+	if (pte.ppn(j) != 0)
+	  return pageFaultType(read, write, exec);
+
+      // 7.
+      if (not pte.accessed() or (write and not pte.dirty()))
+	{
+	  // We have a choice:
+	  // A. Page fault
+	  if (faultOnFirstAccess_)
+	    return pageFaultType(read, write, exec);  // A
+
+	  // Or B
+
+	  // B1. Check PMP. The privMode here is the effective one that
+	  // already accounts for MPRV.
+	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  if (not pmp.isWrite(privMode, privMode, false))
+	    return accessFaultType(read, write, exec);
+
+	  {
+	    // TODO FIX : this has to be atomic
+	    // B2. Compare pte to memory.
+	    PTE pte2(0);
+	    memory_.read(pteAddr, pte2.data_);
+	    if (pte.data_ != pte2.data_)
+	      continue;  // Comparison fails: return to step 2.
+	    pte.bits_.accessed_ = 1;
+	    if (write)
+	      pte.bits_.dirty_ = 1;
+
+	    if (not memory_.write(hartIx_, pteAddr, pte.data_))
+	      return pageFaultType(read, write, exec);
+	  }
+	}
+      break;
+    }
+
+  // 8.
+  pa = va.offset();
+
+  for (int j = 0; j < ii; ++j)
+    pa = pa | (va.vpn(j) << pte.paPpnShift(j)); // Copy from va to pa
+
+  for (unsigned j = ii; j < levels; ++j)
+    pa = pa | pte.ppn(j) << pte.paPpnShift(j);
+
+  // Update tlb-entry with data found in page table entry.
+  tlbEntry.virtPageNum_ = address >> pageBits_;
+  tlbEntry.physPageNum_ = pa >> pageBits_;
+  tlbEntry.asid_ = asid_;
+  tlbEntry.valid_ = true;
+  tlbEntry.global_ = pte.global();
+  tlbEntry.user_ = pte.user();
+  tlbEntry.read_ = pte.read();
+  tlbEntry.write_ = pte.write();
+  tlbEntry.exec_ = pte.exec();
+  tlbEntry.accessed_ = pte.accessed();
+  tlbEntry.dirty_ = pte.dirty();
+  tlbEntry.levels_ = 1+ii;
+  return ExceptionCause::NONE;
+}
+
+
 bool
 VirtMem::setPageSize(uint64_t size)
 {
