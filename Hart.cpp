@@ -362,6 +362,7 @@ Hart<URV>::updateMemoryProtection()
     }
 
   pmpEnabled_ = impCount > 0;
+  pmpManager_.enable(pmpEnabled_);
 }
 
 
