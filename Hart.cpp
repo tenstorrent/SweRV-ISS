@@ -4469,6 +4469,8 @@ Hart<URV>::countBasicBlocks(const DecodedInst* di)
 	    }
 	  bbPc_ = pc_;
 	}
+      else
+	basicBlocks_[bbPc_].count_++;
     }
 }
 
