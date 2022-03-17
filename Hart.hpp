@@ -3930,10 +3930,20 @@ namespace WdRiscv
     std::function<void(Hart<URV>&, bool&, bool&)> preInst_ = nullptr;
 
     // Basic-block stats.
-    uint64_t bbInsts_ = 0;
-    uint64_t bbLimit_ = ~uint64_t(0);
-    std::unordered_map<uint64_t, uint64_t> basicBlocks_; // Map pc to basic-block frequency.
+    struct BbStat
+    {
+      uint64_t count_ = 0;      // Number of times basic block is entered.
+      uint64_t access_ = 0;     // Data cache accesses on 1st entry to block.
+      uint64_t hit_ = 0;        // Data cache hits on 1st entry to block.
+    };
+    uint64_t bbInsts_ = 0;              // Count if bb instructions.
+    uint64_t bbLimit_ = ~uint64_t(0);   // Threshold at which we dump data.
+    uint64_t bbPc_ = 0;                 // Entry PC of current basic block.
+    uint64_t bbCacheAccess_ = 0;
+    uint64_t bbCacheHit_ = 0;
+    std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;
+
     Mcm<URV>* mcm_ = nullptr;
   };
 }

@@ -4401,17 +4401,29 @@ Hart<URV>::dumpBasicBlocks()
 {
   if (bbFile_)
     {
-      fprintf(bbFile_, "T");
+      bool first = true;
       for (const auto& kv : basicBlocks_)
-	if (kv.second)
-	  fprintf(bbFile_, ":%ld:%ld ", kv.first, kv.second);
-      fprintf(bbFile_, "\n");
+	{
+	  const BbStat& stat = kv.second;
+	  if (stat.count_)
+	    {
+	      if (first)
+		{
+		  fprintf(bbFile_, "T");
+		  first = false;
+		}
+	      fprintf(bbFile_, ":%ld:%ld:%ld:%ld ", kv.first, stat.count_,
+		      stat.access_, stat.hit_);
+	    }
+	}
+      if (not first)
+	fprintf(bbFile_, "\n");
     }
   bbInsts_ = 0;
 
   // Clear basic block stats.
   for (auto& kv : basicBlocks_)
-    kv.second = 0;
+    kv.second.count_ = 0;
 }
 
 
@@ -4425,12 +4437,38 @@ Hart<URV>::countBasicBlocks(const DecodedInst* di)
   bbInsts_++;
 
   if (di->instEntry()->isBranch())
-    basicBlocks_[pc_]++;
+    {
+      auto& blockStat = basicBlocks_[pc_];
+      blockStat.count_++;
+
+      if (memory_.cache_)
+	{
+	  uint64_t access = memory_.cache_->accessCount() - bbCacheAccess_;
+	  uint64_t hit = memory_.cache_->hitCount() - bbCacheHit_;
+	  basicBlocks_[bbPc_].access_ += access;
+	  basicBlocks_[bbPc_].hit_ += hit;
+	  bbCacheAccess_ = memory_.cache_->accessCount();
+	  bbCacheHit_ = memory_.cache_->hitCount();
+	}
+      bbPc_ = pc_;
+    }
   else
     {
       auto iter = basicBlocks_.find(pc_);
       if (iter != basicBlocks_.end())
-	iter->second++;
+	{
+	  iter->second.count_++;
+	  if (memory_.cache_)
+	    {
+	      uint64_t access = memory_.cache_->accessCount() - bbCacheAccess_;
+	      uint64_t hit = memory_.cache_->hitCount() - bbCacheHit_;
+	      basicBlocks_[bbPc_].access_ += access;
+	      basicBlocks_[bbPc_].hit_ += hit;
+	      bbCacheAccess_ = memory_.cache_->accessCount();
+	      bbCacheHit_ = memory_.cache_->hitCount();
+	    }
+	  bbPc_ = pc_;
+	}
     }
 }
 
