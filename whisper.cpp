@@ -176,6 +176,7 @@ struct Args
   std::string archInfoFile;    // Architectural coverage definition file (JSON).
   std::string configFile;      // Configuration (JSON) file.
   std::string bblockFile;      // Basci block file.
+  std::string attFile;         // Address translation file.
   std::string isa;
   std::string snapshotDir = "snapshot"; // Dir prefix for saving snapshots
   std::string loadFrom;        // Directory for loading a snapshot
@@ -479,6 +480,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Report instruction frequency to file.")
         ("archinfo", po::value(&args.archInfoFile),
          "Dump instruction table using definition.")
+        ("att", po::value(&args.attFile),
+         "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
 	("setreg", po::value(&args.regInits)->multitoken(),
 	 "Initialize registers. Apply to all harts unless specific prefix "
 	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
@@ -1268,7 +1271,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile)
+	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
 {
   size_t len = args.traceFile.size();
   bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
@@ -1330,6 +1333,17 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 	}
     }
 
+  if (not args.attFile.empty())
+    {
+      attFile = fopen(args.attFile.c_str(), "w");
+      if (not attFile)
+        {
+          std::cerr << "Failed to open address translation file '"
+                    << args.attFile << "' for output\n";
+          return false;
+        }
+    }
+
   return true;
 }
 
@@ -1338,7 +1352,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 static
 void
 closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile)
+	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1362,6 +1376,10 @@ closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
   if (bblockFile and bblockFile != stdout)
     fclose(bblockFile);
   bblockFile = nullptr;
+
+  if (attFile and attFile != stdout)
+    fclose(attFile);
+  attFile = nullptr;
 }
 
 
@@ -1774,7 +1792,8 @@ session(const Args& args, const HartConfig& config)
   FILE* commandLog = nullptr;
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
-  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile))
+  FILE* attFile = nullptr;
+  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1792,6 +1811,8 @@ session(const Args& args, const HartConfig& config)
       hart.setConsoleOutput(consoleOut);
       if (bblockFile)
 	hart.enableBasicBlocks(bblockFile, args.bblockInsts);
+      if (attFile)
+        hart.enableAddrTransTrace(attFile);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())
@@ -1816,7 +1837,7 @@ session(const Args& args, const HartConfig& config)
   if (not args.instFreqFile.empty())
     result = reportInstructionFrequency(hart0, args.instFreqFile) and result;
 
-  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile);
+  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
 
   return result;
 }
