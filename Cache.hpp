@@ -122,6 +122,13 @@ namespace WdRiscv
       return false;
     }
 
+    /// Return number of times caches has been accessed.
+    uint64_t accessCount() const
+    { return accesses_; }
+
+    uint64_t hitCount() const
+    { return hits_; }
+
     /// Fill the given vector (cleared on entry) with the addresses of
     /// the lines curently in the cache in descending order (oldest
     /// one first) by age.
