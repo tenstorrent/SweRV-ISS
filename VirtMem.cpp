@@ -273,9 +273,12 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
-      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-      if (not pmp.isRead(privMode, privMode, false))
-        return accessFaultType(read, write, exec);
+      if (pmpMgr_.isEnabled())
+	{
+	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  if (not pmp.isRead(privMode, privMode, false))
+	    return accessFaultType(read, write, exec);
+	}
 
       if (! memory_.read(pteAddr, pte.data_))
         return pageFaultType(read, write, exec);
@@ -333,9 +336,12 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
-      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-      if (not pmp.isWrite(privMode, privMode, false))
-        return accessFaultType(read, write, exec);
+      if (pmpMgr_.isEnabled())
+	{
+	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  if (not pmp.isWrite(privMode, privMode, false))
+	    return accessFaultType(read, write, exec);
+	}
 
       if (not memory_.write(hartIx_, pteAddr, pte.data_))
         return pageFaultType(read, write, exec);
@@ -389,9 +395,12 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
-      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-      if (not pmp.isRead(privMode, privMode, false))
-        return accessFaultType(read, write, exec);
+      if (pmpMgr_.isEnabled())
+	{
+	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	  if (not pmp.isRead(privMode, privMode, false))
+	    return accessFaultType(read, write, exec);
+	}
 
       if (! memory_.read(pteAddr, pte.data_))
         return pageFaultType(read, write, exec);
@@ -441,9 +450,12 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
 	  // B1. Check PMP. The privMode here is the effective one that
 	  // already accounts for MPRV.
-	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isWrite(privMode, privMode, false))
-	    return accessFaultType(read, write, exec);
+	  if (pmpMgr_.isEnabled())
+	    {
+	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
+	      if (not pmp.isWrite(privMode, privMode, false))
+		return accessFaultType(read, write, exec);
+	    }
 
 	  {
 	    // TODO FIX : this has to be atomic

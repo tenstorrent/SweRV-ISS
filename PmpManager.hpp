@@ -159,6 +159,14 @@ namespace WdRiscv
       return Pmp();
     }
 
+    /// Enable/disable physical memory protection.
+    void enable(bool flag)
+    { enabled_ = flag; }
+
+    /// Return true if physical memory protection is enabled.
+    bool isEnabled() const
+    { return enabled_; }
+
     /// Set access mode of word-aligned words overlapping given region
     /// for user/supervisor.
     void defineRegion(uint64_t addr0, uint64_t addr1, Pmp::Type type,
@@ -180,6 +188,7 @@ namespace WdRiscv
     };
 
     std::vector<Region> regions_;
+    bool enabled_ = false;
     mutable std::vector<uint64_t> accessCount_;  // PMP entry access count.
     mutable std::vector<uint64_t> typeCount_;  // PMP type access count.
   };
