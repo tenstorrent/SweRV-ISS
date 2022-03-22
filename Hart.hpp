@@ -1220,6 +1220,10 @@ namespace WdRiscv
     void enableAddrTransTrace(FILE* file)
     { virtMem_.enableAddrTransTrace(file); }
 
+    /// Set behavior if first access to page
+    void setFaultOnFirstAccess(bool flag)
+    { virtMem_.setFaultOnFirstAccess(flag); }
+
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
     { csRegs_.enablePerModeCounterControl(flag); }

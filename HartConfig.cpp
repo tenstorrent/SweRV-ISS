@@ -1483,6 +1483,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	hart.enableCsvLog(flag);
     }
 
+  tag = "page_fault_on_first_access";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.setFaultOnFirstAccess(flag);
+    }
+
   return errors == 0;
 }
 
