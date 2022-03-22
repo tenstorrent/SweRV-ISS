@@ -616,6 +616,10 @@ namespace WdRiscv
     void setSupervisorAccessUser(bool flag)
     { supervisorOk_ = flag; }
 
+    /// Enable address translation trace
+    void enableAddrTransTrace(FILE* file)
+    { attFile_ = file; }
+
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
 
@@ -640,6 +644,8 @@ namespace WdRiscv
     bool execReadable_ = false;  // MXR bit
     bool supervisorOk_ = false;  // SUM bit
     bool faultOnFirstAccess_ = true;  // Make this configurable.
+
+    FILE* attFile_ = nullptr;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;

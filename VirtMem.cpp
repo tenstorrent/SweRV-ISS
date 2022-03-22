@@ -3,6 +3,7 @@
 #include <ios>
 #include "PmpManager.hpp"
 #include "VirtMem.hpp"
+#include "inttypes.h"
 
 using namespace WdRiscv;
 
@@ -260,6 +261,9 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 
   VA va(address);
 
+  if (attFile_)
+    fprintf(attFile_, "VA: 0x%" PRIx64 "\n", address);
+
   // 2. Root is "a" in section 4.3.2 of privileged spec.
   uint64_t root = pageTableRootPage_ * pageSize_;
   uint64_t pteAddr = 0;
@@ -282,6 +286,16 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 
       if (! memory_.read(pteAddr, pte.data_))
         return pageFaultType(read, write, exec);
+
+      if (attFile_)
+        {
+          bool leaf = pte.valid() and (pte.write() or pte.exec());
+          fprintf(attFile_, "addr: 0x%" PRIx64 "\n", pteAddr);
+          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(), pte.write(), pte.exec(),
+                                                                  pte.user(), pte.global(),
+                                                                  pte.accessed(), pte.dirty());
+          fprintf(attFile_, "leaf: %d, pa:0x%" PRIx64 "\n", leaf, ((uint64_t) pte.ppn() * pageSize_));
+        }
 
       // 4.
       if (not pte.valid() or (not pte.read() and pte.write()))
@@ -356,6 +370,9 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
   for (unsigned j = ii; j < levels; ++j)
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
 
+  if (attFile_)
+    fprintf(attFile_, "PA: 0x%" PRIx64 "\n\n", pa);
+
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
@@ -404,6 +421,16 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
       if (! memory_.read(pteAddr, pte.data_))
         return pageFaultType(read, write, exec);
+
+      if (attFile_)
+        {
+          bool leaf = pte.valid() and (pte.write() or pte.exec());
+          fprintf(attFile_, "addr: 0x%\n" PRIx64, pteAddr);
+          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(), pte.write(), pte.exec(),
+                                                                  pte.user(), pte.global(),
+                                                                  pte.accessed(), pte.dirty());
+          fprintf(attFile_, "leaf: %d, pa:0x%\n\n" PRIx64, leaf, ((uint64_t) pte.ppn() * pageSize_));
+        }
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()))

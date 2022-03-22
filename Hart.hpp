@@ -1216,6 +1216,10 @@ namespace WdRiscv
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }
 
+    /// Enable address translation trace
+    void enableAddrTransTrace(FILE* file)
+    { virtMem_.enableAddrTransTrace(file); }
+
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
     { csRegs_.enablePerModeCounterControl(flag); }
