@@ -320,7 +320,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
   if (privMode == PrivilegeMode::User and not pte.user())
     return pageFaultType(read, write, exec);
   if (privMode == PrivilegeMode::Supervisor and pte.user() and
-      not supervisorOk_)
+      (not supervisorOk_ or exec))
     return pageFaultType(read, write, exec);
 
   bool pteRead = pte.read() or (execReadable_ and pte.exec());
@@ -452,7 +452,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       if (privMode == PrivilegeMode::User and not pte.user())
 	return pageFaultType(read, write, exec);
       if (privMode == PrivilegeMode::Supervisor and pte.user() and
-	  not supervisorOk_)
+	  (not supervisorOk_ or exec))
 	return pageFaultType(read, write, exec);
 
       bool pteRead = pte.read() or (execReadable_ and pte.exec());

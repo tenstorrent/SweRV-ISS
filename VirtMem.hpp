@@ -627,6 +627,10 @@ namespace WdRiscv
     uint32_t addressSpace() const
     { return asid_; }
 
+    /// Set behavior if first access to page or store and page not dirty.
+    void setFaultOnFirstAccess(bool flag)
+    { faultOnFirstAccess_ = flag; }
+
   private:
 
     Memory& memory_;
@@ -643,7 +647,7 @@ namespace WdRiscv
     // Cached mstatus bits
     bool execReadable_ = false;  // MXR bit
     bool supervisorOk_ = false;  // SUM bit
-    bool faultOnFirstAccess_ = true;  // Make this configurable.
+    bool faultOnFirstAccess_ = true;
 
     FILE* attFile_ = nullptr;
 
