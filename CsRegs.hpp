@@ -912,6 +912,9 @@ namespace WdRiscv
     /// Helper to construtor. Define vector CSRs
     void defineVectorRegs();
 
+    /// Helper to construtor. Define floating point CSRs
+    void defineFpRegs();
+
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.
     bool setStoreErrorAddrCapture(URV value);

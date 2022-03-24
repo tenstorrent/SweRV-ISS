@@ -35,6 +35,7 @@ CsRegs<URV>::CsRegs()
   defineHypervisorRegs();
   defineDebugRegs();
   defineVectorRegs();
+  defineFpRegs();
 }
 
 
@@ -1166,11 +1167,6 @@ CsRegs<URV>::defineUserRegs()
   defineCsr("utval",    Csrn::UTVAL,    !mand, !imp, 0, wam, wam);
   defineCsr("uip",      Csrn::UIP,      !mand, !imp, 0, wam, wam);
 
-  // User Floating-Point CSRs
-  defineCsr("fflags",   Csrn::FFLAGS,   !mand, !imp, 0, wam, wam);
-  defineCsr("frm",      Csrn::FRM,      !mand, !imp, 0, wam, wam);
-  defineCsr("fcsr",     Csrn::FCSR,     !mand, !imp, 0, 0xff, 0xff);
-
   // User Counter/Timers
   defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
   defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);
@@ -1328,6 +1324,21 @@ CsRegs<URV>::defineVectorRegs()
   defineCsr("vtype",  CsrNumber::VTYPE,  !mand, !imp, 0, mask, mask);
 
   defineCsr("vlenb",  CsrNumber::VLENB,  !mand, !imp, 0, 0, 0);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineFpRegs()
+{
+  bool mand = true;  // Mndatory
+  bool imp = true;   // Implemented
+
+  // User Floating-Point CSRs
+  URV wam = ~URV(0);  // Write-all mask: all bits writeable.
+  defineCsr("fflags",   CsrNumber::FFLAGS,   !mand, !imp, 0, wam, wam);
+  defineCsr("frm",      CsrNumber::FRM,      !mand, !imp, 0, wam, wam);
+  defineCsr("fcsr",     CsrNumber::FCSR,     !mand, !imp, 0, 0xff, 0xff);
 }
 
 
