@@ -9917,6 +9917,11 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
       if (fields.bits_.TVM)
         return false;
     }
+
+  if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
+    if (not isFpLegal())
+      return false;
+
   return true;
 }
 
@@ -9932,13 +9937,6 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
       illegalInst(di);
       return;
     }
-
-  if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
-    if (not isFpLegal())
-      {
-        illegalInst(di);
-        return;
-      }
 
   // Make auto-increment happen before CSR write for minstret and cycle.
   if (csr == CsrNumber::MINSTRET or csr == CsrNumber::MINSTRETH)
