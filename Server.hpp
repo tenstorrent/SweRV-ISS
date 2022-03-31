@@ -37,7 +37,7 @@ namespace WdRiscv
 
     // Server mode disassemble command.
     void disassembleAnnotateInst(Hart<URV>& hart,
-                                 uint32_t inst, bool interrupted,
+                                 const DecodedInst& di, bool interrupted,
 				 bool hasPreTrigger, bool hasPostTrigger,
 				 std::string& text);
 

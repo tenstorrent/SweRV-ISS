@@ -152,6 +152,9 @@ namespace WdRiscv
     size_t vecRegCount() const
     { return isRvv()? vecRegs_.size() : 0; }
 
+    ssize_t vecRegSize() const
+    { return isRvv()? vecRegs_.bytesPerRegister() : 0; }
+
     /// Return size of memory in bytes.
     size_t memorySize() const
     { return memory_.size(); }
@@ -510,7 +513,7 @@ namespace WdRiscv
     const InstEntry& decode(uint32_t inst, uint32_t& op0, uint32_t& op1,
 			    uint32_t& op2, uint32_t& op3);
 
-    /// Similar to the precedning decode method but with decoded data
+    /// Similar to the preceding decode method but with decoded data
     /// placed in the given DecodedInst object.
     void decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& decodedInst);
 
@@ -628,7 +631,7 @@ namespace WdRiscv
     URV lastPc() const;
 
     /// Support for tracing: Return the index of the integer register
-    /// written by the last executed instruction. Return -1 it no
+    /// written by the last executed instruction. Return -1 if no
     /// integer register was written.
     int lastIntReg() const;
 
@@ -636,6 +639,12 @@ namespace WdRiscv
     /// register written by the last executed instruction. Return -1
     /// it no FP register was written.
     int lastFpReg() const;
+
+    /// Support for tracing: Return the index of the destination
+    /// vector register of the last executed instruction. Return -1 if
+    /// no vector register was written. Set group to the effective
+    /// group multiplier.
+    int lastVecReg(const DecodedInst& di, unsigned& group) const;
 
     /// Return true if the last executed instruction triggered a trap
     /// (had an exception or encouted an interrupt).
