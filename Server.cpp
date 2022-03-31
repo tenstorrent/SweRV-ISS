@@ -426,16 +426,15 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply)
 template <typename URV>
 void
 Server<URV>::disassembleAnnotateInst(Hart<URV>& hart,
-                                     uint32_t inst, bool interrupted,
+                                     const DecodedInst& di, bool interrupted,
 				     bool hasPreTrigger, bool hasPostTrigger,
 				     std::string& text)
 {
-  hart.disassembleInst(inst, text);
-  uint32_t op0 = 0, op1 = 0, op2 = 0, op3 = 0;
-  const InstEntry& entry = hart.decode(inst, op0, op1, op2, op3);
+  hart.disassembleInst(di.inst(), text);
+  const InstEntry& entry = *(di.instEntry());
   if (entry.isBranch())
     {
-      if (hart.lastPc() + instructionSize(inst) != hart.peekPc())
+      if (hart.lastPc() + di.instSize() != hart.peekPc())
        text += " (T)";
       else
        text += " (NT)";
@@ -511,13 +510,13 @@ collectSyscallMemChanges(Hart<URV>& hart,
           bool ok = hart.pokeMemory(slamAddr, addr, true);
           if (ok)
             {
-              changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, addr});
+              changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, addr, 8});
 
               slamAddr += 8;
               ok = hart.pokeMemory(slamAddr, val, true);
               if (ok)
                 {
-                  changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, val});
+                  changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, val, 8});
                   slamAddr += 8;
                 }
             }
@@ -560,8 +559,10 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   reply.resource = inst;
 
   // Add disassembly of instruction to reply.
+  DecodedInst di;
+  hart.decode(0 /*addr: fake*/, 0 /*physAddr: fake*/, inst, di);
   std::string text;
-  disassembleAnnotateInst(hart, inst, interrupted, hasPre, hasPost, text);
+  disassembleAnnotateInst(hart, di, interrupted, hasPre, hasPost, text);
 
   strncpy(reply.buffer, text.c_str(), sizeof(reply.buffer) - 1);
   reply.buffer[sizeof(reply.buffer) -1] = 0;
@@ -581,6 +582,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 	  msg.resource = 'r';
 	  msg.address = regIx;
 	  msg.value = value;
+	  msg.size = sizeof(msg.value);
 	  pendingChanges.push_back(msg);
 	}
     }
@@ -597,11 +599,43 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 	  msg.resource = 'f';
 	  msg.address = fpRegIx;
 	  msg.value = val;
+	  msg.size = sizeof(msg.value);
 	  pendingChanges.push_back(msg);
 	}
     }
 
-  // Collect vector register change (format not yet defined).
+  // Collect vector register change.
+  unsigned groupSize = 0;
+  int vecReg = hart.lastVecReg(di, groupSize);
+  if (vecReg >= 0)
+    {
+      for (unsigned ix = 0; ix < groupSize; ++ix, ++vecReg)
+	{
+	  std::vector<uint8_t> vecData;
+	  if (not hart.peekVecReg(vecReg, vecData))
+	    assert(0 && "Failed to peek vec register");
+
+	  // Break vector data into multiple messages each carring
+	  // 8-bytes of value.
+	  unsigned byteCount = vecData.size();
+	  for (unsigned byteIx = 0; byteIx < byteCount; )
+	    {
+	      WhisperMessage msg;
+	      msg.type = Change;
+	      msg.resource = 'v';
+	      msg.address = vecReg;
+
+	      unsigned size = sizeof(msg.value);
+	      unsigned remain = byteCount - byteIx;
+	      size = std::min(size, remain);
+	      msg.size = size;
+
+	      for (unsigned i = 0; i < size; ++i)
+		msg.value |= uint64_t(vecData.at(byteIx++)) << (8*i);
+	      pendingChanges.push_back(msg);
+	    }
+	}
+    }
 
   // Collect CSR and trigger changes.
   std::vector<CsrNumber> csrs;
@@ -662,6 +696,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   for (const auto& [key, val] : csrMap)
     {
       WhisperMessage msg(0, Change, 'c', key, val);
+      msg.size = sizeof(msg.value);
       pendingChanges.push_back(msg);
     }
 
@@ -671,7 +706,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   if (size)
     {
       WhisperMessage msg(0, Change, 'm', memAddr, memVal);
-      msg.flags = size;
+      msg.size = size;
       pendingChanges.push_back(msg);
     }
 
