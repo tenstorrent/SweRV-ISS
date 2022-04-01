@@ -705,9 +705,20 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   unsigned size = hart.lastStore(memAddr, memVal);
   if (size)
     {
-      WhisperMessage msg(0, Change, 'm', memAddr, memVal);
-      msg.size = size;
+      WhisperMessage msg(0, Change, 'm', memAddr, memVal, size);
       pendingChanges.push_back(msg);
+    }
+  else
+    {
+      std::vector<uint64_t> addr;
+      std::vector<uint64_t> data;
+      unsigned elemSize = 0;
+      if (hart.getLastVectorMemory(addr, data, elemSize) and not data.empty())
+	for (size_t i = 0; i < data.size(); ++i)
+	  {
+	    WhisperMessage msg(0, Change, 'm', addr.at(i), data.at(i), elemSize);
+	    pendingChanges.push_back(msg);
+	  }
     }
 
   // Collect emulated system call changes.
