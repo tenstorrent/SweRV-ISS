@@ -517,6 +517,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   setPc(resetPc_);
   currPc_ = pc_;
+  bbPc_ = pc_;
 
   // Enable extensions if corresponding bits are set in the MISA CSR.
   processExtensions();
@@ -2424,6 +2425,7 @@ void
 Hart<URV>::pokePc(URV address)
 {
   setPc(address);
+  bbPc_ = pc_;
 }
 
 
@@ -4434,7 +4436,12 @@ Hart<URV>::dumpBasicBlocks()
 
   // Clear basic block stats.
   for (auto& kv : basicBlocks_)
-    kv.second.count_ = 0;
+    {
+      auto& stat = kv.second;
+      stat.count_ = 0;
+      stat.access_ = 0;
+      stat.hit_ = 0;
+    }
 }
 
 
