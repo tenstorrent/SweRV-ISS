@@ -13455,7 +13455,10 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	assert(0);
 
       if (traceLdSt_)
-	vecRegs_.ldStAddr_.push_back(addr);
+	{
+	  vecRegs_.ldStSize_ = sizeof(elem);
+	  vecRegs_.ldStAddr_.push_back(addr);
+	}
     }
 }
 
@@ -13603,6 +13606,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 	      memory_.write(hartIx_, eaddr, elem);
 	      if (traceLdSt_)
 		{
+		  vecRegs_.ldStSize_ = sizeof(elem);
 		  vecRegs_.ldStAddr_.push_back(eaddr);
 		  vecRegs_.stData_.push_back(elem);
 		}
@@ -13799,7 +13803,10 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
         }
 
       if (traceLdSt_)
-	vecRegs_.ldStAddr_.push_back(addr);
+	{
+	  vecRegs_.ldStSize_ = sizeof(elem);
+	  vecRegs_.ldStAddr_.push_back(addr);
+	}
     }
 
   assert(errors == 0);
@@ -13905,6 +13912,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
       memory_.write(hartIx_, addr, elem);
       if (traceLdSt_)
 	{
+	  vecRegs_.ldStSize_ = sizeof(elem);
 	  vecRegs_.ldStAddr_.push_back(addr);
 	  vecRegs_.stData_.push_back(elem);
 	}
@@ -14105,7 +14113,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
         }
 
       if (traceLdSt_)
-	vecRegs_.ldStAddr_.push_back(addr);
+	{
+	  vecRegs_.ldStSize_ = sizeof(elem);
+	  vecRegs_.ldStAddr_.push_back(addr);
+	}
     }
 
   assert(errors == 0);
@@ -14255,6 +14266,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	      memory_.write(hartIx_, eaddr, elem);
 	      if (traceLdSt_)
 		{
+		  vecRegs_.ldStSize_ = sizeof(elem);
 		  vecRegs_.ldStAddr_.push_back(eaddr);
 		  vecRegs_.stData_.push_back(elem);
 		}
@@ -14426,7 +14438,10 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
         }
 
       if (traceLdSt_)
-	vecRegs_.ldStAddr_.push_back(eaddr);
+	{
+	  vecRegs_.ldStSize_ = elemSize;
+	  vecRegs_.ldStAddr_.push_back(eaddr);
+	}
     }
 }
 
@@ -14607,6 +14622,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       if (traceLdSt_)
 	{
+	  vecRegs_.ldStSize_ = elemSize;
 	  vecRegs_.ldStAddr_.push_back(eaddr);
 	  vecRegs_.stData_.push_back(data);
 	}
@@ -14752,7 +14768,10 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    assert(0);
 
 	  if (traceLdSt_)
-	    vecRegs_.ldStAddr_.push_back(faddr);
+	    {
+	      vecRegs_.ldStSize_ = sizeof(elem);
+	      vecRegs_.ldStAddr_.push_back(faddr);
+	    }
 	}
     }
 }
@@ -14905,6 +14924,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	      memory_.write(hartIx_, faddr, elem);
 	      if (traceLdSt_)
 		{
+		  vecRegs_.ldStSize_ = sizeof(elem);
 		  vecRegs_.ldStAddr_.push_back(faddr);
 		  vecRegs_.stData_.push_back(elem);
 		}
@@ -15248,7 +15268,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  if (traceLdSt_)
-	    vecRegs_.ldStAddr_.push_back(physAddr);
+	    {
+	      vecRegs_.ldStSize_ = elemSize;
+	      vecRegs_.ldStAddr_.push_back(physAddr);
+	    }
 	}
     }
 }
@@ -15435,6 +15458,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
 	  if (traceLdSt_)
 	    {
+	      vecRegs_.ldStSize_ = elemSize;
 	      vecRegs_.ldStAddr_.push_back(faddr);
 	      vecRegs_.stData_.push_back(data);
 	    }

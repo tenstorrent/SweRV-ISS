@@ -186,3 +186,21 @@ VecRegs::findReg(const std::string& name, unsigned& ix) const
   ix = n;
   return true;
 }
+
+
+bool
+VecRegs::getLastMemory(std::vector<uint64_t>& addresses,
+		       std::vector<uint64_t>& data,
+		       unsigned& elementSize) const
+{
+  addresses.clear();
+  data.clear();
+  elementSize = ldStSize_;
+
+  if (ldStSize_ == 0)
+    return false;
+
+  addresses = ldStAddr_;
+  data = stData_;
+  return true;
+}

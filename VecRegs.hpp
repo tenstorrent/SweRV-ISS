@@ -271,6 +271,16 @@ namespace WdRiscv
     /// 2.
     bool findReg(const std::string& name, unsigned& ix) const;
 
+    /// Get the addresses, data, and element size of the memory
+    /// locations accessed by the most recent instruction. Return true
+    /// on success and false if the most recent instruction was not a
+    /// memory-referencing vector instruction. If most recent instruction
+    /// was not a store, then data will be cleared; otherwise, it will have
+    /// as many elements as addresses.
+    bool getLastMemory(std::vector<uint64_t>& addresses,
+		       std::vector<uint64_t>& data,
+		       unsigned& elementSize) const;
+
     /// Set symbol to the symbolic value of the given numeric group
     /// multiplier (premultiplied by 8). Return true on success and
     /// false if groupX8 is out of bounds.
@@ -340,6 +350,7 @@ namespace WdRiscv
     /// Clear load/address and store data used for logging/tracing./
     void clearTraceData()
     {
+      ldStSize_ = 0;
       ldStAddr_.clear();
       stData_.clear();
       clearLastWrittenReg();
@@ -523,6 +534,7 @@ namespace WdRiscv
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.
+    unsigned ldStSize_ = 0;
     std::vector<uint64_t> ldStAddr_;  // Addresses of vector load/store instruction
     std::vector<uint64_t> stData_;    // Data of vector store instruction
     std::vector<unsigned> opsEmul_;   // Effecive grouping of vector operands.
