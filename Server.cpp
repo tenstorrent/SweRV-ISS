@@ -615,8 +615,14 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 	  if (not hart.peekVecReg(vecReg, vecData))
 	    assert(0 && "Failed to peek vec register");
 
-	  // Break vector data into multiple messages each carring
-	  // 8-bytes of value.
+	  // Reverse bytes since peekVecReg returns most significant
+	  // byte first.
+	  std::reverse(vecData.begin(), vecData.end());
+
+	  // Send a change message for each vector element starting
+	  // with element zero and assuming a vector of double words
+	  // (uint64_t). Last element will be padded with zeros if
+	  // vector size in bytes is not a multiple of 8.
 	  unsigned byteCount = vecData.size();
 	  for (unsigned byteIx = 0; byteIx < byteCount; )
 	    {
