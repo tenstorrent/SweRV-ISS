@@ -113,8 +113,14 @@ namespace WdRiscv
 		bool internal);
     
     /// Initiate a merge buffer write.  All associated store write
-    /// transactions are marked completed. Write instructions where all
-    /// writes are complete are marked complete. Return true on success.
+    /// transactions are marked completed. Write instructions where
+    /// all writes are complete are marked complete. Return true on
+    /// success.  The given physical address must be a multiple of the
+    /// merge buffer line size (which is also the cache line
+    /// size). The rtlData vector must be of size n or larger where n
+    /// is the merge buffer line size. The rtlData bytes will be
+    /// placed in memory in consecutive locations starting with
+    /// physAddr.
     bool mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 			  const std::vector<uint8_t>& rtlData);
 
@@ -141,6 +147,7 @@ namespace WdRiscv
     bool getCurrentLoadValue(Hart<URV>& hart, uint64_t addr, unsigned size,
 			     uint64_t& value);
 
+    /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
     { return lineSize_; }
 
@@ -281,7 +288,7 @@ namespace WdRiscv
 
     WdRiscv::System<URV>& system_;
     uint64_t time_ = 0;
-    unsigned lineSize_ = 64; // Cache/merge buffer line size.
+    unsigned lineSize_ = 64; // Merge buffer line size.
 
     std::vector<McmInstrIx> currentInstrTag_;
 
