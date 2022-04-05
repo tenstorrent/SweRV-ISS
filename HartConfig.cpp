@@ -1753,9 +1753,13 @@ defineMacoSideEffects(System<URV>& system)
 
           // Define pre-write/pre-poke callback: If lock bit is set,
           // then preserve CSR value
-          auto pre = [hart, rv32] (Csr<URV>& csr, URV& val) -> void {
+	  std::weak_ptr<Hart<URV>> wHart(hart);
+          auto pre = [wHart, rv32] (Csr<URV>& csr, URV& val) -> void {
+		       auto hart = wHart.lock();
+		       if (not hart)
+			 return;  // Should not happen.
                        URV previous = 0;
-                       hart->peekCsr(csr.getNumber(), previous);
+		       hart->peekCsr(csr.getNumber(), previous);
                        if (previous & URV(Maco32Masks::Lock))
                          val = previous;  // Locked: keep previous value
                        else if (not rv32)
@@ -1770,7 +1774,10 @@ defineMacoSideEffects(System<URV>& system)
 
           // Define post-write/post-poke callback. Upddate the idempotent
           // regions of the hart.
-          auto post = [hart, macoIx, rv32] (Csr<URV>& csr, URV val) -> void {
+          auto post = [wHart, macoIx, rv32] (Csr<URV>& csr, URV val) -> void {
+		        auto hart = wHart.lock();
+			if (not hart)
+			  return;    // Should not happen.
                         uint64_t start = 0, end = 0;
                         bool idempotent = false, cacheable = false;
                         URV mask = csr.getWriteMask();
@@ -1812,15 +1819,23 @@ defineMdacSideEffects(System<URV>& system)
                      val = (val & ~mask) | 0b10;
                  };
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // Mdac is not shared between harts.
-      auto post = [hart] (Csr<URV>&, URV val) -> void {
+      auto post = [wHart] (Csr<URV>&, URV val) -> void {
+		    auto hart = wHart.lock();
+		    if (not hart)
+		      return;  // Should not happen.
                     bool idempotent = (val & 2) == 0;
                     bool cacheable = (val & 1);
                     hart->setDefaultIdempotent(idempotent);
                     hart->setDefaultCacheable(cacheable);
                   };
 
-      auto reset = [hart] (Csr<URV>& csr) -> void {
+      auto reset = [wHart] (Csr<URV>& csr) -> void {
+	  auto hart = wHart.lock();
+	  if (not hart)
+	    return;  // Should not happen.
           URV val = csr.read();
           bool idempotent = (val & 2) == 0;
           bool cacheable = (val & 1);
@@ -1873,7 +1888,11 @@ defineMnmipdelSideEffects(System<URV>& system)
                  };
 
       // On reset, enable NMI in harts according to the bits of mnmipdel
-      auto reset = [hart] (Csr<URV>& csr) -> void {
+      std::weak_ptr<Hart<URV>> wHart(hart);
+      auto reset = [wHart] (Csr<URV>& csr) -> void {
+	           auto hart = wHart.lock();
+		   if (not hart)
+		     return;  // Should not happen.
                    URV val = csr.read();
                    URV id = hart->sysHartIndex();
                    bool flag = (val & (URV(1) << id)) != 0;
@@ -1903,8 +1922,13 @@ defineMpmcSideEffects(System<URV>& system)
       if (not csrPtr)
         continue;
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // Writing 3 to pmpc enables external interrupts unless in debug mode.
-      auto prePoke = [hart] (Csr<URV>& csr, URV& val) -> void {
+      auto prePoke = [wHart] (Csr<URV>& csr, URV& val) -> void {
+		       auto hart = wHart.lock();
+		       if (not hart)
+			 return;  // Should not happen.
                        if (hart->inDebugMode() or (val & 3) != 3 or
                            (val & csr.getPokeMask()) == 0)
                          return;
@@ -1916,7 +1940,10 @@ defineMpmcSideEffects(System<URV>& system)
                        hart->pokeCsr(CsrNumber::MSTATUS, fields.value_);
                      };
 
-      auto preWrite = [hart] (Csr<URV>& csr, URV& val) -> void {
+      auto preWrite = [wHart] (Csr<URV>& csr, URV& val) -> void {
+		       auto hart = wHart.lock();
+		       if (not hart)
+			 return;  // Should not happen.
                         if (hart->inDebugMode() or (val & 3) != 3 or
                            (val & csr.getWriteMask()) == 0)
                           return;
@@ -1951,9 +1978,14 @@ defineMgpmcSideEffects(System<URV>& system)
       if (not csrPtr)
         continue;
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // For poke, the effect takes place immediately (next instruction
       // will see the new control).
-      auto postPoke = [hart] (Csr<URV>&, URV val) -> void {
+      auto postPoke = [wHart] (Csr<URV>&, URV val) -> void {
+		        auto hart = wHart.lock();
+			if (not hart)
+			  return;  // Should not happen.
                         bool enable = (val & 1) == 1;
                         URV mask = enable? ~URV(0) : 0;
                         mask |= 7; // cycle/time/instret not controlled by mgpmc
@@ -1963,7 +1995,10 @@ defineMgpmcSideEffects(System<URV>& system)
 
       // For write (invoked from current instruction), the effect
       // takes place on the following instruction.
-      auto postWrite = [hart] (Csr<URV>&, URV val) -> void {
+      auto postWrite = [wHart] (Csr<URV>&, URV val) -> void {
+		        auto hart = wHart.lock();
+		        if (not hart)
+			  return;  // Should not happen.
                         bool enable = (val & 1) == 1;
                         URV mask = enable? ~URV(0) : 0;
                         mask |= 7; // cycle/time/instret not controlled by mgpmc
@@ -1988,16 +2023,24 @@ defineMcountinhibitSideEffects(System<URV>& system)
       if (not csrPtr)
         continue;
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // For poke, the effect takes place immediately (next instruction
       // will see the new control).
-      auto postPoke = [hart] (Csr<URV>&, URV val) -> void {
+      auto postPoke = [wHart] (Csr<URV>&, URV val) -> void {
+		        auto hart = wHart.lock();
+			if (not hart)
+			  return;  // Should not happen.
                         hart->setPerformanceCounterControl(~val);
                         hart->setPerformanceCounterControl(~val);
                       };
 
       // For write (invoked from current instruction), the effect
       // takes place on the following instruction.
-      auto postWrite = [hart] (Csr<URV>&, URV val) -> void {
+      auto postWrite = [wHart] (Csr<URV>&, URV val) -> void {
+	                 auto hart = wHart.lock();
+			 if (not hart)
+			   return;  // Should not happen.
                          hart->setPerformanceCounterControl(~val);
                        };
 
