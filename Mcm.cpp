@@ -30,6 +30,9 @@ Mcm<URV>::Mcm(System<URV>& system, unsigned mergeBufferSize)
 
   hartBranchTimes_.resize(system.hartCount());
   hartBranchProducers_.resize(system.hartCount());
+
+  // If no merge buffer, then memory is updated on insert messages.
+  writeOnInsert_ = (lineSize_ == 0);
 }
 
 
@@ -273,17 +276,40 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.isRead_ = false;
   op.internal_ = false;
 
-  hartPendingWrites_.at(hartIx).push_back(op);
+  if (not writeOnInsert_)
+    hartPendingWrites_.at(hartIx).push_back(op);
 
   // If corresponding insruction is retired, compare to its data.
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   assert(instr);
   if (not instr)
     return false;
-  if (instr->retired_)
-    return checkRtlWrite(hart.hartId(), *instr, op);
 
-  return true;
+  bool result = true;
+
+  if (writeOnInsert_)
+    {
+      // Associate write op with instruction.
+      instr->addMemOp(sysMemOps_.size());
+      sysMemOps_.push_back(op);
+      if (checkStoreComplete(*instr))
+	{
+	  instr->complete_ = true;
+	  if (instr->retired_)
+	    if (not ppoRule1(hart, *instr))
+	      result = false;
+	}
+
+      // Commit write to memory. 
+      for (unsigned i = 0; i < op.size_; ++i)
+	hart.pokeMemory(physAddr + i, uint8_t(rtlData >> (i*8)), true);
+    }
+
+  if (instr->retired_)
+    if (not checkRtlWrite(hart.hartId(), *instr, op))
+      result = false;
+
+  return result;
 }
 
 
@@ -389,6 +415,12 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 {
   if (not updateTime("Mcm::mergeBufferWrite", time))
     return false;
+
+  if (lineSize_ == 0)
+    {
+      std::cerr << "Merge buffer write attempted when merge buffer is disabled\n";
+      return false;
+    }
 
   assert(rtlData.size() <= lineSize_);
 

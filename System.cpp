@@ -114,12 +114,13 @@ System<URV>::enableMcm(unsigned mbLineSize)
       return true;
     }
 
-  if (mbLineSize == 0 or not isPowerOf2(mbLineSize) or mbLineSize > 512)
-    {
-      std::cerr << "Error: Invalide merge buffer line size: "
-		<< mbLineSize << '\n';
-      return false;
-    }
+  if (mbLineSize != 0)
+    if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
+      {
+	std::cerr << "Error: Invalid merge buffer line size: "
+		  << mbLineSize << '\n';
+	return false;
+      }
 
   mcm_ = new Mcm<URV>(*this, mbLineSize);
   mbSize_ = mbLineSize;

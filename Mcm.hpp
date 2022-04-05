@@ -290,6 +290,8 @@ namespace WdRiscv
     uint64_t time_ = 0;
     unsigned lineSize_ = 64; // Merge buffer line size.
 
+    bool writeOnInsert_ = false;
+
     std::vector<McmInstrIx> currentInstrTag_;
 
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
