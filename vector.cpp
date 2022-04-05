@@ -11320,7 +11320,7 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, group))
     return;
 
-  int e1 = SRV(intRegs_.read(rs1));
+  SRV e1 = intRegs_.read(rs1);
 
   typedef ElementWidth EW;
   switch (sew)
