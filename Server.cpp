@@ -821,7 +821,18 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // trigger got tripped.
   uint64_t interruptCount = hart.getInterruptCount();
 
-  hart.singleStep(traceFile);
+  // Memory consistency model support. No-op if mcm is off.
+  if (system_.isMcmEnabled())
+    {
+      system_.mcmSetCurrentInstruction(hart, req.instrTag);
+      DecodedInst di;
+      hart.singleStep(di, traceFile);
+      if (not di.isValid())
+	assert(hart.lastInstructionTrapped());
+      system_.mcmRetire(hart, req.time, req.instrTag, di);
+    }
+  else
+    hart.singleStep(traceFile);
 
   bool interrupted = hart.getInterruptCount() != interruptCount;
 

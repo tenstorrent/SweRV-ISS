@@ -150,6 +150,10 @@ namespace WdRiscv
     /// the merge buffer line size in bytes.
     bool enableMcm(unsigned mergeBufferSize);
 
+    /// Return true if memory consistency model is enabled.
+    bool isMcmEnabled() const
+    { return mcm_ != nullptr; }
+
     /// Return the merge buffer line size in bytes (see enableMcm).
     unsigned mergeBufferSize() const
     { return mbSize_; }
