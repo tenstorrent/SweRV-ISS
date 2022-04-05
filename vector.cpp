@@ -11355,7 +11355,7 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, group))
     return;
 
-  int e1 = di->op1As<int32_t>();
+  int32_t e1 = di->op1As<int32_t>();
 
   typedef ElementWidth EW;
   switch (sew)
