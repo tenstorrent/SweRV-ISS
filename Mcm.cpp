@@ -613,8 +613,14 @@ bool
 Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 		       const MemoryOp& op)
 {
-  assert(instr.size_ > 0);
-  assert(op.size_ <= instr.size_);
+  if (op.size_ > instr.size_)
+    {
+      cerr << "Error: Read operation size (" << unsigned(op.size_) << ") larger than "
+	   << "instruction data size (" << unsigned(instr.size_) << "): Hart-id="
+	   << hartId << " time=" << op.time_ << " tag=" << instr.tag_ << '\n';
+      return false;
+    }
+
   if (op.rtlData_ != op.data_)
     {
       cerr << "Error: RTL/whisper read mismatch time=" << op.time_
