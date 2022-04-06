@@ -11044,7 +11044,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
 
     case ElementWidth::Word:
       {
-        uint32_t val = 0;
+        int32_t val = 0;
         vecRegs_.read(vs1, 0, groupX8, val);
         intRegs_.write(rd, SRV(val));
       }
@@ -11320,7 +11320,7 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, group))
     return;
 
-  int e1 = SRV(intRegs_.read(rs1));
+  SRV e1 = intRegs_.read(rs1);
 
   typedef ElementWidth EW;
   switch (sew)
@@ -11355,7 +11355,7 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, group))
     return;
 
-  int e1 = di->op1As<int32_t>();
+  int32_t e1 = di->op1As<int32_t>();
 
   typedef ElementWidth EW;
   switch (sew)
