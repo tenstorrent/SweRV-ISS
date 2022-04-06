@@ -955,7 +955,7 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 	      if (commandLog)
 		{
 		  if (system_.isMcmEnabled())
-		    fprintf(commandLog, "hart=%d time=%s step 1 %" PRId64 ,
+		    fprintf(commandLog, "hart=%d time=%s step 1 %" PRId64 "\n",
 			    hartId, timeStamp.c_str(), msg.instrTag);
 		  else
 		    fprintf(commandLog, "hart=%d step #%" PRId64 " # ts=%s\n",
