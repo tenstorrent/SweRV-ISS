@@ -11044,7 +11044,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
 
     case ElementWidth::Word:
       {
-        uint32_t val = 0;
+        int32_t val = 0;
         vecRegs_.read(vs1, 0, groupX8, val);
         intRegs_.write(rd, SRV(val));
       }
