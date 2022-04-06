@@ -953,8 +953,14 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 	    case Step:
 	      stepCommand(msg, pendingChanges, reply, traceFile);
 	      if (commandLog)
-		fprintf(commandLog, "hart=%d step #%" PRId64 " # ts=%s\n",
-                        hartId, hart.getInstructionCount(), timeStamp.c_str());
+		{
+		  if (system_.isMcmEnabled())
+		    fprintf(commandLog, "hart=%d time=%s step 1 %" PRId64 ,
+			    hartId, timeStamp.c_str(), msg.instrTag);
+		  else
+		    fprintf(commandLog, "hart=%d step #%" PRId64 " # ts=%s\n",
+			    hartId, hart.getInstructionCount(), timeStamp.c_str());
+		}
 	      break;
 
 	    case ChangeCount:
