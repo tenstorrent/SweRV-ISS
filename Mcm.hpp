@@ -4,6 +4,7 @@
 #include <array>
 #include <algorithm>
 #include <cassert>
+#include <iostream>
 #include "DecodedInst.hpp"
 
 
@@ -257,7 +258,8 @@ namespace WdRiscv
 
     void cancelInstr(McmInstr& instr)
     {
-      assert(not instr.isCanceled());
+      if (instr.isCanceled())
+	std::cerr << "Instr with tag=" << instr.tag_ << " already canceled\n";
       instr.cancel();
       for (auto memIx : instr.memOps_)
 	{
