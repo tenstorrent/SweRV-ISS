@@ -1503,6 +1503,8 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   auto producerTag = hartBranchProducers_.at(hartIx);
+  if (hartBranchTimes_.at(hartIx) == 0)
+    return true;
 
   const auto& instrVec = hartInstrVecs_.at(hartIx);
   if (producerTag >= instrVec.size())
