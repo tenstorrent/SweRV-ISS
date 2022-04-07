@@ -1674,17 +1674,14 @@ Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
   if (clintTimerAddrToHart_)
     {
       auto hart = clintTimerAddrToHart_(addr);
-      if (not hart)
+      if (hart)
 	{
-	  storeVal = 0;
+	  hart->alarmLimit_ = storeVal;
+	  URV mipVal = hart->csRegs_.peekMip();
+	  mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+	  hart->pokeCsr(CsrNumber::MIP, mipVal);
 	  return;
 	}
-
-      hart->alarmLimit_ = storeVal;
-      URV mipVal = hart->csRegs_.peekMip();
-      mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-      hart->pokeCsr(CsrNumber::MIP, mipVal);
-      return;
     }
 
   if (addr == 0x200bff8)
@@ -1696,25 +1693,26 @@ Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
   if (clintSoftAddrToHart_)
     {
       auto hart = clintSoftAddrToHart_(addr);
-      if (not hart)
+      if (hart)
 	{
-	  storeVal = 0;
-	  return;  // Address is not in range of harts in system.
+	  if (stSize != 4)
+	    return;  // Must be sw
+
+	  storeVal = storeVal & 1;  // Only bit zero is implemented.
+
+	  URV mipVal = csRegs_.peekMip();
+	  if (storeVal)
+	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
+	  hart->pokeCsr(CsrNumber::MIP, mipVal);
+	  recordCsrWrite(CsrNumber::MIP);
+	  return;
 	}
-
-      if (stSize != 4)
-        return;  // Must be sw
-
-      storeVal = storeVal & 1;  // Only bit zero is implemented.
-
-      URV mipVal = csRegs_.peekMip();
-      if (storeVal)
-        mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
-      else
-        mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
-      hart->pokeCsr(CsrNumber::MIP, mipVal);
-      recordCsrWrite(CsrNumber::MIP);
     }
+
+  // Address did not match any hart entry in clint.
+  storeVal = 0;
 }
 
 

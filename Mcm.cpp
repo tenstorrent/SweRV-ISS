@@ -603,8 +603,12 @@ Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
   if (instrTag > vec.size())
     vec.resize(instrTag);
 
-  while (instrTag and not vec.at(instrTag-1).retired_)
-    cancelInstr(vec.at(--instrTag));
+  while (instrTag)
+    {
+      if (vec.at(instrTag-1).retired_ or vec.at(instrTag-1).canceled_)
+	break;
+      cancelInstr(vec.at(--instrTag));
+    }
 }
 
 
@@ -658,7 +662,7 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
     return true;
 
   cerr << "Error: RTL/whisper write mismatch time=" << op.time_
-       << " hart-id=" << hartId << " instr-tag=0x" << std::hex
+       << " hart-id=" << hartId << " instr-tag="
        << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
        << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
        << " whisper=0x" << data << std::dec << '\n';
