@@ -825,7 +825,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   if (system_.isMcmEnabled())
     {
       system_.mcmSetCurrentInstruction(hart, req.instrTag);
-      hart.setInstructionCount(req.instrTag);
+      hart.setInstructionCount(req.instrTag - 1);
       DecodedInst di;
       hart.singleStep(di, traceFile);
       if (not di.isValid())
