@@ -628,7 +628,7 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
   if (op.rtlData_ != op.data_)
     {
       cerr << "Error: RTL/whisper read mismatch time=" << op.time_
-	   << " hart-id=" << hartId << " instr-tag=0x" << std::hex
+	   << " hart-id=" << hartId << " instr-tag=" 
 	   << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
 	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
 	   << " whisper=0x" << op.data_ << std::dec << '\n';
@@ -916,7 +916,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
   if (mergeMask != expectedMask)
     {
       cerr << "Error: Read ops do not cover all the bytes of load instruction"
-	   << " tag=0x" << std::hex << tag << std::dec << '\n';
+	   << " tag=" << tag << '\n';
       ok = false;
     }
 
@@ -947,7 +947,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 
       cerr << "Error: Internal read forwards from an atomic instruction"
 	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
-	   << " instr-tag=0x" << std::hex << tag << " addr=0x"
+	   << " instr-tag=" << tag << " addr=0x" << std::hex
 	   << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
       return false;
     }
@@ -956,7 +956,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
     {
       cerr << "Error: Internal read does not forward from preceeding stores"
 	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
-	   << " instr-tag=0x" << std::hex << tag << " addr=0x"
+	   << " instr-tag=" << tag << " addr=0x" << std::hex
 	   << op.physAddr_ << std::dec << '\n';
       return false;
     }
