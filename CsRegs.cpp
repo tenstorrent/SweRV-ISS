@@ -862,10 +862,11 @@ CsRegs<URV>::defineMachineRegs()
   using Csrn = CsrNumber;
 
   // Machine info.
-  defineCsr("mvendorid", Csrn::MVENDORID, mand, imp, 0, rom, rom);
-  defineCsr("marchid",   Csrn::MARCHID,   mand, imp, 0, rom, rom);
-  defineCsr("mimpid",    Csrn::MIMPID,    mand, imp, 0, rom, rom);
-  defineCsr("mhartid",   Csrn::MHARTID,   mand, imp, 0, rom, rom);
+  defineCsr("mvendorid",  Csrn::MVENDORID,  mand, imp, 0, rom, rom);
+  defineCsr("marchid",    Csrn::MARCHID,    mand, imp, 0, rom, rom);
+  defineCsr("mimpid",     Csrn::MIMPID,     mand, imp, 0, rom, rom);
+  defineCsr("mhartid",    Csrn::MHARTID,    mand, imp, 0, rom, rom);
+  defineCsr("mconfigptr", Csrn::MCONFIGPTR, mand, imp, 0, rom, rom);
 
   // Machine status setup.
 

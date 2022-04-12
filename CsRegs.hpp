@@ -38,6 +38,7 @@ namespace WdRiscv
       MARCHID = 0xF12,
       MIMPID = 0xF13,
       MHARTID = 0xF14,
+      MCONFIGPTR = 0xF15,
 
       // Machine trap setup.
       MSTATUS = 0x300,
