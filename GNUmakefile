@@ -56,7 +56,12 @@ endif
 
 MEM_CALLBACKS := 1
 ifeq ($(MEM_CALLBACKS), 1)
-override CPPFLAGS += -DMEM_CALLBACKS
+  ifdef FAST_SLOPPY
+    $(warning "FAST_SLOPPY not compatible with MEM_CALLBACKS, turning off MEM_CALLBACKS")
+    MEM_CALLBACKS := 0
+  else
+    override CPPFLAGS += -DMEM_CALLBACKS
+  endif
 endif
 
 ifdef FAST_SLOPPY
