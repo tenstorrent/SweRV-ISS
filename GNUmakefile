@@ -54,7 +54,8 @@ soft_float_build := $(wildcard $(PWD)/third_party/softfloat/build/RISCV-GCC)
 soft_float_lib := $(soft_float_build)/softfloat.a
 endif
 
-ifdef MEM_CALLBACKS
+MEM_CALLBACKS := 1
+ifeq ($(MEM_CALLBACKS), 1)
 override CPPFLAGS += -DMEM_CALLBACKS
 endif
 
