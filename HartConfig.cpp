@@ -1352,6 +1352,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  tag = "enable_zk";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzk(flag);
+      else
+        errors++;
+    }
+
   tag = "even_odd_trigger_chains";
   if (config_ -> count(tag))
     {

@@ -320,6 +320,8 @@ Hart<URV>::processExtensions()
     enableRvzbs(true);
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
+  if (isa_.isEnabled(RvExtension::Zk))
+    enableRvzk(true);
 }
 
 
@@ -5993,6 +5995,38 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vfsgnjn_vf,
      &&vfsgnjx_vv,
      &&vfsgnjx_vf,
+
+     // zk
+     &&aes32dsi,
+     &&aes32dsmi,
+     &&aes32esi,
+     &&aes32esmi,
+     &&aes64ds,
+     &&aes64dsm,
+     &&aes64es,
+     &&aes64esm,
+     &&aes64im,
+     &&aes64ks1i,
+     &&aes64ks2,
+     &&sha256sig0,
+     &&sha256sig1,
+     &&sha256sum0,
+     &&sha256sum1,
+     &&sha512sig0h,
+     &&sha512sig0l,
+     &&sha512sig1h,
+     &&sha512sig1l,
+     &&sha512sum0r,
+     &&sha512sum1r,
+     &&sha512sig0,
+     &&sha512sig1,
+     &&sha512sum0,
+     &&sha512sum1,
+     &&sm3p0,
+     &&sm3p1,
+     &&sm4ed,
+     &&sm4ks,
+
     };
 
   const InstEntry* entry = di->instEntry();
@@ -9142,6 +9176,122 @@ Hart<URV>::execute(const DecodedInst* di)
 
  vfsgnjx_vf:
   execVfsgnjx_vf(di);
+  return;
+
+ aes32dsi:
+  execAes32dsi(di);
+  return;
+
+ aes32dsmi:
+  execAes32dsmi(di);
+  return;
+
+ aes32esi:
+  execAes32esi(di);
+  return;
+
+ aes32esmi:
+  execAes32esmi(di);
+  return;
+
+ aes64ds:
+  execAes64ds(di);
+  return;
+
+ aes64dsm:
+  execAes64dsm(di);
+  return;
+
+ aes64es:
+  execAes64es(di);
+  return;
+
+ aes64esm:
+  execAes64esm(di);
+  return;
+
+ aes64im:
+  execAes64im(di);
+  return;
+
+ aes64ks1i:
+  execAes64ks1i(di);
+  return;
+
+ aes64ks2:
+  execAes64ks2(di);
+  return;
+
+ sha256sig0:
+  execSha256sig0(di);
+  return;
+
+ sha256sig1:
+  execSha256sig1(di);
+  return;
+
+ sha256sum0:
+  execSha256sum0(di);
+  return;
+
+ sha256sum1:
+  execSha256sum1(di);
+  return;
+
+ sha512sig0h:
+  execSha512sig0h(di);
+  return;
+
+ sha512sig0l:
+  execSha512sig0l(di);
+  return;
+
+ sha512sig1h:
+  execSha512sig1h(di);
+  return;
+
+ sha512sig1l:
+  execSha512sig1l(di);
+  return;
+
+ sha512sum0r:
+  execSha512sum0r(di);
+  return;
+
+ sha512sum1r:
+  execSha512sum1r(di);
+  return;
+
+ sha512sig0:
+  execSha512sig0(di);
+  return;
+
+ sha512sig1:
+  execSha512sig1(di);
+  return;
+
+ sha512sum0:
+  execSha512sum0(di);
+  return;
+
+ sha512sum1:
+  execSha512sum1(di);
+  return;
+
+ sm3p0:
+  execSm3p0(di);
+  return;
+
+ sm3p1:
+  execSm3p1(di);
+  return;
+
+ sm4ed:
+  execSm4ed(di);
+  return;
+
+ sm4ks:
+  execSm4ks(di);
   return;
 }
 

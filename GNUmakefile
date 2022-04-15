@@ -125,7 +125,8 @@ RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
 	    Syscall.cpp PmaManager.cpp DecodedInst.cpp snapshot.cpp \
 	    PmpManager.cpp VirtMem.cpp Core.cpp System.cpp Cache.cpp \
 	    Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
-	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp ArchInfo.cpp
+	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp ArchInfo.cpp \
+	    crypto.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp

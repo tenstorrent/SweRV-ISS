@@ -2111,6 +2111,27 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	if      (funct3 == 0)  return instTable_.getEntry(InstId::addi);
 	else if (funct3 == 1)
 	  {
+	    if (op2 == 0x100)
+	      return instTable_.getEntry(InstId::sha256sum0);
+	    if (op2 == 0x101)
+	      return instTable_.getEntry(InstId::sha256sum1);
+	    if (op2 == 0x102)
+	      return instTable_.getEntry(InstId::sha256sig0);
+	    if (op2 == 0x103)
+	      return instTable_.getEntry(InstId::sha256sig1);
+	    if (op2 == 0x104)
+	      return instTable_.getEntry(InstId::sha512sum0);
+	    if (op2 == 0x105)
+	      return instTable_.getEntry(InstId::sha512sum1);
+	    if (op2 == 0x106)
+	      return instTable_.getEntry(InstId::sha512sig0);
+	    if (op2 == 0x107)
+	      return instTable_.getEntry(InstId::sha512sig1);
+	    if (op2 == 0x108)
+	      return instTable_.getEntry(InstId::sm3p0);
+	    if (op2 == 0x109)
+	      return instTable_.getEntry(InstId::sm3p1);
+
 	    unsigned top5 = iform.uimmed() >> 7;
 	    unsigned amt = iform.uimmed() & 0x7f;
 	    if (top5 == 0)
@@ -2163,6 +2184,15 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		op2 = amt;
                 if (funct3 == 1)
                   return instTable_.getEntry(InstId::binvi);
+	      }
+	    else if (op2 == 0x300)
+	      {
+		return instTable_.getEntry(InstId::aes64im);
+	      }
+	    else if ((op2 >> 4) == 0x31) // op2 == 0x0x31?
+	      {
+		op2 = op2 & 0xf;
+		return instTable_.getEntry(InstId::aes64ks1i);
 	      }
 	  }
 	else if (funct3 == 2)  return instTable_.getEntry(InstId::slti);
@@ -2380,6 +2410,22 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	    if (funct3 == 6) return instTable_.getEntry(InstId::xperm_h);
             if (funct3 == 5) return instTable_.getEntry(InstId::gorc);
 	  }
+	else if (funct7 == 0x19)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64es);
+	  }
+	else if (funct7 == 0x1b)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64esm);
+	  }
+	else if (funct7 == 0x1d)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64ds);
+	  }
+	else if (funct7 == 0x1f)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64dsm);
+	  }
 	else if (funct7 == 0x20)
 	  {
 	    if (funct3 == 0) return instTable_.getEntry(InstId::sub);
@@ -2397,6 +2443,30 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	    if (funct3 == 5) return instTable_.getEntry(InstId::bext);
             if (funct3 == 7) return instTable_.getEntry(InstId::bfp);
 	  }
+	else if (funct7 == 0x28)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum0r);
+	  }
+	else if (funct7 == 0x29)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum1r);
+	  }
+	else if (funct7 == 0x2a)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0l);
+	  }
+	else if (funct7 == 0x2b)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1l);
+	  }
+	else if (funct7 == 0x2e)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0h);
+	  }
+	else if (funct7 == 0x2f)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1h);
+	  }
 	else if (funct7 == 0x30)
 	  {
 	    if (funct3 == 1) return instTable_.getEntry(InstId::rol);
@@ -2406,6 +2476,38 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  {
 	    if (funct3 == 1) return instTable_.getEntry(InstId::binv);
             if (funct3 == 5) return instTable_.getEntry(InstId::grev);
+	  }
+	else if (funct7 == 0x3f)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64ks2);
+	  }
+	else if ((funct7 & 0x1f) == 0x11)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32esi);
+	  }
+	else if ((funct7 & 0x1f) == 0x15)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32dsi);
+	  }
+	else if ((funct7 & 0x1f) == 0x17)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32dsmi);
+	  }
+	else if ((funct7 & 0x1f) == 0x13)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32esmi);
+	  }
+	else if ((funct7 & 0x1f) == 0x18)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sm4ed);
+	  }
+	else if ((funct7 & 0x1f) == 0x1a)
+	  {
+	    if (funct3 == 0)
+	      {
+		op3 = inst >> 30;  // Upper 2 bits.
+		return instTable_.getEntry(InstId::sm4ks);
+	      }
 	  }
         else if (funct7 & 2)
           {

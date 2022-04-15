@@ -84,7 +84,9 @@ printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       return;
     }
 
-  out << std::left << std::setw(9) << entry->name();
+  unsigned width = std::max(size_t(9), entry->name().size() + 1);
+
+  out << std::left << std::setw(width) << entry->name();
   unsigned opCount = di.operandCount();
 
   const char* sep = "";

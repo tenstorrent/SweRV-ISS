@@ -746,6 +746,8 @@ applyZisaString(const std::string& zisa, Hart<URV>& hart)
     }
   else if (boost::starts_with(ext, "fh"))
     hart.enableRvzfh(true);
+  else if (boost::starts_with(ext, "k"))
+    hart.enableRvzk(true);
   else
     {
       std::cerr << "No such Z extension: " << zisa << '\n';

@@ -835,6 +835,10 @@ namespace WdRiscv
     void enableRvzfh(bool flag)
     { rvzfh_ = flag; }
 
+    /// Enable/disable the crypto extension.
+    void enableRvzk(bool flag)
+    { rvzk_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -973,6 +977,10 @@ namespace WdRiscv
     /// extension is enabled in this hart.
     bool isRvd() const
     { return rvd_; }
+
+    /// Return true if the zk extension (crypto) is enabled.
+    bool isRvzk() const
+    { return rvzk_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -3668,6 +3676,36 @@ namespace WdRiscv
 		   unsigned start, unsigned elems, bool masked);
     void execVfsgnjx_vf(const DecodedInst*);
 
+    void execAes32dsi(const DecodedInst*);
+    void execAes32dsmi(const DecodedInst*);
+    void execAes32esi(const DecodedInst*);
+    void execAes32esmi(const DecodedInst*);
+    void execAes64ds(const DecodedInst*);
+    void execAes64dsm(const DecodedInst*);
+    void execAes64es(const DecodedInst*);
+    void execAes64esm(const DecodedInst*);
+    void execAes64im(const DecodedInst*);
+    void execAes64ks1i(const DecodedInst*);
+    void execAes64ks2(const DecodedInst*);
+    void execSha256sig0(const DecodedInst*);
+    void execSha256sig1(const DecodedInst*);
+    void execSha256sum0(const DecodedInst*);
+    void execSha256sum1(const DecodedInst*);
+    void execSha512sig0h(const DecodedInst*);
+    void execSha512sig0l(const DecodedInst*);
+    void execSha512sig1h(const DecodedInst*);
+    void execSha512sig1l(const DecodedInst*);
+    void execSha512sum0r(const DecodedInst*);
+    void execSha512sum1r(const DecodedInst*);
+    void execSha512sig0(const DecodedInst*);
+    void execSha512sig1(const DecodedInst*);
+    void execSha512sum0(const DecodedInst*);
+    void execSha512sum1(const DecodedInst*);
+    void execSm3p0(const DecodedInst*);
+    void execSm3p1(const DecodedInst*);
+    void execSm4ed(const DecodedInst*);
+    void execSm4ks(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -3782,6 +3820,7 @@ namespace WdRiscv
     bool rvzbr_ = false;         // True if extension zbr enabled.
     bool rvzbs_ = false;         // True if extension zbs enabled.
     bool rvzbt_ = false;         // True if extension zbt enabled.
+    bool rvzk_ = false;          // True if extension zk (crypto) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.
