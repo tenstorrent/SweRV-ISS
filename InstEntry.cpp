@@ -6215,7 +6215,7 @@ InstTable::setupInstVec()
       { "aes32dsi", InstId::aes32dsi,
         0b0010101'00000'00000'000'00000'0110011, // Opcode
         0b0011111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknd,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6225,7 +6225,7 @@ InstTable::setupInstVec()
       { "aes32dsmi", InstId::aes32dsmi,
         0b0010111'00000'00000'000'00000'0110011, // Opcode
         0b0011111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknd,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6235,7 +6235,7 @@ InstTable::setupInstVec()
       { "aes32esi", InstId::aes32esi,
         0b0010001'00000'00000'000'00000'0110011, // Opcode
         0b0011111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zkne,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6245,7 +6245,7 @@ InstTable::setupInstVec()
       { "aes32esmi", InstId::aes32esmi,
         0b0010011'00000'00000'000'00000'0110011, // Opcode
         0b0011111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zkne,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6255,7 +6255,7 @@ InstTable::setupInstVec()
       { "aes64ds", InstId::aes64ds,
         0b0011101'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknd,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6264,7 +6264,7 @@ InstTable::setupInstVec()
       { "aes64dsm", InstId::aes64dsm,
         0b0011111'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknd,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6273,7 +6273,7 @@ InstTable::setupInstVec()
       { "aes64es", InstId::aes64es,
         0b0011001'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zkne,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6282,7 +6282,7 @@ InstTable::setupInstVec()
       { "aes64esm", InstId::aes64esm,
         0b0011011'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zkne,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6291,7 +6291,7 @@ InstTable::setupInstVec()
       { "aes64im", InstId::aes64im,
         0b0011000'00000'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknd,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6299,7 +6299,7 @@ InstTable::setupInstVec()
       { "aes64ks1i", InstId::aes64ks1i,
         0b0011000'10000'00000'001'00000'0010011, // Opcode
         0b1111111'10000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zkne,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::Imm, OperandMode::None, 0x00f00000,
@@ -6308,7 +6308,7 @@ InstTable::setupInstVec()
       { "aes64ks2", InstId::aes64ks2,
         0b0111111'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zkne,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6317,7 +6317,7 @@ InstTable::setupInstVec()
       { "sha256sig0", InstId::sha256sig0,
         0b0001000'00010'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6325,7 +6325,7 @@ InstTable::setupInstVec()
       { "sha256sig1", InstId::sha256sig1,
         0b0001000'00011'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6333,7 +6333,7 @@ InstTable::setupInstVec()
       { "sha256sum0", InstId::sha256sum0,
         0b0001000'00000'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6341,7 +6341,7 @@ InstTable::setupInstVec()
       { "sha256sum1", InstId::sha256sum1,
         0b0001000'00001'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6349,7 +6349,7 @@ InstTable::setupInstVec()
       { "sha512sig0h", InstId::sha512sig0h,
         0b0101110'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6358,7 +6358,7 @@ InstTable::setupInstVec()
       { "sha512sig0l", InstId::sha512sig0l,
         0b0101010'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6367,7 +6367,7 @@ InstTable::setupInstVec()
       { "sha512sig1h", InstId::sha512sig1h,
         0b0101111'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6376,7 +6376,7 @@ InstTable::setupInstVec()
       { "sha512sig1l", InstId::sha512sig1l,
         0b0101011'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6385,7 +6385,7 @@ InstTable::setupInstVec()
       { "sha512sum0r", InstId::sha512sum0r,
         0b0101000'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6394,7 +6394,7 @@ InstTable::setupInstVec()
       { "sha512sum1r", InstId::sha512sum1r,
         0b0101001'00000'00000'000'00000'0110011, // Opcode
         0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6403,7 +6403,7 @@ InstTable::setupInstVec()
       { "sha512sig0", InstId::sha512sig0,
         0b0001000'00110'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6411,7 +6411,7 @@ InstTable::setupInstVec()
       { "sha512sig1", InstId::sha512sig1,
         0b0001000'00111'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6419,7 +6419,7 @@ InstTable::setupInstVec()
       { "sha512sum0", InstId::sha512sum0,
         0b0001000'00100'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6427,7 +6427,7 @@ InstTable::setupInstVec()
       { "sha512sum1", InstId::sha512sum1,
         0b0001000'00101'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zknh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6435,7 +6435,7 @@ InstTable::setupInstVec()
       { "sm3p0", InstId::sm3p0,
         0b0001000'01000'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zksh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6443,7 +6443,7 @@ InstTable::setupInstVec()
       { "sm3p1", InstId::sm3p1,
         0b0001000'01001'00000'001'00000'0010011, // Opcode
         0b1111111'11111'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zksh,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
       },
@@ -6451,7 +6451,7 @@ InstTable::setupInstVec()
       { "sm4ed", InstId::sm4ed,
         0b0011000'00000'00000'000'00000'0110011, // Opcode
         0b0011111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zksed,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
@@ -6461,7 +6461,7 @@ InstTable::setupInstVec()
       { "sm4ks", InstId::sm4ks,
         0b0011010'00000'00000'000'00000'0110011, // Opcode
         0b0011111'00000'00000'111'00000'1111111, // Mask of opcode bits
-        RvExtension::Zk,
+        RvExtension::Zksed,
         OperandType::IntReg, OperandMode::Write, rdMask,
         OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask,

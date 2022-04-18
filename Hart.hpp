@@ -835,9 +835,25 @@ namespace WdRiscv
     void enableRvzfh(bool flag)
     { rvzfh_ = flag; }
 
-    /// Enable/disable the crypto extension.
-    void enableRvzk(bool flag)
-    { rvzk_ = flag; }
+    /// Enable/disable the crypto zknd (nist decryption) extension.
+    void enableRvzknd(bool flag)
+    { rvzknd_ = flag; }
+
+    /// Enable/disable the crypto zkne (nist encryption) extension.
+    void enableRvzkne(bool flag)
+    { rvzkne_ = flag; }
+
+    /// Enable/disable the crypto zknh (nist hash) extension.
+    void enableRvzknh(bool flag)
+    { rvzknh_ = flag; }
+
+    /// Enable/disable the crypto zksed (sm4 block cipher) extension.
+    void enableRvzksed(bool flag)
+    { rvzksed_ = flag; }
+
+    /// Enable/disable the crypto zksed (sm3 block hash) extension.
+    void enableRvzksh(bool flag)
+    { rvzksh_ = flag; }
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
@@ -978,9 +994,25 @@ namespace WdRiscv
     bool isRvd() const
     { return rvd_; }
 
-    /// Return true if the zk extension (crypto) is enabled.
-    bool isRvzk() const
-    { return rvzk_; }
+    /// Return true if the zknd extension (crypto nist decryption) is enabled.
+    bool isRvzknd() const
+    { return rvzknd_; }
+
+    /// Return true if the zkne extension (crypto nist encryption) is enabled.
+    bool isRvzkne() const
+    { return rvzkne_; }
+
+    /// Return true if the zksed extension (crypto sm4 block cipher) is enabled.
+    bool isRvzksed() const
+    { return rvzksed_; }
+
+    /// Return true if the zksh extension (crypto sm3 block hash) is enabled.
+    bool isRvzksh() const
+    { return rvzksh_; }
+
+    /// Return true if the zknh extension (crypto nist hash) is enabled.
+    bool isRvzknh() const
+    { return rvzknh_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -3820,7 +3852,11 @@ namespace WdRiscv
     bool rvzbr_ = false;         // True if extension zbr enabled.
     bool rvzbs_ = false;         // True if extension zbs enabled.
     bool rvzbt_ = false;         // True if extension zbt enabled.
-    bool rvzk_ = false;          // True if extension zk (crypto) enabled.
+    bool rvzknd_ = false;        // True if extension zknd (crypto) enabled.
+    bool rvzkne_ = false;        // True if extension zkne (crypto) enabled.
+    bool rvzknh_ = false;        // True if extension zknh (crypto) enabled.
+    bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
+    bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.

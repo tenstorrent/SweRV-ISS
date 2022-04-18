@@ -1352,12 +1352,52 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
-  tag = "enable_zk";
+  tag = "enable_zknd";
   if (config_ -> count(tag))
     {
       bool flag = false;
       if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzk(flag);
+        hart.enableRvzknd(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zkne";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzkne(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zknh";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzknh(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zksed";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzksed(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zksh";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzksh(flag);
       else
         errors++;
     }

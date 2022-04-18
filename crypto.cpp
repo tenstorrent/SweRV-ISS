@@ -437,7 +437,7 @@ template <typename URV>
 void
 Hart<URV>::execAes32dsi(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknd() or isRv64())
     {
       illegalInst(di);
       return;
@@ -457,7 +457,7 @@ template <typename URV>
 void
 Hart<URV>::execAes32dsmi(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknd() or isRv64())
     {
       illegalInst(di);
       return;
@@ -478,7 +478,7 @@ template <typename URV>
 void
 Hart<URV>::execAes32esi(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzkne() or isRv64())
     {
       illegalInst(di);
       return;
@@ -498,7 +498,7 @@ template <typename URV>
 void
 Hart<URV>::execAes32esmi(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzkne() or isRv64())
     {
       illegalInst(di);
       return;
@@ -519,7 +519,7 @@ template <typename URV>
 void
 Hart<URV>::execAes64ds(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzknd() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -538,7 +538,7 @@ template <typename URV>
 void
 Hart<URV>::execAes64dsm(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzknd() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -562,7 +562,7 @@ template <typename URV>
 void
 Hart<URV>::execAes64es(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzkne() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -581,7 +581,7 @@ template <typename URV>
 void
 Hart<URV>::execAes64esm(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzkne() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -605,7 +605,7 @@ template <typename URV>
 void
 Hart<URV>::execAes64im(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzknd() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -625,7 +625,7 @@ template <typename URV>
 void
 Hart<URV>::execAes64ks1i(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzkne() or not isRvzknd() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -658,7 +658,7 @@ template <typename URV>
 void
 Hart<URV>::execAes64ks2(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzkne() or not isRvzknd() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -678,7 +678,7 @@ template <typename URV>
 void
 Hart<URV>::execSha256sig0(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzknh())
     {
       illegalInst(di);
       return;
@@ -697,7 +697,7 @@ template <typename URV>
 void
 Hart<URV>::execSha256sig1(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzknh())
     {
       illegalInst(di);
       return;
@@ -716,7 +716,7 @@ template <typename URV>
 void
 Hart<URV>::execSha256sum0(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzknh())
     {
       illegalInst(di);
       return;
@@ -736,7 +736,7 @@ template <typename URV>
 void
 Hart<URV>::execSha256sum1(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzknh())
     {
       illegalInst(di);
       return;
@@ -756,7 +756,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sig0h(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknh() or isRv64())
     {
       illegalInst(di);
       return;
@@ -775,7 +775,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sig0l(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknh() or isRv64())
     {
       illegalInst(di);
       return;
@@ -795,7 +795,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sig1h(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknh() or isRv64())
     {
       illegalInst(di);
       return;
@@ -815,7 +815,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sig1l(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknh() or isRv64())
     {
       illegalInst(di);
       return;
@@ -835,7 +835,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sum0r(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknh() or isRv64())
     {
       illegalInst(di);
       return;
@@ -855,7 +855,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sum1r(const DecodedInst* di)
 {
-  if (not isRvzk() or isRv64())
+  if (not isRvzknh() or isRv64())
     {
       illegalInst(di);
       return;
@@ -875,7 +875,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sig0(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzknh() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -894,7 +894,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sig1(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzknh() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -913,7 +913,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sum0(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzknh() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -933,7 +933,7 @@ template <typename URV>
 void
 Hart<URV>::execSha512sum1(const DecodedInst* di)
 {
-  if (not isRvzk() or not isRv64())
+  if (not isRvzknh() or not isRv64())
     {
       illegalInst(di);
       return;
@@ -953,7 +953,7 @@ template <typename URV>
 void
 Hart<URV>::execSm3p0(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzksh())
     {
       illegalInst(di);
       return;
@@ -973,7 +973,7 @@ template <typename URV>
 void
 Hart<URV>::execSm3p1(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzksh())
     {
       illegalInst(di);
       return;
@@ -993,7 +993,7 @@ template <typename URV>
 void
 Hart<URV>::execSm4ed(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzksed())
     {
       illegalInst(di);
       return;
@@ -1017,12 +1017,12 @@ template <typename URV>
 void
 Hart<URV>::execSm4ks(const DecodedInst* di)
 {
-  if (not isRvzk())
+  if (not isRvzksed())
     {
       illegalInst(di);
       return;
     }
-  if (not isRvzk())
+  if (not isRvzksed())
     {
       illegalInst(di);
       return;
