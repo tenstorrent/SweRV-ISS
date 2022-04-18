@@ -182,7 +182,6 @@ struct Args
   std::string loadFrom;        // Directory for loading a snapshot
   std::string stdoutFile;      // Redirect target program stdout to this.
   std::string stderrFile;      // Redirect target program stderr to this. 
-  StringVec   zisa;
   StringVec   regInits;        // Initial values of regs
   StringVec   targets;         // Target (ELF file) programs and associated
                                // program options to be loaded into simulator
@@ -410,9 +409,6 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	("isa", po::value(&args.isa),
 	 "Specify instruction set extensions to enable. Supported extensions "
 	 "are a, c, d, f, i, m, s and u. Default is imc.")
-	("zisa", po::value(&args.zisa)->multitoken(),
-	 "Specify instruction set z-extension to enable. Only z-extensions "
-	 "currently supported are zbb and zbs (Exammple --zisa zbb)")
 	("xlen", po::value(&args.regWidth),
 	 "Specify register width (32 or 64), defaults to 32")
 	("harts", po::value(&args.harts),
@@ -705,84 +701,6 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 }
 
 
-template<typename URV>
-static
-bool
-applyZisaString(const std::string& zisa, Hart<URV>& hart)
-{
-  if (zisa.empty())
-    return true;
-
-  std::string ext = zisa;
-
-  if (ext.at(0) == 'z')
-    ext = ext.substr(1);
-
-  if (boost::starts_with(ext, "ba"))
-    hart.enableRvzba(true);
-  else if (boost::starts_with(ext, "bb"))
-    hart.enableRvzbb(true);
-  else if (boost::starts_with(ext, "bc"))
-    hart.enableRvzbc(true);
-  else if (boost::starts_with(ext, "be"))
-    hart.enableRvzbe(true);
-  else if (boost::starts_with(ext, "bf"))
-    hart.enableRvzbf(true);
-  else if (boost::starts_with(ext, "bm"))
-    hart.enableRvzbm(true);
-  else if (boost::starts_with(ext, "bp"))
-    hart.enableRvzbp(true);
-  else if (boost::starts_with(ext, "br"))
-    hart.enableRvzbr(true);
-  else if (boost::starts_with(ext, "bs"))
-    hart.enableRvzbs(true);
-  else if (boost::starts_with(ext, "bt"))
-    hart.enableRvzbt(true);
-  else if (boost::starts_with(ext, "bmini"))
-    {
-      hart.enableRvzbb(true);
-      hart.enableRvzbs(true);
-      std::cerr << "ISA option zbmini is deprecated. Using zbb and zbs.\n";
-    }
-  else if (boost::starts_with(ext, "fh"))
-    hart.enableRvzfh(true);
-  else if (boost::starts_with(ext, "knd"))
-    hart.enableRvzknd(true);
-  else if (boost::starts_with(ext, "kne"))
-    hart.enableRvzkne(true);
-  else if (boost::starts_with(ext, "knh"))
-    hart.enableRvzknh(true);
-  else if (boost::starts_with(ext, "ksed"))
-    hart.enableRvzksed(true);
-  else if (boost::starts_with(ext, "ksh"))
-    hart.enableRvzksh(true);
-  else
-    {
-      std::cerr << "No such Z extension: " << zisa << '\n';
-      return false;
-    }
-
-  return true;
-}
-
-
-template<typename URV>
-static
-bool
-applyZisaStrings(const StringVec& zisa, Hart<URV>& hart)
-{
-  unsigned errors = 0;
-
-  for (const auto& ext : zisa)
-    {
-      if (not applyZisaString(ext, hart))
-	errors++;
-    }
-
-  return errors == 0;
-}
-
-
 static
 void
 checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
@@ -989,10 +907,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 		 const HartConfig& config, bool clib)
 {
   unsigned errors = 0;
-
-  // TODO FIX : remove --zisa  remove applyZisaStrings
-  if (not applyZisaStrings(args.zisa, hart))
-    errors++;
 
   if (clib)  // Linux or newlib enabled.
     sanitizeStackPointer(hart, args.verbose);
