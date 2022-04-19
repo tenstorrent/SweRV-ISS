@@ -79,6 +79,7 @@ namespace WdRiscv
 	  case RvExtension::Zknd:   return "Zknd";
 	  case RvExtension::Zkne:   return "Zkne";
 	  case RvExtension::Zknh:   return "Zknh";
+	  case RvExtension::Zbkb:   return "Zbkb";
 	  case RvExtension::Zksed:  return "Zksed";
 	  case RvExtension::Zksh:   return "Zksh";
           default:                  return "Invalid";

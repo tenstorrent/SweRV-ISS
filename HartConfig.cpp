@@ -1382,6 +1382,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  tag = "enable_zbkb";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzbkb(flag);
+      else
+        errors++;
+    }
+
   tag = "enable_zksed";
   if (config_ -> count(tag))
     {

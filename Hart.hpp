@@ -847,6 +847,10 @@ namespace WdRiscv
     void enableRvzknh(bool flag)
     { rvzknh_ = flag; }
 
+    /// Enable/disable the crypto zbkb (crypto bit manip) extension.
+    void enableRvzbkb(bool flag)
+    { rvzbkb_ = flag; }
+
     /// Enable/disable the crypto zksed (sm4 block cipher) extension.
     void enableRvzksed(bool flag)
     { rvzksed_ = flag; }
@@ -1013,6 +1017,10 @@ namespace WdRiscv
     /// Return true if the zknh extension (crypto nist hash) is enabled.
     bool isRvzknh() const
     { return rvzknh_; }
+
+    /// Return true if the zbkb extension (crypto bit manip) is enabled.
+    bool isRvzbkb() const
+    { return rvzbkb_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -3855,6 +3863,7 @@ namespace WdRiscv
     bool rvzknd_ = false;        // True if extension zknd (crypto) enabled.
     bool rvzkne_ = false;        // True if extension zkne (crypto) enabled.
     bool rvzknh_ = false;        // True if extension zknh (crypto) enabled.
+    bool rvzbkb_ = false;        // True if extension zbkb (ctypto) enabled.
     bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
     bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.

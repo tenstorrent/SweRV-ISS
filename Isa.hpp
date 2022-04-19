@@ -8,7 +8,7 @@ namespace WdRiscv
 
   enum class RvExtension : unsigned { A, B, C, D, E, F, I, M, S, U, V,
     Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp, Zbr, Zbs, Zbt, Zfh, Zlsseg,
-    Zknd, Zkne, Zknh, Zksed, Zksh, None };
+    Zknd, Zkne, Zknh, Zbkb, Zksed, Zksh, None };
 
 
   /// Model supported extensions with primary/secondary version numbers.
