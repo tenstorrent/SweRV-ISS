@@ -34,7 +34,7 @@ simulator. In particular you would need:
    ```
 
 3. The Whisper source code which can be downloaded from 
-   [github.](https://github.com/chipsalliance/SweRV-ISS)
+   [github.](https://github.com/tenstorrent/SweRV-ISS)
 
 4. The g++ compiler version 7.2 or higher to compiler Whisper. The g++
    compiler can be installed from a Linux distribution. Alternatively,
@@ -198,6 +198,14 @@ The following is a brief description of the command line options:
 
     --logfile file
        Enable tracing to given file of executed instructions.
+
+    --csv
+       Use CSV (comma separated values) format for the trace log file produced
+       by the --logfile option. The first output line contains the headers of
+       the columns in the rest of the log file. Each executed instruction results
+       in a row that includes the PC, opcode, changed registers,
+       changed memory locations, ... Fields are separated by commas. Multiple
+       values within a field are separated by semicolons.
 
     --consoleoutfile file
        Redirect console output to given file.
