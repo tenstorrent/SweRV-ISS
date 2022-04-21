@@ -730,7 +730,7 @@ Mcm<URV>::checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const
       bool fail = not prev.complete_ or latestOpTime(prev) >= op.time_;
       if (fail)
 	{
-	  cerr << "Error: External read op must forward from store: hart-id="
+	  cerr << "Error: External read op must not forward from store: hart-id="
 	       << hart.hartId() << " op-time=" << op.time_ << " op-instr-tag="
 	       << op.instrTag_ << " store-tag=" << prev.tag_ << '\n';
 	  return false;
