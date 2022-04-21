@@ -227,6 +227,7 @@ namespace WdRiscv
 
     friend class Hart<uint32_t>;
     friend class Hart<uint64_t>;
+    friend class Decoder;
 
     void setAddr(uint64_t addr)
     { addr_ = addr; }

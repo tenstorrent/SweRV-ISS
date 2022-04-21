@@ -35,6 +35,7 @@
 #include "PmpManager.hpp"
 #include "VirtMem.hpp"
 #include "Isa.hpp"
+#include "Decoder.hpp"
 
 namespace WdRiscv
 {
@@ -511,16 +512,19 @@ namespace WdRiscv
     /// op2 will be set. If inst is not a valid instruction , then we
     /// return a reference to the illegal-instruction info.
     const InstEntry& decode(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			    uint32_t& op2, uint32_t& op3);
+			    uint32_t& op2, uint32_t& op3)
+    { return decoder_.decode(inst, op0, op1, op2, op3); }
 
     /// Similar to the preceding decode method but with decoded data
     /// placed in the given DecodedInst object.
-    void decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& decodedInst);
+    void decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& decodedInst)
+    { decoder_.decode(addr, physAddr, inst, decodedInst); }
 
     /// Return the 32-bit instruction corresponding to the given 16-bit
     /// compressed instruction. Return an illegal 32-bit opcode if given
     /// 16-bit code is not a valid compressed instruction.
-    uint32_t expandCompressedInst(uint16_t inst) const;
+    uint32_t expandCompressedInst(uint16_t inst) const
+    { return decoder_.expandCompressedInst(inst); }
 
     /// Load the given hex file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exists,
@@ -4021,6 +4025,7 @@ namespace WdRiscv
 
     VirtMem virtMem_;
     Isa isa_;
+    Decoder decoder_;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

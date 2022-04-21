@@ -593,6 +593,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
     entry.reset();
 
   clearTraceData();
+
+  decoder_.enableRv64(isRv64());
 }
 
 
@@ -6901,7 +6903,7 @@ Hart<URV>::execute(const DecodedInst* di)
   return;
 
  c_srli64:
-  if (not isRvc()) illegalInst(di); else execSrli(di);
+  illegalInst(di); // Only valid in rv128 which is not supported.
   return;
 
  c_srai:
@@ -6909,7 +6911,7 @@ Hart<URV>::execute(const DecodedInst* di)
   return;
 
  c_srai64:
-  if (not isRvc()) illegalInst(di); else execSrai(di);
+  illegalInst(di); // Only valid in rv128 which is not supported.
   return;
 
  c_andi:
