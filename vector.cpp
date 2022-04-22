@@ -4974,10 +4974,13 @@ Hart<URV>::vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2))
         {
-          unsigned vs1Ix = unsigned(e2);
           dest = 0;
-          if (vecRegs_.read(vs1, vs1Ix, group, e1))
-            dest = e1;
+	  if (e2 < vecRegs_.bytesPerRegister() * 8)
+	    {
+	      unsigned vs1Ix = unsigned(e2);
+	      if (vecRegs_.read(vs1, vs1Ix, group, e1))
+		dest = e1;
+	    }
 
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -6897,10 +6900,12 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
 	  continue;
 	}
 
-      unsigned from = ix + amount;
       e1 = 0;
-      if (from >= ix)  // Avoid overflow
-	vecRegs_.read(vs1, from, group, e1);
+      if (amount < vecRegs_.bytesPerRegister() * 8)
+	{
+	  URV from = ix + amount;
+	  vecRegs_.read(vs1, from, group, e1); // no-op if from out of bounds
+	}
       dest = e1;
       if (not vecRegs_.write(vd, ix, group, dest))
         errors++;
