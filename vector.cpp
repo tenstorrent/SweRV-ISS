@@ -11490,7 +11490,7 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
   if (vd == vs1)
     return;
 
-  unsigned bytes = vecRegs_.bytesInRegisterFile();
+  unsigned bytes = vecRegs_.bytesPerRegister()*8;
 
   uint8_t* dest = vecRegs_.getVecData(vd);
   uint8_t* source = vecRegs_.getVecData(vs1);
