@@ -109,6 +109,9 @@ namespace WdRiscv
   template <typename URV>
   class Hart;
 
+  template <typename URV>
+  class ArchInfo;
+
   /// Model a RISCV vector register file.
   class VecRegs
   {
@@ -116,6 +119,8 @@ namespace WdRiscv
 
     friend class Hart<uint32_t>;
     friend class Hart<uint64_t>;
+    friend class ArchInfo<uint32_t>;
+    friend class ArchInfo<uint64_t>;
 
     /// Constructor: Define an empty vector regidter file which may be
     /// reconfigured later using the config method.

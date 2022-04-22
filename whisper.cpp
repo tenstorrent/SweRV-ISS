@@ -1638,27 +1638,12 @@ bool
 staticDump(Hart<URV>& hart, const std::string infoPath)
 {
   nlohmann::json j;
-  ArchInfo<URV> info(infoPath);
-  InstTable table;
+  ArchInfo<URV> info(hart, infoPath);
 
-  for (auto& entry : table.getInstVec())
-    {
-      nlohmann::json record;
-      if (info.createInfoInst(hart, record, entry))
-        j += record;
-    }
-
-  nlohmann::json user;
-  if (info.createInfoMode(hart, user, PrivilegeMode::User))
-    j += user;
-
-  nlohmann::json supervisor;
-  if (info.createInfoMode(hart, supervisor, PrivilegeMode::Supervisor))
-    j += supervisor;
-
-  nlohmann::json machine;
-  if (info.createInfoMode(hart, machine, PrivilegeMode::Machine))
-    j += machine;
+  bool ok = info.createInstInfo(j);
+  ok = ok and info.createModeInfo(j);
+  ok = ok and info.createLmulInfo(j);
+  ok = ok and info.createSewInfo(j);
 
   std::cout << j.dump(2) << '\n';
   return true;

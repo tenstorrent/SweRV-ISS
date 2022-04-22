@@ -10,7 +10,16 @@ namespace WdRiscv
 {
 
   // Entry description
-  enum class ArchEntryName { Opcode, Mode, Undefined };
+  enum class ArchEntryName { Opcode, Mode, Lmul, Sew, Undefined };
+  enum class OperateMode : uint32_t
+  {
+    User = 0,
+    Hypervisor = 1,
+    Reserved = 2,
+    Machine = 3,
+    VirtUser = 4,
+    VirtSupervisor = 5
+  };
 
   struct ArchEntry
   {
@@ -24,34 +33,17 @@ namespace WdRiscv
   public:
 
     /// Copy JSON file
-    ArchInfo(std::string filename);
-
-    /// Convert string to name enum.
-    ArchEntryName stringToName(const std::string str) const
-    {
-      if (str == "Opcode") return ArchEntryName::Opcode;
-      else if (str == "Mode") return ArchEntryName::Mode;
-      else return ArchEntryName::Undefined;
-    }
+    ArchInfo(Hart<URV>& hart, std::string filename);
 
     /// Populate json object depending on opcode definition
-    bool createInfoInst(Hart<URV>& hart, nlohmann::json& record, InstEntry entry);
+    bool createInstInfo(nlohmann::json& j);
 
     /// Populate json object depending on modes definition
-    bool createInfoMode(Hart<URV>& hart, nlohmann::json& record, PrivilegeMode mode);
+    bool createModeInfo(nlohmann::json& j);
 
-    /// Privilege mode to string
-    std::string privToString(const PrivilegeMode mode) const
-    {
-      switch(mode)
-        {
-          case PrivilegeMode::User:         return "UserMode";
-          case PrivilegeMode::Supervisor:   return "SupervisorMode";
-          case PrivilegeMode::Reserved:     return "ReservedMode";
-          case PrivilegeMode::Machine:      return "MachineMode";
-          default:                          return "Invalid";
-        }
-    }
+    /// Popular json object depending on lmul/sew definition
+    bool createLmulInfo(nlohmann::json& j);
+    bool createSewInfo(nlohmann::json& j);
 
     /// Extension to string
     std::string extToString(const RvExtension ext) const
@@ -86,9 +78,38 @@ namespace WdRiscv
         }
     }
 
+    /// Operating (virt + priv) mode to string for when hypervisor
+    /// is enabled.
+    std::string virtPrivToString(const OperateMode mode) const
+    {
+      switch(mode)
+        {
+          case OperateMode::User:           return "UserMode";
+          case OperateMode::Reserved:       return "HypervisorMode";
+          case OperateMode::Hypervisor:     return "Hypervisor-SupervisorMode";
+          case OperateMode::Machine:        return "MachineMode";
+          case OperateMode::VirtUser:       return "VirtualUserMode";
+          case OperateMode::VirtSupervisor: return "VirtualSupervisorMode";
+          default:                          return "Invalid";
+        }
+    }
+
+    std::string privToString(const PrivilegeMode mode) const
+    {
+      switch(mode)
+        {
+          case PrivilegeMode::User:          return "UserMode";
+          case PrivilegeMode::Supervisor:    return "Supervisor";
+          case PrivilegeMode::Reserved:      return "Reserved";
+          case PrivilegeMode::Machine:       return "MachineMode";
+          default:                           return "Invalid";
+        }
+    }
+
   private:
 
     std::unordered_map<ArchEntryName, struct ArchEntry> entries_;
+    Hart<URV>& hart_;
 
     /// Contains a unique human-readable symbol such that -
     /// The same opcode value will have the same symbol AND

@@ -36,12 +36,16 @@
 #include "VirtMem.hpp"
 #include "Isa.hpp"
 #include "Decoder.hpp"
+#include "ArchInfo.hpp"
 
 namespace WdRiscv
 {
 
   template <typename URV>
   class Mcm;
+
+  template <typename URV>
+  class ArchInfo;
 
   /// Thrown by the simulator when a stop (store to to-host) is seen
   /// or when the target program reaches the exit system call.
@@ -110,7 +114,10 @@ namespace WdRiscv
   class Hart
   {
   public:
-    
+
+    friend class ArchInfo<uint32_t>;
+    friend class ArchInfo<uint64_t>;
+
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
     typedef typename std::make_signed_t<URV> SRV;
