@@ -6901,7 +6901,7 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
 	}
 
       e1 = 0;
-      if (amount < vecRegs_.bytesPerRegister() * 8)
+      if (amount < vecRegs_.bytesInRegisterFile())
 	{
 	  URV from = ix + amount;
 	  vecRegs_.read(vs1, from, group, e1); // no-op if from out of bounds
@@ -11490,7 +11490,7 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
   if (vd == vs1)
     return;
 
-  unsigned bytes = vecRegs_.bytesPerRegister() * 8;
+  unsigned bytes = vecRegs_.bytesInRegisterFile();
 
   uint8_t* dest = vecRegs_.getVecData(vd);
   uint8_t* source = vecRegs_.getVecData(vs1);

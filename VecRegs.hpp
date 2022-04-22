@@ -133,18 +133,24 @@ namespace WdRiscv
     uint32_t bytesPerRegister() const
     { return bytesPerReg_; }
 
+    /// Return the number of bytes in this register file.
+    uint32_t bytesInRegisterFile() const
+    { return bytesInRegFile_; }
+
     /// Set value to that of the element with given index within the
     /// vector register of the given number returning true on sucess
     /// and false if the combination of element index, vector number
     /// and group multipier (presecaled by 8) is invalid. We pre-scale
     /// the group multiplier to avoid passing a fraction.
     template<typename T>
-    bool read(uint32_t regNum, uint32_t elemIx, uint32_t groupX8,
+    bool read(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
               T& value) const
     {
+      if (regNum >= regCount_ or elemIx >= bytesInRegFile_)
+	return false;
       if (elemIx*sizeof(T) > ((bytesPerReg_*groupX8) >> 3) - sizeof(T))
         return false;
-      if (regNum*bytesPerReg_ + elemIx*sizeof(T) > bytesPerReg_*regCount_ - sizeof(T))
+      if (regNum*bytesPerReg_ + elemIx*sizeof(T) > bytesInRegFile_ - sizeof(T))
         return false;
       const T* data = reinterpret_cast<const T*>(data_ + regNum*bytesPerReg_);
       value = data[elemIx];
@@ -157,12 +163,14 @@ namespace WdRiscv
     /// and group multipier (presecaled by 8) is invalid. We pre-scale
     /// the group multiplier to avoid passing a fraction.
     template<typename T>
-    bool write(uint32_t regNum, uint32_t elemIx, uint32_t groupX8,
+    bool write(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
                const T& value)
     {
+      if (regNum >= regCount_ or elemIx >= bytesInRegFile_)
+	return false;
       if ((elemIx + 1) * sizeof(T) > ((bytesPerReg_*groupX8) >> 3))
         return false;
-      if (regNum*bytesPerReg_ + (elemIx + 1)*sizeof(T) > bytesPerReg_*regCount_)
+      if (regNum*bytesPerReg_ + (elemIx + 1)*sizeof(T) > bytesInRegFile_)
         return false;
       T* data = reinterpret_cast<T*>(data_ + regNum*bytesPerReg_);
       data[elemIx] = value;
