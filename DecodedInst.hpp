@@ -195,15 +195,6 @@ namespace WdRiscv
     bool isFenceSuccOutput() const
     { return isFence() and ((inst_ >> 22) & 1); }
 
-    /// Associate a value with each operand by fetching
-    /// registers. After this method, the value of an immediate
-    /// operand x is x. The value of register operand y is the value
-    /// currently stored in register x. The value of a non-existing
-    /// operand is zero. Note that the association is only in this
-    /// object and that no register value is changed by this method.
-    template <typename URV>
-    void fetchOperands(const Hart<URV>& hart);
-
     /// Associated a value with the ith operand. This has no effect if
     /// i is out of bounds or if the ith operand is an immediate. Note
     /// that the association is only in this object and that no
@@ -225,8 +216,6 @@ namespace WdRiscv
 
   protected:
 
-    friend class Hart<uint32_t>;
-    friend class Hart<uint64_t>;
     friend class Decoder;
 
     void setAddr(uint64_t addr)
