@@ -18,7 +18,6 @@
 #include <string>
 #include <unordered_map>
 #include "InstEntry.hpp"
-#include "FpRegs.hpp"
 #include "InstId.hpp"
 
 
@@ -142,8 +141,8 @@ namespace WdRiscv
     { return entry_; }
 
     /// Relevant for floating point instructions with rounding mode.
-    RoundingMode roundingMode() const
-    { return RoundingMode((inst_ >> 12) & 7); }
+    unsigned roundingMode() const
+    { return ((inst_ >> 12) & 7); }
 
     /// Relevant to atomic instructions: Return true if acquire bit is
     /// set in an atomic instruction.

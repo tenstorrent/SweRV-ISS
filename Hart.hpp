@@ -1514,7 +1514,7 @@ namespace WdRiscv
 
     /// Return the effective rounding mode for the currently executing
     /// floating point instruction.
-    RoundingMode effectiveRoundingMode(RoundingMode instMode);
+    RoundingMode effectiveRoundingMode(unsigned instMode);
 
     /// Update the accrued floating point bits in the FCSR
     /// register. No-op if a trigger has tripped.

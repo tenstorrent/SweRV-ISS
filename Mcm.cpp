@@ -979,7 +979,8 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
   const auto entry = di.instEntry();
   assert(entry);
 
-  if (entry->hasRoundingMode() and di.roundingMode() == RoundingMode::Dynamic)
+  if (entry->hasRoundingMode() and
+      RoundingMode(di.roundingMode()) == RoundingMode::Dynamic)
     sourceRegs.push_back(unsigned(CsrNumber::FCSR) + csRegOffset_);
 
   if (entry->modifiesFflags())

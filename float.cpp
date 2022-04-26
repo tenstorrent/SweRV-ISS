@@ -84,13 +84,13 @@ Hart<URV>::orFcsrFlags(FpFlags flags)
 template <typename URV>
 inline
 RoundingMode
-Hart<URV>::effectiveRoundingMode(RoundingMode instMode)
+Hart<URV>::effectiveRoundingMode(unsigned instMode)
 {
   if (forceRounding_)
     return forcedRounding_;
 
-  if (instMode != RoundingMode::Dynamic)
-    return instMode;
+  if (RoundingMode(instMode) != RoundingMode::Dynamic)
+    return RoundingMode(instMode);
 
   return getFpRoundingMode();
 }

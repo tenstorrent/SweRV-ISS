@@ -117,7 +117,7 @@ printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
     }
 
   if (entry->hasRoundingMode())
-    out << sep << roundingModeString(di.roundingMode());
+    out << sep << roundingModeString(RoundingMode(di.roundingMode()));
 }
 
 
