@@ -179,9 +179,9 @@ FpRegs::findReg(const std::string& name, unsigned& ix) const
 void
 FpRegs::reset(bool hasHalf, bool hasSingle, bool hasDouble)
 {
-  hasHalf_ = hasHalf_;
-  hasSingle_ = hasSingle_;
-  hasDouble_ = hasDouble_;
+  hasHalf_ = hasHalf;
+  hasSingle_ = hasSingle;
+  hasDouble_ = hasDouble;
 
   if (hasDouble)
     {

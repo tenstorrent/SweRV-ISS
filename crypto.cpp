@@ -234,7 +234,6 @@ aes_subword_inv(uint32_t x)
   uint32_t y0 = aes_sbox_inv(uint8_t(x));
   return y3 | y2 | y1 | y0;
 }
-#endif
 
 
 static inline
@@ -244,6 +243,7 @@ aes_get_column(__uint128_t state, uint8_t c)
   uint32_t res = state >> (32*c & 0x7f);
   return res;
 }
+#endif
 
 
 static

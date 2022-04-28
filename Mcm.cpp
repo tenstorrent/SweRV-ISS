@@ -673,7 +673,7 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
 template <typename URV>
 void
 Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
-				const McmInstr& target, uint64_t mask) const
+				const McmInstr& target, uint64_t& mask) const
 {
   /// Clear in the given mask, bits corresponding to the target instruction
   /// bytes covered by the given store instruction writes.
@@ -701,13 +701,13 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
 	    offset = 8;
 	  opMask <<= offset*8;
 	}
-      storeMask |= mask;
+      storeMask |= opMask;
     }
 
   unsigned unused = (8 - storeInstr.size_)*8;  // Unwritten upper bits of store.
   storeMask = (storeMask << unused) >> unused;
 
-  mask &= storeMask;
+  mask &= ~storeMask;
 }
 
 

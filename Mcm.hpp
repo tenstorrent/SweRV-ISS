@@ -240,7 +240,7 @@ namespace WdRiscv
     bool checkLoadComplete(const McmInstr& instr) const;
 
     void clearMaskBitsForWrite(const McmInstr& storeInstr,
-			       const McmInstr& target, uint64_t mask) const;
+			       const McmInstr& target, uint64_t& mask) const;
 
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
