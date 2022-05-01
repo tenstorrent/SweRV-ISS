@@ -740,6 +740,13 @@ Hart<URV>::pokeMemory(size_t addr, uint32_t val, bool usePma)
 
   memory_.invalidateLrs(addr, sizeof(val));
 
+  URV adjusted = val;
+  if (addr >= clintStart_ and addr < clintLimit_)
+    {
+      processClintWrite(addr, sizeof(val), adjusted);
+      val = adjusted;
+    }
+
   if (memory_.poke(addr, val, usePma))
     {
       invalidateDecodeCache(addr, sizeof(val));
@@ -1472,7 +1479,7 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
     }
 
   ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr >= clintStart_ and addr <= clintLimit_ and addr == 0x200bff8)
+  if (addr >= clintStart_ and addr < clintLimit_ and addr == 0x200bff8)
     {
       narrow = instCounter_;  // Fake time: use instruction count
     }
@@ -1623,13 +1630,6 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       return false;
     }
 
-  if (addr >= clintStart_ and addr <= clintLimit_)
-    {
-      URV val = storeVal;
-      processClintWrite(addr, ldStSize_, val);
-      storeVal = val;
-    }
-
   STORE_TYPE temp = 0;
   memory_.peek(addr, temp, false /*usePma*/);
   ldStPrevData_ = temp;
@@ -1662,8 +1662,15 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   if (mcm_)
     {
       ldStWrite_ = true;
-      ldStData_ = storeVal;  // FIX: Incorrect for masked mem-mapped-regs.
+      ldStData_ = storeVal;
       return true;  // Memory updated when merge buffer is written.
+    }
+
+  if (addr >= clintStart_ and addr < clintLimit_)
+    {
+      URV val = storeVal;
+      processClintWrite(addr, ldStSize_, val);
+      storeVal = val;
     }
 
   if (memory_.write(hartIx_, addr, storeVal))
