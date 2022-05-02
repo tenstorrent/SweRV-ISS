@@ -6,6 +6,11 @@ hdrs = [
     "System.hpp",
     "Server.hpp",
     "Interactive.hpp",
+    "DecodedInst.hpp",
+    "Decoder.hpp",
+    "InstEntry.hpp",
+    "InstId.hpp",
+    "Isa.hpp",
 ]
 
 cc_library(
@@ -15,6 +20,7 @@ cc_library(
     defines  = ["SOFT_FLOAT"],
     deps     = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat"],
     linkopts = ["-lstdc++fs", "-lpthread", "-lz"],
+    visibility = ["//visibility:public"],
 )
 
 cc_binary(
