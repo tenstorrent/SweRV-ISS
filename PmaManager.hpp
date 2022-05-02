@@ -22,12 +22,7 @@ namespace WdRiscv
 {
 
   /// Physical memory attribute. An instance of this is typically
-  /// associated with a section of the address space. The address
-  /// space is evenly divided into contiguous, equally sized sections,
-  /// aligned to the section size.
-  /// For sub-section attribution, an instance is associated with a
-  /// word-aligned memory word. To reduce footprint of the PmaMgr
-  /// object, we typically use a section size of 8 or more pages.
+  /// associated with a word-aligned section of the address space.
   class Pma
   {
   public:
@@ -50,49 +45,49 @@ namespace WdRiscv
       : attrib_(a)
     { }
 
-    /// Return true if mapped.
+    /// Return true if associated address region is mapped (accessible
+    /// for read, write, or execute).
     bool isMapped() const
     { return attrib_ & (Mapped | MemMapped); }
 
-    /// Return true if in ICCM region (instruction closely coupled
+    /// Return true if ICCM region (instruction closely coupled
     /// memory).
     bool isIccm() const
     { return attrib_ & Iccm; }
 
-    /// Return true if in DCCM region (instruction closely coupled
-    /// memory).
+    /// Return true if DCCM region (data closely coupled memory).
     bool isDccm() const
     { return attrib_ & Dccm; }
 
-    /// Return true if in memory-mapped-register region.
+    /// Return true if memory-mapped-register region.
     bool isMemMappedReg() const
     { return attrib_ & MemMapped; }
 
-    /// Return true if in idempotent region.
+    /// Return true if idempotent region (non-IO region).
     bool isIdempotent() const
     { return attrib_ & Idempotent; }
 
-    /// Return true if in cacheable region.
+    /// Return true if cacheable region.
     bool isCacheable() const
     { return attrib_ & Cacheable; }
 
-    /// Return true if in readable (ld instructions allowed) region.
+    /// Return true if readable (load instructions allowed) region.
     bool isRead() const
     { return attrib_ & (Read | MemMapped); }
 
-    /// Return true if in writeable (st instructions allowed) region.
+    /// Return true if writeable (store instructions allowed) region.
     bool isWrite() const
     { return attrib_ & (Write | MemMapped); }
 
-    /// Return true if in executable (fetch allowed) region.
+    /// Return true if executable (fetch allowed) region.
     bool isExec() const
     { return attrib_ & Exec; }
 
-    /// Return true in region where atomic instructions are allowed.
+    /// Return true if atomic instructions are allowed.
     bool isAmo() const
     { return attrib_ & Amo; }
 
-    /// Return true in region where lr/sc are allowed.
+    /// Return true if lr/sc instructions are allowed.
     bool isRsrv() const
     { return attrib_ & Rsrv; }
 
@@ -136,7 +131,7 @@ namespace WdRiscv
 
     friend class Memory;
 
-    PmaManager(uint64_t memorySize, uint64_t sectionSize = 32*1024);
+    PmaManager(uint64_t memorySize);
 
     /// Return the physical memory attribute associated with the
     /// word-aligned address covering the given address. Return
@@ -157,7 +152,12 @@ namespace WdRiscv
     }
 
     /// Define a physical memory attribute region. Regions must be defined
-    /// in order.
+    /// in order (if an address is covered by multiple regions, then the
+    /// first defined region applies). The defined region consists of the
+    /// word-aligned words with addresses between fistAddr and lastAddr
+    /// inclusive. For example, if firstAddr is 5 and lastAddr is 13,
+    /// then the defined region consists of the words at 8 and 12 (bytes
+    /// 8 to 15).
     bool defineRegion(uint64_t firstAddr, uint64_t lastAddr, Pma pma)
     {
       Region region{firstAddr, lastAddr, pma};
