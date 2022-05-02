@@ -33,14 +33,13 @@ BOOST_LIB_DIR := $(wildcard $(BOOST_DIR)/stage/lib $(BOOST_DIR)/lib)
 BOOST_LIBS := boost_program_options
 
 # Add extra dependency libraries here
-ifeq (CYGWIN_NT-10.0,$(shell uname -s))
-EXTRA_LIBS := -lpthread -lz -lstdc++fs
-else
-EXTRA_LIBS := -lpthread -lz -static-libstdc++
-endif
-
-ifeq (Linux,$(shell uname -s))
-EXTRA_LIBS += -lstdc++fs
+EXTRA_LIBS := -lpthread -lm -lz -lstdc++fs
+ifneq (CYGWIN_NT-10.0,$(shell uname -s))
+  ifeq ($(findstring g++,$(CXX)),g++)
+    EXTRA_LIBS += -static-libstdc++
+  else
+    EXTRA_LIBS += -lstdc++ -static
+  endif
 endif
 
 ifeq (mingw,$(findstring mingw,$(shell $(CXX) -v 2>&1 | grep Target | cut -d' ' -f2)))
