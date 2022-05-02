@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <vector>
+#include <unordered_map>
 #include <string>
 #include <cassert>
 
@@ -357,6 +358,38 @@ namespace WdRiscv
       return size_t(ew) < vec.size()? vec.at(size_t(ew)) : "e?";
     }
 
+    static bool to_lmul(std::string lmul, GroupMultiplier& group)
+    {
+      static std::unordered_map<std::string, GroupMultiplier> map(
+        { {"m1", GroupMultiplier::One}, {"m2", GroupMultiplier::Two},
+          {"m4", GroupMultiplier::Four}, {"m8", GroupMultiplier::Eight},
+          {"m?", GroupMultiplier::Reserved}, {"mf8", GroupMultiplier::Eighth},
+          {"mf4", GroupMultiplier::Quarter}, {"mf2", GroupMultiplier::Half} });
+
+      if (map.find(lmul) != map.end())
+        {
+          group = map.at(lmul);
+          return true;
+        }
+      return false;
+    }
+
+    static bool to_sew(std::string sew, ElementWidth& ew)
+    {
+      static std::unordered_map<std::string, ElementWidth> map(
+        { {"e8", ElementWidth::Byte}, {"e16", ElementWidth::Half},
+          {"e32", ElementWidth::Word}, {"e64", ElementWidth::Word2},
+          {"e128", ElementWidth::Word4}, {"e256", ElementWidth::Word8},
+          {"e512", ElementWidth::Word16}, {"e1024", ElementWidth::Word32} });
+
+      if (map.find(sew) != map.end())
+        {
+          ew = map.at(sew);
+          return true;
+        }
+      return false;
+    }
+
 
   protected:
 
@@ -457,7 +490,8 @@ namespace WdRiscv
     /// and configure it later. Old configuration is lost. Register of
     /// newly configured file are initlaized to zero.
     void config(uint32_t bytesPerReg, uint32_t minBytesPerElem,
-		uint32_t maxBytesPerElem);
+		uint32_t maxBytesPerElem,
+                std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul);
 
     void reset();
 

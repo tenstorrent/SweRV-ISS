@@ -742,8 +742,49 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         }
     }
 
+  tag = "min_sew_per_lmul";
+  std::unordered_map<GroupMultiplier, unsigned> minSewPerLmul;
+  if (vconf.count(tag))
+    {
+      auto& minSewMap = vconf.at(tag);
+      if (not minSewMap.is_object())
+        {
+          std::cerr << "Invalid " << tag << " entry in config file (expecting an object)\n";
+          return false;
+        }
+      for (auto it = minSewMap.begin(); it != minSewMap.end(); it++)
+        {
+          GroupMultiplier group;
+          const std::string& lmul = it.key();
+          const unsigned min = it.value();
+          if (not VecRegs::to_lmul(lmul, group))
+            {
+              std::cerr << "Invalid lmul setting: " << lmul << '\n';
+              errors++;
+              continue;
+            }
+
+          if (min < bytesPerElem.at(0) or min > bytesPerElem.at(1))
+            {
+              std::cerr << "Error: Config file " << tag << " ("
+                        << min << ") must be less than specified max"
+                        << " and greater than specified min\n";
+              errors++;
+            }
+
+          if (not isPowerOf2(min))
+            {
+              std::cerr << "Error: config file " << tag << " ("
+                        << min << ") is not a power of 2\n";
+              errors++;
+            }
+
+          minSewPerLmul[group] = min;
+        }
+    }
+
   if (errors == 0)
-    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1));
+    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minSewPerLmul);
 
   return errors == 0;
 }

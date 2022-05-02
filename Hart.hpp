@@ -359,8 +359,9 @@ namespace WdRiscv
 
     /// Configure vector unit of this hart.
     void configVector(unsigned bytesPerVec, unsigned minBytesPerElem,
-		      unsigned maxBytesPerElem)
-    { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem); }
+		      unsigned maxBytesPerElem,
+                      std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul)
+    { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul); }
 
     /// Configure the load-reserve reservation size in bytes.
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
