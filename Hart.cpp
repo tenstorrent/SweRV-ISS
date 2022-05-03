@@ -948,63 +948,63 @@ Hart<URV>::isAddrCacheable(size_t addr) const
 
 static
 void
-printUnsignedHisto(const char* tag, const std::vector<uint64_t>& histo,
+printUnsignedHisto(const char* tag, const std::vector<uintmax_t>& histo,
 		   FILE* file)
 {
   if (histo.size() < 7)
     return;
 
   if (histo.at(0))
-    fprintf(file, "    %s 0           %" PRId64 "\n", tag, histo.at(0));
+    fprintf(file, "    %s 0           %jd\n", tag, histo.at(0));
   if (histo.at(1))
-    fprintf(file, "    %s 1           %" PRId64 "\n", tag, histo.at(1));
+    fprintf(file, "    %s 1           %jd\n", tag, histo.at(1));
   if (histo.at(2))
-    fprintf(file, "    %s 2           %" PRId64 "\n", tag, histo.at(2));
+    fprintf(file, "    %s 2           %jd\n", tag, histo.at(2));
   if (histo.at(3))
-    fprintf(file, "    %s (2,     16] %" PRId64 "\n", tag, histo.at(3));
+    fprintf(file, "    %s (2,     16] %jd\n", tag, histo.at(3));
   if (histo.at(4))
-    fprintf(file, "    %s (16,    1k] %" PRId64 "\n", tag, histo.at(4));
+    fprintf(file, "    %s (16,    1k] %jd\n", tag, histo.at(4));
   if (histo.at(5))
-    fprintf(file, "    %s (1k,   64k] %" PRId64 "\n", tag, histo.at(5));
+    fprintf(file, "    %s (1k,   64k] %jd\n", tag, histo.at(5));
   if (histo.at(6))
-    fprintf(file, "    %s > 64k       %" PRId64 "\n", tag, histo.at(6));
+    fprintf(file, "    %s > 64k       %jd\n", tag, histo.at(6));
 }
 
 
 static
 void
-printSignedHisto(const char* tag, const std::vector<uint64_t>& histo,
+printSignedHisto(const char* tag, const std::vector<uintmax_t>& histo,
 		 FILE* file)
 {
   if (histo.size() < 13)
     return;
 
   if (histo.at(0))
-    fprintf(file, "    %s <= -64k     %" PRId64 "\n", tag, histo.at(0));
+    fprintf(file, "    %s <= -64k     %jd\n", tag, histo.at(0));
   if (histo.at(1))
-    fprintf(file, "    %s (-64k, -1k] %" PRId64 "\n", tag, histo.at(1));
+    fprintf(file, "    %s (-64k, -1k] %jd\n", tag, histo.at(1));
   if (histo.at(2))
-    fprintf(file, "    %s (-1k,  -16] %" PRId64 "\n", tag, histo.at(2));
+    fprintf(file, "    %s (-1k,  -16] %jd\n", tag, histo.at(2));
   if (histo.at(3))
-    fprintf(file, "    %s (-16,   -3] %" PRId64 "\n", tag, histo.at(3));
+    fprintf(file, "    %s (-16,   -3] %jd\n", tag, histo.at(3));
   if (histo.at(4))
-    fprintf(file, "    %s -2          %" PRId64 "\n", tag, histo.at(4));
+    fprintf(file, "    %s -2          %jd\n", tag, histo.at(4));
   if (histo.at(5))
-    fprintf(file, "    %s -1          %" PRId64 "\n", tag, histo.at(5));
+    fprintf(file, "    %s -1          %jd\n", tag, histo.at(5));
   if (histo.at(6))
-    fprintf(file, "    %s 0           %" PRId64 "\n", tag, histo.at(6));
+    fprintf(file, "    %s 0           %jd\n", tag, histo.at(6));
   if (histo.at(7))
-    fprintf(file, "    %s 1           %" PRId64 "\n", tag, histo.at(7));
+    fprintf(file, "    %s 1           %jd\n", tag, histo.at(7));
   if (histo.at(8))
-    fprintf(file, "    %s 2           %" PRId64 "\n", tag, histo.at(8));
+    fprintf(file, "    %s 2           %jd\n", tag, histo.at(8));
   if (histo.at(9))
-    fprintf(file, "    %s (2,     16] %" PRId64 "\n", tag, histo.at(9));
+    fprintf(file, "    %s (2,     16] %jd\n", tag, histo.at(9));
   if (histo.at(10))
-    fprintf(file, "    %s (16,    1k] %" PRId64 "\n", tag, histo.at(10));
+    fprintf(file, "    %s (16,    1k] %jd\n", tag, histo.at(10));
   if (histo.at(11))	              
-    fprintf(file, "    %s (1k,   64k] %" PRId64 "\n", tag, histo.at(11));
+    fprintf(file, "    %s (1k,   64k] %jd\n", tag, histo.at(11));
   if (histo.at(12))	              
-    fprintf(file, "    %s > 64k       %" PRId64 "\n", tag, histo.at(12));
+    fprintf(file, "    %s > 64k       %jd\n", tag, histo.at(12));
 }
 
 
@@ -1014,55 +1014,55 @@ enum class FpKinds { PosInf, NegInf, PosNormal, NegNormal, PosSubnormal, NegSubn
 
 static
 void
-printFpHisto(const char* tag, const std::vector<uint64_t>& histo, FILE* file)
+printFpHisto(const char* tag, const std::vector<uintmax_t>& histo, FILE* file)
 {
   for (unsigned i = 0; i <= unsigned(FpKinds::SignalingNan); ++i)
     {
       FpKinds kind = FpKinds(i);
-      uint64_t freq = histo.at(i);
+      uintmax_t freq = histo.at(i);
       if (not freq)
         continue;
 
       switch (kind)
         {
         case FpKinds::PosInf:
-          fprintf(file, "    %s pos_inf       %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s pos_inf       %jd\n", tag, freq);
           break;
 
         case FpKinds::NegInf:
-          fprintf(file, "    %s neg_inf       %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s neg_inf       %jd\n", tag, freq);
           break;
 
         case FpKinds::PosNormal:
-          fprintf(file, "    %s pos_normal    %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s pos_normal    %jd\n", tag, freq);
           break;
 
         case FpKinds::NegNormal:
-          fprintf(file, "    %s neg_normal    %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s neg_normal    %jd\n", tag, freq);
           break;
 
         case FpKinds::PosSubnormal:
-          fprintf(file, "    %s pos_subnormal %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s pos_subnormal %jd\n", tag, freq);
           break;
 
         case FpKinds::NegSubnormal:
-          fprintf(file, "    %s neg_subnormal %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s neg_subnormal %jd\n", tag, freq);
           break;
 
         case FpKinds::PosZero:
-          fprintf(file, "    %s pos_zero      %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s pos_zero      %jd\n", tag, freq);
           break;
 
         case FpKinds::NegZero:
-          fprintf(file, "    %s neg_zero      %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s neg_zero      %jd\n", tag, freq);
           break;
 
         case FpKinds::QuietNan:
-          fprintf(file, "    %s quiet_nan     %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s quiet_nan     %jd\n", tag, freq);
           break;
 
         case FpKinds::SignalingNan:
-          fprintf(file, "    %s signaling_nan %" PRId64 "\n", tag, freq);
+          fprintf(file, "    %s signaling_nan %jd\n", tag, freq);
           break;
         }
     }
@@ -1094,7 +1094,7 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
       else
         continue;
 
-      fprintf(file, "%s %" PRId64 "\n", instr.c_str(), prof.freq_);
+      fprintf(file, "%s %jd\n", instr.c_str(), prof.freq_);
 
       uint64_t count = 0;
       for (auto n : prof.destRegFreq_) count += n;
@@ -1104,7 +1104,7 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
 	  auto regCount = prof.destRegFreq_.size();
 	  for (unsigned i = 0; i < regCount; ++i)
 	    if (prof.destRegFreq_.at(i))
-              fprintf(file, " %d:%" PRId64, i, prof.destRegFreq_.at(i));
+              fprintf(file, " %d:%jd", i, prof.destRegFreq_.at(i));
           fprintf(file, "\n");
 	}
 
@@ -1127,7 +1127,7 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
                   fprintf(file, "  +rs%d", srcIx + 1);
                   for (unsigned i = 0; i < regCount; ++i)
                     if (regFreq.at(i))
-                      fprintf(file, " %d:%" PRId64, i, regFreq.at(i));
+                      fprintf(file, " %d:%jd", i, regFreq.at(i));
                   fprintf(file, "\n");
 
                   const auto& histo = prof.srcHisto_.at(srcIx);
@@ -1287,10 +1287,10 @@ template <typename URV>
 void
 Hart<URV>::reportLrScStat(FILE* file) const
 {
-  fprintf(file, "Load-reserve dispatched: %" PRId64 "\n", lrCount_);
-  fprintf(file, "Load-reserve successful: %" PRId64 "\n", lrSuccess_); 
-  fprintf(file, "Store-conditional dispatched: %" PRId64 "\n", scCount_);
-  fprintf(file, "Store-conditional successful: %" PRId64 "\n", scSuccess_);
+  fprintf(file, "Load-reserve dispatched: %jd\n", uintmax_t(lrCount_));
+  fprintf(file, "Load-reserve successful: %jd\n", uintmax_t(lrSuccess_)); 
+  fprintf(file, "Store-conditional dispatched: %jd\n", uintmax_t(scCount_));
+  fprintf(file, "Store-conditional successful: %jd\n", uintmax_t(scSuccess_));
 }
 
 
@@ -2663,8 +2663,8 @@ formatVecInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId,
 			     unsigned vecReg, const uint8_t* data,
 			     unsigned byteCount, const char* assembly)
 {
-  fprintf(out, "#%" PRId64 " %d %08x %8s v %02x ",
-	  tag, hartId, currPc, opcode, vecReg);
+  fprintf(out, "#%jd %d %08x %8s v %02x ",
+	  uintmax_t(tag), hartId, currPc, opcode, vecReg);
   for (unsigned i = 0; i < byteCount; ++i)
     fprintf(out, "%02x", data[byteCount - 1 - i]);
   fprintf(out, " %s", assembly);
@@ -2678,8 +2678,8 @@ formatVecInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
 			     unsigned vecReg, const uint8_t* data,
 			     unsigned byteCount, const char* assembly)
 {
-  fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s v %02x ",
-          tag, hartId, currPc, opcode, vecReg);
+  fprintf(out, "#%jd %d %016jx %8s v %02x ",
+          uintmax_t(tag), hartId, uintmax_t(currPc), opcode, vecReg);
   for (unsigned i = 0; i < byteCount; ++i)
     fprintf(out, "%02x", data[byteCount - 1 - i]);
   fprintf(out, " %s", assembly);
@@ -2700,21 +2700,21 @@ formatInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId, uint32_t cur
 {
   if (resource == 'r')
     {
-      fprintf(out, "#%" PRId64 " %d %08x %8s r %02x         %08x  %s",
-              tag, hartId, currPc, opcode, addr, value, assembly);
+      fprintf(out, "#%jd %d %08x %8s r %02x         %08x  %s",
+              uintmax_t(tag), hartId, currPc, opcode, addr, value, assembly);
     }
   else if (resource == 'c')
     {
       if ((addr >> 16) == 0)
-        fprintf(out, "#%" PRId64 " %d %08x %8s c %04x       %08x  %s",
-                tag, hartId, currPc, opcode, addr, value, assembly);
+        fprintf(out, "#%jd %d %08x %8s c %04x       %08x  %s",
+                uintmax_t(tag), hartId, currPc, opcode, addr, value, assembly);
       else
-        fprintf(out, "#%" PRId64 " %d %08x %8s c %08x   %08x  %s",
-                tag, hartId, currPc, opcode, addr, value, assembly);
+        fprintf(out, "#%jd %d %08x %8s c %08x   %08x  %s",
+                uintmax_t(tag), hartId, currPc, opcode, addr, value, assembly);
     }
   else
     {
-      fprintf(out, "#%" PRId64 " %d %08x %8s %c %08x   %08x  %s", tag, hartId,
+      fprintf(out, "#%jd %d %08x %8s %c %08x   %08x  %s", uintmax_t(tag), hartId,
               currPc, opcode, resource, addr, value, assembly);
     }
 }
@@ -2726,8 +2726,9 @@ formatInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId, uint64_t cur
 		const char* opcode, char resource, uint64_t addr,
 		uint64_t value, const char* assembly)
 {
-  fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s %c %016" PRIx64 " %016" PRIx64 "  %s",
-          tag, hartId, currPc, opcode, resource, addr, value, assembly);
+  fprintf(out, "#%jd %d %016jx %8s %c %016" PRIx64 " %016" PRIx64 "  %s",
+          uintmax_t(tag), hartId, uintmax_t(currPc), opcode, resource, addr,
+	  value, assembly);
 }
 
 
@@ -2746,14 +2747,14 @@ formatFpInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId,
 {
   if (width == 64)
     {
-      fprintf(out, "#%" PRId64 " %d %08x %8s f %02x %016" PRIx64 "  %s",
-	      tag, hartId, currPc, opcode, fpReg, fpVal, assembly);
+      fprintf(out, "#%jd %d %08x %8s f %02x %016jx  %s", uintmax_t(tag), hartId,
+	      currPc, opcode, fpReg, uintmax_t(fpVal), assembly);
     }
   else
     {
       uint32_t val32 = fpVal;
-      fprintf(out, "#%" PRId64 " %d %08x %8s f %02x         %08" PRIx32 "  %s",
-	      tag, hartId, currPc, opcode, fpReg, val32, assembly);
+      fprintf(out, "#%jd %d %08x %8s f %02x         %08x  %s",
+	      uintmax_t(tag), hartId, currPc, opcode, fpReg, val32, assembly);
     }
 }
 
@@ -2766,14 +2767,16 @@ formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
 {
   if (width == 64)
     {
-      fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s f %016" PRIx64 " %016" PRIx64 "  %s",
-          tag, hartId, currPc, opcode, uint64_t(fpReg), fpVal, assembly);
+      fprintf(out, "#%jd %d %016jx %8s f %016jx %016jx  %s",
+	      uintmax_t(tag), hartId, uintmax_t(currPc), opcode, uintmax_t(fpReg),
+	      uintmax_t(fpVal), assembly);
     }
   else
     {
       uint32_t val32 = fpVal;
-      fprintf(out, "#%" PRId64 " %d %016" PRIx64 " %8s f %016" PRIx64 "         %08" PRIx32 "  %s",
-          tag, hartId, currPc, opcode, uint64_t(fpReg), val32, assembly);
+      fprintf(out, "#%jd %d %016jx %8s f %016jx         %08x  %s",
+	      uintmax_t(tag), hartId, uintmax_t(currPc), opcode, uintmax_t(fpReg),
+	      val32, assembly);
     }
 }
 

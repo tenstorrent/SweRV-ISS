@@ -956,11 +956,13 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 	      if (commandLog)
 		{
 		  if (system_.isMcmEnabled())
-		    fprintf(commandLog, "hart=%d time=%s step 1 %" PRId64 "\n",
-			    hartId, timeStamp.c_str(), msg.instrTag);
+		    fprintf(commandLog, "hart=%d time=%s step 1 %jd\n",
+			    hartId, timeStamp.c_str(), uintmax_t(msg.instrTag));
 		  else
-		    fprintf(commandLog, "hart=%d step #%" PRId64 " # ts=%s\n",
-			    hartId, hart.getInstructionCount(), timeStamp.c_str());
+		    fprintf(commandLog, "hart=%d step #%jd # ts=%s\n",
+			    hartId, uintmax_t(hart.getInstructionCount()),
+			    timeStamp.c_str());
+		  fflush(commandLog);
 		}
 	      break;
 

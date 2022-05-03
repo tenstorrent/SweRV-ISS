@@ -25,15 +25,15 @@ namespace WdRiscv
   struct InstProfile
   {
     InstId id_ = InstId::illegal;
-    uint64_t freq_ = 0;       // Number of times instruction was executed
-    uint64_t user_ = 0;       // Number of times exeuted in user mode.
-    uint64_t supervisor_ = 0; // Number of times exeuted in supervisor mode.
-    uint64_t machine_ = 0;    // Number of times exeuted in machine mode.
+    uintmax_t freq_ = 0;       // Number of times instruction was executed
+    uintmax_t user_ = 0;       // Number of times exeuted in user mode.
+    uintmax_t supervisor_ = 0; // Number of times exeuted in supervisor mode.
+    uintmax_t machine_ = 0;    // Number of times exeuted in machine mode.
     ElementWidth elemWidth_ = ElementWidth::Byte;  // For vector instructions.
 
     // One entry per integer register: Count of times register was used
     // by instruction as destination register.
-    std::vector<uint64_t> destRegFreq_;
+    std::vector<uintmax_t> destRegFreq_;
 
     // SrcRegFreq_[0] corresponds to the 1st source register operand,
     // srcRegFreq_[1] to the second and srcRegFreq_[3] to the
@@ -41,9 +41,9 @@ namespace WdRiscv
     // with one entry per integer/fp register indicating the count of
     // times that register was used by the instruction as a source
     // operand.
-    std::vector< std::vector<uint64_t> > srcRegFreq_;
+    std::vector< std::vector<uintmax_t> > srcRegFreq_;
 
-    std::vector< std::vector<uint64_t> > srcHisto_;
+    std::vector< std::vector<uintmax_t> > srcHisto_;
 
     bool hasImm_ = false;
     int32_t minImm_ = 0;  // Minimum immediate operand value.

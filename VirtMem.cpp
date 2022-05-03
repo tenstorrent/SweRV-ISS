@@ -262,7 +262,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
   VA va(address);
 
   if (attFile_)
-    fprintf(attFile_, "VA: 0x%" PRIx64 "\n", address);
+    fprintf(attFile_, "VA: 0x%jx\n", uintmax_t(address));
 
   // 2. Root is "a" in section 4.3.2 of privileged spec.
   uint64_t root = pageTableRootPage_ * pageSize_;
@@ -290,11 +290,12 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
       if (attFile_)
         {
           bool leaf = pte.valid() and (pte.write() or pte.exec());
-          fprintf(attFile_, "addr: 0x%" PRIx64 "\n", pteAddr);
-          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(), pte.write(), pte.exec(),
-                                                                  pte.user(), pte.global(),
-                                                                  pte.accessed(), pte.dirty());
-          fprintf(attFile_, "leaf: %d, pa:0x%" PRIx64 "\n", leaf, ((uint64_t) pte.ppn() * pageSize_));
+          fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
+          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
+		  pte.write(), pte.exec(), pte.user(), pte.global(),
+		  pte.accessed(), pte.dirty());
+          fprintf(attFile_, "leaf: %d, pa:0x%jx\n", leaf,
+		  uintmax_t(pte.ppn()) * pageSize_);
         }
 
       // 4.
@@ -371,7 +372,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
     pa = pa | pte.ppn(j) << pte.paPpnShift(j);
 
   if (attFile_)
-    fprintf(attFile_, "PA: 0x%" PRIx64 "\n\n", pa);
+    fprintf(attFile_, "PA: 0x%jx\n\n", uintmax_t(pa));
 
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
@@ -425,11 +426,12 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       if (attFile_)
         {
           bool leaf = pte.valid() and (pte.write() or pte.exec());
-          fprintf(attFile_, "addr: 0x%\n" PRIx64, pteAddr);
-          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(), pte.write(), pte.exec(),
-                                                                  pte.user(), pte.global(),
-                                                                  pte.accessed(), pte.dirty());
-          fprintf(attFile_, "leaf: %d, pa:0x%\n\n" PRIx64, leaf, ((uint64_t) pte.ppn() * pageSize_));
+          fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
+          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
+		  pte.write(), pte.exec(), pte.user(), pte.global(),
+		  pte.accessed(), pte.dirty());
+          fprintf(attFile_, "leaf: %d, pa:0x%jx\n\n", leaf,
+		  uintmax_t(pte.ppn()) * pageSize_);
         }
 
       // 3.
