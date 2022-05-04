@@ -26,6 +26,7 @@ namespace WdRiscv
 
   enum class OperandType { IntReg, FpReg, CsReg, VecReg, Imm, None };
   enum class OperandMode { Read, Write, ReadWrite, None };
+  enum class RvFormat { R, R4, I, S, B, U, J, None };
 
   /// Return true if given instruction is a 4-byte instruction.
   inline bool
@@ -71,20 +72,21 @@ namespace WdRiscv
 
     // Constructor.
     InstEntry(std::string name = "", InstId id = InstId::illegal,
-	     uint32_t code = 0, uint32_t mask = ~0,
-	     RvExtension ext = RvExtension::I,
-	     OperandType op0Type = OperandType::None,
-	     OperandMode op0Mode = OperandMode::None,
-	     uint32_t op0Mask = 0,
-	     OperandType op1Type = OperandType::None,
-	     OperandMode op1Mode = OperandMode::None,
-	     uint32_t op1Mask = 0,
-	     OperandType op2Type = OperandType::None,
-	     OperandMode op2Mode = OperandMode::None,
-	     uint32_t op2Mask = 0,
-	     OperandType op3Type = OperandType::None,
-	     OperandMode op3Mode = OperandMode::None,
-	     uint32_t op3Mask = 0);
+	      uint32_t code = 0, uint32_t mask = ~0,
+	      RvExtension ext = RvExtension::I,
+	      RvFormat fmt = RvFormat::None,
+	      OperandType op0Type = OperandType::None,
+	      OperandMode op0Mode = OperandMode::None,
+	      uint32_t op0Mask = 0,
+	      OperandType op1Type = OperandType::None,
+	      OperandMode op1Mode = OperandMode::None,
+	      uint32_t op1Mask = 0,
+	      OperandType op2Type = OperandType::None,
+	      OperandMode op2Mode = OperandMode::None,
+	      uint32_t op2Mask = 0,
+	      OperandType op3Type = OperandType::None,
+	      OperandMode op3Mode = OperandMode::None,
+	      uint32_t op3Mask = 0);
 
 
     /// Return the name of the instruction.
@@ -190,6 +192,10 @@ namespace WdRiscv
     /// for c.fld).
     RvExtension extension() const
     { return ext_; }
+
+    /// Return the RISCV instruction format. 
+    RvFormat format() const
+    { return fmt_; }
 
     /// Return true if this is a load instruction (lb, lh, flw, lr ...)
     bool isLoad() const
@@ -338,6 +344,7 @@ namespace WdRiscv
     uint32_t codeMask_;  // Bit corresponding to code bits are 1. Bits
 
     RvExtension ext_ = RvExtension::I;
+    RvFormat fmt_ = RvFormat::None;
 
     uint32_t op0Mask_;
     uint32_t op1Mask_;
