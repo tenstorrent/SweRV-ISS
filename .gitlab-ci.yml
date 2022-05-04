@@ -1,0 +1,38 @@
+# Documentation for the format of this file can be found at https://docs.gitlab.com/ce/ci/yaml/README.html
+
+
+image:
+  name: yyz-gitlab.local.tenstorrent.com:5005/tenstorrent/infra/devel-whisper
+  entrypoint: [""]
+
+
+# Global variables
+variables:
+  GIT_DEPTH: 1  # Shallow clone to only one depth for speed up
+  GIT_SUBMODULE_STRATEGY: recursive  # See https://docs.gitlab.com/ce/ci/git_submodules.html
+  SILENT: 0  # Causes make to print all commands it executes
+
+# Commonly used YAML (anchors)
+.define-anchors:
+# refs:
+- &BRANCH_IS_MASTER /^master$/
+- &BRANCH_IS_BLACKHOLE /^black-hole.*$/
+
+stages:
+- test               # Nothing too serious; one stage is all we need right now
+
+
+
+
+post-commit-test:
+  stage: test
+  allow_failure: false
+  script:
+    - make -j32
+    - cd testing && source init_venv.sh && ralph trace -t configs.py --clean
+  artifacts: &TEST_ARTIFACTS
+    when: always
+    expire_in: 8 hours
+    paths:
+    - "test_output/*/*" 
+

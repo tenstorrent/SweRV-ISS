@@ -12,12 +12,8 @@
     "Comment" : "Replace subnormal floating point results with zero.",
     "force_subnormal_to_zero" : "true",
 
-    "isa" : "rv32imafvzfh",
-
-    "enable_zfh" : "true",
-
-    "enable_zba" : "true",
-    "enable_zbb" : "true",
+    "Comment" : "No misaligned ld/st addresses",
+    "enable_misaligned_data" : "false",
 
     "enable_performance_counters" : "true",
     "perf_count_atomic_load_store" : "true",

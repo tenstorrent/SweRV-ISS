@@ -1,0 +1,11 @@
+python-lsp-server[all]
+rich==12.0.0
+PyYAML
+ordereddict
+argparse
+rxjson
+six
+fasteners
+cachetools
+git+https://yyz-gitlab.local.tenstorrent.com/jconnolly/microprobe.git@ttfork
+git+https://yyz-gitlab.local.tenstorrent.com/jconnolly/ralph.git@master
