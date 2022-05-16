@@ -2380,6 +2380,17 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
   if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
     updateCachedMstatusFields();
 
+  if (csr == CsrNumber::VTYPE)
+    {
+      bool vill = (val >> (8*sizeof(URV) - 1)) & 1;
+      bool ma = (val >> 7) & 1;
+      bool ta = (val >> 6) & 1;
+      GroupMultiplier gm = GroupMultiplier(val & 7);
+      ElementWidth ew = ElementWidth((val >> 3) & 7);
+      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+    }
+
+
   return true;
 }
 
