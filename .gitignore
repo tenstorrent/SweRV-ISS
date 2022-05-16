@@ -2,3 +2,5 @@
 *.o
 whisper
 librvcore.a
+*.a
+bazel-*

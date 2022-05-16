@@ -122,7 +122,13 @@ namespace WdRiscv
 #endif
 
       if (cache_)
-        cache_->insert(address);
+	{
+	  cache_->insert(address);
+	  if (address & (sizeof(T) - 1))  // If misaligned
+	    if (cache_->getLineNumber(address) != cache_->getLineNumber(address + sizeof(T) - 1))
+	      cache_->insert(address + sizeof(T) - 1);
+	}
+
       return true;
     }
 
@@ -152,8 +158,8 @@ namespace WdRiscv
           value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
 
-          if (cache_)
-            cache_->insert(address);
+          // if (cache_)
+          //   cache_->insert(address);
 	  return true;
 	}
       return false;
@@ -208,10 +214,7 @@ namespace WdRiscv
       lwd.size_ = sizeof(T);
       lwd.addr_ = address;
       lwd.value_ = value;
-      lwd.prevValue_ = *(reinterpret_cast<T*>(data_ + address));
       *(reinterpret_cast<T*>(data_ + address)) = value;
-
-      return true;
 #else
 
       Pma pma1 = pmaMgr_.getPma(address);
@@ -241,7 +244,6 @@ namespace WdRiscv
   #ifdef MEM_CALLBACKS
       uint64_t val = 0;
       readCallback_(address, sizeof(T), val);
-      lwd.prevValue_ = val;
       val = value;
       if (not writeCallback_(address, sizeof(T), val))
         {
@@ -249,12 +251,19 @@ namespace WdRiscv
           return false;
         }
   #else
-      lwd.prevValue_ = *(reinterpret_cast<T*>(data_ + address));
       *(reinterpret_cast<T*>(data_ + address)) = value;
   #endif
 
-      return true;
 #endif
+      if (cache_)
+	{
+	  cache_->insert(address);
+	  if (address & (sizeof(T) - 1))  // If misaligned
+	    if (cache_->getLineNumber(address) != cache_->getLineNumber(address + sizeof(T) - 1))
+	      cache_->insert(address + sizeof(T) - 1);
+	}
+
+      return true;
     }
 
     /// Write half-word (2 bytes) to given address. Return true on
@@ -478,39 +487,6 @@ namespace WdRiscv
     /// and external memory are written.
     bool specialInitializeByte(size_t address, uint8_t value);
 
-    /// Set addr to the address of the last write and value to the
-    /// corresponding value and return the size of that write. Return
-    /// 0 if no write since the most recent clearLastWriteInfo in
-    /// which case addr and value are not modified.
-    unsigned getLastWriteNewValue(unsigned sysHartIx, uint64_t& addr,
-                                  uint64_t& value) const
-    {
-      const auto& lwd = lastWriteData_.at(sysHartIx);
-      if (lwd.size_)
-	{
-	  addr = lwd.addr_;
-	  value = lwd.value_;
-	}
-      return lwd.size_;
-    }
-
-    /// Set addr to the address of the last write and value to the
-    /// corresponding previous value (value before last write) and
-    /// return the size of that write. Return 0 if no write since the
-    /// most recent clearLastWriteInfo in which case addr and value
-    /// are not modified.
-    unsigned getLastWriteOldValue(unsigned sysHartIx, size_t& addr,
-                                  uint64_t& value) const
-    {
-      auto& lwd = lastWriteData_.at(sysHartIx);
-      if (lwd.size_)
-	{
-	  addr = lwd.addr_;
-	  value = lwd.value_;
-	}
-      return lwd.size_;
-    }
-
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
     {
@@ -545,39 +521,13 @@ namespace WdRiscv
     bool checkCcmOverlap(const std::string& tag, size_t addr, size_t size,
 			 bool iccm, bool dccm, bool pic) const;
 
-    /// If a region contains dccm/pic or iccm (but not both) then only
-    /// the proper dcc/pic or iccm area is accessible.
-    void narrowCcmRegion(size_t addr, bool trim);
-
-    /// Define instruction closed coupled memory (in core instruction memory).
-    /// If trim is true then region containing ICCM is marked inaccessible
-    /// except for the ICCM area.
-    bool defineIccm(size_t addr, size_t size, bool trim);
-
-    /// Define data closed coupled memory (in core data memory). If
-    /// trim is true then region containing DCCM is marked
-    /// inaccessible except for the ICCM area.
-    bool defineDccm(size_t addr, size_t size, bool trim);
-
-    /// Define region for memory mapped registers (MMR). Return true
-    /// on success and false if offset or size are not properly
-    /// aligned or sized. If trim is true then region containing MMR
-    /// is marked inaccessible except for the MMR area.
-    bool defineMemoryMappedRegisterArea(size_t addr, size_t size, bool trim );
-
     /// Reset (to zero) all memory mapped registers.
     void resetMemoryMappedRegisters();
 
     /// Define write mask for a memory-mapped register with given
     /// address.  Return true on success and false if the address is
-    /// not within a memory-mapped area (see
-    /// defineMemoryMappedRegisterArea).
+    /// not within a memory-mapped area.
     bool defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask);
-
-    /// Called after memory is configured to refine memory access to
-    /// sections of regions containing ICCM, DCCM or memory mapped
-    /// register area (e.g. PIC).
-    void finishCcmConfig(bool iccmRw);
 
     /// Read a memory mapped register.
     bool readRegister(size_t addr, uint32_t& value) const
@@ -603,17 +553,12 @@ namespace WdRiscv
     /// Write a memory mapped register.
     bool writeRegister(unsigned sysHartIx, size_t addr, uint32_t value)
     {
-      uint32_t prev = 0;
-      if (not readRegister(addr, prev))
-        return false;
-
       value = doRegisterMasking(addr, value);
 
       if (not pmaMgr_.writeRegister(addr, value))
         return false;
 
       auto& lwd = lastWriteData_.at(sysHartIx);
-      lwd.prevValue_ = prev;
       lwd.size_ = 4;
       lwd.addr_ = addr;
       lwd.value_ = value;
@@ -728,7 +673,6 @@ namespace WdRiscv
       unsigned size_ = 0;
       size_t addr_ = 0;
       uint64_t value_ = 0;
-      uint64_t prevValue_ = 0;
     };
 
     size_t size_;        // Size of memory in bytes.

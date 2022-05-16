@@ -182,13 +182,12 @@ The following is a brief description of the command line options:
        Specify register width (32 or 64), defaults to 32.
 
     --isa string
-       Select the RISCV options to enable. The currently supported options are
-       a (atomic), c (compressed instructions), d (double precision fp), 
+       Select the RISCV extensions to enable. The currently supported options are
+       a (atomic), c (compressed instructions), d (double precision fp),
        f (single precision fp), i (base integer), m (multiply divide),
-       s (supervisor mode), u (user mode), and v (vector). By default, only i, m and c
-       are enabled. Note that option i cannot be turned off. Example: "--isa imcf".
-       It is recommended to avoid this option if the configuration of the "misa" CSR is
-       included in the JSON configuration file.
+       s (supervisor mode), u (user mode), and v). By default, only i, m and
+       c are enabled. Canonical ISA strings with versioned ectension are supported.
+       Examples: --isa imacf, --isa rv32i2p0_m2p0_f2p0_v1p0_zfh0p1
 
     --target program
        Specify target program (ELF file) to load into simulated memory. In newlib
@@ -199,6 +198,14 @@ The following is a brief description of the command line options:
 
     --logfile file
        Enable tracing to given file of executed instructions.
+
+    --csv
+       Use CSV (comma separated values) format for the trace log file produced
+       by the --logfile option. The first output line contains the headers of
+       the columns in the rest of the log file. Each executed instruction results
+       in a row that includes the PC, opcode, changed registers,
+       changed memory locations, ... Fields are separated by commas. Multiple
+       values within a field are separated by semicolons.
 
     --consoleoutfile file
        Redirect console output to given file.
@@ -468,23 +475,34 @@ Number of cores in simulated system.
 ### xlen
 Integer register size in bits.
 
+### isa
+Enable instruction set architecture (isa) features.
+Example:
+   "isa" : "rv32imaf"
+
 ### memmap
 Object defining memory organization. Fields of memap:
 * size: Field defining physical memory size
 * page_size: Field defining page size
-* inst: Array of entries defining areas of physical memory where
-instruction fetch is legal (if not used, then all of memory is valid
-for fetch). Each entry is an array of 2 integers defining the start
-and end address of a fetch region.
-* data: Array of entries defining areas of physical memory where
-data load/store is legal (if not used, then all of memory is
-valid for load/store). Each entry is an array of 2 integers
-defining the start and end address of a data region.
+* pma: Array of entries defining physical memory attributes.
+Each entry is an object with a "low" and "high" addresses and an
+"attribs" array defining the physical memory attributes.
 
 Example:
 
     "memmap" : { "size" : "0x100000000", "page_size" : 4096,
-                 "inst" : [0, "0x20000000"] }
+        "pma" : [
+            {
+                "low" : "0x80000000",  "high" : "0x801fffff",
+                "attribs" : [ "read", "write", "exec", "amo", "rsrv", "idempotent" ]
+            },
+            {
+                "low" : "0x0",  "high" : "0xffffffff",
+                "attribs" : [ "read", "write", "amo", "rsrv", "idempotent" ]
+            }
+        ]
+    }
+
        
 ### num_mmode_perf_regs
 Number of implemented performance counters. If specified number is n,
@@ -498,9 +516,27 @@ this is set to true. Note that pipeline specific events (such as
 mispredicted branches) are not supported. Synchronous events (such as
 count retired load insructions) are supported.
 
+###  enable_zba
+When set to true, this enables the the zba bit-manipulation
+extension. Similary, enable_zbb, enable_zbc, and enable_zbs can be
+used to enable the corresponding bit-manipulation extension.
+
+###  enable_zfh
+When set to true, this enables the half-precision (16-bit) floating point
+extension.
+
 ###  abi_names
 If set to true then registers are identified by their ABI names in the
 log file (e.g. ra instead of x1).
+
+###  enable_misaligned_data
+If set to false then a misaligend data access by a load/store
+instructions will trigger an exception.
+
+###  physical_memory_protection_grain
+Define the G value of the physical memory protection grain. This is
+the log base 2 of the grain minus 2.  The default is G=0 (implying a
+grain of 4).
 
 ###  csr
 The CSR configuration is a map wher each key is a CSR name and the
@@ -530,7 +566,12 @@ Example:
     }
 
 ###  reset_vec
-Defines the PC value after reset
+Defines the program counter (PC) value after reset. The ELF file
+entry point will supersede the reset_vec value unless --raw is
+used. The value of the --startpc option will supersede both the
+reset_vec and the ELF file entry point. In interactive mode, a reset
+command will change the program counter to the value of reset_vec.
+
 
 ###  nmi_vec
 Defines the PC address after a non-maskable-interrupt.
@@ -549,4 +590,5 @@ SOFT_FLOAT=1" in which case simulation of floating point instructions
 slows down significantly.
 
 Suppprted extensions: A, B, C, D, F, I, M, S, U, V, ZFH, ZBA, ZBB, and ZBS.
+
 

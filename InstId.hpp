@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace WdRiscv
 {
   /// Associate a unique integer identifier with each instruction.
@@ -60,6 +62,7 @@ namespace WdRiscv
      or_,
      and_,
      fence,
+     fence_tso,
      fencei,
      ecall,
      ebreak,
@@ -402,11 +405,6 @@ namespace WdRiscv
      fslw,
      fsrw,
      fsriw,
-
-     // Custom instructions
-     load64,
-     store64,
-     bbarrier,
 
      // vector
      vsetvli,
@@ -926,6 +924,37 @@ namespace WdRiscv
      vfsgnjx_vv,
      vfsgnjx_vf,
 
-     maxId = vfsgnjx_vf
+     // Crypto (rvk)
+     aes32dsi,
+     aes32dsmi,
+     aes32esi,
+     aes32esmi,
+     aes64ds,
+     aes64dsm,
+     aes64es,
+     aes64esm,
+     aes64im,
+     aes64ks1i,
+     aes64ks2,
+     sha256sig0,
+     sha256sig1,
+     sha256sum0,
+     sha256sum1,
+     sha512sig0h,
+     sha512sig0l,
+     sha512sig1h,
+     sha512sig1l,
+     sha512sum0r,
+     sha512sum1r,
+     sha512sig0,
+     sha512sig1,
+     sha512sum0,
+     sha512sum1,
+     sm3p0,
+     sm3p1,
+     sm4ed,
+     sm4ks,
+
+     maxId = sm4ks
     };
 }

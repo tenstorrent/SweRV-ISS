@@ -1,0 +1,94 @@
+// Copyright 2020 Western Digital Corporation or its affiliates.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
+#include <cstdint>
+#include "InstId.hpp"
+#include "InstEntry.hpp"
+#include "DecodedInst.hpp"
+
+namespace WdRiscv
+{
+
+  class Decoder
+  {
+  public:
+    
+    /// Constructor.
+    Decoder();
+
+    /// Destructor.
+    ~Decoder();
+
+    /// Decode given instruction returning a pointer to the
+    /// instruction information and filling op0, op1 and op2 with the
+    /// corresponding operand specifier values. For example, if inst
+    /// is the instruction code for "addi r3, r4, 77", then the
+    /// returned value would correspond to addi and op0, op1 and op2
+    /// will be set to 3, 4, and 77 respectively. If an instruction
+    /// has fewer than 3 operands then only a subset of op0, op1 and
+    /// op2 will be set. If inst is not a valid instruction , then we
+    /// return a reference to the illegal-instruction info.
+    const InstEntry& decode(uint32_t inst, uint32_t& op0, uint32_t& op1,
+			    uint32_t& op2, uint32_t& op3);
+
+    /// Similar to the preceding decode method but with decoded data
+    /// placed in the given DecodedInst object.
+    void decode(uint64_t addr, uint64_t physAddr, uint32_t inst,
+		DecodedInst& decodedInst);
+
+    /// Return the 32-bit instruction corresponding to the given 16-bit
+    /// compressed instruction. Return an illegal 32-bit opcode if given
+    /// 16-bit code is not a valid compressed instruction.
+    uint32_t expandCompressedInst(uint16_t inst) const;
+
+    /// Enable/disabled rv64. Some code points will decode differently if
+    /// rv64 is enabled.
+    void enableRv64(bool flag)
+    { rv64_ = flag; }
+
+    /// Return true if rv64 is enabled.
+    bool isRv64() const
+    { return rv64_; }
+
+  protected:
+
+    /// Decode a floating point instruction.
+    const InstEntry& decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1,
+			      uint32_t& op2);
+
+    /// Decode a vector instruction.
+    const InstEntry& decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1,
+			       uint32_t& op2, uint32_t& op3);
+
+    /// Decode a vector load instruction.
+    const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12,
+				   uint32_t& fieldCount);
+
+    /// Decode a vector store instruction.
+    const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12,
+				    uint32_t& fieldCount);
+
+    /// Decode a compressed instruction.
+    const InstEntry& decode16(uint16_t inst, uint32_t& op0, uint32_t& op1,
+			      uint32_t& op2);
+
+  private:
+
+    InstTable instTable_;
+    bool rv64_ = false;
+  };
+}
+

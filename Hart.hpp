@@ -35,9 +35,17 @@
 #include "PmpManager.hpp"
 #include "VirtMem.hpp"
 #include "Isa.hpp"
+#include "Decoder.hpp"
+#include "ArchInfo.hpp"
 
 namespace WdRiscv
 {
+
+  template <typename URV>
+  class Mcm;
+
+  template <typename URV>
+  class ArchInfo;
 
   /// Thrown by the simulator when a stop (store to to-host) is seen
   /// or when the target program reaches the exit system call.
@@ -106,7 +114,10 @@ namespace WdRiscv
   class Hart
   {
   public:
-    
+
+    friend class ArchInfo<uint32_t>;
+    friend class ArchInfo<uint64_t>;
+
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
     typedef typename std::make_signed_t<URV> SRV;
@@ -143,6 +154,14 @@ namespace WdRiscv
     /// extension f is not enabled.
     size_t fpRegCount() const
     { return isRvf()? fpRegs_.size() : 0; }
+
+    /// Return count of vector registers. Return zero if extension v
+    /// is not enabled.
+    size_t vecRegCount() const
+    { return isRvv()? vecRegs_.size() : 0; }
+
+    ssize_t vecRegSize() const
+    { return isRvv()? vecRegs_.bytesPerRegister() : 0; }
 
     /// Return size of memory in bytes.
     size_t memorySize() const
@@ -212,6 +231,17 @@ namespace WdRiscv
     /// bound.
     bool pokeCsr(CsrNumber csr, URV val);
 
+    /// Put in value the bytes of the given vector register (most
+    /// significant byte first). Return true on success, return false
+    /// if reg is out of bounds.
+    bool peekVecReg(unsigned reg, std::vector<uint8_t>& value) const;
+
+    /// Put the bytes of the value in the given vector regiser.
+    /// The first byte in value should be the most significant.
+    /// If value is smaller than vector regiser size, it is padded
+    /// with zeros on the most-significant side.
+    bool pokeVecReg(unsigned reg, const std::vector<uint8_t>& value);
+
     /// Find the integer register with the given name (which may
     /// represent an integer or a symbolic name). Set num to the
     /// number of the corresponding register if found. Return true on
@@ -222,6 +252,9 @@ namespace WdRiscv
     /// number of the corresponding register if found. Return true on
     /// success and false if no such register.
     bool findFpReg(const std::string& name, unsigned& num) const;
+
+    /// Find vector register by name. See findFpReg.
+    bool findVecReg(const std::string& name, unsigned& num) const;
 
     /// Find the control and status register with the given name
     /// (which may represent an integer or a symbolic name). Return
@@ -326,8 +359,9 @@ namespace WdRiscv
 
     /// Configure vector unit of this hart.
     void configVector(unsigned bytesPerVec, unsigned minBytesPerElem,
-		      unsigned maxBytesPerElem)
-    { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem); }
+		      unsigned maxBytesPerElem,
+                      std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul)
+    { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul); }
 
     /// Configure the load-reserve reservation size in bytes.
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
@@ -378,6 +412,10 @@ namespace WdRiscv
     /// program counter. If file is non-null then print thereon
     /// tracing information related to the executed instruction.
     void singleStep(FILE* file = nullptr);
+
+    /// Same as above but decoded istruction information is placed
+    /// in given di object.
+    void singleStep(DecodedInst& di, FILE* file = nullptr);
 
     /// Determine the effect of instruction fetching and discarding n
     /// bytes (where n is the instruction size of the given
@@ -482,16 +520,19 @@ namespace WdRiscv
     /// op2 will be set. If inst is not a valid instruction , then we
     /// return a reference to the illegal-instruction info.
     const InstEntry& decode(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			    uint32_t& op2, uint32_t& op3);
+			    uint32_t& op2, uint32_t& op3)
+    { return decoder_.decode(inst, op0, op1, op2, op3); }
 
-    /// Similar to the precedning decode method but with decoded data
+    /// Similar to the preceding decode method but with decoded data
     /// placed in the given DecodedInst object.
-    void decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& decodedInst);
+    void decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& decodedInst)
+    { decoder_.decode(addr, physAddr, inst, decodedInst); }
 
     /// Return the 32-bit instruction corresponding to the given 16-bit
     /// compressed instruction. Return an illegal 32-bit opcode if given
     /// 16-bit code is not a valid compressed instruction.
-    uint32_t expandCompressedInst(uint16_t inst) const;
+    uint32_t expandCompressedInst(uint16_t inst) const
+    { return decoder_.expandCompressedInst(inst); }
 
     /// Load the given hex file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exists,
@@ -602,7 +643,7 @@ namespace WdRiscv
     URV lastPc() const;
 
     /// Support for tracing: Return the index of the integer register
-    /// written by the last executed instruction. Return -1 it no
+    /// written by the last executed instruction. Return -1 if no
     /// integer register was written.
     int lastIntReg() const;
 
@@ -610,6 +651,17 @@ namespace WdRiscv
     /// register written by the last executed instruction. Return -1
     /// it no FP register was written.
     int lastFpReg() const;
+
+    /// Support for tracing: Return the index of the destination
+    /// vector register of the last executed instruction. Return -1 if
+    /// no vector register was written. Set group to the effective
+    /// group multiplier.
+    int lastVecReg(const DecodedInst& di, unsigned& group) const;
+
+    /// Return true if the last executed instruction triggered a trap
+    /// (had an exception or encouted an interrupt).
+    bool lastInstructionTrapped() const
+    { return hasException_ or hasInterrupt_; }
 
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
@@ -620,19 +672,38 @@ namespace WdRiscv
     void lastCsr(std::vector<CsrNumber>& csrs,
 		 std::vector<unsigned>& triggers) const;
 
-    /// Support for tracing: Set address and value to the memory
-    /// location changed by the last instruction. Return the size
-    /// of the change or zero if the last instruction did not change
-    /// memory in which case address and value are not modified.
-    /// Returned size is one of 0, 1, 2, 4, or 8.
-    unsigned lastMemory(uint64_t& addr, uint64_t& value) const;
+    /// Support for tracing: Set address and value to the physical
+    /// memory location changed by the last instruction and return the
+    /// number of bytes written. Return 0 leaving addr and value
+    /// unmodified if last instruction did not write memory (not a
+    /// store or store got trapped).
+    unsigned lastStore(uint64_t& addr, uint64_t& value) const
+    {
+      if (not ldStWrite_)
+	return 0;
+      addr = ldStPhysAddr_;
+      value = ldStData_;
+      return ldStSize_;
+    }
+
+    bool getLastVectorMemory(std::vector<uint64_t>& addresses,
+			     std::vector<uint64_t>& data,
+			     unsigned& elementSize) const
+    { return vecRegs_.getLastMemory(addresses, data, elementSize); }
+      
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
 
-    /// Return data address of last executed ld/st instruction.
+    /// Return data address of last executed ld/st instruction. Return 0
+    /// if last instruction was not a ld/st.
     URV lastLdStAddress() const
-    { return ldStAddr_; }
+    { return ldStSize_? ldStAddr_ : 0; }
+
+    /// Return the size of the last ld/st instruction or 0 if last
+    /// instruction was not a ld/st.
+    unsigned lastLdStSize() const
+    { return ldStSize_; }
 
     /// Read instruction at given address. Return true on success and
     /// false if address is out of memory bounds.
@@ -657,37 +728,9 @@ namespace WdRiscv
     uint64_t getInstructionCount() const 
     { return instCounter_; }
 
-    /// Define instruction closed coupled memory (in core instruction memory).
-    bool defineIccm(size_t addr, size_t size);
-
-    /// Define data closed coupled memory (in core data memory).
-    bool defineDccm(size_t addr, size_t size);
-
-    /// Define an area of memory mapped registers.
-    bool defineMemoryMappedRegisterArea(size_t addr, size_t size);
-
     /// Define a memory mapped register. Address must be within an
     /// area already defined using defineMemoryMappedRegisterArea.
     bool defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask);
-
-    /// Called after memory is configured to refine memory access to
-    /// sections of regions containing ICCM, DCCM or PIC-registers.
-    void finishCcmConfig(bool iccmRw)
-    { memory_.finishCcmConfig(iccmRw); }
-
-    /// Turn off all fetch access (except in ICCM regions) then turn
-    /// it on only in the pages overlapping the given address windows.
-    /// Return true on success and false on failure (invalid window
-    /// entry).  Do nothing returning true if the windows vector is
-    /// empty.
-    bool configMemoryFetch(const std::vector< std::pair<URV,URV> >& windows);
-
-    /// Turn off all data access (except in DCCM/PIC regions) then
-    /// turn it on only in the pages overlapping the given address
-    /// windows. Return true on success and false on failure (invalid
-    /// window entry). Do nothing returning true if the windows vector
-    /// is empty.
-    bool configMemoryDataAccess(const std::vector< std::pair<URV,URV> >& windows);
 
     /// Direct this hart to take an instruction access fault exception
     /// within the next singleStep invocation.
@@ -698,7 +741,7 @@ namespace WdRiscv
     /// the subsequent singleStep invocation executing a load/store
     /// instruction or take an NMI (double-bit-ecc) within the
     /// subsequent interrupt if fast-interrupt is enabled.
-    void postDataAccessFault(URV offset, SecondaryCause cause);
+    void postDataAccessFault(URV offset);
 
     /// Enable printing of load/store data address in instruction
     /// trace mode.
@@ -729,44 +772,8 @@ namespace WdRiscv
     void getTriggerChange(URV trigger, bool& t1, bool& t2, bool& t3) const
     { csRegs_.getTriggerChange(trigger, t1, t2, t3); }
 
-    /// Apply an imprecise store exception at given address. Return
-    /// true if address is found exactly once in the store
-    /// queue. Return false otherwise. Save the given address in
-    /// mdseac. Set matchCount to the number of entries in the store
-    /// queue that match the given address.
-    bool applyStoreException(URV address, unsigned& matchCount);
-
-    /// Apply an imprecise load exception at given address. Return
-    /// true if address is found exactly once in the pending load
-    /// queue. Return false otherwise. Save the given address in
-    /// mdseac. Set matchCount to the number of entries in the store
-    /// queue that match the given address.
-    bool applyLoadException(URV address, unsigned tag, unsigned& matchCount);
-
-    /// This supports the test-bench. Mark load-queue entry matching
-    /// given address as completed and remove it from the queue. Set
-    /// match count to 1 if matching entry is found and zero
-    /// otherwise. Return true if matching entry found. The testbench
-    /// will invoke this only for loads where the destination register
-    /// is updated.
-    bool applyLoadFinished(URV address, unsigned tag, unsigned& matchCount);
-
-    /// Enable processing of imprecise load exceptions from test-bench.
-    void enableBenchLoadExceptions(bool flag)
-    { loadQueueEnabled_ = flag; }
-
-    /// Set load queue size (used when load exceptions are enabled).
-    void setLoadQueueSize(unsigned size)
-    { maxLoadQueueSize_ = size; }
-
     /// Enable collection of instruction frequencies.
     void enableInstructionFrequency(bool b);
-
-    /// Enable expedited dispatch of external interrupt handler: Instead of
-    /// setting pc to the external interrupt handler, we set it to the
-    /// specific entry associated with the external interrupt id.
-    void enableFastInterrupts(bool b)
-    { fastInterrupts_ = b; }
 
     /// Enable/disable the zba (bit manipulation base) extension. When
     /// disabled all the instructions in zba extension result in an
@@ -839,6 +846,30 @@ namespace WdRiscv
     /// Enable/disable the half-precision floating point extension.
     void enableRvzfh(bool flag)
     { rvzfh_ = flag; }
+
+    /// Enable/disable the crypto zknd (nist decryption) extension.
+    void enableRvzknd(bool flag)
+    { rvzknd_ = flag; }
+
+    /// Enable/disable the crypto zkne (nist encryption) extension.
+    void enableRvzkne(bool flag)
+    { rvzkne_ = flag; }
+
+    /// Enable/disable the crypto zknh (nist hash) extension.
+    void enableRvzknh(bool flag)
+    { rvzknh_ = flag; }
+
+    /// Enable/disable the crypto zbkb (crypto bit manip) extension.
+    void enableRvzbkb(bool flag)
+    { rvzbkb_ = flag; }
+
+    /// Enable/disable the crypto zksed (sm4 block cipher) extension.
+    void enableRvzksed(bool flag)
+    { rvzksed_ = flag; }
+
+    /// Enable/disable the crypto zksed (sm3 block hash) extension.
+    void enableRvzksh(bool flag)
+    { rvzksh_ = flag; }
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
@@ -959,6 +990,11 @@ namespace WdRiscv
     bool isDataAddressExternal(size_t addr) const
     { return memory_.isDataAddressExternal(addr); }
 
+    /// Return true if given extension is statically enabled (enabled my
+    /// --isa but may be turned off by the MSTATUS/MISA CSRs).
+    bool hasIsaExtension(RvExtension ext) const
+    { return isa_.isEnabled(ext); }
+
     /// Return true if rv32f (single precision floating point)
     /// extension is enabled in this hart.
     bool isRvf() const
@@ -973,6 +1009,30 @@ namespace WdRiscv
     /// extension is enabled in this hart.
     bool isRvd() const
     { return rvd_; }
+
+    /// Return true if the zknd extension (crypto nist decryption) is enabled.
+    bool isRvzknd() const
+    { return rvzknd_; }
+
+    /// Return true if the zkne extension (crypto nist encryption) is enabled.
+    bool isRvzkne() const
+    { return rvzkne_; }
+
+    /// Return true if the zksed extension (crypto sm4 block cipher) is enabled.
+    bool isRvzksed() const
+    { return rvzksed_; }
+
+    /// Return true if the zksh extension (crypto sm3 block hash) is enabled.
+    bool isRvzksh() const
+    { return rvzksh_; }
+
+    /// Return true if the zknh extension (crypto nist hash) is enabled.
+    bool isRvzknh() const
+    { return rvzknh_; }
+
+    /// Return true if the zbkb extension (crypto bit manip) is enabled.
+    bool isRvzbkb() const
+    { return rvzbkb_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -1084,26 +1144,19 @@ namespace WdRiscv
     size_t getMemorySize() const
     { return memory_.size(); }
 
-    /// Copy memory region configuration from other processor.
-    void copyMemRegionConfig(const Hart<URV>& other);
-
-    /// Return true if hart was put in run state after reset. Hart 0
-    /// is automatically in run state after reset. If mhartstart CSR
-    /// exists, then each remaining hart must be explicitly started by
-    /// hart 0 by writing to the corresponding bit in that CSR. This
-    /// is special for WD.
-    bool isStarted()
-    { return hartStarted_; }
-
-    /// Mark this hart as started.
-    void setStarted(bool flag)
-    { hartStarted_ = flag; }
-
     /// Return the index of this hart within the system. Harts are
     /// assigned indices 0 to m*n - 1 where m is the number of cores
     /// and n is the number of harts per core.
-    unsigned sysHartIndex()
+    unsigned sysHartIndex() const
     { return hartIx_; }
+
+    /// Return the value of the MHARTID CSR.
+    URV hartId() const
+    {
+      URV id = 0;
+      peekCsr(CsrNumber::MHARTID, id);
+      return id;
+    }
 
     /// Tie the shared CSRs in this hart to the corresponding CSRs in
     /// the target hart making them share the same location for their
@@ -1203,10 +1256,6 @@ namespace WdRiscv
     void enableMisalignedData(bool flag)
     { misalDataOk_ = flag; }
 
-    /// Change the base address of the memory-mapped-register area.
-    bool changeMemMappedBase(uint64_t newBase)
-    { return memory_.pmaMgr_.changeMemMappedBase(newBase); }
-
     /// Return current privilege mode.
     PrivilegeMode privilegeMode() const
     { return privMode_; }
@@ -1217,9 +1266,14 @@ namespace WdRiscv
     /// and false if the sizes are not powers of 2 or if any of them
     /// is zero, or if they are too large (more than 64 MB for cache
     /// size, more than 1024 for line size, and more than 64 for
-    /// associativity). This has no impact on functionality.
+    /// associativity). This has no impact on functionality.  Cache
+    /// consists of l lines (l = size/lineSize) organized in s sets (s
+    /// = l/setSize) each set contains setSize lines.  An address is
+    /// mapped to a memory-line ml (ml = address/lineSize) which is
+    /// mapped to a set index (ml % s), then all the lines in that set
+    /// are searched for that memory-line.
     bool configureCache(uint64_t size, unsigned lineSize,
-                        unsigned setAssociativity);
+                        unsigned setSize);
 
     /// Delete currently configured cache.
     void deleteCache();
@@ -1236,6 +1290,14 @@ namespace WdRiscv
     /// Debug method: print address translation table. 
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }
+
+    /// Enable address translation trace
+    void enableAddrTransTrace(FILE* file)
+    { virtMem_.enableAddrTransTrace(file); }
+
+    /// Set behavior if first access to page
+    void setFaultOnFirstAccess(bool flag)
+    { virtMem_.setFaultOnFirstAccess(flag); }
 
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
@@ -1304,13 +1366,17 @@ namespace WdRiscv
       return true;
     }
 
-    /// Enable disable wide load/store mode (64-bit on 32-bit machine).
-    void enableWideLoadStore(bool flag)
-    { enableWideLdSt_ = flag; }
+    /// Define physical memory attribute region. Region addresses are between
+    /// low and high inclusive. To define a 1024-byte region at address zero
+    /// we would set low to zero and high to 1023.
+    bool definePmaRegion(uint64_t low, uint64_t high, Pma pma)
+    { return memory_.pmaMgr_.defineRegion(low, high, pma); }
 
-    /// Enable bbarrier (bus barrier) custom instruction.
-    void enableBusBarrier(bool flag)
-    { enableBbarrier_ = flag; }
+    /// Associate a mask with the word-aligned word at the given
+    /// address. Return true on success and flase if given address is
+    /// not in a memory mapped region.
+    bool setMemMappedMask(uint64_t addr, uint32_t mask)
+    { return memory_.pmaMgr_.setMemMappedMask(addr, mask); }
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to
@@ -1323,11 +1389,7 @@ namespace WdRiscv
                                 Pmp::Mode& mode, bool& locked,
                                 uint64_t& low, uint64_t& high) const;
 
-    /// Mark the 256MB region with the given region index as
-    /// idempotent/non-idempotent according to flag.
-    void markRegionIdempotent(unsigned regionIx, bool flag);
 
-    /// Define address at which to slam memory changes resulting from
     /// an emulated system call. If addr is zero, no slamming is done.
     void defineSyscallSlam(URV addr)
     { syscallSlam_ = addr; }
@@ -1350,6 +1412,10 @@ namespace WdRiscv
     /// stats every instCount instructions.
     void enableBasicBlocks(FILE* file, uint64_t instCount)
     { bbFile_ = file; bbLimit_ = instCount; }
+
+    /// Enable memory consistency model.
+    void setMcm(Mcm<URV>* mcm)
+    { mcm_ = mcm; }
 
   protected:
 
@@ -1449,7 +1515,7 @@ namespace WdRiscv
 
     /// Return the effective rounding mode for the currently executing
     /// floating point instruction.
-    RoundingMode effectiveRoundingMode(RoundingMode instMode);
+    RoundingMode effectiveRoundingMode(unsigned instMode);
 
     /// Update the accrued floating point bits in the FCSR
     /// register. No-op if a trigger has tripped.
@@ -1521,65 +1587,58 @@ namespace WdRiscv
 			   uint64_t& counter, bool beforeTiming);
 
     /// Helper to load. Return NONE if no exception.
-    ExceptionCause determineMisalLoadException(URV addr, unsigned accessSize,
-                                               SecondaryCause& secCause) const;
+    ExceptionCause determineMisalLoadException(URV addr, unsigned ldSize) const;
 
     /// Helper to load. Return NONE if no exception.
-    ExceptionCause determineMisalStoreException(URV addr, unsigned accessSize,
-                                                SecondaryCause& secCause) const;
+    ExceptionCause determineMisalStoreException(URV addr, unsigned stSize) const;
+
 
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateLoadException(ExceptionCause cause, URV addr,
-			       SecondaryCause secCause);
+    void initiateLoadException(ExceptionCause cause, URV addr);
 
     /// Helper to store methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateStoreException(ExceptionCause cause, URV addr,
-				SecondaryCause secCause);
-
-    /// Helper to load methods: Return true if base and effective
-    /// address fall in regions of different types (with respect to io
-    /// and cacheability).
-    bool effectiveAndBaseAddrMismatch(URV base, URV addr);
+    void initiateStoreException(ExceptionCause cause, URV addr);
 
     /// Helper to lb, lh, lw and ld. Load type should be int_8, int16_t
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
     /// etc... for lbu, lhu, etc...
     /// Return true if the load is successful. Return false if an exception
-    /// or a trigger is encoutered.
+    /// or a trigger is encoutered. On succes loadd value (sign extended for
+    /// signed type) is placed in value. Updating the destination register is
+    /// the resposibilty of the caller.
     template<typename LOAD_TYPE>
-    bool load(uint32_t rd, uint32_t rs1, int32_t imm);
+    bool load(uint64_t virtAddr, uint64_t& value);
 
     /// For use by performance model. 
     template<typename LOAD_TYPE>
-    bool fastLoad(uint32_t rd, uint32_t rs1, int32_t imm);
+    bool fastLoad(uint64_t virtAddr, uint64_t& value);
 
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and
     /// address translation is successful, then addr is changed to the
     /// translated physical address.
-    ExceptionCause determineLoadException(unsigned rs1, URV base, uint64_t& addr,
-					  unsigned ldSize, SecondaryCause& secCause);
+    ExceptionCause determineLoadException(uint64_t& addr, unsigned ldSize);
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
     /// Return true if store is successful. Return false if an exception
     /// or a trigger is encountered.
     template<typename STORE_TYPE>
-    bool store(uint32_t rs1, URV base, URV addr, STORE_TYPE value);
+    bool store(URV addr, STORE_TYPE value);
 
     /// For use by performance model. 
     template<typename STORE_TYPE>
-    bool fastStore(uint32_t rs1, URV base, URV addr, STORE_TYPE value);
+    bool fastStore(URV addr, STORE_TYPE value);
 
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
     template<typename STORE_TYPE>
-    ExceptionCause determineStoreException(uint32_t rs1, URV base, uint64_t& addr,
+    ExceptionCause determineStoreException(uint64_t& addr,
 					   STORE_TYPE& storeVal,
-                                           SecondaryCause& secCause, bool& forced);
+                                           bool& forced);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
@@ -1587,34 +1646,13 @@ namespace WdRiscv
     /// physAddr is set to the result of the virtual to physical
     /// translation of the referenced memory address.
     template<typename LOAD_TYPE>
-    bool loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr);
+    bool loadReserve(uint32_t rd, uint32_t rs1);
 
     /// Helper to execSc. Store type must be uint32_t, or uint64_t.
     /// Return true if store is successful. Return false otherwise
     /// (exception or trigger or condition failed).
     template<typename STORE_TYPE>
-    bool storeConditional(unsigned rs1, URV addr, STORE_TYPE value);
-
-    /// Do a 64-bit wide load in one transaction. This is swerv
-    /// specfic.
-    bool wideLoad(unsigned rd, URV addr);
-
-    /// Do a 64-bit wide store in one transaction. This is swerv
-    /// specfic.
-    bool wideStore(URV addr, URV storeVal);
-
-    /// Helper to load methods. Check loads performed with stack
-    /// pointer.  Return true if referenced bytes are all between the
-    /// stack bottom and the stack pointer value excluding the stack
-    /// pointer value.  Initiate an exception and return false
-    /// otherwise.
-    bool checkStackLoad(URV base, URV addr, unsigned loadSize);
-
-    /// Helper to store methods. Check stores performed with stack
-    /// pointer. Return true if referenced bytes are all between the
-    /// stack bottom and the stack top excluding the stack top and
-    /// false otherwise.
-    bool checkStackStore(URV base, URV addr, unsigned storeSize);
+    bool storeConditional(URV addr, STORE_TYPE value);
 
     /// Helper to CSR instructions: return true if given CSR is
     /// writebale and false otherwise.
@@ -1730,17 +1768,10 @@ namespace WdRiscv
     void printInstCsvTrace(const DecodedInst& di, FILE* out);
 
     /// Start a synchronous exceptions.
-    void initiateException(ExceptionCause cause, URV pc, URV info,
-			   SecondaryCause secCause = SecondaryCause::NONE);
+    void initiateException(ExceptionCause cause, URV pc, URV info);
 
     /// Start an asynchronous exception (interrupt).
     void initiateInterrupt(InterruptCause cause, URV pc);
-
-    /// Start an asynchronous exception (interrupt) directly from the
-    /// interrupt handler associated with the interrupt id. Return
-    /// true on success. Return false if there is an error while
-    /// accessing the table of interrupt handler addresses.
-    void initiateFastInterrupt(InterruptCause cause, URV pc);
 
     /// Start a non-maskable interrupt.
     void initiateNmi(URV cause, URV pc);
@@ -1796,8 +1827,7 @@ namespace WdRiscv
     /// exception or the instruction to resume after asynchronous
     /// exception is handled). The info value holds additional
     /// information about an exception.
-    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info,
-		      URV secCause);
+    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info);
 
     /// Illegal instruction. Initiate an illegal instruction trap.
     /// This is used for one of the following:
@@ -1827,28 +1857,24 @@ namespace WdRiscv
     /// it is out of DCCM range in DCCM-only mode. If successful, the
     /// given virtual addr is replaced by the translated physical
     /// address.
-    ExceptionCause validateAmoAddr(uint32_t rs1, uint64_t& addr, unsigned accessSize,
-                                   SecondaryCause& secCause);
+    ExceptionCause validateAmoAddr(uint64_t& addr, unsigned accessSize);
 
     /// Do the load value part of a word-sized AMO instruction. Return
     /// true on success putting the loaded value in val. Return false
     /// if a trigger tripped or an exception took place in which case
     /// val is not modified. The loaded word is sign extended to fill
     /// the URV value (this is relevant for rv64).
-    bool amoLoad32(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& val);
+    bool amoLoad32(uint32_t rs1, URV& val);
 
     /// Do the load value part of a double-word-sized AMO
     /// instruction. Return true on success putting the loaded value
     /// in val. Return false if a trigger tripped or an exception took
     /// place in which case val is not modified.
-    bool amoLoad64(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& val);
+    bool amoLoad64(uint32_t rs1, URV& val);
 
     /// Invalidate cache entries overlapping the bytes written by a
     /// store.
     void invalidateDecodeCache(URV addr, unsigned storeSize);
-
-    /// Update stack checker parameters after a write/poke to a CSR.
-    void updateStackChecker();
 
     /// Helper to shift/bit execute instruction with immediate
     /// operands: Signal an illegal instruction if immediate value is
@@ -1992,6 +2018,7 @@ namespace WdRiscv
     void execAnd(const DecodedInst*);
 
     void execFence(const DecodedInst*);
+    void execFence_tso(const DecodedInst*);
     void execFencei(const DecodedInst*);
 
     void execEcall(const DecodedInst*);
@@ -2288,11 +2315,6 @@ namespace WdRiscv
     void execFslw(const DecodedInst*);
     void execFsrw(const DecodedInst*);
     void execFsriw(const DecodedInst*);
-
-    // Custom insts
-    void execLoad64(const DecodedInst*);
-    void execStore64(const DecodedInst*);
-    void execBbarrier(const DecodedInst*);
 
     void vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
     void execVsetvli(const DecodedInst*);
@@ -3706,6 +3728,36 @@ namespace WdRiscv
 		   unsigned start, unsigned elems, bool masked);
     void execVfsgnjx_vf(const DecodedInst*);
 
+    void execAes32dsi(const DecodedInst*);
+    void execAes32dsmi(const DecodedInst*);
+    void execAes32esi(const DecodedInst*);
+    void execAes32esmi(const DecodedInst*);
+    void execAes64ds(const DecodedInst*);
+    void execAes64dsm(const DecodedInst*);
+    void execAes64es(const DecodedInst*);
+    void execAes64esm(const DecodedInst*);
+    void execAes64im(const DecodedInst*);
+    void execAes64ks1i(const DecodedInst*);
+    void execAes64ks2(const DecodedInst*);
+    void execSha256sig0(const DecodedInst*);
+    void execSha256sig1(const DecodedInst*);
+    void execSha256sum0(const DecodedInst*);
+    void execSha256sum1(const DecodedInst*);
+    void execSha512sig0h(const DecodedInst*);
+    void execSha512sig0l(const DecodedInst*);
+    void execSha512sig1h(const DecodedInst*);
+    void execSha512sig1l(const DecodedInst*);
+    void execSha512sum0r(const DecodedInst*);
+    void execSha512sum1r(const DecodedInst*);
+    void execSha512sig0(const DecodedInst*);
+    void execSha512sig1(const DecodedInst*);
+    void execSha512sum0(const DecodedInst*);
+    void execSha512sum1(const DecodedInst*);
+    void execSm3p0(const DecodedInst*);
+    void execSm3p1(const DecodedInst*);
+    void execSm4ed(const DecodedInst*);
+    void execSm4ks(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -3756,16 +3808,6 @@ namespace WdRiscv
       bool cacheable_;
     };
 
-    void putInLoadQueue(unsigned size, size_t addr, unsigned regIx,
-			uint64_t prevData, bool isWide = false,
-                        bool fp = false);
-
-    void removeFromLoadQueue(unsigned regIx, bool isDiv, bool fp = false);
-
-    void invalidateInLoadQueue(unsigned regIx, bool isDiv, bool fp = false);
-
-    void loadQueueCommit(const DecodedInst&);
-
     /// Save snapshot of registers (PC, integer, floating point, CSR) into file
     bool saveSnapshotRegs(const std::string& path);
 
@@ -3777,13 +3819,25 @@ namespace WdRiscv
     void setPc(URV value)
     { pc_ = value & pcMask_; }
 
+    // Clear information changed by instruction execution.
+    inline
+    void resetExecInfo()
+    {
+      triggerTripped_ = hasInterrupt_ = hasException_ = false;
+      ebreakInstDebug_ = false;
+      ldStSize_ = 0;
+      lastPriv_ = privMode_;
+      ldStWrite_ = false;
+      ldStAtomic_ = false;
+      clearTraceData();
+    }
+
     void countBasicBlocks(const DecodedInst* di);
     void dumpBasicBlocks();
 
   private:
 
     unsigned hartIx_ = 0;        // Hart ix in system, see sysHartIndex method.
-    std::atomic<bool> hartStarted_ = true;    // True if hart is running. WD special.
     Memory& memory_;
     IntRegs<URV> intRegs_;       // Integer register file.
     CsRegs<URV> csRegs_;         // Control and status registers.
@@ -3818,6 +3872,12 @@ namespace WdRiscv
     bool rvzbr_ = false;         // True if extension zbr enabled.
     bool rvzbs_ = false;         // True if extension zbs enabled.
     bool rvzbt_ = false;         // True if extension zbt enabled.
+    bool rvzknd_ = false;        // True if extension zknd (crypto) enabled.
+    bool rvzkne_ = false;        // True if extension zkne (crypto) enabled.
+    bool rvzknh_ = false;        // True if extension zknh (crypto) enabled.
+    bool rvzbkb_ = false;        // True if extension zbkb (ctypto) enabled.
+    bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
+    bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.
@@ -3879,8 +3939,6 @@ namespace WdRiscv
     unsigned lrResSize_ = sizeof(URV); // LR reservation size.
     bool forceAccessFail_ = false;  // Force load/store access fault.
     bool forceFetchFail_ = false;   // Force fetch access fault.
-    bool fastInterrupts_ = false;
-    SecondaryCause forcedCause_ = SecondaryCause::NONE;
     URV forceAccessFailOffset_ = 0;
     URV forceFetchFailOffset_ = 0;
     uint64_t forceAccessFailMark_ = 0; // Instruction at which forced fail is seen.
@@ -3901,15 +3959,13 @@ namespace WdRiscv
     uint32_t prevPerfControl_ = ~0; // Value before current instruction.
 
     bool traceLdSt_ = false;        // Trace addr of ld/st insts if true.
-    URV ldStAddr_ = 0;              // Address of data of most recent ld/st inst.
+    URV ldStAddr_ = 0;              // Addr of data of most recent ld/st inst.
     uint64_t ldStPhysAddr_ = 0;
-    bool ldStAddrValid_ = false;    // True if ldStAddr_ valid.
-
-    // We keep track of the last committed 8 loads so that we can
-    // revert in the case of an imprecise load exception.
-    std::vector<LoadInfo> loadQueue_;
-    unsigned maxLoadQueueSize_ = 16;
-    bool loadQueueEnabled_ = false;
+    unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
+    uint64_t ldStData_ = 0;         // For tracing
+    uint64_t ldStPrevData_ = 0;
+    bool ldStWrite_ = false;        // True if memory written by last store.
+    bool ldStAtomic_ = false;       // True if amo or lr/sc
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
 
@@ -3932,15 +3988,6 @@ namespace WdRiscv
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
 
-    // Stack access control.
-    bool checkStackAccess_ = false;
-    URV stackMax_ = ~URV(0);
-    URV stackMin_ = 0;
-
-    bool enableWideLdSt_ = false;   // True if wide (64-bit) ld/st enabled.
-    bool wideLdSt_ = false;         // True if executing wide ld/st instrution.
-    bool enableBbarrier_ = false;
-
     int gdbInputFd_ = -1;  // Input file descriptor when running in gdb mode.
 
     InstTable instTable_;
@@ -3948,26 +3995,11 @@ namespace WdRiscv
 
     std::vector<uint64_t> interruptStat_;  // Count of different types of interrupts.
 
-    // Indexed by exception cause. Each entry is indexed by secondary cause.
-    std::vector<std::vector<uint64_t>> exceptionStat_;
-
-    // Ith entry is true if ith region has iccm/dccm/pic.
-    std::vector<bool> regionHasLocalMem_;
-
-    // Ith entry is true if ith region has dccm/pic.
-    std::vector<bool> regionHasLocalDataMem_;
-
-    // Ith entry is true if ith region has dccm/pic.
-    std::vector<bool> regionHasLocalInstMem_;
-
-    // Ith entry is true if ith region has dccm.
-    std::vector<bool> regionHasDccm_;
+    // Indexed by exception cause.
+    std::vector<uint64_t> exceptionStat_;
 
     // Ith entry is true if ith region has pic
     std::vector<bool> regionHasMemMappedRegs_;
-
-    // Ith entry is true if ith region is idempotent.
-    std::vector<bool> regionIsIdempotent_;
 
     // Decoded instruction cache.
     std::vector<DecodedInst> decodeCache_;
@@ -4001,6 +4033,7 @@ namespace WdRiscv
 
     VirtMem virtMem_;
     Isa isa_;
+    Decoder decoder_;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;
@@ -4017,10 +4050,21 @@ namespace WdRiscv
     std::function<void(Hart<URV>&, bool&, bool&)> preInst_ = nullptr;
 
     // Basic-block stats.
-    uint64_t bbInsts_ = 0;
-    uint64_t bbLimit_ = ~uint64_t(0);
-    std::unordered_map<uint64_t, uint64_t> basicBlocks_; // Map pc to basic-block frequency.
+    struct BbStat
+    {
+      uint64_t count_ = 0;      // Number of times basic block is entered.
+      uint64_t access_ = 0;     // Data cache accesses on 1st entry to block.
+      uint64_t hit_ = 0;        // Data cache hits on 1st entry to block.
+    };
+    uint64_t bbInsts_ = 0;              // Count if bb instructions.
+    uint64_t bbLimit_ = ~uint64_t(0);   // Threshold at which we dump data.
+    uint64_t bbPc_ = 0;                 // Entry PC of current basic block.
+    uint64_t bbCacheAccess_ = 0;
+    uint64_t bbCacheHit_ = 0;
+    std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;
+
+    Mcm<URV>* mcm_ = nullptr;
   };
 }
 

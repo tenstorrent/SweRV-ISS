@@ -16,6 +16,7 @@
 #include <fstream>
 #include <sstream>
 #include <thread>
+#include <optional>
 #include <atomic>
 #if defined(__cpp_lib_filesystem)
   #include <filesystem>
@@ -49,6 +50,8 @@ typedef int socklen_t;
 #include "System.hpp"
 #include "Server.hpp"
 #include "Interactive.hpp"
+#include "third_party/nlohmann/json.hpp"
+#include "ArchInfo.hpp"
 
 
 using namespace WdRiscv;
@@ -170,14 +173,15 @@ struct Args
   std::string consoleOutFile;  // Console io output file.
   std::string serverFile;      // File in which to write server host and port.
   std::string instFreqFile;    // Instruction frequency file.
+  std::string archInfoFile;    // Architectural coverage definition file (JSON).
   std::string configFile;      // Configuration (JSON) file.
   std::string bblockFile;      // Basci block file.
+  std::string attFile;         // Address translation file.
   std::string isa;
   std::string snapshotDir = "snapshot"; // Dir prefix for saving snapshots
   std::string loadFrom;        // Directory for loading a snapshot
   std::string stdoutFile;      // Redirect target program stdout to this.
   std::string stderrFile;      // Redirect target program stderr to this. 
-  StringVec   zisa;
   StringVec   regInits;        // Initial values of regs
   StringVec   targets;         // Target (ELF file) programs and associated
                                // program options to be loaded into simulator
@@ -200,7 +204,7 @@ struct Args
   std::optional<uint64_t> snapshotPeriod;
   std::optional<uint64_t> alarmInterval;
   std::optional<uint64_t> swInterrupt;  // Sotware interrupt mem mapped address
-  std::optional<uint64_t> clint;  // Clint mem mapped address
+  std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
   std::optional<uint64_t> syscallSlam;
 
   unsigned regWidth = 32;
@@ -230,7 +234,6 @@ struct Args
   bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
   bool fastExt = false;    // True if fast external interrupt dispatch enabled.
   bool unmappedElfOk = false;
-  bool iccmRw = false;
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
@@ -259,7 +262,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 739;
+  unsigned subversion = 786;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 }
@@ -406,9 +409,6 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	("isa", po::value(&args.isa),
 	 "Specify instruction set extensions to enable. Supported extensions "
 	 "are a, c, d, f, i, m, s and u. Default is imc.")
-	("zisa", po::value(&args.zisa)->multitoken(),
-	 "Specify instruction set z-extension to enable. Only z-extensions "
-	 "currently supported are zbb and zbs (Exammple --zisa zbb)")
 	("xlen", po::value(&args.regWidth),
 	 "Specify register width (32 or 64), defaults to 32")
 	("harts", po::value(&args.harts),
@@ -474,6 +474,10 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 			" gdb will work with stdio (default -1).")
 	("profileinst", po::value(&args.instFreqFile),
 	 "Report instruction frequency to file.")
+        ("archinfo", po::value(&args.archInfoFile),
+         "Dump instruction table using definition.")
+        ("att", po::value(&args.attFile),
+         "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
 	("setreg", po::value(&args.regInits)->multitoken(),
 	 "Initialize registers. Apply to all harts unless specific prefix "
 	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
@@ -548,8 +552,6 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "with a sequence of pairs of double words designating addresses and "
          "corresponding values. A zero/zero pair will indicate the end of "
          "sequence.")
-        ("iccmrw", po::bool_switch(&args.iccmRw),
-         "Temporary switch to make ICCM region available to ld/st isntructions.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
          "Terminate multi-threaded run when any hart finishes (default is to wait "
          "for all harts.)")
@@ -616,7 +618,7 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 {
   bool ok = true;
 
-  URV hartId = hart.sysHartIndex();
+  URV hartIx = hart.sysHartIndex();
 
   for (const auto& regInit : args.regInits)
     {
@@ -637,13 +639,13 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
       const std::string& regVal = tokens.at(1);
 
       bool specificHart = false;
-      unsigned id = 0;
+      unsigned ix = 0;
       size_t colonIx = regName.find(':');
       if (colonIx != std::string::npos)
 	{
 	  std::string hartStr = regName.substr(0, colonIx);
 	  regName = regName.substr(colonIx + 1);
-	  if (not parseCmdLineNumber("hart", hartStr, id))
+	  if (not parseCmdLineNumber("hart", hartStr, ix))
 	    {
 	      std::cerr << "Invalid command line register initialization: "
 			<< regInit << '\n';
@@ -660,7 +662,7 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
 	  continue;
 	}
 
-      if (specificHart and id != hartId)
+      if (specificHart and ix != hartIx)
 	continue;
 
       if (unsigned reg = 0; hart.findIntReg(regName, reg))
@@ -696,74 +698,6 @@ applyCmdLineRegInit(const Args& args, Hart<URV>& hart)
     }
 
   return ok;
-}
-
-
-template<typename URV>
-static
-bool
-applyZisaString(const std::string& zisa, Hart<URV>& hart)
-{
-  if (zisa.empty())
-    return true;
-
-  std::string ext = zisa;
-
-  if (ext.at(0) == 'z')
-    ext = ext.substr(1);
-
-  if (boost::starts_with(ext, "ba"))
-    hart.enableRvzba(true);
-  else if (boost::starts_with(ext, "bb"))
-    hart.enableRvzbb(true);
-  else if (boost::starts_with(ext, "bc"))
-    hart.enableRvzbc(true);
-  else if (boost::starts_with(ext, "be"))
-    hart.enableRvzbe(true);
-  else if (boost::starts_with(ext, "bf"))
-    hart.enableRvzbf(true);
-  else if (boost::starts_with(ext, "bm"))
-    hart.enableRvzbm(true);
-  else if (boost::starts_with(ext, "bp"))
-    hart.enableRvzbp(true);
-  else if (boost::starts_with(ext, "br"))
-    hart.enableRvzbr(true);
-  else if (boost::starts_with(ext, "bs"))
-    hart.enableRvzbs(true);
-  else if (boost::starts_with(ext, "bt"))
-    hart.enableRvzbt(true);
-  else if (boost::starts_with(ext, "bmini"))
-    {
-      hart.enableRvzbb(true);
-      hart.enableRvzbs(true);
-      std::cerr << "ISA option zbmini is deprecated. Using zbb and zbs.\n";
-    }
-  else if (boost::starts_with(ext, "fh"))
-    hart.enableRvzfh(true);
-  else
-    {
-      std::cerr << "No such Z extension: " << zisa << '\n';
-      return false;
-    }
-
-  return true;
-}
-
-
-template<typename URV>
-static
-bool
-applyZisaStrings(const StringVec& zisa, Hart<URV>& hart)
-{
-  unsigned errors = 0;
-
-  for (const auto& ext : zisa)
-    {
-      if (not applyZisaString(ext, hart))
-	errors++;
-    }
-
-  return errors == 0;
 }
 
 
@@ -969,13 +903,10 @@ getIsaStringFromCsr(const Hart<URV>& hart)
 template<typename URV>
 static
 bool
-applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool clib)
+applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
+		 const HartConfig& config, bool clib)
 {
   unsigned errors = 0;
-
-  // TODO FIX : remove --zisa  remove applyZisaStrings
-  if (not applyZisaStrings(args.zisa, hart))
-    errors++;
 
   if (clib)  // Linux or newlib enabled.
     sanitizeStackPointer(hart, args.verbose);
@@ -986,7 +917,8 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
   if (args.consoleIoSym)
     hart.setConsoleIoSymbol(*args.consoleIoSym);
 
-  // Load ELF files.
+  // Load ELF files. Entry point of first file sets the start PC uness in raw mode.
+  bool firstElf = true;
   for (const auto& target : args.expandedTargets)
     {
       const auto& elfFile = target.front();
@@ -994,9 +926,13 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
 	std::cerr << "Loading ELF file " << elfFile << '\n';
       size_t entryPoint = 0;
       if (hart.loadElfFile(elfFile, entryPoint))
-	hart.pokePc(URV(entryPoint));
+	{
+	  if (firstElf and not args.raw)
+	    hart.pokePc(URV(entryPoint));
+	}
       else
 	errors++;
+      firstElf = false;
     }
 
   // Load HEX files.
@@ -1048,15 +984,15 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
     {
       uint64_t swAddr = *args.clint;
       uint64_t timerAddr = swAddr + 0x4000;
-      uint64_t clintLimit = swAddr + 0x40000000 - 1;
-      configureClint(hart, system, swAddr, clintLimit, timerAddr);
+      uint64_t clintLimit = swAddr + 0x8000 - 1;
+      config.configClint(system, hart, swAddr, clintLimit, timerAddr);
     }
   else if (args.swInterrupt)
     {
       uint64_t swAddr = *args.swInterrupt;
       uint64_t timerAddr = swAddr + 0x4000;
       uint64_t clintLimit = swAddr + system.hartCount() * 4 - 1;
-      configureClint(hart, system, swAddr, clintLimit, timerAddr);
+      config.configClint(system, hart, swAddr, clintLimit, timerAddr);
     }
 
   if (args.syscallSlam)
@@ -1092,9 +1028,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system, bool cl
     hart.enablePerformanceCounters(args.counters);
   if (args.abiNames)
     hart.enableAbiNames(args.abiNames);
-
-  if (args.fastExt)
-    hart.enableFastInterrupts(args.fastExt);
 
   // Apply register initialization.
   if (not applyCmdLineRegInit(args, hart))
@@ -1243,6 +1176,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 		<< "' for output.\n";
       return false;
     }
+
   hart.reportInstructionFrequency(outFile);
   hart.reportTrapStat(outFile);
   fprintf(outFile, "\n");
@@ -1261,7 +1195,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile)
+	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
 {
   size_t len = args.traceFile.size();
   bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
@@ -1323,6 +1257,17 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 	}
     }
 
+  if (not args.attFile.empty())
+    {
+      attFile = fopen(args.attFile.c_str(), "w");
+      if (not attFile)
+        {
+          std::cerr << "Failed to open address translation file '"
+                    << args.attFile << "' for output\n";
+          return false;
+        }
+    }
+
   return true;
 }
 
@@ -1331,7 +1276,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 static
 void
 closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile)
+	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1355,6 +1300,10 @@ closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
   if (bblockFile and bblockFile != stdout)
     fclose(bblockFile);
   bblockFile = nullptr;
+
+  if (attFile and attFile != stdout)
+    fclose(attFile);
+  attFile = nullptr;
 }
 
 
@@ -1390,18 +1339,11 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll)
 
   std::atomic<bool> result = true;
   std::atomic<unsigned> finished = 0;  // Count of finished threads. 
-  std::atomic<bool> hart0Done = false;
 
-  auto threadFunc = [&traceFile, &result, &finished, &hart0Done] (Hart<URV>* hart) {
-                      // In multi-hart system, wait till hart is started by hart0.
-                      while (not hart->isStarted())
-                        if (hart0Done)
-                          return;  // We are not going to be started.
+  auto threadFunc = [&traceFile, &result, &finished] (Hart<URV>* hart) {
 		      bool r = hart->run(traceFile);
 		      result = result and r;
                       finished++;
-                      if (hart->sysHartIndex() == 0)
-                        hart0Done = true;
 		    };
 
   for (unsigned i = 0; i < system.hartCount(); ++i)
@@ -1528,13 +1470,14 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 template <typename URV>
 static
 bool
-sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
-	   bool clib)
+sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 {
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyCmdLineArgs(args, *system.ithHart(i), system, clib))
-      if (not args.interactive)
-	return false;
+  // if (args.instructionInfo)
+  // {
+  //    auto hart = system.ithHart(0);
+  //    hart->dumpInstructionTable();
+  //    return true;
+  // }
 
   // In server/interactive modes: enable triggers and performance counters.
   bool serverMode = not args.serverFile.empty();
@@ -1554,7 +1497,6 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog,
         {
           auto& hart = *system.ithHart(i);
           hart.enableLoadErrorRollback(false);
-          hart.enableBenchLoadExceptions(false);
         }
     }
 
@@ -1689,6 +1631,25 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
 }
 
 
+/// Static dump of ISA information, program run not needed
+template<typename URV>
+static
+bool
+staticDump(Hart<URV>& hart, const std::string infoPath)
+{
+  nlohmann::json j;
+  ArchInfo<URV> info(hart, infoPath);
+
+  bool ok = info.createInstInfo(j);
+  ok = ok and info.createModeInfo(j);
+  ok = ok and info.createLmulInfo(j);
+  ok = ok and info.createSewInfo(j);
+
+  std::cout << j.dump(2) << '\n';
+  return true;
+}
+
+
 template <typename URV>
 static
 bool
@@ -1726,11 +1687,11 @@ session(const Args& args, const HartConfig& config)
       return false;
 
   // Configure memory.
-  if (not config.configMemory(system, args.iccmRw, args.unmappedElfOk, args.verbose))
+  if (not config.configMemory(system, args.unmappedElfOk))
     return false;
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
-      and not args.interactive)
+      and not args.interactive and args.archInfoFile.empty())
     {
       std::cerr << "No program file specified.\n";
       return false;
@@ -1740,7 +1701,8 @@ session(const Args& args, const HartConfig& config)
   FILE* commandLog = nullptr;
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
-  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile))
+  FILE* attFile = nullptr;
+  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1758,21 +1720,33 @@ session(const Args& args, const HartConfig& config)
       hart.setConsoleOutput(consoleOut);
       if (bblockFile)
 	hart.enableBasicBlocks(bblockFile, args.bblockInsts);
+      if (attFile)
+        hart.enableAddrTransTrace(attFile);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())
 	if (not hart.configIsa(isa, updateMisa))
 	  return false;
       hart.reset();
+
+      if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
+	if (not args.interactive)
+	  return false;
     }
 
-  bool result = sessionRun(system, args, traceFile, commandLog, clib);
+  // Static analysis of ISA, do not run program
+  if (not args.archInfoFile.empty())
+    {
+      return staticDump(*system.ithHart(0), args.archInfoFile);
+    }
+
+  bool result = sessionRun(system, args, traceFile, commandLog);
 
   auto& hart0 = *system.ithHart(0);
   if (not args.instFreqFile.empty())
     result = reportInstructionFrequency(hart0, args.instFreqFile) and result;
 
-  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile);
+  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
 
   return result;
 }

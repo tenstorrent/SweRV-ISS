@@ -18,7 +18,6 @@
 #include <string>
 #include <unordered_map>
 #include "InstEntry.hpp"
-#include "FpRegs.hpp"
 #include "InstId.hpp"
 
 
@@ -142,27 +141,58 @@ namespace WdRiscv
     { return entry_; }
 
     /// Relevant for floating point instructions with rounding mode.
-    RoundingMode roundingMode() const
-    { return RoundingMode((inst_ >> 12) & 7); }
+    unsigned roundingMode() const
+    { return ((inst_ >> 12) & 7); }
 
     /// Relevant to atomic instructions: Return true if acquire bit is
-    /// set.
+    /// set in an atomic instruction.
     bool isAtomicAcquire() const
-    { return (inst_ >> 26) & 1; }
+    { return entry_ and entry_->isAtomic() and ((inst_ >> 26) & 1); }
 
     /// Relevant to atomic instructions: Return true if release bit is
-    /// set.
+    /// set in an atomic instrution.
     bool isAtomicRelease() const
-    { return (inst_ >> 25) & 1; }
+    { return entry_ and entry_->isAtomic() and ((inst_ >> 25) & 1); }
 
-    /// Associate a value with each operand by fetching
-    /// registers. After this method, the value of an immediate
-    /// operand x is x. The value of register operand y is the value
-    /// currently stored in register x. The value of a non-existing
-    /// operand is zero. Note that the association is only in this
-    /// object and that no register value is changed by this method.
-    template <typename URV>
-    void fetchOperands(const Hart<URV>& hart);
+    /// Return true if this a fence instruction (not fence.tso).
+    bool isFence() const
+    { return entry_ and entry_->instId() == InstId::fence; }
+
+    /// Return true if this a fence.tso instruction (not fence).
+    bool isFenceTso() const
+    { return entry_ and entry_->instId() == InstId::fence_tso; }
+
+    /// Predecessor read bit of fence instruction.
+    bool isFencePredRead() const
+    { return isFence() and ((inst_ >> 25) & 1); }
+
+    /// Predecessor write bit of fence instruction.
+    bool isFencePredWrite() const
+    { return isFence() and ((inst_ >> 24) & 1); }
+
+    /// Predecessor input (io read) bit of fence instruction.
+    bool isFencePredInput() const
+    { return isFence() and ((inst_ >> 27) & 1); }
+
+    /// Predecessor output (io write) bit of fence instruction.
+    bool isFencePredOutput() const
+    { return isFence() and ((inst_ >> 26) & 1); }
+
+    /// Successor read bit of fence instruction.
+    bool isFenceSuccRead() const
+    { return isFence() and ((inst_ >> 21) & 1); }
+
+    /// Successor write bit of fence instruction.
+    bool isFenceSuccWrite() const
+    { return isFence() and ((inst_ >> 20) & 1); }
+
+    /// Successor input (io read) bit of fence instruction.
+    bool isFenceSuccInput() const
+    { return isFence() and ((inst_ >> 23) & 1); }
+
+    /// Successor output (io write) bit of fence instruction.
+    bool isFenceSuccOutput() const
+    { return isFence() and ((inst_ >> 22) & 1); }
 
     /// Associated a value with the ith operand. This has no effect if
     /// i is out of bounds or if the ith operand is an immediate. Note
@@ -185,8 +215,7 @@ namespace WdRiscv
 
   protected:
 
-    friend class Hart<uint32_t>;
-    friend class Hart<uint64_t>;
+    friend class Decoder;
 
     void setAddr(uint64_t addr)
     { addr_ = addr; }

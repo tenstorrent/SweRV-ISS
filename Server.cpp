@@ -79,15 +79,27 @@ deserializeMessage(const char buffer[], size_t bufferLen,
   p += sizeof(x);
 
   x = ntohl(* reinterpret_cast<const uint32_t*> (p));
+  msg.size = x;
+  p += sizeof(x);
+
+  x = ntohl(* reinterpret_cast<const uint32_t*> (p));
   msg.flags = x;
   p += sizeof(x);
 
   uint32_t part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.rank = uint64_t(part) << 32;
+  msg.instrTag = uint64_t(part) << 32;
   p += sizeof(part);
 
   part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.rank |= part;
+  msg.instrTag |= part;
+  p += sizeof(part);
+
+  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
+  msg.time = uint64_t(part) << 32;
+  p += sizeof(part);
+
+  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
+  msg.time |= part;
   p += sizeof(part);
 
   part = ntohl(* reinterpret_cast<const uint32_t*> (p));
@@ -139,16 +151,30 @@ serializeMessage(const WhisperMessage& msg, char buffer[],
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
 
+  x = htonl(msg.size);
+  memcpy(p, &x, sizeof(x));
+  p += sizeof(x);
+
   x = htonl(msg.flags);
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
 
-  uint32_t part = static_cast<uint32_t>(msg.rank >> 32);
+  uint32_t part = static_cast<uint32_t>(msg.instrTag >> 32);
   x = htonl(part);
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
 
-  part = (msg.rank) & 0xffffffff;
+  part = (msg.instrTag) & 0xffffffff;
+  x = htonl(part);
+  memcpy(p, &x, sizeof(x));
+  p += sizeof(x);
+
+  part = static_cast<uint32_t>(msg.time >> 32);
+  x = htonl(part);
+  memcpy(p, &x, sizeof(x));
+  p += sizeof(x);
+
+  part = (msg.time) & 0xffffffff;
   x = htonl(part);
   memcpy(p, &x, sizeof(x));
   p += sizeof(x);
@@ -400,16 +426,15 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply)
 template <typename URV>
 void
 Server<URV>::disassembleAnnotateInst(Hart<URV>& hart,
-                                     uint32_t inst, bool interrupted,
+                                     const DecodedInst& di, bool interrupted,
 				     bool hasPreTrigger, bool hasPostTrigger,
 				     std::string& text)
 {
-  hart.disassembleInst(inst, text);
-  uint32_t op0 = 0, op1 = 0, op2 = 0, op3 = 0;
-  const InstEntry& entry = hart.decode(inst, op0, op1, op2, op3);
+  hart.disassembleInst(di.inst(), text);
+  const InstEntry& entry = *(di.instEntry());
   if (entry.isBranch())
     {
-      if (hart.lastPc() + instructionSize(inst) != hart.peekPc())
+      if (hart.lastPc() + di.instSize() != hart.peekPc())
        text += " (T)";
       else
        text += " (NT)";
@@ -485,13 +510,13 @@ collectSyscallMemChanges(Hart<URV>& hart,
           bool ok = hart.pokeMemory(slamAddr, addr, true);
           if (ok)
             {
-              changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, addr});
+              changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, addr, 8});
 
               slamAddr += 8;
               ok = hart.pokeMemory(slamAddr, val, true);
               if (ok)
                 {
-                  changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, val});
+                  changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, val, 8});
                   slamAddr += 8;
                 }
             }
@@ -534,8 +559,10 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   reply.resource = inst;
 
   // Add disassembly of instruction to reply.
+  DecodedInst di;
+  hart.decode(0 /*addr: fake*/, 0 /*physAddr: fake*/, inst, di);
   std::string text;
-  disassembleAnnotateInst(hart, inst, interrupted, hasPre, hasPost, text);
+  disassembleAnnotateInst(hart, di, interrupted, hasPre, hasPost, text);
 
   strncpy(reply.buffer, text.c_str(), sizeof(reply.buffer) - 1);
   reply.buffer[sizeof(reply.buffer) -1] = 0;
@@ -555,6 +582,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 	  msg.resource = 'r';
 	  msg.address = regIx;
 	  msg.value = value;
+	  msg.size = sizeof(msg.value);
 	  pendingChanges.push_back(msg);
 	}
     }
@@ -571,11 +599,49 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 	  msg.resource = 'f';
 	  msg.address = fpRegIx;
 	  msg.value = val;
+	  msg.size = sizeof(msg.value);
 	  pendingChanges.push_back(msg);
 	}
     }
 
-  // Collect vector register change (format not yet defined).
+  // Collect vector register change.
+  unsigned groupSize = 0;
+  int vecReg = hart.lastVecReg(di, groupSize);
+  if (vecReg >= 0)
+    {
+      for (unsigned ix = 0; ix < groupSize; ++ix, ++vecReg)
+	{
+	  std::vector<uint8_t> vecData;
+	  if (not hart.peekVecReg(vecReg, vecData))
+	    assert(0 && "Failed to peek vec register");
+
+	  // Reverse bytes since peekVecReg returns most significant
+	  // byte first.
+	  std::reverse(vecData.begin(), vecData.end());
+
+	  // Send a change message for each vector element starting
+	  // with element zero and assuming a vector of double words
+	  // (uint64_t). Last element will be padded with zeros if
+	  // vector size in bytes is not a multiple of 8.
+	  unsigned byteCount = vecData.size();
+	  for (unsigned byteIx = 0; byteIx < byteCount; )
+	    {
+	      WhisperMessage msg;
+	      msg.type = Change;
+	      msg.resource = 'v';
+	      msg.address = vecReg;
+
+	      unsigned size = sizeof(msg.value);
+	      unsigned remain = byteCount - byteIx;
+	      size = std::min(size, remain);
+	      msg.size = size;
+
+	      for (unsigned i = 0; i < size; ++i)
+		msg.value |= uint64_t(vecData.at(byteIx++)) << (8*i);
+	      pendingChanges.push_back(msg);
+	    }
+	}
+    }
 
   // Collect CSR and trigger changes.
   std::vector<CsrNumber> csrs;
@@ -636,17 +702,29 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   for (const auto& [key, val] : csrMap)
     {
       WhisperMessage msg(0, Change, 'c', key, val);
+      msg.size = sizeof(msg.value);
       pendingChanges.push_back(msg);
     }
 
   // Collect memory change.
   uint64_t memAddr = 0, memVal = 0;
-  unsigned size = hart.lastMemory(memAddr, memVal);
+  unsigned size = hart.lastStore(memAddr, memVal);
   if (size)
     {
-      WhisperMessage msg(0, Change, 'm', memAddr, memVal);
-      msg.flags = size;
+      WhisperMessage msg(0, Change, 'm', memAddr, memVal, size);
       pendingChanges.push_back(msg);
+    }
+  else
+    {
+      std::vector<uint64_t> addr;
+      std::vector<uint64_t> data;
+      unsigned elemSize = 0;
+      if (hart.getLastVectorMemory(addr, data, elemSize) and not data.empty())
+	for (size_t i = 0; i < data.size(); ++i)
+	  {
+	    WhisperMessage msg(0, Change, 'm', addr.at(i), data.at(i), elemSize);
+	    pendingChanges.push_back(msg);
+	  }
     }
 
   // Collect emulated system call changes.
@@ -688,7 +766,7 @@ Server<URV>::checkHartId(const WhisperMessage& req, WhisperMessage& reply)
 
 template <typename URV>
 bool
-Server<URV>::checkHart(const WhisperMessage& req, const std::string& command,
+Server<URV>::checkHart(const WhisperMessage& req, const std::string& /*command*/,
                        WhisperMessage& reply)
 {
   if (not checkHartId(req, reply))
@@ -698,15 +776,6 @@ Server<URV>::checkHart(const WhisperMessage& req, const std::string& command,
   auto hartPtr = system_.findHartByHartId(hartId);
   if (not hartPtr)
     return false;
-
-  auto& hart = *hartPtr;
-  if (not hart.isStarted())
-    {
-      std::cerr << "Error: Command " << command
-                << " received for a non-started hart\n";
-      reply.type = Invalid;
-      return false;
-    }
 
   return true;
 }
@@ -752,7 +821,19 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // trigger got tripped.
   uint64_t interruptCount = hart.getInterruptCount();
 
-  hart.singleStep(traceFile);
+  // Memory consistency model support. No-op if mcm is off.
+  if (system_.isMcmEnabled())
+    {
+      system_.mcmSetCurrentInstruction(hart, req.instrTag);
+      hart.setInstructionCount(req.instrTag - 1);
+      DecodedInst di;
+      hart.singleStep(di, traceFile);
+      if (not di.isValid())
+	assert(hart.lastInstructionTrapped());
+      system_.mcmRetire(hart, req.time, req.instrTag, di);
+    }
+  else
+    hart.singleStep(traceFile);
 
   bool interrupted = hart.getInterruptCount() != interruptCount;
 
@@ -774,99 +855,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   reply.flags |= (fpFlags << 16);
 #endif
 
-  hart.clearTraceData();
   return true;
-}
-
-
-// Server mode exception command.
-template <typename URV>
-bool
-Server<URV>::exceptionCommand(const WhisperMessage& req, 
-			      WhisperMessage& reply,
-			      std::string& text)
-{
-  reply = req;
-
-  if (not checkHart(req, "exception", reply))
-    return false;
-
-  uint32_t hartId = req.hart;
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    return false;
-  auto& hart = *hartPtr;
-
-  std::ostringstream oss;
-
-  bool ok = true;
-  URV addr = static_cast<URV>(req.address);
-  if (addr != req.address)
-    std::cerr << "Error: Address too large (" << std::hex << req.address
-	      << ") in exception command.\n" << std::dec;
-
-  WhisperExceptionType expType = WhisperExceptionType(req.value);
-  switch (expType)
-    {
-    case InstAccessFault:
-      hart.postInstAccessFault(addr);
-      oss << "exception inst " << addr;
-      break;
-
-    case DataAccessFault:
-      hart.postDataAccessFault(addr, SecondaryCause::LOAD_ACC_DOUBLE_ECC);
-      oss << "exception data " << addr;
-      break;
-
-    case ImpreciseStoreFault:
-      {
-        unsigned count = 0;
-        ok = hart.applyStoreException(addr, count);
-        reply.value = count;
-      }
-      oss << "exception store 0x" << std::hex << addr << std::dec;
-      break;
-
-    case ImpreciseLoadFault:
-      {
-	unsigned tag = reply.flags;  // Tempoary.
-        unsigned count = 0;
-        ok = hart.applyLoadException(addr, tag, count);
-	reply.value = count;
-        oss << "exception load 0x" << std::hex << addr << std::dec << ' '
-            << tag;
-      }
-      break;
-
-    case NonMaskableInterrupt:
-      if (hart.isNmiEnabled())
-        hart.setPendingNmi(NmiCause(addr));
-      oss << "exception nmi 0x" << std::hex << addr << std::dec;
-      break;
-
-    case PreciseLoadFault:
-      oss << "exception precise_load 0x" << std::hex << addr << std::dec;
-      hart.postDataAccessFault(addr, SecondaryCause::LOAD_ACC_PRECISE);
-      ok = false;
-      break;
-
-    case PreciseStoreFault:
-      hart.postDataAccessFault(addr, SecondaryCause::STORE_ACC_PRECISE);
-      oss << "exception precise_store 0x" << std::hex << addr << std::dec;
-      ok = false;
-      break;
-
-    default:
-      oss << "exception ? 0x" << std::hex << addr << std::dec;
-      ok = false;
-      break;
-    }
-
-  if (not ok)
-    reply.type = Invalid;
-
-  text = oss.str();
-  return ok;
 }
 
 
@@ -911,7 +900,7 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 
       if (checkHartId(msg, reply))
 	{
-          std::string timeStamp = std::to_string(msg.rank);
+          std::string timeStamp = std::to_string(msg.time);
 
           uint32_t hartId = msg.hart;
           auto hartPtr = system_.findHartByHartId(hartId);
@@ -965,8 +954,16 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 	    case Step:
 	      stepCommand(msg, pendingChanges, reply, traceFile);
 	      if (commandLog)
-		fprintf(commandLog, "hart=%d step #%" PRId64 " # ts=%s\n",
-                        hartId, hart.getInstructionCount(), timeStamp.c_str());
+		{
+		  if (system_.isMcmEnabled())
+		    fprintf(commandLog, "hart=%d time=%s step 1 %jd\n",
+			    hartId, timeStamp.c_str(), uintmax_t(msg.instrTag));
+		  else
+		    fprintf(commandLog, "hart=%d step #%jd # ts=%s\n",
+			    hartId, uintmax_t(hart.getInstructionCount()),
+			    timeStamp.c_str());
+		  fflush(commandLog);
+		}
 	      break;
 
 	    case ChangeCount:
@@ -1026,16 +1023,6 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 	      }
 	      break;
 
-	    case Exception:
-	      {
-                std::string text;
-		exceptionCommand(msg, reply, text);
-		if (commandLog)
-		  fprintf(commandLog, "hart=%d %s # ts=%s\n", hartId,
-			  text.c_str(), timeStamp.c_str());
-	      }
-	      break;
-
 	    case EnterDebug:
               {
                 bool force = msg.flags;
@@ -1054,28 +1041,6 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
                 fprintf(commandLog, "hart=%d exit_debug # ts=%s\n", hartId,
                         timeStamp.c_str());
 	      break;
-
-	    case LoadFinished:
-              {
-                URV addr = static_cast<URV>(msg.address);
-                unsigned tag = msg.flags;
-                if (checkHart(msg, "load_finished", reply))
-                  {
-                    if (addr != msg.address)
-                      std::cerr << "Error: Address too large (" << std::hex
-                                << msg.address << ") in load finished command.\n"
-                                << std::dec;
-                    unsigned matchCount = 0;
-                    hart.applyLoadFinished(addr, tag, matchCount);
-                    reply.value = matchCount;
-                  }
-                if (commandLog)
-                  fprintf(commandLog, "hart=%d load_finished 0x%0*" PRIx64 " %d # ts=%s\n",
-                          hartId,
-                          ( (sizeof(URV) == 4) ? 8 : 16 ), uint64_t(addr),
-                          tag, timeStamp.c_str());
-              }
-              break;
 
             case CancelDiv:
               if (checkHart(msg, "cancel_div", reply))
@@ -1101,6 +1066,51 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
                 fprintf(commandLog, "hart=%d dump_memory %s # ts=%s\n",
                         hartId, msg.buffer, timeStamp.c_str());
               break;
+
+	    case McmRead:
+	      if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
+				      msg.size, msg.value, msg.flags))
+		reply.type = Invalid;
+	      if (commandLog)
+		fprintf(commandLog, "hart=%d time=%ld mread %ld 0x%lx %d 0x%lx %s\n",
+			hartId, msg.time, msg.instrTag, msg.address, msg.size,
+			msg.value, msg.flags? "e" : "i");
+	      break;
+
+	    case McmInsert:
+	      if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
+					  msg.address, msg.size, msg.value))
+		reply.type = Invalid;
+	      if (commandLog)
+		fprintf(commandLog, "hart=%d time=%ld mbinsert %ld 0x%lx %d 0x%lx\n",
+			hartId, msg.time, msg.instrTag, msg.address, msg.size,
+			msg.value);
+	      break;
+
+	    case McmWrite:
+	      if (msg.size > sizeof(msg.buffer))
+		{
+		  std::cerr << "Error: Server command: McmWrite data size too large: " << msg.size << '\n';
+		  reply.type = Invalid;
+		}
+	      else
+		{
+		  std::vector<uint8_t> data(msg.size);
+		  for (size_t i = 0; i < msg.size; ++i)
+		    data[i] = msg.buffer[i];
+		  if (not system_.mcmMbWrite(hart, msg.time, msg.address, data))
+		    reply.type = Invalid;
+
+		  if (commandLog)
+		    {
+		      fprintf(commandLog, "hart=%d time=%ld, mbwrite 0x%lx 0x",
+			      hartId, msg.time, msg.address);
+		      for (uint8_t item :  data)
+			fprintf(commandLog, "%02x", item);
+		      fprintf(commandLog, "\n");
+		    }
+		}
+	      break;
 
 	    default:
               std::cerr << "Unknown command\n";

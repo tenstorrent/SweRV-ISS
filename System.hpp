@@ -29,6 +29,10 @@ namespace WdRiscv
   template <typename URV>
   class Core;
 
+  template <typename URV>
+  class Mcm;
+
+  class DecodedInst;
 
   /// Model a system consisting of n cores with m-harts per core and a
   /// memory. The harts in the system are indexed from 0 to n*m -
@@ -138,6 +142,45 @@ namespace WdRiscv
     /// contents of accessed pages.
     bool writeAccessedMemory(const std::string& path) const;
 
+    /// Enable memory consistency model. This is relevant in
+    /// server/interactive where RTL monitor or interactive command
+    /// may initiate out of order memory transactions. Behavior is
+    /// undefined if used in non-server/non-interactive mode or if
+    /// used after execution has started. The mergeBuffserSize is
+    /// the merge buffer line size in bytes.
+    bool enableMcm(unsigned mergeBufferSize);
+
+    /// Return true if memory consistency model is enabled.
+    bool isMcmEnabled() const
+    { return mcm_ != nullptr; }
+
+    /// Return the merge buffer line size in bytes (see enableMcm).
+    unsigned mergeBufferSize() const
+    { return mbSize_; }
+
+    bool mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
+		 unsigned size, uint64_t data, bool internal);
+
+    /// Initiate a merge buffer write.  All associated store write
+    /// transactions are marked completed. Write instructions where
+    /// all writes are complete are marked complete. Return true on
+    /// success.  The given physical address must be a multiple of the
+    /// merge buffer line size (which is also the cache line
+    /// size). The rtlData vector must be of size n or larger where n
+    /// is the merge buffer line size. The rtlData bytes will be
+    /// placed in memory in consecutive locations starting with
+    /// physAddr.
+    bool mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t pysAddr,
+		    const std::vector<uint8_t>& rtlData);
+
+    bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		     uint64_t addr, unsigned size, uint64_t data);
+
+    bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		   const DecodedInst& di);
+
+    bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
+
   private:
 
     unsigned hartCount_;
@@ -148,5 +191,7 @@ namespace WdRiscv
     std::unordered_map<URV, unsigned> hartIdToIndex_;
     std::shared_ptr<Memory> memory_ = nullptr;
     SparseMem* sparseMem_ = nullptr;
+    Mcm<URV>* mcm_ = nullptr;
+    unsigned mbSize_ = 64;  // Merge buffer size.
   };
 }

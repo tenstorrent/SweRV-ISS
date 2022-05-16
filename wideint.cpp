@@ -107,6 +107,9 @@ Uint128::operator %= (const Uint128& x)
 Uint128&
 Uint128::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -131,6 +134,9 @@ Uint128::operator >>= (int n)
 Uint128&
 Uint128::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -293,6 +299,9 @@ Int128::operator %= (const Int128& xx)
 Int128&
 Int128::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   bool neg = high_ < HalfType(0);
 
   int halfw = halfWidth();
@@ -327,6 +336,9 @@ Int128::operator >>= (int n)
 Int128&
 Int128::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -455,6 +467,9 @@ Uint256::operator %= (const Uint256& x)
 Uint256&
 Uint256::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -479,6 +494,9 @@ Uint256::operator >>= (int n)
 Uint256&
 Uint256::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -641,6 +659,9 @@ Int256::operator %= (const Int256& xx)
 Int256&
 Int256::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   bool neg = high_ < HalfType(0);
 
   int halfw = halfWidth();
@@ -675,6 +696,9 @@ Int256::operator >>= (int n)
 Int256&
 Int256::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -803,6 +827,9 @@ Uint512::operator %= (const Uint512& x)
 Uint512&
 Uint512::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -827,6 +854,9 @@ Uint512::operator >>= (int n)
 Uint512&
 Uint512::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -989,6 +1019,9 @@ Int512::operator %= (const Int512& xx)
 Int512&
 Int512::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   bool neg = high_ < HalfType(0);
 
   int halfw = halfWidth();
@@ -1023,6 +1056,9 @@ Int512::operator >>= (int n)
 Int512&
 Int512::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -1151,6 +1187,9 @@ Uint1024::operator %= (const Uint1024& x)
 Uint1024&
 Uint1024::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -1175,6 +1214,9 @@ Uint1024::operator >>= (int n)
 Uint1024&
 Uint1024::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())
@@ -1337,6 +1379,9 @@ Int1024::operator %= (const Int1024& xx)
 Int1024&
 Int1024::operator >>= (int n)
 {
+  if (n == 0)
+    return *this;
+
   bool neg = high_ < HalfType(0);
 
   int halfw = halfWidth();
@@ -1371,6 +1416,9 @@ Int1024::operator >>= (int n)
 Int1024&
 Int1024::operator <<= (int n)
 {
+  if (n == 0)
+    return *this;
+
   int halfw = halfWidth();
 
   if (n >= width())

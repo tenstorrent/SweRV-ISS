@@ -12,11 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
 #include "Hart.hpp"
 #include "Core.hpp"
 #include "System.hpp"
+#include "Mcm.hpp"
 
 using namespace WdRiscv;
+
+
+inline bool
+isPowerOf2(uint64_t x)
+{
+  return x != 0 and (x & (x-1)) == 0;
+}
 
 
 template <typename URV>
@@ -69,6 +78,9 @@ System<URV>::~System()
 {
   delete sparseMem_;
   sparseMem_ = nullptr;
+
+  delete mcm_;
+  mcm_ = nullptr;
 }
 
 
@@ -88,6 +100,89 @@ System<URV>::writeAccessedMemory(const std::string& path) const
   if (not sparseMem_)
     return false;
   return sparseMem_->writeHexFile(path);
+}
+
+
+template <typename URV>
+bool
+System<URV>::enableMcm(unsigned mbLineSize)
+{
+  if (mcm_)
+    {
+      assert(mcm_->mergeBufferLineSize() == mbLineSize);
+      std::cerr << "System::enableMcm: Already enabled\n";
+      return true;
+    }
+
+  if (mbLineSize != 0)
+    if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
+      {
+	std::cerr << "Error: Invalid merge buffer line size: "
+		  << mbLineSize << '\n';
+	return false;
+      }
+
+  mcm_ = new Mcm<URV>(*this, mbLineSize);
+  mbSize_ = mbLineSize;
+
+  for (auto hart :  sysHarts_)
+    hart->setMcm(mcm_);
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		     uint64_t addr, unsigned size, uint64_t data,
+		     bool internal)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->readOp(hart, time, tag, addr, size, data, internal);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t addr,
+		    const std::vector<uint8_t>& data)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->mergeBufferWrite(hart, time, addr, data);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
+			 uint64_t addr, unsigned size, uint64_t data)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->mergeBufferInsert(hart, time, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		       const DecodedInst& di)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->retire(hart, time, tag, di);
+}
+
+template <typename URV>
+bool
+System<URV>::mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->setCurrentInstruction(hart, tag);
 }
 
 

@@ -55,7 +55,7 @@ VecRegs::~VecRegs()
 
 void
 VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
-		unsigned maxBytesPerElem)
+		unsigned maxBytesPerElem, std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul)
 {
   if (bytesPerReg > 4096)
     {
@@ -137,6 +137,7 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
   minBytesPerElem_ = minBytesPerElem;
   maxBytesPerElem_ = maxBytesPerElem;
   bytesInRegFile_ = regCount_ * bytesPerReg_;
+  uint32_t minLmul = minBytesPerElem_*8/maxBytesPerElem_;
 
   // Make illegal all group entries for element-widths greater than
   // the max-element-width (which is in bytesPerElem_) or smaller
@@ -145,12 +146,41 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
     {
       ElementWidth ew = ElementWidth(i);
       unsigned bytes = VecRegs::elementWidthInBytes(ew);
+      auto& groupFlags = legalConfigs_.at(size_t(ew));
       if (bytes > maxBytesPerElem_ or bytes < minBytesPerElem_ )
 	{
-	  auto& groupFlags = legalConfigs_.at(size_t(ew));
 	  groupFlags.assign(groupFlags.size(), false);
+          continue;
 	}
+
+      // By default, make illegal for LMUL < SEWmin/ELEN. Can be overwritten
+      // by user minimum SEW config for each LMUL setting.
+      if (minLmul > 0)
+      {
+        GroupMultiplier minLmulEnum;
+        assert(groupNumberX8ToSymbol(minLmul, minLmulEnum));
+        minLmulEnum = (minLmulEnum == GroupMultiplier::One) ? GroupMultiplier::Half :
+                                          static_cast<GroupMultiplier>(unsigned(minLmulEnum) - 1);
+        for (unsigned i = unsigned(minLmulEnum); i != unsigned(GroupMultiplier::Reserved);)
+          {
+            groupFlags[i] = false;
+            i = (i == unsigned(GroupMultiplier::One)) ? unsigned(GroupMultiplier::Half) : i - 1;
+          }
+      }
+
+      // Allow user to set a greater minimum sew for an LMUL setting than minBytesPerElem
+      if (minSewPerLmul)
+        {
+          for (auto it = minSewPerLmul->begin(); it != minSewPerLmul->end(); ++it)
+          for (auto const& [group, min] : *minSewPerLmul)
+            {
+              assert(min >= minBytesPerElem_ and min <= maxBytesPerElem_);
+              if (min > bytes)
+                groupFlags[size_t(group)] = false;
+            }
+        }
     }
+
 
   delete [] data_;
   data_ = new uint8_t[bytesInRegFile_];
@@ -165,4 +195,42 @@ VecRegs::reset()
     memset(data_, 0, bytesInRegFile_);
   lastWrittenReg_ = -1;
   lastGroupX8_ = 8;
+}
+
+
+bool
+VecRegs::findReg(const std::string& name, unsigned& ix) const
+{
+  if (name.empty())
+    return false;
+
+  std::string numStr = name;
+  if (numStr.at(0) == 'v')
+    numStr = numStr.substr(1);
+
+  char* end = nullptr;
+  unsigned n = strtoul(numStr.c_str(), &end, 10);
+  if (end and *end)
+    return false;
+
+  ix = n;
+  return true;
+}
+
+
+bool
+VecRegs::getLastMemory(std::vector<uint64_t>& addresses,
+		       std::vector<uint64_t>& data,
+		       unsigned& elementSize) const
+{
+  addresses.clear();
+  data.clear();
+  elementSize = ldStSize_;
+
+  if (ldStSize_ == 0)
+    return false;
+
+  addresses = ldStAddr_;
+  data = stData_;
+  return true;
 }

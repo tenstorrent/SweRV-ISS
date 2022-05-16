@@ -33,14 +33,13 @@ BOOST_LIB_DIR := $(wildcard $(BOOST_DIR)/stage/lib $(BOOST_DIR)/lib)
 BOOST_LIBS := boost_program_options
 
 # Add extra dependency libraries here
-ifeq (CYGWIN_NT-10.0,$(shell uname -s))
-EXTRA_LIBS := -lpthread -lz -lstdc++fs
-else
-EXTRA_LIBS := -lpthread -lz -static-libstdc++
-endif
-
-ifeq (Linux,$(shell uname -s))
-EXTRA_LIBS += -lstdc++fs
+EXTRA_LIBS := -lpthread -lm -lz -lstdc++fs
+ifneq (CYGWIN_NT-10.0,$(shell uname -s))
+  ifeq ($(findstring g++,$(CXX)),g++)
+    EXTRA_LIBS += -static-libstdc++
+  else
+    EXTRA_LIBS += -lstdc++ -static
+  endif
 endif
 
 ifeq (mingw,$(findstring mingw,$(shell $(CXX) -v 2>&1 | grep Target | cut -d' ' -f2)))
@@ -48,16 +47,25 @@ EXTRA_LIBS += -lws2_32
 endif
 
 ifdef SOFT_FLOAT
-override CPPFLAGS += -I$(PWD)/softfloat/source/include
+override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include
 override CPPFLAGS += -DSOFT_FLOAT
-soft_float_build := $(wildcard $(PWD)/softfloat/build/RISCV-GCC)
+soft_float_build := $(wildcard $(PWD)/third_party/softfloat/build/RISCV-GCC)
 soft_float_lib := $(soft_float_build)/softfloat.a
 endif
 
-ifdef MEM_CALLBACKS
-override CPPFLAGS += -DMEM_CALLBACKS
+MEM_CALLBACKS := 1
+ifeq ($(MEM_CALLBACKS), 1)
+  ifdef FAST_SLOPPY
+    $(warning "FAST_SLOPPY not compatible with MEM_CALLBACKS, turning off MEM_CALLBACKS")
+    MEM_CALLBACKS := 0
+  else
+    override CPPFLAGS += -DMEM_CALLBACKS
+  endif
 endif
 
+ifdef FAST_SLOPPY
+override CPPFLAGS += -DFAST_SLOPPY
+endif
 
 # Add External Library location paths here
 LINK_DIRS := $(addprefix -L,$(BOOST_LIB_DIR))
@@ -83,7 +91,7 @@ RM := rm -rf
 OFLAGS := -O3
 
 # Include paths.
-IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I.
+IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I. -Ithird_party
 
 # Command to compile .cpp files.
 ifeq (CYGWIN_NT-10.0,$(shell uname -s))
@@ -112,11 +120,12 @@ $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
 RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
             Memory.cpp Hart.cpp InstEntry.cpp Triggers.cpp \
             PerfRegs.cpp gdb.cpp HartConfig.cpp \
-            Server.cpp Interactive.cpp decode.cpp disas.cpp \
+            Server.cpp Interactive.cpp disas.cpp \
 	    Syscall.cpp PmaManager.cpp DecodedInst.cpp snapshot.cpp \
 	    PmpManager.cpp VirtMem.cpp Core.cpp System.cpp Cache.cpp \
 	    Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
-	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp
+	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp ArchInfo.cpp \
+	    crypto.cpp Decoder.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp

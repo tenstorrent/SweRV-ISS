@@ -1,0 +1,255 @@
+{
+    "xlen" : 32,
+
+    "isa" : "rv32imafvzfh_zba_zbb",
+
+    "Comment" : "Rounding mode is forced to round-to-nearest-even regardless of FRM CSR.",
+    "force_rounding_mode" : "rne",
+
+    "Comment" : "Round after multiply operation in fused mutliply-add/sub instructions.",
+    "round_after_fused_multiply" : "true",
+
+    "Comment" : "Replace subnormal floating point results with zero.",
+    "force_subnormal_to_zero" : "true",
+
+    "Comment" : "No misaligned ld/st addresses",
+    "enable_misaligned_data" : "false",
+
+    "enable_performance_counters" : "true",
+    "perf_count_atomic_load_store" : "true",
+    "perf_count_fp_load_store" : "true",
+
+    "Comment" : "Use ABI register names in log file (e.g. sp instead of x2).",
+    "abi_names" : "true",
+    
+    "Comment" : "Print memory addres of ld/st instructions in trace log.",
+    "print_load_store_address" : "true",
+
+    "Comment" : "2 performance counters implemented (mhpmcount3 and 4), rest (5 to 31) hardwired to 0",
+    "num_mmode_perf_regs" : 2,
+
+    "memmap" : {
+	"Comment": "Instruction fetch valid only in 0x80000000 to 0x801fffff",
+	"inst" : [ [ "0x80000000", "0x801fffff" ] ],
+	"pma" : [
+	    {
+		"Comment": "Instruction fetch valid only in this range",
+		"low" : "0x80000000",  "high" : "0x801fffff",
+		"attribs" : [ "read", "write", "exec", "amo", "rsrv", "idempotent" ]
+	    },
+	    {
+		"Comment": "Remaining address range is for data ld/st",
+		"low" : "0x0",  "high" : "0xffffffff",
+		"attribs" : [ "read", "write", "amo", "rsrv", "idempotent" ]
+	    }
+	]
+    },
+
+    "csr" : {
+	"misa" : {
+	    "reset-comment" : "imabfv",
+	    "reset" : "0x40201123",
+	    "mask-comment" : "Misa is not writable by CSR instructions",
+	    "mask" : "0x0"
+	},
+
+	"mstatus" : {
+	    "mstatus-comment" : "Hardwired to zero except for FS, VS, and SD.",
+	    "reset" : "0x80006600",
+	    "mask" : "0x0",
+	    "poke_mask" : "0x0"
+	},
+
+	"mepc" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"mcause" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"mtval" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tselect" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tdata1" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tdata2" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"tdata3" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dcsr" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dpc" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dscratch" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"dscratch1" : {
+	    "Comment" : "Hardwired to 0",
+	    "number" : "0x7b3",
+	    "reset" : "0x0",
+	    "mask" : "0x0"
+	},
+
+	"vstart" : {
+	    "Comment" : "Hardwired to 0",
+	    "reset" : 0,
+	    "mask" : 0,
+	    "poke_mask" : 0
+	},
+
+	"cycle" : {
+	    "exists" : "false"
+	},
+
+	"instret" : {
+	    "exists" : "false"
+	},
+
+	"time" : {
+	    "exists" : "false"
+	},
+
+	"cfg" : {
+	    "number" : "0x7c0",
+	    "reset" : "0x20000",
+	    "mask" : "0xffffffff"
+	},
+
+	"vgsrc" : {
+	    "number" : "0x7c6",
+	    "reset" : 0,
+	    "mask" : "0xffffffff"
+	},
+
+	"pmacfg0" : {
+	    "number" : "0x7c1",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"pmacfg1" : {
+	    "number" : "0x7c2",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Qstatus" : {
+	    "number" : "0xbc0",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Bstatus" : {
+	    "number" : "0xbc1",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus0" : {
+	    "number" : "0xbc2",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus1" : {
+	    "number" : "0xbc3",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus2" : {
+	    "number" : "0xbc4",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus3" : {
+	    "number" : "0xbc5",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus4" : {
+	    "number" : "0xbc6",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus5" : {
+	    "number" : "0xbc7",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus6" : {
+	    "number" : "0xbc8",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	},
+
+	"tt_cfg_Sstatus7" : {
+	    "number" : "0xbc9",
+	    "reset" : "0x0",
+	    "mask" : "0xffffffff"
+	}
+
+    },
+
+    "mmode_perf_event_map" : {
+	"None"         : "0x0",
+	"Mult"         : "0x00000e00",
+	"Div"          : "0x00000f00",
+	"Csr"          : "0x00001000",
+	"MultDiv"      : "0x00003000",
+	"Bitmanip"     : "0x00005000",
+	"FpSingle"     : "0x00006000",
+	"FpHalf"       : "0x00007000",
+	"InstCommited" : "0x00800000",
+	"Load"         : "0x00c00000",
+	"Store"        : "0x00d00000"
+    },
+ 
+    "vector" : {
+	"bytes_per_vec" : 16,
+	"min_bytes_per_elem" : 1,
+	"Comment" : "Hardware supports 32-bit ELEN plus some widening operations from 32 to 64-bit",
+	"max_bytes_per_elem" : 8
+    }
+}

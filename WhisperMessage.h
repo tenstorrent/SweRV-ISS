@@ -20,7 +20,7 @@
 enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
                           Quit, Invalid, Reset, Exception, EnterDebug,
                           ExitDebug, LoadFinished, CancelDiv, CancelLr,
-                          DumpMemory };
+                          DumpMemory, McmRead, McmInsert, McmWrite };
 
 // Be careful changing this: test-bench file (defines.svh) needs to be
 // updated.
@@ -41,9 +41,10 @@ struct WhisperMessage
 #ifdef __cplusplus
   WhisperMessage(uint32_t hart = 0, WhisperMessageType type = Invalid,
 		 uint32_t resource = 0, uint64_t address = 0, 
-		 uint64_t value = 0, uint64_t rank = 0)
-  : hart(hart), type(type), resource(resource), flags(0), rank(rank),
-    address(address), value(value)
+		 uint64_t value = 0, uint32_t size = 0, uint64_t instrTag = 0,
+		 uint64_t time = 0)
+    : hart(hart), type(type), resource(resource), size(size), flags(0),
+      instrTag(instrTag), time(time), address(address), value(value)
   {
     buffer[0] = 0;
     tag[0] = 0;
@@ -53,8 +54,10 @@ struct WhisperMessage
   uint32_t hart;
   uint32_t type;
   uint32_t resource;
+  uint32_t size;
   uint32_t flags;
-  uint64_t rank;    // Future: to re-order out of order transactions
+  uint64_t instrTag; // Instruction tag.
+  uint64_t time;     // Time stamp.
   uint64_t address;
   uint64_t value;
   char buffer[128];

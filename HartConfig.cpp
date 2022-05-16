@@ -390,10 +390,10 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
           std::cerr << "Warning: Bit corresponding to hart 0 is cleared "
                     << "in reset value of mhartstart CSR -- Bit is ignored\n";
 
-      if (csrName == "mhartid")
+      if (csrName == "mhartid" or csrName == "vlenb")
         {
-          std::cerr << "CSR mhartid cannot be configured.\n";
-          std::cerr << "Ignoring mhartid CSR configuration in config file.\n";
+          std::cerr << "CSR " << csrName << " cannot be configured.\n";
+          std::cerr << "Ignoring " << csrName << " CSR configuration in config file.\n";
           continue;
         }
 
@@ -443,140 +443,6 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
     errors++;
 
   return errors == 0;
-}
-
-
-template <typename URV>
-static
-bool
-applyMemMappedRegConfig(Hart<URV>& hart, const nlohmann::json& config)
-{
-  if (not config.count("memory_mapped_registers"))
-    return true;  // Nothing to apply.
-
-  const auto& mmr = config.at("memory_mapped_registers");
-
-  unsigned errors = 0;
-
-
-  // Define memory-mapped-register region.
-  uint64_t addr = 0, size = 0;
-  if (getJsonUnsigned("address", mmr.at("address"), addr) and
-      getJsonUnsigned("size", mmr.at("size"), size))
-    {
-      if (not hart.defineMemoryMappedRegisterArea(addr, size))
-        return false;
-    }
-  else
-    errors++;
-
-  // Start by giving all registers in region a default mask.
-  size_t possibleRegCount = size / 4;
-  if (mmr.count("default_mask"))
-    {
-      uint32_t mask = 0;
-      if (getJsonUnsigned("default_mask", mmr.at("default_mask"), mask))
-        for (size_t ix = 0; ix < possibleRegCount; ++ix)
-          hart.defineMemoryMappedRegisterWriteMask(addr + ix*4, mask);
-      else
-        errors++;
-    }
-
-  if (not mmr.count("registers"))
-    return true;
-
-  const auto& regs = mmr.at("registers");
-  if (not regs.is_object())
-    {
-      std::cerr << "Invalid memory_mapped_registers.registers entry "
-                << "in config file (expecting an object)\n";
-      return false;
-    }
-
-  for (auto it = regs.begin(); it != regs.end(); ++it)
-    {
-      const std::string& name = it.key();
-      const auto& conf = it.value();
-
-      if (not conf.count("count") or not conf.count("address") or
-          not conf.count("mask"))
-        {
-          std::cerr << "Register entry \"" << name << "\"under "
-                    << "memory_mapped_registers must have count/address/mask\n";
-          errors++;
-          continue;
-        }
-      URV count = 0, mask = 0, addr = 0;
-      if (getJsonUnsigned("count", conf.at("count"), count) and
-          getJsonUnsigned("mask", conf.at("mask"), mask) and
-          getJsonUnsigned("address", conf.at("address"), addr))
-        {
-          for (URV ix = 0; ix < count; ++ix)
-            if (not hart.defineMemoryMappedRegisterWriteMask(addr + ix*4, mask))
-              errors++;
-        }
-      else
-        errors++;
-    }
-
-  return errors == 0;
-}
-
-
-template <typename URV>
-static
-bool
-applyIccmConfig(Hart<URV>& hart, const nlohmann::json& config)
-{
-  if (not config.count("iccm"))
-    return true;
-
-  const auto& iccm = config.at("iccm");
-  if (iccm.count("region") and iccm.count("size") and iccm.count("offset"))
-    {
-      size_t region = 0, size = 0, offset = 0;
-      if (getJsonUnsigned("iccm.region", iccm.at("region"), region) and
-          getJsonUnsigned("iccm.size",   iccm.at("size"), size) and
-          getJsonUnsigned("iccm.offset", iccm.at("offset"), offset))
-        {
-          size_t addr = region*hart.regionSize() + offset;
-          return hart.defineIccm(addr, size);
-        }
-      else
-        return false;
-    }
-
-  std::cerr << "The ICCM entry in the configuration file must contain "
-            << "a region, offset and a size entry.\n";
-  return false;
-}
-
-
-template <typename URV>
-static
-bool
-applyDccmConfig(Hart<URV>& hart, const nlohmann::json& config)
-{
-  if (not config.count("dccm"))
-    return true;
-
-  const auto& dccm = config.at("dccm");
-  if (dccm.count("region") and dccm.count("size") and dccm.count("offset"))
-    {
-      size_t region = 0, size = 0, offset = 0;
-      if (getJsonUnsigned("dccm.region", dccm.at("region"), region) and
-          getJsonUnsigned("dccm.size",   dccm.at("size"), size) and
-          getJsonUnsigned("dccm.offset", dccm.at("offset"), offset))
-        {
-          size_t addr = region*hart.regionSize() + offset;
-          return hart.defineDccm(addr, size);
-        }
-      return false;
-    }
-
-  std::cerr << "The DCCM entry in the configuration file must contain "
-            << "a region, offset and a size entry.\n";
-  return false;
 }
 
 
@@ -876,8 +742,96 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         }
     }
 
+  tag = "min_sew_per_lmul";
+  std::unordered_map<GroupMultiplier, unsigned> minSewPerLmul;
+  if (vconf.count(tag))
+    {
+      auto& minSewMap = vconf.at(tag);
+      if (not minSewMap.is_object())
+        {
+          std::cerr << "Invalid " << tag << " entry in config file (expecting an object)\n";
+          return false;
+        }
+      for (auto it = minSewMap.begin(); it != minSewMap.end(); it++)
+        {
+          GroupMultiplier group;
+          const std::string& lmul = it.key();
+          const unsigned min = it.value();
+          if (not VecRegs::to_lmul(lmul, group))
+            {
+              std::cerr << "Invalid lmul setting: " << lmul << '\n';
+              errors++;
+              continue;
+            }
+
+          if (min < bytesPerElem.at(0) or min > bytesPerElem.at(1))
+            {
+              std::cerr << "Error: Config file " << tag << " ("
+                        << min << ") must be less than specified max"
+                        << " and greater than specified min\n";
+              errors++;
+            }
+
+          if (not isPowerOf2(min))
+            {
+              std::cerr << "Error: config file " << tag << " ("
+                        << min << ") is not a power of 2\n";
+              errors++;
+            }
+
+          minSewPerLmul[group] = min;
+        }
+    }
+
   if (errors == 0)
-    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1));
+    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minSewPerLmul);
+
+  return errors == 0;
+}
+
+
+/// Collect the physical memory attributes from the given json object
+/// (tagged "attribs") and add them to the given Pma object.  Return
+/// true on success and false on failure. Path is the hierarchical
+/// name of the condig object in the JSON configuration file.
+/// Sample JSON input parse in this functions:
+///     "attribs" : [ "read", "write", "exec", "amo", "rsrv" ]
+static
+bool
+getConfigPma(const std::string& path, const nlohmann::json& attribs, Pma& pma)
+{
+  using std::cerr;
+
+  if (not attribs.is_array())
+    {
+      cerr << "Error: Invalid \"attribs\" entry in configuraion item " << path
+	   << " -- expecting an array\n";
+      return false;
+    }
+
+  unsigned errors = 0;
+
+  for (auto& attrib : attribs)
+    {
+      if (not attrib.is_string())
+	{
+	  cerr << "Error: Invalid item value in config item " << (path + ".attribs")
+	       << " -- expecting a string\n";
+	  errors++;
+	  continue;
+	}
+
+      Pma::Attrib attr = Pma::Attrib::None;
+      std::string valueStr = attrib.get<std::string>();
+      if (not Pma::stringToAttrib(valueStr, attr))
+	{
+	  cerr << "Error: Invalid value in config item (" << valueStr << ") "
+	       << (path + ".attribs") << '\n';
+	  errors++;
+	}
+      else
+	pma.enable(attr);
+    }
 
   return errors == 0;
 }
@@ -886,47 +840,52 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 template <typename URV>
 static
 bool
-applyInstMemConfig(Hart<URV>& hart, const nlohmann::json& config)
+processMemMappedMasks(Hart<URV>& hart, const std::string& path, const nlohmann::json& masks,
+		      uint64_t low, uint64_t high)
 {
-  using std::cerr;
-
-  if (not config.is_array())
-    {
-      cerr << "Invalid inst entry in config file memmap (execpting an array)\n";
-      return false;
-    }
-
-  // Pairs of addresses in which inst fetch is allowed.
-  std::vector<std::pair<URV,URV>> windows;
-
-  unsigned errors = 0;
+  // Parse an array of entries, each entry is an array containing low
+  // address, high address, and maks.
   unsigned ix = 0;
-  for (auto it = config.begin(); it != config.end(); ++it, ++ix)
+  unsigned errors = 0;
+  for (auto maskIter = masks.begin(); maskIter != masks.end(); ++maskIter, ++ix)
     {
-      const auto& addrPair = *it;
-      if (not addrPair.is_array() or addrPair.size() != 2)
+      const auto& entry = *maskIter;
+      std::string entryPath = path + ".masks[" + std::to_string(ix) + "]";
+      std::vector<uint64_t> vec;
+      if (not getJsonUnsignedVec(entryPath, entry, vec))
 	{
-	  cerr << "Invalid address range in config file memap inst ("
-	       << "expecting an array of 2 numbers at index " << ix << ")\n";
-	  ++errors;
-	  break;
+	  errors++;
+	  continue;
 	}
 
-      std::vector<URV> vec;
-      if (not getJsonUnsignedVec("memmap.inst", addrPair, vec))
-        errors++;
-      else if (vec.size() != 2)
-	errors++;
-      else
+      if (vec.size() != 3)
 	{
-	  auto p = std::make_pair(vec.at(0), vec.at(1));
-	  windows.push_back(p);
+	  std::cerr << "Error: Expecting 3 values for config item "
+		    << entryPath << '\n';
+	  errors++;
+	  continue;
 	}
+
+      bool ok = vec.at(0) >= low and vec.at(0) <= high;
+      ok = ok and vec.at(1) >= low and vec.at(1) <= high;
+      if (not ok)
+	{
+	  std::cerr << "Error: Mask address out of PMA region bounds for config item "
+		    << entryPath << '\n';
+	  errors++;
+	  continue;
+	}
+
+      uint32_t mask = vec.at(2);
+      for (uint64_t addr = vec.at(0); addr <= vec.at(1); addr += 4)
+	if (not hart.setMemMappedMask(addr, mask))
+	  {
+	    std::cerr << "Error: Failed to configure mask for config item "
+		      << entryPath << " at addres 0x" << std::hex << addr
+		      << std::dec << '\n';
+	    errors++;
+	  }
     }
-
-  if (not errors and not windows.empty())
-    if (not hart.configMemoryFetch(windows))
-      errors++;
 
   return errors == 0;
 }
@@ -935,47 +894,79 @@ applyInstMemConfig(Hart<URV>& hart, const nlohmann::json& config)
 template <typename URV>
 static
 bool
-applyDataMemConfig(Hart<URV>& hart, const nlohmann::json& config)
+applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 {
   using std::cerr;
 
   if (not config.is_array())
     {
-      cerr << "Invalid data entry in config file memmap (execpting an array)\n";
+      cerr << "Error: Invalid memmap.pma entry in config file memmap (execpting an array)\n";
       return false;
     }
-
-  // Pairs of addresses in which data access is allowed.
-  std::vector<std::pair<URV,URV>> windows;
 
   unsigned errors = 0;
   unsigned ix = 0;
   for (auto it = config.begin(); it != config.end(); ++it, ++ix)
     {
-      const auto& addrPair = *it;
-      if (not addrPair.is_array() or addrPair.size() != 2)
+      std::string path = std::string("memmap.pma[") + std::to_string(ix) + "]";
+
+      const auto& item = *it;
+      if (not item.is_object())
 	{
-	  cerr << "Invalid address range in config file memap data ("
-	       << "expecting an array of 2 numbers at index " << ix << ")\n";
-	  ++errors;
-	  break;
+	  cerr << "Error: Configuration item at" << path << " is not an object\n";
+	  errors++;
+	  continue;
 	}
 
-      std::vector<URV> vec;
-      if (not getJsonUnsignedVec("memmap.data", addrPair, vec))
-        errors++;
-      if (vec.size() != 2)
-	errors++;
+      unsigned itemErrors = 0;
+
+      std::string tag = "low";
+      uint64_t low = 0;
+      if (not item.count(tag))
+	{
+	  cerr << "Error: Missing entry \"low\" in configuration item " << path << "\n";
+	  itemErrors++;
+	}
+      else if (not getJsonUnsigned(path + "." + tag, item.at(tag), low))
+	itemErrors++;
+
+      tag = "high";
+      uint64_t high = 0;
+      if (not item.count(tag))
+	{
+	  cerr << "Error: Missing entry \"high\" in configuration item " << path << "\n";
+	  itemErrors++;
+	}
+      else if (not getJsonUnsigned(path + "." + tag, item.at(tag), high))
+	itemErrors++;
+
+      tag = "attribs";
+      if (not item.count(tag))
+	{
+	  cerr << "Error: Missing entry \"attribs\" in configuration item " << path << "\n";
+	  itemErrors++;
+	}
       else
 	{
-	  auto p = std::make_pair(vec.at(0), vec.at(1));
-	  windows.push_back(p);
+	  Pma pma;
+	  if (not getConfigPma(path, item.at(tag), pma))
+	    itemErrors++;
+	  if (not itemErrors)
+	    {
+	      if (not hart.definePmaRegion(low, high, pma))
+		itemErrors++;
+	      else if (pma.isMemMappedReg())
+		{
+		  tag = "masks";
+		  if (item.count(tag))
+		    if (not processMemMappedMasks(hart, path, item.at(tag), low, high))
+		      itemErrors++;
+		}
+	    }
 	}
-    }
 
-  if (not errors and not windows.empty())
-    if (not hart.configMemoryDataAccess(windows))
-      errors++;
+      errors += itemErrors;
+    }
 
   return errors == 0;
 }
@@ -983,39 +974,125 @@ applyDataMemConfig(Hart<URV>& hart, const nlohmann::json& config)
 
 template<typename URV>
 bool
-HartConfig::applyMemoryConfig(Hart<URV>& hart, bool iccmRw, bool /*verbose*/) const
+HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 {
   unsigned errors = 0;
-  if (not applyIccmConfig(hart, *config_))
-    errors++;
-
-  if (not applyDccmConfig(hart, *config_))
-    errors++;
-
-  if (not applyMemMappedRegConfig(hart, *config_))
-    errors++;
-
-  if (config_ -> count("iccmrw"))
-    if (not getJsonBoolean("iccmrw", config_ ->at("iccmrw"), iccmRw))
-      errors++;
-
-  hart.finishCcmConfig(iccmRw);
 
   if (config_ -> count("memmap"))
     {
       // Apply memory protection windows.
-      const auto& memmap = config_ -> at("memmap");
+      const auto& memMap = config_ -> at("memmap");
       std::string tag = "inst";
-      if (memmap.count(tag))
-	if (not applyInstMemConfig(hart, memmap.at(tag)))
-	  errors++;
+      if (memMap.count(tag))
+	std::cerr << "Configuration memmap.data no longer supported -- ignored\n";
+
       tag = "data";
-      if (memmap.count(tag))
-	if (not applyDataMemConfig(hart, memmap.at(tag)))
+      if (memMap.count(tag))
+	std::cerr << "Configuration memmap.data no longer supported -- ignored\n";
+
+      tag = "pma";
+      if (memMap.count(tag))
+	if (not applyPmaConfig(hart, memMap.at(tag)))
 	  errors++;
     }
 
+  if (config_ -> count("cache"))
+    {
+      std::vector<unsigned> values;
+      const auto& cache = config_ -> at("cache");
+      for (auto item : { "size", "line_size", "set_size" } )
+	{
+	  if (not cache.count(item))
+	    {
+	      std::cerr << "Error: Missing " << item  << " tag in cache entry "
+			<< "in JSON configuration file.\n";
+	      errors++;
+	      continue;
+	    }
+
+	  unsigned value = 0;
+	  std::string path = std::string("cache.") + item;
+	  if (not getJsonUnsigned(path, cache.at(item), value))
+	    {
+	      errors++;
+	      continue;
+	    }
+	  if (not isPowerOf2(value))
+	    {
+	      std::cerr << "Error: Config file entry " << path
+			<< " is not a power of 2: " << value << '\n';
+	      errors++;
+	      continue;
+	    }
+	  values.push_back(value);
+	}
+
+      if (values.size() == 3)
+	{
+	  bool good = true;
+	  if (values.at(0) < 32 or values.at(0) > 128*1024*1024)
+	    {
+	      std::cerr << "Error: Invalid cache size in config file: "
+			<< values.at(0) << '\n';
+	      good = false;
+	    }
+	  if (values.at(1) < 4 or values.at(1) > values.at(0))
+	    {
+	      std::cerr << "Error: Invalid cache line-size in config file: "
+			<< values.at(1) << '\n';
+	      good = false;
+	    }
+	  if (values.at(2) < 1 or values.at(2) > 32)
+	    {
+	      std::cerr << "Error: Invalid cache set-size in config file: "
+			<< values.at(2) << '\n';
+	      good = false;
+	    }
+	  if (good)
+	    good = hart.configureCache(values.at(0), values.at(1), values.at(2));
+	  if (not good)
+	    errors++;
+	}
+    }
+
   return errors == 0;
+}
+
+
+template<typename URV>
+bool
+HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
+			uint64_t clintStart, uint64_t clintLimit,
+			uint64_t timerAddr) const
+{
+  // Define callback to associate a memory mapped software interrupt
+  // location to its corresponding hart so that when such a location
+  // is written the software interrupt bit is set/cleared in the MIP
+  // register of that hart.
+  uint64_t swAddr = clintStart;
+  auto swAddrToHart = [swAddr, &system](URV addr) -> Hart<URV>* {
+    uint64_t addr2 = swAddr + system.hartCount()*4; // 1 word per hart
+    if (addr >= swAddr and addr < addr2)
+      {
+        size_t ix = (addr - swAddr) / 4;
+        return system.ithHart(ix).get();
+      }
+    return nullptr;
+  };
+
+  // Same for timer limit addresses.
+  auto timerAddrToHart = [timerAddr, &system](URV addr) -> Hart<URV>* {
+    uint64_t addr2 = timerAddr + system.hartCount()*8; // 1 double word per hart
+    if (addr >= timerAddr and addr < addr2)
+      {
+        size_t ix = (addr - timerAddr) / 8;
+        return system.ithHart(ix).get();
+      }
+    return nullptr;
+  };
+
+  hart.configClint(clintStart, clintLimit, swAddrToHart, timerAddrToHart);
+  return true;
 }
 
 
@@ -1113,41 +1190,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	errors++;
     }
 
-  // Wide (64-bit) load/store. WDC special.
-  tag = "enable_wide_load_store";
-  if (config_ -> count(tag))
-    {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableWideLoadStore(flag);
-      else
-        errors++;
-    }
-
-  // Bus barrier. WDC special.
-  tag = "enable_bus_barrier";
-  if (config_ -> count(tag))
-    {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableBusBarrier(flag);
-      else
-        errors++;
-    }
-
-  // Ld/st instructions trigger misaligned exception if base address
-  // (value in rs1) and effective address refer to regions of
-  // different types.
-  tag = "effective_address_compatible_with_base";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.setEaCompatibleWithBase(flag);
-      else
-        errors++;
-    }
-
   // Enable debug triggers.
   tag = "enable_triggers";
   if (config_ -> count(tag))
@@ -1209,19 +1251,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       if (getJsonBoolean(tag, config_ -> at(tag), flag))
         {
           hart.enableLoadErrorRollback(flag);
-          hart.enableBenchLoadExceptions(flag);
         }
-      else
-        errors++;
-    }
-
-  // Enable fast interrupts.
-  tag = "fast_interrupt_redirect";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableFastInterrupts(flag);
       else
         errors++;
     }
@@ -1363,20 +1393,62 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
-  tag = "load_queue_size";
+  tag = "enable_zknd";
   if (config_ -> count(tag))
     {
-      unsigned lqs = 0;
-      if (getJsonUnsigned(tag, config_ -> at(tag), lqs))
-        {
-          if (lqs > 64)
-            {
-              std::cerr << "Config file load queue size (" << lqs << ") too large"
-                        << " -- using 64.\n";
-              lqs = 64;
-            }
-          hart.setLoadQueueSize(lqs);
-        }
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzknd(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zkne";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzkne(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zknh";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzknh(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zbkb";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzbkb(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zksed";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzksed(flag);
+      else
+        errors++;
+    }
+
+  tag = "enable_zksh";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzksh(flag);
       else
         errors++;
     }
@@ -1502,6 +1574,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	hart.enableCsvLog(flag);
     }
 
+  tag = "page_fault_on_first_access";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.setFaultOnFirstAccess(flag);
+    }
+
   return errors == 0;
 }
 
@@ -1515,8 +1597,49 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 
   // Apply JSON configuration.
   for (unsigned i = 0; i < system.hartCount(); ++i)
-    if (not applyConfig(*system.ithHart(i), userMode, verbose))
+    {
+      Hart<URV>& hart = *system.ithHart(i);
+      if (not applyConfig(hart, userMode, verbose))
+	return false;
+
+      std::string tag = "clint";
+      if (config_ -> count(tag))
+	{
+	  uint64_t addr = 0;
+	  if (getJsonUnsigned(tag, config_ ->at(tag), addr))
+	    {
+	      if ((addr & 7) != 0)
+		{
+		  std::cerr << "Error: Config file clint address (0x" << std::hex
+			    << addr << std::dec << ") is not a multiple of 8\n";
+		  return false;
+		}
+	      else
+		{
+		  uint64_t clintStart = addr, clintEnd = addr + 0x8000 -1;
+		  uint64_t timerAddr = addr + 0x4000;
+		  configClint(system, hart, clintStart, clintEnd, timerAddr);
+		}
+	    }
+	  else
+	    return false;
+	}
+    }
+
+  unsigned mbLineSize = 64;
+  std::string tag = "merge_buffer_line_size";
+  if (config_ -> count(tag))
+    if (not getJsonUnsigned(tag, config_ -> at(tag), mbLineSize))
       return false;
+
+  tag = "enable_memory_consistency";
+  bool enableMcm = false;
+  if (config_ -> count(tag))
+    if (not getJsonBoolean(tag, config_ -> at(tag), enableMcm))
+      return false;
+
+  if (enableMcm and not system.enableMcm(mbLineSize))
+    return false;
 
   return finalizeCsrConfig(system);
 }
@@ -1524,17 +1647,13 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 
 template<typename URV>
 bool
-HartConfig::configMemory(System<URV>& system, bool iccmRw, bool unmappedElfOk,
-                         bool verbose) const
+HartConfig::configMemory(System<URV>& system, bool unmappedElfOk) const
 {
   system.checkUnmappedElf(not unmappedElfOk);
 
   auto& hart0 = *system.ithHart(0);
-  if (not applyMemoryConfig(hart0, iccmRw, verbose))
+  if (not applyMemoryConfig(hart0))
     return false;
-
-  for (unsigned i = 1; i < system.hartCount(); ++i)
-    system.ithHart(i)->copyMemRegionConfig(hart0);
 
   return true;
 }
@@ -1735,9 +1854,13 @@ defineMacoSideEffects(System<URV>& system)
 
           // Define pre-write/pre-poke callback: If lock bit is set,
           // then preserve CSR value
-          auto pre = [hart, rv32] (Csr<URV>& csr, URV& val) -> void {
+	  std::weak_ptr<Hart<URV>> wHart(hart);
+          auto pre = [wHart, rv32] (Csr<URV>& csr, URV& val) -> void {
+		       auto hart = wHart.lock();
+		       if (not hart)
+			 return;  // Should not happen.
                        URV previous = 0;
-                       hart->peekCsr(csr.getNumber(), previous);
+		       hart->peekCsr(csr.getNumber(), previous);
                        if (previous & URV(Maco32Masks::Lock))
                          val = previous;  // Locked: keep previous value
                        else if (not rv32)
@@ -1752,7 +1875,10 @@ defineMacoSideEffects(System<URV>& system)
 
           // Define post-write/post-poke callback. Upddate the idempotent
           // regions of the hart.
-          auto post = [hart, macoIx, rv32] (Csr<URV>& csr, URV val) -> void {
+          auto post = [wHart, macoIx, rv32] (Csr<URV>& csr, URV val) -> void {
+		        auto hart = wHart.lock();
+			if (not hart)
+			  return;    // Should not happen.
                         uint64_t start = 0, end = 0;
                         bool idempotent = false, cacheable = false;
                         URV mask = csr.getWriteMask();
@@ -1768,66 +1894,6 @@ defineMacoSideEffects(System<URV>& system)
         }
 
       hart->definePmaOverrideRegions(macoIx);
-    }
-}
-
-
-/// Associate callbacks with write/poke of the mrac CSR. Mrac is
-/// memory region accss control CSR which defines which regions are
-/// cacahble/idempotent.
-template <typename URV>
-void
-defineMracSideEffects(System<URV>& system)
-{
-  unsigned count = 0; // Count of mrac definitions.
-
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mrac");
-      if (not csrPtr)
-        continue;
-
-      count++;
-
-      auto pre = [] (Csr<URV>&, URV& val) -> void {
-                   // A value of 0b11 (io/cacheable) for the ith
-                   // region is invalid: Make it 0b10
-                   // (io/non-cacheable).
-                   URV mask = 0b11;
-                   unsigned xlen = sizeof(URV) * 8; // FIX.
-                   for (unsigned i = 0; i < xlen; i += 2)
-                     {
-                       if ((val & mask) == mask)
-                         val = (val & ~mask) | (0b10 << i);
-                       mask = mask << 2;
-                     }
-                 };
-
-      // Mrac is shared between harts. If one hart writes it, all
-      // harts must be updated.
-      auto post = [&system] (Csr<URV>&, URV val) -> void {
-                    for (unsigned hix = 0; hix < system.hartCount(); ++hix)
-                      {
-                        auto ht = system.ithHart(hix);
-                        for (unsigned region = 0; region < 16; ++region)
-                          {
-                            unsigned bit = (val >> (region*2 + 1)) & 1;
-                            ht->markRegionIdempotent(region, bit == 0);
-                          }
-                      }
-                  };
-
-      csrPtr->registerPrePoke(pre);
-      csrPtr->registerPreWrite(pre);
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-    }
-
-  if (count and sizeof(URV) == 8)
-    {
-      std::cerr << "Warning: mrac CSR is defined with rv32. This is likely "
-                << "a mistake. Only least significant 32 bits will be used.\n";
     }
 }
 
@@ -1854,15 +1920,23 @@ defineMdacSideEffects(System<URV>& system)
                      val = (val & ~mask) | 0b10;
                  };
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // Mdac is not shared between harts.
-      auto post = [hart] (Csr<URV>&, URV val) -> void {
+      auto post = [wHart] (Csr<URV>&, URV val) -> void {
+		    auto hart = wHart.lock();
+		    if (not hart)
+		      return;  // Should not happen.
                     bool idempotent = (val & 2) == 0;
                     bool cacheable = (val & 1);
                     hart->setDefaultIdempotent(idempotent);
                     hart->setDefaultCacheable(cacheable);
                   };
 
-      auto reset = [hart] (Csr<URV>& csr) -> void {
+      auto reset = [wHart] (Csr<URV>& csr) -> void {
+	  auto hart = wHart.lock();
+	  if (not hart)
+	    return;  // Should not happen.
           URV val = csr.read();
           bool idempotent = (val & 2) == 0;
           bool cacheable = (val & 1);
@@ -1877,71 +1951,6 @@ defineMdacSideEffects(System<URV>& system)
       csrPtr->registerPostWrite(post);
 
       csrPtr->registerPostReset(reset);
-    }
-}
-
-
-/// Associate callbacks with write/poke of the mpicbaddr (pic base
-/// address csr).
-template <typename URV>
-void
-defineMpicbaddrSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mpicbaddr");
-      if (not csrPtr)
-        continue;
-
-      auto post = [hart] (Csr<URV>&, URV val) -> void {
-                    hart->changeMemMappedBase(val);
-                  };
-
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-    }
-}
-
-
-/// Associate callbacks with write/poke of mhartstart to start harts
-/// when corresponding bits are set in that CSR.
-template <typename URV>
-void
-defineMhartstartSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mhartstart");
-      if (not csrPtr)
-        continue;
-      auto csrNum = csrPtr->getNumber();
-
-      auto post = [&system] (Csr<URV>&, URV val) -> void {
-                    // Start harts corresponding to set bits
-                    for (unsigned ii = 0; ii < system.hartCount(); ++ii)
-                      {
-                        auto ht = system.ithHart(ii);
-                        URV id = ht->sysHartIndex();
-                        if (val & (URV(1) << id))
-                          ht->setStarted(true);
-                      }
-                  };
-
-      auto pre = [&system, csrNum] (Csr<URV>&, URV& val) -> void {
-                   // Implement write-one semantics. We let hart 0 do
-                   // the shared CSR value change.
-                   auto ht = system.ithHart(0);
-                   URV prev = 0;
-                   ht->peekCsr(csrNum, prev);
-                   val |= prev;
-                 };
-
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-      csrPtr->registerPrePoke(pre);
-      csrPtr->registerPreWrite(pre);
     }
 }
 
@@ -1980,7 +1989,11 @@ defineMnmipdelSideEffects(System<URV>& system)
                  };
 
       // On reset, enable NMI in harts according to the bits of mnmipdel
-      auto reset = [hart] (Csr<URV>& csr) -> void {
+      std::weak_ptr<Hart<URV>> wHart(hart);
+      auto reset = [wHart] (Csr<URV>& csr) -> void {
+	           auto hart = wHart.lock();
+		   if (not hart)
+		     return;  // Should not happen.
                    URV val = csr.read();
                    URV id = hart->sysHartIndex();
                    bool flag = (val & (URV(1) << id)) != 0;
@@ -2010,8 +2023,13 @@ defineMpmcSideEffects(System<URV>& system)
       if (not csrPtr)
         continue;
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // Writing 3 to pmpc enables external interrupts unless in debug mode.
-      auto prePoke = [hart] (Csr<URV>& csr, URV& val) -> void {
+      auto prePoke = [wHart] (Csr<URV>& csr, URV& val) -> void {
+		       auto hart = wHart.lock();
+		       if (not hart)
+			 return;  // Should not happen.
                        if (hart->inDebugMode() or (val & 3) != 3 or
                            (val & csr.getPokeMask()) == 0)
                          return;
@@ -2023,7 +2041,10 @@ defineMpmcSideEffects(System<URV>& system)
                        hart->pokeCsr(CsrNumber::MSTATUS, fields.value_);
                      };
 
-      auto preWrite = [hart] (Csr<URV>& csr, URV& val) -> void {
+      auto preWrite = [wHart] (Csr<URV>& csr, URV& val) -> void {
+		       auto hart = wHart.lock();
+		       if (not hart)
+			 return;  // Should not happen.
                         if (hart->inDebugMode() or (val & 3) != 3 or
                            (val & csr.getWriteMask()) == 0)
                           return;
@@ -2058,9 +2079,14 @@ defineMgpmcSideEffects(System<URV>& system)
       if (not csrPtr)
         continue;
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // For poke, the effect takes place immediately (next instruction
       // will see the new control).
-      auto postPoke = [hart] (Csr<URV>&, URV val) -> void {
+      auto postPoke = [wHart] (Csr<URV>&, URV val) -> void {
+		        auto hart = wHart.lock();
+			if (not hart)
+			  return;  // Should not happen.
                         bool enable = (val & 1) == 1;
                         URV mask = enable? ~URV(0) : 0;
                         mask |= 7; // cycle/time/instret not controlled by mgpmc
@@ -2070,7 +2096,10 @@ defineMgpmcSideEffects(System<URV>& system)
 
       // For write (invoked from current instruction), the effect
       // takes place on the following instruction.
-      auto postWrite = [hart] (Csr<URV>&, URV val) -> void {
+      auto postWrite = [wHart] (Csr<URV>&, URV val) -> void {
+		        auto hart = wHart.lock();
+		        if (not hart)
+			  return;  // Should not happen.
                         bool enable = (val & 1) == 1;
                         URV mask = enable? ~URV(0) : 0;
                         mask |= 7; // cycle/time/instret not controlled by mgpmc
@@ -2095,16 +2124,24 @@ defineMcountinhibitSideEffects(System<URV>& system)
       if (not csrPtr)
         continue;
 
+      std::weak_ptr<Hart<URV>> wHart(hart);
+
       // For poke, the effect takes place immediately (next instruction
       // will see the new control).
-      auto postPoke = [hart] (Csr<URV>&, URV val) -> void {
+      auto postPoke = [wHart] (Csr<URV>&, URV val) -> void {
+		        auto hart = wHart.lock();
+			if (not hart)
+			  return;  // Should not happen.
                         hart->setPerformanceCounterControl(~val);
                         hart->setPerformanceCounterControl(~val);
                       };
 
       // For write (invoked from current instruction), the effect
       // takes place on the following instruction.
-      auto postWrite = [hart] (Csr<URV>&, URV val) -> void {
+      auto postWrite = [wHart] (Csr<URV>&, URV val) -> void {
+	                 auto hart = wHart.lock();
+			 if (not hart)
+			   return;  // Should not happen.
                          hart->setPerformanceCounterControl(~val);
                        };
 
@@ -2143,13 +2180,10 @@ HartConfig::finalizeCsrConfig(System<URV>& system) const
 
   // The following are WD non-standard CSRs. We implement their
   // actions by associating callbacks with the write/poke CSR methods.
-  defineMhartstartSideEffects(system);
   defineMnmipdelSideEffects(system);
-  defineMpicbaddrSideEffects(system);
   defineMpmcSideEffects(system);
   defineMgpmcSideEffects(system);
   defineMacoSideEffects(system);
-  defineMracSideEffects(system);
   defineMdacSideEffects(system);
 
   // Define callback to react to write/poke to mcountinhibit CSR.
@@ -2222,17 +2256,17 @@ template bool
 HartConfig::configHarts<uint64_t>(System<uint64_t>&, bool, bool) const;
 
 template bool
-HartConfig::configMemory(System<uint32_t>&, bool, bool, bool) const;
+HartConfig::configMemory(System<uint32_t>&, bool) const;
 
 template bool
-HartConfig::configMemory(System<uint64_t>&, bool, bool, bool) const;
+HartConfig::configMemory(System<uint64_t>&, bool) const;
 
 
 template bool
-HartConfig::applyMemoryConfig<uint32_t>(Hart<uint32_t>&, bool, bool) const;
+HartConfig::applyMemoryConfig<uint32_t>(Hart<uint32_t>&) const;
 
 template bool
-HartConfig::applyMemoryConfig<uint64_t>(Hart<uint64_t>&, bool, bool) const;
+HartConfig::applyMemoryConfig<uint64_t>(Hart<uint64_t>&) const;
 
 template bool
 HartConfig::finalizeCsrConfig<uint32_t>(System<uint32_t>&) const;
@@ -2240,15 +2274,22 @@ HartConfig::finalizeCsrConfig<uint32_t>(System<uint32_t>&) const;
 template bool
 HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
 
-
-template
-void
+template void
 unpackMacoValue<uint32_t>(uint32_t value, uint32_t mask, bool rv32,
                           uint64_t& start, uint64_t& end, bool& idempotent,
                           bool& cacheable);
 
-template
-void
+template void
 unpackMacoValue<uint64_t>(uint64_t value, uint64_t mask, bool rv32,
                           uint64_t& start, uint64_t& end, bool& idempotent,
                           bool& cacheable);
+
+template bool
+HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
+				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t timerAddr) const;
+
+template bool
+HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
+				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t timerAddr) const;

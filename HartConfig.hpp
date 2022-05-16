@@ -60,13 +60,16 @@ namespace WdRiscv
 
     /// Configure memory.
     template<typename URV>
-    bool configMemory(System<URV>& system, bool iccmRw, bool unmappedElfOk,
-                      bool verbose) const;
+    bool configMemory(System<URV>& system, bool unmappedElfOk) const;
 
     /// Apply the memory configuration in this object. Helper to configMemory.
     template<typename URV>
-    bool applyMemoryConfig(Hart<URV>&, bool iccmRw, bool verbose) const;
+    bool applyMemoryConfig(Hart<URV>&) const;
     
+    template<typename URV>
+    bool configClint(System<URV>&, Hart<URV>&, uint64_t clintStart,
+		     uint64_t clintLimit, uint64_t timerAddr) const;
+
     /// Set xeln to the register width configuration held in this
     /// object returning true on success and false if this object does
     /// not contain a register width (xlen) configuration.

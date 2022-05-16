@@ -38,6 +38,7 @@ namespace WdRiscv
       MARCHID = 0xF12,
       MIMPID = 0xF13,
       MHARTID = 0xF14,
+      MCONFIGPTR = 0xF15,
 
       // Machine trap setup.
       MSTATUS = 0x300,
@@ -193,6 +194,36 @@ namespace WdRiscv
       // Supervisor Protection and Translation 
       SATP = 0x180,
 
+      // Hypervisor registers
+      HSTATUS = 0x600,
+      HEDELEG = 0x602,
+      HIDELEG = 0x603,
+      HIE = 0x604,
+      HCOUNTEREN = 0x606,
+      HGEIE = 0x607,
+      HTVAL = 0x643,
+      HIP = 0x644,
+      HVIP = 0x645,  
+      HTINST = 0x64A,
+      HGEIP = 0xE12,
+      HENVCFG = 0x60A,
+      HENVCFGH = 0x61A,
+      HGATP = 0x680,
+      HCONTEXT = 0x6A8,
+      HTIMEDELTA = 0x605,
+      HTIMEDELTAH = 0x615,
+
+      // Virtual supervisor
+      VSSTATUS = 0x200,
+      VSIE = 0x204,
+      VSTVEC = 0x205,
+      VSSCRATCH = 0x240,
+      VSEPC = 0x241,
+      VSCAUSE = 0x242,
+      VSTVAL = 0x243,
+      VSIP = 0x244,
+      VSATP = 0x280,
+
       // User mode registers.
 
       // User trap setup.
@@ -301,22 +332,6 @@ namespace WdRiscv
       VL       = 0xc20,
       VTYPE    = 0xc21,
       VLENB    = 0xc22,
-
-      // Non-standard registers.
-      MRAC     = 0x7c0,
-      MDSEAC   = 0xfc0,
-      MDEAU    = 0xbc0,
-
-      MEIVT    = 0xbc8, // Ext int vector table reg 
-      MEIHAP   = 0xfc8, // Ext int handler address pointer reg
-
-      MSPCBA   = 0x7f4, // Stack pointer checker base address
-      MSPCTA   = 0x7f5, // Stack pointer checker top address
-      MSPCC    = 0x7f6, // Stack pointer checker control
-
-      MDBHD   = 0xbc7,  // D-Bus 64-bit high data
-
-      MSCAUSE  = 0x7ff, // Secondary exception cause
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
@@ -889,14 +904,17 @@ namespace WdRiscv
     /// Helper to construtor. Define user-mode CSRs
     void defineUserRegs();
 
+    /// Helper to constructor. Define hypervisor CSRs.
+    void defineHypervisorRegs();
+
     /// Helper to construtor. Define debug-mode CSRs
     void defineDebugRegs();
 
     /// Helper to construtor. Define vector CSRs
     void defineVectorRegs();
 
-    /// Helper to construtor. Define non-standard CSRs
-    void defineNonStandardRegs();
+    /// Helper to construtor. Define floating point CSRs
+    void defineFpRegs();
 
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.
@@ -1167,7 +1185,7 @@ namespace WdRiscv
     {
       unsigned UIE      : 1;
       unsigned SIE      : 1;
-      unsigned res2     : 1;
+      unsigned res0     : 1;
       unsigned MIE      : 1;
       unsigned UPIE     : 1;
       unsigned SPIE     : 1;
@@ -1184,12 +1202,14 @@ namespace WdRiscv
       unsigned TVM      : 1;
       unsigned TW       : 1;
       unsigned TSR      : 1;
-      unsigned res0     : 9;
+      unsigned res1     : 9;
       unsigned UXL      : 2;
       unsigned SXL      : 2;
       unsigned SBE      : 1;
       unsigned MBE      : 1;
-      unsigned res      : 25;  // Reserved
+      unsigned GBA      : 1;
+      unsigned MPV      : 1;
+      unsigned res2     : 23;  // Reserved
       unsigned SD       : 1;
     } bits_;
   };

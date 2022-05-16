@@ -84,7 +84,9 @@ printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       return;
     }
 
-  out << std::left << std::setw(9) << entry->name();
+  unsigned width = std::max(size_t(9), entry->name().size() + 1);
+
+  out << std::left << std::setw(width) << entry->name();
   unsigned opCount = di.operandCount();
 
   const char* sep = "";
@@ -115,7 +117,7 @@ printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
     }
 
   if (entry->hasRoundingMode())
-    out << sep << roundingModeString(di.roundingMode());
+    out << sep << roundingModeString(RoundingMode(di.roundingMode()));
 }
 
 
@@ -267,6 +269,31 @@ printBranch2(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
       imm = -imm;
     }
   stream << sign << " 0x" << std::hex << imm << std::dec;
+}
+
+
+template <typename URV>
+static
+void
+printFence(const Hart<URV>& /*hart*/, std::ostream& stream,
+	   const DecodedInst& di)
+{
+  stream << std::left << std::setw(8) << di.instEntry()->name() << ' ';
+
+  std::string pred, succ;
+
+  if (di.isFencePredRead())   pred += "r";
+  if (di.isFencePredWrite())  pred += "w";
+  if (di.isFencePredInput())  pred += "i";
+  if (di.isFencePredOutput()) pred += "o";
+  
+  if (di.isFenceSuccRead())   succ += "r";
+  if (di.isFenceSuccWrite())  succ += "w";
+  if (di.isFenceSuccInput())  succ += "i";
+  if (di.isFenceSuccOutput()) succ += "o";
+
+  if (not pred.empty() or not succ.empty())
+    stream << pred << ", " << succ;
 }
 
 
@@ -516,6 +543,11 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printBranch3(*this, out, di);
       break;
 
+    case InstId::fence_tso:
+    case InstId::fence:
+      printFence(*this, out, di);
+      break;
+      
     case InstId::csrrw:
     case InstId::csrrs:
     case InstId::csrrc:
@@ -748,14 +780,6 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::fsriw:
       printRdRs1Rs3Imm(*this, out, "fsriw", di);
-      break;
-
-    case InstId::load64:
-      printLdSt(*this, out, di);
-      break;
-
-    case InstId::store64:
-      printLdSt(*this, out, di);
       break;
 
     default:
