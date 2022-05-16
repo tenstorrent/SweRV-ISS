@@ -111,7 +111,7 @@ Float16::fromFloat(float val)
   if (val == 0 or not std::isnormal(val))
     return sign? -Float16{} : Float16{};
 
-  // Normalized number. Update exponent for float16 bias.
+  // Normalized float. Update exponent for float16 bias.
   Uint32FloatUnion uf{val};
 
   uint32_t sig = (uf.u << 9) >> 9;
@@ -121,7 +121,11 @@ Float16::fromFloat(float val)
     return sign? -Float16{} : Float16{};
   if (exp < 0)
     {
-      assert(0);
+      // In Float16 number would be subnormal. Adjust.
+      int shift = -exp;
+      sig = sig | (1 << 23);  // Put back implied most sig digit.
+      sig = sig >> shift;
+      exp = 0;
     }
   if (exp >= 0x1f)
     return sign? -Float16::infinity() : Float16::infinity();
@@ -175,9 +179,9 @@ FpRegs::findReg(const std::string& name, unsigned& ix) const
 void
 FpRegs::reset(bool hasHalf, bool hasSingle, bool hasDouble)
 {
-  hasHalf_ = hasHalf_;
-  hasSingle_ = hasSingle_;
-  hasDouble_ = hasDouble_;
+  hasHalf_ = hasHalf;
+  hasSingle_ = hasSingle;
+  hasDouble_ = hasDouble;
 
   if (hasDouble)
     {

@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <vector>
+#include <unordered_map>
 #include <string>
 #include <cassert>
 
@@ -109,6 +110,9 @@ namespace WdRiscv
   template <typename URV>
   class Hart;
 
+  template <typename URV>
+  class ArchInfo;
+
   /// Model a RISCV vector register file.
   class VecRegs
   {
@@ -116,6 +120,8 @@ namespace WdRiscv
 
     friend class Hart<uint32_t>;
     friend class Hart<uint64_t>;
+    friend class ArchInfo<uint32_t>;
+    friend class ArchInfo<uint64_t>;
 
     /// Constructor: Define an empty vector regidter file which may be
     /// reconfigured later using the config method.
@@ -133,18 +139,24 @@ namespace WdRiscv
     uint32_t bytesPerRegister() const
     { return bytesPerReg_; }
 
+    /// Return the number of bytes in this register file.
+    uint32_t bytesInRegisterFile() const
+    { return bytesInRegFile_; }
+
     /// Set value to that of the element with given index within the
     /// vector register of the given number returning true on sucess
     /// and false if the combination of element index, vector number
     /// and group multipier (presecaled by 8) is invalid. We pre-scale
     /// the group multiplier to avoid passing a fraction.
     template<typename T>
-    bool read(uint32_t regNum, uint32_t elemIx, uint32_t groupX8,
+    bool read(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
               T& value) const
     {
+      if (regNum >= regCount_ or elemIx >= bytesInRegFile_)
+	return false;
       if (elemIx*sizeof(T) > ((bytesPerReg_*groupX8) >> 3) - sizeof(T))
         return false;
-      if (regNum*bytesPerReg_ + elemIx*sizeof(T) > bytesPerReg_*regCount_ - sizeof(T))
+      if (regNum*bytesPerReg_ + elemIx*sizeof(T) > bytesInRegFile_ - sizeof(T))
         return false;
       const T* data = reinterpret_cast<const T*>(data_ + regNum*bytesPerReg_);
       value = data[elemIx];
@@ -157,12 +169,14 @@ namespace WdRiscv
     /// and group multipier (presecaled by 8) is invalid. We pre-scale
     /// the group multiplier to avoid passing a fraction.
     template<typename T>
-    bool write(uint32_t regNum, uint32_t elemIx, uint32_t groupX8,
+    bool write(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
                const T& value)
     {
+      if (regNum >= regCount_ or elemIx >= bytesInRegFile_)
+	return false;
       if ((elemIx + 1) * sizeof(T) > ((bytesPerReg_*groupX8) >> 3))
         return false;
-      if (regNum*bytesPerReg_ + (elemIx + 1)*sizeof(T) > bytesPerReg_*regCount_)
+      if (regNum*bytesPerReg_ + (elemIx + 1)*sizeof(T) > bytesInRegFile_)
         return false;
       T* data = reinterpret_cast<T*>(data_ + regNum*bytesPerReg_);
       data[elemIx] = value;
@@ -265,6 +279,22 @@ namespace WdRiscv
       return legalConfig(eew, emul);
     }
 
+    /// Set ix to the number of the register corresponding to the
+    /// given name returning true on success and false if no such
+    /// register.  For example, if name is "v2" then ix will be set to
+    /// 2.
+    bool findReg(const std::string& name, unsigned& ix) const;
+
+    /// Get the addresses, data, and element size of the memory
+    /// locations accessed by the most recent instruction. Return true
+    /// on success and false if the most recent instruction was not a
+    /// memory-referencing vector instruction. If most recent instruction
+    /// was not a store, then data will be cleared; otherwise, it will have
+    /// as many elements as addresses.
+    bool getLastMemory(std::vector<uint64_t>& addresses,
+		       std::vector<uint64_t>& data,
+		       unsigned& elementSize) const;
+
     /// Set symbol to the symbolic value of the given numeric group
     /// multiplier (premultiplied by 8). Return true on success and
     /// false if groupX8 is out of bounds.
@@ -328,12 +358,45 @@ namespace WdRiscv
       return size_t(ew) < vec.size()? vec.at(size_t(ew)) : "e?";
     }
 
+    static bool to_lmul(std::string lmul, GroupMultiplier& group)
+    {
+      static std::unordered_map<std::string, GroupMultiplier> map(
+        { {"m1", GroupMultiplier::One}, {"m2", GroupMultiplier::Two},
+          {"m4", GroupMultiplier::Four}, {"m8", GroupMultiplier::Eight},
+          {"m?", GroupMultiplier::Reserved}, {"mf8", GroupMultiplier::Eighth},
+          {"mf4", GroupMultiplier::Quarter}, {"mf2", GroupMultiplier::Half} });
+
+      if (map.find(lmul) != map.end())
+        {
+          group = map.at(lmul);
+          return true;
+        }
+      return false;
+    }
+
+    static bool to_sew(std::string sew, ElementWidth& ew)
+    {
+      static std::unordered_map<std::string, ElementWidth> map(
+        { {"e8", ElementWidth::Byte}, {"e16", ElementWidth::Half},
+          {"e32", ElementWidth::Word}, {"e64", ElementWidth::Word2},
+          {"e128", ElementWidth::Word4}, {"e256", ElementWidth::Word8},
+          {"e512", ElementWidth::Word16}, {"e1024", ElementWidth::Word32} });
+
+      if (map.find(sew) != map.end())
+        {
+          ew = map.at(sew);
+          return true;
+        }
+      return false;
+    }
+
 
   protected:
 
     /// Clear load/address and store data used for logging/tracing./
     void clearTraceData()
     {
+      ldStSize_ = 0;
       ldStAddr_.clear();
       stData_.clear();
       clearLastWrittenReg();
@@ -427,7 +490,8 @@ namespace WdRiscv
     /// and configure it later. Old configuration is lost. Register of
     /// newly configured file are initlaized to zero.
     void config(uint32_t bytesPerReg, uint32_t minBytesPerElem,
-		uint32_t maxBytesPerElem);
+		uint32_t maxBytesPerElem,
+                std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul);
 
     void reset();
 
@@ -517,6 +581,7 @@ namespace WdRiscv
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.
+    unsigned ldStSize_ = 0;
     std::vector<uint64_t> ldStAddr_;  // Addresses of vector load/store instruction
     std::vector<uint64_t> stData_;    // Data of vector store instruction
     std::vector<unsigned> opsEmul_;   // Effecive grouping of vector operands.

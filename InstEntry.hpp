@@ -18,6 +18,7 @@
 #include <string>
 #include <unordered_map>
 #include "InstId.hpp"
+#include "Isa.hpp"
 
 
 namespace WdRiscv
@@ -25,9 +26,7 @@ namespace WdRiscv
 
   enum class OperandType { IntReg, FpReg, CsReg, VecReg, Imm, None };
   enum class OperandMode { Read, Write, ReadWrite, None };
-  enum class InstType { Load, Store, Multiply, Divide, Branch, Int, Rvf, Rvd,
-                        Csr, Atomic, Vector, Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
-                        Zbr, Zbs, Zbt, Zfh };
+  enum class RvFormat { R, R4, I, S, B, U, J, None };
 
   /// Return true if given instruction is a 4-byte instruction.
   inline bool
@@ -73,20 +72,21 @@ namespace WdRiscv
 
     // Constructor.
     InstEntry(std::string name = "", InstId id = InstId::illegal,
-	     uint32_t code = 0, uint32_t mask = ~0,
-	     InstType type = InstType::Int,
-	     OperandType op0Type = OperandType::None,
-	     OperandMode op0Mode = OperandMode::None,
-	     uint32_t op0Mask = 0,
-	     OperandType op1Type = OperandType::None,
-	     OperandMode op1Mode = OperandMode::None,
-	     uint32_t op1Mask = 0,
-	     OperandType op2Type = OperandType::None,
-	     OperandMode op2Mode = OperandMode::None,
-	     uint32_t op2Mask = 0,
-	     OperandType op3Type = OperandType::None,
-	     OperandMode op3Mode = OperandMode::None,
-	     uint32_t op3Mask = 0);
+	      uint32_t code = 0, uint32_t mask = ~0,
+	      RvExtension ext = RvExtension::I,
+	      RvFormat fmt = RvFormat::None,
+	      OperandType op0Type = OperandType::None,
+	      OperandMode op0Mode = OperandMode::None,
+	      uint32_t op0Mask = 0,
+	      OperandType op1Type = OperandType::None,
+	      OperandMode op1Mode = OperandMode::None,
+	      uint32_t op1Mask = 0,
+	      OperandType op2Type = OperandType::None,
+	      OperandMode op2Mode = OperandMode::None,
+	      uint32_t op2Mask = 0,
+	      OperandType op3Type = OperandType::None,
+	      OperandMode op3Mode = OperandMode::None,
+	      uint32_t op3Mask = 0);
 
 
     /// Return the name of the instruction.
@@ -170,6 +170,14 @@ namespace WdRiscv
       return ithOperandMode(i) == OperandMode::Read;
     }
 
+    /// Return true if ith operand is an integer register and is a destination.
+    bool isIthOperandIntRegDest(unsigned i) const
+    {
+      if (ithOperandType(i) != OperandType::IntReg)
+	return false;
+      return ithOperandMode(i) == OperandMode::Write;
+    }
+
     /// Return true if ith operand is a floating point register and is
     /// a source.
     bool isIthOperandFpRegSource(unsigned i) const
@@ -179,9 +187,15 @@ namespace WdRiscv
       return ithOperandMode(i) == OperandMode::Read;
     }
 
-    /// Return the instruction type.
-    InstType type() const
-    { return type_; }
+    /// Return the extension containing this instruction. Compressed
+    /// insructions (e.g. c.fld) return the secondary extension (RvExtension::D
+    /// for c.fld).
+    RvExtension extension() const
+    { return ext_; }
+
+    /// Return the RISCV instruction format. 
+    RvFormat format() const
+    { return fmt_; }
 
     /// Return true if this is a load instruction (lb, lh, flw, lr ...)
     bool isLoad() const
@@ -205,32 +219,49 @@ namespace WdRiscv
 
     /// Return true if this is a branch instruction (beq, jal, ...)
     bool isBranch() const
-    { return type_ == InstType::Branch; }
+    { return isBranch_; }
 
     /// Return true if this is a multiply instruction (mul, mulh, ...)
     bool isMultiply() const
-    { return type_ == InstType::Multiply; }
+    { return ext_ == RvExtension::M and not isDivide(); }
 
     /// Return true if this is a divide instruction (div, rem, ...)
     bool isDivide() const
-    { return type_ == InstType::Divide; }
+    { return isDiv_; }
 
     /// Return true if a floating point instruction (fadd.s, fadd.d ...)
     bool isFp() const
-    { return type_ == InstType::Rvf or type_ == InstType::Rvd or
-	type_ == InstType::Zfh; }
+    { return ext_ == RvExtension::F or ext_ == RvExtension::D or
+	ext_ == RvExtension::Zfh; }
 
     /// Return true if this is a CSR instruction.
     bool isCsr() const
-    { return type_ == InstType::Csr; }
+    { return id_ >= InstId::csrrw and id_ <= InstId::csrrci; }
 
     /// Return true if this is an atomic instruction.
     bool isAtomic() const
-    { return type_ == InstType::Atomic; }
+    { return ext_ == RvExtension::A; }
+
+    /// Return true if this a compressed instruction.
+    bool isCompressed() const
+    { return isCompressedInst(code_); }
+
+    /// Return true if this a load-reserve.
+    bool isLr() const
+    { return id_ == InstId::lr_w or id_ == InstId::lr_d; }
+
+    /// Return true if this a store-conditional.
+    bool isSc() const
+    { return id_ == InstId::sc_w or id_ == InstId::sc_d; }
+
+    /// Return true if this is an amo instruction (lr/sc are atomic
+    /// but not amo).
+    bool isAmo() const
+    { return isAtomic() and not isLr() and not isSc(); }
 
     /// Return true if this is an vector instruction.
     bool isVector() const
-    { return type_ == InstType::Vector; }
+    { return ext_ == RvExtension::V; }
 
     /// Return true if source operands have unsigned integer values.
     bool isUnsigned() const
@@ -263,16 +294,28 @@ namespace WdRiscv
     bool hasRoundingMode() const
     { return hasRm_; }
 
+    /// Return true if instruction writes FFLAGS CSR.
+    bool modifiesFflags() const
+    { return modifiesFflags_; }
+
   protected:
 
     /// Mark instruction as having a rounding mode field.
     void setHasRoundingMode(bool flag)
     { hasRm_ = flag; }
 
+    /// Mark instruction as modifying FFLAGS.
+    void setModifiesFflags(bool flag)
+    { modifiesFflags_ = flag; }
+
     /// Mark instruction as having unsigned source operands.
     void setIsUnsigned(bool flag)
     { isUns_ = flag; }
 
+    /// Mark instruction as a divide/remainder instruction.
+    void setIsDivide(bool flag)
+    { isDiv_ = flag; }
+    
     /// Set the size of load instructions.
     void setLoadSize(unsigned size)
     { ldSize_ = size; isLoad_ = true; isPerfLoad_ = true; }
@@ -283,11 +326,15 @@ namespace WdRiscv
 
     /// Mark as a conditional branch instruction.
     void setConditionalBranch(bool flag)
-    { isCond_ = flag; }
+    { isBranch_ = flag; isCond_ = flag; }
 
     /// Mark as a branch to register instruction.
     void setBranchToRegister(bool flag)
-    { isRegBranch_ = flag; }
+    { isBranch_ = flag; isRegBranch_ = flag; }
+
+    /// Mark as a branch insruction.
+    void setBranch(bool flag)
+    { isBranch_ = flag; }
 
   private:
 
@@ -296,7 +343,8 @@ namespace WdRiscv
     uint32_t code_;      // Code with all operand bits set to zero.
     uint32_t codeMask_;  // Bit corresponding to code bits are 1. Bits
 
-    InstType type_ = InstType::Int;
+    RvExtension ext_ = RvExtension::I;
+    RvFormat fmt_ = RvFormat::None;
 
     uint32_t op0Mask_;
     uint32_t op1Mask_;
@@ -317,6 +365,7 @@ namespace WdRiscv
     unsigned ldSize_ = 0;      // Load size: Zero for non-load.
     unsigned stSize_ = 0;      // Store size: Zero for non-store.
     bool isUns_ = false;       // True if source operands are unsigned.
+    bool isBranch_ = false;    // True if a branch instruction.
     bool isCond_ = false;      // True if conditional branch.
     bool isRegBranch_ = false; // True if branch to register.
     bool isBitManip_ = false;  // True if bit manipulation instruction.
@@ -324,7 +373,9 @@ namespace WdRiscv
     bool isStore_ = false;
     bool isPerfLoad_ = false;  // True if perf counters view instr as load.
     bool isPerfStore_ = false; // True if perf counters view instr as store.
-    bool hasRm_ = false;       // True if instr has an explicit rounding mode 
+    bool hasRm_ = false;       // True if instr has an explicit rounding mode .
+    bool modifiesFflags_ = false; // True if instr modifed FFLAGS.
+    bool isDiv_ = false;       // True for integer divide or remainder instr.
   };
 
 
@@ -360,6 +411,10 @@ namespace WdRiscv
     /// is true, flw will count as both a load instruction and as an
     /// fp instruction.
     void perfCountFpLoadStore(bool flag);
+
+    /// Return the instruction vector table.
+    std::vector<InstEntry> getInstVec()
+    { return instVec_; }
 
   private:
 

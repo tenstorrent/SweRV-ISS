@@ -877,12 +877,7 @@ Memory::specialInitializeByte(size_t addr, uint8_t value)
 
   if (pmaMgr_.isAddrMemMapped(addr))
     {
-      // Perform masking for memory mapped registers.
-      uint32_t mask = getMemoryMappedMask(addr);
-      unsigned byteIx = addr & 3;
-      uint8_t masked = value & uint8_t((mask >> (byteIx*8)));
-
-      if (not pmaMgr_.writeRegisterByte(addr, masked))
+      if (not pmaMgr_.writeRegisterByte(addr, value))
         return false;
     }
 
@@ -965,99 +960,6 @@ Memory::checkCcmOverlap(const std::string& tag, size_t addr, size_t size,
 
 
 void
-Memory::narrowCcmRegion(size_t addr, bool trim)
-{
-  size_t region = addr / regionSize_;
-  if (region > regionCount_)
-    return;
-
-  // If a region is ever configured, then only the configured parts
-  // are available (accessible).
-  if (not regionConfigured_.at(region))
-    {
-      regionConfigured_.at(region) = true;
-      if (trim)
-        {
-          // Region never configured. Make it all inaccessible.
-          size_t start = region*regionSize();
-          pmaMgr_.setAttribute(start, start + regionSize() - 1,
-                               Pma::Attrib::None);
-        }
-    }
-}
-
-
-bool
-Memory::defineIccm(size_t addr, size_t size, bool trim)
-{
-  if (not checkCcmConfig("ICCM", addr, size))
-    return false;
-
-  size_t region = addr / regionSize_;
-  if (region < regionCount_)
-  regionHasLocalInst_.at(region) = true;
-
-  narrowCcmRegion(addr, trim);
-  checkCcmOverlap("ICCM", addr, size, true, false, false);
-
-  // Mark as excutable and iccm.
-  Pma::Attrib attrib = Pma::Attrib(Pma::Exec | Pma::Iccm);
-  pmaMgr_.setAttribute(addr, addr + size - 1, attrib);
-
-  return true;
-}
-
-
-bool
-Memory::defineDccm(size_t addr, size_t size, bool trim)
-{
-  if (not checkCcmConfig("DCCM", addr, size))
-    return false;
-
-  size_t region = addr / regionSize_;
-  if (region < regionCount_ and trim)
-    regionHasLocalData_.at(region) = true;
-
-  narrowCcmRegion(addr, trim);
-  checkCcmOverlap("DCCM", addr, size, false, true, false);
-
-  // Mark as read/write/dccm.
-  Pma::Attrib attrib = Pma::Attrib(Pma::Read | Pma::Write | Pma::Dccm);
-  pmaMgr_.setAttribute(addr, addr + size - 1, attrib);
-
-  return true;
-}
-
-
-bool
-Memory::defineMemoryMappedRegisterArea(size_t addr, size_t size, bool trim)
-{
-  if (not checkCcmConfig("PIC memory", addr, size))
-    return false;
-
-  size_t region = addr / regionSize_;
-  if (region < regionCount_ and trim)
-    regionHasLocalData_.at(region) = true;
-
-  narrowCcmRegion(addr, trim);
-  checkCcmOverlap("PIC memory", addr, size, false, false, true);
-
-  // Mark as read/write/memory-mapped.
-  Pma::Attrib attrib = Pma::Attrib(Pma::Read | Pma::Write | Pma::MemMapped);
-
-  // For elx2s: mark as executable as well.
-  if (not trim)
-    attrib = Pma::Attrib(attrib | Pma::Exec);
-
-  pmaMgr_.setAttribute(addr, addr + size - 1, attrib);
-
-  pmaMgr_.defineMemMappedArea(addr, size);
-
-  return true;
-}
-
-
-void
 Memory::resetMemoryMappedRegisters()
 {
   pmaMgr_.resetMemMapped();
@@ -1088,70 +990,6 @@ Memory::defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask)
 }
 
 
-// If a region (256 mb) contains one or more ICCM section but no
-// DCCM/PIC, then all pages in that region become accessible for data
-// (including those of the ICCM sections).
-//
-// If a region contains one or more DCCM/PIC section but no ICCM, then
-// all pages in that region become accessible for instruction fetch
-// (including those of the DCCM/PIC sections).
-//
-// If a region contains both ICCM and DCCM/PIC sections then no page
-// outside the ICCM section(s) is accessible for instruction fetch and
-// no page outside the DCCM/PIC section(s) is accessible for data
-// access.
-//
-// This is done to match the echx1 RTL.
-void
-Memory::finishCcmConfig(bool iccmRw)
-{
-  for (size_t region = 0; region < regionCount_; ++region)
-    {
-      if (not regionConfigured_.at(region))
-	continue;   // Region does not have DCCM, PIC, or ICCM.
-
-      // True if region has DCCM/PIC section(s).
-      bool hasData = regionHasLocalData_.at(region);
-
-      // True if region has ICCM section(s).
-      bool hasInst = regionHasLocalInst_.at(region);
-
-      if (hasInst and hasData)
-	{
-	  // Make ICCM pages non-read and non-write. Make DCCM pages
-	  // non-exec.
-          size_t regionPageCount = regionSize_ / pageSize_;
-	  for (size_t i = 0; i < regionPageCount; ++i)
-	    {
-              size_t start = region*regionSize() + i*pageSize_;
-              Pma pma = pmaMgr_.getPma(start);
-	      if (pma.isExec())
-		{
-                  if (not iccmRw)
-                    pmaMgr_.disable(start, start + pageSize_ - 1, Pma::Attrib::ReadWrite);
-		}
-	      else if (pma.isWrite())
-                pmaMgr_.disable(start, start + pageSize_ - 1, Pma::Attrib::Exec);
-	    }
-
-	  continue;
-	}
-
-      if (hasInst)
-	{
-          size_t start = region*regionSize();
-          pmaMgr_.enable(start, start + regionSize() - 1, Pma::ReadWrite);
-	}
-
-      if (hasData)
-	{
-          size_t start = region*regionSize();
-          pmaMgr_.enable(start, start + regionSize() - 1, Pma::Exec);
-	}
-    }
-}
-
-
 bool
 Memory::configureCache(uint64_t size, unsigned lineSize, unsigned setSize)
 {
@@ -1168,7 +1006,7 @@ Memory::configureCache(uint64_t size, unsigned lineSize, unsigned setSize)
       std::cerr << "Cache size not a power of 2: " << size << '\n';
       return false;
     }
-  if (size > 64L*1024L*1024L)
+  if (size > 128L*1024L*1024L)
     {
       std::cerr << "Cache size too large: " << size << '\n';
       return false;

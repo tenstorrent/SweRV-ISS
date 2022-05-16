@@ -75,6 +75,12 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    /// Page based memory type. NA for Sv32.
+    uint32_t pbmt() const   { return 0; }
+
+    /// Naturally aligned power of 2 translation. NA for Sv32.
+    bool hasNapot() const  { return false; }
+
     uint32_t ppn(int i) const
     {
       if (i == 0) return ppn0();
@@ -106,7 +112,9 @@ namespace WdRiscv
     unsigned ppn0_     : 9;   // Physical page num
     unsigned ppn1_     : 9;   // Physical page num
     unsigned ppn2_     : 26;  // Physical page num
-    unsigned res_      : 10;  // Reserved
+    unsigned res_      : 7;   // Reserved
+    unsigned pbmt_     : 2;   // Page based memory type
+    unsigned n_        : 1;
   } __attribute((packed));
 
 
@@ -147,6 +155,12 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    /// Page based memory type.
+    uint32_t pbmt() const   { return bits_.pbmt_; }
+
+    /// Naturally aligned power of 2 translation.
+    bool hasNapot() const  { return bits_.n_; }
+
     uint64_t ppn(int i) const
     {
       if (i == 0) { return ppn0(); }
@@ -182,7 +196,9 @@ namespace WdRiscv
     unsigned ppn1_     : 9;   // Physical page num
     unsigned ppn2_     : 9;   // Physical page num
     unsigned ppn3_     : 17;  // Physical page num
-    unsigned res_      : 10;  // Reserved
+    unsigned res_      : 7;   // Reserved
+    unsigned pbmt_     : 2;   // Page based memory type
+    unsigned n_        : 1;
   } __attribute__((packed));
 
 
@@ -225,6 +241,12 @@ namespace WdRiscv
 
     uint32_t size() const   { return sizeof(data_); }
 
+    /// Page based memory type.
+    uint32_t pbmt() const   { return bits_.pbmt_; }
+
+    /// Naturally aligned power of 2 translation.
+    bool hasNapot() const  { return bits_.n_; }
+
     uint64_t ppn(int i) const
     {
       if (i == 0) { return ppn0(); }
@@ -246,6 +268,98 @@ namespace WdRiscv
     }
   };
 
+
+  struct Pte57Bits
+  {
+    unsigned valid_    : 1;
+    unsigned read_     : 1;
+    unsigned write_    : 1;
+    unsigned exec_     : 1;
+    unsigned user_     : 1;
+    unsigned global_   : 1;
+    unsigned accessed_ : 1;
+    unsigned dirty_    : 1;
+    unsigned rsw_      : 2;   // Reserved for supervisor.
+    unsigned ppn0_     : 9;   // Physical page num
+    unsigned ppn1_     : 9;   // Physical page num
+    unsigned ppn2_     : 9;   // Physical page num
+    unsigned ppn3_     : 9;   // Physical page num
+    unsigned ppn4_     : 8;   // Physical page num
+    unsigned res_      : 7;   // Reserved
+    unsigned pbmt_     : 2;   // Page based memory type.
+    unsigned n_        : 1;
+  } __attribute__((packed));
+
+
+  /// Page table entry for Sv48
+  union Pte57
+  {
+    Pte57Bits bits_;
+    uint64_t data_ = 0;
+
+    Pte57(uint64_t data) : data_(data)
+    { }
+
+    bool valid() const      { return bits_.valid_; }
+
+    bool read() const       { return bits_.read_; }
+
+    bool write() const      { return bits_.write_; }
+
+    bool exec() const       { return bits_.exec_; }
+
+    bool user() const       { return bits_.user_; }
+
+    bool global() const     { return bits_.global_; }
+
+    bool accessed() const   { return bits_.accessed_; }
+
+    bool dirty() const      { return bits_.dirty_; }
+
+    uint64_t ppn() const    { return ppn0() | (ppn1() << 9) | (ppn2() << 18) | (ppn3() << 27); }
+
+    uint64_t ppn0() const   { return bits_.ppn0_; }
+
+    uint64_t ppn1() const   { return bits_.ppn1_; }
+
+    uint64_t ppn2() const   { return bits_.ppn2_; }
+
+    uint64_t ppn3() const   { return bits_.ppn3_; }
+
+    uint64_t ppn4() const   { return bits_.ppn4_; }
+
+    uint32_t levels() const { return 5; }
+
+    uint32_t size() const   { return sizeof(data_); }
+
+    /// Page based memory type.
+    uint32_t pbmt() const   { return bits_.pbmt_; }
+
+    /// Naturally aligned power of 2 translation.
+    bool hasNapot() const  { return bits_.n_; }
+
+    uint64_t ppn(int i) const
+    {
+      if (i == 0) { return ppn0(); }
+      if (i == 1) { return ppn1(); }
+      if (i == 2) { return ppn2(); }
+      if (i == 3) { return ppn3(); }
+      if (i == 4) { return ppn4(); }
+      assert(0);
+      return 0;
+    }
+
+    uint32_t paPpnShift(int i) const
+    {
+      if (i == 0) { return 12; }
+      if (i == 1) { return 21; }
+      if (i == 2) { return 30; }
+      if (i == 3) { return 39; }
+      if (i == 4) { return 48; }
+      assert(0);
+      return 0;
+    }
+  };
 
 
   /// Structure to unpack the fields of 32-bit virtual address.
@@ -348,7 +462,7 @@ namespace WdRiscv
 
     uint64_t vpn2() const   { return bits_.vpn2_; }
 
-    uint64_t vpn3() const   { return bits_.vpn2_; }
+    uint64_t vpn3() const   { return bits_.vpn3_; }
 
     uint64_t vpn(int i) const
     {
@@ -356,6 +470,52 @@ namespace WdRiscv
       if (i == 1) return vpn1();
       if (i == 2) return vpn2();
       if (i == 3) return vpn3();
+      assert(0);
+      return 0;
+    }
+  };
+
+
+  /// Structure to unpack the fields of Sv57 virtual address.
+  struct Va57Bits
+  {
+    unsigned offset_ : 12;
+    unsigned vpn0_   : 9;
+    unsigned vpn1_   : 9;
+    unsigned vpn2_   : 9;
+    unsigned vpn3_   : 9;
+    unsigned vpn4_   : 9;
+  } __attribute__((packed));
+
+
+  /// 57-bit virtual address.
+  union Va57
+  {
+    Va57Bits bits_;
+    uint64_t data_ = 0;
+
+    Va57(uint64_t data) : data_(data)
+    { }
+
+    uint64_t offset() const { return bits_.offset_; }
+
+    uint64_t vpn0() const   { return bits_.vpn0_; }
+
+    uint64_t vpn1() const   { return bits_.vpn1_; }
+
+    uint64_t vpn2() const   { return bits_.vpn2_; }
+
+    uint64_t vpn3() const   { return bits_.vpn3_; }
+
+    uint64_t vpn4() const   { return bits_.vpn4_; }
+
+    uint64_t vpn(int i) const
+    {
+      if (i == 0) return vpn0();
+      if (i == 1) return vpn1();
+      if (i == 2) return vpn2();
+      if (i == 3) return vpn3();
+      if (i == 4) return vpn4();
       assert(0);
       return 0;
     }
@@ -421,6 +581,11 @@ namespace WdRiscv
     ExceptionCause pageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
                                  bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
+    /// Same as above but for version 1.12 of spec.
+    template <typename PTE, typename VA>
+    ExceptionCause pageTableWalk1p12(uint64_t va, PrivilegeMode pm, bool read, bool write,
+				     bool exec, uint64_t& pa, TlbEntry& tlbEntry);
+
     /// Helper to translate method.
     ExceptionCause pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode pm, bool read,
                                           bool write, bool exec, uint64_t& pa);
@@ -451,12 +616,20 @@ namespace WdRiscv
     void setSupervisorAccessUser(bool flag)
     { supervisorOk_ = flag; }
 
+    /// Enable address translation trace
+    void enableAddrTransTrace(FILE* file)
+    { attFile_ = file; }
+
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
 
     /// Return current address space id.
     uint32_t addressSpace() const
     { return asid_; }
+
+    /// Set behavior if first access to page or store and page not dirty.
+    void setFaultOnFirstAccess(bool flag)
+    { faultOnFirstAccess_ = flag; }
 
   private:
 
@@ -474,7 +647,9 @@ namespace WdRiscv
     // Cached mstatus bits
     bool execReadable_ = false;  // MXR bit
     bool supervisorOk_ = false;  // SUM bit
-    bool faultOnFirstAccess_ = true;  // Make this configurable.
+    bool faultOnFirstAccess_ = true;
+
+    FILE* attFile_ = nullptr;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;

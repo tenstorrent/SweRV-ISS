@@ -1,6 +1,8 @@
 {
     "xlen" : 32,
 
+    "isa" : "rv32imafvzfh_zba_zbb",
+
     "Comment" : "Rounding mode is forced to round-to-nearest-even regardless of FRM CSR.",
     "force_rounding_mode" : "rne",
 
@@ -10,14 +12,12 @@
     "Comment" : "Replace subnormal floating point results with zero.",
     "force_subnormal_to_zero" : "true",
 
-    "isa" : "rv32imafvzfh",
-
-    "enable_zfh" : "true",
-
-    "enable_zba" : "true",
-    "enable_zbb" : "true",
+    "Comment" : "No misaligned ld/st addresses",
+    "enable_misaligned_data" : "false",
 
     "enable_performance_counters" : "true",
+    "perf_count_atomic_load_store" : "true",
+    "perf_count_fp_load_store" : "true",
 
     "Comment" : "Use ABI register names in log file (e.g. sp instead of x2).",
     "abi_names" : "true",
@@ -29,8 +29,20 @@
     "num_mmode_perf_regs" : 2,
 
     "memmap" : {
-	"Comment": "Instruction fetch allowed only in 0x80000000 to 0x801fffff",
-	"inst": [ ["0x80000000", "0x801fffff"] ]
+	"Comment": "Instruction fetch valid only in 0x80000000 to 0x801fffff",
+	"inst" : [ [ "0x80000000", "0x801fffff" ] ],
+	"pma" : [
+	    {
+		"Comment": "Instruction fetch valid only in this range",
+		"low" : "0x80000000",  "high" : "0x801fffff",
+		"attribs" : [ "read", "write", "exec", "amo", "rsrv", "idempotent" ]
+	    },
+	    {
+		"Comment": "Remaining address range is for data ld/st",
+		"low" : "0x0",  "high" : "0xffffffff",
+		"attribs" : [ "read", "write", "amo", "rsrv", "idempotent" ]
+	    }
+	]
     },
 
     "csr" : {
@@ -122,9 +134,27 @@
 	    "poke_mask" : 0
 	},
 
+	"cycle" : {
+	    "exists" : "false"
+	},
+
+	"instret" : {
+	    "exists" : "false"
+	},
+
+	"time" : {
+	    "exists" : "false"
+	},
+
 	"cfg" : {
 	    "number" : "0x7c0",
-	    "reset" : "0x0",
+	    "reset" : "0x20000",
+	    "mask" : "0xffffffff"
+	},
+
+	"vgsrc" : {
+	    "number" : "0x7c6",
+	    "reset" : 0,
 	    "mask" : "0xffffffff"
 	},
 
@@ -141,69 +171,85 @@
 	},
 
 	"tt_cfg_Qstatus" : {
-	    "number" : "0xfc0",
+	    "number" : "0xbc0",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Bstatus" : {
-	    "number" : "0xfc1",
+	    "number" : "0xbc1",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus0" : {
-	    "number" : "0xfc2",
+	    "number" : "0xbc2",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus1" : {
-	    "number" : "0xfc3",
+	    "number" : "0xbc3",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus2" : {
-	    "number" : "0xfc4",
+	    "number" : "0xbc4",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus3" : {
-	    "number" : "0xfc5",
+	    "number" : "0xbc5",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus4" : {
-	    "number" : "0xfc6",
+	    "number" : "0xbc6",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus5" : {
-	    "number" : "0xfc7",
+	    "number" : "0xbc7",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus6" : {
-	    "number" : "0xfc8",
+	    "number" : "0xbc8",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	},
 
 	"tt_cfg_Sstatus7" : {
-	    "number" : "0xfc9",
+	    "number" : "0xbc9",
 	    "reset" : "0x0",
-	    "mask" : "0x0"
+	    "mask" : "0xffffffff"
 	}
 
     },
 
+    "mmode_perf_event_map" : {
+	"None"         : "0x0",
+	"Mult"         : "0x00000e00",
+	"Div"          : "0x00000f00",
+	"Csr"          : "0x00001000",
+	"MultDiv"      : "0x00003000",
+	"Bitmanip"     : "0x00005000",
+	"FpSingle"     : "0x00006000",
+	"FpHalf"       : "0x00007000",
+	"InstCommited" : "0x00800000",
+	"Load"         : "0x00c00000",
+	"Store"        : "0x00d00000"
+    },
+ 
     "vector" : {
 	"bytes_per_vec" : 16,
+	"min_bytes_per_elem" : 1,
+	"Comment" : "Hardware supports 32-bit ELEN plus some widening operations from 32 to 64-bit",
 	"max_bytes_per_elem" : 8
     }
 }

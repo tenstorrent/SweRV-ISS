@@ -12,19 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cfenv>
-#include <cmath>
-#include "Hart.hpp"
+#include "IntRegs.hpp"
+#include "Decoder.hpp"
 #include "instforms.hpp"
-#include "DecodedInst.hpp"
 
 
 using namespace WdRiscv;
 
 
-template <typename URV>
+Decoder::Decoder()
+{
+}
+
+
+Decoder::~Decoder()
+{
+}
+
+
 void
-Hart<URV>::decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& di)
+Decoder::decode(uint64_t addr, uint64_t physAddr, uint32_t inst, DecodedInst& di)
 {
   // For vector load/store ops, op3 captures the number of fields
   // (non-zero for segmented, and whole-register ld/st).
@@ -35,19 +42,22 @@ Hart<URV>::decode(URV addr, uint64_t physAddr, uint32_t inst, DecodedInst& di)
 
   di.reset(addr, physAddr, inst, &entry, op0, op1, op2, op3);
 
-  // Set the mask bit for vector instructions.
-  if (di.instEntry() and di.instEntry()->isVector())
+  // Set the mask bit for vector instructions.  Set acuire/release bits
+  // for atomic instructions.
+  if (di.instEntry())
     {
-      bool masked = ((inst >> 25) & 1) == 0;  // Bit 25 of instruction
-      di.setMasked(masked);
-      di.setVecFieldCount(op3);
+      if (di.instEntry()->isVector())
+	{
+	  bool masked = ((inst >> 25) & 1) == 0;  // Bit 25 of instruction
+	  di.setMasked(masked);
+	  di.setVecFieldCount(op3);
+	}
     }
 }
 
 
-template <typename URV>
 const InstEntry&
-Hart<URV>::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
+Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 {
   RFormInst rform(inst);
 
@@ -245,14 +255,10 @@ isMaskedVec(uint32_t inst)
 
 
 // Least sig 7 bits already determined to be: 1010111
-template <typename URV>
 const InstEntry&
-Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
-                     uint32_t& op3)
+Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
+		   uint32_t& op3)
 {
-  if (not isRvv())
-    return instTable_.getEntry(InstId::illegal);  
-
   RFormInst rform(inst);
   unsigned f3 = rform.bits.funct3, f6 = rform.top6();
   unsigned vm = (inst >> 25) & 1;
@@ -803,9 +809,8 @@ Hart<URV>::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 }
 
 
-template <typename URV>
 const InstEntry&
-Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
+Decoder::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   unsigned mop = (imm12 >> 6) & 3;     // Bits 6 & 7 of imm12
@@ -1012,9 +1017,8 @@ Hart<URV>::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 }
 
 
-template <typename URV>
 const InstEntry&
-Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
+Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   // unsigned vm = (imm12 >> 5) & 1;      // Bit 5 of imm12
@@ -1173,9 +1177,8 @@ Hart<URV>::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 }
 
 
-template <typename URV>
 const InstEntry&
-Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
+Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 {
   uint16_t quadrant = inst & 0x3;
   uint16_t funct3 =  uint16_t(inst >> 13);    // Bits 15 14 and 13
@@ -1198,8 +1201,6 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 
       if (funct3 == 1) // c.fld c.lq
 	{
-	  if (not isRvd())
-	    return instTable_.getEntry(InstId::illegal);
 	  ClFormInst clf(inst);
 	  op0 = 8+clf.bits.rdp; op1 = 8+clf.bits.rs1p; op2 = clf.ldImmed();
 	  return instTable_.getEntry(InstId::c_fld);
@@ -1222,24 +1223,16 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	    }
 
 	  // c.flw
-	  if (isRvf())
-	    {
-	      op0 = 8+clf.bits.rdp; op1 = 8+clf.bits.rs1p;
-	      op2 = clf.lwImmed();
-	      return instTable_.getEntry(InstId::c_flw);
-	    }
-	  return instTable_.getEntry(InstId::illegal);
+	  op0 = 8+clf.bits.rdp; op1 = 8+clf.bits.rs1p;
+	  op2 = clf.lwImmed();
+	  return instTable_.getEntry(InstId::c_flw);
 	}
 
       if (funct3 == 5)  // c.fsd
 	{
 	  CsFormInst cs(inst);  // Double check this
-	  if (isRvd())
-	    {
-	      op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.sdImmed();
-	      return instTable_.getEntry(InstId::c_fsd);
-	    }
-	  return instTable_.getEntry(InstId::illegal);
+	  op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.sdImmed();
+	  return instTable_.getEntry(InstId::c_fsd);
 	}
 
       if (funct3 == 6)  // c.sw
@@ -1254,12 +1247,8 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	  CsFormInst cs(inst);  // Double check this
 	  if (not isRv64())
 	    {
-	      if (isRvf())
-		{
-		  op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.swImmed();
-		  return instTable_.getEntry(InstId::c_fsw);
-		}
-	      return instTable_.getEntry(InstId::illegal);
+	      op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.swImmed();
+	      return instTable_.getEntry(InstId::c_fsw);
 	    }
 	  op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.sdImmed();
 	  return instTable_.getEntry(InstId::c_sd);
@@ -1401,13 +1390,9 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 
       if (funct3 == 1)  // c.fldsp c.lqsp
 	{
-	  if (isRvd())
-	    {
-	      CiFormInst cif(inst);
-	      op0 = cif.bits.rd; op1 = RegSp, op2 = cif.ldspImmed();
-	      return instTable_.getEntry(InstId::c_fldsp);
-	    }
-	  return instTable_.getEntry(InstId::illegal);
+	  CiFormInst cif(inst);
+	  op0 = cif.bits.rd; op1 = RegSp, op2 = cif.ldspImmed();
+	  return instTable_.getEntry(InstId::c_fldsp);
 	}
 
       if (funct3 == 2) // c.lwsp
@@ -1431,12 +1416,8 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 		return instTable_.getEntry(InstId::illegal);
 	      return instTable_.getEntry(InstId::c_ldsp);
 	    }
-	  if (isRvf())
-	    {
-	      op0 = rd; op1 = RegSp; op2 = cif.lwspImmed();
-	      return instTable_.getEntry(InstId::c_flwsp);
-	    }
-	  return instTable_.getEntry(InstId::illegal);
+	  op0 = rd; op1 = RegSp; op2 = cif.lwspImmed();
+	  return instTable_.getEntry(InstId::c_flwsp);
 	}
 
       if (funct3 == 4) // c.jr c.mv c.ebreak c.jalr c.add
@@ -1473,13 +1454,9 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 
       if (funct3 == 5)  // c.fsdsp c.sqsp
 	{
-	  if (isRvd())
-	    {
-	      CswspFormInst csw(inst);
-	      op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.sdImmed();
-	      return instTable_.getEntry(InstId::c_fsdsp);
-	    }
-	  return instTable_.getEntry(InstId::illegal);
+	  CswspFormInst csw(inst);
+	  op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.sdImmed();
+	  return instTable_.getEntry(InstId::c_fsdsp);
 	}
 
       if (funct3 == 6) // c.swsp
@@ -1497,13 +1474,9 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 	      op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.sdImmed();
 	      return instTable_.getEntry(InstId::c_sdsp);
 	    }
-	  if (isRvf())   // c.fswsp
-	    {
-	      CswspFormInst csw(inst);
-	      op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.swImmed();
-	      return instTable_.getEntry(InstId::c_fswsp);
-	    }
-	  return instTable_.getEntry(InstId::illegal);
+	  CswspFormInst csw(inst);
+	  op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.swImmed();
+	  return instTable_.getEntry(InstId::c_fswsp);
 	}
 
       return instTable_.getEntry(InstId::illegal);
@@ -1513,9 +1486,8 @@ Hart<URV>::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
 }
 
 
-template <typename URV>
 uint32_t
-Hart<URV>::expandCompressedInst(uint16_t inst) const
+Decoder::expandCompressedInst(uint16_t inst) const
 {
   uint16_t quadrant = inst & 0x3;
   uint16_t funct3 =  uint16_t(inst >> 13);    // Bits 15 14 and 13
@@ -1541,8 +1513,6 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 
       if (funct3 == 1) // c.fld c.lq
 	{
-	  if (not isRvd())
-	    return expanded; // Illegal
 	  ClFormInst clf(inst);
 	  op0 = 8+clf.bits.rdp; op1 = 8+clf.bits.rs1p; op2 = clf.ldImmed();
           encodeFld(op0, op1, op2, expanded);
@@ -1568,26 +1538,18 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 	    }
 
 	  // c.flw
-	  if (isRvf())
-	    {
-	      op0 = 8+clf.bits.rdp; op1 = 8+clf.bits.rs1p;
-	      op2 = clf.lwImmed();
-              encodeFlw(op0, op1, op2, expanded);
-              return expanded;
-	    }
-	  return expanded; // Illegal
+	  op0 = 8+clf.bits.rdp; op1 = 8+clf.bits.rs1p;
+	  op2 = clf.lwImmed();
+	  encodeFlw(op0, op1, op2, expanded);
+	  return expanded;
 	}
 
       if (funct3 == 5)  // c.fsd
 	{
 	  CsFormInst cs(inst);  // Double check this
-	  if (isRvd())
-	    {
-	      op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.sdImmed();
-	      encodeFsd(op0, op1, op2, expanded);
-              return expanded;
-	    }
-	  return expanded; // Illegal
+	  op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.sdImmed();
+	  encodeFsd(op0, op1, op2, expanded);
+	  return expanded;
 	}
 
       if (funct3 == 6)  // c.sw
@@ -1603,13 +1565,9 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 	  CsFormInst cs(inst);  // Double check this
 	  if (not isRv64())
 	    {
-	      if (isRvf())
-		{
-		  op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.swImmed();
-                  encodeFsw(op0, op1, op2, expanded);
-                  return expanded;
-		}
-	      return expanded; // Illegal
+	      op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.swImmed();
+	      encodeFsw(op0, op1, op2, expanded);
+	      return expanded;
 	    }
 	  op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.sdImmed();
           encodeSd(op0, op1, op2, expanded);
@@ -1765,14 +1723,10 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 
       if (funct3 == 1)  // c.fldsp c.lqsp
 	{
-	  if (isRvd())
-	    {
-	      CiFormInst cif(inst);
-	      op0 = cif.bits.rd; op1 = RegSp, op2 = cif.ldspImmed();
-	      encodeFld(op0, op1, op2, expanded);
-              return expanded;
-	    }
-	  return expanded; // Illegal
+	  CiFormInst cif(inst);
+	  op0 = cif.bits.rd; op1 = RegSp, op2 = cif.ldspImmed();
+	  encodeFld(op0, op1, op2, expanded);
+	  return expanded;
 	}
 
       if (funct3 == 2) // c.lwsp
@@ -1796,13 +1750,9 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 	      encodeLd(op0, op1, op2, expanded);
               return expanded;
 	    }
-	  if (isRvf())
-	    {
-	      op0 = rd; op1 = RegSp; op2 = cif.lwspImmed();
-	      encodeFlw(op0, op1, op2, expanded);
-              return expanded;
-	    }
-	  return expanded; // Illegal
+	  op0 = rd; op1 = RegSp; op2 = cif.lwspImmed();
+	  encodeFlw(op0, op1, op2, expanded);
+	  return expanded;
 	}
 
       if (funct3 == 4) // c.jr c.mv c.ebreak c.jalr c.add
@@ -1846,14 +1796,10 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 
       if (funct3 == 5)  // c.fsdsp c.sqsp
 	{
-	  if (isRvd())
-	    {
-	      CswspFormInst csw(inst);
-	      op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.sdImmed();
-	      encodeFsd(op0, op1, op2, expanded);
-              return expanded;
-	    }
-	  return expanded; // Illegal
+	  CswspFormInst csw(inst);
+	  op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.sdImmed();
+	  encodeFsd(op0, op1, op2, expanded);
+	  return expanded;
 	}
 
       if (funct3 == 6) // c.swsp
@@ -1873,14 +1819,10 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 	      encodeSd(op0, op1, op2, expanded);
               return expanded;
 	    }
-	  if (isRvf())   // c.fswsp
-	    {
-	      CswspFormInst csw(inst);
-	      op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.swImmed();
-	      encodeFsw(op0, op1, op2, expanded);
-              return expanded;
-	    }
-	  return expanded; // Illegal
+	  CswspFormInst csw(inst);
+	  op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.swImmed();
+	  encodeFsw(op0, op1, op2, expanded);
+	  return expanded;
 	}
 
       return expanded; // Illegal
@@ -1890,10 +1832,9 @@ Hart<URV>::expandCompressedInst(uint16_t inst) const
 }
 
 
-template <typename URV>
 const InstEntry&
-Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
-		  uint32_t& op3)
+Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
+		uint32_t& op3)
 {
 #pragma GCC diagnostic ignored "-Wpedantic"
 
@@ -1906,9 +1847,6 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 
   if (isCompressedInst(inst))
     {
-      // return decode16(inst, op0, op1, op2);
-      if (not isRvc())
-	inst = 0; // All zeros: illegal 16-bit instruction.
       return decode16(uint16_t(inst), op0, op1, op2);
     }
 
@@ -1965,15 +1903,6 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 
     l2:       // 00010  I-form
       {
-	IFormInst iform(inst);
-	op0 = iform.fields.rd;
-	op1 = iform.fields.rs1;
-	op2 = iform.immed(); 
-        unsigned f3 = iform.fields.funct3;
-        if (f3 == 3)
-          return instTable_.getEntry(InstId::load64);
-        if (f3 == 0 and op2 == 0x0ff)
-          return instTable_.getEntry(InstId::bbarrier);
         return instTable_.getEntry(InstId::illegal);
       }
 
@@ -2006,17 +1935,6 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
       return instTable_.getEntry(InstId::illegal);
 
     l10:      // 01010  S-form
-      {
-	// For the store instructions, the stored register is op0, the
-	// base-address register is op1 and the offset is op2.
-	SFormInst sform(inst);
-	op0 = sform.bits.rs2;
-	op1 = sform.bits.rs1;
-	op2 = sform.immed();
-	uint32_t f3 = sform.bits.funct3;
-
-        if (f3 == 3)  return instTable_.getEntry(InstId::store64);
-      }
       return instTable_.getEntry(InstId::illegal);
 
     l15:
@@ -2105,11 +2023,10 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	    if (funct3 == 0)
 	      {
 		if (iform.top4() == 0)
-		  {
-		    op0 = iform.pred();
-		    op1 = iform.succ();
-		    return instTable_.getEntry(InstId::fence);
-		  }
+		  return instTable_.getEntry(InstId::fence);
+		if (iform.top4() == 8)
+		  return instTable_.getEntry(InstId::fence_tso);
+		return instTable_.getEntry(InstId::illegal);
 	      }
 	    else if (funct3 == 1)
 	      {
@@ -2131,6 +2048,27 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	if      (funct3 == 0)  return instTable_.getEntry(InstId::addi);
 	else if (funct3 == 1)
 	  {
+	    if (op2 == 0x100)
+	      return instTable_.getEntry(InstId::sha256sum0);
+	    if (op2 == 0x101)
+	      return instTable_.getEntry(InstId::sha256sum1);
+	    if (op2 == 0x102)
+	      return instTable_.getEntry(InstId::sha256sig0);
+	    if (op2 == 0x103)
+	      return instTable_.getEntry(InstId::sha256sig1);
+	    if (op2 == 0x104)
+	      return instTable_.getEntry(InstId::sha512sum0);
+	    if (op2 == 0x105)
+	      return instTable_.getEntry(InstId::sha512sum1);
+	    if (op2 == 0x106)
+	      return instTable_.getEntry(InstId::sha512sig0);
+	    if (op2 == 0x107)
+	      return instTable_.getEntry(InstId::sha512sig1);
+	    if (op2 == 0x108)
+	      return instTable_.getEntry(InstId::sm3p0);
+	    if (op2 == 0x109)
+	      return instTable_.getEntry(InstId::sm3p1);
+
 	    unsigned top5 = iform.uimmed() >> 7;
 	    unsigned amt = iform.uimmed() & 0x7f;
 	    if (top5 == 0)
@@ -2183,6 +2121,15 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		op2 = amt;
                 if (funct3 == 1)
                   return instTable_.getEntry(InstId::binvi);
+	      }
+	    else if (op2 == 0x300)
+	      {
+		return instTable_.getEntry(InstId::aes64im);
+	      }
+	    else if ((op2 >> 4) == 0x31) // op2 == 0x0x31?
+	      {
+		op2 = op2 & 0xf;
+		return instTable_.getEntry(InstId::aes64ks1i);
 	      }
 	  }
 	else if (funct3 == 2)  return instTable_.getEntry(InstId::slti);
@@ -2400,6 +2347,22 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	    if (funct3 == 6) return instTable_.getEntry(InstId::xperm_h);
             if (funct3 == 5) return instTable_.getEntry(InstId::gorc);
 	  }
+	else if (funct7 == 0x19)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64es);
+	  }
+	else if (funct7 == 0x1b)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64esm);
+	  }
+	else if (funct7 == 0x1d)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64ds);
+	  }
+	else if (funct7 == 0x1f)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64dsm);
+	  }
 	else if (funct7 == 0x20)
 	  {
 	    if (funct3 == 0) return instTable_.getEntry(InstId::sub);
@@ -2417,6 +2380,30 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	    if (funct3 == 5) return instTable_.getEntry(InstId::bext);
             if (funct3 == 7) return instTable_.getEntry(InstId::bfp);
 	  }
+	else if (funct7 == 0x28)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum0r);
+	  }
+	else if (funct7 == 0x29)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum1r);
+	  }
+	else if (funct7 == 0x2a)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0l);
+	  }
+	else if (funct7 == 0x2b)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1l);
+	  }
+	else if (funct7 == 0x2e)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0h);
+	  }
+	else if (funct7 == 0x2f)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1h);
+	  }
 	else if (funct7 == 0x30)
 	  {
 	    if (funct3 == 1) return instTable_.getEntry(InstId::rol);
@@ -2426,6 +2413,38 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  {
 	    if (funct3 == 1) return instTable_.getEntry(InstId::binv);
             if (funct3 == 5) return instTable_.getEntry(InstId::grev);
+	  }
+	else if (funct7 == 0x3f)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64ks2);
+	  }
+	else if ((funct7 & 0x1f) == 0x11)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32esi);
+	  }
+	else if ((funct7 & 0x1f) == 0x15)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32dsi);
+	  }
+	else if ((funct7 & 0x1f) == 0x17)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32dsmi);
+	  }
+	else if ((funct7 & 0x1f) == 0x13)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32esmi);
+	  }
+	else if ((funct7 & 0x1f) == 0x18)
+	  {
+	    if (funct3 == 0) return instTable_.getEntry(InstId::sm4ed);
+	  }
+	else if ((funct7 & 0x1f) == 0x1a)
+	  {
+	    if (funct3 == 0)
+	      {
+		op3 = inst >> 30;  // Upper 2 bits.
+		return instTable_.getEntry(InstId::sm4ks);
+	      }
 	  }
         else if (funct7 & 2)
           {
@@ -2608,7 +2627,3 @@ Hart<URV>::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
   else
     return instTable_.getEntry(InstId::illegal);
 }
-
-
-template class WdRiscv::Hart<uint32_t>;
-template class WdRiscv::Hart<uint64_t>;

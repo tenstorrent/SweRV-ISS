@@ -6,20 +6,28 @@ hdrs = [
     "System.hpp",
     "Server.hpp",
     "Interactive.hpp",
+    "DecodedInst.hpp",
+    "Decoder.hpp",
+    "InstEntry.hpp",
+    "InstId.hpp",
+    "Isa.hpp",
 ]
 
 cc_library(
     name     = "rvcore",
     srcs     = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
     hdrs     = hdrs,
-    deps     = ["//third_party:nlohmann", "//third_party:elfio"],
+    defines  = ["SOFT_FLOAT"],
+    deps     = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat"],
     linkopts = ["-lstdc++fs", "-lpthread", "-lz"],
+    visibility = ["//visibility:public"],
 )
 
 cc_binary(
     name       = "whisper",
     srcs       = ["whisper.cpp"],
     deps       = [":rvcore"],
+    defines    = ["SOFT_FLOAT"],
     linkopts   = ["-lboost_program_options", "-lstdc++fs"],
     visibility = ["//visibility:public"],
 )

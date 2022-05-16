@@ -6,13 +6,15 @@
 namespace WdRiscv
 {
 
+  enum class RvExtension : unsigned { A, B, C, D, E, F, I, M, S, U, V,
+    Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp, Zbr, Zbs, Zbt, Zfh, Zlsseg,
+    Zknd, Zkne, Zknh, Zbkb, Zksed, Zksh, None };
+
+
   /// Model supported extensions with primary/secondary version numbers.
   class Isa
   {
   public:
-
-    enum class Extension : unsigned { A, B, C, D, E, F, I, M, S, U, V,
-      Zba, Zbb, Zbc, Zbs, Zfh, Zlsseg, None };
 
     Isa();
 
@@ -23,51 +25,51 @@ namespace WdRiscv
     /// successful. Return false if given extension or associated
     /// version/subversion is not supported. If successful, subsequent
     /// calls to getVersion will return the newly slected version.
-    bool selectVersion(Extension ext, unsigned version, unsigned subversion);
+    bool selectVersion(RvExtension ext, unsigned version, unsigned subversion);
 
     /// Return true if given extension is supported.
-    bool isSupported(Extension ext) const;
+    bool isSupported(RvExtension ext) const;
 
     /// Return true if given version of given extension is supported.
-    bool isSupported(Extension ext, unsigned version, unsigned subversion) const;
+    bool isSupported(RvExtension ext, unsigned version, unsigned subversion) const;
 
     /// Return true if given extension is supported setting verion and
     /// subversion to the corresponding default version. Return false
     /// leaving version/subversion unmodified if given extension is
     /// not supported.
-    bool getDefaultVersion(Extension ext, unsigned& version,
+    bool getDefaultVersion(RvExtension ext, unsigned& version,
 			   unsigned& subversion) const;
 
     /// Return true if given extension is supported setting version
     /// to the currently selected primary version number.
-    bool getVersion(Extension ext, unsigned& version) const;
+    bool getVersion(RvExtension ext, unsigned& version) const;
 
     /// Return true if given extension is supported setting version/subversino
     /// to the currently selected primary/secondary version numbers.
-    bool getVersion(Extension ext, unsigned& version, unsigned& subversion) const;
+    bool getVersion(RvExtension ext, unsigned& version, unsigned& subversion) const;
 
     /// Return true if geven extension is enabled.
-    bool isEnabled(Extension ext) const
+    bool isEnabled(RvExtension ext) const
     {
       unsigned ix = extIx(ext);
       return ix < infoVec_.size()? infoVec_.at(ix).enabled : false;
     }
 
     /// Enable/disable given extension if flag is true/false.
-    void enable(Extension ext, bool flag)
+    void enable(RvExtension ext, bool flag)
     {
       unsigned ix = extIx(ext);
       if (ix < infoVec_.size()) infoVec_.at(ix).enabled = flag;
     }
 
     /// Return extension corresponding to given string. For example,
-    /// return Extension::A for "a". Return Extension::None if no such
+    /// return RvExtension::A for "a". Return RvExtension::None if no such
     /// extension.
-    Extension stringToExtension(const std::string& str) const;
+    RvExtension stringToExtension(const std::string& str) const;
 
     /// Return string correponding to given extension enum. Return empty
     /// string if given extension is out of bounds.
-    std::string extensionToString(Extension ext) const;
+    std::string extensionToString(RvExtension ext) const;
 
     /// Process extension string enabling etxesions and selecting
     /// versions. Return true on success. Return false if extension
@@ -81,7 +83,7 @@ namespace WdRiscv
     bool applyIsaString(const std::string& isa);
 
     /// Return integer value underlying extension enum.
-    unsigned extIx(Extension ext) const
+    unsigned extIx(RvExtension ext) const
     { return static_cast<unsigned>(ext); } // Use std::to_underlying
 
   private:
@@ -108,7 +110,7 @@ namespace WdRiscv
 
     std::vector<Info> infoVec_;
 
-    std::unordered_map<std::string, Extension> stringToExt_;
+    std::unordered_map<std::string, RvExtension> stringToExt_;
     std::vector<std::string> extToString_;
   };
 }

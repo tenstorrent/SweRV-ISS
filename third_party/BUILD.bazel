@@ -14,3 +14,35 @@ cc_library(
     includes = ['.'],
     visibility = ['//:__pkg__'],
 )
+
+cc_library(
+    name = "softfloat",
+    hdrs = glob(["softfloat/build/RISCV-GCC/*.h", "softfloat/source/RISCV/*.h", "softfloat/source/include/*.h"]),
+
+    srcs = glob(include = ["softfloat/source/*.c",
+                           "softfloat/source/RISCV/*.c",
+                          ],
+    	        exclude = ["softfloat/source/s_mulAddF128M.c",
+		           "softfloat/source/s_invalidF128M.c",
+   		           "softfloat/source/s_shiftRightM.c",
+			   "softfloat/source/s_compareNonnormExtF80M.c",
+			   "softfloat/source/s_addF128M.c",
+   			   "softfloat/source/s_addExtF80M.c",
+			   "softfloat/source/s_shiftLeftM.c",
+			   "softfloat/source/s_roundPackMToF128M.c",
+   			   "softfloat/source/s_shiftNormSigF128M.c",
+   			   "softfloat/source/s_roundPackMToExtF80M.c",
+   			   "softfloat/source/s_normSubnormalF128SigM.c",
+   			   "softfloat/source/s_tryPropagateNaNExtF80M.c",
+   			   "softfloat/source/s_shiftRightJamM.c",
+   			   "softfloat/source/s_normRoundPackMToF128M.c",
+			   "softfloat/source/s_normRoundPackMToExtF80M.c",
+			   "softfloat/source/s_tryPropagateNaNF128M.c",
+   			   "softfloat/source/RISCV/s_commonNaNToF128M.c",
+   			   "softfloat/source/RISCV/s_propagateNaNF128M.c",
+			   ]),
+
+    includes = ["softfloat/build/RISCV-GCC/", "softfloat/source/RISCV/", "softfloat/source/include"],
+    visibility = ['//:__pkg__'],
+    copts = ["-DSOFTFLOAT_ROUND_ODD", "-DINLINE_LEVEL=5", "-DSOFTFLOAT_FAST_INT64", "-O2"],
+)

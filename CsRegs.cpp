@@ -32,9 +32,10 @@ CsRegs<URV>::CsRegs()
   defineMachineRegs();
   defineSupervisorRegs();
   defineUserRegs();
+  defineHypervisorRegs();
   defineDebugRegs();
   defineVectorRegs();
-  defineNonStandardRegs();
+  defineFpRegs();
 }
 
 
@@ -391,22 +392,6 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
     {
       MstatusFields<URV> fields(csr->read());
       interruptEnable_ = fields.bits_.MIE;
-    }
-
-  // Writing MDEAU unlocks mdseac.
-  if (number == CsrNumber::MDEAU)
-    lockMdseac(false);
-
-  // Writing MEIVT changes the base address in MEIHAP.
-  if (number == CsrNumber::MEIVT)
-    {
-      value = (value >> 10) << 10;  // Clear least sig 10 bits keeping base.
-      size_t meihapIx = size_t(CsrNumber::MEIHAP);
-      URV meihap = regs_.at(meihapIx).read();
-      meihap &= 0x3ff;  // Clear base address bits.
-      meihap |= value;  // Copy base address bits from MEIVT.
-      regs_.at(meihapIx).poke(meihap);
-      recordWrite(CsrNumber::MEIHAP);
     }
 
   // Writing mcounteren/scounteren changes accessibility of the
@@ -877,10 +862,11 @@ CsRegs<URV>::defineMachineRegs()
   using Csrn = CsrNumber;
 
   // Machine info.
-  defineCsr("mvendorid", Csrn::MVENDORID, mand, imp, 0, rom, rom);
-  defineCsr("marchid",   Csrn::MARCHID,   mand, imp, 0, rom, rom);
-  defineCsr("mimpid",    Csrn::MIMPID,    mand, imp, 0, rom, rom);
-  defineCsr("mhartid",   Csrn::MHARTID,   mand, imp, 0, rom, rom);
+  defineCsr("mvendorid",  Csrn::MVENDORID,  mand, imp, 0, rom, rom);
+  defineCsr("marchid",    Csrn::MARCHID,    mand, imp, 0, rom, rom);
+  defineCsr("mimpid",     Csrn::MIMPID,     mand, imp, 0, rom, rom);
+  defineCsr("mhartid",    Csrn::MHARTID,    mand, imp, 0, rom, rom);
+  defineCsr("mconfigptr", Csrn::MCONFIGPTR, mand, imp, 0, rom, rom);
 
   // Machine status setup.
 
@@ -899,14 +885,13 @@ CsRegs<URV>::defineMachineRegs()
   URV pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
 
   defineCsr("mstatus", Csrn::MSTATUS, mand, imp, val, mask, pokeMask);
-  defineCsr("misa", Csrn::MISA, mand,  imp, 0x40001104, rom, rom);
+  defineCsr("misa", Csrn::MISA, mand,  imp, 0x40001105, rom, rom);
 
-  // Bits corresponding to user-level interrupts are hardwired to zero
-  // in medeleg. If N extension is enabled, we will flip those bits
-  // (currently N extension is not supported).
-  URV userBits = ( (URV(1) << unsigned(InterruptCause::U_SOFTWARE)) |
-                   (URV(1) << unsigned(InterruptCause::U_TIMER)) |
-                   (URV(1) << unsigned(InterruptCause::U_EXTERNAL)) );
+  // Bits corresponding to reserved interrupts are hardwired to zero
+  // in medeleg.
+  URV userBits = ( (URV(1) << unsigned(InterruptCause::RESERVED0)) |
+                   (URV(1) << unsigned(InterruptCause::RESERVED1)) |
+                   (URV(1) << unsigned(InterruptCause::RESERVED2)) );
   mask = wam & ~ userBits;
   defineCsr("medeleg", Csrn::MEDELEG, !mand, !imp, 0, mask, mask);
 
@@ -1183,11 +1168,6 @@ CsRegs<URV>::defineUserRegs()
   defineCsr("utval",    Csrn::UTVAL,    !mand, !imp, 0, wam, wam);
   defineCsr("uip",      Csrn::UIP,      !mand, !imp, 0, wam, wam);
 
-  // User Floating-Point CSRs
-  defineCsr("fflags",   Csrn::FFLAGS,   !mand, !imp, 0, wam, wam);
-  defineCsr("frm",      Csrn::FRM,      !mand, !imp, 0, wam, wam);
-  defineCsr("fcsr",     Csrn::FCSR,     !mand, !imp, 0, 0xff, 0xff);
-
   // User Counter/Timers
   defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
   defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);
@@ -1210,6 +1190,36 @@ CsRegs<URV>::defineUserRegs()
       csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
       defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineHypervisorRegs()
+{
+  bool mand = true;    // Mandatory.
+  bool imp  = true;    // Implemented.
+  URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
+
+  using Csrn = CsrNumber;
+
+  defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, 0, wam, wam);
+  defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, wam, wam);
+  defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, wam, wam);
+  defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, wam, wam);
+  defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
+  defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, wam, wam);
+  defineCsr("htval",       Csrn::HTVAL,       !mand, !imp, 0, wam, wam);
+  defineCsr("hip",         Csrn::HIP,         !mand, !imp, 0, wam, wam);
+  defineCsr("hvip",        Csrn::HVIP,        !mand, !imp, 0, wam, wam);
+  defineCsr("htinst",      Csrn::HTINST,      !mand, !imp, 0, wam, wam);
+  defineCsr("hgeip",       Csrn::HGEIP,       !mand, !imp, 0, wam, wam);
+  defineCsr("henvcfg",     Csrn::HENVCFG,     !mand, !imp, 0, wam, wam);
+  defineCsr("henvcfgh",    Csrn::HENVCFGH,    !mand, !imp, 0, wam, wam);
+  defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, wam, wam);
+  defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
+  defineCsr("htimedelta",  Csrn::HTIMEDELTA,  !mand, !imp, 0, wam, wam);
+  defineCsr("htimedeltah", Csrn::HTIMEDELTAH, !mand, !imp, 0, wam, wam);
 }
 
 
@@ -1320,33 +1330,16 @@ CsRegs<URV>::defineVectorRegs()
 
 template <typename URV>
 void
-CsRegs<URV>::defineNonStandardRegs()
+CsRegs<URV>::defineFpRegs()
 {
-  return;
-  URV rom = 0;        // Read-only mask: no bit writeable.
+  bool mand = true;  // Mndatory
+  bool imp = true;   // Implemented
+
+  // User Floating-Point CSRs
   URV wam = ~URV(0);  // Write-all mask: all bits writeable.
-
-  bool mand = true; // Mandatory.
-  bool imp = true;  // Implemented.
-
-  using Csrn = CsrNumber;
-
-  // mdseac is read-only to CSR insts but is modifiable with poke.
-  defineCsr("mdseac", Csrn::MDSEAC,   !mand, imp, 0, rom, wam);
-
-  // mdeau is write-only, it unlocks mdseac when written, it always
-  // reads zero.
-  defineCsr("mdeau",  Csrn::MDEAU,    !mand, imp, 0, rom, rom);
-
-  // Least sig 10 bits of interrupt vector table (meivt) are read only.
-  URV mask = (~URV(0)) << 10;
-  defineCsr("meivt",  Csrn::MEIVT,    !mand, imp, 0, mask, mask);
-
-  // None of the bits are writeable by CSR instructions. All but least
-  // sig 2 bis are modifiable.
-  defineCsr("meihap", Csrn::MEIHAP,   !mand, imp, 0, rom, ~URV(3));
-
-  defineCsr("mscause",  Csrn::MSCAUSE, !mand, !imp, 0, wam, wam);
+  defineCsr("fflags",   CsrNumber::FFLAGS,   !mand, !imp, 0, wam, wam);
+  defineCsr("frm",      CsrNumber::FRM,      !mand, !imp, 0, wam, wam);
+  defineCsr("fcsr",     CsrNumber::FCSR,     !mand, !imp, 0, 0xff, 0xff);
 }
 
 
@@ -1468,21 +1461,6 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
     {
       MstatusFields<URV> fields(csr->read());
       interruptEnable_ = fields.bits_.MIE;
-    }
-
-  // Poking MDEAU unlocks mdseac.
-  if (number == CsrNumber::MDEAU)
-    lockMdseac(false);
-
-  // Poking MEIVT changes the base address in MEIHAP.
-  if (number == CsrNumber::MEIVT)
-    {
-      value = (value >> 10) << 10;  // Clear least sig 10 bits keeping base.
-      size_t meihapIx = size_t(CsrNumber::MEIHAP);
-      URV meihap = regs_.at(meihapIx).read();
-      meihap &= 0x3ff;  // Clear base address bits.
-      meihap |= value;  // Copy base address bits from MEIVT.
-      regs_.at(meihapIx).poke(meihap);
     }
 
   // Poking mcounteren/scounteren changes accessibility of the

@@ -21,14 +21,14 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "System.hpp"
+#include "Mcm.hpp"
 
 using namespace WdRiscv;
 
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::validateAmoAddr(uint32_t rs1, uint64_t& addr, unsigned accessSize,
-                           SecondaryCause& secCause)
+Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
 {
   URV mask = URV(accessSize) - 1;
 
@@ -37,48 +37,33 @@ Hart<URV>::validateAmoAddr(uint32_t rs1, uint64_t& addr, unsigned accessSize,
   if (accessSize == 4)
     {
       uint32_t storeVal = 0;
-      cause = determineStoreException(rs1, addr, addr, storeVal, secCause, forcedFail);
+      cause = determineStoreException(addr, storeVal, forcedFail);
     }
   else
     {
       uint64_t storeVal = 0;
-      cause = determineStoreException(rs1, addr, addr, storeVal, secCause, forcedFail);
+      cause = determineStoreException(addr, storeVal, forcedFail);
     }
 
-  if (cause == ExceptionCause::STORE_ADDR_MISAL and
-      misalAtomicCauseAccessFault_)
+  if (cause == ExceptionCause::STORE_ADDR_MISAL)
     {
-      cause = ExceptionCause::STORE_ACC_FAULT;
-      secCause = SecondaryCause::STORE_ACC_AMO;
+      if (misalAtomicCauseAccessFault_)
+	return ExceptionCause::STORE_ACC_FAULT;
+      return cause;
     }
 
   // Check if invalid unless cacheable.
   if (amoInCacheableOnly_ and not isAddrCacheable(addr))
-    if (cause == ExceptionCause::NONE)
-      {
-        cause = ExceptionCause::STORE_ACC_FAULT;
-        secCause = SecondaryCause::STORE_ACC_AMO_UNCACHED;
-      }
+    return ExceptionCause::STORE_ACC_FAULT;
 
   // Address must be word aligned for word access and double-word
   // aligned for double-word access.
-  bool fail = (addr & mask) != 0;
+  if ((addr & mask) != 0)
+    return ExceptionCause::STORE_ACC_FAULT;
 
-  // Check if invalid outside DCCM.
-  if (amoInDccmOnly_ and not isAddrInDccm(addr))
-    fail = true;
-
-  if (fail)
-    {
-      // AMO secondary cause has priority over ECC.
-      if (cause == ExceptionCause::NONE or
-          secCause == SecondaryCause::STORE_ACC_DOUBLE_ECC)
-        {
-          // Per spec cause is store-access-fault.
-          cause = ExceptionCause::STORE_ACC_FAULT;
-          secCause = SecondaryCause::STORE_ACC_AMO;
-        }
-    }
+  Pma pma = memory_.pmaMgr_.getPma(addr);
+  if (not pma.isAmo())
+    return ExceptionCause::STORE_ACC_FAULT;
 
   return cause;
 }
@@ -86,19 +71,14 @@ Hart<URV>::validateAmoAddr(uint32_t rs1, uint64_t& addr, unsigned accessSize,
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad32(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& value)
+Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 {
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
-  ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
-
-  if (loadQueueEnabled_)
-    {
-      removeFromLoadQueue(rs1, false);
-      removeFromLoadQueue(rs2, false);
-    }
+  ldStSize_ = 4;
+  ldStAtomic_ = true;
 
   if (hasActiveTrigger())
     {
@@ -107,53 +87,51 @@ Hart<URV>::amoLoad32(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& value)
 	triggerTripped_ = true;
     }
 
-  unsigned ldSize = 4;
-
-  auto secCause = SecondaryCause::STORE_ACC_AMO;
-  
   uint64_t addr = virtAddr;
-  auto cause = validateAmoAddr(rs1, addr, ldSize, secCause);
+  auto cause = validateAmoAddr(addr, ldStSize_);
   ldStPhysAddr_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr, secCause);
+        initiateLoadException(cause, virtAddr);
       return false;
     }
 
   uint32_t uval = 0;
-  if (memory_.read(addr, uval))
+
+  bool hasMcmVal = false;
+  if (mcm_)
     {
-      value = SRV(int32_t(uval)); // Sign extend.
-
-      URV prevRdVal = peekIntReg(rd);
-      putInLoadQueue(4 /*ldSize*/, addr, rd, prevRdVal);
-
-      return true;  // Success.
+      uint64_t mcmVal = 0;
+      if (mcm_->getCurrentLoadValue(*this, addr, ldStSize_, mcmVal))
+	{
+	  uval = mcmVal;
+	  hasMcmVal = true;
+	}
     }
 
-  cause = ExceptionCause::STORE_ACC_FAULT;
-  initiateLoadException(cause, virtAddr, secCause);
-  return false;
+  if (not hasMcmVal and not memory_.read(addr, uval))
+    {
+      assert(0);
+      return false;
+    }
+
+  value = SRV(int32_t(uval)); // Sign extend.
+  return true;  // Success.
 }
 
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad64(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& value)
+Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
 {
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
-  ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
-
-  if (loadQueueEnabled_)
-    {
-      removeFromLoadQueue(rs1, false);
-      removeFromLoadQueue(rs2, false);
-    }
+  ldStSize_ = 8;
+  ldStAtomic_ = true;
 
   if (hasActiveTrigger())
     {
@@ -162,50 +140,42 @@ Hart<URV>::amoLoad64(uint32_t rd, uint32_t rs1, uint32_t rs2, URV& value)
 	triggerTripped_ = true;
     }
 
-  unsigned ldSize = 8;
-
-  auto secCause = SecondaryCause::STORE_ACC_AMO;
   uint64_t addr = virtAddr;
-  auto cause = validateAmoAddr(rs1, addr, ldSize, secCause);
+  auto cause = validateAmoAddr(addr, ldStSize_);
   ldStPhysAddr_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr, secCause);
+        initiateLoadException(cause, virtAddr);
       return false;
     }
 
   uint64_t uval = 0;
-  if (memory_.read(addr, uval))
+  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, addr, ldStSize_, uval);
+
+  if (not hasMcm and not memory_.read(addr, uval))
     {
-      value = SRV(int64_t(uval)); // Sign extend.
-
-      URV prevRdVal = peekIntReg(rd);
-      putInLoadQueue(8 /*ldSize*/, addr, rd, prevRdVal);
-
-      return true;  // Success.
+      assert(0);
+      return false;
     }
 
-  cause = ExceptionCause::STORE_ACC_FAULT;
-  initiateLoadException(cause, virtAddr, secCause);
-  return false;
+  value = uval;
+  return true;  // Success.
 }
 
 
 template <typename URV>
 template <typename LOAD_TYPE>
 bool
-Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
+Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 {
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
-  ldStAddrValid_ = true;  // For reporting load addr in trace-mode.
-
-  if (loadQueueEnabled_)
-    removeFromLoadQueue(rs1, false);
+  ldStSize_ = sizeof(LOAD_TYPE);
+  ldStAtomic_ = true;
 
   if (hasActiveTrigger())
     {
@@ -222,17 +192,15 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
   // Unsigned version of LOAD_TYPE
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
-  auto secCause = SecondaryCause::NONE;
   unsigned ldSize = sizeof(LOAD_TYPE);
   uint64_t addr = virtAddr;
-  auto cause = determineLoadException(rs1, virtAddr, addr, ldSize, secCause);
+  auto cause = determineLoadException(addr, ldSize);
   if (cause != ExceptionCause::NONE)
     {
       if (cause == ExceptionCause::LOAD_ADDR_MISAL and
 	  misalAtomicCauseAccessFault_)
         {
           cause = ExceptionCause::LOAD_ACC_FAULT;
-          secCause = SecondaryCause::LOAD_ACC_AMO;
         }
     }
   ldStPhysAddr_ = addr;
@@ -242,7 +210,6 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
     if (cause == ExceptionCause::NONE)
       {
         cause = ExceptionCause::LOAD_ACC_FAULT;
-        secCause = SecondaryCause::LOAD_ACC_AMO_UNCACHED;
       }
 
   // Address outside DCCM causes an exception (this is swerv specific).
@@ -252,28 +219,39 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
   if ((addr & (ldSize - 1)) != 0)
     fail = true;
 
+  fail = fail or not memory_.pmaMgr_.getPma(addr).isRsrv();
+
   if (fail)
     {
       // AMO secondary cause has priority over ECC.
-      if (cause == ExceptionCause::NONE or
-          secCause == SecondaryCause::LOAD_ACC_DOUBLE_ECC)
+      if (cause == ExceptionCause::NONE)
         {
           // Per spec cause is store-access-fault.
           cause = ExceptionCause::LOAD_ACC_FAULT;
-          secCause = SecondaryCause::LOAD_ACC_AMO;
         }
     }
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateLoadException(cause, virtAddr, secCause);
+      initiateLoadException(cause, virtAddr);
       return false;
     }
 
   ULT uval = 0;
-  if (not memory_.read(addr, uval))
-    {  // Should never happen.
-      initiateLoadException(cause, virtAddr, secCause);
+  bool hasMcmVal = false;
+  if (mcm_)
+    {
+      uint64_t mcmVal = 0;
+      if (mcm_->getCurrentLoadValue(*this, addr, ldStSize_, mcmVal))
+	{
+	  uval = mcmVal;
+	  hasMcmVal = true;
+	}
+    }
+
+  if (not hasMcmVal and not memory_.read(addr, uval))
+    {
+      assert(0);
       return false;
     }      
 
@@ -281,13 +259,8 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1, uint64_t& physAddr)
   if (not std::is_same<ULT, LOAD_TYPE>::value)
     value = SRV(LOAD_TYPE(uval)); // Sign extend.
 
-  // Put entry in load queue with value of rd before this load.
-  if (loadQueueEnabled_)
-    putInLoadQueue(ldSize, addr, rd, peekIntReg(rd));
-
   intRegs_.write(rd, value);
 
-  physAddr = addr;
   return true;
 }
 
@@ -305,12 +278,11 @@ Hart<URV>::execLr_w(const DecodedInst* di)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   lrCount_++;
-  uint64_t physAddr = 0;
-  if (not loadReserve<int32_t>(di->op0(), di->op1(), physAddr))
+  if (not loadReserve<int32_t>(di->op0(), di->op1()))
     return;
 
   unsigned size = 4;
-  uint64_t resAddr = physAddr; 
+  uint64_t resAddr = ldStPhysAddr_; 
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of
@@ -328,11 +300,12 @@ Hart<URV>::execLr_w(const DecodedInst* di)
 template <typename URV>
 template <typename STORE_TYPE>
 bool
-Hart<URV>::storeConditional(uint32_t rs1, URV virtAddr, STORE_TYPE storeVal)
+Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr_ = ldStAddr_;
-  ldStAddrValid_ = true;  // For reporting ld/st addr in trace-mode.
+  ldStSize_ = sizeof(STORE_TYPE);
+  ldStAtomic_ = true;
 
   // ld/st-address or instruction-address triggers have priority over
   // ld/st access or misaligned exceptions.
@@ -349,17 +322,14 @@ Hart<URV>::storeConditional(uint32_t rs1, URV virtAddr, STORE_TYPE storeVal)
   bool misal = virtAddr & alignMask;
   misalignedLdSt_ = misal;
 
-  auto secCause = SecondaryCause::NONE;
   uint64_t addr = virtAddr;
   bool forcedFail = false;
-  auto cause = determineStoreException(rs1, virtAddr, addr, storeVal, secCause,
-                                       forcedFail);
+  auto cause = determineStoreException(addr, storeVal, forcedFail);
 
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
       misalAtomicCauseAccessFault_)
     {
       cause = ExceptionCause::STORE_ACC_FAULT;
-      secCause = SecondaryCause::STORE_ACC_AMO;
     }
   ldStPhysAddr_ = addr;
 
@@ -368,7 +338,6 @@ Hart<URV>::storeConditional(uint32_t rs1, URV virtAddr, STORE_TYPE storeVal)
     if (cause == ExceptionCause::NONE)
       {
         cause = ExceptionCause::STORE_ACC_FAULT;
-        secCause = SecondaryCause::STORE_ACC_AMO_UNCACHED;
       }
 
   bool fail = misal or (amoInDccmOnly_ and not isAddrInDccm(addr));
@@ -376,14 +345,15 @@ Hart<URV>::storeConditional(uint32_t rs1, URV virtAddr, STORE_TYPE storeVal)
   if (fail)
     {
       // AMO secondary cause has priority over ECC.
-      if (cause == ExceptionCause::NONE or
-          secCause == SecondaryCause::STORE_ACC_DOUBLE_ECC)
+      if (cause == ExceptionCause::NONE)
         {
           // Per spec cause is store-access-fault.
           cause = ExceptionCause::STORE_ACC_FAULT;
-          secCause = SecondaryCause::STORE_ACC_AMO;
         }
     }
+
+  if (not memory_.pmaMgr_.getPma(addr).isRsrv() and cause == ExceptionCause::NONE)
+    cause = ExceptionCause::STORE_ACC_FAULT;
 
   // If no exception: consider store-data  trigger
   if (cause == ExceptionCause::NONE and hasTrig)
@@ -395,28 +365,37 @@ Hart<URV>::storeConditional(uint32_t rs1, URV virtAddr, STORE_TYPE storeVal)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateStoreException(cause, virtAddr, secCause);
+      initiateStoreException(cause, virtAddr);
       return false;
     }
 
   if (not memory_.hasLr(hartIx_, addr, sizeof(storeVal)))
     return false;
 
-  if (memory_.write(hartIx_, addr, storeVal))
-    {
-      invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
+  STORE_TYPE prev = 0;
+  memory_.peek(addr, prev, false /*usePma*/);
+  ldStData_ = storeVal;
+  ldStPrevData_ = prev;
+  ldStWrite_ = true;
 
-      // If we write to special location, end the simulation.
-      if (toHostValid_ and addr == toHost_ and storeVal != 0)
-        throw CoreException(CoreException::Stop, "write to to-host",
-                            toHost_, storeVal);
-      return true;
+  // If we write to special location, end the simulation.
+  if (toHostValid_ and addr == toHost_ and storeVal != 0)
+    {
+      if (not memory_.write(hartIx_, addr, storeVal))
+	assert(0);
+      throw CoreException(CoreException::Stop, "write to to-host",
+			  toHost_, storeVal);
     }
 
-  // Should never happen.
-  secCause = SecondaryCause::STORE_ACC_AMO;
-  initiateStoreException(ExceptionCause::STORE_ACC_FAULT, virtAddr, secCause);
-  return false;
+  if (mcm_)
+    return true;  // Memory updated when merge buffer is written.
+
+  if (not memory_.write(hartIx_, addr, storeVal))
+    assert(0);
+
+  invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
+
+  return true;
 }
 
 
@@ -437,19 +416,13 @@ Hart<URV>::execSc_w(const DecodedInst* di)
   URV addr = intRegs_.read(rs1);
   scCount_++;
 
-  if (loadQueueEnabled_)
-    removeFromLoadQueue(rs1, false);
-
   uint64_t prevCount = exceptionCount_;
 
-  bool ok = storeConditional(rs1, addr, uint32_t(value));
+  bool ok = storeConditional(addr, uint32_t(value));
   cancelLr(); // Clear LR reservation (if any).
 
   if (ok)
     {
-      if (loadQueueEnabled_)
-        putInLoadQueue(4 /* size*/, addr, rd, peekIntReg(rd));
-
       memory_.invalidateOtherHartLr(hartIx_, addr, 4);
       intRegs_.write(rd, 0); // success
       scSuccess_++;
@@ -460,9 +433,6 @@ Hart<URV>::execSc_w(const DecodedInst* di)
   // If exception or trigger tripped then rd is not modified.
   if (triggerTripped_ or exceptionCount_ != prevCount)
     return;
-
-  if (loadQueueEnabled_)
-    putInLoadQueue(4 /* size*/, addr, rd, peekIntReg(rd));
 
   intRegs_.write(di->op0(), 1);  // fail
 }
@@ -485,7 +455,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
 
   URV loadedValue = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad32(rd, rs1, rs2, loadedValue);
+  bool loadOk = amoLoad32(rs1, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -494,7 +464,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint32_t>(rs1, addr, addr, uint32_t(result));
+      bool storeOk = store<uint32_t>(addr, uint32_t(result));
 
       if (storeOk and not triggerTripped_)
 	intRegs_.write(rd, rdVal);
@@ -611,12 +581,11 @@ Hart<URV>::execLr_d(const DecodedInst* di)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   lrCount_++;
-  uint64_t physAddr = 0;
-  if (not loadReserve<int64_t>(di->op0(), di->op1(), physAddr))
+  if (not loadReserve<int64_t>(di->op0(), di->op1()))
     return;
 
   unsigned size = 8;
-  uint64_t resAddr = physAddr; 
+  uint64_t resAddr = ldStPhysAddr_; 
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of
@@ -647,19 +616,13 @@ Hart<URV>::execSc_d(const DecodedInst* di)
   URV addr = intRegs_.read(rs1);
   scCount_++;
 
-  if (loadQueueEnabled_)
-    removeFromLoadQueue(rs1, false);
-
   uint64_t prevCount = exceptionCount_;
 
-  bool ok = storeConditional(rs1, addr, uint64_t(value));
+  bool ok = storeConditional(addr, uint64_t(value));
   cancelLr(); // Clear LR reservation (if any).
 
   if (ok)
     {
-      if (loadQueueEnabled_)
-        putInLoadQueue(8 /* size*/, addr, rd, peekIntReg(rd));
-
       memory_.invalidateOtherHartLr(hartIx_, addr, 8);
       intRegs_.write(rd, 0); // success
       scSuccess_++;
@@ -670,9 +633,6 @@ Hart<URV>::execSc_d(const DecodedInst* di)
   // If exception or trigger tripped then rd is not modified.
   if (triggerTripped_ or exceptionCount_ != prevCount)
     return;
-
-  if (loadQueueEnabled_)
-    putInLoadQueue(8 /* size*/, addr, rd, peekIntReg(rd));
 
   intRegs_.write(di->op0(), 1);  // fail
 }
@@ -695,7 +655,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
 
   URV loadedValue = 0;
   URV rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad64(rd, rs1, rs2, loadedValue);
+  bool loadOk = amoLoad64(rs1, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -704,7 +664,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint64_t>(rs1, addr, addr, result);
+      bool storeOk = store<uint64_t>(addr, result);
 
       if (storeOk and not triggerTripped_)
 	intRegs_.write(rd, rdVal);

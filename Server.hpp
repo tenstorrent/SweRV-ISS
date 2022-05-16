@@ -37,7 +37,7 @@ namespace WdRiscv
 
     // Server mode disassemble command.
     void disassembleAnnotateInst(Hart<URV>& hart,
-                                 uint32_t inst, bool interrupted,
+                                 const DecodedInst& di, bool interrupted,
 				 bool hasPreTrigger, bool hasPostTrigger,
 				 std::string& text);
 
@@ -46,10 +46,6 @@ namespace WdRiscv
 		     std::vector<WhisperMessage>& pendingChanges,
 		     WhisperMessage& reply,
 		     FILE* traceFile);
-
-    /// Server mode exception command.
-    bool exceptionCommand(const WhisperMessage& req, WhisperMessage& reply,
-			  std::string& text);
 
     /// Server mode loop: Receive command and send reply till a quit
     /// command is received. Return true on successful termination (quit

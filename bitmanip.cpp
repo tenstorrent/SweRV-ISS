@@ -129,7 +129,7 @@ template <typename URV>
 void
 Hart<URV>::execAndn(const DecodedInst* di)
 {
-  if (not isRvzbb() and not isRvzbp())
+  if (not isRvzbb() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -146,7 +146,7 @@ template <typename URV>
 void
 Hart<URV>::execOrn(const DecodedInst* di)
 {
-  if (not isRvzbb() and not isRvzbp())
+  if (not isRvzbb() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -163,7 +163,7 @@ template <typename URV>
 void
 Hart<URV>::execXnor(const DecodedInst* di)
 {
-  if (not isRvzbb() and not isRvzbp())
+  if (not isRvzbb() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -248,7 +248,7 @@ template <typename URV>
 void
 Hart<URV>::execRol(const DecodedInst* di)
 {
-  if (not isRvzbb() and not isRvzbp())
+  if (not isRvzbb() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -268,7 +268,7 @@ template <typename URV>
 void
 Hart<URV>::execRor(const DecodedInst* di)
 {
-  if (not isRvzbb() and not isRvzbp())
+  if (not isRvzbb() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -288,7 +288,7 @@ template <typename URV>
 void
 Hart<URV>::execRori(const DecodedInst* di)
 {
-  if (not isRvzbb() and not isRvzbp())
+  if (not isRvzbb() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -309,7 +309,7 @@ template <typename URV>
 void
 Hart<URV>::execRolw(const DecodedInst* di)
 {
-  if (not isRv64() or (not isRvzbb() and not isRvzbp()))
+  if (not isRv64() or (not isRvzbb() and not isRvzbp() and not isRvzbkb()))
     {
       illegalInst(di);
       return;
@@ -355,7 +355,7 @@ template <typename URV>
 void
 Hart<URV>::execRoriw(const DecodedInst* di)
 {
-  if (not isRv64() or (not isRvzbb() and not isRvzbp()))
+  if (not isRv64() or (not isRvzbb() and not isRvzbp() and not isRvzbkb()))
     {
       illegalInst(di);
       return;
@@ -436,7 +436,7 @@ Hart<URV>::execPack(const DecodedInst* di)
   // Zext.h is a zbb pseudo-inst that maps to pack: pack rd, rs1, zero.
   bool zext_h = (di->op2() == 0);
 
-  bool legal = isRvzbe() or isRvzbf() or isRvzbp();
+  bool legal = isRvzbe() or isRvzbf() or isRvzbp() or isRvzbkb();
   legal = legal or (isRv64() and isRvzbm());
   if (zext_h)
     legal = legal or isRvzbb();
@@ -484,7 +484,7 @@ template <typename URV>
 void
 Hart<URV>::execPackh(const DecodedInst* di)
 {
-  if (not isRvzbe() and not isRvzbf() and not isRvzbp())
+  if (not isRvzbe() and not isRvzbf() and not isRvzbp() and not isRvzbkb())
     {
       illegalInst(di);
       return;
@@ -522,7 +522,7 @@ void
 Hart<URV>::execPackw(const DecodedInst* di)
 {
   // zext.h is an alias for packw and is part of zbb.
-  if (not isRv64() or (not isRvzbe() and not isRvzbf() and not isRvzbp()))
+  if (not isRv64() or (not isRvzbe() and not isRvzbf() and not isRvzbp() and not isRvzbkb()))
     {
       illegalInst(di);
       return;
@@ -616,17 +616,22 @@ Hart<URV>::execGrevi(const DecodedInst* di)
 {
   URV shamt = di->op2();
 
-  bool zbb = false;  // True if variant is also a zbb instruction.
+  bool rev8 = false;  // True if variant is rev8
   if (isRv64())
-    zbb = shamt == 0x38;  // rev8 is also in zbb
+    rev8 = shamt == 0x38;
   else
-    zbb = shamt == 0x18;  // rev8 is also in zbb
+    rev8 = shamt == 0x18;
 
-  bool illegal = not isRvzbp();
-  if (zbb)
-    illegal = not isRvzbb() and not isRvzbp();
+  bool brev8 = shamt == 0x7;  // True if variant is brev8
 
-  if (illegal)
+  bool legal = isRvzbp();
+  if (rev8)
+    legal = legal or isRvzbb() or isRvzbkb();
+
+  if (brev8)
+    legal = legal or isRvzbkb();
+
+  if (not legal)
     {
       illegalInst(di);
       return;
@@ -1431,14 +1436,18 @@ template <typename URV>
 void
 Hart<URV>::execShfli(const DecodedInst* di)
 {
-  if (not isRvzbp())
+  bool legal = isRvzbp();
+
+  URV amt = di->op2();
+  legal = legal or (isRvzbkb() and (amt == 0xf));  // Zip
+
+  if (not legal)
     {
       illegalInst(di);
       return;
     }
 
   URV v1 = intRegs_.read(di->op1());
-  URV amt = di->op2();
   URV val = 0;
 
   if (mxlen_ == 32)
@@ -1504,6 +1513,8 @@ Hart<URV>::execUnshfli(const DecodedInst* di)
   // Instructions zip8 and unzip16 are aliases to unshfli for
   // immediate values of 0x18 and 0x10 and are legal when zbm is on.
   legal = legal or (isRvzbm() and (amt == 0x18 or amt == 0x10));
+
+  legal = legal or (isRvzbkb() and (amt == 0xf));  // Unzip 
 
   if (not legal)
     {
