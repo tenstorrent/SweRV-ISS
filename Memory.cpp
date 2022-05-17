@@ -107,6 +107,9 @@ Memory::~Memory()
 
   delete cache_;
   cache_ = nullptr;
+
+  if (not dataLineFile_.empty())
+    saveDataAddressTrace(dataLineFile_);
 }
 
 
@@ -861,6 +864,44 @@ Memory::loadCacheSnapshot(const std::string& path)
 }
 
 
+bool
+Memory::saveDataAddressTrace(const std::string& path)
+{
+  if (not lineTrace_)
+    return true;
+
+  std::ofstream out(path, std::ios::trunc);
+
+  if (not out)
+    {
+      std::cerr << "Cache::saveDataAddressTrace failed - cannot open " << path
+		<< " for write\n";
+      return false;
+    }
+
+  std::cerr << "Memory data reference count: " << memRefCount_ << '\n';
+  std::cerr << "Data trace map size: " << lineMap_.size() << '\n';
+
+  std::vector<uint64_t> addrVec;
+  addrVec.reserve(lineMap_.size());
+
+  for (auto& kv : lineMap_)
+    addrVec.push_back(kv.first);
+
+  std::sort(addrVec.begin(), addrVec.end(),
+	    [this](uint64_t a, uint64_t b) {
+	      return this->lineMap_[a] < this->lineMap_[b];
+	    });
+
+  out << std::hex;
+
+  for (auto a : addrVec)
+    out << a << '\n';
+
+  return true;
+}
+
+
 void
 Memory::copy(const Memory& other)
 {
@@ -1064,5 +1105,4 @@ Memory::getCacheLineAddresses(std::vector<uint64_t>& addresses)
   if (cache_)
     cache_->getLineAddresses(addresses);
 }
-
 

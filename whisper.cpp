@@ -182,6 +182,7 @@ struct Args
   std::string loadFrom;        // Directory for loading a snapshot
   std::string stdoutFile;      // Redirect target program stdout to this.
   std::string stderrFile;      // Redirect target program stderr to this. 
+  std::string dataLines;       // Output file for data address line tracing.
   StringVec   regInits;        // Initial values of regs
   StringVec   targets;         // Target (ELF file) programs and associated
                                // program options to be loaded into simulator
@@ -498,6 +499,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Redirect standard output of newlib/Linux target program to this.")
 	("stderr", po::value(&args.stderrFile),
 	 "Redirect standard error of newlib/Linux target program to this.")
+	("datalines", po::value(&args.dataLines),
+	 "Generate data line address trace to the given file.")
 	("abinames", po::bool_switch(&args.abiNames),
 	 "Use ABI register names (e.g. sp instead of x2) in instruction disassembly.")
 	("newlib", po::bool_switch(&args.newlib),
@@ -1689,6 +1692,9 @@ session(const Args& args, const HartConfig& config)
   // Configure memory.
   if (not config.configMemory(system, args.unmappedElfOk))
     return false;
+
+  if (not args.dataLines.empty())
+    system.enableDataLineTrace(args.dataLines);
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
       and not args.interactive and args.archInfoFile.empty())
