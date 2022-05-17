@@ -36,30 +36,16 @@ isPowerOf2(uint64_t x)
 }
 
 
-Memory::Memory(size_t size, size_t pageSize, size_t regionSize)
+Memory::Memory(size_t size, size_t pageSize)
   : size_(size), data_(nullptr), pageSize_(pageSize), reservations_(1),
     lastWriteData_(1), pmaMgr_(size)
 { 
   assert(size >= pageSize);
-  assert(regionSize >= pageSize);
   assert(pageSize >= 64);
 
   assert(isPowerOf2(pageSize));
 
   pageShift_ = static_cast<unsigned>(std::log2(pageSize_));
-
-  pageCount_ = size_ / pageSize_;
-  assert(pageCount_ * pageSize_ == size_);
-
-  assert(isPowerOf2(regionSize));
-
-  size_t pagesInRegion = regionSize_ / pageSize_;
-  size_t multiple = pagesInRegion * pageSize_;
-  assert(multiple == regionSize_);
-
-  regionCount_ = size_ / regionSize_;
-  if (regionCount_ * regionSize_ < size_)
-    regionCount_++;
 
 #ifndef MEM_CALLBACKS
 
@@ -84,12 +70,6 @@ Memory::Memory(size_t size, size_t pageSize, size_t regionSize)
 
 #endif
 
-  // Mark all regions as non-configured.
-  regionConfigured_.resize(regionCount_);
-
-  // Mark all regions as having neither iccm or dccm/mem-mappped-reg.
-  regionHasLocalInst_.resize(regionCount_);
-  regionHasLocalData_.resize(regionCount_);
 }
 
 
@@ -967,38 +947,6 @@ Memory::checkCcmConfig(const std::string& tag, size_t addr, size_t size) const
   return true;
 }
     
-
-bool
-Memory::checkCcmOverlap(const std::string& tag, size_t addr, size_t size,
-                        bool iccm, bool dccm, bool pic) const
-{
-  size_t region = addr / regionSize_;
-  if (region > regionCount_)
-    {
-      std::cerr << tag << " area at address 0x" << std::hex << addr
-                << " is outside of defined memory.\n";
-      return false;
-    }
-
-  if (iccm or dccm or pic)
-    {
-      // Check area overlap.
-      size_t end = addr + size;
-      for (size_t aa = addr; aa < end; aa += pageSize())
-        {
-          Pma pma = pmaMgr_.getPma(aa);
-          if (pma.isDccm() or pma.isIccm() or pma.isMemMappedReg())
-            {
-              std::cerr << tag << " area at address " << addr << " overlaps"
-			<< " a previously defined area.\n";
-              return false;
-            }
-        }
-    }
-
-  return true;
-}
-
 
 void
 Memory::resetMemoryMappedRegisters()
