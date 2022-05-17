@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <boost/algorithm/string.hpp>
 
 #if defined(__cpp_lib_filesystem)
   #include <filesystem>
@@ -107,7 +108,7 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
   ofs << "pc 0x" << std::hex << peekPc() << "\n";
 
   // write integer registers
-  for(unsigned i = 1; i < 32; i++)
+  for (unsigned i = 1; i < 32; i++)
     ofs << "x " << std::dec << i << " 0x" << std::hex << peekIntReg(i) << "\n";
 
   // write floating point registers
@@ -125,6 +126,17 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       if (not peekCsr(CsrNumber(i), val))
         continue;
       ofs << "c 0x" << std::hex << i << " 0x" << val << "\n";
+    }
+
+  // write vector registers.
+  std::vector<uint8_t> vecBytes;
+  for (unsigned i = 0; i < vecRegCount(); ++i)
+    {
+      peekVecReg(i, vecBytes);
+      ofs << "v " << std::dec << i << " 0x";
+      for (auto byte : vecBytes)
+	ofs << std::hex << std::setw(2) << std::setfill('0') << unsigned(byte);
+      ofs << '\n';
     }
 
   ofs.close();
@@ -167,6 +179,60 @@ loadRegNumAndValue(std::istream& stream, unsigned& num, uint64_t& val)
   if (extra and *extra)
     return false;
   return loadSnapshotValue(stream, val);
+}
+
+
+/// Read from the given stream a vector register number and a register value.
+/// Return true on success and false on failure. Register value must have
+/// with a 0x prefix and must be a hexadecimal number. The most sig digits
+/// of the register value are placed in the first entry of vecBytes.
+static
+bool
+loadVecRegNumAndValue(std::istream& stream, unsigned& num,
+		      std::vector<uint8_t>& vecBytes)
+{
+  vecBytes.clear();
+
+  std::string str;
+  if (not (stream >> str))
+    return false;
+
+  char* extra = nullptr;
+  num = strtoull(str.c_str(), &extra, 0);
+  if (extra and *extra)
+    return false;
+
+  std::string vvs;  // vector value string
+  if (not (stream >> vvs))
+    return false;
+
+  if (not (boost::starts_with(vvs, "0x") or boost::starts_with(vvs, "0X")))
+    return false;
+
+  vvs = vvs.substr(2);  // Skip leading 0x
+
+  for (auto c : vvs)
+    if (not std::isxdigit(c))
+      return false;
+
+  if ((vvs.size() & 1) != 0)
+    vvs.insert(vvs.begin(), '0');  // Make hex digit count even by prepeindg a '0'.
+
+  vecBytes.resize(vvs.size() / 2);
+
+  for (size_t i = 0; i < vvs.size(); ++i)
+    {
+      unsigned hd = vvs[i], nibble = 0;
+      if      (hd >= '0' and hd <= '9') nibble = hd - '0';
+      else if (hd >= 'a' and hd <= 'f') nibble = 10 + hd - 'a';
+      else if (hd >= 'A' and hd <= 'F') nibble = 10 + hd - 'A';
+      if ((i & 1) == 0)
+	vecBytes[i/2] |= (nibble << 4);
+      else
+	vecBytes[i/2] |= nibble;
+    }
+
+  return true;
 }
 
 
@@ -239,6 +305,17 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
                 break; // error: poke failed
             }
         }
+      else if (type.compare("v") == 0) // Vector registers
+	{
+	  if (isRvv())
+	    {
+	      std::vector<uint8_t> vecBytes;
+	      if (not loadVecRegNumAndValue(iss, num, vecBytes))
+		break;
+	      if (not pokeVecReg(num, vecBytes))
+		break;
+	    }
+	}
       else
         break;  // error: parse failed
       error = false;
