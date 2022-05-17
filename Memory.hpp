@@ -129,6 +129,9 @@ namespace WdRiscv
 	      cache_->insert(address + sizeof(T) - 1);
 	}
 
+      if (lineTrace_)
+	lineMap_[address >> lineShift_] = memRefCount_++;
+
       return true;
     }
 
@@ -262,6 +265,9 @@ namespace WdRiscv
 	    if (cache_->getLineNumber(address) != cache_->getLineNumber(address + sizeof(T) - 1))
 	      cache_->insert(address + sizeof(T) - 1);
 	}
+
+      if (lineTrace_)
+	lineMap_[address >> lineShift_] = memRefCount_++;
 
       return true;
     }
@@ -438,6 +444,9 @@ namespace WdRiscv
     {
       writeCallback_ = callback;
     }
+
+    void enableDataLineTrace(const std::string& path)
+    { lineTrace_ = true; dataLineFile_ = path; }
 
   protected:
 
@@ -665,6 +674,10 @@ namespace WdRiscv
     /// and false on failure. Return true if no cache is present.
     bool loadCacheSnapshot(const std::string& path);
 
+    /// If address tracing enabled, then write the accumulated data
+    /// addresses into the given file.
+    bool saveDataAddressTrace(const std::string& path);
+
   private:
 
     /// Information about last write operation by a hart.
@@ -706,6 +719,13 @@ namespace WdRiscv
 
     PmaManager pmaMgr_;
     Cache* cache_ = nullptr;
+
+    // Support for line address traces
+    bool lineTrace_ = false;
+    std::string dataLineFile_;
+    unsigned lineShift_ = 6;   // log2 of line size.
+    mutable uint64_t memRefCount_ = 0;
+    mutable std::unordered_map<uint64_t, uint64_t> lineMap_;  // Map line addr to order
 
     /// Callback for read: bool func(uint64_t addr, unsigned size, uint64_t& val);
     std::function<bool(uint64_t, unsigned, uint64_t&)> readCallback_ = nullptr;
