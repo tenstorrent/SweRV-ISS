@@ -59,11 +59,8 @@ namespace WdRiscv
 
     /// Constructor: define a memory of the given size initialized to
     /// zero. Given memory size (byte count) must be a multiple of 4
-    /// otherwise, it is truncated to a multiple of 4. The memory
-    /// is partitioned into regions according to the region size which
-    /// must be a power of 2.
-    Memory(size_t size, size_t pageSize = 4*1024,
-	   size_t regionSize = 256*1024*1024);
+    /// otherwise, it is truncated to a multiple of 4.
+    Memory(size_t size, size_t pageSize = 4*1024);
 
     /// Destructor.
     ~Memory();
@@ -82,7 +79,7 @@ namespace WdRiscv
     /// organization. Return true on success. Return false if any of
     /// the requested bytes is out of memory bounds, fall in unmapped
     /// memory, are in a region marked non-read, or if is to a
-    /// memory-mapped-register aht the access size is different than
+    /// memory-mapped-register and the access size is different than
     /// 4.
     template <typename T>
     bool read(size_t address, T& value) const
@@ -507,10 +504,6 @@ namespace WdRiscv
     size_t pageSize() const
     { return pageSize_; }
 
-    /// Return the region size.
-    size_t regionSize() const
-    { return regionSize_; }
-
     /// Return the number of the page containing the given address.
     size_t getPageIx(size_t addr) const
     { return addr >> pageShift_; }
@@ -523,12 +516,6 @@ namespace WdRiscv
     /// addr/size is valid. Return false otherwise. Tag parameter
     /// ("iccm"/"dccm"/"pic") is used with error messages.
     bool checkCcmConfig(const std::string& tag, size_t addr, size_t size) const;
-
-    /// Complain if CCM (iccm or dccm) defined by region/offset/size
-    /// overlaps a previously defined CCM area. Return true if all is
-    /// well (no overlap).
-    bool checkCcmOverlap(const std::string& tag, size_t addr, size_t size,
-			 bool iccm, bool dccm, bool pic) const;
 
     /// Reset (to zero) all memory mapped registers.
     void resetMemoryMappedRegisters();
@@ -573,10 +560,6 @@ namespace WdRiscv
       lwd.value_ = value;
       return true;
     }
-
-    /// Return the number of the 256-mb region containing given address.
-    size_t getRegionIndex(size_t addr) const
-    { return (addr >> regionShift_) & regionMask_; }
 
     /// Return true if given data address is external to the core.
     bool isDataAddressExternal(size_t addr) const
@@ -691,17 +674,6 @@ namespace WdRiscv
     size_t size_;        // Size of memory in bytes.
     uint8_t* data_;      // Pointer to memory data.
 
-    // Memory is organized in regions (e.g. 256 Mb). Each region is
-    // organized in pages (e.g 4kb). Each page is associated with
-    // access attributes. Memory mapped register pages are also
-    // associated with write-masks (one 4-byte mask per word).
-    size_t regionCount_    = 16;
-    size_t regionSize_     = 256*1024*1024;
-    std::vector<bool> regionConfigured_; // One per region.
-    std::vector<bool> regionHasLocalInst_; // One per region.
-    std::vector<bool> regionHasLocalData_; // One per region.
-
-    size_t pageCount_     = 1024*1024; // Should be derived from page size.
     size_t pageSize_      = 4*1024;    // Must be a power of 2.
     unsigned pageShift_   = 12;        // Shift address by this to get page no.
     unsigned regionShift_ = 28;        // Shift address by this to get region no.
