@@ -90,6 +90,9 @@ Memory::~Memory()
 
   if (not dataLineFile_.empty())
     saveDataAddressTrace(dataLineFile_);
+
+  if (not instrLineFile_.empty())
+    saveInstructionAddressTrace(instrLineFile_);
 }
 
 
@@ -845,32 +848,30 @@ Memory::loadCacheSnapshot(const std::string& path)
 
 
 bool
-Memory::saveDataAddressTrace(const std::string& path)
+Memory::saveAddressTrace(const std::string& tag,
+			 const std::unordered_map<uint64_t, uint64_t>& lineMap,
+			 const std::string& path) const
 {
-  if (not lineTrace_)
-    return true;
-
   std::ofstream out(path, std::ios::trunc);
 
   if (not out)
     {
-      std::cerr << "Cache::saveDataAddressTrace failed - cannot open " << path
+      std::cerr << "Memory::saveAddressTrace failed - cannot open " << path
 		<< " for write\n";
       return false;
     }
 
-  std::cerr << "Memory data reference count: " << memRefCount_ << '\n';
-  std::cerr << "Data trace map size: " << lineMap_.size() << '\n';
+  std::cerr << "Trace map size for " << tag << ": " << lineMap.size() << '\n';
 
   std::vector<uint64_t> addrVec;
-  addrVec.reserve(lineMap_.size());
+  addrVec.reserve(lineMap.size());
 
-  for (auto& kv : lineMap_)
+  for (auto& kv : lineMap)
     addrVec.push_back(kv.first);
 
   std::sort(addrVec.begin(), addrVec.end(),
-	    [this](uint64_t a, uint64_t b) {
-	      return this->lineMap_[a] < this->lineMap_[b];
+	    [&lineMap](uint64_t a, uint64_t b) {
+	      return lineMap.at(a) < lineMap.at(b);
 	    });
 
   out << std::hex;
@@ -879,6 +880,24 @@ Memory::saveDataAddressTrace(const std::string& path)
     out << a << '\n';
 
   return true;
+}
+
+
+bool
+Memory::saveDataAddressTrace(const std::string& path) const
+{
+  if (not dataLineTrace_)
+    return true;
+  return saveAddressTrace("data", dataLineMap_, path);
+}
+
+
+bool
+Memory::saveInstructionAddressTrace(const std::string& path) const
+{
+  if (not instrLineTrace_)
+    return true;
+  return saveAddressTrace("instruction", instrLineMap_, path);
 }
 
 

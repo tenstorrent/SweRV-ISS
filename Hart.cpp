@@ -4339,6 +4339,9 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 	  if (bbFile_)
 	    countBasicBlocks(di);
 
+	  if (instrLineTrace_)
+	    memory_.traceInstructionLine(currPc_);
+
 	  if (doStats)
 	    accumulateInstructionStats(*di);
 	  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
@@ -4411,7 +4414,7 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim or bbFile_)
+          if (hasLim or bbFile_ or instrLineTrace_)
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4550,6 +4553,9 @@ Hart<URV>::simpleRunWithLimit()
 
       pc_ += di->instSize();
       execute(di);
+
+      if (instrLineTrace_)
+	memory_.traceInstructionLine(currPc_);
 
       if (bbFile_)
 	countBasicBlocks(di);

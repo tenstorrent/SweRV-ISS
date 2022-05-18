@@ -126,8 +126,8 @@ namespace WdRiscv
 	      cache_->insert(address + sizeof(T) - 1);
 	}
 
-      if (lineTrace_)
-	lineMap_[address >> lineShift_] = memRefCount_++;
+      if (dataLineTrace_)
+	traceDataLine(address);
 
       return true;
     }
@@ -263,8 +263,8 @@ namespace WdRiscv
 	      cache_->insert(address + sizeof(T) - 1);
 	}
 
-      if (lineTrace_)
-	lineMap_[address >> lineShift_] = memRefCount_++;
+      if (dataLineTrace_)
+	traceDataLine(address);
 
       return true;
     }
@@ -443,7 +443,10 @@ namespace WdRiscv
     }
 
     void enableDataLineTrace(const std::string& path)
-    { lineTrace_ = true; dataLineFile_ = path; }
+    { dataLineTrace_ = true; dataLineFile_ = path; }
+
+    void enableInstructionLineTrace(const std::string& path)
+    { instrLineTrace_ = true;  instrLineFile_ = path; }
 
   protected:
 
@@ -659,7 +662,23 @@ namespace WdRiscv
 
     /// If address tracing enabled, then write the accumulated data
     /// addresses into the given file.
-    bool saveDataAddressTrace(const std::string& path);
+    bool saveDataAddressTrace(const std::string& path) const;
+
+    /// If instruction tracing enabled, then write the accumulated
+    /// addresses into the given file.
+    bool saveInstructionAddressTrace(const std::string& path) const;
+
+    bool saveAddressTrace(const std::string& tag,
+			  const std::unordered_map<uint64_t, uint64_t>& lineMap,
+			  const std::string& path) const;
+
+    /// Add line of given address to the data line address trace.
+    void traceDataLine(uint64_t addr) const
+    { dataLineMap_[addr >> lineShift_] = memRefCount_++; }
+
+    /// Add line of given address to the instruction line address trace.
+    void traceInstructionLine(uint64_t addr) const
+    { instrLineMap_[addr >> lineShift_] = memRefCount_++; }
 
   private:
 
@@ -693,11 +712,14 @@ namespace WdRiscv
     Cache* cache_ = nullptr;
 
     // Support for line address traces
-    bool lineTrace_ = false;
+    bool dataLineTrace_ = false;
+    bool instrLineTrace_ = false;
     std::string dataLineFile_;
+    std::string instrLineFile_;
     unsigned lineShift_ = 6;   // log2 of line size.
     mutable uint64_t memRefCount_ = 0;
-    mutable std::unordered_map<uint64_t, uint64_t> lineMap_;  // Map line addr to order
+    mutable std::unordered_map<uint64_t, uint64_t> dataLineMap_;  // Map line addr to order
+    mutable std::unordered_map<uint64_t, uint64_t> instrLineMap_;  // Map line addr to order
 
     /// Callback for read: bool func(uint64_t addr, unsigned size, uint64_t& val);
     std::function<bool(uint64_t, unsigned, uint64_t&)> readCallback_ = nullptr;

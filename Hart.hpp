@@ -1413,6 +1413,10 @@ namespace WdRiscv
     void setMcm(Mcm<URV>* mcm)
     { mcm_ = mcm; }
 
+    /// Enable instruction line address tracing.
+    void enableInstructionLineTrace()
+    { instrLineTrace_ = true; }
+
   protected:
 
     /// Helper to reset: reset floating point related structures.
@@ -3917,6 +3921,8 @@ namespace WdRiscv
 
     bool csvTrace_ = false;      // Print trace in CSV format.
     bool traceHeaderPrinted_ = false; // True if trace file header printed.
+
+    bool instrLineTrace_ = false;
 
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
