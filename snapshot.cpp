@@ -50,8 +50,12 @@ Hart<URV>::saveSnapshot(const std::string& dir)
   if (not memory_.saveCacheSnapshot(cachePath))
     return false;
 
-  FileSystem::path tracePath = dirPath / "data-lines";
-  if (not memory_.saveDataAddressTrace(tracePath))
+  FileSystem::path dtracePath = dirPath / "data-lines";
+  if (not memory_.saveDataAddressTrace(dtracePath))
+    return false;
+
+  FileSystem::path itracePath = dirPath / "instr-lines";
+  if (not memory_.saveInstructionAddressTrace(itracePath))
     return false;
 
   return true;

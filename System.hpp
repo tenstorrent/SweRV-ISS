@@ -114,6 +114,13 @@ namespace WdRiscv
     void enableDataLineTrace(const std::string& path)
     { memory_->enableDataLineTrace(path); }
 
+    /// Similar to enableDataLineTrace but for instructions.
+    void enableInstructionLineTrace(const std::string& path)
+    {
+      memory_->enableInstructionLineTrace(path);
+      for (auto hart : sysHarts_)  hart->enableInstructionLineTrace();
+    }
+
     /// Define read memory callback. This (along with
     /// defineWriteMemoryCallback) allows the caller to bypass the
     /// memory model with their own.
