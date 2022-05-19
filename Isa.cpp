@@ -208,6 +208,14 @@ Isa::extensionToString(RvExtension ext) const
 }
 
 
+/// Extract a single charecter (not 'z') extension or a multi-character
+/// extension starting with a 'z' from the isa string starting at locaton
+/// i and update i.  Multi-char extensions are of of the
+/// form: z<name><version>p<subversion>
+/// where <name> is a sequence of letters, or a sequence of letters
+/// followed by a sequence of digits and then a letter other than 'p'.
+/// The <version>/<subversion> are sequences of digits. The
+/// <version>p<subversion> suffix is optional.
 bool
 extractExtension(const std::string& isa, size_t& i, std::string& extension)
 {
@@ -216,8 +224,26 @@ extractExtension(const std::string& isa, size_t& i, std::string& extension)
     return true;
   if (isa.at(i) == 'z')
     {
+      // A sequence of letters following 'z', is part of the extension
+      // name.
       while (i < len and isa.at(i) >= 'a' and isa.at(i) <= 'z')
 	extension.push_back(isa.at(i++));
+
+      // A sequence of digits followed by an letter other than 'p' is also
+      // part of the extension name.
+      size_t j = i;
+      for ( ; j < len and std::isdigit(isa.at(j)); ++j)
+	;
+      if (j < len and j > i)
+	{
+	  auto c = isa.at(j);
+	  if (c >= 'a' and c < 'z' and c != 'p')
+	    {
+	      extension += isa.substr(i, j - i + 1);
+	      i = j + 1;
+	    }
+	}
+
       return true;
     }
   if (isa.at(i) >= 'a' and isa.at(i) < 'z')
@@ -231,7 +257,7 @@ extractExtension(const std::string& isa, size_t& i, std::string& extension)
 }
 
 
-// Extract optional versio. If next character i a digit, extract
+// Extract optional version. If next character is a digit, extract
 // version and subversion: a sequence of decimal digits followed by a
 // 'p' followed by another sequence of decimal digits. Return true on
 // success.
