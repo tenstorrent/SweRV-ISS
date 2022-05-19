@@ -2,20 +2,9 @@ INSTALL_DIR := .
 
 PROJECT := whisper
 
-# For Static Linking to Boost Library
-# STATIC_LINK := 1
-# For Dynamic linking to Boost Library change the following line to
-# STATIC_LINK := 0
-# or
+# For Dynamic linking to Boost Library use:
 # make STATIC_LINK=0
 STATIC_LINK := 1
-
-# For non-default compiler toolchain uncomment and change the following variables
-#CC := gcc-8
-#CXX := g++-8
-#AR := gcc-ar-8
-# Or run make with these options
-# $ make CC=gcc-8 CXX=g++-8 AR=gcc-ar-8
 
 # We use boost 1.67.
 # Set the BOOST_ROOT environment variable to point to the base install
@@ -33,22 +22,13 @@ BOOST_LIB_DIR := $(wildcard $(BOOST_DIR)/stage/lib $(BOOST_DIR)/lib)
 BOOST_LIBS := boost_program_options
 
 # Add extra dependency libraries here
-EXTRA_LIBS := -lpthread -lm -lz -lstdc++fs
-ifeq ($(findstring g++,$(CXX)),g++)
-  EXTRA_LIBS += -static-libstdc++
-else
-  EXTRA_LIBS += -lstdc++ -static
-endif
-
-ifeq (mingw,$(findstring mingw,$(shell $(CXX) -v 2>&1 | grep Target | cut -d' ' -f2)))
-EXTRA_LIBS += -lws2_32
-endif
+EXTRA_LIBS := -lpthread -lm -lz -lstdc++fs -static-libstdc++
 
 ifdef SOFT_FLOAT
-override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include
-override CPPFLAGS += -DSOFT_FLOAT
-soft_float_build := $(wildcard $(PWD)/third_party/softfloat/build/RISCV-GCC)
-soft_float_lib := $(soft_float_build)/softfloat.a
+  override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include
+  override CPPFLAGS += -DSOFT_FLOAT
+  soft_float_build := $(wildcard $(PWD)/third_party/softfloat/build/RISCV-GCC)
+  soft_float_lib := $(soft_float_build)/softfloat.a
 endif
 
 MEM_CALLBACKS := 1
@@ -62,7 +42,7 @@ ifeq ($(MEM_CALLBACKS), 1)
 endif
 
 ifdef FAST_SLOPPY
-override CPPFLAGS += -DFAST_SLOPPY
+  override CPPFLAGS += -DFAST_SLOPPY
 endif
 
 # Add External Library location paths here
@@ -78,7 +58,7 @@ else
 endif
 
 ifeq (Darwin,$(shell uname))
-   LINK_LIBS := $(BOOST_LIB_DIR)/lib$(BOOST_LIBS).a $(EXTRA_LIBS)
+  LINK_LIBS := $(BOOST_LIB_DIR)/lib$(BOOST_LIBS).a $(EXTRA_LIBS)
 endif
 
 # For out of source build
@@ -98,11 +78,6 @@ override CXXFLAGS += -MMD -MP -mfma -std=c++17 $(OFLAGS) $(IFLAGS) -fPIC -pedant
 $(BUILD_DIR)/%.cpp.o:  %.cpp
 	@if [ ! -d "$(dir $@)" ]; then $(MKDIR_P) $(dir $@); fi
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
-
-# Rule to make a .o from a .c file.
-$(BUILD_DIR)/%.c.o:  %.c
-	@if [ ! -d "$(dir $@)" ]; then $(MKDIR_P) $(dir $@); fi
-	$(CC) $(CFLAGS) -c -o $@ $<
 
 # Main target.(only linking)
 $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
