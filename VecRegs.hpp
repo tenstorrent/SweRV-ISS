@@ -120,8 +120,6 @@ namespace WdRiscv
 
     friend class Hart<uint32_t>;
     friend class Hart<uint64_t>;
-    friend class ArchInfo<uint32_t>;
-    friend class ArchInfo<uint64_t>;
 
     /// Constructor: Define an empty vector regidter file which may be
     /// reconfigured later using the config method.
@@ -294,6 +292,20 @@ namespace WdRiscv
     bool getLastMemory(std::vector<uint64_t>& addresses,
 		       std::vector<uint64_t>& data,
 		       unsigned& elementSize) const;
+
+    /// Return true if the given element width and grouping
+    /// combination is legal.
+    bool legalConfig(ElementWidth ew, GroupMultiplier mul) const
+    {
+      if (size_t(ew) >= legalConfigs_.size()) return false;
+      const auto& groupFlags = legalConfigs_.at(size_t(ew));
+      if (size_t(mul) >= groupFlags.size()) return false;
+      return groupFlags.at(size_t(mul));
+    }
+
+    /// Return the smallest element size in bytes.
+    unsigned minElementSizeInBytes() const
+    { return minBytesPerElem_; }
 
     /// Set symbol to the symbolic value of the given numeric group
     /// multiplier (premultiplied by 8). Return true on success and
@@ -495,12 +507,6 @@ namespace WdRiscv
 
     void reset();
 
-    uint32_t startIndex() const
-    { return start_; }
-
-    void setStartIndex(uint32_t start)
-    { start_ = start; }
-
     /// Return currently configure element count (cached valye of VL).
     uint32_t elemCount() const
     { return elems_; }
@@ -522,16 +528,6 @@ namespace WdRiscv
     bool legalConfig() const
     { return not vill_; }
 
-    /// Return true if the given element width and grouping
-    /// combination is legal.
-    bool legalConfig(ElementWidth ew, GroupMultiplier mul) const
-    {
-      if (size_t(ew) >= legalConfigs_.size()) return false;
-      const auto& groupFlags = legalConfigs_.at(size_t(ew));
-      if (size_t(mul) >= groupFlags.size()) return false;
-      return groupFlags.at(size_t(mul));
-    }
-
     /// Update cached vtype fields. This is called when Vsetvli is
     /// executed.
     void updateConfig(ElementWidth sew, GroupMultiplier gm,
@@ -548,6 +544,16 @@ namespace WdRiscv
     }
 
   private:
+
+    /// Return the start index of vector operations. This is a cached
+    /// value of the VSTART CSR.
+    uint32_t startIndex() const
+    { return start_; }
+
+    /// Set the start index of vector operations. This is a cached
+    /// value of of the VSTART CSR.
+    void setStartIndex(uint32_t start)
+    { start_ = start; }
 
     /// Map an vector group multiplier to a flag indicating whether given
     /// group is supported.
