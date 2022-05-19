@@ -4069,33 +4069,21 @@ public:
   SignalHandlers()
   {
     clearUserStop();
-#ifdef __MINGW64__
-  __p_sig_fn_t newKbdAction = forceUserStop;
-  prevKbdAction_ = signal(SIGINT, newKbdAction);
-#else
-  struct sigaction newKbdAction;
-  memset(&newKbdAction, 0, sizeof(newKbdAction));
-  newKbdAction.sa_handler = forceUserStop;
-  sigaction(SIGINT, &newKbdAction, &prevKbdAction_);
-#endif
+
+    struct sigaction newKbdAction;
+    memset(&newKbdAction, 0, sizeof(newKbdAction));
+    newKbdAction.sa_handler = forceUserStop;
+    sigaction(SIGINT, &newKbdAction, &prevKbdAction_);
   }
 
   ~SignalHandlers()
   {
-#ifdef __MINGW64__
-    signal(SIGINT, prevKbdAction_);
-#else
     sigaction(SIGINT, &prevKbdAction_, nullptr);
-#endif
   }
   
 private:
 
-#ifdef __MINGW64__
-  __p_sig_fn_t prevKbdAction_ = nullptr;
-#else
   struct sigaction prevKbdAction_;
-#endif
 };
 
 

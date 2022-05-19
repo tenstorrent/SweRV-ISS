@@ -34,12 +34,10 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#ifndef __MINGW64__
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
-#endif
 
 #include "Hart.hpp"
 #include "Syscall.hpp"
@@ -48,7 +46,7 @@
 using namespace WdRiscv;
 
 
-#if defined(__APPLE__) || defined(__CYGWIN__)
+#if defined(__APPLE__)
   #define off64_t off_t
   #define MREMAP_MAYMOVE 0
 #endif
@@ -154,30 +152,6 @@ copyStatBufferToRiscv(Hart<URV>& hart, const struct stat& buff,
 #ifdef __APPLE__
   // TODO: adapt code for Mac OS.
   addr += 40;
-#elif defined __MINGW64__
-  if (not hart.pokeMemory(addr, uint32_t(buff.st_atime), true))
-    return addr - rvBuff;
-  addr += 4;
-
-  if (not hart.pokeMemory(addr, uint32_t(0), true))
-    return addr - rvBuff;
-  addr += 4;
-
-  if (not hart.pokeMemory(addr, uint32_t(buff.st_mtime), true))
-    return addr - rvBuff;
-  addr += 4;
-
-  if (not hart.pokeMemory(addr, uint32_t(0), true))
-    return addr - rvBuff;
-  addr += 4;
-
-  if (not hart.pokeMemory(addr, uint32_t(buff.st_ctime), true))
-    return addr - rvBuff;
-  addr += 4;
-
-  if (not hart.pokeMemory(addr, uint32_t(0), true))
-    return addr - rvBuff;
-  addr += 4;
 #else
   if (not hart.pokeMemory(addr, uint32_t(buff.st_blksize), true))
     return addr - rvBuff;
@@ -738,9 +712,7 @@ Syscall<URV>::emulate()
 
   memChanges_.clear();
 
-#ifndef __MINGW64__
   URV a3 = hart_.peekIntReg(RegA3);
-#endif
 
   URV num = 0;
   if (hart_.isRve())
@@ -750,7 +722,6 @@ Syscall<URV>::emulate()
 
   switch (num)
     {
-#ifndef __MINGW64__
     case 17:       // getcwd
       {
 	size_t size = a1;
@@ -938,7 +909,7 @@ Syscall<URV>::emulate()
 
     case 61:       // getdents64  -- get directory entries
       {
-#if defined(__APPLE__) || defined(__CYGWIN__)
+#if defined(__APPLE__)
 	return SRV(-1);
 #else
 	// TBD: double check that struct linux_dirent is same
@@ -1065,7 +1036,6 @@ Syscall<URV>::emulate()
         memChanges_.push_back(AddrLen{rvBuff, len});
 	return copyOk? rc : SRV(-1);
       }
-#endif
 
     case 80:       // fstat
       {
@@ -1188,7 +1158,6 @@ Syscall<URV>::emulate()
 	return 0;
       }
 
-#ifndef __MINGW64__
     case 153: // times
       {
 	URV rvBuff = a0;
@@ -1335,7 +1304,6 @@ Syscall<URV>::emulate()
 
         return mmap_alloc(length);
       }
-#endif
 
     case 276:  // rename
       {

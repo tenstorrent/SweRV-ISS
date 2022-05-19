@@ -19,9 +19,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <boost/algorithm/string.hpp>
-#ifndef __MINGW64__
 #include <sys/mman.h>
-#endif
 #include <elfio/elfio.hpp>
 #include <zlib.h>
 #include "Memory.hpp"
@@ -49,7 +47,6 @@ Memory::Memory(size_t size, size_t pageSize)
 
 #ifndef MEM_CALLBACKS
 
-#ifndef __MINGW64__
   void* mem = mmap(nullptr, size_, PROT_READ | PROT_WRITE,
 		   MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
   if (mem == (void*) -1)
@@ -57,14 +54,6 @@ Memory::Memory(size_t size, size_t pageSize)
       std::cerr << "Failed to map " << size_ << " bytes using mmap.\n";
       throw std::runtime_error("Out of memory");
     }
-#else
-  void* mem = malloc(size_);
-  if (mem == nullptr)
-    {
-      std::cerr << "Failed to alloc " << size_ << " bytes using malloc.\n";
-      throw std::runtime_error("Out of memory");
-    }
-#endif
 
   data_ = reinterpret_cast<uint8_t*>(mem);
 
@@ -77,11 +66,7 @@ Memory::~Memory()
 {
   if (data_)
     {
-#ifndef __MINGW64__
       munmap(data_, size_);
-#else
-      free(data_);
-#endif
       data_ = nullptr;
     }
 

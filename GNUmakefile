@@ -34,12 +34,10 @@ BOOST_LIBS := boost_program_options
 
 # Add extra dependency libraries here
 EXTRA_LIBS := -lpthread -lm -lz -lstdc++fs
-ifneq (CYGWIN_NT-10.0,$(shell uname -s))
-  ifeq ($(findstring g++,$(CXX)),g++)
-    EXTRA_LIBS += -static-libstdc++
-  else
-    EXTRA_LIBS += -lstdc++ -static
-  endif
+ifeq ($(findstring g++,$(CXX)),g++)
+  EXTRA_LIBS += -static-libstdc++
+else
+  EXTRA_LIBS += -lstdc++ -static
 endif
 
 ifeq (mingw,$(findstring mingw,$(shell $(CXX) -v 2>&1 | grep Target | cut -d' ' -f2)))
@@ -94,11 +92,7 @@ OFLAGS := -O3
 IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I. -Ithird_party
 
 # Command to compile .cpp files.
-ifeq (CYGWIN_NT-10.0,$(shell uname -s))
-override CXXFLAGS += -MMD -MP -mfma -std=c++17 -D_GNU_SOURCE $(OFLAGS) $(IFLAGS) -pedantic -Wall -Wextra
-else
 override CXXFLAGS += -MMD -MP -mfma -std=c++17 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra
-endif
 
 # Rule to make a .o from a .cpp file.
 $(BUILD_DIR)/%.cpp.o:  %.cpp

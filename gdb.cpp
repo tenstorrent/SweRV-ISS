@@ -23,10 +23,6 @@
 #include "Hart.hpp"
 
 
-#ifdef __MINGW64__
-#define SIGTRAP 5
-#endif
-
 static
 int
 putDebugChar(char c, int fd)

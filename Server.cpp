@@ -19,12 +19,8 @@
 #include <algorithm>
 #include <boost/format.hpp>
 #include <cstring>
-#ifdef __MINGW64__
-#include <winsock2.h>
-#else
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#endif
 
 #define __STDC_FORMAT_MACROS
 #include <cinttypes>
