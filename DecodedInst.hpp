@@ -213,9 +213,29 @@ namespace WdRiscv
     unsigned vecFieldCount() const
     { return vecFields_; }
 
-  protected:
+    /// Reset this object to the given values.
+    void reset(uint64_t addr, uint64_t physAddr, uint32_t inst,
+	       const InstEntry* entry,
+	       uint32_t op0, uint32_t op1, uint32_t op2, uint32_t op3)
+    {
+      addr_ = addr;
+      physAddr_ = physAddr;
+      inst_ = inst;
+      entry_ = entry;
+      op0_ = op0; op1_ = op1; op2_ = op2; op3_ = op3;
+      size_ = instructionSize(inst);
+      valid_ = entry != nullptr;
+    }
 
-    friend class Decoder;
+    /// Mark as a masked instruction. Only relevant to vector instructions.
+    void setMasked(bool flag)
+    { masked_ = flag; }
+
+    /// Set the field count. Only relevant to vector load/store instruction.
+    void setVecFieldCount(uint32_t count)
+    { vecFields_ = count; }
+
+  protected:
 
     void setAddr(uint64_t addr)
     { addr_ = addr; }
@@ -237,25 +257,6 @@ namespace WdRiscv
 
     void setOp3(uint32_t op3)
     { op3_ = op3; }
-
-    void setMasked(bool flag)
-    { masked_ = flag; }
-
-    void setVecFieldCount(uint32_t count)
-    { vecFields_ = count; }
-
-    void reset(uint64_t addr, uint64_t physAddr, uint32_t inst,
-	       const InstEntry* entry,
-	       uint32_t op0, uint32_t op1, uint32_t op2, uint32_t op3)
-    {
-      addr_ = addr;
-      physAddr_ = physAddr;
-      inst_ = inst;
-      entry_ = entry;
-      op0_ = op0; op1_ = op1; op2_ = op2; op3_ = op3;
-      size_ = instructionSize(inst);
-      valid_ = entry != nullptr;
-    }
 
   private:
 

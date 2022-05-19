@@ -135,7 +135,7 @@ ArchInfo<URV>::createLmulInfo(nlohmann::json& j)
     {
       nlohmann::json record;
       GroupMultiplier lmulEnum = static_cast<GroupMultiplier>(lmul);
-      bool enable = hart_.vecRegs_.legalConfig(static_cast<ElementWidth>(hart_.vecRegs_.minBytesPerElem_), lmulEnum);
+      bool enable = hart_.vecRegs_.legalConfig(static_cast<ElementWidth>(hart_.vecRegs_.minElementSizeInBytes()), lmulEnum);
       enable = enable and (lmulEnum != GroupMultiplier::Reserved);
 
       unsigned encoding = lmul & entries_.at(ArchEntryName::Lmul).mask;
