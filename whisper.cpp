@@ -30,17 +30,9 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
-#ifdef __MINGW64__
-#include <winsock2.h>
-typedef int socklen_t;
-#define close(s)          closesocket((s))
-#define setlinebuf(f)     setvbuf((f),NULL,_IOLBF,0)
-#define strerror_r(a,b,c) strerror((a))
-#else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#endif
 
 #include <csignal>
 #include "HartConfig.hpp"
@@ -1513,15 +1505,11 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
     {
       // Ignore keyboard interrupt for most commands. Long running
       // commands will enable keyboard interrupts while they run.
-#ifdef __MINGW64__
-      signal(SIGINT, kbdInterruptHandler);
-#else
       struct sigaction newAction;
       sigemptyset(&newAction.sa_mask);
       newAction.sa_flags = 0;
       newAction.sa_handler = kbdInterruptHandler;
       sigaction(SIGINT, &newAction, nullptr);
-#endif
 
       Interactive interactive(system);
       return interactive.interact(traceFile, cmdLog);
