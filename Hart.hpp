@@ -743,11 +743,6 @@ namespace WdRiscv
     /// subsequent interrupt if fast-interrupt is enabled.
     void postDataAccessFault(URV offset);
 
-    /// Enable printing of load/store data address in instruction
-    /// trace mode.
-    void setTraceLoadStore(bool flag)
-    { traceLdSt_ = flag; }
-
     /// Return count of traps (exceptions or interrupts) seen by this
     /// hart.
     uint64_t getTrapCount() const
@@ -3960,7 +3955,6 @@ namespace WdRiscv
     uint32_t perfControl_ = ~0;     // Performance counter control
     uint32_t prevPerfControl_ = ~0; // Value before current instruction.
 
-    bool traceLdSt_ = false;        // Trace addr of ld/st insts if true.
     URV ldStAddr_ = 0;              // Addr of data of most recent ld/st inst.
     uint64_t ldStPhysAddr_ = 0;
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
