@@ -455,7 +455,7 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	("interactive,i", po::bool_switch(&args.interactive),
 	 "Enable interactive mode.")
 	("traceload", po::bool_switch(&args.traceLdSt),
-	 "Enable tracing of load/store instruction data address.")
+	 "Enable tracing of load/store instruction data address (deprecated -- now always on).")
 	("triggers", po::bool_switch(&args.triggers),
 	 "Enable debug triggers (triggers are on in interactive and server modes)")
 	("counters", po::bool_switch(&args.counters),
@@ -1005,8 +1005,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     }
 
   // Print load-instruction data-address when tracing instructions.
-  if (args.traceLdSt)
-    hart.setTraceLoadStore(args.traceLdSt);
+  // if (args.traceLdSt)  // Deprecated -- now always on.
 
   // Setup periodic external interrupts.
   if (args.alarmInterval)

@@ -2837,27 +2837,24 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   if (hasInterrupt_)
     tmp += " (interrupted)";
 
-  if (traceLdSt_)
+  if (ldStSize_)
     {
-      if (ldStSize_)
+      std::ostringstream oss;
+      oss << "0x" << std::hex << ldStAddr_;
+      tmp += " [" + oss.str() + "]";
+    }
+  else if (not vecRegs_.ldStAddr_.empty())
+    {
+      std::ostringstream oss;
+      for (size_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
 	{
-	  std::ostringstream oss;
-	  oss << "0x" << std::hex << ldStAddr_;
-	  tmp += " [" + oss.str() + "]";
+	  if (i > 0)
+	    oss << ";";
+	  oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
+	  if (i < vecRegs_.stData_.size())
+	    oss << ':' << "0x" << vecRegs_.stData_.at(i);
 	}
-      else if (not vecRegs_.ldStAddr_.empty())
-	{
-	  std::ostringstream oss;
-	  for (size_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
-	    {
-	      if (i > 0)
-		oss << ";";
-	      oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
-	      if (i < vecRegs_.stData_.size())
-		oss << ':' << "0x" << vecRegs_.stData_.at(i);
-	    }
-	  tmp += " [" + oss.str() + "]";
-	}
+      tmp += " [" + oss.str() + "]";
     }
 
   char instBuff[128];
