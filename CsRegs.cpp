@@ -36,6 +36,7 @@ CsRegs<URV>::CsRegs()
   defineDebugRegs();
   defineVectorRegs();
   defineFpRegs();
+  defineAiaRegs();
 }
 
 
@@ -1340,6 +1341,33 @@ CsRegs<URV>::defineFpRegs()
   defineCsr("fflags",   CsrNumber::FFLAGS,   !mand, !imp, 0, wam, wam);
   defineCsr("frm",      CsrNumber::FRM,      !mand, !imp, 0, wam, wam);
   defineCsr("fcsr",     CsrNumber::FCSR,     !mand, !imp, 0, 0xff, 0xff);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineAiaRegs()
+{
+  bool mand = true;  // Mndatory
+  bool imp = true;   // Implemented
+  URV wam = ~URV(0);  // Write-all mask: all bits writeable.
+
+  // Advanced interrupt archtecture CSRs
+  defineCsr("miselect",   CsrNumber::MISELECT,   !mand, !imp, 0, wam, wam);
+  defineCsr("mireg",      CsrNumber::MIREG,      !mand, !imp, 0, wam, wam);
+  defineCsr("mtopi",      CsrNumber::MTOPI,      !mand, !imp, 0, wam, wam);
+  defineCsr("mseteipnum", CsrNumber::MSETEIPNUM, !mand, !imp, 0, wam, wam);
+  defineCsr("mclreipnum", CsrNumber::MCLREIPNUM, !mand, !imp, 0, wam, wam);
+  defineCsr("mseteienum", CsrNumber::MSETEIENUM, !mand, !imp, 0, wam, wam);
+  defineCsr("mclreienum", CsrNumber::MCLREIENUM, !mand, !imp, 0, wam, wam);
+  defineCsr("mtopei",     CsrNumber::MTOPEI,     !mand, !imp, 0, wam, wam);
+  defineCsr("mvien",      CsrNumber::MVIEN,      !mand, !imp, 0, wam, wam);
+  defineCsr("mvip",       CsrNumber::MVIP,       !mand, !imp, 0, wam, wam);
+  defineCsr("midelegh",   CsrNumber::MIDELEGH,   !mand, !imp, 0, wam, wam);
+  defineCsr("mieh",       CsrNumber::MIEH,       !mand, !imp, 0, wam, wam);
+  defineCsr("mvienh",     CsrNumber::MVIENH,     !mand, !imp, 0, wam, wam);
+  defineCsr("mviph",      CsrNumber::MVIPH,      !mand, !imp, 0, wam, wam);
+  defineCsr("miph",       CsrNumber::MIPH,       !mand, !imp, 0, wam, wam);
 }
 
 
