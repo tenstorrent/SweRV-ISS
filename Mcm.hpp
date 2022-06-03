@@ -11,9 +11,6 @@
 namespace WdRiscv
 {
   template <typename URV>
-  class System;
-
-  template <typename URV>
   class Hart;
 
   class DecodedInst;
@@ -96,7 +93,7 @@ namespace WdRiscv
   {
   public:
 
-    Mcm(WdRiscv::System<URV>&, unsigned mergeBufferSize);
+    Mcm(unsigned hartCount, unsigned mergeBufferSize);
 
     ~Mcm();
 
@@ -288,7 +285,6 @@ namespace WdRiscv
     std::vector<McmInstrVec> hartInstrVecs_; // One vector per hart.
     std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
 
-    WdRiscv::System<URV>& system_;
     uint64_t time_ = 0;
     unsigned lineSize_ = 64; // Merge buffer line size.
 
