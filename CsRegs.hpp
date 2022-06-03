@@ -330,6 +330,23 @@ namespace WdRiscv
       VTYPE    = 0xc21,
       VLENB    = 0xc22,
 
+      // Advanced interrupt architecture (AIA)
+      MISELECT   = 0x315,
+      MIREG      = 0x351,
+      MTOPI      = 0xFB0,
+      MSETEIPNUM = 0x358,
+      MCLREIPNUM = 0x359,
+      MSETEIENUM = 0x35a,
+      MCLREIENUM = 0x35b,
+      MTOPEI     = 0x35c,
+      MVIEN      = 0x308,
+      MVIP       = 0x309,
+      MIDELEGH   = 0x313,
+      MIEH       = 0x314,
+      MVIENH     = 0x318,
+      MVIPH      = 0x319,
+      MIPH       = 0x354,
+
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
     };
@@ -912,6 +929,9 @@ namespace WdRiscv
 
     /// Helper to construtor. Define floating point CSRs
     void defineFpRegs();
+
+    /// Helper to construtor. Define advanced interrupt architecture CSRs
+    void defineAiaRegs();
 
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.

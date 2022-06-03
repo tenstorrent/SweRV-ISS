@@ -8,28 +8,28 @@ using std::cerr;
 
 
 template <typename URV>
-Mcm<URV>::Mcm(System<URV>& system, unsigned mergeBufferSize)
-  : system_(system), lineSize_(mergeBufferSize)
+Mcm<URV>::Mcm(unsigned hartCount, unsigned mergeBufferSize)
+  : lineSize_(mergeBufferSize)
 {
   sysMemOps_.reserve(200000);
 
-  hartInstrVecs_.resize(system.hartCount());
+  hartInstrVecs_.resize(hartCount);
   for (auto& vec : hartInstrVecs_)
     vec.reserve(200000);
 
-  hartPendingWrites_.resize(system.hartCount());
-  currentInstrTag_.resize(system.hartCount());
+  hartPendingWrites_.resize(hartCount);
+  currentInstrTag_.resize(hartCount);
 
-  hartRegTimes_.resize(system.hartCount());
+  hartRegTimes_.resize(hartCount);
   for (auto& vec : hartRegTimes_)
     vec.resize(totalRegCount_);
 
-  hartRegProducers_.resize(system.hartCount());
+  hartRegProducers_.resize(hartCount);
   for (auto& vec : hartRegProducers_)
     vec.resize(totalRegCount_);
 
-  hartBranchTimes_.resize(system.hartCount());
-  hartBranchProducers_.resize(system.hartCount());
+  hartBranchTimes_.resize(hartCount);
+  hartBranchProducers_.resize(hartCount);
 
   // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
