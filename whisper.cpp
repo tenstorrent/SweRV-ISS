@@ -1570,8 +1570,9 @@ checkAndRepairMemoryParams(size_t& memSize, size_t& pageSize)
   size_t pageCount = memSize / pageSize;
   if (pageCount * pageSize != memSize)
     {
-      pageCount++;
-      size_t newSize = pageCount * pageSize;
+      size_t newSize = (pageCount + 1) * pageSize;
+      if (newSize == 0)
+	newSize = (pageCount - 1) * pageSize;  // Avoid overflow
       std::cerr << "Memory size (0x" << std::hex << memSize << ") is not a "
 		<< "multiple of page size (0x" << pageSize << ") -- "
 		<< "using 0x" << newSize << '\n' << std::dec;
