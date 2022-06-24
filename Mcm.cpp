@@ -383,12 +383,14 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	  updateDependencies(hart, *instr);
 	  return false;
 	}
+#if 0
       if (instrHasWrite(*instr))
 	{
 	  cerr << "Error: Amo instruction tag=" << tag
-	       << " retired after read op.\n";
+	       << " retired after write op.\n";
 	  return false;
 	}
+#endif
       instr->isStore_ = true;  // AMO is both load and store.
     }
 
