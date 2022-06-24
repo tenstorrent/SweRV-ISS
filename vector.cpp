@@ -161,8 +161,7 @@ namespace std
 namespace WdRiscv
 {
   /// Return the width in bits of the given integer type T. This is
-  /// usually 8*sizeof(T) but is different for wide types implemented
-  /// using boost multiprecision types.
+  /// usually 8*sizeof(T).
   template <typename T>
   unsigned
   integerWidth()
@@ -211,7 +210,7 @@ namespace WdRiscv
 
 
   /// Return the integral type that is the same width as the given
-  /// floating point. For example:
+  /// floating point type. For example:
   ///    getSameWidthIntegerType<float>::type
   /// yields the type
   ///    int32_t.
@@ -224,8 +223,8 @@ namespace WdRiscv
   template <> struct getSameWidthIntType<float>    { typedef int32_t  type; };
   template <> struct getSameWidthIntType<double>   { typedef int64_t  type; };
 
-  /// Return the unsignefd integral type that is the same width as the given
-  /// floating point. For example:
+  /// Return the unsigned integral type that is the same width as the given
+  /// floating point type. For example:
   ///    getSameWidthIntegerType<float>::type
   /// yields the type
   ///    uint32_t.
@@ -419,7 +418,7 @@ namespace WdRiscv
   }
 
   /// Set result to the product of a and b where a is signed and b
-  /// is an unsigned and where a and b have the same width.
+  /// is unsigned and where a and b have the same width.
   template <typename TS, typename TU>
   void mulsu(const TS& a, const TU& b, TS& result)
   {
@@ -494,7 +493,7 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
   // Clear soft-float library or x86 exception flags
   clearSimulatorFpFlags();
 
-  // Set soft-float library or x86 rounding mode.
+  // Set soft-float library or x86 rounding mode
   setSimulatorRoundingMode(getFpRoundingMode());
 
   if (not ok)
@@ -1115,10 +1114,10 @@ Hart<URV>::execVadd_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vadd_vx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Half:   vadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word:   vadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word2:  vadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
+    case EW::Byte:   vadd_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:   vadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:   vadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word2:  vadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -1147,10 +1146,10 @@ Hart<URV>::execVadd_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vadd_vx<int8_t> (vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Half:   vadd_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word:   vadd_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word2:  vadd_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
+    case EW::Byte:   vadd_vx<int8_t> (vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Half:   vadd_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word:   vadd_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
+    case EW::Word2:  vadd_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); break;
     case EW::Word8:  illegalInst(di); break;
     case EW::Word16: illegalInst(di); break;
@@ -3185,8 +3184,7 @@ Hart<URV>::vminu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 {
   unsigned errors = 0;
 
-  // Spec (sep 24, 2020) says this should be sign extended. We hope
-  // they come to their senses.
+  // Spec (sep 24, 2020) says this should be sign extended.
   ELEM_TYPE e2 = intRegs_.read(rs2);
   ELEM_TYPE e1 = 0, dest = 0;
 
@@ -3441,8 +3439,7 @@ Hart<URV>::vmaxu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 {
   unsigned errors = 0;
 
-   // Spec (sep 24, 2020) says this should be sign extended. We hope
-   // they come to their senses.
+  // Spec (sep 24, 2020) says this should be sign extended.
   ELEM_TYPE e2 = intRegs_.read(rs2);
   ELEM_TYPE e1 = 0, dest = 0;
 
@@ -3697,7 +3694,7 @@ Hart<URV>::vand_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 {
   unsigned errors = 0;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -3762,7 +3759,7 @@ Hart<URV>::vand_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
 {
   unsigned errors = 0;
 
-  // Spec says sign extend immediate. We comply. Looks foolish.
+  // Spec says sign extend immediate. We comply.
   ELEM_TYPE e1 = 0, e2 = imm, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -3891,7 +3888,7 @@ Hart<URV>::vor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 {
   unsigned errors = 0;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -4085,7 +4082,7 @@ Hart<URV>::vxor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 {
   unsigned errors = 0;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -4327,7 +4324,7 @@ Hart<URV>::execVsll_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   URV e2 = SRV(intRegs_.read(rs2));
 
   typedef ElementWidth EW;
@@ -4497,7 +4494,7 @@ Hart<URV>::execVsrl_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   URV e2 = SRV(intRegs_.read(rs2));
 
   typedef ElementWidth EW;
@@ -4597,7 +4594,7 @@ Hart<URV>::execVsra_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   URV e2 = SRV(intRegs_.read(rs2));
 
   typedef ElementWidth EW;
@@ -4786,7 +4783,7 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   URV e2 = SRV(intRegs_.read(rs2));
 
   typedef ElementWidth EW;
@@ -4898,7 +4895,7 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  // Spec says sign extend scalar register. We comply. Looks foolish.
+  // Spec says sign extend scalar register. We comply.
   URV e2 = SRV(intRegs_.read(rs2));
 
   typedef ElementWidth EW;
@@ -5325,7 +5322,7 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
       return;
     }
 
-  // vs2 is a maks register: elmul2 is 1
+  // vs2 is a mask register: elmul2 is 1
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -6662,8 +6659,8 @@ Hart<URV>::execVid_v(const DecodedInst* di)
       return;
     }
 
-  // Spec does not mention vstart > 0. Got a clarification saying it is ok not
-  // to ake an exception in that case.
+  // Spec does not mention vstart > 0. Got a clarification saying it
+  // is ok not to take an exception in that case.
   uint32_t start = vecRegs_.startIndex();
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -8304,7 +8301,7 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  SRV e2 = SRV(intRegs_.read(rs2));  // Spec says sign extend. Bogus.
+  SRV e2 = SRV(intRegs_.read(rs2));  // Spec says sign extend.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -8610,7 +8607,7 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  SRV e2 = SRV(intRegs_.read(rs2));   // Spec says sign extend. Bogus.
+  SRV e2 = SRV(intRegs_.read(rs2));   // Spec says sign extend.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -8712,7 +8709,7 @@ Hart<URV>::vwmaccu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 
   ELEM_TYPE e2 = 0;
   DWT dest = 0;
-  SDWT sde1 = SDWT(e1);  // sign extend (spec is foolish)
+  SDWT sde1 = SDWT(e1);  // sign extend (per spec)
   DWT de1 = sde1;  // And make unsigned
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -8763,7 +8760,7 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
       return;
     }
 
-  SRV e1 = SRV(intRegs_.read(rs1));  // Spec says sign extend. Bogus.
+  SRV e1 = SRV(intRegs_.read(rs1));  // Spec says sign extend.
 
   typedef ElementWidth EW;
   switch (sew)
@@ -9212,7 +9209,7 @@ Hart<URV>::vdivu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
   unsigned errors = 0;
 
   // Spec (sep 24, 2020) says scalar register value should be sign
-  // extended. We hope they come to their senses.
+  // extended.
   ELEM_TYPE e1 = 0, e2 = intRegs_.read(rs2), dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -9491,7 +9488,7 @@ Hart<URV>::vremu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
   unsigned errors = 0;
 
   // Spec (sep 24, 2020) says scalar register value should be sign
-  // extended. We hope they come to their senses.
+  // extended.
   ELEM_TYPE e1 = 0, e2 = intRegs_.read(rs2), dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
