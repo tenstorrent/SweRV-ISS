@@ -1479,9 +1479,12 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
     }
 
   ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr >= clintStart_ and addr < clintLimit_ and addr == 0x200bff8)
-    {
-      narrow = instCounter_;  // Fake time: use instruction count
+  if (addr >= clintStart_ and addr < clintLimit_ and addr - clintStart_ >= 0xbff8)
+    {    // Fake time: use instruction count
+      if ((addr & 7) == 0)  // Multiple of 8
+	narrow = instCounter_;  
+      else if ((addr & 3) == 0)  // multiple of 4
+	narrow = instCounter_ >> 32;
     }
   else
     {
@@ -1697,27 +1700,42 @@ Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
       auto hart = clintTimerAddrToHart_(addr);
       if (hart)
 	{
-	  hart->alarmLimit_ = storeVal;
-	  URV mipVal = hart->csRegs_.peekMip();
-	  mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-	  hart->pokeCsr(CsrNumber::MIP, mipVal);
+	  if (stSize == 4)
+	    {
+	      if ((addr & 7) == 0)  // Multiple of 8
+		{
+		  hart->alarmLimit_ = (hart->alarmLimit_ >> 32) << 32;  // Clear low 32
+		  hart->alarmLimit_ |= uint32_t(storeVal);  // Update low 32.
+		}
+	      else if ((addr & 3) == 0)  // Multiple of 4
+		{
+		  hart->alarmLimit_ = (hart->alarmLimit_ << 32) >> 32;  // Clear high 32
+		  hart->alarmLimit_ |= (uint64_t(storeVal) << 32);  // Update high 32.
+		}
+	    }
+	  else if (stSize == 8)
+	    {
+	      if ((addr & 7) == 0)
+		hart->alarmLimit_ = storeVal;
+	    }
+
+	  // URV mipVal = hart->csRegs_.peekMip();
+	  // mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+	  // hart->pokeCsr(CsrNumber::MIP, mipVal);
 	  return;
 	}
     }
 
-  if (addr == 0x200bff8)
-    {
-      std::cerr << "Aie mtime updated\n";
-      return;
-    }
+  if (addr - clintStart_ >= 0xbff8)
+    return;  // Timer.
 
   if (clintSoftAddrToHart_)
     {
       auto hart = clintSoftAddrToHart_(addr);
       if (hart)
 	{
-	  if (stSize != 4)
-	    return;  // Must be sw
+	  if (stSize != 4 or (addr & 3) != 0)
+	    return;  // Must be sw and word aligned
 
 	  storeVal = storeVal & 1;  // Only bit zero is implemented.
 
@@ -4746,12 +4764,19 @@ template <typename URV>
 bool
 Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 {
+  URV mipVal = csRegs_.peekMip();
   if (instCounter_ >= alarmLimit_)
     {
-      URV mipVal = csRegs_.peekMip();
       mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
       csRegs_.poke(CsrNumber::MIP, mipVal);
       alarmLimit_ += alarmInterval_;
+    }
+  else
+    {
+      URV prev = mipVal;
+      mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+      if (mipVal != prev)
+	csRegs_.poke(CsrNumber::MIP, mipVal);
     }
 
   if (debugStepMode_ and not dcsrStepIe_)

@@ -1608,7 +1608,7 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 		}
 	      else
 		{
-		  uint64_t clintStart = addr, clintEnd = addr + 0x8000 -1;
+		  uint64_t clintStart = addr, clintEnd = addr + 0xc000 -1;
 		  uint64_t timerAddr = addr + 0x4000;
 		  configClint(system, hart, clintStart, clintEnd, timerAddr);
 		}
