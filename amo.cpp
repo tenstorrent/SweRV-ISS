@@ -20,7 +20,6 @@
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
-#include "System.hpp"
 #include "Mcm.hpp"
 
 using namespace WdRiscv;

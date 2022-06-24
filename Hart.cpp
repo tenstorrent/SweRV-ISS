@@ -51,7 +51,6 @@
 
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
-#include "System.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
 #include "third_party/nlohmann/json.hpp"
