@@ -4728,12 +4728,6 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
         if (mie & mask & mip)
           {
             cause = ic;
-            if (ic == IC::M_TIMER and alarmInterval_ > 0)
-              {
-                // Reset the timer-interrupt pending bit.
-                mip = mip & ~mask;
-                pokeCsr(CsrNumber::MIP, mip);
-              }
             return true;
           }
     }
