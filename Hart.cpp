@@ -3056,28 +3056,28 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   fprintf(out, ",%x,", di.inst());
 
   // Changed integer register.
-  int reg = intRegs_.getLastWrittenReg();
+  int reg = lastIntReg();
   uint64_t val64 = 0;
   const char* sep = "";
   if (reg > 0)
     {
-      val64 = intRegs_.read(reg);
+      val64 = peekIntReg(reg);
       fprintf(out, "x%d=%lx", reg, val64);
       sep = ";";
     }
 
   // Changed fp register.
-  reg = fpRegs_.getLastWrittenReg();
+  reg = lastFpReg();
   if (reg >= 0)
     {
-      val64 = fpRegs_.readBitsRaw(reg);
+      peekFpReg(reg, val64);
       if (isRvd())
 	fprintf(out, "%sf%d=%lx", sep, reg, val64);
       else
 	fprintf(out, "%sf%d=%x", sep, reg, uint32_t(val64));
 
       // Print incremental flags since FRM is sticky.
-      unsigned fpFlags = fpRegs_.getLastFpFlags(); // Incremental FP flags.
+      unsigned fpFlags = lastFpFlags();
       if (fpFlags != 0)
 	fprintf(out, ";ff=%x", fpFlags);
       sep = ";";
@@ -3085,8 +3085,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Changed CSR register(s).
   std::vector<CsrNumber> csrns;
-  std::vector<unsigned> triggers;
-  lastCsr(csrns, triggers);
+  lastCsr(csrns);
   for (auto csrn : csrns)
     {
       URV val = 0;
@@ -3096,31 +3095,10 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     }
 
   // Changed vector register group.
-  unsigned groupX8 = 8;
-  int vecReg = vecRegs_.getLastWrittenReg(groupX8);
+  unsigned groupSize = 0;
+  int vecReg = lastVecReg(di, groupSize);
   if (vecReg >= 0)
     {
-      // We want to report all the registers in the group.
-      unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
-      vecReg = vecReg - (vecReg % groupSize);
-
-      InstId instId = di.instEntry()->instId();
-      if (instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v)
-	{
-	  vecReg = di.op0();
-	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
-	}
-      else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
-	{
-	  vecReg = di.op0();
-	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
-	}
-      else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
-	{
-	  vecReg = di.op0();
-	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
-	}
-
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
 	{
 	  fprintf(out, "%sv%d=", sep, vecReg);
@@ -3936,22 +3914,6 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
     return false;
 
   return true;
-}
-
-
-template <typename URV>
-int
-Hart<URV>::lastIntReg() const
-{
-  return intRegs_.getLastWrittenReg();
-}
-
-
-template <typename URV>
-int
-Hart<URV>::lastFpReg() const
-{
-  return fpRegs_.getLastWrittenReg();
 }
 
 

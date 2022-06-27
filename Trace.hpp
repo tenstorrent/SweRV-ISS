@@ -27,6 +27,12 @@ namespace WdRiscv
       : hart_(hart), di_(di)
     { }
 
+    /// Hart index of trace record. Every hart in the system is
+    /// assigned an unqiue index from a set of consecutive integers
+    /// starting with zero.
+    unsigned hartIndex() const
+    { return hart_->sysHartIndex(); }
+
     /// Virtual PC of last executed instruction.
     uint64_t virtPc() const
     { return di_.address(); }

@@ -655,12 +655,20 @@ namespace WdRiscv
     /// Support for tracing: Return the index of the integer register
     /// written by the last executed instruction. Return -1 if no
     /// integer register was written.
-    int lastIntReg() const;
+    int lastIntReg() const
+    { return intRegs_.getLastWrittenReg(); }
 
     /// Support for tracing: Return the index of the floating point
     /// register written by the last executed instruction. Return -1
     /// it no FP register was written.
-    int lastFpReg() const;
+    int lastFpReg() const
+    { return fpRegs_.getLastWrittenReg(); }
+
+    /// Support for tracing: Return the incremental change to the FRM
+    /// register by the last floating point instruction. Return zer0
+    /// if last instruction was not FP or if it had no impact on FRM.
+    unsigned lastFpFlags() const
+    { return fpRegs_.getLastFpFlags(); }
 
     /// Support for tracing: Return the index of the destination
     /// vector register of the last executed instruction. Return -1 if
