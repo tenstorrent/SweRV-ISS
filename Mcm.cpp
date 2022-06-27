@@ -211,9 +211,9 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     }
   else if (instEntry->isStore())
     return;   // No destination register.
-  else if (instEntry->isLoad() or instEntry->isAmo())
+  else if (di.isLoad() or di.isAmo())
     hasDep = false;
-  else if (instEntry->isBranch())
+  else if (di.isBranch())
     hasDep = false;
 
   for (const auto& opIx : instr.memOps_)
@@ -223,7 +223,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	tag = instr.tag_;
       }
 
-  if (instEntry->isBranch())
+  if (di.isBranch())
     hartBranchTimes_.at(hartIx) = 0;
 
   std::vector<unsigned> sourceRegs, destRegs;
@@ -237,7 +237,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  time = regTimeVec.at(regIx);
 	  tag = regProducer.at(regIx);
 	}
-      if (instEntry->isBranch())
+      if (di.isBranch())
 	if (first or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
 	  {
 	    first = false;

@@ -427,8 +427,7 @@ Server<URV>::disassembleAnnotateInst(Hart<URV>& hart,
 				     std::string& text)
 {
   hart.disassembleInst(di.inst(), text);
-  const InstEntry& entry = *(di.instEntry());
-  if (entry.isBranch())
+  if (di.isBranch())
     {
       if (hart.lastPc() + di.instSize() != hart.peekPc())
        text += " (T)";
@@ -437,24 +436,15 @@ Server<URV>::disassembleAnnotateInst(Hart<URV>& hart,
     }
 
   if (not interrupted)
-    if (entry.isLoad() or entry.isStore() or entry.isAtomic())
-      {
-        URV addr = hart.lastLdStAddress();
-        std::ostringstream oss;
-        oss << " [0x" << std::hex << addr << "]" << std::dec;
-        text += oss.str();
-        bool cacheable = hart.isAddrCacheable(addr);
-        bool io = not hart.isAddrCacheable(addr);
-        if (cacheable or io)
-          {
-            text += " (";
-            if (cacheable)
-              text += "C";
-            if (io)
-              text += "S";
-            text += ")";
-          }
-      }
+    {
+      uint64_t va = 0, pa = 0;
+      if (hart.lastLdStAddress(va, pa))
+	{
+	  std::ostringstream oss;
+	  oss << " [0x" << std::hex << va << "]" << std::dec;
+	  text += oss.str();
+	}
+    }
 
   if (interrupted)
     text += " (interrupted)";

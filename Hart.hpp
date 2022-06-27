@@ -638,9 +638,19 @@ namespace WdRiscv
     bool getToHostAddress(size_t& address) const
     { if (toHostValid_) address = toHost_; return toHostValid_; }
 
+    /// Program counter.
+    URV pc()
+    { return pc_; }
+
     /// Support for tracing: Return the pc of the last executed
     /// instruction.
-    URV lastPc() const;
+    URV lastPc() const
+    { return currPc_; }
+
+    /// Support for tracing: Return the privilege mode before the last
+    /// executed instruction.
+    PrivilegeMode lastPrivMode() const
+    { return lastPriv_; }
 
     /// Support for tracing: Return the index of the integer register
     /// written by the last executed instruction. Return -1 if no
@@ -666,8 +676,15 @@ namespace WdRiscv
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
     /// last instruction. CSRs modified as a side effect (e.g. mcycle
+    /// and minstret) are not included.
+    void lastCsr(std::vector<CsrNumber>& csrs) const
+    { csRegs_.getLastWrittenRegs(csrs); }
+
+    /// Support for tracing: Fill the csrs vector with the
+    /// register-numbers of the CSRs written by the execution of the
+    /// last instruction. CSRs modified as a side effect (e.g. mcycle
     /// and minstret) are not included. Fill the triggers vector with
-    /// the number of the debug-trigger registers written by the
+    /// the numbers of the debug-trigger registers written by the
     /// execution of the last instruction.
     void lastCsr(std::vector<CsrNumber>& csrs,
 		 std::vector<unsigned>& triggers) const;
@@ -695,10 +712,19 @@ namespace WdRiscv
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
 
-    /// Return data address of last executed ld/st instruction. Return 0
-    /// if last instruction was not a ld/st.
-    URV lastLdStAddress() const
-    { return ldStSize_? ldStAddr_ : 0; }
+    /// Return data size if last instruction is a ld/st instruction (AMO is considered a
+    /// store) setting virtAddr and physAddr to the corresponding virtual and physical
+    /// data addresses. Return 0 if last instruction was not a ld/st instruction
+    /// leaving virtAddr and physAddr unmodified. The value of physAddr will be zero
+    /// if virtual to physical translation encoutered an exception.
+    unsigned lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
+    {
+      if (ldStSize_ == 0)
+	return 0;
+      virtAddr = ldStAddr_;
+      physAddr = ldStPhysAddr_;
+      return ldStSize_;
+    }
 
     /// Return the size of the last ld/st instruction or 0 if last
     /// instruction was not a ld/st.

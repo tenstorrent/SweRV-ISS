@@ -3180,20 +3180,17 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Memory
   fputc(',', out);
+  uint64_t virtDataAddr = 0, physDataAddr = 0;
   bool load = false, store = false;
-  if (ldStSize_)
+  if (lastLdStAddress(virtDataAddr, physDataAddr))
     {
-      fprintf(out, "%lx", uint64_t(ldStAddr_));
-      if (ldStPhysAddr_ != ldStAddr_)
-	fprintf(out, ":%lx", ldStPhysAddr_);
-      uint64_t addr = 0, val = 0;
-      if (lastStore(addr, val))
-	{
-	  store = true;
-	  fprintf(out, "=%lx", val);
-	}
-      else
-	load = true;
+      store = ldStWrite_;
+      load = not store;
+      fprintf(out, "%lx", virtDataAddr);
+      if (physDataAddr != virtDataAddr)
+	fprintf(out, ":%lx", physDataAddr);
+      if (store)
+	fprintf(out, "=%lx", ldStData_);
     }
   else if (not vecRegs_.ldStAddr_.empty())
     {
@@ -3222,7 +3219,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	fputs(lastBranchTaken_ ? "t" : "nt", out);
       else
 	{
-	  if (instEntry->isBranchToRegister() and
+	  if (di.isBranchToRegister() and
 	      di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
 	    fputc('r', out);
 	  else if (di.op0() == IntRegNumber::RegRa)
@@ -3939,14 +3936,6 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
     return false;
 
   return true;
-}
-
-
-template <typename URV>
-URV
-Hart<URV>::lastPc() const
-{
-  return currPc_;
 }
 
 

@@ -194,6 +194,31 @@ namespace WdRiscv
     bool isFenceSuccOutput() const
     { return isFence() and ((inst_ >> 22) & 1); }
 
+    /// Return true if this is an AMO instruction.
+    bool isAmo() const
+    { return entry_ and entry_->isAmo(); }
+
+    /// Return true if this is a load instruction.
+    bool isLoad() const
+    { return entry_ and entry_->isLoad(); }
+
+    /// Return true if this is a store instruction.
+    bool isStore() const
+    { return entry_ and entry_->isStore(); }
+
+    /// Return true if this is a branch instruction.
+    bool isBranch() const
+    { return entry_ and entry_->isBranch(); }
+
+    /// Return true if this is a conditional branch instruction.
+    bool isConditionalBranch() const
+    { return entry_ and entry_->isConditionalBranch(); }
+
+    /// Return true if this is a branch instruction where the target
+    /// address is in a register.
+    bool isBranchToRegister() const
+    { return entry_ and entry_->isBranchToRegister(); }
+
     /// Associated a value with the ith operand. This has no effect if
     /// i is out of bounds or if the ith operand is an immediate. Note
     /// that the association is only in this object and that no

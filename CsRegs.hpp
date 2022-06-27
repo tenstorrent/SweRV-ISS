@@ -1017,6 +1017,13 @@ namespace WdRiscv
 
     /// Fill the nums vector with the numbers of the CSRs written by
     /// the last instruction.
+    void getLastWrittenRegs(std::vector<CsrNumber>& csrNums) const
+    {
+      csrNums = lastWrittenRegs_;
+    }
+
+    /// Fill the nums vector with the numbers of the CSRs and triggers
+    /// written by the last instruction.
     void getLastWrittenRegs(std::vector<CsrNumber>& csrNums,
 			    std::vector<unsigned>& triggerNums) const
     {
