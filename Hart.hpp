@@ -485,6 +485,7 @@ namespace WdRiscv
 
     /// Define a memory mapped locations for software interrupts.
     void configClint(uint64_t clintStart, uint64_t clintLimit,
+		     bool softwareInterruptOnReset,
                      std::function<Hart<URV>*(size_t addr)> swFunc,
                      std::function<Hart<URV>*(size_t addr)> timerFunc)
     {
@@ -492,6 +493,7 @@ namespace WdRiscv
       clintLimit_ = clintLimit;
       clintSoftAddrToHart_ = swFunc;
       clintTimerAddrToHart_ = timerFunc;
+      clintSiOnReset_ = softwareInterruptOnReset;
     }
 
     /// Disassemble given instruction putting results on the given
@@ -1451,6 +1453,9 @@ namespace WdRiscv
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
     void resetFloat();
+
+    /// Helper to reset.
+    void resetVector();
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
@@ -3927,6 +3932,7 @@ namespace WdRiscv
     uint64_t clintLimit_ = 0;
     std::function<Hart<URV>*(size_t addr)> clintSoftAddrToHart_ = nullptr;
     std::function<Hart<URV>*(size_t addr)> clintTimerAddrToHart_ = nullptr;
+    bool clintSiOnReset_ = false;
 
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
     bool nmiPending_ = false;

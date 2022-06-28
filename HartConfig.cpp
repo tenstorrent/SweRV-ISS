@@ -1063,7 +1063,7 @@ template<typename URV>
 bool
 HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
 			uint64_t clintStart, uint64_t clintLimit,
-			uint64_t timerAddr) const
+			uint64_t timerAddr, bool siOnReset) const
 {
   // Define callback to associate a memory mapped software interrupt
   // location to its corresponding hart so that when such a location
@@ -1091,7 +1091,7 @@ HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
     return nullptr;
   };
 
-  hart.configClint(clintStart, clintLimit, swAddrToHart, timerAddrToHart);
+  hart.configClint(clintStart, clintLimit, siOnReset, swAddrToHart, timerAddrToHart);
   return true;
 }
 
@@ -1587,6 +1587,12 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 {
   userMode = userMode or this->userModeEnabled();
 
+  bool siOnReset = false;
+  std::string siTag = "clint_software_interrupt_on_reset";
+  if (config_ -> count(siTag))
+    if (not getJsonBoolean(siTag, config_ -> at(siTag), siOnReset))
+      return false;
+
   // Apply JSON configuration.
   for (unsigned i = 0; i < system.hartCount(); ++i)
     {
@@ -1610,7 +1616,8 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 		{
 		  uint64_t clintStart = addr, clintEnd = addr + 0xc000 -1;
 		  uint64_t timerAddr = addr + 0x4000;
-		  configClint(system, hart, clintStart, clintEnd, timerAddr);
+		  if (not configClint(system, hart, clintStart, clintEnd, timerAddr, siOnReset))
+		    return false;
 		}
 	    }
 	  else
@@ -2279,9 +2286,9 @@ unpackMacoValue<uint64_t>(uint64_t value, uint64_t mask, bool rv32,
 template bool
 HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
 				  uint64_t clintStart, uint64_t clintLimit,
-				  uint64_t timerAddr) const;
+				  uint64_t timerAddr, bool siOnReset) const;
 
 template bool
 HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
 				  uint64_t clintStart, uint64_t clintLimit,
-				  uint64_t timerAddr) const;
+				  uint64_t timerAddr, bool siOnReset) const;

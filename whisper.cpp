@@ -197,7 +197,6 @@ struct Args
   std::optional<uint64_t> memorySize;
   std::optional<uint64_t> snapshotPeriod;
   std::optional<uint64_t> alarmInterval;
-  std::optional<uint64_t> swInterrupt;  // Sotware interrupt mem mapped address
   std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
   std::optional<uint64_t> syscallSlam;
 
@@ -353,18 +352,6 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       else if ((*args.clint & 7) != 0)
         {
           std::cerr << "Error: clint address must be a multiple of 8\n";
-          ok = false;
-        }
-    }
-
-  if (varMap.count("softinterrupt"))
-    {
-      auto numStr = varMap["softinterrupt"].as<std::string>();
-      if (not parseCmdLineNumber("softinterrupt", numStr, args.swInterrupt))
-        ok = false;
-      else if ((*args.swInterrupt & 3) != 0)
-        {
-          std::cerr << "Error: softinterrupt address must be a multiple of 4\n";
           ok = false;
         }
     }
@@ -975,21 +962,11 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   hart.enableConsoleInput(! args.noConInput);
 
-  if (args.clint and args.swInterrupt)
-    std::cerr << "Ignoring --sontinterrupt: incompatible with --clint.\n";
-
   if (args.clint)
     {
       uint64_t swAddr = *args.clint;
       uint64_t timerAddr = swAddr + 0x4000;
       uint64_t clintLimit = swAddr + 0xc000 - 1;
-      config.configClint(system, hart, swAddr, clintLimit, timerAddr);
-    }
-  else if (args.swInterrupt)
-    {
-      uint64_t swAddr = *args.swInterrupt;
-      uint64_t timerAddr = swAddr + 0x4000;
-      uint64_t clintLimit = swAddr + system.hartCount() * 4 - 1;
       config.configClint(system, hart, swAddr, clintLimit, timerAddr);
     }
 

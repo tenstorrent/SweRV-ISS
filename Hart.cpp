@@ -533,17 +533,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // Enable extensions if corresponding bits are set in the MISA CSR.
   processExtensions();
 
-  // If vector extension enabled but vectors not configured, then
-  // configure for 128-bits per regiser and 32-bits per elemement.
-  if (isRvv())
-    {
-      if (vecRegs_.registerCount() == 0)
-	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
-			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/);
-      unsigned bytesPerReg = vecRegs_.bytesPerRegister();
-      csRegs_.configCsr("vlenb", true, bytesPerReg, 0, 0, false, false);
-    }
-
   perfControl_ = ~uint32_t(0);
   URV value = 0;
   if (peekCsr(CsrNumber::MCOUNTINHIBIT, value))
@@ -562,15 +551,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
       dcsrStep_ = (value >> 2) & 1;
       dcsrStepIe_ = (value >> 11) & 1;
     }
-  if (peekCsr(CsrNumber::VTYPE, value))
-    {
-      bool vill = (value >> (8*sizeof(URV) - 1)) & 1;
-      bool ma = (value >> 7) & 1;
-      bool ta = (value >> 6) & 1;
-      GroupMultiplier gm = GroupMultiplier(value & 7);
-      ElementWidth ew = ElementWidth((value >> 3) & 7);
-      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
-    }
+
+  resetVector();
 
   resetFloat();
 
@@ -591,9 +573,42 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   for (auto& entry : pmaOverrideVec_)
     entry.reset();
 
+  // Trigger software interrupt in hart 0 on reset.
+  if (clintSiOnReset_ and hartIx_ == 0)
+    pokeMemory(clintStart_, uint32_t(1), true);
+
   clearTraceData();
 
   decoder_.enableRv64(isRv64());
+}
+
+
+template <typename URV>
+void
+Hart<URV>::resetVector()
+{
+  // If vector extension enabled but vectors not configured, then
+  // configure for 128-bits per regiser and 32-bits per elemement.
+  if (isRvv())
+    {
+      if (vecRegs_.registerCount() == 0)
+	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
+			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/);
+      unsigned bytesPerReg = vecRegs_.bytesPerRegister();
+      csRegs_.configCsr("vlenb", true, bytesPerReg, 0, 0, false, false);
+    }
+
+  // Make cached vector engine parameters match reset value of the VTYPE CSR.
+  URV value = 0;
+  if (peekCsr(CsrNumber::VTYPE, value))
+    {
+      bool vill = (value >> (8*sizeof(URV) - 1)) & 1;
+      bool ma = (value >> 7) & 1;
+      bool ta = (value >> 6) & 1;
+      GroupMultiplier gm = GroupMultiplier(value & 7);
+      ElementWidth ew = ElementWidth((value >> 3) & 7);
+      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+    }
 }
 
 
