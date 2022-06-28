@@ -88,6 +88,30 @@ namespace WdRiscv
     bool isBranchToRegister() const
     { return di_.isBranchToRegister(); }
 
+    /// Return true if record is for a floating point instruction.
+    bool isFp() const
+    { return di_.isFp(); }
+
+    /// Return true if record is for a vector instruction.
+    bool isVector() const
+    { return di_.isVector(); }
+
+    /// Return true if record is for a multiply instruction.
+    bool isMultiply() const
+    { return di_.isVector(); }
+
+    /// Return true if record is for a divide/remainder instruction.
+    bool isDivide() const
+    { return di_.isDivide(); }
+
+    /// Return the RISCV ISA extension of the instruction of this record.
+    RvExtension extension() const
+    { return di_.extension(); }
+
+    /// Return the RISCV instruction format of the instruction of this record.
+    RvFormat format() const
+    { return di_.format(); }
+
   private:
 
     const DecodedInst& di_;

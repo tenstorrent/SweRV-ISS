@@ -36,7 +36,7 @@
 #include "VirtMem.hpp"
 #include "Isa.hpp"
 #include "Decoder.hpp"
-#include "ArchInfo.hpp"
+
 
 namespace WdRiscv
 {
@@ -114,9 +114,6 @@ namespace WdRiscv
   class Hart
   {
   public:
-
-    friend class ArchInfo<uint32_t>;
-    friend class ArchInfo<uint64_t>;
 
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
@@ -535,6 +532,16 @@ namespace WdRiscv
     /// 16-bit code is not a valid compressed instruction.
     uint32_t expandCompressedInst(uint16_t inst) const
     { return decoder_.expandCompressedInst(inst); }
+
+    /// Return the instruction table entry associated with the given
+    /// instruction id. Reutrn illegal instruction entry id is out of
+    /// bounds.
+    const InstEntry& getInstructionEntry(InstId id) const
+    { return instTable_.getEntry(id); }
+
+    /// Return the vector registers associated with this hart.
+    const VecRegs& vecRegs() const
+    { return vecRegs_; }
 
     /// Load the given hex file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exists,

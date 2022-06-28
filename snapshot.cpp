@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <boost/algorithm/string.hpp>
+#include <iomanip>
 
 #if defined(__cpp_lib_filesystem)
   #include <filesystem>

@@ -198,6 +198,22 @@ namespace WdRiscv
     bool isAmo() const
     { return entry_ and entry_->isAmo(); }
 
+    /// Return true if this a floating point instruction.
+    bool isFp() const
+    { return entry_ and entry_->isFp(); }
+
+    /// Return true if this a vector instruction.
+    bool isVector() const
+    { return entry_ and entry_->isVector(); }
+    
+    /// Return true if this a multiply instruction.
+    bool isMultiply() const
+    { return entry_ and entry_->isMultiply(); }
+
+    /// Return true if this a divide instruction.
+    bool isDivide() const
+    { return entry_ and entry_->isDivide(); }
+
     /// Return true if this is a load instruction.
     bool isLoad() const
     { return entry_ and entry_->isLoad(); }
@@ -218,6 +234,14 @@ namespace WdRiscv
     /// address is in a register.
     bool isBranchToRegister() const
     { return entry_ and entry_->isBranchToRegister(); }
+
+    /// Return the RISCV extension of this instruction.
+    RvExtension extension() const
+    { return entry_? entry_->extension() : RvExtension::None; }
+
+    /// Return the RISCV format of this instruction.
+    RvFormat format() const
+    { return entry_? entry_->format() : RvFormat::None; }
 
     /// Associated a value with the ith operand. This has no effect if
     /// i is out of bounds or if the ith operand is an immediate. Note

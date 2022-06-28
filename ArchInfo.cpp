@@ -63,8 +63,11 @@ ArchInfo<URV>::createInstInfo(nlohmann::json& j)
 {
   if (entries_.find(ArchEntryName::Opcode) == entries_.end()) return true;
 
-  for (auto& entry : hart_.instTable_.getInstVec())
+  for (unsigned i = 0; i <= unsigned(InstId::maxId); ++i)
     {
+      InstId id = InstId(i);
+      auto& entry = hart_.getInstructionEntry(id);
+
       nlohmann::json record;
       bool disable = not hart_.hasIsaExtension(entry.extension());
       if (entry.isCompressed())
@@ -135,13 +138,13 @@ ArchInfo<URV>::createLmulInfo(nlohmann::json& j)
     {
       nlohmann::json record;
       GroupMultiplier lmulEnum = static_cast<GroupMultiplier>(lmul);
-      bool enable = hart_.vecRegs_.legalConfig(static_cast<ElementWidth>(hart_.vecRegs_.minElementSizeInBytes()), lmulEnum);
+      bool enable = hart_.vecRegs().legalConfig(static_cast<ElementWidth>(hart_.vecRegs().minElementSizeInBytes()), lmulEnum);
       enable = enable and (lmulEnum != GroupMultiplier::Reserved);
 
       unsigned encoding = lmul & entries_.at(ArchEntryName::Lmul).mask;
       if (enable)
         {
-          record += nlohmann::json::object_t::value_type("symbol", hart_.vecRegs_.to_string(lmulEnum));
+          record += nlohmann::json::object_t::value_type("symbol", hart_.vecRegs().to_string(lmulEnum));
           record += nlohmann::json::object_t::value_type("group", "lmul");
 
           std::ostringstream oss;
@@ -165,12 +168,12 @@ ArchInfo<URV>::createSewInfo(nlohmann::json& j)
     {
       nlohmann::json record;
       ElementWidth sewEnum = static_cast<ElementWidth>(sew);
-      bool enable = hart_.vecRegs_.legalConfig(sewEnum, GroupMultiplier::Eight);
+      bool enable = hart_.vecRegs().legalConfig(sewEnum, GroupMultiplier::Eight);
 
       unsigned encoding = sew & entries_.at(ArchEntryName::Sew).mask;
       if (enable)
         {
-          record += nlohmann::json::object_t::value_type("symbol", hart_.vecRegs_.to_string(sewEnum));
+          record += nlohmann::json::object_t::value_type("symbol", hart_.vecRegs().to_string(sewEnum));
           record += nlohmann::json::object_t::value_type("group", "sew");
 
           std::ostringstream oss;
