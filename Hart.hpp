@@ -36,7 +36,7 @@
 #include "VirtMem.hpp"
 #include "Isa.hpp"
 #include "Decoder.hpp"
-#include "ArchInfo.hpp"
+
 
 namespace WdRiscv
 {
@@ -114,9 +114,6 @@ namespace WdRiscv
   class Hart
   {
   public:
-
-    friend class ArchInfo<uint32_t>;
-    friend class ArchInfo<uint64_t>;
 
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
@@ -485,6 +482,7 @@ namespace WdRiscv
 
     /// Define a memory mapped locations for software interrupts.
     void configClint(uint64_t clintStart, uint64_t clintLimit,
+		     bool softwareInterruptOnReset,
                      std::function<Hart<URV>*(size_t addr)> swFunc,
                      std::function<Hart<URV>*(size_t addr)> timerFunc)
     {
@@ -492,6 +490,7 @@ namespace WdRiscv
       clintLimit_ = clintLimit;
       clintSoftAddrToHart_ = swFunc;
       clintTimerAddrToHart_ = timerFunc;
+      clintSiOnReset_ = softwareInterruptOnReset;
     }
 
     /// Disassemble given instruction putting results on the given
@@ -533,6 +532,16 @@ namespace WdRiscv
     /// 16-bit code is not a valid compressed instruction.
     uint32_t expandCompressedInst(uint16_t inst) const
     { return decoder_.expandCompressedInst(inst); }
+
+    /// Return the instruction table entry associated with the given
+    /// instruction id. Reutrn illegal instruction entry id is out of
+    /// bounds.
+    const InstEntry& getInstructionEntry(InstId id) const
+    { return instTable_.getEntry(id); }
+
+    /// Return the vector registers associated with this hart.
+    const VecRegs& vecRegs() const
+    { return vecRegs_; }
 
     /// Load the given hex file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exists,
@@ -638,19 +647,37 @@ namespace WdRiscv
     bool getToHostAddress(size_t& address) const
     { if (toHostValid_) address = toHost_; return toHostValid_; }
 
+    /// Program counter.
+    URV pc()
+    { return pc_; }
+
     /// Support for tracing: Return the pc of the last executed
     /// instruction.
-    URV lastPc() const;
+    URV lastPc() const
+    { return currPc_; }
+
+    /// Support for tracing: Return the privilege mode before the last
+    /// executed instruction.
+    PrivilegeMode lastPrivMode() const
+    { return lastPriv_; }
 
     /// Support for tracing: Return the index of the integer register
     /// written by the last executed instruction. Return -1 if no
     /// integer register was written.
-    int lastIntReg() const;
+    int lastIntReg() const
+    { return intRegs_.getLastWrittenReg(); }
 
     /// Support for tracing: Return the index of the floating point
     /// register written by the last executed instruction. Return -1
     /// it no FP register was written.
-    int lastFpReg() const;
+    int lastFpReg() const
+    { return fpRegs_.getLastWrittenReg(); }
+
+    /// Support for tracing: Return the incremental change to the FRM
+    /// register by the last floating point instruction. Return zer0
+    /// if last instruction was not FP or if it had no impact on FRM.
+    unsigned lastFpFlags() const
+    { return fpRegs_.getLastFpFlags(); }
 
     /// Support for tracing: Return the index of the destination
     /// vector register of the last executed instruction. Return -1 if
@@ -666,8 +693,15 @@ namespace WdRiscv
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
     /// last instruction. CSRs modified as a side effect (e.g. mcycle
+    /// and minstret) are not included.
+    void lastCsr(std::vector<CsrNumber>& csrs) const
+    { csRegs_.getLastWrittenRegs(csrs); }
+
+    /// Support for tracing: Fill the csrs vector with the
+    /// register-numbers of the CSRs written by the execution of the
+    /// last instruction. CSRs modified as a side effect (e.g. mcycle
     /// and minstret) are not included. Fill the triggers vector with
-    /// the number of the debug-trigger registers written by the
+    /// the numbers of the debug-trigger registers written by the
     /// execution of the last instruction.
     void lastCsr(std::vector<CsrNumber>& csrs,
 		 std::vector<unsigned>& triggers) const;
@@ -695,10 +729,19 @@ namespace WdRiscv
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
 
-    /// Return data address of last executed ld/st instruction. Return 0
-    /// if last instruction was not a ld/st.
-    URV lastLdStAddress() const
-    { return ldStSize_? ldStAddr_ : 0; }
+    /// Return data size if last instruction is a ld/st instruction (AMO is considered a
+    /// store) setting virtAddr and physAddr to the corresponding virtual and physical
+    /// data addresses. Return 0 if last instruction was not a ld/st instruction
+    /// leaving virtAddr and physAddr unmodified. The value of physAddr will be zero
+    /// if virtual to physical translation encoutered an exception.
+    unsigned lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
+    {
+      if (ldStSize_ == 0)
+	return 0;
+      virtAddr = ldStAddr_;
+      physAddr = ldStPhysAddr_;
+      return ldStSize_;
+    }
 
     /// Return the size of the last ld/st instruction or 0 if last
     /// instruction was not a ld/st.
@@ -884,16 +927,6 @@ namespace WdRiscv
 
     /// Take this hart out of debug mode.
     void exitDebugMode();
-
-    /// Enable/disable imprecise store error rollback. This is useful
-    /// in test-bench server mode.
-    void enableStoreErrorRollback(bool flag)
-    { storeErrorRollback_ = flag; }
-
-    /// Enable/disable imprecise load error rollback. This is useful
-    /// in test-bench server mode.
-    void enableLoadErrorRollback(bool flag)
-    { loadErrorRollback_ = flag; }
 
     /// Print collected instruction frequency to the given file.
     void reportInstructionFrequency(FILE* file) const;
@@ -1417,6 +1450,9 @@ namespace WdRiscv
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
     void resetFloat();
+
+    /// Helper to reset.
+    void resetVector();
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
@@ -3893,6 +3929,7 @@ namespace WdRiscv
     uint64_t clintLimit_ = 0;
     std::function<Hart<URV>*(size_t addr)> clintSoftAddrToHart_ = nullptr;
     std::function<Hart<URV>*(size_t addr)> clintTimerAddrToHart_ = nullptr;
+    bool clintSiOnReset_ = false;
 
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
     bool nmiPending_ = false;
@@ -3977,8 +4014,6 @@ namespace WdRiscv
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
-    bool storeErrorRollback_ = false;
-    bool loadErrorRollback_ = false;
     bool targetProgFinished_ = false;
     bool useElfSymbols_ = true;
     unsigned mxlen_ = 8*sizeof(URV);

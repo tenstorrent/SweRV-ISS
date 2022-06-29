@@ -78,7 +78,7 @@ void
 printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 {
   const InstEntry* entry = di.instEntry();
-  if (entry->isLoad() or entry->isStore())
+  if (di.isLoad() or di.isStore())
     {
       printLdSt(hart, out, di);
       return;

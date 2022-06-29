@@ -51,10 +51,10 @@
 
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
-#include "System.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
-#include "third_party/nlohmann/json.hpp"
+#include "Trace.hpp"
+
 
 #ifndef SO_REUSEPORT
 #define SO_REUSEPORT SO_REUSEADDR
@@ -534,17 +534,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // Enable extensions if corresponding bits are set in the MISA CSR.
   processExtensions();
 
-  // If vector extension enabled but vectors not configured, then
-  // configure for 128-bits per regiser and 32-bits per elemement.
-  if (isRvv())
-    {
-      if (vecRegs_.registerCount() == 0)
-	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
-			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/);
-      unsigned bytesPerReg = vecRegs_.bytesPerRegister();
-      csRegs_.configCsr("vlenb", true, bytesPerReg, 0, 0, false, false);
-    }
-
   perfControl_ = ~uint32_t(0);
   URV value = 0;
   if (peekCsr(CsrNumber::MCOUNTINHIBIT, value))
@@ -563,15 +552,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
       dcsrStep_ = (value >> 2) & 1;
       dcsrStepIe_ = (value >> 11) & 1;
     }
-  if (peekCsr(CsrNumber::VTYPE, value))
-    {
-      bool vill = (value >> (8*sizeof(URV) - 1)) & 1;
-      bool ma = (value >> 7) & 1;
-      bool ta = (value >> 6) & 1;
-      GroupMultiplier gm = GroupMultiplier(value & 7);
-      ElementWidth ew = ElementWidth((value >> 3) & 7);
-      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
-    }
+
+  resetVector();
 
   resetFloat();
 
@@ -592,9 +574,42 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   for (auto& entry : pmaOverrideVec_)
     entry.reset();
 
+  // Trigger software interrupt in hart 0 on reset.
+  if (clintSiOnReset_ and hartIx_ == 0)
+    pokeMemory(clintStart_, uint32_t(1), true);
+
   clearTraceData();
 
   decoder_.enableRv64(isRv64());
+}
+
+
+template <typename URV>
+void
+Hart<URV>::resetVector()
+{
+  // If vector extension enabled but vectors not configured, then
+  // configure for 128-bits per regiser and 32-bits per elemement.
+  if (isRvv())
+    {
+      if (vecRegs_.registerCount() == 0)
+	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
+			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/);
+      unsigned bytesPerReg = vecRegs_.bytesPerRegister();
+      csRegs_.configCsr("vlenb", true, bytesPerReg, 0, 0, false, false);
+    }
+
+  // Make cached vector engine parameters match reset value of the VTYPE CSR.
+  URV value = 0;
+  if (peekCsr(CsrNumber::VTYPE, value))
+    {
+      bool vill = (value >> (8*sizeof(URV) - 1)) & 1;
+      bool ma = (value >> 7) & 1;
+      bool ta = (value >> 6) & 1;
+      GroupMultiplier gm = GroupMultiplier(value & 7);
+      ElementWidth ew = ElementWidth((value >> 3) & 7);
+      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+    }
 }
 
 
@@ -2812,12 +2827,14 @@ formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
 
 static std::mutex printInstTraceMutex;
 
+extern void (*tracerExtension)(void*);
+
 template <typename URV>
 void
 Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
 			  FILE* out)
 {
-  if (not out)
+  if (not out and not tracerExtension)
     return;
 
   uint32_t ix = (currPc_ >> 1) & decodeCacheMask_;
@@ -2839,6 +2856,12 @@ void
 Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::string& tmp,
                                  FILE* out)
 {
+  if (tracerExtension)
+    {
+      TraceRecord<URV> tr(this, di);
+      tracerExtension(&tr);
+    }
+
   if (not out)
     return;
 
@@ -3057,28 +3080,28 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   fprintf(out, ",%x,", di.inst());
 
   // Changed integer register.
-  int reg = intRegs_.getLastWrittenReg();
+  int reg = lastIntReg();
   uint64_t val64 = 0;
   const char* sep = "";
   if (reg > 0)
     {
-      val64 = intRegs_.read(reg);
+      val64 = peekIntReg(reg);
       fprintf(out, "x%d=%lx", reg, val64);
       sep = ";";
     }
 
   // Changed fp register.
-  reg = fpRegs_.getLastWrittenReg();
+  reg = lastFpReg();
   if (reg >= 0)
     {
-      val64 = fpRegs_.readBitsRaw(reg);
+      peekFpReg(reg, val64);
       if (isRvd())
 	fprintf(out, "%sf%d=%lx", sep, reg, val64);
       else
 	fprintf(out, "%sf%d=%x", sep, reg, uint32_t(val64));
 
       // Print incremental flags since FRM is sticky.
-      unsigned fpFlags = fpRegs_.getLastFpFlags(); // Incremental FP flags.
+      unsigned fpFlags = lastFpFlags();
       if (fpFlags != 0)
 	fprintf(out, ";ff=%x", fpFlags);
       sep = ";";
@@ -3086,8 +3109,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Changed CSR register(s).
   std::vector<CsrNumber> csrns;
-  std::vector<unsigned> triggers;
-  lastCsr(csrns, triggers);
+  lastCsr(csrns);
   for (auto csrn : csrns)
     {
       URV val = 0;
@@ -3097,31 +3119,10 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     }
 
   // Changed vector register group.
-  unsigned groupX8 = 8;
-  int vecReg = vecRegs_.getLastWrittenReg(groupX8);
+  unsigned groupSize = 0;
+  int vecReg = lastVecReg(di, groupSize);
   if (vecReg >= 0)
     {
-      // We want to report all the registers in the group.
-      unsigned groupSize  = (groupX8 >= 8) ? groupX8/8 : 1;
-      vecReg = vecReg - (vecReg % groupSize);
-
-      InstId instId = di.instEntry()->instId();
-      if (instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v)
-	{
-	  vecReg = di.op0();
-	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
-	}
-      else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
-	{
-	  vecReg = di.op0();
-	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
-	}
-      else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
-	{
-	  vecReg = di.op0();
-	  groupSize = groupSize*di.vecFieldCount();  // Scale by field count
-	}
-
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
 	{
 	  fprintf(out, "%sv%d=", sep, vecReg);
@@ -3181,20 +3182,17 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Memory
   fputc(',', out);
+  uint64_t virtDataAddr = 0, physDataAddr = 0;
   bool load = false, store = false;
-  if (ldStSize_)
+  if (lastLdStAddress(virtDataAddr, physDataAddr))
     {
-      fprintf(out, "%lx", uint64_t(ldStAddr_));
-      if (ldStPhysAddr_ != ldStAddr_)
-	fprintf(out, ":%lx", ldStPhysAddr_);
-      uint64_t addr = 0, val = 0;
-      if (lastStore(addr, val))
-	{
-	  store = true;
-	  fprintf(out, "=%lx", val);
-	}
-      else
-	load = true;
+      store = ldStWrite_;
+      load = not store;
+      fprintf(out, "%lx", virtDataAddr);
+      if (physDataAddr != virtDataAddr)
+	fprintf(out, ":%lx", physDataAddr);
+      if (store)
+	fprintf(out, "=%lx", ldStData_);
     }
   else if (not vecRegs_.ldStAddr_.empty())
     {
@@ -3223,7 +3221,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	fputs(lastBranchTaken_ ? "t" : "nt", out);
       else
 	{
-	  if (instEntry->isBranchToRegister() and
+	  if (di.isBranchToRegister() and
 	      di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
 	    fputc('r', out);
 	  else if (di.op0() == IntRegNumber::RegRa)
@@ -3944,30 +3942,6 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
 
 
 template <typename URV>
-URV
-Hart<URV>::lastPc() const
-{
-  return currPc_;
-}
-
-
-template <typename URV>
-int
-Hart<URV>::lastIntReg() const
-{
-  return intRegs_.getLastWrittenReg();
-}
-
-
-template <typename URV>
-int
-Hart<URV>::lastFpReg() const
-{
-  return fpRegs_.getLastWrittenReg();
-}
-
-
-template <typename URV>
 int
 Hart<URV>::lastVecReg(const DecodedInst& di, unsigned& group) const
 {
@@ -4303,7 +4277,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 	  ++instCounter_;
 
           if (processExternalInterrupt(traceFile, instStr))
-            continue;  // Next instruction in trap handler.
+	    continue;  // Next instruction in trap handler.
 	  uint64_t physPc = 0;
           if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
 	    continue;  // Next instruction in trap handler.
@@ -4664,12 +4638,12 @@ Hart<URV>::run(FILE* file)
 
   // To run fast, this method does not do much besides
   // straight-forward execution. If any option is turned on, we switch
-  // to runUntilAdress which supports all features.
+  // to runUntilAddress which supports all features.
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   bool hasClint = clintStart_ < clintLimit_;
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
-                  or hasClint or isRvs());
+                  or hasClint or isRvs() or tracerExtension);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 
@@ -4729,12 +4703,6 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
         if (mie & mask & mip)
           {
             cause = ic;
-            if (ic == IC::M_TIMER and alarmInterval_ > 0)
-              {
-                // Reset the timer-interrupt pending bit.
-                mip = mip & ~mask;
-                pokeCsr(CsrNumber::MIP, mip);
-              }
             return true;
           }
     }

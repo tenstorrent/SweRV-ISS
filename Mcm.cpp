@@ -211,9 +211,9 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     }
   else if (instEntry->isStore())
     return;   // No destination register.
-  else if (instEntry->isLoad() or instEntry->isAmo())
+  else if (di.isLoad() or di.isAmo())
     hasDep = false;
-  else if (instEntry->isBranch())
+  else if (di.isBranch())
     hasDep = false;
 
   for (const auto& opIx : instr.memOps_)
@@ -223,7 +223,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	tag = instr.tag_;
       }
 
-  if (instEntry->isBranch())
+  if (di.isBranch())
     hartBranchTimes_.at(hartIx) = 0;
 
   std::vector<unsigned> sourceRegs, destRegs;
@@ -237,7 +237,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  time = regTimeVec.at(regIx);
 	  tag = regProducer.at(regIx);
 	}
-      if (instEntry->isBranch())
+      if (di.isBranch())
 	if (first or regTimeVec.at(regIx) > hartBranchTimes_.at(hartIx))
 	  {
 	    first = false;
@@ -301,8 +301,16 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	}
 
       // Commit write to memory. 
-      for (unsigned i = 0; i < op.size_; ++i)
-	hart.pokeMemory(physAddr + i, uint8_t(rtlData >> (i*8)), true);
+      if (op.size_ == 1)
+	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
+      else if (op.size_ == 2)
+	hart.pokeMemory(physAddr, uint16_t(rtlData), true);
+      else if (op.size_ == 4)
+	hart.pokeMemory(physAddr, uint32_t(rtlData), true);
+      else if (op.size_ == 8)
+	hart.pokeMemory(physAddr, uint64_t(rtlData), true);
+      else
+	assert(0 && "write size is not a power of 2");
     }
 
   if (instr->retired_)
@@ -383,12 +391,14 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	  updateDependencies(hart, *instr);
 	  return false;
 	}
+#if 0
       if (instrHasWrite(*instr))
 	{
 	  cerr << "Error: Amo instruction tag=" << tag
-	       << " retired after read op.\n";
+	       << " retired after write op.\n";
 	  return false;
 	}
+#endif
       instr->isStore_ = true;  // AMO is both load and store.
     }
 
@@ -484,8 +494,12 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
     }
 
-  for (unsigned i = 0; i < lineSize_; ++i)
-    hart.pokeMemory(physAddr + i, line.at(i), true);
+  // Poke words to accomodate clint.
+  for (unsigned i = 0; i < lineSize_; i += 4)
+    {
+      uint32_t word = *((uint32_t*) (line.data() + i));
+      hart.pokeMemory(physAddr + i, word, true);
+    }
   
   // Compare our line to RTL line.
   bool result = true;
