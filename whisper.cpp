@@ -34,6 +34,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include <dlfcn.h>
 #include <csignal>
 #include "HartConfig.hpp"
 #include "WhisperMessage.h"
@@ -169,6 +170,7 @@ struct Args
   std::string configFile;      // Configuration (JSON) file.
   std::string bblockFile;      // Basci block file.
   std::string attFile;         // Address translation file.
+  std::string tracerLib;       // Path to tracer extension shared library.
   std::string isa;
   std::string snapshotDir = "snapshot"; // Dir prefix for saving snapshots
   std::string loadFrom;        // Directory for loading a snapshot
@@ -459,6 +461,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "Dump instruction table using definition.")
         ("att", po::value(&args.attFile),
          "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
+        ("tracerlib", po::value(&args.tracerLib),
+         "Path to tracer extension shared library which should provide C symbol tracerExtension.")
 	("setreg", po::value(&args.regInits)->multitoken(),
 	 "Initialize registers. Apply to all harts unless specific prefix "
 	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
@@ -1439,6 +1443,33 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 }
 
 
+void (*tracerExtension)(void*) = nullptr;
+
+static
+bool
+loadTracerLibrary(const std::string& tracerLib)
+{
+  if (tracerLib.empty())
+    return true;
+
+  auto soPtr = dlopen(tracerLib.c_str(), RTLD_NOW);
+  if (not soPtr)
+    {
+      std::cerr << "Error: Failed to load shared libarary " << dlerror() << '\n';
+      return false;
+    }
+
+  tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, "tracerExtension"));
+  if (not tracerExtension)
+    {
+      std::cerr << "Error: Could not find symbol tracerExtension in " << tracerLib << '\n';
+      return false;
+    }
+
+  return true;
+}
+
+
 /// Depending on command line args, start a server, run in interactive
 /// mode, or initiate a batch run.
 template <typename URV>
@@ -1446,12 +1477,8 @@ static
 bool
 sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 {
-  // if (args.instructionInfo)
-  // {
-  //    auto hart = system.ithHart(0);
-  //    hart->dumpInstructionTable();
-  //    return true;
-  // }
+  if (not loadTracerLibrary(args.tracerLib))
+    return false;
 
   // In server/interactive modes: enable triggers and performance counters.
   bool serverMode = not args.serverFile.empty();
@@ -1462,15 +1489,6 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
           auto& hart = *system.ithHart(i);
           hart.enableTriggers(true);
           hart.enablePerformanceCounters(true);
-        }
-    }
-  else
-    {
-      // Load error rollback is an annoyance if not in server/interactive mode
-      for (unsigned i = 0; i < system.hartCount(); ++i)
-        {
-          auto& hart = *system.ithHart(i);
-          hart.enableLoadErrorRollback(false);
         }
     }
 

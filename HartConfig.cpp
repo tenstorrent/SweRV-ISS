@@ -1224,30 +1224,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
-  // Enable rollback of memory on store error.
-  tag = "store_error_rollback";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableStoreErrorRollback(flag);
-      else
-        errors++;
-    }
-
-  // Enable rollback of register on load error.
-  tag = "load_error_rollback";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        {
-          hart.enableLoadErrorRollback(flag);
-        }
-      else
-        errors++;
-    }
-
   tag = "enable_per_mode_counter_control";
   if (config_ -> count(tag))
     {

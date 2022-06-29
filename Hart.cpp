@@ -53,7 +53,8 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
-#include "third_party/nlohmann/json.hpp"
+#include "Trace.hpp"
+
 
 #ifndef SO_REUSEPORT
 #define SO_REUSEPORT SO_REUSEADDR
@@ -2826,12 +2827,14 @@ formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
 
 static std::mutex printInstTraceMutex;
 
+extern void (*tracerExtension)(void*);
+
 template <typename URV>
 void
 Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
 			  FILE* out)
 {
-  if (not out)
+  if (not out and not tracerExtension)
     return;
 
   uint32_t ix = (currPc_ >> 1) & decodeCacheMask_;
@@ -2853,6 +2856,12 @@ void
 Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::string& tmp,
                                  FILE* out)
 {
+  if (tracerExtension)
+    {
+      TraceRecord<URV> tr(this, di);
+      tracerExtension(&tr);
+    }
+
   if (not out)
     return;
 
@@ -4268,7 +4277,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 	  ++instCounter_;
 
           if (processExternalInterrupt(traceFile, instStr))
-            continue;  // Next instruction in trap handler.
+	    continue;  // Next instruction in trap handler.
 	  uint64_t physPc = 0;
           if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
 	    continue;  // Next instruction in trap handler.
@@ -4629,12 +4638,12 @@ Hart<URV>::run(FILE* file)
 
   // To run fast, this method does not do much besides
   // straight-forward execution. If any option is turned on, we switch
-  // to runUntilAdress which supports all features.
+  // to runUntilAddress which supports all features.
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   bool hasClint = clintStart_ < clintLimit_;
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
-                  or hasClint or isRvs());
+                  or hasClint or isRvs() or tracerExtension);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 

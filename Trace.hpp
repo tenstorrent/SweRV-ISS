@@ -68,7 +68,7 @@ namespace WdRiscv
     { return di_.isLoad(); }
 
     /// Return true if record is for a store instruction.
-    bool isSore() const
+    bool isStore() const
     { return di_.isStore(); }
 
     /// Return true if record is for an AMO instruction.
@@ -114,7 +114,7 @@ namespace WdRiscv
 
   private:
 
-    const DecodedInst& di_;
     const Hart<URV>* hart_ = nullptr;
+    const DecodedInst& di_;
   };
 }

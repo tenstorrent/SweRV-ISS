@@ -928,16 +928,6 @@ namespace WdRiscv
     /// Take this hart out of debug mode.
     void exitDebugMode();
 
-    /// Enable/disable imprecise store error rollback. This is useful
-    /// in test-bench server mode.
-    void enableStoreErrorRollback(bool flag)
-    { storeErrorRollback_ = flag; }
-
-    /// Enable/disable imprecise load error rollback. This is useful
-    /// in test-bench server mode.
-    void enableLoadErrorRollback(bool flag)
-    { loadErrorRollback_ = flag; }
-
     /// Print collected instruction frequency to the given file.
     void reportInstructionFrequency(FILE* file) const;
 
@@ -4024,8 +4014,6 @@ namespace WdRiscv
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
-    bool storeErrorRollback_ = false;
-    bool loadErrorRollback_ = false;
     bool targetProgFinished_ = false;
     bool useElfSymbols_ = true;
     unsigned mxlen_ = 8*sizeof(URV);
