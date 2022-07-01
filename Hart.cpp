@@ -4670,10 +4670,9 @@ Hart<URV>::run(FILE* file)
   // straight-forward execution. If any option is turned on, we switch
   // to runUntilAddress which supports all features.
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
-  bool hasClint = clintStart_ < clintLimit_;
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
-                  or enableCounters_ or alarmInterval_ or file
-                  or hasClint or isRvs() or tracerExtension or hasInterruptor_);
+                  or enableCounters_ or alarmInterval_ or file or hasClint()
+		  or isRvs() or tracerExtension or hasInterruptor_);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 
