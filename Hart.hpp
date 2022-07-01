@@ -1229,6 +1229,14 @@ namespace WdRiscv
     void setSnapshotIndex(unsigned ix)
     { snapshotIx_ = ix; }
 
+    /// Initialize the list of snapshot periods
+    void setSnapshotPeriods(const std::vector<uint64_t>& periods)
+    { snapshotPeriods_.assign(periods.begin(), periods.end()); }
+
+    /// Get list of snapshot periods
+    std::vector<uint64_t> getSnapshotPeriods() const
+    { return snapshotPeriods_; }
+
     /// save snapshot (registers, memory etc)
     bool saveSnapshot(const std::string& dirPath);
 
@@ -4052,6 +4060,7 @@ namespace WdRiscv
     uint32_t decodeCacheMask_ = 0;  // Derived from decodeCacheSize_
 
     uint32_t snapshotIx_ = 0;
+    std::vector<uint64_t> snapshotPeriods_;
 
     // Following is for test-bench support. It allow us to cancel div/rem
     bool hasLastDiv_ = false;

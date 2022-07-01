@@ -155,6 +155,7 @@ parseCmdLineNumber(const std::string& option,
 
 
 typedef std::vector<std::string> StringVec;
+typedef std::vector<uint64_t> Uint64Vec;
 
 
 /// Hold values provided on the command line.
@@ -197,7 +198,7 @@ struct Args
   std::optional<uint64_t> consoleIo;
   std::optional<uint64_t> instCountLim;
   std::optional<uint64_t> memorySize;
-  std::optional<uint64_t> snapshotPeriod;
+  Uint64Vec snapshotPeriods;
   std::optional<uint64_t> alarmInterval;
   std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
   std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
@@ -312,15 +313,6 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       auto numStr = varMap["memorysize"].as<std::string>();
       if (not parseCmdLineNumber("memorysize", numStr, args.memorySize))
         ok = false;
-    }
-
-  if (varMap.count("snapshotperiod"))
-    {
-      auto numStr = varMap["snapshotperiod"].as<std::string>();
-      if (not parseCmdLineNumber("snapshotperiod", numStr, args.snapshotPeriod))
-        ok = false;
-      else if (*args.snapshotPeriod == 0)
-        std::cerr << "Warning: Zero snapshot period ignored.\n";
     }
 
   if (varMap.count("tohostsym"))
@@ -488,8 +480,9 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Basic block stats are reported even mulitples of given instruction counts and once at end of run.")
 	("snapshotdir", po::value(&args.snapshotDir),
 	 "Directory prefix for saving snapshots.")
-	("snapshotperiod", po::value<std::string>(),
-	 "Snapshot period: Save snapshot using snapshotdir every so many instructions.")
+	("snapshotperiod", po::value(&args.snapshotPeriods)->multitoken(),
+	 "Snapshot period: Save snapshot using snapshotdir every so many instructions. "
+         "Specifying multiple periods will only save a snapshot on first instance (not periodic).")
 	("loadfrom", po::value(&args.loadFrom),
 	 "Snapshot directory from which to restore a previously saved (snapshot) state.")
 	("stdout", po::value(&args.stdoutFile),
@@ -1029,6 +1022,27 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.csv)
     hart.enableCsvLog(args.csv);
 
+  if (not args.snapshotPeriods.empty())
+    {
+      auto periods = args.snapshotPeriods;
+      std::sort(periods.begin(), periods.end());
+      if (std::find(periods.begin(), periods.end(), 0)
+                      != periods.end())
+        {
+          std::cerr << "Snapshot periods of 0 are ignored\n";
+          periods.erase(std::remove(periods.begin(), periods.end(), 0), periods.end());
+        }
+
+      auto it = std::unique(periods.begin(), periods.end());
+      if (it != periods.end())
+        {
+          periods.erase(it, periods.end());
+          std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
+        }
+
+      hart.setSnapshotPeriods(periods);
+    }
+
   return errors == 0;
 }
 
@@ -1348,23 +1362,25 @@ template <typename URV>
 static
 bool
 snapshotRun(System<URV>& system, FILE* traceFile,
-            const std::string& snapDir, uint64_t snapPeriod)
+            const std::string& snapDir)
 {
-  if (not snapPeriod)
-    {
-      std::cerr << "Warning: Zero snap period ignored.\n";
-      return batchRun(system, traceFile, true /* waitAll */);
-    }
-
   assert(system.hartCount() == 1);
   Hart<URV>& hart = *(system.ithHart(0));
 
   bool done = false;
   uint64_t globalLimit = hart.getInstructionCountLimit();
 
+  size_t period = 0;
+  const auto snapPeriods = hart.getSnapshotPeriods();
   while (not done)
     {
-      uint64_t nextLimit = hart.getInstructionCount() +  snapPeriod;
+      uint64_t nextLimit;
+      if (period < snapPeriods.size())
+        nextLimit = (snapPeriods.size() == 1) ? hart.getInstructionCount() + snapPeriods[0]
+                                                        : snapPeriods[period];
+      else
+        nextLimit = globalLimit;
+
       if (nextLimit >= globalLimit)
         done = true;
       nextLimit = std::min(nextLimit, globalLimit);
@@ -1374,15 +1390,23 @@ snapshotRun(System<URV>& system, FILE* traceFile,
         done = true;
       if (not done)
         {
-          unsigned index = hart.snapshotIndex();
-          FileSystem::path path(snapDir + std::to_string(index));
+          std::string pathStr;
+          if (snapPeriods.size() == 1)
+            {
+              unsigned snapIndex = hart.snapshotIndex();
+              pathStr = snapDir + std::to_string(snapIndex);
+              hart.setSnapshotIndex(snapIndex + 1);
+            }
+          else
+            pathStr = snapDir + std::to_string(snapPeriods[period++]);
+
+          FileSystem::path path(pathStr);
           if (not FileSystem::is_directory(path))
             if (not FileSystem::create_directories(path))
               {
                 std::cerr << "Error: Failed to create snapshot directory " << path << '\n';
                 return false;
               }
-          hart.setSnapshotIndex(index + 1);
           if (not hart.saveSnapshot(path))
             {
               std::cerr << "Error: Failed to save a snapshot\n";
@@ -1497,12 +1521,11 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
       return interactive.interact(traceFile, cmdLog);
     }
 
-  if (args.snapshotPeriod and *args.snapshotPeriod)
+  if (not system.ithHart(0)->getSnapshotPeriods().empty())
     {
-      uint64_t period = *args.snapshotPeriod;
       std::string dir = args.snapshotDir;
       if (system.hartCount() == 1)
-        return snapshotRun(system, traceFile, dir, period);
+        return snapshotRun(system, traceFile, dir);
       std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
     }
 

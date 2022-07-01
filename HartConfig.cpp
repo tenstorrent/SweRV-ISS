@@ -1548,6 +1548,43 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.setFaultOnFirstAccess(flag);
     }
 
+  tag = "page_fault_on_first_access";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.setFaultOnFirstAccess(flag);
+    }
+
+  tag = "snapshot_periods";
+  if (config_ -> count(tag))
+    {
+      std::vector<uint64_t> periods;
+      if (not getJsonUnsignedVec(tag, config_ -> at(tag), periods))
+        errors++;
+      else
+        {
+          std::sort(periods.begin(), periods.end());
+          if (std::find(periods.begin(), periods.end(), 0)
+                          != periods.end())
+            {
+              std::cerr << "Snapshot periods of 0 are ignored\n";
+              periods.erase(std::remove(periods.begin(), periods.end(), 0), periods.end());
+            }
+
+          auto it = std::unique(periods.begin(), periods.end());
+          if (it != periods.end())
+            {
+              periods.erase(it, periods.end());
+              std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
+            }
+
+          hart.setSnapshotPeriods(periods);
+        }
+    }
+
   return errors == 0;
 }
 
