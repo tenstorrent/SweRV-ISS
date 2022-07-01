@@ -480,17 +480,24 @@ namespace WdRiscv
     bool getConsoleIo(URV& address) const
     { if (conIoValid_) address = conIo_; return conIoValid_; }
 
-    /// Define a memory mapped locations for software interrupts.
+    /// Define memory mapped locations for CLINT.
     void configClint(uint64_t clintStart, uint64_t clintLimit,
 		     bool softwareInterruptOnReset,
-                     std::function<Hart<URV>*(size_t addr)> swFunc,
-                     std::function<Hart<URV>*(size_t addr)> timerFunc)
+                     std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       clintStart_ = clintStart;
       clintLimit_ = clintLimit;
-      clintSoftAddrToHart_ = swFunc;
-      clintTimerAddrToHart_ = timerFunc;
       clintSiOnReset_ = softwareInterruptOnReset;
+      indexToHart_ = indexToHart;
+    }
+
+    /// Define a memory mapped locations for interruptor agent.
+    void configInterruptor(uint64_t addr, 
+			   std::function<Hart<URV>*(unsigned ix)> indexToHart)
+    {
+      interruptor_ = addr;
+      hasInterruptor_ = true;
+      indexToHart_ = indexToHart;
     }
 
     /// Disassemble given instruction putting results on the given
@@ -1222,6 +1229,14 @@ namespace WdRiscv
     void setSnapshotIndex(unsigned ix)
     { snapshotIx_ = ix; }
 
+    /// Initialize the list of snapshot periods
+    void setSnapshotPeriods(const std::vector<uint64_t>& periods)
+    { snapshotPeriods_.assign(periods.begin(), periods.end()); }
+
+    /// Get list of snapshot periods
+    std::vector<uint64_t> getSnapshotPeriods() const
+    { return snapshotPeriods_; }
+
     /// save snapshot (registers, memory etc)
     bool saveSnapshot(const std::string& dirPath);
 
@@ -1306,10 +1321,6 @@ namespace WdRiscv
     /// lines currently in the cache sorted in decreasing age (oldest
     /// one first).
     void getCacheLineAddresses(std::vector<uint64_t>& addresses);
-
-    /// Configure clint (core local interruptor).
-    void configureClint(unsigned hartCount, uint64_t softInterruptBase,
-                        uint64_t timerLimitBase, uint64_t timerAddr);
 
     /// Debug method: print address translation table. 
     void printPageTable(std::ostream& out) const
@@ -1453,6 +1464,10 @@ namespace WdRiscv
 
     /// Helper to reset.
     void resetVector();
+
+    /// Return true if CLINT is configured.
+    bool hasClint() const
+    { return clintStart_ < clintLimit_; }
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
@@ -1930,7 +1945,11 @@ namespace WdRiscv
     /// is outside the range of valid harts, set stVal to zero.  If it is
     /// in the software interrupt range then keep it least sig bit and zero
     /// the rest.
-    void processClintWrite(size_t addr, unsigned stSize, URV& stVal);
+    void processClintWrite(uint64_t addr, unsigned stSize, URV& stVal);
+
+    /// Called if interruptor address is written. Unpack written value
+    /// and set MIP bit in target hart.
+    void processInterruptorWrite(uint32_t stVal);
 
     /// Mask to extract shift amount from a integer register value to use
     /// in shift instructions. This returns 0x1f in 32-bit more and 0x3f
@@ -3927,9 +3946,12 @@ namespace WdRiscv
 
     uint64_t clintStart_ = 0;
     uint64_t clintLimit_ = 0;
-    std::function<Hart<URV>*(size_t addr)> clintSoftAddrToHart_ = nullptr;
-    std::function<Hart<URV>*(size_t addr)> clintTimerAddrToHart_ = nullptr;
+    uint64_t clintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
     bool clintSiOnReset_ = false;
+    std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
+
+    bool  hasInterruptor_ = false;
+    uint64_t interruptor_ = 0;
 
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
     bool nmiPending_ = false;
@@ -4038,6 +4060,7 @@ namespace WdRiscv
     uint32_t decodeCacheMask_ = 0;  // Derived from decodeCacheSize_
 
     uint32_t snapshotIx_ = 0;
+    std::vector<uint64_t> snapshotPeriods_;
 
     // Following is for test-bench support. It allow us to cancel div/rem
     bool hasLastDiv_ = false;

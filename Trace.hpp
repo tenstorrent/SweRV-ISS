@@ -19,7 +19,7 @@
 namespace WdRiscv
 {
   template <typename URV>
-  class TraceRecord
+  struct TraceRecord
   {
   public:
 
@@ -112,7 +112,13 @@ namespace WdRiscv
     RvFormat format() const
     { return di_.format(); }
 
-  private:
+    /// Return the instruction id of the instruction of this record.
+    InstId instId() const
+    { return di_.instId(); }
+
+    /// Return the instruction name of the instruction of this record.
+    std::string name() const
+    { return di_.name(); }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;

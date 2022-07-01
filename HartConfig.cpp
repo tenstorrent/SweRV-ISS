@@ -1063,35 +1063,31 @@ template<typename URV>
 bool
 HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
 			uint64_t clintStart, uint64_t clintLimit,
-			uint64_t timerAddr, bool siOnReset) const
+			bool siOnReset) const
 {
-  // Define callback to associate a memory mapped software interrupt
-  // location to its corresponding hart so that when such a location
-  // is written the software interrupt bit is set/cleared in the MIP
-  // register of that hart.
-  uint64_t swAddr = clintStart;
-  auto swAddrToHart = [swAddr, &system](URV addr) -> Hart<URV>* {
-    uint64_t addr2 = swAddr + system.hartCount()*4; // 1 word per hart
-    if (addr >= swAddr and addr < addr2)
-      {
-        size_t ix = (addr - swAddr) / 4;
-        return system.ithHart(ix).get();
-      }
-    return nullptr;
+  // Define callback to recover a hart from a hart index. We do
+  // this to avoid having the Hart class depend on the System class.
+  auto indexToHart = [&system](unsigned ix) -> Hart<URV>* {
+    return system.ithHart(ix).get();
   };
 
-  // Same for timer limit addresses.
-  auto timerAddrToHart = [timerAddr, &system](URV addr) -> Hart<URV>* {
-    uint64_t addr2 = timerAddr + system.hartCount()*8; // 1 double word per hart
-    if (addr >= timerAddr and addr < addr2)
-      {
-        size_t ix = (addr - timerAddr) / 8;
-        return system.ithHart(ix).get();
-      }
-    return nullptr;
+  hart.configClint(clintStart, clintLimit, siOnReset, indexToHart);
+  return true;
+}
+
+
+template<typename URV>
+bool
+HartConfig::configInterruptor(System<URV>& system, Hart<URV>& hart,
+			      uint64_t addr) const
+{
+  // Define callback to recover a hart from a hart index. We do
+  // this to avoid having the Hart class depend on the System class.
+  auto indexToHart = [&system](unsigned ix) -> Hart<URV>* {
+    return system.ithHart(ix).get();
   };
 
-  hart.configClint(clintStart, clintLimit, siOnReset, swAddrToHart, timerAddrToHart);
+  hart.configInterruptor(addr, indexToHart);
   return true;
 }
 
@@ -1552,6 +1548,43 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.setFaultOnFirstAccess(flag);
     }
 
+  tag = "page_fault_on_first_access";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.setFaultOnFirstAccess(flag);
+    }
+
+  tag = "snapshot_periods";
+  if (config_ -> count(tag))
+    {
+      std::vector<uint64_t> periods;
+      if (not getJsonUnsignedVec(tag, config_ -> at(tag), periods))
+        errors++;
+      else
+        {
+          std::sort(periods.begin(), periods.end());
+          if (std::find(periods.begin(), periods.end(), 0)
+                          != periods.end())
+            {
+              std::cerr << "Snapshot periods of 0 are ignored\n";
+              periods.erase(std::remove(periods.begin(), periods.end(), 0), periods.end());
+            }
+
+          auto it = std::unique(periods.begin(), periods.end());
+          if (it != periods.end())
+            {
+              periods.erase(it, periods.end());
+              std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
+            }
+
+          hart.setSnapshotPeriods(periods);
+        }
+    }
+
   return errors == 0;
 }
 
@@ -1591,8 +1624,7 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 	      else
 		{
 		  uint64_t clintStart = addr, clintEnd = addr + 0xc000 -1;
-		  uint64_t timerAddr = addr + 0x4000;
-		  if (not configClint(system, hart, clintStart, clintEnd, timerAddr, siOnReset))
+		  if (not configClint(system, hart, clintStart, clintEnd, siOnReset))
 		    return false;
 		}
 	    }
@@ -2262,9 +2294,17 @@ unpackMacoValue<uint64_t>(uint64_t value, uint64_t mask, bool rv32,
 template bool
 HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
 				  uint64_t clintStart, uint64_t clintLimit,
-				  uint64_t timerAddr, bool siOnReset) const;
+				  bool siOnReset) const;
 
 template bool
 HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
 				  uint64_t clintStart, uint64_t clintLimit,
-				  uint64_t timerAddr, bool siOnReset) const;
+				  bool siOnReset) const;
+
+template bool
+HartConfig::configInterruptor<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
+					uint64_t addr) const;
+
+template bool
+HartConfig::configInterruptor<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
+					uint64_t addr) const;

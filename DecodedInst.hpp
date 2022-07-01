@@ -243,6 +243,14 @@ namespace WdRiscv
     RvFormat format() const
     { return entry_? entry_->format() : RvFormat::None; }
 
+    /// Return the instruction id of this instruction.
+    InstId instId() const
+    { return entry_? entry_->instId() : InstId::illegal; }
+
+    /// Return the instruction name.
+    std::string name() const
+    { return entry_? entry_->name() : "illegal"; }
+
     /// Associated a value with the ith operand. This has no effect if
     /// i is out of bounds or if the ith operand is an immediate. Note
     /// that the association is only in this object and that no

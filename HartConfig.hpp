@@ -68,8 +68,10 @@ namespace WdRiscv
     
     template<typename URV>
     bool configClint(System<URV>&, Hart<URV>&, uint64_t clintStart,
-		     uint64_t clintLimit, uint64_t timerAddr,
-		     bool siOnReset = false) const;
+		     uint64_t clintLimit, bool siOnReset = false) const;
+
+    template<typename URV>
+    bool configInterruptor(System<URV>&, Hart<URV>&, uint64_t addr) const;
 
     /// Set xeln to the register width configuration held in this
     /// object returning true on success and false if this object does
