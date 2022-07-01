@@ -480,17 +480,23 @@ namespace WdRiscv
     bool getConsoleIo(URV& address) const
     { if (conIoValid_) address = conIo_; return conIoValid_; }
 
-    /// Define a memory mapped locations for software interrupts.
+    /// Define memory mapped locations for CLINT.
     void configClint(uint64_t clintStart, uint64_t clintLimit,
 		     bool softwareInterruptOnReset,
-                     std::function<Hart<URV>*(size_t addr)> swFunc,
-                     std::function<Hart<URV>*(size_t addr)> timerFunc)
+                     std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       clintStart_ = clintStart;
       clintLimit_ = clintLimit;
-      clintSoftAddrToHart_ = swFunc;
-      clintTimerAddrToHart_ = timerFunc;
       clintSiOnReset_ = softwareInterruptOnReset;
+      indexToHart_ = indexToHart;
+    }
+
+    /// Define a memory mapped locations for interruptor agent.
+    void configInterruptor(uint64_t addr, 
+			   std::function<Hart<URV>*(unsigned ix)> indexToHart)
+    {
+      interruptor_ = addr;
+      indexToHart_ = indexToHart;
     }
 
     /// Disassemble given instruction putting results on the given
@@ -1306,10 +1312,6 @@ namespace WdRiscv
     /// lines currently in the cache sorted in decreasing age (oldest
     /// one first).
     void getCacheLineAddresses(std::vector<uint64_t>& addresses);
-
-    /// Configure clint (core local interruptor).
-    void configureClint(unsigned hartCount, uint64_t softInterruptBase,
-                        uint64_t timerLimitBase, uint64_t timerAddr);
 
     /// Debug method: print address translation table. 
     void printPageTable(std::ostream& out) const
@@ -3927,9 +3929,10 @@ namespace WdRiscv
 
     uint64_t clintStart_ = 0;
     uint64_t clintLimit_ = 0;
-    std::function<Hart<URV>*(size_t addr)> clintSoftAddrToHart_ = nullptr;
-    std::function<Hart<URV>*(size_t addr)> clintTimerAddrToHart_ = nullptr;
     bool clintSiOnReset_ = false;
+    std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
+
+    uint64_t interruptor_ = 0;
 
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
     bool nmiPending_ = false;

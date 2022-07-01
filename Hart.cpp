@@ -1710,60 +1710,62 @@ template <typename URV>
 void
 Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
 {
-  if (clintTimerAddrToHart_)
+  if (addr >= clintStart_ and addr < clintStart_ + 0x4000)
     {
-      auto hart = clintTimerAddrToHart_(addr);
-      if (hart)
-	{
-	  if (stSize == 4)
-	    {
-	      if ((addr & 7) == 0)  // Multiple of 8
-		{
-		  hart->alarmLimit_ = (hart->alarmLimit_ >> 32) << 32;  // Clear low 32
-		  hart->alarmLimit_ |= uint32_t(storeVal);  // Update low 32.
-		}
-	      else if ((addr & 3) == 0)  // Multiple of 4
-		{
-		  hart->alarmLimit_ = (hart->alarmLimit_ << 32) >> 32;  // Clear high 32
-		  hart->alarmLimit_ |= (uint64_t(storeVal) << 32);  // Update high 32.
-		}
-	    }
-	  else if (stSize == 8)
-	    {
-	      if ((addr & 7) == 0)
-		hart->alarmLimit_ = storeVal;
-	    }
+      unsigned hartIx = (addr - clintStart_) / 4;
+      auto hart = indexToHart_(hartIx);
+      if (not hart)
+	return;
 
-	  // URV mipVal = hart->csRegs_.peekMip();
-	  // mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-	  // hart->pokeCsr(CsrNumber::MIP, mipVal);
-	  return;
+      if (stSize != 4 or (addr & 3) != 0)
+	return;  // Must be sw and word aligned
+
+      storeVal = storeVal & 1;  // Only bit zero is implemented.
+
+      URV mipVal = csRegs_.peekMip();
+      if (storeVal)
+	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
+      else
+	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
+      hart->pokeCsr(CsrNumber::MIP, mipVal);
+      recordCsrWrite(CsrNumber::MIP);
+      return;
+    }
+
+  if (addr >= clintStart_ + 0x4000 and addr < clintStart_ + 0xbff8) 
+    {
+      unsigned hartIx = (addr - clintStart_ - 0x4000) / 8;
+      auto hart = indexToHart_(hartIx);
+      if (not hart)
+	return;
+
+      if (stSize == 4)
+	{
+	  if ((addr & 7) == 0)  // Multiple of 8
+	    {
+	      hart->alarmLimit_ = (hart->alarmLimit_ >> 32) << 32;  // Clear low 32
+	      hart->alarmLimit_ |= uint32_t(storeVal);  // Update low 32.
+	    }
+	  else if ((addr & 3) == 0)  // Multiple of 4
+	    {
+	      hart->alarmLimit_ = (hart->alarmLimit_ << 32) >> 32;  // Clear high 32
+	      hart->alarmLimit_ |= (uint64_t(storeVal) << 32);  // Update high 32.
+	    }
 	}
+      else if (stSize == 8)
+	{
+	  if ((addr & 7) == 0)
+	    hart->alarmLimit_ = storeVal;
+	}
+
+      // URV mipVal = hart->csRegs_.peekMip();
+      // mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+      // hart->pokeCsr(CsrNumber::MIP, mipVal);
+      return;
     }
 
   if (addr - clintStart_ >= 0xbff8)
     return;  // Timer.
-
-  if (clintSoftAddrToHart_)
-    {
-      auto hart = clintSoftAddrToHart_(addr);
-      if (hart)
-	{
-	  if (stSize != 4 or (addr & 3) != 0)
-	    return;  // Must be sw and word aligned
-
-	  storeVal = storeVal & 1;  // Only bit zero is implemented.
-
-	  URV mipVal = csRegs_.peekMip();
-	  if (storeVal)
-	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
-	  else
-	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
-	  hart->pokeCsr(CsrNumber::MIP, mipVal);
-	  recordCsrWrite(CsrNumber::MIP);
-	  return;
-	}
-    }
 
   // Address did not match any hart entry in clint.
   storeVal = 0;

@@ -200,6 +200,7 @@ struct Args
   std::optional<uint64_t> snapshotPeriod;
   std::optional<uint64_t> alarmInterval;
   std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
+  std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
   std::optional<uint64_t> syscallSlam;
 
   unsigned regWidth = 32;
@@ -354,6 +355,18 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       else if ((*args.clint & 7) != 0)
         {
           std::cerr << "Error: clint address must be a multiple of 8\n";
+          ok = false;
+        }
+    }
+
+  if (varMap.count("interruptor"))
+    {
+      auto numStr = varMap["interruptor"].as<std::string>();
+      if (not parseCmdLineNumber("interruptor", numStr, args.clint))
+        ok = false;
+      else if ((*args.clint & 7) != 0)
+        {
+          std::cerr << "Error: interruptor address must be a multiple of 8\n";
           ok = false;
         }
     }
@@ -533,6 +546,12 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "of these double words sets the timer-limit of the corresponding hart. "
          "A timer interrupt in such a hart becomes pending when the timer value "
          "equals or exceeds the timer limit.")
+        ("interruptor", po::value<std::string>(),
+         "Define address, z, of a memory mapped interrupt agent. Storing a word in z,"
+	 "using a sw instruction, will set/clear a bit in the MIP CSR of a hart"
+	 "in the system. The stored word should have the hart index in bits 0 to 11,"
+	 "the interrupt id (bit number of MIP) in bits 12 to 19, and the interrupt"
+	 "value in bits 20 to 31 (0 to clear, non-zero to set).")
         ("syscallslam", po::value<std::string>(),
          "Define address, a, of a non-cached memory area in which the "
          "memory changes of an emulated system call will be slammed. This "
@@ -796,43 +815,6 @@ loadSnapshot(Hart<URV>& hart, const std::string& snapDir)
 }
 
 
-
-template<typename URV>
-static
-void
-configureClint(Hart<URV>& hart, System<URV>& system, uint64_t clintStart,
-               uint64_t clintLimit, uint64_t timerAddr)
-{
-  // Define callback to associate a memory mapped software interrupt
-  // location to its corresponding hart so that when such a location
-  // is written the software interrupt bit is set/cleared in the MIP
-  // register of that hart.
-  uint64_t swAddr = clintStart;
-  auto swAddrToHart = [swAddr, &system](URV addr) -> Hart<URV>* {
-    uint64_t addr2 = swAddr + system.hartCount()*4; // 1 word per hart
-    if (addr >= swAddr and addr < addr2)
-      {
-        size_t ix = (addr - swAddr) / 4;
-        return system.ithHart(ix).get();
-      }
-    return nullptr;
-  };
-
-  // Same for timer limit addresses.
-  auto timerAddrToHart = [timerAddr, &system](URV addr) -> Hart<URV>* {
-    uint64_t addr2 = timerAddr + system.hartCount()*8; // 1 double word per hart
-    if (addr >= timerAddr and addr < addr2)
-      {
-        size_t ix = (addr - timerAddr) / 8;
-        return system.ithHart(ix).get();
-      }
-    return nullptr;
-  };
-
-  hart.configClint(clintStart, clintLimit, swAddrToHart, timerAddrToHart);
-}
-
-
 static
 bool
 getElfFilesIsaString(const Args& args, std::string& isaString)
@@ -972,6 +954,12 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
       uint64_t timerAddr = swAddr + 0x4000;
       uint64_t clintLimit = swAddr + 0xc000 - 1;
       config.configClint(system, hart, swAddr, clintLimit, timerAddr);
+    }
+
+  if (args.interruptor)
+    {
+      uint64_t addr = *args.interruptor;
+      config.configInterruptor(system, hart, addr);
     }
 
   if (args.syscallSlam)
