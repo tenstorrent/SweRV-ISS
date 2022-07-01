@@ -496,6 +496,7 @@ namespace WdRiscv
 			   std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       interruptor_ = addr;
+      hasInterruptor_ = true;
       indexToHart_ = indexToHart;
     }
 
@@ -1456,6 +1457,10 @@ namespace WdRiscv
     /// Helper to reset.
     void resetVector();
 
+    /// Return true if CLINT is configured.
+    bool hasClint() const
+    { return clintStart_ < clintLimit_; }
+
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
     { return mstatusFs_ != FpFs::Off; }
@@ -1932,7 +1937,11 @@ namespace WdRiscv
     /// is outside the range of valid harts, set stVal to zero.  If it is
     /// in the software interrupt range then keep it least sig bit and zero
     /// the rest.
-    void processClintWrite(size_t addr, unsigned stSize, URV& stVal);
+    void processClintWrite(uint64_t addr, unsigned stSize, URV& stVal);
+
+    /// Called if interruptor address is written. Unpack written value
+    /// and set MIP bit in target hart.
+    void processInterruptorWrite(uint32_t stVal);
 
     /// Mask to extract shift amount from a integer register value to use
     /// in shift instructions. This returns 0x1f in 32-bit more and 0x3f
@@ -3929,9 +3938,11 @@ namespace WdRiscv
 
     uint64_t clintStart_ = 0;
     uint64_t clintLimit_ = 0;
+    uint64_t clintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
     bool clintSiOnReset_ = false;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
 
+    bool  hasInterruptor_ = false;
     uint64_t interruptor_ = 0;
 
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.

@@ -362,9 +362,9 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
   if (varMap.count("interruptor"))
     {
       auto numStr = varMap["interruptor"].as<std::string>();
-      if (not parseCmdLineNumber("interruptor", numStr, args.clint))
+      if (not parseCmdLineNumber("interruptor", numStr, args.interruptor))
         ok = false;
-      else if ((*args.clint & 7) != 0)
+      else if ((*args.interruptor & 7) != 0)
         {
           std::cerr << "Error: interruptor address must be a multiple of 8\n";
           ok = false;

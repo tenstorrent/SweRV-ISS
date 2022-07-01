@@ -1691,6 +1691,9 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       storeVal = val;
     }
 
+  if (hasInterruptor_ and addr == interruptor_ and ldStSize_ == 4)
+    processInterruptorWrite(storeVal);
+
   if (memory_.write(hartIx_, addr, storeVal))
     {
       ldStWrite_ = true;
@@ -1708,7 +1711,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
 template <typename URV>
 void
-Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
+Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 {
   if (addr >= clintStart_ and addr < clintStart_ + 0x4000)
     {
@@ -1743,13 +1746,13 @@ Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
 	{
 	  if ((addr & 7) == 0)  // Multiple of 8
 	    {
-	      hart->alarmLimit_ = (hart->alarmLimit_ >> 32) << 32;  // Clear low 32
-	      hart->alarmLimit_ |= uint32_t(storeVal);  // Update low 32.
+	      hart->clintAlarm_ = (hart->clintAlarm_ >> 32) << 32;  // Clear low 32
+	      hart->clintAlarm_ |= uint32_t(storeVal);  // Update low 32.
 	    }
 	  else if ((addr & 3) == 0)  // Multiple of 4
 	    {
-	      hart->alarmLimit_ = (hart->alarmLimit_ << 32) >> 32;  // Clear high 32
-	      hart->alarmLimit_ |= (uint64_t(storeVal) << 32);  // Update high 32.
+	      hart->clintAlarm_ = (hart->clintAlarm_ << 32) >> 32;  // Clear high 32
+	      hart->clintAlarm_ |= (uint64_t(storeVal) << 32);  // Update high 32.
 	    }
 	}
       else if (stSize == 8)
@@ -1769,6 +1772,31 @@ Hart<URV>::processClintWrite(size_t addr, unsigned stSize, URV& storeVal)
 
   // Address did not match any hart entry in clint.
   storeVal = 0;
+}
+
+
+template <typename URV>
+void
+Hart<URV>::processInterruptorWrite(uint32_t storeVal)
+{
+  if (not indexToHart_)
+    return;
+
+  unsigned hartIx = storeVal & 0xfff;
+  unsigned interruptId = (storeVal >> 12) & 0xff;
+  unsigned val = (storeVal >> 20) == 0 ? 0 : 1;
+  auto hart = indexToHart_(hartIx);
+  if (not hart)
+    return;
+
+  URV mipVal = csRegs_.peekMip();
+  if (val)
+    mipVal = mipVal | (URV(1) << interruptId);
+  else
+    mipVal = mipVal & ~(URV(1) << interruptId);
+
+  hart->pokeCsr(CsrNumber::MIP, mipVal);
+  recordCsrWrite(CsrNumber::MIP);
 }
 
 
@@ -4645,7 +4673,7 @@ Hart<URV>::run(FILE* file)
   bool hasClint = clintStart_ < clintLimit_;
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
-                  or hasClint or isRvs() or tracerExtension);
+                  or hasClint or isRvs() or tracerExtension or hasInterruptor_);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 
@@ -4735,18 +4763,27 @@ bool
 Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 {
   URV mipVal = csRegs_.peekMip();
-  if (instCounter_ >= alarmLimit_)
+
+  if (hasClint())
     {
-      mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
+      if (instCounter_ >= clintAlarm_)
+	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
+      else
+	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
       csRegs_.poke(CsrNumber::MIP, mipVal);
-      alarmLimit_ += alarmInterval_;
     }
-  else
+
+  bool hasAlarm = alarmLimit_ != ~uint64_t(0);
+  if (hasAlarm)
     {
-      URV prev = mipVal;
-      mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-      if (mipVal != prev)
-	csRegs_.poke(CsrNumber::MIP, mipVal);
+      if (instCounter_ >= alarmLimit_)
+	{
+	  alarmLimit_ += alarmInterval_;
+	  mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
+	}
+      else
+	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+      csRegs_.poke(CsrNumber::MIP, mipVal);
     }
 
   if (debugStepMode_ and not dcsrStepIe_)
