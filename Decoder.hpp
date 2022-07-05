@@ -63,6 +63,24 @@ namespace WdRiscv
     bool isRv64() const
     { return rv64_; }
 
+    /// Do not consider lr and sc instructions as load/store events for
+    /// performance counter when flag is false. Do consider them when
+    /// flag is true.
+    void perfCountAtomicLoadStore(bool flag)
+    { instTable_.perfCountAtomicLoadStore(flag); }
+
+    /// Do not consider flw,fsw,fld,fsd...c instructions as load/store
+    /// events for performance counter when flag is false. Do consider
+    /// them when flag is true.
+    void perfCountFpLoadStore(bool flag)
+    { instTable_.perfCountFpLoadStore(flag); }
+
+    /// Return the instruction table entry associated with the given
+    /// instruction id. Return illegal instruction entry id is out of
+    /// bounds.
+    const InstEntry& getInstructionEntry(InstId id) const
+    { return instTable_.getEntry(id); }
+
   protected:
 
     /// Decode a floating point instruction.

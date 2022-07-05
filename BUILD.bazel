@@ -14,20 +14,20 @@ hdrs = [
 ]
 
 cc_library(
-    name     = "rvcore",
-    srcs     = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
-    hdrs     = hdrs,
-    defines  = ["SOFT_FLOAT", "MEM_CALLBACKS"],
-    deps     = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat"],
-    linkopts = ["-lstdc++fs", "-lpthread", "-lz"],
-    visibility = ["//visibility:public"],
+    name          = "rvcore",
+    srcs          = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
+    hdrs          = hdrs,
+    local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
+    deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat"],
+    linkopts      = ["-lstdc++fs", "-lpthread", "-lz", "-ldl"],
+    visibility    = ["//visibility:public"],
 )
 
 cc_binary(
-    name       = "whisper",
-    srcs       = ["whisper.cpp"],
-    deps       = [":rvcore"],
-    defines    = ["SOFT_FLOAT", "MEM_CALLBACKS"],
-    linkopts   = ["-lboost_program_options", "-lstdc++fs"],
-    visibility = ["//visibility:public"],
+    name          = "whisper",
+    srcs          = ["whisper.cpp"],
+    deps          = [":rvcore"],
+    local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
+    linkopts      = ["-lboost_program_options", "-lstdc++fs"],
+    visibility    = ["//visibility:public"],
 )
