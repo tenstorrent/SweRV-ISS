@@ -346,13 +346,13 @@ namespace WdRiscv
     /// performance counter when flag is false. Do consider them when
     /// flag is true.
     void perfCountAtomicLoadStore(bool flag)
-    { instTable_.perfCountAtomicLoadStore(flag); }
+    { decoder_.perfCountAtomicLoadStore(flag); }
 
     /// Do not consider flw,fsw,fld,fsd...c instructions as load/store
     /// events for performance counter when flag is false. Do consider
     /// them when flag is true.
     void perfCountFpLoadStore(bool flag)
-    { instTable_.perfCountFpLoadStore(flag); }
+    { decoder_.perfCountFpLoadStore(flag); }
 
     /// Configure vector unit of this hart.
     void configVector(unsigned bytesPerVec, unsigned minBytesPerElem,
@@ -541,10 +541,10 @@ namespace WdRiscv
     { return decoder_.expandCompressedInst(inst); }
 
     /// Return the instruction table entry associated with the given
-    /// instruction id. Reutrn illegal instruction entry id is out of
+    /// instruction id. Return illegal instruction entry id is out of
     /// bounds.
     const InstEntry& getInstructionEntry(InstId id) const
-    { return instTable_.getEntry(id); }
+    { return decoder_.getInstructionEntry(id); }
 
     /// Return the vector registers associated with this hart.
     const VecRegs& vecRegs() const
@@ -4043,7 +4043,6 @@ namespace WdRiscv
 
     int gdbInputFd_ = -1;  // Input file descriptor when running in gdb mode.
 
-    InstTable instTable_;
     InstProfiles instProfs_; // Instruction frequency manager
 
     std::vector<uint64_t> interruptStat_;  // Count of different types of interrupts.

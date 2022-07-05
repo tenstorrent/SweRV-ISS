@@ -1098,7 +1098,7 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
 	continue;
 
       const InstProfile& prof = *profPtr;
-      const InstEntry& entry = instTable_.getEntry(prof.id_);
+      const InstEntry& entry = decoder_.getInstructionEntry(prof.id_);
 
       std::string instr;
       // Don't collect non-vector repeats
@@ -1735,7 +1735,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
     {
       unsigned hartIx = (addr - clintStart_ - 0x4000) / 8;
       auto hart = indexToHart_(hartIx);
-      if (hart and (stSize == 4 or stSize == 9))
+      if (hart and (stSize == 4 or stSize == 8))
 	{
 	  if (stSize == 4)
 	    {
