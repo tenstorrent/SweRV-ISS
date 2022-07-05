@@ -1717,57 +1717,52 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
     {
       unsigned hartIx = (addr - clintStart_) / 4;
       auto hart = indexToHart_(hartIx);
-      if (not hart)
-	return;
+      if (hart and stSize == 4 and (addr & 3) == 0)
+	{
+	  storeVal = storeVal & 1;  // Only bit zero is implemented.
 
-      if (stSize != 4 or (addr & 3) != 0)
-	return;  // Must be sw and word aligned
-
-      storeVal = storeVal & 1;  // Only bit zero is implemented.
-
-      URV mipVal = csRegs_.peekMip();
-      if (storeVal)
-	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
-      else
-	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
-      hart->pokeCsr(CsrNumber::MIP, mipVal);
-      recordCsrWrite(CsrNumber::MIP);
-      return;
+	  URV mipVal = csRegs_.peekMip();
+	  if (storeVal)
+	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
+	  hart->pokeCsr(CsrNumber::MIP, mipVal);
+	  recordCsrWrite(CsrNumber::MIP);
+	  return;
+	}
     }
-
-  if (addr >= clintStart_ + 0x4000 and addr < clintStart_ + 0xbff8) 
+  else if (addr >= clintStart_ + 0x4000 and addr < clintStart_ + 0xbff8) 
     {
       unsigned hartIx = (addr - clintStart_ - 0x4000) / 8;
       auto hart = indexToHart_(hartIx);
-      if (not hart)
-	return;
-
-      if (stSize == 4)
+      if (hart and (stSize == 4 or stSize == 9))
 	{
-	  if ((addr & 7) == 0)  // Multiple of 8
+	  if (stSize == 4)
 	    {
-	      hart->clintAlarm_ = (hart->clintAlarm_ >> 32) << 32;  // Clear low 32
-	      hart->clintAlarm_ |= uint32_t(storeVal);  // Update low 32.
+	      if ((addr & 7) == 0)  // Multiple of 8
+		{
+		  hart->clintAlarm_ = (hart->clintAlarm_ >> 32) << 32;  // Clear low 32
+		  hart->clintAlarm_ |= uint32_t(storeVal);  // Update low 32.
+		}
+	      else if ((addr & 3) == 0)  // Multiple of 4
+		{
+		  hart->clintAlarm_ = (hart->clintAlarm_ << 32) >> 32;  // Clear high 32
+		  hart->clintAlarm_ |= (uint64_t(storeVal) << 32);  // Update high 32.
+		}
 	    }
-	  else if ((addr & 3) == 0)  // Multiple of 4
+	  else if (stSize == 8)
 	    {
-	      hart->clintAlarm_ = (hart->clintAlarm_ << 32) >> 32;  // Clear high 32
-	      hart->clintAlarm_ |= (uint64_t(storeVal) << 32);  // Update high 32.
+	      if ((addr & 7) == 0)
+		hart->alarmLimit_ = storeVal;
 	    }
-	}
-      else if (stSize == 8)
-	{
-	  if ((addr & 7) == 0)
-	    hart->alarmLimit_ = storeVal;
-	}
 
-      // URV mipVal = hart->csRegs_.peekMip();
-      // mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-      // hart->pokeCsr(CsrNumber::MIP, mipVal);
-      return;
+	  // URV mipVal = hart->csRegs_.peekMip();
+	  // mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+	  // hart->pokeCsr(CsrNumber::MIP, mipVal);
+	  return;
+	}
     }
-
-  if (addr - clintStart_ >= 0xbff8)
+  else if (addr - clintStart_ >= 0xbff8)
     return;  // Timer.
 
   // Address did not match any hart entry in clint.
