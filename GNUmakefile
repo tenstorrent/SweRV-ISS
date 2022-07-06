@@ -83,7 +83,7 @@ $(BUILD_DIR)/%.cpp.o:  %.cpp
 $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
                          $(BUILD_DIR)/librvcore.a \
 			 $(soft_float_lib)
-	$(CXX) -o $@ $^ $(LINK_DIRS) $(LINK_LIBS)
+	$(CXX) -o $@ $^ $(LINK_DIRS) $(LINK_LIBS) -Wl,-export-dynamic
 
 # List of all CPP sources needed for librvcore.a
 RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
