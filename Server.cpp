@@ -1060,7 +1060,7 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 	      if (commandLog)
 		fprintf(commandLog, "hart=%d time=%ld mread %ld 0x%lx %d 0x%lx %s\n",
 			hartId, msg.time, msg.instrTag, msg.address, msg.size,
-			msg.value, msg.flags? "e" : "i");
+			msg.value, msg.flags? "i" : "e");
 	      break;
 
 	    case McmInsert:
