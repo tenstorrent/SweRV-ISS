@@ -110,9 +110,6 @@ namespace WdRiscv
   template <typename URV>
   class Hart;
 
-  template <typename URV>
-  class ArchInfo;
-
   /// Model a RISCV vector register file.
   class VecRegs
   {
