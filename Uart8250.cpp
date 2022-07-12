@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <poll.h>
+#include <termios.h>
 #include "Uart8250.hpp"
 
 
@@ -13,6 +14,11 @@ Uart8250::Uart8250(uint64_t addr, uint64_t size)
 {
   auto func = [this]() { this->monitorStdin(); };
   stdinThread_ = std::thread(func);
+
+  struct termios term;
+  tcgetattr(fileno(stdin), &term);
+  cfmakeraw(&term);
+  tcsetattr(fileno(stdin), 0, &term);
 }
 
 
@@ -80,6 +86,7 @@ Uart8250::monitorStdin()
 		std::cerr << "Uart8250::monitorStdin: unexpected fail on read\n";
 	      byte_ = c;
 	      setPendingInterrupt(true);
+	      std::cerr << "Uart monitor: " << c << '\n';
 	    }
 	}
 
