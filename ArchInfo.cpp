@@ -64,7 +64,7 @@ template <typename URV>
 void
 ArchInfo<URV>::addInstPoints(ArchInfoEntry& entry)
 {
-  InstEntry inst = hart_.decoder_.getInstructionEntry(entry.name_);
+  InstEntry inst = hart_.getInstructionEntry(entry.name_);
   bool disable = not hart_.hasIsaExtension(inst.extension());
   if (inst.isCompressed())
     disable = disable and not hart_.isRvc();
@@ -92,7 +92,7 @@ ArchInfo<URV>::addDestBins(ArchInfoEntry& entry) const
     return false;
 
   nlohmann::json list;
-  InstEntry inst = hart_.decoder_.getInstructionEntry(entry.name_);
+  InstEntry inst = hart_.getInstructionEntry(entry.name_);
 
   // four possible operands
   for (unsigned i = 0; i < 4; i++)
@@ -101,12 +101,11 @@ ArchInfo<URV>::addDestBins(ArchInfoEntry& entry) const
         {
           uint32_t limit = 0;
           if (inst.ithOperandType(i) == OperandType::IntReg)
-            limit = (hart_.isRve()) ? uint32_t(IntRegNumber::RegX15)
-                                                : uint32_t(IntRegNumber::RegX31);
+            limit = hart_.intRegCount();
           else if (inst.ithOperandType(i) == OperandType::FpReg)
-            limit = uint32_t(FpRegNumber::RegF31);
+            limit = hart_.fpRegCount();
           else if (inst.ithOperandType(i) == OperandType::VecReg)
-            limit = uint32_t(VecRegNumber::RegV31);
+            limit = hart_.vecRegCount();
           else if (inst.ithOperandType(i) == OperandType::CsReg)
             limit = uint32_t(CsrNumber::MAX_CSR_);
           else
@@ -119,7 +118,7 @@ ArchInfo<URV>::addDestBins(ArchInfoEntry& entry) const
               else
                 {
                   CsrNumber destEnum = static_cast<CsrNumber>(dest);
-                  Csr<URV>* csr = hart_.csRegs_.findCsr(destEnum);
+                  Csr<URV>* csr; csr = hart_.csRegs().findCsr(destEnum);
                   if (csr and csr->isImplemented())
                     list.emplace_back(toJsonHex(dest));
                 }
@@ -139,7 +138,7 @@ ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
     return false;
 
   nlohmann::json list;
-  InstEntry inst = hart_.decoder_.getInstructionEntry(entry.name_);
+  InstEntry inst = hart_.getInstructionEntry(entry.name_);
 
   // four possible operands
   for (unsigned i = 0; i < 4; i++)
@@ -148,12 +147,11 @@ ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
         {
           uint32_t limit = 0;
           if (inst.ithOperandType(i) == OperandType::IntReg)
-            limit = (hart_.isRve()) ? uint32_t(IntRegNumber::RegX15)
-                                        : uint32_t(IntRegNumber::RegX31);
+            limit = hart_.intRegCount();
           else if (inst.ithOperandType(i) == OperandType::FpReg)
-            limit = uint32_t(FpRegNumber::RegF31);
+            limit = hart_.fpRegCount();
           else if (inst.ithOperandType(i) == OperandType::VecReg)
-            limit = uint32_t(VecRegNumber::RegV31);
+            limit = hart_.vecRegCount();
           else if (inst.ithOperandType(i) == OperandType::CsReg)
             limit = uint32_t(CsrNumber::MAX_CSR_);
           else
@@ -166,7 +164,7 @@ ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
               else
                 {
                   CsrNumber srcEnum = static_cast<CsrNumber>(src);
-                  Csr<URV>* csr = hart_.csRegs_.findCsr(srcEnum);
+                  Csr<URV>* csr; csr = hart_.csRegs().findCsr(srcEnum);
                   if (csr and csr->isImplemented())
                     list.emplace_back(toJsonHex(src));
                 }
@@ -186,7 +184,7 @@ ArchInfo<URV>::addSewBins(ArchInfoEntry& entry) const
   for (uint32_t sew = 0; sew <= uint32_t(ElementWidth::Word32); ++sew)
     {
       ElementWidth sewEnum = static_cast<ElementWidth>(sew);
-      bool enable = hart_.vecRegs_.legalConfig(sewEnum, GroupMultiplier::Eight);
+      bool enable = hart_.vecRegs().legalConfig(sewEnum, GroupMultiplier::Eight);
       if (enable)
         list.emplace_back(toJsonHex(sew));
     }
@@ -203,7 +201,7 @@ ArchInfo<URV>::addLmulBins(ArchInfoEntry& entry) const
   for (uint32_t lmul = 0; lmul <= uint32_t(GroupMultiplier::Half); ++lmul)
     {
       GroupMultiplier lmulEnum = static_cast<GroupMultiplier>(lmul);
-      bool enable = hart_.vecRegs_.legalConfig(static_cast<ElementWidth>(hart_.vecRegs_.minElementSizeInBytes()), lmulEnum);
+      bool enable = hart_.vecRegs().legalConfig(static_cast<ElementWidth>(hart_.vecRegs().minElementSizeInBytes()), lmulEnum);
       enable = enable and (lmulEnum != GroupMultiplier::Reserved);
       if (enable)
         list.emplace_back(toJsonHex(lmul));

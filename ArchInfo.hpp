@@ -75,7 +75,7 @@ namespace WdRiscv
 
     ArchInfoGroup getGroup(std::string name) const
     {
-      InstEntry inst = hart_.decoder_.getInstructionEntry(name);
+      InstEntry inst = hart_.getInstructionEntry(name);
       if (inst.instId() != InstId::illegal)
         return ArchInfoGroup::Inst;
       else
