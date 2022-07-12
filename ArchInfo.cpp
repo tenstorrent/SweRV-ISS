@@ -8,11 +8,13 @@
 using namespace WdRiscv;
 
 const std::unordered_map<std::string, ArchInfoPoint> table =
-  { {"dest", ArchInfoPoint::Dest},
-    {"src",  ArchInfoPoint::Src},
-    {"sew",  ArchInfoPoint::Sew},
-    {"lmul", ArchInfoPoint::Lmul},
-    {"mode", ArchInfoPoint::Mode} };
+  { {"dest",        ArchInfoPoint::Dest},
+    {"src",         ArchInfoPoint::Src},
+    {"sew",         ArchInfoPoint::Sew},
+    {"lmul",        ArchInfoPoint::Lmul},
+    {"mode",        ArchInfoPoint::Mode},
+    {"exception",   ArchInfoPoint::Exception}
+  };
 
 template <typename URV>
 ArchInfo<URV>::ArchInfo(Hart<URV>& hart, std::string filename)
@@ -53,17 +55,6 @@ ArchInfo<URV>::ArchInfo(Hart<URV>& hart, std::string filename)
         for (auto& append : entry.value().at("append"))
           infoEntry.crosses_.push_back(table.at(append));
 
-
-      // additional options
-      // TODO: fix this
-      // for (auto& options : entry.items())
-      //   {
-      //     if (options.key() == "cross")
-      //       for (auto& cross : options.items())
-      //         {
-      //           continue;
-      //         }
-      //   }
       entries_.push_back(infoEntry);
     }
 }
@@ -73,7 +64,7 @@ template <typename URV>
 void
 ArchInfo<URV>::addInstPoints(ArchInfoEntry& entry)
 {
-  InstEntry inst = hart_.instTable_.getEntry(entry.name_);
+  InstEntry inst = hart_.decoder_.getInstructionEntry(entry.name_);
   bool disable = not hart_.hasIsaExtension(inst.extension());
   if (inst.isCompressed())
     disable = disable and not hart_.isRvc();
@@ -101,7 +92,7 @@ ArchInfo<URV>::addDestBins(ArchInfoEntry& entry) const
     return false;
 
   nlohmann::json list;
-  InstEntry inst = hart_.instTable_.getEntry(entry.name_);
+  InstEntry inst = hart_.decoder_.getInstructionEntry(entry.name_);
 
   // four possible operands
   for (unsigned i = 0; i < 4; i++)
@@ -148,7 +139,7 @@ ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
     return false;
 
   nlohmann::json list;
-  InstEntry inst = hart_.instTable_.getEntry(entry.name_);
+  InstEntry inst = hart_.decoder_.getInstructionEntry(entry.name_);
 
   // four possible operands
   for (unsigned i = 0; i < 4; i++)

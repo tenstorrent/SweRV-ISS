@@ -13,7 +13,7 @@ namespace WdRiscv
 
   // Entry description
   enum class ArchInfoPoint { Dest, Src, Sew, Lmul, Frm, Fflags,
-                              Mode, Exceptions, Undefined };
+                              Mode, Exception, Undefined };
 
   enum class ArchInfoGroup { Inst, Paging, Custom };
 
@@ -36,11 +36,11 @@ namespace WdRiscv
             {
               switch (point)
                 {
-                  case ArchInfoPoint::Dest: addDestBins(entry); break;
-                  case ArchInfoPoint::Src:  addSrcBins(entry); break;
-                  case ArchInfoPoint::Sew:  addSewBins(entry); break;
-                  case ArchInfoPoint::Lmul: addLmulBins(entry); break;
-                  case ArchInfoPoint::Mode: addModeBins(entry); break;
+                  case ArchInfoPoint::Dest:             addDestBins(entry); break;
+                  case ArchInfoPoint::Src:              addSrcBins(entry); break;
+                  case ArchInfoPoint::Sew:              addSewBins(entry); break;
+                  case ArchInfoPoint::Lmul:             addLmulBins(entry); break;
+                  case ArchInfoPoint::Mode:             addModeBins(entry); break;
                   default: break;
                 }
             }
@@ -60,13 +60,7 @@ namespace WdRiscv
       std::vector<ArchInfoPoint> crosses_;
     } ArchInfoEntry;
 
-    /// Populate coverage space depending on instruction definition.
-    ///  By default will include:
-    ///      all - dest/src operands
-    ///      ld/st - alignment
-    ///      vector - sew, lmul
-    ///      branch - taken/not taken
-    ///      fp - frm, fflags
+    /// Populate archinfo space depending on instruction attributes.
     void addInstPoints(ArchInfoEntry& entry);
 
     bool addDestBins(ArchInfoEntry& entry) const;
@@ -81,7 +75,7 @@ namespace WdRiscv
 
     ArchInfoGroup getGroup(std::string name) const
     {
-      InstEntry inst = hart_.instTable_.getEntry(name);
+      InstEntry inst = hart_.decoder_.getInstructionEntry(name);
       if (inst.instId() != InstId::illegal)
         return ArchInfoGroup::Inst;
       else

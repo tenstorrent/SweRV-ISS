@@ -115,6 +115,9 @@ namespace WdRiscv
   {
   public:
 
+    friend class ArchInfo<uint32_t>;
+    friend class ArchInfo<uint64_t>;
+
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
     typedef typename std::make_signed_t<URV> SRV;
