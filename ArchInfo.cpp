@@ -111,7 +111,7 @@ ArchInfo<URV>::addDestBins(ArchInfoEntry& entry) const
           else
             continue;
 
-          for (uint32_t dest = 0; dest <= limit; ++dest)
+          for (uint32_t dest = 0; dest < limit; ++dest)
             {
               if (inst.ithOperandType(i) != OperandType::CsReg)
                 list.emplace_back(toJsonHex(dest));
@@ -143,7 +143,7 @@ ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
   // four possible operands
   for (unsigned i = 0; i < 4; i++)
     {
-      if (inst.isIthOperandWrite(i))
+      if (inst.isIthOperandRead(i))
         {
           uint32_t limit = 0;
           if (inst.ithOperandType(i) == OperandType::IntReg)
@@ -157,7 +157,7 @@ ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
           else
             continue;
 
-          for (uint32_t src = 0; src <= limit; ++src)
+          for (uint32_t src = 0; src < limit; ++src)
             {
               if (inst.ithOperandType(i) != OperandType::CsReg)
                 list.emplace_back(toJsonHex(src));
