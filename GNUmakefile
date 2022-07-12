@@ -94,7 +94,7 @@ RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
 	    PmpManager.cpp VirtMem.cpp Core.cpp System.cpp Cache.cpp \
 	    Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
 	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp ArchInfo.cpp \
-	    crypto.cpp Decoder.cpp Trace.cpp
+	    crypto.cpp Decoder.cpp Trace.cpp Uart8250.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp
