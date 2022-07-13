@@ -557,6 +557,20 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
       printCsr(*this, out, di);
       break;
 
+    case InstId::pack:
+      if (di.op2() == 0)
+	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
+      else
+	printInst(*this, out, di);
+      break;
+
+    case InstId::packw:
+      if (di.op2() == 0)
+	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
+      else
+	printInst(*this, out, di);
+      break;
+
     case InstId::lr_w:
       printLr(*this, out, "lr.w", di);
       break;
