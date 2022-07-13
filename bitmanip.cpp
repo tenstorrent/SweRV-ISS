@@ -522,7 +522,12 @@ void
 Hart<URV>::execPackw(const DecodedInst* di)
 {
   // zext.h is an alias for packw and is part of zbb.
-  if (not isRv64() or (not isRvzbe() and not isRvzbf() and not isRvzbp() and not isRvzbkb()))
+  bool zext_h = (di->op2() == 0);
+
+  bool legal = isRv64() and (isRvzbf() or isRvzbp() or isRvzbkb());
+  if (zext_h)
+    legal = legal or (isRv64() and isRvzbb());
+  if (not legal)
     {
       illegalInst(di);
       return;
