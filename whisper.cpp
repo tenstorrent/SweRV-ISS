@@ -1457,6 +1457,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 
 void (*tracerExtension)(void*) = nullptr;
 
+template <typename URV>
 static
 bool
 loadTracerLibrary(const std::string& tracerLib)
@@ -1471,7 +1472,10 @@ loadTracerLibrary(const std::string& tracerLib)
       return false;
     }
 
-  tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, "tracerExtension"));
+  std::string entry("tracerExtension");
+  entry += sizeof(URV) == 4 ? "32" : "64";
+
+  tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, entry.c_str()));
   if (not tracerExtension)
     {
       std::cerr << "Error: Could not find symbol tracerExtension in " << tracerLib << '\n';
@@ -1489,7 +1493,7 @@ static
 bool
 sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
 {
-  if (not loadTracerLibrary(args.tracerLib))
+  if (not loadTracerLibrary<URV>(args.tracerLib))
     return false;
 
   // In server/interactive modes: enable triggers and performance counters.
