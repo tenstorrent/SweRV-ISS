@@ -20139,10 +20139,13 @@ static uint16_t
 fpToUnsigned(Float16 x)
 {
 #ifdef SOFT_FLOAT
+  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
   uint32_t i = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
   if (i > 0xffff)
     {
-      softfloat_exceptionFlags |= softfloat_flag_inexact;
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
+      softfloat_exceptionFlags |= softfloat_flag_invalid;
       return 0xffff;
     }
   return i;
@@ -20180,14 +20183,19 @@ static int16_t
 fpToSigned(Float16 x)
 {
 #ifdef SOFT_FLOAT
+  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
   int32_t i = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
   if (i > 0x7fff)
     {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
       softfloat_exceptionFlags |= softfloat_flag_inexact;
       return 0x7fff;
     }
   if (i < int16_t(0x8000))
     {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
       softfloat_exceptionFlags |= softfloat_flag_inexact;
       return int16_t(0x8000);
     }
@@ -20269,9 +20277,15 @@ static uint16_t
 fpToUnsignedHalf(float x)
 {
 #ifdef SOFT_FLOAT
+  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
   uint32_t val = f32_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
   if (val > 0xffff)
-    return 0xffff;
+    {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
+      softfloat_exceptionFlags |= softfloat_flag_invalid;
+      return 0xffff;
+    }
   return val;
 #else
   // TODO: handle NAN and infinity.
@@ -20283,9 +20297,15 @@ static uint8_t
 fpToUnsignedHalf(Float16 x)
 {
 #ifdef SOFT_FLOAT
+  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
   uint32_t val = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
   if (val > 0xff)
-    return 0xff;
+    {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
+      softfloat_exceptionFlags |= softfloat_flag_invalid;
+      return 0xff;
+    }
   return val;
 #else
   // TODO: handle NAN and infinity.
@@ -20309,11 +20329,22 @@ static int16_t
 fpToSignedHalf(float x)
 {
 #ifdef SOFT_FLOAT
+  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
   int32_t val = f32_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
   if (val > int16_t(0x7fff))
-    return int16_t(0x7fff);
+    {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
+      softfloat_exceptionFlags |= softfloat_flag_invalid;
+      return int16_t(0x7fff);
+    }
   if (val < int16_t(0x8000))
-    return int16_t(0x8000);
+    {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
+      softfloat_exceptionFlags |= softfloat_flag_invalid;
+      return int16_t(0x8000);
+    }
   return val;
 #else
   // TODO: handle NAN and infinity.
@@ -20325,11 +20356,22 @@ static int8_t
 fpToSignedHalf(Float16 x)
 {
 #ifdef SOFT_FLOAT
+  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
   int32_t val = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
   if (val > int8_t(0x7f))
-    return int8_t(0x7f);
+    {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
+      softfloat_exceptionFlags |= softfloat_flag_invalid;
+      return int8_t(0x7f);
+    }
   if (val < int8_t(0x80))
-    return int8_t(0x80);
+    {
+      if (prevInexact == 0)
+	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
+      softfloat_exceptionFlags |= softfloat_flag_invalid;
+      return int8_t(0x80);
+    }
   return val;
 #else
   // TODO: handle NAN and infinity.
