@@ -44,9 +44,6 @@ namespace WdRiscv
   template <typename URV>
   class Mcm;
 
-  template <typename URV>
-  class ArchInfo;
-
   /// Thrown by the simulator when a stop (store to to-host) is seen
   /// or when the target program reaches the exit system call.
   class CoreException : public std::exception
@@ -545,6 +542,17 @@ namespace WdRiscv
     /// bounds.
     const InstEntry& getInstructionEntry(InstId id) const
     { return decoder_.getInstructionEntry(id); }
+
+    /// Return the instruction table entry associated with the given
+    /// instruction id. Return illegal instruction entry id is out of
+    /// bounds.
+    const InstEntry& getInstructionEntry(const std::string& name) const
+    { return decoder_.getInstructionEntry(name); }
+
+    /// Return the CS registers associated with this hart.
+    /// TODO: make const, but copy constructor for CSRs disabled.
+    CsRegs<URV>& csRegs()
+    { return csRegs_; }
 
     /// Return the vector registers associated with this hart.
     const VecRegs& vecRegs() const

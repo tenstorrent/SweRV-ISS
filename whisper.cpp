@@ -1641,15 +1641,10 @@ static
 bool
 staticDump(Hart<URV>& hart, const std::string infoPath)
 {
-  nlohmann::json j;
   ArchInfo<URV> info(hart, infoPath);
 
-  bool ok = info.createInstInfo(j);
-  ok = ok and info.createModeInfo(j);
-  ok = ok and info.createLmulInfo(j);
-  ok = ok and info.createSewInfo(j);
-
-  std::cout << j.dump(2) << '\n';
+  nlohmann::json j = info.dumpArchInfo();
+  std::cout << j.dump(1) << '\n';
   return true;
 }
 
