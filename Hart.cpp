@@ -1612,7 +1612,7 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
 static bool
 hasPendingInput(int fd)
 {
-  static bool firstTime = false;
+  static bool firstTime = true;
 
   if (firstTime)
     {
@@ -1621,6 +1621,7 @@ hasPendingInput(int fd)
       struct termios term;
       tcgetattr(fd, &term);
       cfmakeraw(&term);
+      term.c_lflag &= ~ECHO;
       tcsetattr(fd, 0, &term);
     }
 
@@ -1672,7 +1673,8 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	  int ch = readCharNonBlocking(fileno(stdin));
 	  if (ch < 0)
 	    throw CoreException(CoreException::Stop, "EOF", toHost_, val);
-	  memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch));
+	  if (ch > 0)
+	    memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch));
 	}
     }
   else if (dev == 0 and cmd == 0)
@@ -1846,6 +1848,15 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	    {
 	      if ((addr & 7) == 0)
 		hart->clintAlarm_ = storeVal;
+
+	      // A tif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      if (fromHostValid_ and hasPendingInput(fileno(stdin)))
+		{
+		  uint64_t v = 0;
+		  peekMemory(fromHost_, v, true);
+		  if (v == 0)
+		    memory_.poke(fromHost_, (uint64_t(1) << 56) | char(readCharNonBlocking(fileno(stdin))));
+		}
 	    }
 
 	  // URV mipVal = hart->csRegs_.peekMip();
