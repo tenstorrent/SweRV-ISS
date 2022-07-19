@@ -648,6 +648,12 @@ namespace WdRiscv
     void setTohostSymbol(const std::string& sym)
     { toHostSym_ = sym; }
 
+    void setFromHostAddress(size_t addr)
+    { fromHost_ = addr; fromHostValid_ = true; }
+
+    void setFromHostSymbol(const std::string& sym)
+    { fromHostSym_ = sym; }
+
     /// Special target program symbol writing/reading to/from which
     /// writes/reads to/from the console.
     void setConsoleIoSymbol(const std::string& sym)
@@ -1674,6 +1680,11 @@ namespace WdRiscv
     /// address translation is successful, then addr is changed to the
     /// translated physical address.
     ExceptionCause determineLoadException(uint64_t& addr, unsigned ldSize);
+
+    /// Implement part of TIF protocol for writing the "tohost" magical
+    /// location.
+    template<typename STORE_TYPE>
+    void handleStoreToHost(URV physAddr, STORE_TYPE value);
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
@@ -3946,6 +3957,11 @@ namespace WdRiscv
     URV toHost_ = 0;             // Writing to this stops the simulator.
     bool toHostValid_ = false;   // True if toHost_ is valid.
     std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
+
+    URV fromHost_ = 0;
+    bool fromHostValid_ = false;
+    std::string fromHostSym_ = "fromhost";
+
     std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
 
     URV conIo_ = 0;              // Writing a byte to this writes to console.

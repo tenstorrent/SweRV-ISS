@@ -42,6 +42,8 @@ Uart8250::read(uint64_t addr)
       byte_ = 0;
       return res;
     }
+  std::cerr << "Uart reading addr 0x" << std::hex << addr << '\n';
+  assert(0);
   return 0;
 }
 
@@ -57,6 +59,8 @@ Uart8250::write(uint64_t addr, uint32_t value)
       putchar(value);
       fflush(stdout);
     }
+  std::cerr << "Uart writing addr 0x" << std::hex << addr << " value=0x" << std::hex << value << '\n';
+  assert(0);
 }
 
 
