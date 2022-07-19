@@ -80,6 +80,9 @@ namespace WdRiscv
       PMPADDR14 = 0x3be,
       PMPADDR15 = 0x3bf,
 
+      MENVCFG = 0x30a,
+      MENVCFGH = 0x31a,
+
       // Machine Counter/Timers
       MCYCLE = 0xb00,
       MINSTRET = 0xb02,

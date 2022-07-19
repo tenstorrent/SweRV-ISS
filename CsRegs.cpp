@@ -886,7 +886,11 @@ CsRegs<URV>::defineMachineRegs()
   URV pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
 
   defineCsr("mstatus", Csrn::MSTATUS, mand, imp, val, mask, pokeMask);
-  defineCsr("misa", Csrn::MISA, mand,  imp, 0x40001105, rom, rom);
+
+  val = 0x40001105;  // MISA: acim
+  if constexpr (sizeof(URV) == 8)
+    val = 0x8000000000001105;  // MISA: acim
+  defineCsr("misa", Csrn::MISA, mand,  imp, val, rom, rom);
 
   // Bits corresponding to reserved interrupts are hardwired to zero
   // in medeleg.
@@ -962,6 +966,10 @@ CsRegs<URV>::defineMachineRegs()
   defineCsr("pmpaddr13", Csrn::PMPADDR13, !mand, imp, 0, pmpMask, pmpMask);
   defineCsr("pmpaddr14", Csrn::PMPADDR14, !mand, imp, 0, pmpMask, pmpMask);
   defineCsr("pmpaddr15", Csrn::PMPADDR15, !mand, imp, 0, pmpMask, pmpMask);
+
+  defineCsr("menvcfg", Csrn::MENVCFG, mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
+  if (rv32_)
+    defineCsr("menvcfgh", Csrn::MENVCFGH, mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
 
   // Machine Counter/Timers.
   defineCsr("mcycle",    Csrn::MCYCLE,    mand, imp, 0, wam, wam);

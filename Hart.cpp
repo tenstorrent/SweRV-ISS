@@ -25,6 +25,7 @@
 #include <boost/format.hpp>
 #include <sys/time.h>
 #include <poll.h>
+#include <sys/ioctl.h>
 
 #include <boost/multiprecision/cpp_int.hpp>
 
@@ -651,6 +652,9 @@ Hart<URV>::loadElfFile(const std::string& file, size_t& entryPoint)
 
   if (not toHostSym_.empty() and this->findElfSymbol(toHostSym_, sym))
     this->setToHostAddress(sym.addr_);
+
+  if (not fromHostSym_.empty() and this->findElfSymbol(fromHostSym_, sym))
+    this->setFromHostAddress(sym.addr_);
 
   if (not consoleIoSym_.empty() and this->findElfSymbol(consoleIoSym_, sym))
     this->setConsoleIo(URV(sym.addr_));
@@ -1603,6 +1607,97 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
 }
 
 
+#include <termios.h>
+
+static bool
+hasPendingInput(int fd)
+{
+  static bool firstTime = true;
+
+  if (firstTime)
+    {
+      firstTime = false;
+      
+      struct termios term;
+      tcgetattr(fd, &term);
+      cfmakeraw(&term);
+      term.c_lflag &= ~ECHO;
+      tcsetattr(fd, 0, &term);
+    }
+
+  struct pollfd inPollfd;
+  inPollfd.fd = fd;
+  inPollfd.events = POLLIN;
+  int code = poll(&inPollfd, 1, 0);
+  return code == 1 and (inPollfd.revents & POLLIN) != 0;
+}
+  
+
+static int
+readCharNonBlocking(int fd)
+{
+  if (not hasPendingInput(fd))
+    return 0;
+
+  char c = 0;
+  if (::read(fd, &c, sizeof(c)) == 1)
+    return c;
+
+  std::cerr << "readCharNonBlocking: unexpected fail on read\n";
+  return -1;
+}
+
+
+template <typename URV>
+template <typename STORE_TYPE>
+void
+Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
+{
+  uint64_t val = storeVal;
+  uint64_t data = (val << 16) >> 16;
+  unsigned cmd = (val >> 48) & 0xff;
+  unsigned dev = (val >> 56) & 0xff;
+  if (dev == 1)
+    {
+      if (cmd == 1)
+	{
+	  char c = data;
+	  if (c)
+	    {
+	      putchar(c);
+	      fflush(stdout);
+	    }
+	}
+      else if (cmd == 0 and fromHostValid_)
+	{
+	  int ch = readCharNonBlocking(fileno(stdin));
+	  if (ch < 0)
+	    throw CoreException(CoreException::Stop, "EOF", toHost_, val);
+	  if (ch > 0)
+	    memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch));
+	}
+    }
+  else if (dev == 0 and cmd == 0)
+    {
+      ldStWrite_ = true;
+      ldStData_ = storeVal;
+      memory_.write(hartIx_, physAddr, storeVal);
+      if (storeVal & 1)
+	throw CoreException(CoreException::Stop, "write to to-host",
+			    toHost_, val);
+      else
+	assert(0);
+    }
+  else
+    {
+      ldStWrite_ = true;
+      ldStData_ = storeVal;
+      memory_.write(hartIx_, physAddr, storeVal);
+      assert(0);
+    }
+}
+
+
 template <typename URV>
 template <typename STORE_TYPE>
 inline
@@ -1655,13 +1750,10 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   ldStPrevData_ = temp;
 
   // If we write to special location, end the simulation.
-  if (toHostValid_ and addr == toHost_ and storeVal != 0)
+  if (toHostValid_ and addr == toHost_)
     {
-      ldStWrite_ = true;
-      ldStData_ = storeVal;
-      memory_.write(hartIx_, addr, storeVal);
-      throw CoreException(CoreException::Stop, "write to to-host",
-			  toHost_, storeVal);
+      handleStoreToHost(addr, storeVal);
+      return true;
     }
 
   // If addr is special location, then write to console.
@@ -1755,7 +1847,16 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	  else if (stSize == 8)
 	    {
 	      if ((addr & 7) == 0)
-		hart->alarmLimit_ = storeVal;
+		hart->clintAlarm_ = storeVal;
+
+	      // A tif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      if (fromHostValid_ and hasPendingInput(fileno(stdin)))
+		{
+		  uint64_t v = 0;
+		  peekMemory(fromHost_, v, true);
+		  if (v == 0)
+		    memory_.poke(fromHost_, (uint64_t(1) << 56) | char(readCharNonBlocking(fileno(stdin))));
+		}
 	    }
 
 	  // URV mipVal = hart->csRegs_.peekMip();
@@ -4134,7 +4235,7 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
   if (ce.type() == CoreException::Stop)
     {
       isRetired = true;
-      success = ce.value() == 1; // Anything besides 1 is a fail.
+      success = (ce.value() >> 1) == 0;
       setTargetProgramFinished(true);
     }
   else if (ce.type() == CoreException::Exit)
@@ -4173,11 +4274,21 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
   return success;
 }
 
-
+#include <termios.h>
 static
 bool
 isInputPending(int fd)
 {
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      firstTime = false;
+      struct termios term;
+      tcgetattr(fileno(stdin), &term);
+      cfmakeraw(&term);
+      tcsetattr(fileno(stdin), 0, &term);
+    }
+
   struct pollfd pfds[1];
   pfds[0].fd = fd;
   pfds[0].events = POLLIN;
@@ -4760,12 +4871,21 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 {
   URV mipVal = csRegs_.peekMip();
 
+  for (auto dev : memory_.ioDevs_)
+    if (dev->isInterruptPending())
+      {
+	mipVal |=  (URV(1) << URV(InterruptCause::M_EXTERNAL)) | (URV(1) << URV(InterruptCause::S_EXTERNAL));
+	csRegs_.poke(CsrNumber::MIP, mipVal);
+	break;
+      }
+
   if (hasClint())
     {
+      // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
       if (instCounter_ >= clintAlarm_)
-	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
+	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER)) | (URV(1) << URV(InterruptCause::S_TIMER));
       else
-	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
       csRegs_.poke(CsrNumber::MIP, mipVal);
     }
 

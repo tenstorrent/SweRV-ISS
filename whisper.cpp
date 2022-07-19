@@ -195,6 +195,7 @@ struct Args
   std::optional<uint64_t> startPc;
   std::optional<uint64_t> endPc;
   std::optional<uint64_t> toHost;
+  std::optional<uint64_t> fromHost;
   std::optional<uint64_t> consoleIo;
   std::optional<uint64_t> instCountLim;
   std::optional<uint64_t> memorySize;
@@ -290,6 +291,13 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
     {
       auto numStr = varMap["tohost"].as<std::string>();
       if (not parseCmdLineNumber("tohost", numStr, args.toHost))
+	ok = false;
+    }
+
+  if (varMap.count("fromhost"))
+    {
+      auto numStr = varMap["fromhost"].as<std::string>();
+      if (not parseCmdLineNumber("fromhost", numStr, args.toHost))
 	ok = false;
     }
 
@@ -429,11 +437,13 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Set stop program counter. Simulator will stop once instruction at "
 	 "the stop program counter is executed.")
 	("tohost", po::value<std::string>(),
-	 "Memory address to which a write stops simulator.")
+	 "Memory address for host target interface (HTIF).")
 	("tohostsym", po::value<std::string>(),
 	 "ELF symbol to use for setting tohost from ELF file (in the case "
 	 "where tohost is not specified on the command line). Default: "
 	 "\"tohost\".")
+	("fromhost", po::value<std::string>(),
+	 "Memory address for host target interface (HTIF).")
 	("consoleio", po::value<std::string>(),
 	 "Memory address corresponding to console io. Reading/writing "
 	 "(lw/lh/lb sw/sh/sb) from given address reads/writes a byte from the "
@@ -926,6 +936,8 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   // Command line to-host overrides that of ELF and config file.
   if (args.toHost)
     hart.setToHostAddress(*args.toHost);
+  if (args.fromHost)
+    hart.setFromHostAddress(*args.fromHost);
 
   // Command-line entry point overrides that of ELF.
   if (args.startPc)
@@ -1641,15 +1653,10 @@ static
 bool
 staticDump(Hart<URV>& hart, const std::string infoPath)
 {
-  nlohmann::json j;
   ArchInfo<URV> info(hart, infoPath);
 
-  bool ok = info.createInstInfo(j);
-  ok = ok and info.createModeInfo(j);
-  ok = ok and info.createLmulInfo(j);
-  ok = ok and info.createSewInfo(j);
-
-  std::cout << j.dump(2) << '\n';
+  nlohmann::json j = info.dumpArchInfo();
+  std::cout << j.dump(1) << '\n';
   return true;
 }
 

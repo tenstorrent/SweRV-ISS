@@ -38,10 +38,12 @@ Uart8250::read(uint64_t addr)
       std::lock_guard<std::mutex> lock(mutex_);
       uint32_t res = byte_;
 
-      setPendingInterrupt(false);
+      setInterruptPending(false);
       byte_ = 0;
       return res;
     }
+  std::cerr << "Uart reading addr 0x" << std::hex << addr << '\n';
+  assert(0);
   return 0;
 }
 
@@ -51,9 +53,14 @@ Uart8250::write(uint64_t addr, uint32_t value)
 {
   if (addr == address())
     {
+      value &= 0xff;
+      if (not value)
+	return;
       putchar(value);
       fflush(stdout);
     }
+  std::cerr << "Uart writing addr 0x" << std::hex << addr << " value=0x" << std::hex << value << '\n';
+  assert(0);
 }
 
 
@@ -85,7 +92,7 @@ Uart8250::monitorStdin()
 	      if (::read(fd, &c, sizeof(c)) != 1)
 		std::cerr << "Uart8250::monitorStdin: unexpected fail on read\n";
 	      byte_ = c;
-	      setPendingInterrupt(true);
+	      setInterruptPending(true);
 	      std::cerr << "Uart monitor: " << c << '\n';
 	    }
 	}

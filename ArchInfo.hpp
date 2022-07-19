@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <iostream>
+#include <fstream>
 #include "InstEntry.hpp"
 #include "trapEnums.hpp"
 #include "Hart.hpp"
@@ -10,21 +12,10 @@ namespace WdRiscv
 {
 
   // Entry description
-  enum class ArchEntryName { Opcode, Mode, Lmul, Sew, Undefined };
-  enum class OperateMode : uint32_t
-  {
-    User = 0,
-    Hypervisor = 1,
-    Reserved = 2,
-    Machine = 3,
-    VirtUser = 4,
-    VirtSupervisor = 5
-  };
+  enum class ArchInfoPoint { Dest, Src, Sew, Lmul, Frm, Fflags,
+                              Mode, Exception, Undefined };
 
-  struct ArchEntry
-  {
-    unsigned mask = 0; // Size of data (# of bits)
-  };
+  enum class ArchInfoGroup { Inst, Paging, Custom };
 
   /// Architectural coverage definition. Should be provided as a json file.
   template <typename URV>
@@ -35,86 +26,70 @@ namespace WdRiscv
     /// Copy JSON file
     ArchInfo(Hart<URV>& hart, std::string filename);
 
-    /// Populate json object depending on opcode definition
-    bool createInstInfo(nlohmann::json& j);
-
-    /// Populate json object depending on modes definition
-    bool createModeInfo(nlohmann::json& j);
-
-    /// Popular json object depending on lmul/sew definition
-    bool createLmulInfo(nlohmann::json& j);
-    bool createSewInfo(nlohmann::json& j);
-
-    /// Extension to string
-    std::string extToString(const RvExtension ext) const
+    /// generate architectural space
+    nlohmann::json dumpArchInfo()
     {
-      switch(ext)
+      nlohmann::json j;
+      for (auto& entry : entries_)
         {
-          case RvExtension::M:      return "Rvm";
-          case RvExtension::I:      return "Rvi";
-          case RvExtension::F:      return "Rvf";
-          case RvExtension::D:      return "Rvd";
-          case RvExtension::A:      return "Rva";
-          case RvExtension::V:      return "Rvv";
-          case RvExtension::Zba:    return "Zba";
-          case RvExtension::Zbb:    return "Zbb";
-          case RvExtension::Zbc:    return "Zbc";
-          case RvExtension::Zbe:    return "Zbe";
-          case RvExtension::Zbf:    return "Zbf";
-          case RvExtension::Zbm:    return "Zbm";
-          case RvExtension::Zbp:    return "Zbp";
-          case RvExtension::Zbr:    return "Zbr";
-          case RvExtension::Zbs:    return "Zbs";
-          case RvExtension::Zbt:    return "Zbt";
-          case RvExtension::Zfh:    return "Zfh";
-          case RvExtension::Zlsseg: return "Zlsseg";
-	  case RvExtension::Zknd:   return "Zknd";
-	  case RvExtension::Zkne:   return "Zkne";
-	  case RvExtension::Zknh:   return "Zknh";
-	  case RvExtension::Zbkb:   return "Zbkb";
-	  case RvExtension::Zksed:  return "Zksed";
-	  case RvExtension::Zksh:   return "Zksh";
-          default:                  return "Invalid";
+          for (auto& point : entry.crosses_)
+            {
+              switch (point)
+                {
+                  case ArchInfoPoint::Dest:             addDestBins(entry); break;
+                  case ArchInfoPoint::Src:              addSrcBins(entry); break;
+                  case ArchInfoPoint::Sew:              addSewBins(entry); break;
+                  case ArchInfoPoint::Lmul:             addLmulBins(entry); break;
+                  case ArchInfoPoint::Mode:             addModeBins(entry); break;
+                  default: break;
+                }
+            }
+          j += nlohmann::json::object_t::value_type(entry.name_, entry.j_);
         }
-    }
 
-    /// Operating (virt + priv) mode to string for when hypervisor
-    /// is enabled.
-    std::string virtPrivToString(const OperateMode mode) const
-    {
-      switch(mode)
-        {
-          case OperateMode::User:           return "UserMode";
-          case OperateMode::Reserved:       return "HypervisorMode";
-          case OperateMode::Hypervisor:     return "Hypervisor-SupervisorMode";
-          case OperateMode::Machine:        return "MachineMode";
-          case OperateMode::VirtUser:       return "VirtualUserMode";
-          case OperateMode::VirtSupervisor: return "VirtualSupervisorMode";
-          default:                          return "Invalid";
-        }
-    }
-
-    std::string privToString(const PrivilegeMode mode) const
-    {
-      switch(mode)
-        {
-          case PrivilegeMode::User:          return "UserMode";
-          case PrivilegeMode::Supervisor:    return "Supervisor";
-          case PrivilegeMode::Reserved:      return "Reserved";
-          case PrivilegeMode::Machine:       return "MachineMode";
-          default:                           return "Invalid";
-        }
+      return j;
     }
 
   private:
 
-    std::unordered_map<ArchEntryName, struct ArchEntry> entries_;
-    Hart<URV>& hart_;
+    typedef struct
+    {
+      ArchInfoGroup group_;
+      std::string name_;
+      nlohmann::json j_;
+      std::vector<ArchInfoPoint> crosses_;
+    } ArchInfoEntry;
 
-    /// Contains a unique human-readable symbol such that -
-    /// The same opcode value will have the same symbol AND
-    /// A different opcode value will have a different symbol
-    std::unordered_map<unsigned, std::string> symbols_;
-    std::unordered_map<std::string, unsigned> typeIdx_;
+    /// Populate archinfo space depending on instruction attributes.
+    void addInstPoints(ArchInfoEntry& entry);
+
+    bool addDestBins(ArchInfoEntry& entry) const;
+
+    bool addSrcBins(ArchInfoEntry& entry) const;
+
+    bool addSewBins(ArchInfoEntry& entry) const;
+
+    bool addLmulBins(ArchInfoEntry& entry) const;
+
+    bool addModeBins(ArchInfoEntry& entry) const;
+
+    ArchInfoGroup getGroup(std::string name) const
+    {
+      InstEntry inst = hart_.getInstructionEntry(name);
+      if (inst.instId() != InstId::illegal)
+        return ArchInfoGroup::Inst;
+      else
+        return ArchInfoGroup::Custom;
+    }
+
+    static std::string toJsonHex(const unsigned num)
+    {
+      std::ostringstream oss;
+      oss << "0x" << std::hex << num;
+      return oss.str();
+    }
+
+    std::vector<ArchInfoEntry> entries_;
+    Hart<URV>& hart_;
   };
 }

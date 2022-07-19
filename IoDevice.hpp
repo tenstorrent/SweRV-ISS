@@ -27,11 +27,11 @@ namespace WdRiscv
     virtual void write(uint64_t addr, uint32_t value) = 0;
 
     /// Return true if this device has a pending interrupt.
-    bool isInterruptPeding() const
+    bool isInterruptPending() const
     { return hasInterrupt_; }
 
     /// Mark this device as having/not-having a pending interrupt.
-    void setPendingInterrupt(bool flag)
+    void setInterruptPending(bool flag)
     { hasInterrupt_ = flag; }
 
     /// Return true if given address falls within the memory mapped

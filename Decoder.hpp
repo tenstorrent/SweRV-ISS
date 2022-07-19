@@ -81,6 +81,12 @@ namespace WdRiscv
     const InstEntry& getInstructionEntry(InstId id) const
     { return instTable_.getEntry(id); }
 
+    /// Return the instruction table entry associated with the given
+    /// instruction id. Return illegal instruction entry id is out of
+    /// bounds.
+    const InstEntry& getInstructionEntry(const std::string& name) const
+    { return instTable_.getEntry(name); }
+
   protected:
 
     /// Decode a floating point instruction.
