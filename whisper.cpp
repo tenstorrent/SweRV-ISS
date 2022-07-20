@@ -931,15 +931,17 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   // Load binary files
   for (const auto& binaryFile : args.binaryFiles)
     {
+      std::string filename = binaryFile;
+      size_t offs = 0;
       auto end = binaryFile.find(":");
-      if (end == std::string::npos)
+      if (end != std::string::npos)
         {
-          std::cerr << "Binary " << binaryFile << " does not have an address, will ignore\n";
-          continue;
+          filename = binaryFile.substr(0, end);
+          std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
+          offs = strtoull(offsStr.c_str(), NULL, 0);
         }
-      std::string filename = binaryFile.substr(0, end);
-      std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
-      size_t offs = strtoull(offsStr.c_str(), NULL, 0);
+      else
+        std::cerr << "Binary " << binaryFile << " does not have an address, will use address 0x0\n";
 
       if (args.verbose)
 	std::cerr << "Loading binary " << filename << " at address 0x" << std::hex << offs << '\n';
@@ -949,7 +951,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (not args.kernelFile.empty())
     {
-      std::string filename;
+      std::string filename = args.kernelFile;
       size_t offs = URV(entryPoint) + ((hart.isRv64()) ? 0x200000 : 0x400000);
       auto end = args.kernelFile.find(":");
       // check for user offset
@@ -959,8 +961,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
           std::string offsStr = args.kernelFile.substr(end + 1, args.kernelFile.length());
           offs = strtoull(offsStr.c_str(), NULL, 0);
         }
-      else
-        filename = args.kernelFile;
 
       if (args.verbose)
 	std::cerr << "Loading kernel image " << filename << " at address 0x" << std::hex << offs << '\n';
