@@ -566,6 +566,12 @@ namespace WdRiscv
     /// tokens each consisting of two hexadecimal digits.
     bool loadHexFile(const std::string& file);
 
+    /// Load the binary file and set memory locations accordingly.
+    /// Return true on success. Return false if file does not exist,
+    /// or cannot be opened.
+    bool loadBinaryFile(const std::string& file, size_t addr)
+    { return memory_.loadBinaryFile(file, addr); }
+
     /// Load the given ELF file and place its contents in memory.
     /// Return true on success. Return false if file does not exists,
     /// cannot be opened or contains malformed data. On success, set

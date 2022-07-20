@@ -162,6 +162,7 @@ typedef std::vector<uint64_t> Uint64Vec;
 struct Args
 {
   StringVec   hexFiles;        // Hex files to be loaded into simulator memory.
+  StringVec   binaryFiles;     // Binary files to be loaded into simulator memory.
   std::string traceFile;       // Log of state change after each instruction.
   std::string commandLogFile;  // Log of interactive or socket commands.
   std::string consoleOutFile;  // Console io output file.
@@ -179,6 +180,7 @@ struct Args
   std::string stderrFile;      // Redirect target program stderr to this. 
   std::string dataLines;       // Output file for data address line tracing.
   std::string instrLines;      // Output file for instruction address line tracing.
+  std::string kernelFile;      // Load kernel image at address.
   StringVec   regInits;        // Initial values of regs
   StringVec   targets;         // Target (ELF file) programs and associated
                                // program options to be loaded into simulator
@@ -420,6 +422,11 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Target program argument separator.")
 	("hex,x", po::value(&args.hexFiles)->multitoken(),
 	 "HEX file to load into simulator memory.")
+	("binary,b", po::value(&args.binaryFiles)->multitoken(),
+	 "Binary file to load into simulator memory. "
+         "Expected format is /path/to/binary<:0xdeadbeef>.")
+        ("kernel", po::value(&args.kernelFile),
+         "Kernel file to load at addr (default=0x400000 for rv32, 0x200000 for rv64).")
 	("logfile,f", po::value(&args.traceFile),
 	 "Enable tracing to given file of executed instructions. Output is compressed (with /usr/bin/gzip) if file name ends with \".gz\".")
 	("csvlog", po::bool_switch(&args.csv),
@@ -893,12 +900,12 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   // Load ELF files. Entry point of first file sets the start PC uness in raw mode.
   bool firstElf = true;
+  size_t entryPoint = 0;
   for (const auto& target : args.expandedTargets)
     {
       const auto& elfFile = target.front();
       if (args.verbose)
 	std::cerr << "Loading ELF file " << elfFile << '\n';
-      size_t entryPoint = 0;
       if (hart.loadElfFile(elfFile, entryPoint))
 	{
 	  if (firstElf and not args.raw)
@@ -916,6 +923,46 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 	std::cerr << "Loading HEX file " << hexFile << '\n';
       if (not hart.loadHexFile(hexFile))
 	errors++;
+    }
+
+  // Load binary files
+  for (const auto& binaryFile : args.binaryFiles)
+    {
+      auto end = binaryFile.find(":");
+      if (end == std::string::npos)
+        {
+          std::cerr << "Binary " << binaryFile << " does not have an address, will ignore\n";
+          continue;
+        }
+      std::string filename = binaryFile.substr(0, end);
+      std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
+      size_t offs = strtoull(offsStr.c_str(), NULL, 0);
+
+      if (args.verbose)
+	std::cerr << "Loading binary " << filename << " at address 0x" << std::hex << offs << '\n';
+      if (not hart.loadBinaryFile(filename, offs))
+        errors++;
+    }
+
+  if (not args.kernelFile.empty())
+    {
+      std::string filename;
+      size_t offs = URV(entryPoint) + ((hart.isRv64()) ? 0x200000 : 0x400000);
+      auto end = args.kernelFile.find(":");
+      // check for user offset
+      if (end != std::string::npos)
+        {
+          filename = args.kernelFile.substr(0, end);
+          std::string offsStr = args.kernelFile.substr(end + 1, args.kernelFile.length());
+          offs = strtoull(offsStr.c_str(), NULL, 0);
+        }
+      else
+        filename = args.kernelFile;
+
+      if (args.verbose)
+	std::cerr << "Loading kernel image " << filename << " at address 0x" << std::hex << offs << '\n';
+      if (not hart.loadBinaryFile(filename, offs))
+        errors++;
     }
 
   if (not args.instFreqFile.empty())
