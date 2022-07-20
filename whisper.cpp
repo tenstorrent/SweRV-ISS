@@ -423,10 +423,13 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	("hex,x", po::value(&args.hexFiles)->multitoken(),
 	 "HEX file to load into simulator memory.")
 	("binary,b", po::value(&args.binaryFiles)->multitoken(),
-	 "Binary file to load into simulator memory. "
-         "Expected format is /path/to/binary<:0xdeadbeef>.")
+	 "Binary file to load into simulator memory. File path may be suffixed with a colon followed "
+	 "by an address (integer) in which case data will be loaded at address as opposed to zero. "
+	 " Example: -b file1  -b file2:0x1040")
         ("kernel", po::value(&args.kernelFile),
-         "Kernel file to load at addr (default=0x400000 for rv32, 0x200000 for rv64).")
+         "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
+	 "rv32 or 0x200000 for rv64 unless an explicit addresss is specified after a colon suffix "
+	 "to the file path.")
 	("logfile,f", po::value(&args.traceFile),
 	 "Enable tracing to given file of executed instructions. Output is compressed (with /usr/bin/gzip) if file name ends with \".gz\".")
 	("csvlog", po::bool_switch(&args.csv),
