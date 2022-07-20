@@ -4529,7 +4529,7 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim or bbFile_ or instrLineTrace_)
+          if (hasLim or bbFile_ or instrLineTrace_ or isRvs() or hasClint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4649,10 +4649,17 @@ bool
 Hart<URV>::simpleRunWithLimit()
 {
   uint64_t limit = instCountLim_;
+  bool checkInterrupt = isRvs() or hasClint();
+  std::string instStr;
+
   while (noUserStop and instCounter_ < limit) 
     {
       currPc_ = pc_;
       ++instCounter_;
+	  cycleCount_++;
+
+      if (checkInterrupt and processExternalInterrupt(nullptr, instStr))
+	continue;
 
       // Fetch/decode unless match in decode cache.
       uint32_t ix = (pc_ >> 1) & decodeCacheMask_;
@@ -4779,8 +4786,8 @@ Hart<URV>::run(FILE* file)
   // to runUntilAddress which supports all features.
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
-                  or enableCounters_ or alarmInterval_ or file or hasClint()
-		  or isRvs() or tracerExtension or hasInterruptor_);
+                  or enableCounters_ or alarmInterval_ or file
+		  or tracerExtension or hasInterruptor_);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 
