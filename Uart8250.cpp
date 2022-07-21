@@ -33,15 +33,32 @@ Uart8250::~Uart8250()
 uint32_t
 Uart8250::read(uint64_t addr)
 {
-  if (addr == address())
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      uint32_t res = byte_;
+  uint64_t offset = addr - address();
+  bool dlab = lcr_ & 0x80;
 
-      setInterruptPending(false);
-      byte_ = 0;
-      return res;
+  switch (offset)
+    {
+    case 0:
+      if (dlab)
+	return baudDivLow_;
+      else
+	{
+	  std::lock_guard<std::mutex> lock(mutex_);
+	  uint32_t res = byte_;
+
+	  setInterruptPending(false);
+	  byte_ = 0;
+	  return res;
+	}
+
+    case 1: return dlab? baudDivHigh_ : ier_;
+    case 2: return isr_;
+    case 3: return lcr_;
+    case 4: return mcr_;
+    case 5: return lsr_;
+    case 6: return msr_;
     }
+
   std::cerr << "Uart reading addr 0x" << std::hex << addr << '\n';
   assert(0);
   return 0;
@@ -51,16 +68,37 @@ Uart8250::read(uint64_t addr)
 void
 Uart8250::write(uint64_t addr, uint32_t value)
 {
-  if (addr == address())
+  uint64_t offset = addr - address();
+  bool dlab = lcr_ & 0x80;
+
+  switch (offset)
     {
-      value &= 0xff;
-      if (not value)
-	return;
-      putchar(value);
-      fflush(stdout);
+    case 0:
+      if (dlab)
+	baudDivLow_ = uint8_t(value);
+      else
+	{
+	  value &= 0xff;
+	  if (value)
+	    {
+	      putchar(uint8_t(value));
+	      fflush(stdout);
+	    }
+	}
+      break;
+
+    case 1:
+      if (dlab)
+	baudDivHigh_ = uint8_t(value);
+      else
+	ier_ = uint8_t(value);
+      break;
+
+    case 2: fcr_ = uint8_t(value); break;
+    case 3: lcr_ = uint8_t(value); break;
+    case 4: mcr_ = uint8_t(value); break;
+    case 5: if (dlab) psd_ = uint8_t(value); break;
     }
-  std::cerr << "Uart writing addr 0x" << std::hex << addr << " value=0x" << std::hex << value << '\n';
-  assert(0);
 }
 
 
