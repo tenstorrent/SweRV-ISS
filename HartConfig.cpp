@@ -1230,202 +1230,22 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
-  // Enable zbb.
-  tag = "enable_zbmini";
-  if (config_ -> count(tag))
+  for (auto ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin",
+		     "zknd", "zkne", "zknh", "zbkb", "zksed", "zksh"} )
     {
-      std::cerr << "Config file tag \"enable_zbmini\" deprecated: "
-		<< "Using \"enable_zbb\" and \"enable_zbs\"\n";
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        {
-          hart.enableRvzbb(flag);
-          hart.enableRvzbs(flag);
-        }
-      else
-        errors++;
-
+      std::string etag = std::string("enable_") + ztag;
+      if (config_ -> count(etag))
+	std::cerr << "Config file tag \"" << etag << "\" deprecated: "
+		  << "Add extension string \"" << ztag << "\" to \"isa\" tag instead.\n";
     }
 
-  tag = "enable_zba";
-  if (config_ -> count(tag))
+  for (auto ztag : { "zbe", "zbf", "zbm", "zbp", "zbr", "zbt" } )
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzba(flag);
-      else
-        errors++;
+      std::string etag = std::string("enable_") + ztag;
+      if (config_ -> count(etag))
+	std::cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
-  tag = "enable_zbb";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbb(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbc";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbc(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbe";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbe(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbf";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbf(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbm";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbm(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbp";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbp(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbr";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbr(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbs";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbs(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbt";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbt(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zfh";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzfh(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zfhmin";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzfhmin(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zknd";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzknd(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zkne";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzkne(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zknh";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzknh(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zbkb";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzbkb(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zksed";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzksed(flag);
-      else
-        errors++;
-    }
-
-  tag = "enable_zksh";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.enableRvzksh(flag);
-      else
-        errors++;
-    }
 
   tag = "even_odd_trigger_chains";
   if (config_ -> count(tag))
