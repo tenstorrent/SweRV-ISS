@@ -2551,7 +2551,7 @@ template<typename URV>
 void
 Hart<URV>::execFlh(const DecodedInst* di)
 {
-  if (not isZfhLegal())
+  if (not isZfhLegal() and not isZfhminLegal())
     {
       illegalInst(di);
       return;
@@ -2578,7 +2578,7 @@ template<typename URV>
 void
 Hart<URV>::execFsh(const DecodedInst* di)
 {
-  if (not isZfhLegal())
+  if (not isZfhLegal() and not isZfhminLegal())
     {
       illegalInst(di);
       return;
@@ -2959,6 +2959,12 @@ Hart<URV>::execFcvt_s_h(const DecodedInst* di)
 {
   // Half to single
 
+  if (not isZfhLegal() and not isZfhminLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
   if (not checkRoundingModeHp(di))
     return;
 
@@ -2987,7 +2993,13 @@ Hart<URV>::execFcvt_d_h(const DecodedInst* di)
 {
   // Half to double
 
-  if (not checkRoundingModeHp(di) or not isRvd())
+  if (not isRvd() or (not isZfhLegal() and not isZfhminLegal()))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkRoundingModeHp(di))
     return;
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
@@ -3014,6 +3026,12 @@ void
 Hart<URV>::execFcvt_h_s(const DecodedInst* di)
 {
   // Single to half.
+
+  if (not isZfhLegal() and not isZfhminLegal())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkRoundingModeHp(di))
     return;
@@ -3043,7 +3061,13 @@ Hart<URV>::execFcvt_h_d(const DecodedInst* di)
 {
   // Double to half.
 
-  if (not checkRoundingModeHp(di) or not isRvd())
+  if (not isRvd() or (not isZfhLegal() and not isZfhminLegal()))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkRoundingModeHp(di))
     return;
 
   double d1 = fpRegs_.readDouble(di->op1());
@@ -3192,7 +3216,7 @@ template<typename URV>
 void
 Hart<URV>::execFmv_x_h(const DecodedInst* di)
 {
-  if (not isZfhLegal())
+  if (not isZfhLegal() and not isZfhminLegal())
     {
       illegalInst(di);
       return;
@@ -3358,7 +3382,7 @@ Hart<URV>::execFmv_h_x(const DecodedInst* di)
 {
   // move bits of integer register to half fp
 
-  if (not isZfhLegal())
+  if (not isZfhLegal() and not isZfhminLegal())
     {
       illegalInst(di);
       return;

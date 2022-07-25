@@ -1357,6 +1357,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  tag = "enable_zfhmin";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ -> at(tag), flag))
+        hart.enableRvzfhmin(flag);
+      else
+        errors++;
+    }
+
   tag = "enable_zknd";
   if (config_ -> count(tag))
     {

@@ -321,6 +321,8 @@ Hart<URV>::processExtensions()
     enableRvzbs(true);
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
+  if (isa_.isEnabled(RvExtension::Zfhmin))
+    enableRvzfhmin(true);
   if (isa_.isEnabled(RvExtension::Zknd))
     enableRvzknd(true);
   if (isa_.isEnabled(RvExtension::Zkne))

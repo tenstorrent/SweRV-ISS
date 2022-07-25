@@ -912,6 +912,10 @@ namespace WdRiscv
     void enableRvzfh(bool flag)
     { rvzfh_ = flag; }
 
+    /// Enable/disable the minimal half-precision floating point extension.
+    void enableRvzfhmin(bool flag)
+    { rvzfhmin_ = flag; }
+
     /// Enable/disable the crypto zknd (nist decryption) extension.
     void enableRvzknd(bool flag)
     { rvzknd_ = flag; }
@@ -1059,6 +1063,11 @@ namespace WdRiscv
     /// enabled.
     bool isRvzfh() const
     { return rvzfh_; }
+
+    /// Return true if the minimal half-precision floating point
+    /// extension is enabled.
+    bool isRvzfhmin() const
+    { return rvzfhmin_; }
 
     /// Return true if rv64d (double precision floating point)
     /// extension is enabled in this hart.
@@ -1493,11 +1502,17 @@ namespace WdRiscv
     bool isFpEnabled() const
     { return mstatusFs_ != FpFs::Off; }
 
-    // Return true if it is legal to execute an zfh instruction: f and zfh
+    // Return true if it is legal to execute a zfh instruction: f and zfh
     // extensions must be enabled and FS feild of MSTATUS must not be
     // OFF.
     bool isZfhLegal() const
     { return isRvf() and isRvzfh() and isFpEnabled(); }
+
+    // Return true if it is legal to execute a zfhmin instruction: f and zfhmin
+    // extensions must be enabled and FS feild of MSTATUS must not be
+    // OFF.
+    bool isZfhminLegal() const
+    { return isRvf() and isRvzfhmin() and isFpEnabled(); }
 
     // Return true if it is legal to execute an FP instruction: F extension must
     // be enabled and FS field of MSTATUS must not be OFF.
@@ -3932,6 +3947,7 @@ namespace WdRiscv
     bool rve_ = false;           // True if extension E (embedded) enabled.
     bool rvf_ = false;           // True if extension F (single fp) enabled.
     bool rvzfh_ = false;         // True if extension zfh (half fp) enabled.
+    bool rvzfhmin_ = false;      // True if extension zfhmin (minimal half fp) enabled.
     bool rvm_ = true;            // True if extension M (mul/div) enabled.
     bool rvs_ = false;           // True if extension S (supervisor-mode) enabled.
     bool rvu_ = false;           // True if extension U (user-mode) enabled.
