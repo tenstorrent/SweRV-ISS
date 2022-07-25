@@ -72,7 +72,7 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
   mem.defineWriteMemoryCallback(writef);
 #endif
 
-  // mem.registerIoDevice(new Uart8250(0x10000000, 0x100));
+  // mem.registerIoDevice(new Uart8250(0x1000000, 0x100));
 }
 
 

@@ -193,6 +193,62 @@ Memory::loadHexFile(const std::string& fileName)
 
 
 bool
+Memory::loadBinaryFile(const std::string& fileName, size_t addr)
+{
+  std::ifstream input(fileName, std::ios::binary);
+
+  if (not input.good())
+    {
+      std::cerr << "Failed to open binary file '" << fileName << "' for input\n";
+      return false;
+    }
+
+  // unmapped and out of bounds addresses
+  size_t unmappedCount = 0, oob = 0, num = 0;
+
+  char b;
+  while (input.get(b))
+    {
+      if (addr < size_)
+        {
+          if (not specialInitializeByte(addr, b))
+            {
+              if (unmappedCount == 0)
+                std::cerr << "Failed to copy binary file byte at address 0x"
+                          << std::hex << addr << std::dec
+                          << ": corresponding location is not mapped\n";
+              unmappedCount++;
+              if (checkUnmappedElf_)
+                return false;
+            }
+          addr++;
+        }
+      else
+        {
+          if (not oob)
+            std::cerr << "File " << fileName << ", Byte " << num << ": "
+                      << "Warning: Address out of bounds: "
+                      << std::hex << addr << '\n' << std::dec;
+          oob++;
+        }
+      num++;
+    };
+
+
+  if (oob > 1)
+    std::cerr << "File " << fileName << ": Warning: File contained "
+              << oob << " out of bounds addresses.\n";
+
+  // In case writing ELF data modified last-written-data associated
+  // with each hart.
+  for (unsigned hartId = 0; hartId < reservations_.size(); ++hartId)
+    clearLastWriteInfo(hartId);
+
+  return true;
+}
+
+
+bool
 Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
 {
   const ELFIO::segment* seg = reader.segments[segIx];
