@@ -483,8 +483,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
     {
       std::cerr << "Invalid peek command: " << line << '\n';
       std::cerr << "Expecting: peek <item> <addr>  or  peek pc  or  peek all\n";
-      std::cerr << "  Item is one of r, f, c, v, t , pc, or m for integer, floating point,\n";
-      std::cerr << "  CSR, vector, trigger register, program counter, or memory location respectively\n";
+      std::cerr << "  Item is one of r, f, c, v, t , pc, m, or s for integer, floating point,\n";
+      std::cerr << "  CSR, vector, trigger register, program counter, memory location, or special respectively\n";
 
       std::cerr << "  example:  peek r x3\n";
       std::cerr << "  example:  peek f f4\n";
@@ -493,6 +493,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       std::cerr << "  example:  peek m 0x4096\n";
       std::cerr << "  example:  peek t 0\n";
       std::cerr << "  example:  peek pc\n";
+      std::cerr << "  example:  peek s pm\n";
       return false;
     }
 
@@ -697,8 +698,29 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       return false;
     }
 
+  if (resource == "s")
+    {
+      bool ok = true;
+      if (addrStr == "pm")
+	out << unsigned(hart.privilegeMode()) << std::endl;
+      else if (addrStr == "ppm")
+	out << unsigned(hart.lastPrivMode()) << std::endl;
+      else if (addrStr == "iff")
+	out << (boost::format("0x%x") % hart.lastFpFlags()) << std::endl;
+      else if (addrStr == "trap")
+	out << (hart.lastInstructionTrapped() ? "1" : "0") << std::endl;
+      else
+	ok = false;
+
+      if (ok)
+	return true;
+
+      std::cerr << "Invalid special resource: " << addrStr << '\n';
+      return false;
+    }
+
   std::cerr << "No such resource: " << resource
-	    << " -- expecting r, m, c, t, or pc\n";
+	    << " -- expecting r, f, v, c, t, m , s, or pc\n";
   return false;
 }
 
@@ -1250,20 +1272,26 @@ Interactive<URV>::helpCommand(const std::vector<std::string>& tokens)
       cout << "peek <res> <addr>\n"
 	   << "peek m <addr> [<addr>] [<file>]\n"
 	   << "peek pc\n"
-	   << "  Show the contents of the item at the given address witin the given\n"
-	   << "  resource. Possible resources are r, f, c, v, or m for integer, FP,\n"
-	   << "  CSR, vector register, or for memory respectively. Addr stands for a\n"
+	   << "peek s  pm | ppm | iff | trap\n"
+	   << "  Show the contents of the item at the given address within the given\n"
+	   << "  resource. Possible resources are r, f, c, v, m, or s for integer, FP,\n"
+	   << "  CSR, vector register, memory, or special respectively. Addr stands for a\n"
 	   << "  register number, register name, or memory address. If resource is\n"
 	   << "  memory (m), then an additional address may be provided to define a\n"
 	   << "  range of memory locations to be display and an optional filename\n"
 	   << "  after 2nd address may be provided to write memory contents to a file.\n"
 	   << "  Vector register values are printed just like intger register (most\n"
-	   << "  significant byte first). Examples:\n"
+	   << "  significant byte first). If resource is special (s) then following\n"
+	   << "  special items may be queried: pm, ppm, iff, and trap which stand for\n"
+	   << "  privilege-mode, previous-privilege-mode, incremental-fp-flags, and\n"
+	   << "  whether or not the last executed instruction took a trap.\n"
+	   <<"   Examples:\n"
 	   << "    peek pc\n"
 	   << "    peek r t0\n"
 	   << "    peek r x12\n"
 	   << "    peek c mtval\n"
 	   << "    peek v v2\n"
+	   << "    peek s pm\n"
 	   << "    peek m 0x80000000\n"
 	   << "    peek m 0x80000000 0x80000010\n"
       	   << "    peek m 0x80000000 0x80000010 out\n";
