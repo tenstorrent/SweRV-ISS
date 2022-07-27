@@ -1,5 +1,9 @@
 #include <iostream>
 #include <fstream>
+#include <bitset>
+#include <limits.h>
+#include <boost/bimap.hpp>
+#include <boost/assign.hpp>
 #include "ArchInfo.hpp"
 #include "Hart.hpp"
 #include "VecRegs.hpp"
@@ -7,14 +11,29 @@
 
 using namespace WdRiscv;
 
-const std::unordered_map<std::string, ArchInfoPoint> table =
-  { {"dest",        ArchInfoPoint::Dest},
-    {"src",         ArchInfoPoint::Src},
-    {"sew",         ArchInfoPoint::Sew},
-    {"lmul",        ArchInfoPoint::Lmul},
-    {"mode",        ArchInfoPoint::Mode},
-    {"exception",   ArchInfoPoint::Exception}
-  };
+typedef boost::bimap<std::string, ArchInfoPoint> StringArchPoint;
+StringArchPoint table = boost::assign::list_of< StringArchPoint::relation >
+  ( "dest",             ArchInfoPoint::Dest)
+  ( "src",              ArchInfoPoint::Src)
+  ( "sew",              ArchInfoPoint::Sew)
+  ( "lmul",             ArchInfoPoint::Lmul)
+  ( "privmode",         ArchInfoPoint::PrivilegeMode)
+  ( "pte.V",            ArchInfoPoint::PteV)
+  ( "pte.R",            ArchInfoPoint::PteR)
+  ( "pte.W",            ArchInfoPoint::PteW)
+  ( "pte.X",            ArchInfoPoint::PteX)
+  ( "pte.U",            ArchInfoPoint::PteU)
+  ( "pte.G",            ArchInfoPoint::PteG)
+  ( "pte.A",            ArchInfoPoint::PteA)
+  ( "pte.D",            ArchInfoPoint::PteD)
+  ( "pagingmode",       ArchInfoPoint::PagingMode)
+  ( "paginglevel",      ArchInfoPoint::PagingLevel)
+  ( "minterrupt",       ArchInfoPoint::MInterrupt)
+  ( "mexception",       ArchInfoPoint::MException)
+  ( "mtvecmode",        ArchInfoPoint::MTrapVecMode)
+  ( "sinterrupt",       ArchInfoPoint::SInterrupt)
+  ( "sexception",       ArchInfoPoint::SException)
+  ( "stvecmode",        ArchInfoPoint::STrapVecMode);
 
 template <typename URV>
 ArchInfo<URV>::ArchInfo(Hart<URV>& hart, std::string filename)
@@ -50,51 +69,33 @@ ArchInfo<URV>::ArchInfo(Hart<URV>& hart, std::string filename)
       if (infoEntry.group_ == ArchInfoGroup::Inst)
         addInstPoints(infoEntry);
 
-      // additional options
-      if (entry.value().count("append"))
-        for (auto& append : entry.value().at("append"))
-          infoEntry.crosses_.push_back(table.at(append));
+      // additional coverpoints
+      for (auto& point : entry.value())
+        {
+          auto it = table.left.find(point);
+          if (it == table.left.end())
+            std::cerr << "Unsupported info " << point << ", will ignore.\n";
+          else
+            infoEntry.points_.push_back(table.left.at(point));
+        }
 
       entries_.push_back(infoEntry);
     }
 }
 
-
 template <typename URV>
 void
-ArchInfo<URV>::addInstPoints(ArchInfoEntry& entry)
+ArchInfo<URV>::addDest(ArchInfoEntry& entry) const
 {
-  InstEntry inst = hart_.getInstructionEntry(entry.name_);
-  bool disable = not hart_.hasIsaExtension(inst.extension());
-  if (inst.isCompressed())
-    disable = disable and not hart_.isRvc();
-  if (disable)
-    {
-      std::cerr << "Instruction " << entry.name_ << " not enabled by config, will ignore\n";
-      return;
-    }
-
-  entry.crosses_.push_back(ArchInfoPoint::Dest);
-  entry.crosses_.push_back(ArchInfoPoint::Src);
-
-  if (inst.extension() == RvExtension::V)
-    {
-      entry.crosses_.push_back(ArchInfoPoint::Sew);
-      entry.crosses_.push_back(ArchInfoPoint::Lmul);
-    }
-}
-
-template <typename URV>
-bool
-ArchInfo<URV>::addDestBins(ArchInfoEntry& entry) const
-{
+  // should only be used within an instruction context
   if (entry.group_ != ArchInfoGroup::Inst)
-    return false;
+    return;
 
   nlohmann::json list;
   InstEntry inst = hart_.getInstructionEntry(entry.name_);
 
   // four possible operands
+  unsigned num = 0;
   for (unsigned i = 0; i < 4; i++)
     {
       if (inst.isIthOperandWrite(i))
@@ -123,24 +124,24 @@ ArchInfo<URV>::addDestBins(ArchInfoEntry& entry) const
                     list.emplace_back(toJsonHex(dest));
                 }
             }
+          entry.addBins(table.right.at(ArchInfoPoint::Dest) + std::to_string(++num), list);
+          list.clear();
         }
     }
-
-  entry.j_ += nlohmann::json::object_t::value_type("dest", list);
-  return true;
 }
 
 template <typename URV>
-bool
-ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
+void
+ArchInfo<URV>::addSrc(ArchInfoEntry& entry) const
 {
   if (entry.group_ != ArchInfoGroup::Inst)
-    return false;
+    return;
 
   nlohmann::json list;
   InstEntry inst = hart_.getInstructionEntry(entry.name_);
 
   // four possible operands
+  unsigned num = 0;
   for (unsigned i = 0; i < 4; i++)
     {
       if (inst.isIthOperandRead(i))
@@ -169,16 +170,15 @@ ArchInfo<URV>::addSrcBins(ArchInfoEntry& entry) const
                     list.emplace_back(toJsonHex(src));
                 }
             }
+          entry.addBins(table.right.at(ArchInfoPoint::Src) + std::to_string(++num), list);
+          list.clear();
         }
     }
-
-  entry.j_ += nlohmann::json::object_t::value_type("src", list);
-  return true;
 }
 
 template <typename URV>
-bool
-ArchInfo<URV>::addSewBins(ArchInfoEntry& entry) const
+void
+ArchInfo<URV>::addSew(ArchInfoEntry& entry) const
 {
   nlohmann::json list;
   for (uint32_t sew = 0; sew <= uint32_t(ElementWidth::Word32); ++sew)
@@ -189,13 +189,12 @@ ArchInfo<URV>::addSewBins(ArchInfoEntry& entry) const
         list.emplace_back(toJsonHex(sew));
     }
 
-  entry.j_ += nlohmann::json::object_t::value_type("sew", list);
-  return true;
+  entry.addBins(table.right.at(ArchInfoPoint::Sew), list);
 }
 
 template <typename URV>
-bool
-ArchInfo<URV>::addLmulBins(ArchInfoEntry& entry) const
+void
+ArchInfo<URV>::addLmul(ArchInfoEntry& entry) const
 {
   nlohmann::json list;
   for (uint32_t lmul = 0; lmul <= uint32_t(GroupMultiplier::Half); ++lmul)
@@ -207,13 +206,12 @@ ArchInfo<URV>::addLmulBins(ArchInfoEntry& entry) const
         list.emplace_back(toJsonHex(lmul));
     }
 
-  entry.j_ += nlohmann::json::object_t::value_type("lmul", list);
-  return true;
+  entry.addBins(table.right.at(ArchInfoPoint::Lmul), list);
 }
 
 template <typename URV>
-bool
-ArchInfo<URV>::addModeBins(ArchInfoEntry& entry) const
+void
+ArchInfo<URV>::addPrivilegeMode(ArchInfoEntry& entry) const
 {
   nlohmann::json list;
   for (uint32_t mode = 0; mode <= uint32_t(PrivilegeMode::Machine); ++mode)
@@ -228,8 +226,127 @@ ArchInfo<URV>::addModeBins(ArchInfoEntry& entry) const
         list.emplace_back(toJsonHex(mode));
     }
 
-  entry.j_ += nlohmann::json::object_t::value_type("mode", list);
-  return true;
+  entry.addBins(table.right.at(ArchInfoPoint::PrivilegeMode), list);
+}
+
+template <typename URV>
+void
+ArchInfo<URV>::addPteField(ArchInfoEntry& entry, ArchInfoPoint p) const
+{
+  if (not hart_.isRvs())
+    return;
+
+  nlohmann::json list;
+  Pte57 pte(~0ULL);
+  std::bitset<64> bits;
+  switch (p)
+    {
+      case ArchInfoPoint::PteV:   bits = pte.bits_.valid_; break;
+      case ArchInfoPoint::PteR:   bits = pte.bits_.read_; break;
+      case ArchInfoPoint::PteW:   bits = pte.bits_.write_; break;
+      case ArchInfoPoint::PteX:   bits = pte.bits_.exec_; break;
+      case ArchInfoPoint::PteU:   bits = pte.bits_.user_; break;
+      case ArchInfoPoint::PteG:   bits = pte.bits_.global_; break;
+      case ArchInfoPoint::PteA:   bits = pte.bits_.accessed_; break;
+      case ArchInfoPoint::PteD:   bits = pte.bits_.dirty_; break;
+      default:                    assert(false); break;
+    }
+
+  for (uint32_t i = 0; i <= bits.count(); ++i)
+    list.emplace_back(toJsonHex(i));
+
+  entry.addBins(table.right.at(p), list);
+}
+
+template <typename URV>
+void
+ArchInfo<URV>::addPagingMode(ArchInfoEntry& entry) const
+{
+  nlohmann::json list;
+  std::vector<VirtMem::Mode> modes = { VirtMem::Mode::Bare };
+  if (not hart_.isRv64())
+    modes.insert(modes.end(), { VirtMem::Mode::Sv32 });
+  else
+    modes.insert(modes.end(), { VirtMem::Mode::Sv39, VirtMem::Mode::Sv48, VirtMem::Mode::Sv57 });
+
+  for (auto mode : modes)
+    list.emplace_back(toJsonHex(uint32_t(mode)));
+
+  entry.addBins(table.right.at(ArchInfoPoint::PagingMode), list);
+}
+
+template <typename URV>
+void
+ArchInfo<URV>::addPagingLevel(ArchInfoEntry& entry) const
+{
+  nlohmann::json list;
+  Pte57 pte(0);
+
+  for (uint32_t level = 1; level < pte.levels(); ++level)
+    list.emplace_back(toJsonHex(level));
+
+  entry.addBins(table.right.at(ArchInfoPoint::PagingLevel), list);
+}
+
+template <typename URV>
+void
+ArchInfo<URV>::addInterrupt(ArchInfoEntry& entry, ArchInfoPoint p) const
+{
+  if (p == ArchInfoPoint::SInterrupt and not hart_.isRvs())
+    return;
+
+  nlohmann::json list;
+  std::vector<InterruptCause> interrupts
+                = { InterruptCause::S_SOFTWARE, InterruptCause::S_TIMER,
+                    InterruptCause::S_EXTERNAL };
+
+  if (p != ArchInfoPoint::SInterrupt)
+    interrupts.insert(interrupts.end(), { InterruptCause::M_SOFTWARE,
+                          InterruptCause::M_TIMER, InterruptCause::M_EXTERNAL } );
+
+  for (auto interrupt : interrupts)
+    list.emplace_back(toJsonHex(uint32_t(interrupt)));
+
+  entry.addBins(table.right.at(p), list);
+}
+
+template <typename URV>
+void
+ArchInfo<URV>::addException(ArchInfoEntry& entry, ArchInfoPoint p) const
+{
+  if (p == ArchInfoPoint::SInterrupt and not hart_.isRvs())
+    return;
+
+  nlohmann::json list;
+  std::vector<ExceptionCause> exceptions
+                = { ExceptionCause::INST_ADDR_MISAL, ExceptionCause::INST_ACC_FAULT,
+                    ExceptionCause::ILLEGAL_INST, ExceptionCause::BREAKP,
+                    ExceptionCause::LOAD_ADDR_MISAL, ExceptionCause::LOAD_ACC_FAULT,
+                    ExceptionCause::STORE_ADDR_MISAL, ExceptionCause::STORE_ACC_FAULT,
+                    ExceptionCause::U_ENV_CALL, ExceptionCause::S_ENV_CALL,
+                    ExceptionCause::INST_PAGE_FAULT, ExceptionCause::LOAD_PAGE_FAULT };
+
+  if (p != ArchInfoPoint::SException)
+    exceptions.insert(exceptions.end(), { ExceptionCause::M_ENV_CALL });
+
+  for (auto exception : exceptions)
+    list.emplace_back(toJsonHex(uint32_t(exception)));
+
+  entry.addBins(table.right.at(p), list);
+}
+
+template <typename URV>
+void
+ArchInfo<URV>::addTrapVecMode(ArchInfoEntry& entry, ArchInfoPoint p) const
+{
+  if (p == ArchInfoPoint::STrapVecMode and not hart_.isRvs())
+    return;
+
+  nlohmann::json list;
+  for (uint32_t mode = 0; mode <= uint32_t(TrapVectorMode::VECTORED); ++mode)
+    list.emplace_back(toJsonHex(uint32_t(mode)));
+
+  entry.addBins(table.right.at(p), list);
 }
 
 
