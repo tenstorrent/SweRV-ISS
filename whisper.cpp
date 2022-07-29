@@ -44,7 +44,6 @@
 #include "Server.hpp"
 #include "Interactive.hpp"
 #include "third_party/nlohmann/json.hpp"
-#include "ArchInfo.hpp"
 
 
 using namespace WdRiscv;
@@ -168,7 +167,6 @@ struct Args
   std::string consoleOutFile;  // Console io output file.
   std::string serverFile;      // File in which to write server host and port.
   std::string instFreqFile;    // Instruction frequency file.
-  std::string archInfoFile;    // Architectural coverage definition file (JSON).
   std::string configFile;      // Configuration (JSON) file.
   std::string bblockFile;      // Basci block file.
   std::string attFile;         // Address translation file.
@@ -482,8 +480,6 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 			" gdb will work with stdio (default -1).")
 	("profileinst", po::value(&args.instFreqFile),
 	 "Report instruction frequency to file.")
-        ("archinfo", po::value(&args.archInfoFile),
-         "Dump instruction table using definition.")
         ("att", po::value(&args.attFile),
          "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
         ("tracerlib", po::value(&args.tracerLib),
@@ -1697,20 +1693,6 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
 }
 
 
-/// Static dump of ISA information, program run not needed
-template<typename URV>
-static
-bool
-staticDump(Hart<URV>& hart, const std::string infoPath)
-{
-  ArchInfo<URV> info(hart, infoPath);
-
-  nlohmann::json j = info.dumpArchInfo();
-  std::cout << j.dump(1) << '\n';
-  return true;
-}
-
-
 template <typename URV>
 static
 bool
@@ -1757,7 +1739,7 @@ session(const Args& args, const HartConfig& config)
     system.enableInstructionLineTrace(args.instrLines);
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
-      and not args.interactive and args.archInfoFile.empty())
+      and not args.interactive)
     {
       std::cerr << "No program file specified.\n";
       return false;
@@ -1798,12 +1780,6 @@ session(const Args& args, const HartConfig& config)
       if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
 	if (not args.interactive)
 	  return false;
-    }
-
-  // Static analysis of ISA, do not run program
-  if (not args.archInfoFile.empty())
-    {
-      return staticDump(*system.ithHart(0), args.archInfoFile);
     }
 
   bool result = sessionRun(system, args, traceFile, commandLog);
