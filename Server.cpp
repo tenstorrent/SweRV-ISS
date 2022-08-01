@@ -412,6 +412,22 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply)
     case 'p':
       reply.value = hart.peekPc();
       return true;
+    case 's':
+      {
+	bool ok = true;
+	if (req.address == WhisperSpecialResource::PrivMode)
+	  reply.value = unsigned(hart.privilegeMode());
+	else if (req.address == WhisperSpecialResource::PrevPrivMode)
+	  reply.value = unsigned(hart.lastPrivMode());
+	else if (req.address == WhisperSpecialResource::FpFlags)
+	  reply.value = hart.lastFpFlags();
+	else if (req.address == WhisperSpecialResource::Trap)
+	  reply.value = hart.lastInstructionTrapped()? 1 : 0;
+	else
+	  ok = false;
+	if (ok)
+	  return true;
+      }
     }
 
   reply.type = Invalid;
@@ -863,6 +879,23 @@ serverPrintFinalRegisterState(std::shared_ptr<Hart<URV>> hartPtr)
 }
 
 
+static
+const char*
+specialResourceToStr(uint64_t v)
+{
+  WhisperSpecialResource sr = WhisperSpecialResource(v);
+  switch (sr)
+    {
+    case WhisperSpecialResource::PrivMode:     return "pm";
+    case WhisperSpecialResource::PrevPrivMode: return "ppm";
+    case WhisperSpecialResource::FpFlags:      return "iff";
+    case WhisperSpecialResource::Trap:         return "trap";
+    default:                                   return "?";
+    }
+  return "?";
+}
+
+
 // Server mode loop: Receive command and send reply till a quit
 // command is received. Return true on successful termination (quit
 // received). Return false otherwise.
@@ -928,6 +961,10 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
                   if (msg.resource == 'p')
                     fprintf(commandLog, "hart=%d peek pc # ts=%s tag=%s\n",
                             hartId, timeStamp.c_str(), msg.tag);
+		  else if (msg.resource == 's')
+		    fprintf(commandLog, "hart=%d peek s %s # ts=%s tag=%s\n",
+			    hartId, specialResourceToStr(msg.address),
+			    timeStamp.c_str(), msg.tag);
                   else
                     fprintf(commandLog, "hart=%d peek %c %s # ts=%s tag=%s\n",
                             hartId,
