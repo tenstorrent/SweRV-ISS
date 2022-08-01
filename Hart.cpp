@@ -2279,7 +2279,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   URV base = (tvec >> 2) << 2;  // Clear least sig 2 bits.
   unsigned tvecMode = tvec & 0x3;
 
-  if (tvecMode == 1 and interrupt)
+  if (tvecMode == unsigned(TrapVectorMode::VECTORED) and interrupt)
     base = base + 4*cause;
 
   setPc(base);
