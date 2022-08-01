@@ -177,7 +177,8 @@ struct Args
   std::string snapshotDir = "snapshot"; // Dir prefix for saving snapshots
   std::string loadFrom;        // Directory for loading a snapshot
   std::string stdoutFile;      // Redirect target program stdout to this.
-  std::string stderrFile;      // Redirect target program stderr to this. 
+  std::string stderrFile;      // Redirect target program stderr to this.
+  std::string stdinFile;       // Redirect target program stdin to this. 
   std::string dataLines;       // Output file for data address line tracing.
   std::string instrLines;      // Output file for instruction address line tracing.
   std::string kernelFile;      // Load kernel image at address.
@@ -509,6 +510,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Redirect standard output of newlib/Linux target program to this.")
 	("stderr", po::value(&args.stderrFile),
 	 "Redirect standard error of newlib/Linux target program to this.")
+	("stdin", po::value(&args.stdinFile),
+	 "Redirect standard input of newlib/Linux target program to this.")
 	("datalines", po::value(&args.dataLines),
 	 "Generate data line address trace to the given file.")
 	("instrlines", po::value(&args.instrLines),
@@ -981,6 +984,10 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (not args.stderrFile.empty())
     if (not hart.redirectOutputDescriptor(STDERR_FILENO, args.stderrFile))
+      errors++;
+
+  if (not args.stdinFile.empty())
+    if (not hart.redirectInputDescriptor(STDIN_FILENO, args.stdinFile))
       errors++;
 
   // Command line to-host overrides that of ELF and config file.

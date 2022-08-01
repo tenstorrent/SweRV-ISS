@@ -3414,6 +3414,14 @@ Hart<URV>::redirectOutputDescriptor(int fd, const std::string& path)
 
 template <typename URV>
 bool
+Hart<URV>::redirectInputDescriptor(int fd, const std::string& path)
+{
+  return syscall_.redirectInputDescriptor(fd, path);
+}
+
+
+template <typename URV>
+bool
 Hart<URV>::cancelLastDiv()
 {
   if (not hasLastDiv_)

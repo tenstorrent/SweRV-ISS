@@ -1272,10 +1272,15 @@ namespace WdRiscv
     /// Load snapshot (registers, memory etc)
     bool loadSnapshot(const std::string& dirPath);
 
-    /// Redirect the given output file descriptor (typically stdout or
-    /// stderr) to the given file. Return true on success and false on
-    /// failure.
+    /// Redirect the given output file descriptor (typically that of
+    /// stdout or stderr) to the given file. Return true on success
+    /// and false on failure.
     bool redirectOutputDescriptor(int fd, const std::string& file);
+
+    /// Redirect the given input file descriptor (typically that of
+    /// stdin) to the given file. Return true on success and false on
+    /// failure.
+    bool redirectInputDescriptor(int fd, const std::string& file);
 
     /// Rollback destination register of most recent dev/rem
     /// instruction.  Return true on success and false on failure (no
