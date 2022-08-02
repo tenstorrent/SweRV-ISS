@@ -1440,7 +1440,7 @@ InstTable::setupInstVec()
 	RvExtension::I, RvFormat::I },
 
       // Supervisor
-      { "sfence.vma", InstId::sfence_vma, 0x12000073, 0xfe00707f,
+      { "sfence.vma", InstId::sfence_vma, 0x12000073, 0xfe007fff,
         RvExtension::S, RvFormat::I,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask
@@ -6482,5 +6482,22 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask,
 	OperandType::Imm, OperandMode::None, 0xc0000000,
       },
+
+      // TLB invalidate (svinval)
+
+      { "sinval.vma", InstId::sinval_vma, 0x16000073, 0xfe007fff,
+        RvExtension::S, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask
+      },
+
+      { "sfence.w.inval", InstId::sfence_w_inval, 0x18000073, 0xffffffff,
+        RvExtension::S, RvFormat::I
+      },
+
+      { "sfence.inval.ir", InstId::sfence_inval_ir, 0x18100073, 0xffffffff,
+        RvExtension::S, RvFormat::I
+      },
+
     };
 }

@@ -2579,7 +2579,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	op0 = iform.fields.rd;
 	op1 = iform.fields.rs1;
 	op2 = iform.uimmed(); // csr
-	switch (iform.fields.funct3)
+	unsigned f3 = iform.fields.funct3;
+	switch (f3)
 	  {
 	  case 0:
 	    {
@@ -2604,6 +2605,21 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                       op2 = iform.rs2();
                       return instTable_.getEntry(InstId::sfence_vma);
                     }
+		}
+	      else if (funct7 == 0xb)
+		{
+		  if (op0 == 0 and f3 == 0)
+		    return instTable_.getEntry(InstId::sinval_vma);
+		  return instTable_.getEntry(InstId::illegal);
+		}
+	      else if (funct7 == 0xc)
+		{
+		  op2 = iform.rs2();
+		  if (op0 == 0 and op1 == 0 and op2 == 0 and f3 == 0)
+		    return instTable_.getEntry(InstId::sfence_w_inval);
+		  if (op0 == 0 and op1 == 0 and op2 == 1 and f3 == 0)
+		    return instTable_.getEntry(InstId::sfence_inval_ir);
+		  return instTable_.getEntry(InstId::illegal);
 		}
 	      else if (op2 == 0x102 and op0 == 0 and op1 == 0)
 		return instTable_.getEntry(InstId::sret);

@@ -33,6 +33,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zbkb)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zksed)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zksh)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Svinval)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 
@@ -60,6 +61,7 @@ Isa::Isa()
   stringToExt_["zbkb"] = RvExtension::Zbkb;
   stringToExt_["zksed"] = RvExtension::Zksed;
   stringToExt_["zksh"] = RvExtension::Zksh;
+  stringToExt_["svinval"] = RvExtension::Svinval;
 
   extToString_.resize(extIx(RvExtension::None));
   extToString_.at(extIx(RvExtension::A)) = "a";
@@ -84,6 +86,7 @@ Isa::Isa()
   extToString_.at(extIx(RvExtension::Zbkb)) = "zbkb";
   extToString_.at(extIx(RvExtension::Zksed)) = "zksed";
   extToString_.at(extIx(RvExtension::Zksh)) = "zksh";
+  extToString_.at(extIx(RvExtension::Svinval)) = "svinval";
 }
 
 

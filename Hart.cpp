@@ -335,6 +335,8 @@ Hart<URV>::processExtensions()
     enableRvzksed(true);
   if (isa_.isEnabled(RvExtension::Zksh))
     enableRvzksh(true);
+  if (isa_.isEnabled(RvExtension::Svinval))
+    enableRvsvinval(true);
 }
 
 
@@ -6216,6 +6218,10 @@ Hart<URV>::execute(const DecodedInst* di)
      &&sm4ed,
      &&sm4ks,
 
+     &&sinval_vma,
+     &&sfence_w_inval,
+     &&sfence_inval_ir,
+
     };
 
   const InstEntry* entry = di->instEntry();
@@ -9482,6 +9488,18 @@ Hart<URV>::execute(const DecodedInst* di)
  sm4ks:
   execSm4ks(di);
   return;
+
+ sinval_vma:
+  execSinval_vma(di);
+  return;
+
+ sfence_w_inval:
+  execSfence_w_inval(di);
+  return;
+
+ sfence_inval_ir:
+  execSfence_inval_ir(di);
+  return;
 }
 
 
@@ -10016,13 +10034,7 @@ template <typename URV>
 void
 Hart<URV>::execSfence_vma(const DecodedInst* di)
 {
-  if (not isRvs())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  if (privMode_ < PrivilegeMode::Supervisor)
+  if (not isRvs() or privMode_ < PrivilegeMode::Supervisor)
     {
       illegalInst(di);
       return;
@@ -10049,6 +10061,38 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       uint64_t last = pageStart + virtMem_.pageSize();
       for (uint64_t addr = pageStart; addr < last; addr += 4)
         invalidateDecodeCache(addr, 4);
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSinval_vma(const DecodedInst* di)
+{
+  execSfence_vma(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSfence_w_inval(const DecodedInst* di)
+{
+  if (not isRvs() or not isRvsvinval() or privMode_ < PrivilegeMode::Supervisor)
+    {
+      illegalInst(di);
+      return;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSfence_inval_ir(const DecodedInst* di)
+{
+  if (not isRvs() or not isRvsvinval() or privMode_ < PrivilegeMode::Supervisor)
+    {
+      illegalInst(di);
+      return;
     }
 }
 

@@ -955,6 +955,11 @@ namespace WdRiscv
      sm4ed,
      sm4ks,
 
-     maxId = sm4ks
+     // TLB invalidate (svinval)
+     sinval_vma,
+     sfence_w_inval,
+     sfence_inval_ir,
+
+     maxId = sfence_inval_ir
     };
 }

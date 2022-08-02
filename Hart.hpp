@@ -940,6 +940,10 @@ namespace WdRiscv
     void enableRvzksh(bool flag)
     { rvzksh_ = flag; }
 
+    /// Enable/disable the svinval (TLB invalidation) extension.
+    void enableRvsvinval(bool flag)
+    { rvsvinval_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1097,6 +1101,10 @@ namespace WdRiscv
     /// Return true if the zbkb extension (crypto bit manip) is enabled.
     bool isRvzbkb() const
     { return rvzbkb_; }
+
+    /// Return true if the svinval extension (TLB invalidate) is enabled.
+    bool isRvsvinval() const
+    { return rvsvinval_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -3853,6 +3861,10 @@ namespace WdRiscv
     void execSm4ed(const DecodedInst*);
     void execSm4ks(const DecodedInst*);
 
+    void execSinval_vma(const DecodedInst*);
+    void execSfence_w_inval(const DecodedInst*);
+    void execSfence_inval_ir(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -3974,6 +3986,7 @@ namespace WdRiscv
     bool rvzbkb_ = false;        // True if extension zbkb (ctypto) enabled.
     bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
     bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
+    bool rvsvinval_ = false;     // True if extension svinval (TLB invalidate) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.
