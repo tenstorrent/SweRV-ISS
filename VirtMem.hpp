@@ -565,6 +565,10 @@ namespace WdRiscv
     uint64_t pageStartAddress(uint64_t address) const
     { return (address >> pageBits_) << pageBits_; }
 
+    /// Return the page number corresponding to the given address.
+    uint64_t pageNumber(uint64_t addr) const
+    { return addr >> pageBits_; }
+
     /// Debug method: Print all the entries in the page table.
     void printPageTable(std::ostream& os) const;
 

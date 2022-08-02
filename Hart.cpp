@@ -10049,7 +10049,26 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
     }
 
   // Invalidate whole TLB. This is overkill. TBD FIX: Improve.
-  virtMem_.tlb_.invalidate();
+  if (di->op1() == 0 and di->op2() == 0)
+    virtMem_.tlb_.invalidate();
+  else if (di->op1() == 0 and di->op2() != 0)
+    {
+      URV asid = intRegs_.read(di->op2());
+      virtMem_.tlb_.invalidateAsid(asid);
+    }
+  else if (di->op1() != 0 and di->op2() == 0)
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      virtMem_.tlb_.invalidateVirtualPage(vpn);
+    }
+  else
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      URV asid = intRegs_.read(di->op2());
+      virtMem_.tlb_.invalidateVirtualPage(vpn, asid);
+    }
 
   // std::cerr << "sfence.vma " << di->op1() << ' ' << di->op2() << '\n';
   if (di->op1() == 0)
