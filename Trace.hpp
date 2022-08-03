@@ -143,11 +143,11 @@ namespace WdRiscv
 
     /// Return currently configured element width.
     ElementWidth elemWidth() const
-    { return vecRegs_.elemWidth(); }
+    { return hart_->elemWidth(); }
 
     /// Return currently configured group multiplier.
     GroupMultiplier groupMultiplier() const
-    { return vecRegs_.groupMultiplier(); }
+    { return hart_->groupMultiplier(); }
 
     /// Return the paging mode after last executed instruction.
     VirtMem::Mode pageMode() const
