@@ -54,6 +54,11 @@ namespace WdRiscv
     OperandType ithOperandType(unsigned i) const
     { return di_.ithOperandType(i); }
 
+    /// Return the mode of the ith operand or None if i is out of
+    /// bounds. Object must be valid.
+    OperandMode ithOperandMode(unsigned i) const
+    { return di_.ithOperandMode(i); }
+
     /// Return the ith operands or zero if i is out of bounds. For exmaple, if
     /// decode insruction is "addi x3, x4, 10" then the 0th operand would be 3
     /// and the second operands would be 10.
@@ -70,7 +75,7 @@ namespace WdRiscv
 
     /// True if last executed instruction encountered a trap and
     /// set cause to interrupt/exception cause.
-    bool trap(URV& cause) const
+    bool hasTrap(URV& cause) const
     {
       bool trapped = hasTrap();
       if (trapped)
