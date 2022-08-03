@@ -357,6 +357,14 @@ namespace WdRiscv
                       std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul); }
 
+    /// Return currently configured element width
+    ElementWidth elemWidth() const
+    { return vecRegs_.elemWidth(); }
+
+    /// Return currently configured group multiplier
+    GroupMultiplier groupMultiplier() const
+    { return vecRegs_.groupMultiplier(); }
+
     /// Configure the load-reserve reservation size in bytes.
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
     void configReservationSize(unsigned size)
@@ -716,6 +724,9 @@ namespace WdRiscv
     /// (had an exception or encouted an interrupt).
     bool lastInstructionTrapped() const
     { return hasException_ or hasInterrupt_; }
+
+    /// Return true if last executed instruction had an exception. Set
+    /// cause to mstatus cause.
 
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
@@ -1375,6 +1386,10 @@ namespace WdRiscv
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
+
+    /// Return the current paging mode
+    VirtMem::Mode pageMode() const
+    { return virtMem_.mode(); }
 
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)

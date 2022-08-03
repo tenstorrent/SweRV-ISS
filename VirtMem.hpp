@@ -627,6 +627,10 @@ namespace WdRiscv
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
 
+    /// Return current paging mode.
+    Mode mode() const
+    { return mode_; }
+
     /// Return current address space id.
     uint32_t addressSpace() const
     { return asid_; }
