@@ -207,6 +207,11 @@ namespace WdRiscv
       return aTime < bTime;
     }
 
+    /// Configure checking whole merge buffer line (versus checking
+    /// bytes covered by stores).
+    void setCheckWholeMbLine(bool flag)
+    { checkWholeLine_ = flag; }
+
   protected:
 
     /// Forward from a store to a read op. Return true on success.
@@ -289,6 +294,10 @@ namespace WdRiscv
     unsigned lineSize_ = 64; // Merge buffer line size.
 
     bool writeOnInsert_ = false;
+
+    // Check whole merge buffer line if true otherwise check bytes
+    // covered by store instructions.
+    bool checkWholeLine_ = false;
 
     std::vector<McmInstrIx> currentInstrTag_;
 

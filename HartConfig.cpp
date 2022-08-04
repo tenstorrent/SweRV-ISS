@@ -1469,13 +1469,19 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
     if (not getJsonUnsigned(tag, config_ -> at(tag), mbLineSize))
       return false;
 
+  tag = "merge_buffer_check_all";
+  bool checkAll = false;
+  if (config_ -> count(tag))
+    if (not getJsonBoolean(tag, config_ -> at(tag), checkAll))
+      return false;
+
   tag = "enable_memory_consistency";
   bool enableMcm = false;
   if (config_ -> count(tag))
     if (not getJsonBoolean(tag, config_ -> at(tag), enableMcm))
       return false;
 
-  if (enableMcm and not system.enableMcm(mbLineSize))
+  if (enableMcm and not system.enableMcm(mbLineSize, checkAll))
     return false;
 
   return finalizeCsrConfig(system);

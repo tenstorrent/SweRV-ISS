@@ -164,7 +164,7 @@ namespace WdRiscv
     /// undefined if used in non-server/non-interactive mode or if
     /// used after execution has started. The mergeBuffserSize is
     /// the merge buffer line size in bytes.
-    bool enableMcm(unsigned mergeBufferSize);
+    bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
 
     /// Return true if memory consistency model is enabled.
     bool isMcmEnabled() const
