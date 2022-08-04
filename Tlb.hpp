@@ -67,15 +67,19 @@ namespace WdRiscv
     /// print TLB entry
     void printEntry(std::ostream& ost, const TlbEntry& te) const;
 
+    /// Set number of TLB entries.
+    void setTlbSize(unsigned size)
+    { entries_.resize(size); }
+
     /// Insert a TLB entry for the given translation parameters. If TLB is full
     /// the contents of the  least recently accessed slot are replaced by the
-    /// given parameters.
-    void insertEntry(uint64_t virtPageNum, uint64_t phyPageNUm,
+    /// given parameters. Return true on success and false otherwise.
+    bool insertEntry(uint64_t virtPageNum, uint64_t phyPageNum,
                      uint32_t asid, bool global, bool isUser, bool read,
                      bool write, bool exec);
 
-    /// Insert copy of given entry.
-    void insertEntry(const TlbEntry& entry);
+    /// Insert copy of given entry. Return true on success and false otherwise.
+    bool insertEntry(const TlbEntry& entry);
 
     /// Invalidate every entry matching given address space identifier
     /// unless it is global.
@@ -117,4 +121,4 @@ namespace WdRiscv
   };
 }
 
-    
+

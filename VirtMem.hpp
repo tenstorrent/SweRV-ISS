@@ -556,6 +556,10 @@ namespace WdRiscv
     /// Same as translate but only check for write access.
     ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, uint64_t& pa);
 
+    /// Set number of TLB entries.
+    void setTlbSize(unsigned size)
+    { tlb_.setTlbSize(size); }
+
     /// Return page size.
     unsigned pageSize() const
     { return pageSize_; }

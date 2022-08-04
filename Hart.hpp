@@ -1375,6 +1375,10 @@ namespace WdRiscv
     /// one first).
     void getCacheLineAddresses(std::vector<uint64_t>& addresses);
 
+    /// Set number of TLB entries.
+    void setTlbSize(unsigned size)
+    { virtMem_.setTlbSize(size); }
+
     /// Debug method: print address translation table. 
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }

@@ -96,7 +96,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
     fpRegs_(32), vecRegs_(), syscall_(*this),
     pmpManager_(memory.size(), 1024*1024),
-    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16 /* FIX: TLB size*/),
+    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16),
     isa_()
 {
   decodeCacheSize_ = 128*1024;  // Must be a power of 2.

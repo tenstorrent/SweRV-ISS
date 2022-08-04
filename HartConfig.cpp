@@ -1378,16 +1378,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.setFaultOnFirstAccess(flag);
     }
 
-  tag = "page_fault_on_first_access";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
-        errors++;
-      else
-        hart.setFaultOnFirstAccess(flag);
-    }
-
   tag = "snapshot_periods";
   if (config_ -> count(tag))
     {
@@ -1413,6 +1403,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 
           hart.setSnapshotPeriods(periods);
         }
+    }
+
+  tag = "tlb_entries";
+  if (config_ -> count(tag))
+    {
+      unsigned size = 0;
+      if (not getJsonUnsigned(tag, config_ -> at(tag), size))
+        errors++;
+      else
+        hart.setTlbSize(size);
     }
 
   return errors == 0;
