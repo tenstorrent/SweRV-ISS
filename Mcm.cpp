@@ -532,13 +532,20 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	{
 	  for (unsigned i = 0; i < write.size_; ++i)
 	    {
-	      uint8_t rtlByte = ((uint8_t*) &(write.rtlData_))[i];
-	      uint8_t byte = 0;
 	      uint64_t addr = write.physAddr_ + i;
-	      reportMismatch(hart.hartId(), time, "merge buffer write", addr,
-			     rtlByte, byte);
-	      result = false;
-	      break;
+	      uint64_t offset = addr - physAddr;
+	      if (offset < rtlData.size() and offset < lineSize_)
+		{
+		  uint8_t rtlByte = rtlData.at(offset);
+		  uint8_t byte = line.at(offset);
+		  if (byte != rtlByte)
+		    {
+		      reportMismatch(hart.hartId(), time, "merge buffer write", addr,
+				     rtlByte, byte);
+		      result = false;
+		      break;
+		    }
+		}
 	    }
 	}
     }
