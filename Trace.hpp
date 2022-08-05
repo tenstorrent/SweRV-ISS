@@ -69,6 +69,14 @@ namespace WdRiscv
     PrivilegeMode privMode() const
     { return hart_->lastPrivMode(); }
 
+    /// Privilege mode after last executed instruction.
+    PrivilegeMode nextPrivMode() const
+    { return hart_->privilegeMode(); }
+
+    /// Trap vector mode after last executed instruction
+    TrapVectorMode nextTvecMode() const
+    { return hart_->tvecMode(); }
+
     /// True if last executed instruction encountered a trap.
     bool hasTrap() const
     { return hart_->lastInstructionTrapped(); }
@@ -155,8 +163,9 @@ namespace WdRiscv
     { return hart_->groupMultiplier(); }
 
     /// Return the paging mode after last executed instruction.
-    VirtMem::Mode pageMode() const
+    VirtMem::Mode nextPageMode() const
     { return hart_->pageMode(); }
+
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;

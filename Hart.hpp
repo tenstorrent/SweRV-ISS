@@ -1352,6 +1352,10 @@ namespace WdRiscv
     PrivilegeMode privilegeMode() const
     { return privMode_; }
 
+    /// Return current trap vector mode.
+    TrapVectorMode tvecMode() const
+    { return tvecMode_; }
+
     /// This is for performance modeling. Enable a highest level cache
     /// with given size, line size, and set associativity.  Any
     /// previously enabled cache is deleted.  Return true on success
@@ -4106,6 +4110,7 @@ namespace WdRiscv
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
+    TrapVectorMode tvecMode_ = TrapVectorMode::Direct;  // Trap vector mode.
 
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
     PrivilegeMode mstatusMpp_ = PrivilegeMode::Machine; // Cached mstatus.mpp.
