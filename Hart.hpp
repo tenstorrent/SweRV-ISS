@@ -1395,9 +1395,19 @@ namespace WdRiscv
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
 
+    /// Return the paging mode before last executed instruction.
+    VirtMem::Mode lastPageMode() const
+    { return lastPageMode_; }
+
     /// Return the current paging mode
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
+
+    /// Set entries to the page table walk for fetch/load/store of last executed
+    /// instruction. Will be empty if there was no walk.
+    void getPageTableWalk(std::vector<VirtMem::PteType>& entries,
+                          bool fetch, bool load, bool store) const
+    { virtMem_.getPageTableWalk(entries, fetch, load, store); }
 
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
@@ -3959,6 +3969,7 @@ namespace WdRiscv
       lastPriv_ = privMode_;
       ldStWrite_ = false;
       ldStAtomic_ = false;
+      lastPageMode_ = virtMem_.mode();
       clearTraceData();
     }
 
@@ -4118,6 +4129,8 @@ namespace WdRiscv
     FpFs mstatusFs_ = FpFs::Off;                        // Cahced mstatus.fs.
 
     FpFs mstatusVs_ = FpFs::Off;
+
+    VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 
     bool debugMode_ = false;         // True on debug mode.
     bool debugStepMode_ = false;     // True in debug step mode.

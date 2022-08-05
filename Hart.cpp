@@ -3998,6 +3998,7 @@ Hart<URV>::clearTraceData()
   memory_.clearLastWriteInfo(hartIx_);
   syscall_.clearMemoryChanges();
   vecRegs_.clearTraceData();
+  virtMem_.clearPageTableWalk();
   lastBranchTaken_ = false;
 }
 
