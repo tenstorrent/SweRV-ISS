@@ -446,9 +446,7 @@ Here is a sample configuration file:
 
     {
         "xlen" : 32,
-        "enable_zfh" : "true",
-        "enable_zba" : "true",
-        "enable_zbb" : "true",
+        "isa" : "rv32imafd_zfh_zba_zbb_zbc_sbs",
         "abi_names" : "true",
     
         "csr" : {
@@ -515,15 +513,6 @@ Whisper will count events associated with performance counters when
 this is set to true. Note that pipeline specific events (such as
 mispredicted branches) are not supported. Synchronous events (such as
 count retired load insructions) are supported.
-
-###  enable_zba
-When set to true, this enables the the zba bit-manipulation
-extension. Similary, enable_zbb, enable_zbc, and enable_zbs can be
-used to enable the corresponding bit-manipulation extension.
-
-###  enable_zfh
-When set to true, this enables the half-precision (16-bit) floating point
-extension.
 
 ###  abi_names
 If set to true then registers are identified by their ABI names in the
