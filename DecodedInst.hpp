@@ -128,6 +128,11 @@ namespace WdRiscv
     OperandType ithOperandType(unsigned i) const
     { return isValid()? entry_->ithOperandType(i) : OperandType::None; }
 
+    /// Return the mode of the ith operand or None if i is out of
+    /// bounds. Object must be valid.
+    OperandMode ithOperandMode(unsigned i) const
+    { return isValid()? entry_->ithOperandMode(i) : OperandMode::None; }
+
     /// Return true if this object is valid.
     bool isValid() const
     { return valid_; }

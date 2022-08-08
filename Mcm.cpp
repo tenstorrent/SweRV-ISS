@@ -418,6 +418,17 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 }
 
 
+static void
+reportMismatch(uint64_t hartId, uint64_t time, std::string tag, uint64_t addr,
+	       uint64_t rtlData, uint64_t whisperData)
+{
+  std::cerr << "Error: Mismatch on " << tag << " time=" << time
+	    << " hart-id=" << hartId << " addr=0x" << std::hex
+	    << addr << " rtl=0x" << rtlData
+	    << " whisper=0x" << whisperData << std::dec << '\n';
+}
+
+
 template <typename URV>
 bool
 Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
@@ -503,16 +514,40 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   
   // Compare our line to RTL line.
   bool result = true;
-  assert(rtlData.size() <= line.size());
-  auto iterPair = std::mismatch(rtlData.begin(), rtlData.end(), line.begin());
-  if (iterPair.first != rtlData.end())
+  if (checkWholeLine_)
     {
-      size_t offset = iterPair.first - rtlData.begin();
-      cerr << "Error: Mismatch on merge buffer write time=" << time
-	   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
-	   << (physAddr + offset) << " rtl=0x" << unsigned(rtlData.at(offset))
-	   << " whisper=0x" << unsigned(line.at(offset)) << std::dec << '\n';
-      result = false;
+      assert(rtlData.size() <= line.size());
+      auto iterPair = std::mismatch(rtlData.begin(), rtlData.end(), line.begin());
+      if (iterPair.first != rtlData.end())
+	{
+	  size_t offset = iterPair.first - rtlData.begin();
+	  reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + offset,
+			 rtlData.at(offset), line.at(offset));
+	  result = false;
+	}
+    }
+  else
+    {   // Compare covered writes.
+      for (const auto& write : coveredWrites)
+	{
+	  for (unsigned i = 0; i < write.size_; ++i)
+	    {
+	      uint64_t addr = write.physAddr_ + i;
+	      uint64_t offset = addr - physAddr;
+	      if (offset < rtlData.size() and offset < lineSize_)
+		{
+		  uint8_t rtlByte = rtlData.at(offset);
+		  uint8_t byte = line.at(offset);
+		  if (byte != rtlByte)
+		    {
+		      reportMismatch(hart.hartId(), time, "merge buffer write", addr,
+				     rtlByte, byte);
+		      result = false;
+		      break;
+		    }
+		}
+	    }
+	}
     }
 
   auto& instrVec = hartInstrVecs_.at(hartIx);

@@ -49,13 +49,47 @@ namespace WdRiscv
     uint64_t nextVirtPc() const
     { return hart_->pc(); }
 
+    /// Return the operand type of the ith operand. Returns None if
+    /// i is out of bounds.
+    OperandType ithOperandType(unsigned i) const
+    { return di_.ithOperandType(i); }
+
+    /// Return the mode of the ith operand or None if i is out of
+    /// bounds. Object must be valid.
+    OperandMode ithOperandMode(unsigned i) const
+    { return di_.ithOperandMode(i); }
+
+    /// Return the ith operands or zero if i is out of bounds. For exmaple, if
+    /// decode insruction is "addi x3, x4, 10" then the 0th operand would be 3
+    /// and the second operands would be 10.
+    uint32_t ithOperand(unsigned i) const
+    { return di_.ithOperand(i); }
+
     /// Privilege mode before last executed instruction.
     PrivilegeMode privMode() const
     { return hart_->lastPrivMode(); }
 
-    /// True if last executed instruction encoutred a trap.
+    /// Privilege mode after last executed instruction.
+    PrivilegeMode nextPrivMode() const
+    { return hart_->privilegeMode(); }
+
+    /// Trap vector mode after last executed instruction
+    TrapVectorMode nextTvecMode() const
+    { return hart_->tvecMode(); }
+
+    /// True if last executed instruction encountered a trap.
     bool hasTrap() const
     { return hart_->lastInstructionTrapped(); }
+
+    /// True if last executed instruction encountered a trap and
+    /// set cause to interrupt/exception cause.
+    bool hasTrap(URV& cause) const
+    {
+      bool trapped = hasTrap();
+      if (trapped)
+        hart_->peekCsr(CsrNumber::MCAUSE, cause);
+      return trapped;
+    }
 
     /// Return size of data of last load/store/amo instruction or zero
     /// if last instrcution was not load/store/amo.  Set virtAddr and
@@ -119,6 +153,28 @@ namespace WdRiscv
     /// Return the instruction name of the instruction of this record.
     std::string name() const
     { return di_.name(); }
+
+    /// Return currently configured element width.
+    ElementWidth elemWidth() const
+    { return hart_->elemWidth(); }
+
+    /// Return currently configured group multiplier.
+    GroupMultiplier groupMultiplier() const
+    { return hart_->groupMultiplier(); }
+
+    /// Return the paging mode before last executed instruction.
+    VirtMem::Mode pageMode() const
+    { return hart_->lastPageMode(); }
+
+    /// Return the paging mode after last executed instruction.
+    VirtMem::Mode nextPageMode() const
+    { return hart_->pageMode(); }
+
+    /// Return the page table walk for load/store/fetch of last executed instruction.
+    /// Will be empty if there was no walk.
+    void getPageTableWalk(std::vector<VirtMem::PteType>& entries,
+                          bool fetch, bool load, bool store) const
+    { hart_->getPageTableWalk(entries, fetch, load, store); }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;

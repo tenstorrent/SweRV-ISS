@@ -11,7 +11,7 @@ Tlb::Tlb(unsigned size)
 }
 
 
-void
+bool
 Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
                  bool global, bool isUser, bool read, bool write, bool exec)
 {
@@ -22,16 +22,21 @@ Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
       if (not entry.valid_ or (best and entry.time_ < best->time_))
         best = &entry;
     }
-  best->valid_ = true;
-  best->virtPageNum_ = virtPageNum;
-  best->physPageNum_ = physPageNum;
-  best->time_ = time_++;
-  best->asid_ = asid;
-  best->global_ = global;
-  best->user_ = isUser;
-  best->read_ = read;
-  best->write_ = write;
-  best->exec_ = exec;
+  if (best)
+    {
+      best->valid_ = true;
+      best->virtPageNum_ = virtPageNum;
+      best->physPageNum_ = physPageNum;
+      best->time_ = time_++;
+      best->asid_ = asid;
+      best->global_ = global;
+      best->user_ = isUser;
+      best->read_ = read;
+      best->write_ = write;
+      best->exec_ = exec;
+      return true;
+    }
+  return false;
 }
 
 
@@ -59,7 +64,7 @@ Tlb::printEntry(std::ostream& ost, const TlbEntry& te) const
 }
 
 
-void
+bool
 Tlb::insertEntry(const TlbEntry& te)
 {
   TlbEntry* best = nullptr;
@@ -75,6 +80,11 @@ Tlb::insertEntry(const TlbEntry& te)
         best = &entry;
     }
 
-  *best = te;
-  best->time_ = time_++;
+  if (best)
+    {
+      *best = te;
+      best->time_ = time_++;
+      return true;
+    }
+  return false;
 }

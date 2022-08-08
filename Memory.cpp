@@ -252,16 +252,16 @@ bool
 Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
 {
   const ELFIO::segment* seg = reader.segments[segIx];
-  ELFIO::Elf64_Addr vaddr = seg->get_virtual_address();
+  ELFIO::Elf64_Addr paddr = seg->get_physical_address();
   ELFIO::Elf_Xword segSize = seg->get_file_size(); // Size in file.
   end = 0;
   if (seg->get_type() != PT_LOAD)
     return true;
 
-  if (vaddr + segSize > size_)
+  if (paddr + segSize > size_)
     {
       std::cerr << "End of ELF segment " << segIx << " ("
-                << (vaddr+segSize)
+                << (paddr+segSize)
                 << ") is beyond end of simulated memory ("
                 << size_ << ")\n";
       if (checkUnmappedElf_)
@@ -292,7 +292,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
             {
               if (unmappedCount == 0)
                 std::cerr << "Failed to copy ELF byte at address 0x"
-                          << std::hex << (vaddr + i) << std::dec
+                          << std::hex << (addr + i) << std::dec
                           << ": corresponding location is not mapped\n";
               unmappedCount++;
               if (checkUnmappedElf_)
@@ -325,11 +325,11 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
   const char* segData = seg->get_data();
   for (size_t i = 0; i < segSize; ++i)
     {
-      if (not specialInitializeByte(vaddr + i, segData[i]))
+      if (not specialInitializeByte(paddr + i, segData[i]))
         {
           if (unmappedCount == 0)
             std::cerr << "Failed to copy ELF byte at address 0x"
-                      << std::hex << (vaddr + i) << std::dec
+                      << std::hex << (paddr + i) << std::dec
                       << ": corresponding location is not mapped\n";
           unmappedCount++;
           if (checkUnmappedElf_)
@@ -339,7 +339,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
 
 #endif
 
-  end = vaddr + size_t(segSize);
+  end = paddr + size_t(segSize);
   return true;
 }
 

@@ -108,7 +108,7 @@ System<URV>::writeAccessedMemory(const std::string& path) const
 
 template <typename URV>
 bool
-System<URV>::enableMcm(unsigned mbLineSize)
+System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 {
   if (mcm_)
     {
@@ -127,6 +127,7 @@ System<URV>::enableMcm(unsigned mbLineSize)
 
   mcm_ = new Mcm<URV>(this->hartCount(), mbLineSize);
   mbSize_ = mbLineSize;
+  mcm_->setCheckWholeMbLine(mbLineCheckAll);
 
   for (auto hart :  sysHarts_)
     hart->setMcm(mcm_);

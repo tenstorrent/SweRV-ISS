@@ -311,6 +311,31 @@ Syscall<URV>::redirectOutputDescriptor(int fd, const std::string& path)
 
 
 template <typename URV>
+bool
+Syscall<URV>::redirectInputDescriptor(int fd, const std::string& path)
+{
+  if (fdMap_.count(fd))
+    {
+      std::cerr << "Hart::redirectOutputDecritpor: Error: File decriptor " << fd
+                << " alrady used.\n";
+      return false;
+    }
+
+  int newFd = open(path.c_str(), O_RDONLY);
+  if (newFd < 0)
+    {
+      std::cerr << "Error: Failed to open file " << path << " for input\n";
+      return false;
+    }
+  fdMap_[fd] = newFd;
+  fdIsRead_[fd] = true;
+  fdPath_[fd] = path;
+
+  return true;
+}
+
+
+template <typename URV>
 void
 Syscall<URV>::reportOpenedFiles(std::ostream& out)
 {

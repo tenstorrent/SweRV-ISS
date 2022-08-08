@@ -15,6 +15,7 @@
 #pragma once
 
 #include <iosfwd>
+#include <boost/variant.hpp>
 #include "trapEnums.hpp"
 #include "Memory.hpp"
 #include "Tlb.hpp"
@@ -556,6 +557,10 @@ namespace WdRiscv
     /// Same as translate but only check for write access.
     ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, uint64_t& pa);
 
+    /// Set number of TLB entries.
+    void setTlbSize(unsigned size)
+    { tlb_.setTlbSize(size); }
+
     /// Return page size.
     unsigned pageSize() const
     { return pageSize_; }
@@ -565,6 +570,10 @@ namespace WdRiscv
     uint64_t pageStartAddress(uint64_t address) const
     { return (address >> pageBits_) << pageBits_; }
 
+    /// Return the page number corresponding to the given address.
+    uint64_t pageNumber(uint64_t addr) const
+    { return addr >> pageBits_; }
+
     /// Debug method: Print all the entries in the page table.
     void printPageTable(std::ostream& os) const;
 
@@ -573,6 +582,29 @@ namespace WdRiscv
     /// printPageTable.
     template <typename PTE, typename VA>
     void printEntries(std::ostream& os, uint64_t addr, std::string path) const;
+
+    typedef boost::variant<Pte32, Pte39, Pte48, Pte57> PteType;
+
+    /// Support for tracing: return page table walk trace for fetch/load/store
+    void getPageTableWalk(std::vector<PteType>& entries, bool fetch,
+                          bool load, bool store) const
+    {
+      assert(fetch or load or store);
+      if (fetch)
+        entries.assign(pageTableWalkForFetch_.begin(), pageTableWalkForFetch_.end());
+      else if (load)
+        entries.assign(pageTableWalkForLoad_.begin(), pageTableWalkForLoad_.end());
+      else
+        entries.assign(pageTableWalkForStore_.begin(), pageTableWalkForStore_.end());
+    }
+
+    /// Clear trace of page table walk
+    void clearPageTableWalk()
+    {
+      pageTableWalkForFetch_.clear();
+      pageTableWalkForLoad_.clear();
+      pageTableWalkForStore_.clear();
+    }
 
   protected:
 
@@ -623,6 +655,10 @@ namespace WdRiscv
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
 
+    /// Return current paging mode.
+    Mode mode() const
+    { return mode_; }
+
     /// Return current address space id.
     uint32_t addressSpace() const
     { return asid_; }
@@ -650,6 +686,12 @@ namespace WdRiscv
     bool faultOnFirstAccess_ = true;
 
     FILE* attFile_ = nullptr;
+
+    // Keep track of page table walk of fetch/load/store. Will be empty
+    // if no walk.
+    std::vector<PteType> pageTableWalkForFetch_;
+    std::vector<PteType> pageTableWalkForLoad_;
+    std::vector<PteType> pageTableWalkForStore_;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;

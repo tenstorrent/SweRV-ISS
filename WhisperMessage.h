@@ -29,6 +29,9 @@ enum WhisperExceptionType { InstAccessFault, DataAccessFault,
                             PreciseStoreFault, PreciseLoadFault, 
                             NonMaskableInterrupt };
 
+/// Resource identifiers for peek special.
+enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap };
+
 
 /// Structure used to communicate with the whisper program using
 /// sockets.  When a ChangeCount message is returned by whisper (as a

@@ -67,16 +67,48 @@ namespace WdRiscv
     /// print TLB entry
     void printEntry(std::ostream& ost, const TlbEntry& te) const;
 
+    /// Set number of TLB entries.
+    void setTlbSize(unsigned size)
+    { entries_.resize(size); }
+
     /// Insert a TLB entry for the given translation parameters. If TLB is full
     /// the contents of the  least recently accessed slot are replaced by the
-    /// given parameters.
-    void insertEntry(uint64_t virtPageNum, uint64_t phyPageNUm,
+    /// given parameters. Return true on success and false otherwise.
+    bool insertEntry(uint64_t virtPageNum, uint64_t phyPageNum,
                      uint32_t asid, bool global, bool isUser, bool read,
                      bool write, bool exec);
 
-    /// Insert copy of given entry.
-    void insertEntry(const TlbEntry& entry);
+    /// Insert copy of given entry. Return true on success and false otherwise.
+    bool insertEntry(const TlbEntry& entry);
 
+    /// Invalidate every entry matching given address space identifier
+    /// unless it is global.
+    void invalidateAsid(uint32_t asid)
+    {
+      for (auto& entry : entries_)
+	if (entry.asid_ == asid and not entry.global_)
+	  entry.valid_ = false;
+    }
+
+    /// Invalidate every entry matching given virtual page number.
+    void invalidateVirtualPage(uint64_t vpn)
+    {
+      for (auto& entry : entries_)
+	if (entry.virtPageNum_ == vpn)
+	  entry.valid_ = false;
+    }
+
+    /// Invalidate every entry matching given virtual page number and
+    /// address space identifer except for global entries.
+    void invalidateVirtualPage(uint64_t vpn, uint32_t asid)
+    {
+      for (auto& entry : entries_)
+	if (entry.virtPageNum_ == vpn and entry.asid_ == asid and
+	    not entry.global_)
+	  entry.valid_ = false;
+    }
+
+    /// Invalidate all entries.
     void invalidate()
     { for (auto& entry : entries_) entry.valid_ = false; }
 
@@ -89,4 +121,4 @@ namespace WdRiscv
   };
 }
 
-    
+

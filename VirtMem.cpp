@@ -298,6 +298,13 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 		  uintmax_t(pte.ppn()) * pageSize_);
         }
 
+      if (read)
+        pageTableWalkForLoad_.push_back(pte);
+      if (write)
+        pageTableWalkForStore_.push_back(pte);
+      if (exec)
+        pageTableWalkForFetch_.push_back(pte);
+
       // 4.
       if (not pte.valid() or (not pte.read() and pte.write()))
         return pageFaultType(read, write, exec);
@@ -406,6 +413,9 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
   VA va(address);
 
+  if (attFile_)
+    fprintf(attFile_, "VA: 0x%jx\n", uintmax_t(address));
+
   while (true)
     {
       // 2.
@@ -433,6 +443,13 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
           fprintf(attFile_, "leaf: %d, pa:0x%jx\n\n", leaf,
 		  uintmax_t(pte.ppn()) * pageSize_);
         }
+
+      if (read)
+        pageTableWalkForLoad_.push_back(pte);
+      if (write)
+        pageTableWalkForStore_.push_back(pte);
+      if (exec)
+        pageTableWalkForFetch_.push_back(pte);
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()))

@@ -357,6 +357,14 @@ namespace WdRiscv
                       std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul); }
 
+    /// Return currently configured element width
+    ElementWidth elemWidth() const
+    { return vecRegs_.elemWidth(); }
+
+    /// Return currently configured group multiplier
+    GroupMultiplier groupMultiplier() const
+    { return vecRegs_.groupMultiplier(); }
+
     /// Configure the load-reserve reservation size in bytes.
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
     void configReservationSize(unsigned size)
@@ -717,6 +725,9 @@ namespace WdRiscv
     bool lastInstructionTrapped() const
     { return hasException_ or hasInterrupt_; }
 
+    /// Return true if last executed instruction had an exception. Set
+    /// cause to mstatus cause.
+
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
     /// last instruction. CSRs modified as a side effect (e.g. mcycle
@@ -940,6 +951,10 @@ namespace WdRiscv
     void enableRvzksh(bool flag)
     { rvzksh_ = flag; }
 
+    /// Enable/disable the svinval (TLB invalidation) extension.
+    void enableRvsvinval(bool flag)
+    { rvsvinval_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1097,6 +1112,10 @@ namespace WdRiscv
     /// Return true if the zbkb extension (crypto bit manip) is enabled.
     bool isRvzbkb() const
     { return rvzbkb_; }
+
+    /// Return true if the svinval extension (TLB invalidate) is enabled.
+    bool isRvsvinval() const
+    { return rvsvinval_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -1272,10 +1291,15 @@ namespace WdRiscv
     /// Load snapshot (registers, memory etc)
     bool loadSnapshot(const std::string& dirPath);
 
-    /// Redirect the given output file descriptor (typically stdout or
-    /// stderr) to the given file. Return true on success and false on
-    /// failure.
+    /// Redirect the given output file descriptor (typically that of
+    /// stdout or stderr) to the given file. Return true on success
+    /// and false on failure.
     bool redirectOutputDescriptor(int fd, const std::string& file);
+
+    /// Redirect the given input file descriptor (typically that of
+    /// stdin) to the given file. Return true on success and false on
+    /// failure.
+    bool redirectInputDescriptor(int fd, const std::string& file);
 
     /// Rollback destination register of most recent dev/rem
     /// instruction.  Return true on success and false on failure (no
@@ -1328,6 +1352,10 @@ namespace WdRiscv
     PrivilegeMode privilegeMode() const
     { return privMode_; }
 
+    /// Return current trap vector mode.
+    TrapVectorMode tvecMode() const
+    { return tvecMode_; }
+
     /// This is for performance modeling. Enable a highest level cache
     /// with given size, line size, and set associativity.  Any
     /// previously enabled cache is deleted.  Return true on success
@@ -1351,6 +1379,10 @@ namespace WdRiscv
     /// one first).
     void getCacheLineAddresses(std::vector<uint64_t>& addresses);
 
+    /// Set number of TLB entries.
+    void setTlbSize(unsigned size)
+    { virtMem_.setTlbSize(size); }
+
     /// Debug method: print address translation table. 
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }
@@ -1362,6 +1394,20 @@ namespace WdRiscv
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
+
+    /// Return the paging mode before last executed instruction.
+    VirtMem::Mode lastPageMode() const
+    { return lastPageMode_; }
+
+    /// Return the current paging mode
+    VirtMem::Mode pageMode() const
+    { return virtMem_.mode(); }
+
+    /// Set entries to the page table walk for fetch/load/store of last executed
+    /// instruction. Will be empty if there was no walk.
+    void getPageTableWalk(std::vector<VirtMem::PteType>& entries,
+                          bool fetch, bool load, bool store) const
+    { virtMem_.getPageTableWalk(entries, fetch, load, store); }
 
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
@@ -3848,6 +3894,10 @@ namespace WdRiscv
     void execSm4ed(const DecodedInst*);
     void execSm4ks(const DecodedInst*);
 
+    void execSinval_vma(const DecodedInst*);
+    void execSfence_w_inval(const DecodedInst*);
+    void execSfence_inval_ir(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -3919,6 +3969,7 @@ namespace WdRiscv
       lastPriv_ = privMode_;
       ldStWrite_ = false;
       ldStAtomic_ = false;
+      lastPageMode_ = virtMem_.mode();
       clearTraceData();
     }
 
@@ -3969,6 +4020,7 @@ namespace WdRiscv
     bool rvzbkb_ = false;        // True if extension zbkb (ctypto) enabled.
     bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
     bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
+    bool rvsvinval_ = false;     // True if extension svinval (TLB invalidate) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.
@@ -4069,6 +4121,7 @@ namespace WdRiscv
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
+    TrapVectorMode tvecMode_ = TrapVectorMode::Direct;  // Trap vector mode.
 
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
     PrivilegeMode mstatusMpp_ = PrivilegeMode::Machine; // Cached mstatus.mpp.
@@ -4076,6 +4129,8 @@ namespace WdRiscv
     FpFs mstatusFs_ = FpFs::Off;                        // Cahced mstatus.fs.
 
     FpFs mstatusVs_ = FpFs::Off;
+
+    VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 
     bool debugMode_ = false;         // True on debug mode.
     bool debugStepMode_ = false;     // True in debug step mode.

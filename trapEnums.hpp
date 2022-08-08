@@ -63,7 +63,7 @@ namespace WdRiscv
       STORE_ACC_FAULT    = 7,  // Store access fault.
       U_ENV_CALL         = 8,  // Environment call from user mode
       S_ENV_CALL         = 9,  // Environment call from supervisor mode
-      VS_ENV_VALL        = 10, // Environment call from virtual supervisor mode
+      VS_ENV_CALL        = 10, // Environment call from virtual supervisor mode
       M_ENV_CALL         = 11, // Environment call from machine mode
       INST_PAGE_FAULT    = 12, // Instruction page fault
       LOAD_PAGE_FAULT    = 13, // Load page fault
@@ -78,6 +78,14 @@ namespace WdRiscv
       G_STORE_PAGE_FAULT = 23, // Store guest-page fault.
       NONE               = 24,
       MAX_CAUSE          = NONE
+    };
+
+
+  /// RISCV trap vector mode.
+  enum class TrapVectorMode : uint32_t
+    {
+      Direct             = 0,   // All traps set pc to BASE
+      Vectored           = 1    // For exceptions, pc = BASE. For interrupts, pc = BASE + 4xcause
     };
 
 

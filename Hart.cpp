@@ -96,7 +96,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
     fpRegs_(32), vecRegs_(), syscall_(*this),
     pmpManager_(memory.size(), 1024*1024),
-    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16 /* FIX: TLB size*/),
+    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16),
     isa_()
 {
   decodeCacheSize_ = 128*1024;  // Must be a power of 2.
@@ -335,6 +335,8 @@ Hart<URV>::processExtensions()
     enableRvzksed(true);
   if (isa_.isEnabled(RvExtension::Zksh))
     enableRvzksh(true);
+  if (isa_.isEnabled(RvExtension::Svinval))
+    enableRvsvinval(true);
 }
 
 
@@ -2277,9 +2279,9 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
     assert(0 and "Failed to read TVEC register");
 
   URV base = (tvec >> 2) << 2;  // Clear least sig 2 bits.
-  unsigned tvecMode = tvec & 0x3;
+  tvecMode_ = TrapVectorMode(tvec & 0x3);
 
-  if (tvecMode == 1 and interrupt)
+  if (tvecMode_ == TrapVectorMode::Vectored and interrupt)
     base = base + 4*cause;
 
   setPc(base);
@@ -3414,6 +3416,14 @@ Hart<URV>::redirectOutputDescriptor(int fd, const std::string& path)
 
 template <typename URV>
 bool
+Hart<URV>::redirectInputDescriptor(int fd, const std::string& path)
+{
+  return syscall_.redirectInputDescriptor(fd, path);
+}
+
+
+template <typename URV>
+bool
 Hart<URV>::cancelLastDiv()
 {
   if (not hasLastDiv_)
@@ -3988,6 +3998,7 @@ Hart<URV>::clearTraceData()
   memory_.clearLastWriteInfo(hartIx_);
   syscall_.clearMemoryChanges();
   vecRegs_.clearTraceData();
+  virtMem_.clearPageTableWalk();
   lastBranchTaken_ = false;
 }
 
@@ -4010,6 +4021,18 @@ Hart<URV>::setTargetProgramBreak(URV addr)
 template <typename URV>
 inline
 bool
+pokeString(Hart<URV>& hart, uint64_t addr, const std::string& str)
+{
+  for (uint8_t c : str)
+    if (not hart.pokeMemory(addr++, c, true))
+      return false;
+  return hart.pokeMemory(addr, uint8_t(0), true);   // null byte at end
+}
+
+
+template <typename URV>
+inline
+bool
 Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
 {
   URV sp = 0;
@@ -4022,43 +4045,56 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
     sp -= (sp & 0xf);
 
   // Push the arguments on the stack recording their addresses.
-  std::vector<URV> addresses;  // Address of the argv strings.
+  std::vector<URV> argvAddrs;  // Address of the argv strings.
   for (const auto& arg : args)
     {
-      sp -= URV(arg.size() + 1);  // Make room for arg and null char.
-      addresses.push_back(sp);
-
-      size_t ix = 0;
-
-      for (uint8_t c : arg)
-	if (not memory_.poke(sp + ix++, c))
-	  return false;
-
-      if (not memory_.poke(sp + ix++, uint8_t(0))) // Null char.
+      sp -= arg.size() + 1;  // Make room for arg and null char.
+      argvAddrs.push_back(sp);
+      if (not pokeString(*this, sp, arg))
 	return false;
     }
+  argvAddrs.push_back(0);  // Null pointer at end of argv.
 
-  addresses.push_back(0);  // Null pointer at end of argv.
+  // Setup envp on the stack (LANG is needed for clang compiled code).
+  std::vector<std::string> envs = { "LANG=C", "LC_ALL=C" };
+  std::vector<URV> envpAddrs;  // Addresses of the envp strings.
+  for (const auto& env : envs)
+    {
+      sp -= env.size() + 1;  // Make room for env entry and null char.
+      envpAddrs.push_back(sp);
+      if (not pokeString(*this, sp, env))
+	return false;
+    }
+  envpAddrs.push_back(0);  // Null pointer at end of envp.
 
-  // Push on stack null for environment and null for aux vector.
+  // Push on stack null for aux vector.
   sp -= sizeof(URV);
   if (not memory_.poke(sp, URV(0)))
     return false;
-  sp -= sizeof(URV);
-  if (not memory_.poke(sp, URV(0)))
-    return false;
 
-  // Push argv entries on the stack.
-  sp -= URV(addresses.size() + 1) * sizeof(URV); // Make room for argv & argc
+  // Push argv/envp entries on the stack.
+  sp -= URV(envpAddrs.size() + argvAddrs.size() + 1) * sizeof(URV); // Make room for envp, argv, & argc
+
   if ((sp & 0xf) != 0)
     sp -= (sp & 0xf);  // Make sp 16-byte aligned.
 
-  URV ix = 1;  // Index 0 is for argc
-  for (const auto addr : addresses)
-    {
-      if (not memory_.poke(sp + ix++*sizeof(URV), addr))
-	return false;
-    }
+  size_t ix = 1;  // Index 0 is for argc
+
+  // Push argv entries on the stack.
+  for (const auto addr : argvAddrs)
+    if (not memory_.poke(sp + ix++*sizeof(URV), addr))
+      return false;
+
+  // Set environ for newlib. This is superfluous for Linux.
+  URV ea = sp + ix*sizeof(URV);  // Address of envp array
+  ElfSymbol sym;
+  if (findElfSymbol("environ", sym))
+    memory_.poke(URV(sym.addr_), ea);
+
+  // Push envp entries on the stack.
+  for (const auto addr : envpAddrs)
+    if (not memory_.poke(sp + ix++*sizeof(URV), addr))
+      return false;
 
   // Put argc on the stack.
   if (not memory_.poke(sp, URV(args.size())))
@@ -6207,6 +6243,10 @@ Hart<URV>::execute(const DecodedInst* di)
      &&sm3p1,
      &&sm4ed,
      &&sm4ks,
+
+     &&sinval_vma,
+     &&sfence_w_inval,
+     &&sfence_inval_ir,
 
     };
 
@@ -9474,6 +9514,18 @@ Hart<URV>::execute(const DecodedInst* di)
  sm4ks:
   execSm4ks(di);
   return;
+
+ sinval_vma:
+  execSinval_vma(di);
+  return;
+
+ sfence_w_inval:
+  execSfence_w_inval(di);
+  return;
+
+ sfence_inval_ir:
+  execSfence_inval_ir(di);
+  return;
 }
 
 
@@ -10008,13 +10060,7 @@ template <typename URV>
 void
 Hart<URV>::execSfence_vma(const DecodedInst* di)
 {
-  if (not isRvs())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  if (privMode_ < PrivilegeMode::Supervisor)
+  if (not isRvs() or privMode_ < PrivilegeMode::Supervisor)
     {
       illegalInst(di);
       return;
@@ -10029,7 +10075,26 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
     }
 
   // Invalidate whole TLB. This is overkill. TBD FIX: Improve.
-  virtMem_.tlb_.invalidate();
+  if (di->op1() == 0 and di->op2() == 0)
+    virtMem_.tlb_.invalidate();
+  else if (di->op1() == 0 and di->op2() != 0)
+    {
+      URV asid = intRegs_.read(di->op2());
+      virtMem_.tlb_.invalidateAsid(asid);
+    }
+  else if (di->op1() != 0 and di->op2() == 0)
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      virtMem_.tlb_.invalidateVirtualPage(vpn);
+    }
+  else
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      URV asid = intRegs_.read(di->op2());
+      virtMem_.tlb_.invalidateVirtualPage(vpn, asid);
+    }
 
   // std::cerr << "sfence.vma " << di->op1() << ' ' << di->op2() << '\n';
   if (di->op1() == 0)
@@ -10041,6 +10106,38 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       uint64_t last = pageStart + virtMem_.pageSize();
       for (uint64_t addr = pageStart; addr < last; addr += 4)
         invalidateDecodeCache(addr, 4);
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSinval_vma(const DecodedInst* di)
+{
+  execSfence_vma(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSfence_w_inval(const DecodedInst* di)
+{
+  if (not isRvs() or not isRvsvinval() or privMode_ < PrivilegeMode::Supervisor)
+    {
+      illegalInst(di);
+      return;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSfence_inval_ir(const DecodedInst* di)
+{
+  if (not isRvs() or not isRvsvinval() or privMode_ < PrivilegeMode::Supervisor)
+    {
+      illegalInst(di);
+      return;
     }
 }
 

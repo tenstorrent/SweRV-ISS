@@ -44,7 +44,6 @@
 #include "Server.hpp"
 #include "Interactive.hpp"
 #include "third_party/nlohmann/json.hpp"
-#include "ArchInfo.hpp"
 
 
 using namespace WdRiscv;
@@ -168,7 +167,6 @@ struct Args
   std::string consoleOutFile;  // Console io output file.
   std::string serverFile;      // File in which to write server host and port.
   std::string instFreqFile;    // Instruction frequency file.
-  std::string archInfoFile;    // Architectural coverage definition file (JSON).
   std::string configFile;      // Configuration (JSON) file.
   std::string bblockFile;      // Basci block file.
   std::string attFile;         // Address translation file.
@@ -177,7 +175,8 @@ struct Args
   std::string snapshotDir = "snapshot"; // Dir prefix for saving snapshots
   std::string loadFrom;        // Directory for loading a snapshot
   std::string stdoutFile;      // Redirect target program stdout to this.
-  std::string stderrFile;      // Redirect target program stderr to this. 
+  std::string stderrFile;      // Redirect target program stderr to this.
+  std::string stdinFile;       // Redirect target program stdin to this. 
   std::string dataLines;       // Output file for data address line tracing.
   std::string instrLines;      // Output file for instruction address line tracing.
   std::string kernelFile;      // Load kernel image at address.
@@ -262,7 +261,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 787;
+  unsigned subversion = 788;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 }
@@ -482,8 +481,6 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 			" gdb will work with stdio (default -1).")
 	("profileinst", po::value(&args.instFreqFile),
 	 "Report instruction frequency to file.")
-        ("archinfo", po::value(&args.archInfoFile),
-         "Dump instruction table using definition.")
         ("att", po::value(&args.attFile),
          "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
         ("tracerlib", po::value(&args.tracerLib),
@@ -509,6 +506,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Redirect standard output of newlib/Linux target program to this.")
 	("stderr", po::value(&args.stderrFile),
 	 "Redirect standard error of newlib/Linux target program to this.")
+	("stdin", po::value(&args.stdinFile),
+	 "Redirect standard input of newlib/Linux target program to this.")
 	("datalines", po::value(&args.dataLines),
 	 "Generate data line address trace to the given file.")
 	("instrlines", po::value(&args.instrLines),
@@ -981,6 +980,10 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (not args.stderrFile.empty())
     if (not hart.redirectOutputDescriptor(STDERR_FILENO, args.stderrFile))
+      errors++;
+
+  if (not args.stdinFile.empty())
+    if (not hart.redirectInputDescriptor(STDIN_FILENO, args.stdinFile))
       errors++;
 
   // Command line to-host overrides that of ELF and config file.
@@ -1697,20 +1700,6 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
 }
 
 
-/// Static dump of ISA information, program run not needed
-template<typename URV>
-static
-bool
-staticDump(Hart<URV>& hart, const std::string infoPath)
-{
-  ArchInfo<URV> info(hart, infoPath);
-
-  nlohmann::json j = info.dumpArchInfo();
-  std::cout << j.dump(1) << '\n';
-  return true;
-}
-
-
 template <typename URV>
 static
 bool
@@ -1757,7 +1746,7 @@ session(const Args& args, const HartConfig& config)
     system.enableInstructionLineTrace(args.instrLines);
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
-      and not args.interactive and args.archInfoFile.empty())
+      and not args.interactive)
     {
       std::cerr << "No program file specified.\n";
       return false;
@@ -1798,12 +1787,6 @@ session(const Args& args, const HartConfig& config)
       if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
 	if (not args.interactive)
 	  return false;
-    }
-
-  // Static analysis of ISA, do not run program
-  if (not args.archInfoFile.empty())
-    {
-      return staticDump(*system.ithHart(0), args.archInfoFile);
     }
 
   bool result = sessionRun(system, args, traceFile, commandLog);

@@ -52,10 +52,15 @@ namespace WdRiscv
     /// value corresponding to the result.
     URV emulate();
 
-    /// Redirect the given output file descriptor (typically stdout or
-    /// stderr) to the given file. Return true on success and false on
-    /// failure.
+    /// Redirect the given output file descriptor (typically that of
+    /// stdout or stderr) to the given file. Return true on success
+    /// and false on failure.
     bool redirectOutputDescriptor(int fd, const std::string& path);
+
+    /// Redirect the given input file descriptor (typically that of
+    /// stdin) to the given file. Return true on success and false on
+    /// failure.
+    bool redirectInputDescriptor(int fd, const std::string& path);
 
     void enableLinux(bool flag)
     { linux_ = flag; }
