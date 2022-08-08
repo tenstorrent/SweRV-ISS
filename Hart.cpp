@@ -4033,11 +4033,11 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
     sp -= (sp & 0xf);
 
   // Push the arguments on the stack recording their addresses.
-  std::vector<URV> addresses;  // Address of the argv strings.
+  std::vector<URV> argvAddrs;  // Address of the argv strings.
   for (const auto& arg : args)
     {
       sp -= URV(arg.size() + 1);  // Make room for arg and null char.
-      addresses.push_back(sp);
+      argvAddrs.push_back(sp);
 
       size_t ix = 0;
 
@@ -4049,27 +4049,60 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
 	return false;
     }
 
-  addresses.push_back(0);  // Null pointer at end of argv.
+  argvAddrs.push_back(0);  // Null pointer at end of argv.
 
-  // Push on stack null for environment and null for aux vector.
+  // Setup envp on the stack (LANG is needed for clang compiled code).
+  std::vector<URV> envpAddrs;  // Addresses of the envp strings.
+  std::string env0 = "LANG=C";
+  sp -= env0.size() + 1;  // Make room for env entry and null char.
+  envpAddrs.push_back(sp);
+  size_t ix = 0;
+  for (uint8_t c : env0)
+    if (not memory_.poke(sp + ix++, c))
+      return false;
+  if (not memory_.poke(sp + ix++, uint8_t(0))) // Null char.
+    return false;
+
+  std::string env1 = "LC_ALL=C";
+  sp -= env1.size() + 1;  // Make room for env entry and null char.
+  envpAddrs.push_back(sp);
+  ix = 0;
+  for (uint8_t c : env1)
+    if (not memory_.poke(sp + ix++, c))
+      return false;
+  if (not memory_.poke(sp + ix++, uint8_t(0))) // Null char.
+    return false;
+
+  envpAddrs.push_back(0);  // Null pointer at end of envp.
+
+  // Push on stack null for aux vector.
   sp -= sizeof(URV);
   if (not memory_.poke(sp, URV(0)))
     return false;
-  sp -= sizeof(URV);
-  if (not memory_.poke(sp, URV(0)))
-    return false;
 
-  // Push argv entries on the stack.
-  sp -= URV(addresses.size() + 1) * sizeof(URV); // Make room for argv & argc
+  // Push argv/envp entries on the stack.
+  sp -= URV(envpAddrs.size() + argvAddrs.size() + 1) * sizeof(URV); // Make room for envp, argv, & argc
+
   if ((sp & 0xf) != 0)
     sp -= (sp & 0xf);  // Make sp 16-byte aligned.
 
-  URV ix = 1;  // Index 0 is for argc
-  for (const auto addr : addresses)
-    {
-      if (not memory_.poke(sp + ix++*sizeof(URV), addr))
-	return false;
-    }
+  ix = 1;  // Index 0 is for argc
+
+  // Push argv entries on the stack.
+  for (const auto addr : argvAddrs)
+    if (not memory_.poke(sp + ix++*sizeof(URV), addr))
+      return false;
+
+  // Set environ for newlib. This is superfluous for Linux.
+  URV ea = sp + ix*sizeof(URV);  // Address of envp array
+  ElfSymbol sym;
+  if (findElfSymbol("environ", sym))
+    memory_.poke(URV(sym.addr_), ea);
+
+  // Push envp entries on the stack.
+  for (const auto addr : envpAddrs)
+    if (not memory_.poke(sp + ix++*sizeof(URV), addr))
+      return false;
 
   // Put argc on the stack.
   if (not memory_.poke(sp, URV(args.size())))
