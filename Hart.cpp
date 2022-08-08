@@ -4021,6 +4021,18 @@ Hart<URV>::setTargetProgramBreak(URV addr)
 template <typename URV>
 inline
 bool
+pokeString(Hart<URV>& hart, uint64_t addr, const std::string& str)
+{
+  for (uint8_t c : str)
+    if (not hart.pokeMemory(addr++, c, true))
+      return false;
+  return hart.pokeMemory(addr, uint8_t(0), true);   // null byte at end
+}
+
+
+template <typename URV>
+inline
+bool
 Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
 {
   URV sp = 0;
@@ -4036,43 +4048,23 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   std::vector<URV> argvAddrs;  // Address of the argv strings.
   for (const auto& arg : args)
     {
-      sp -= URV(arg.size() + 1);  // Make room for arg and null char.
+      sp -= arg.size() + 1;  // Make room for arg and null char.
       argvAddrs.push_back(sp);
-
-      size_t ix = 0;
-
-      for (uint8_t c : arg)
-	if (not memory_.poke(sp + ix++, c))
-	  return false;
-
-      if (not memory_.poke(sp + ix++, uint8_t(0))) // Null char.
+      if (not pokeString(*this, sp, arg))
 	return false;
     }
-
   argvAddrs.push_back(0);  // Null pointer at end of argv.
 
   // Setup envp on the stack (LANG is needed for clang compiled code).
+  std::vector<std::string> envs = { "LANG=C", "LC_ALL=C" };
   std::vector<URV> envpAddrs;  // Addresses of the envp strings.
-  std::string env0 = "LANG=C";
-  sp -= env0.size() + 1;  // Make room for env entry and null char.
-  envpAddrs.push_back(sp);
-  size_t ix = 0;
-  for (uint8_t c : env0)
-    if (not memory_.poke(sp + ix++, c))
-      return false;
-  if (not memory_.poke(sp + ix++, uint8_t(0))) // Null char.
-    return false;
-
-  std::string env1 = "LC_ALL=C";
-  sp -= env1.size() + 1;  // Make room for env entry and null char.
-  envpAddrs.push_back(sp);
-  ix = 0;
-  for (uint8_t c : env1)
-    if (not memory_.poke(sp + ix++, c))
-      return false;
-  if (not memory_.poke(sp + ix++, uint8_t(0))) // Null char.
-    return false;
-
+  for (const auto& env : envs)
+    {
+      sp -= env.size() + 1;  // Make room for env entry and null char.
+      envpAddrs.push_back(sp);
+      if (not pokeString(*this, sp, env))
+	return false;
+    }
   envpAddrs.push_back(0);  // Null pointer at end of envp.
 
   // Push on stack null for aux vector.
@@ -4086,7 +4078,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   if ((sp & 0xf) != 0)
     sp -= (sp & 0xf);  // Make sp 16-byte aligned.
 
-  ix = 1;  // Index 0 is for argc
+  size_t ix = 1;  // Index 0 is for argc
 
   // Push argv entries on the stack.
   for (const auto addr : argvAddrs)
