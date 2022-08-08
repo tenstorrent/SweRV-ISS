@@ -1352,6 +1352,10 @@ namespace WdRiscv
     PrivilegeMode privilegeMode() const
     { return privMode_; }
 
+    /// Return current trap vector mode.
+    TrapVectorMode tvecMode() const
+    { return tvecMode_; }
+
     /// This is for performance modeling. Enable a highest level cache
     /// with given size, line size, and set associativity.  Any
     /// previously enabled cache is deleted.  Return true on success
@@ -1391,9 +1395,19 @@ namespace WdRiscv
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
 
+    /// Return the paging mode before last executed instruction.
+    VirtMem::Mode lastPageMode() const
+    { return lastPageMode_; }
+
     /// Return the current paging mode
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
+
+    /// Set entries to the page table walk for fetch/load/store of last executed
+    /// instruction. Will be empty if there was no walk.
+    void getPageTableWalk(std::vector<VirtMem::PteType>& entries,
+                          bool fetch, bool load, bool store) const
+    { virtMem_.getPageTableWalk(entries, fetch, load, store); }
 
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
@@ -3955,6 +3969,7 @@ namespace WdRiscv
       lastPriv_ = privMode_;
       ldStWrite_ = false;
       ldStAtomic_ = false;
+      lastPageMode_ = virtMem_.mode();
       clearTraceData();
     }
 
@@ -4106,6 +4121,7 @@ namespace WdRiscv
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
+    TrapVectorMode tvecMode_ = TrapVectorMode::Direct;  // Trap vector mode.
 
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
     PrivilegeMode mstatusMpp_ = PrivilegeMode::Machine; // Cached mstatus.mpp.
@@ -4113,6 +4129,8 @@ namespace WdRiscv
     FpFs mstatusFs_ = FpFs::Off;                        // Cahced mstatus.fs.
 
     FpFs mstatusVs_ = FpFs::Off;
+
+    VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 
     bool debugMode_ = false;         // True on debug mode.
     bool debugStepMode_ = false;     // True in debug step mode.

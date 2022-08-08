@@ -2279,9 +2279,9 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
     assert(0 and "Failed to read TVEC register");
 
   URV base = (tvec >> 2) << 2;  // Clear least sig 2 bits.
-  unsigned tvecMode = tvec & 0x3;
+  tvecMode_ = TrapVectorMode(tvec & 0x3);
 
-  if (tvecMode == unsigned(TrapVectorMode::VECTORED) and interrupt)
+  if (tvecMode_ == TrapVectorMode::Vectored and interrupt)
     base = base + 4*cause;
 
   setPc(base);
@@ -3998,6 +3998,7 @@ Hart<URV>::clearTraceData()
   memory_.clearLastWriteInfo(hartIx_);
   syscall_.clearMemoryChanges();
   vecRegs_.clearTraceData();
+  virtMem_.clearPageTableWalk();
   lastBranchTaken_ = false;
 }
 
