@@ -848,14 +848,11 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   processStepCahnges(hart, inst, pendingChanges, interrupted, hasPre,
 		     hasPost, reply);
 
-  // Send privilege mode in reply.flags
-  reply.flags = privMode;
-
-#if 0
-  // Send floating point flags in bits 16 to 19 of reply.flags.
-  unsigned fpFlags = 0;
-  reply.flags |= (fpFlags << 16);
-#endif
+  // Send privilege mode, incremental floating point flags, and trap info
+  // in flags: 2 bits for priv mode, 4 bits for fp flags, 1 bit for trap.
+  unsigned fpFlags = hart.lastFpFlags();
+  unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
+  reply.flags = (privMode & 3) | ((fpFlags & 0xf) >> 2) | (trap << 6);
 
   return true;
 }
