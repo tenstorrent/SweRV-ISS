@@ -165,6 +165,12 @@ Mcm<URV>::findOrAddInstr(unsigned hartIx, uint32_t tag)
   auto& vec = hartInstrVecs_.at(hartIx);
   if (tag >= vec.size())
     {
+      if (tag > 100000000)
+	{
+	  std::cerr << "MCM: Instruction tag way too large: " << tag << '\n';
+	  std::cerr << "MCM: Code expects dense consecutive tags starting at 0\n";
+	  assert(0);
+	}
       McmInstr instr;
       instr.tag_ = tag;
       vec.resize(tag + 1);
