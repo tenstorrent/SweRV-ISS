@@ -47,18 +47,27 @@ namespace WdRiscv
     Tlb(unsigned size);
 
     /// Return pointer to TLB entry associated with given virtual page
-    /// number and address space identifier.  Return nullptr if no
-    /// such entry.
+    /// number and address space identifier. 
+    /// Return nullptr if no such entry.
     TlbEntry* findEntry(uint64_t pageNum, uint32_t asid)
     {
       for (auto& entry : entries_)
         if (entry.valid_ and entry.virtPageNum_ == pageNum)
           if (entry.global_ or entry.asid_ == asid)
-            {
-              entry.time_ = time_++;
               return &entry;
-            }
       return nullptr;
+    }
+
+    /// Return pointer to TLB entry associated with given virtual page
+    /// number and address space identifier. Update entry time of
+    /// access and increment time if entry is found. Return nullptr if
+    /// no such entry.
+    TlbEntry* findEntryUpdateTime(uint64_t pageNum, uint32_t asid)
+    {
+      auto entry = findEntry(pageNum, asid);
+      if (entry)
+	entry->time_ = time_++;
+      return entry;
     }
 
     /// print TLB content
@@ -102,10 +111,9 @@ namespace WdRiscv
     /// address space identifer except for global entries.
     void invalidateVirtualPage(uint64_t vpn, uint32_t asid)
     {
-      for (auto& entry : entries_)
-	if (entry.virtPageNum_ == vpn and entry.asid_ == asid and
-	    not entry.global_)
-	  entry.valid_ = false;
+      auto entry = findEntry(vpn, asid);
+      if (entry and not entry->global_)
+	entry->valid_ = false;
     }
 
     /// Invalidate all entries.

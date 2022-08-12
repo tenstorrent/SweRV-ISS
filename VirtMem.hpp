@@ -695,6 +695,10 @@ namespace WdRiscv
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
+
+    // Addresses of PTEs used in most recent insruction an data translations.
+    std::vector<uint64_t> pteInstrAddr_;
+    std::vector<uint64_t> pteDataAddr_;
   };
 
 }
