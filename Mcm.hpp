@@ -62,13 +62,21 @@ namespace WdRiscv
 
     void addMemOp(MemoryOpIx memOpIx)
     {
-      assert(std::find(memOps_.begin(), memOps_.end(), memOpIx) == memOps_.end());
+      if (std::find(memOps_.begin(), memOps_.end(), memOpIx) != memOps_.end())
+	{
+	  std::cerr << "McmInstr::addMemOp: Error: Op already added\n";
+	  assert(0 && "McmInstr::addMemOp: Op ix already present");
+	}
       memOps_.push_back(memOpIx);
     }
 
     bool overlaps(const McmInstr& other) const
     {
-      assert(size_ > 0 and other.size_ > 0);
+      if (size_ == 0 or other.size_ == 0)
+	{
+	  std::cerr << "McmInstr::overlaps: Error: zero data size\n";
+	  assert(0 && "McmInstr::overlaps: zero data size\n");
+	}
       if (physAddr_ == other.physAddr_)
 	return true;
       if (physAddr_ < other.physAddr_)
@@ -78,7 +86,11 @@ namespace WdRiscv
 
     bool overlaps(const MemoryOp& op) const
     {
-      assert(size_ > 0 and op.size_ > 0);
+      if (size_ == 0 or op.size_ == 0)
+	{
+	  std::cerr << "McmInstr::overlaps: Error: zero data size\n";
+	  assert(0 && "McmInstr::overlaps: zero data size\n");
+	}
       if (physAddr_ == op.physAddr_)
 	return true;
       if (physAddr_ < op.physAddr_)
@@ -171,7 +183,11 @@ namespace WdRiscv
 
     uint64_t latestOpTime(const McmInstr& instr) const
     {
-      assert(instr.complete_);
+      if (not instr.complete_)
+	{
+	  std::cerr << "Mcm::latestOpTime: Called on an incomplete instruction\n";
+	  assert(0 && "Mcm::lasestOpTime: Incomplete instr");
+	}
       uint64_t time = 0;
       for (auto opIx : instr.memOps_)
 	if (opIx < sysMemOps_.size())
@@ -181,7 +197,11 @@ namespace WdRiscv
 
     uint64_t earliestOpTime(const McmInstr& instr) const
     {
-      assert(instr.complete_);
+      if (not instr.complete_)
+	{
+	  std::cerr << "Mcm::earliestOpTime: Called on an incomplete instruction\n";
+	  assert(0 && "Mcm::earliestOpTime: Incomplete instr");
+	}
       uint64_t time = ~uint64_t(0);
       for (auto opIx : instr.memOps_)
 	if (opIx < sysMemOps_.size())
@@ -197,7 +217,8 @@ namespace WdRiscv
 	return false;
       if (not a.complete_ and not b.complete_)
 	{
-	  assert(0);
+	  std::cerr << "Mcm::isBeforeInMemoryTime: Both instructions incomplete\n";
+	  assert(0 && "Mcm::isBeforeInMemoryTime: Both instructions incomplete");
 	  return false;
 	}
       uint64_t aTime = latestOpTime(a);
@@ -265,7 +286,11 @@ namespace WdRiscv
       instr.cancel();
       for (auto memIx : instr.memOps_)
 	{
-	  assert(not sysMemOps_.at(memIx).isCanceled());
+	  if (sysMemOps_.at(memIx).isCanceled())
+	    {
+	      std::cerr << "Mcm::cancelInstr: Error: op already canceled\n";
+	      assert(0 && "Mcm::cancelInstr: op already canceled");
+	    }
 	  sysMemOps_.at(memIx).cancel();
 	}
     }
