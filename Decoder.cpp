@@ -2018,21 +2018,33 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
       {
 	IFormInst iform(inst);
 	unsigned funct3 = iform.fields.funct3;
-	if (iform.fields.rd == 0 and iform.fields.rs1 == 0)
+	unsigned imm = iform.uimmed(), rd = iform.fields.rd, rs1 = iform.fields.rs1;
+	
+	if (funct3 == 0)
 	  {
-	    if (funct3 == 0)
+	    if (rd == 0 and rs1 == 0)
 	      {
 		if (iform.top4() == 0)
 		  return instTable_.getEntry(InstId::fence);
 		if (iform.top4() == 8)
 		  return instTable_.getEntry(InstId::fence_tso);
-		return instTable_.getEntry(InstId::illegal);
 	      }
-	    else if (funct3 == 1)
-	      {
-		if (iform.uimmed() == 0)
-		  return instTable_.getEntry(InstId::fencei);
-	      }
+	  }
+	else if (funct3 == 1)
+	  {
+	    if (rd == 0 and rs1 == 0 and imm == 0)
+	      return instTable_.getEntry(InstId::fencei);
+	  }
+	else if (funct3 == 2)
+	  {
+	    if (imm == 0 and rd == 0)
+	      return instTable_.getEntry(InstId::cbo_inval);
+	    if (imm == 1 and rd == 0)
+	      return instTable_.getEntry(InstId::cbo_clean);
+	    if (imm == 2 and rd == 0)
+	      return instTable_.getEntry(InstId::cbo_flush);
+	    if (imm == 4 and rd == 0)
+	      return instTable_.getEntry(InstId::cbo_zero);
 	  }
       }
       return instTable_.getEntry(InstId::illegal);

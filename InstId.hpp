@@ -960,6 +960,14 @@ namespace WdRiscv
      sfence_w_inval,
      sfence_inval_ir,
 
-     maxId = sfence_inval_ir
+     // Cache block management (zicbom)
+     cbo_clean,
+     cbo_flush,
+     cbo_inval,
+
+     // Cache block zero (zicboz)
+     cbo_zero,
+
+     maxId = cbo_zero
     };
 }

@@ -6499,5 +6499,28 @@ InstTable::setupInstVec()
         RvExtension::S, RvFormat::I
       },
 
+      // Cache block management (zicbom)
+
+      { "cbo.clean", InstId::cbo_clean, 0x0010200f, 0xfff07fff,
+	RvExtension::Zicbom, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "cbo.flush", InstId::cbo_flush, 0x0020200f, 0xfff0777f,
+	RvExtension::Zicbom, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "cbo.inval", InstId::cbo_inval, 0x0000200f, 0xfff0777f,
+	RvExtension::Zicbom, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      // Cache block zero (zicboz)
+
+      { "cbo.zero", InstId::cbo_zero, 0x0040200f, 0xfff0777f,
+	RvExtension::Zicboz, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
     };
 }
