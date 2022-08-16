@@ -583,65 +583,6 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1, unsigned groupX
 }
 
 
-template <typename URV>
-inline
-bool
-Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned /*op0*/, unsigned op1,
-				 unsigned groupX8)
-{
-  if (not isVecLegal() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return false;
-    }
-
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
-
-  if ((op1 & mask) == 0)
-    {
-      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
-      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
-      return true;
-    }
-
-  // Vector operand not a multiple of emul: illegal.
-  illegalInst(di);
-  return false;
-}
-
-
-template <typename URV>
-inline
-bool
-Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned /*op0*/, unsigned op1,
-				 unsigned op2, unsigned groupX8)
-{
-  if (not isVecLegal() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return false;
-    }
-
-  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
-
-  unsigned op = op1 | op2;
-  if ((op & mask) == 0)
-    {
-      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
-      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
-      vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging
-      return true;
-    }
-
-  // Vector operand not a multiple of emul: illegal.
-  illegalInst(di);
-  return false;
-}
-
-
-
 /// Return true if destination/source overlap is allowed.
 static
 bool
@@ -680,6 +621,77 @@ hasDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
   if (src >= dest + destGroup or dest >= src + srcGroup)
     return false;  // No overlap.
   return true;
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+				 unsigned groupX8)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig())
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
+
+  if (not checkDestSourceOverlap(op0, 8, op1, groupX8))
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  if ((op1 & mask) == 0)
+    {
+      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
+      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
+      return true;
+    }
+
+  // Vector operand not a multiple of emul: illegal.
+  illegalInst(di);
+  return false;
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+				 unsigned op2, unsigned groupX8)
+{
+  if (not isVecLegal() or not vecRegs_.legalConfig())
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
+  unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
+
+  if (not checkDestSourceOverlap(op0, 8, op1, groupX8) or
+      not checkDestSourceOverlap(op0, 8, op2, groupX8))
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  unsigned op = op1 | op2;
+  if ((op & mask) == 0)
+    {
+      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
+      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
+      vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging
+      return true;
+    }
+
+  // Vector operand not a multiple of emul: illegal.
+  illegalInst(di);
+  return false;
 }
 
 

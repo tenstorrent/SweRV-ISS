@@ -59,7 +59,7 @@ VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = tlb_.findEntry(virPageNum, asid_);
+  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
   if (entry)
     {
       // Use TLB entry.
@@ -95,7 +95,7 @@ VirtMem::translateForLoad(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = tlb_.findEntry(virPageNum, asid_);
+  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
   if (entry)
     {
       // Use TLB entry.
@@ -131,7 +131,7 @@ VirtMem::translateForStore(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = tlb_.findEntry(virPageNum, asid_);
+  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
   if (entry)
     {
       // Use TLB entry.
@@ -168,7 +168,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = tlb_.findEntry(virPageNum, asid_);
+  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
   if (entry)
     {
       // Use TLB entry.
@@ -205,7 +205,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
   TlbEntry tmpTlbEntry;
 
   if (mode_ == Sv32)
-    cause = pageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, tmpTlbEntry);
+    cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, tmpTlbEntry);
   else if (mode_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-39 must equal bit 38
@@ -214,7 +214,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0x1ffffff;  // Least sig 25 bits set
       if ((va >> 39) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk<Pte39, Va39>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, tmpTlbEntry);
     }
   else if (mode_ == Sv48)
     {
@@ -224,7 +224,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0xffff;  // Least sig 16 bits set
       if ((va >> 48) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk<Pte48, Va48>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, tmpTlbEntry);
     }
   else if (mode_ == Sv57)
     {
@@ -234,7 +234,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0x3f;  // Least sig 7 bits set
       if ((va >> 57) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk<Pte57, Va57>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, tmpTlbEntry);
     }
   else
     assert(0 and "Unspupported virtual memory mode.");
@@ -413,6 +413,10 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
   VA va(address);
 
+  // Collect PTE addresses used in the translation process.
+  auto& addrTrace = exec ? pteInstrAddr_ : pteDataAddr_;
+  addrTrace.clear();
+
   if (attFile_)
     fprintf(attFile_, "VA: 0x%jx\n", uintmax_t(address));
 
@@ -420,6 +424,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
     {
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
+      addrTrace.push_back(pteAddr);
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.

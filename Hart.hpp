@@ -955,6 +955,14 @@ namespace WdRiscv
     void enableRvsvinval(bool flag)
     { rvsvinval_ = flag; }
 
+    /// Enable/disable the zicbom (cache block management) extension.
+    void enableRvzicbom(bool flag)
+    { rvzicbom_ = flag; }
+
+    /// Enable/disable the zicboz (cache block zero) extension.
+    void enableRvzicboz(bool flag)
+    { rvzicboz_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1116,6 +1124,14 @@ namespace WdRiscv
     /// Return true if the svinval extension (TLB invalidate) is enabled.
     bool isRvsvinval() const
     { return rvsvinval_; }
+
+    /// Return true if the zicbom extension (cache block management) is enabled.
+    bool isRvzicbom() const
+    { return rvzicbom_; }
+
+    /// Return true if the zicboz extension (cache block zero) is enabled.
+    bool isRvzicboz() const
+    { return rvzicboz_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -3898,6 +3914,11 @@ namespace WdRiscv
     void execSfence_w_inval(const DecodedInst*);
     void execSfence_inval_ir(const DecodedInst*);
 
+    void execCbo_clean(const DecodedInst*);
+    void execCbo_flush(const DecodedInst*);
+    void execCbo_inval(const DecodedInst*);
+    void execCbo_zero(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -4021,6 +4042,8 @@ namespace WdRiscv
     bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
     bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
     bool rvsvinval_ = false;     // True if extension svinval (TLB invalidate) enabled.
+    bool rvzicbom_ = false;      // True if extension zicbom (cache block management) enabled.
+    bool rvzicboz_ = false;      // True if extension zicboz (cache block zero) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.
@@ -4075,6 +4098,8 @@ namespace WdRiscv
     bool traceHeaderPrinted_ = false; // True if trace file header printed.
 
     bool instrLineTrace_ = false;
+
+    unsigned cacheLineSize_ = 64;
 
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.

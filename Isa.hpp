@@ -10,7 +10,7 @@ namespace WdRiscv
 				      Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
 				      Zbr, Zbs, Zbt, Zfh, Zfhmin, Zlsseg,
 				      Zknd, Zkne, Zknh, Zbkb, Zksed, Zksh,
-				      Svinval, None };
+				      Svinval, Zicbom, Zicboz, None };
 
   /// Model supported extensions with primary/secondary version numbers.
   class Isa

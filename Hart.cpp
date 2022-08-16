@@ -337,6 +337,10 @@ Hart<URV>::processExtensions()
     enableRvzksh(true);
   if (isa_.isEnabled(RvExtension::Svinval))
     enableRvsvinval(true);
+  if (isa_.isEnabled(RvExtension::Zicbom))
+    enableRvzicbom(true);
+  if (isa_.isEnabled(RvExtension::Zicboz))
+    enableRvzicboz(true);
 }
 
 
@@ -6248,6 +6252,11 @@ Hart<URV>::execute(const DecodedInst* di)
      &&sfence_w_inval,
      &&sfence_inval_ir,
 
+     &&cbo_clean,
+     &&cbo_flush,
+     &&cbo_inval,
+     &&cbo_zero,
+
     };
 
   const InstEntry* entry = di->instEntry();
@@ -9526,6 +9535,22 @@ Hart<URV>::execute(const DecodedInst* di)
  sfence_inval_ir:
   execSfence_inval_ir(di);
   return;
+
+ cbo_clean:
+  execCbo_clean(di);
+  return;
+
+ cbo_flush:
+  execCbo_flush(di);
+  return;
+
+ cbo_inval:
+  execCbo_inval(di);
+  return;
+
+ cbo_zero:
+  execCbo_zero(di);
+  return;
 }
 
 
@@ -10139,6 +10164,160 @@ Hart<URV>::execSfence_inval_ir(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCbo_clean(const DecodedInst* di)
+{
+  if (not isRvzicbom())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef PrivilegeMode PM;
+  PM pm = privilegeMode();
+
+  URV menv = 0, senv = 0;
+  peekCsr(CsrNumber::MENVCFG, menv);
+  peekCsr(CsrNumber::SENVCFG, senv);
+
+  unsigned mcbcfe = (menv >> 6) & 1;
+  unsigned scbcfe = (senv >> 6) & 1;
+
+  if ( (pm != PM::Machine and not mcbcfe) or
+       (pm == PM::User and not scbcfe) )
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Check for exception.
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_clean: check for exception" << '\n';
+      firstTime = false;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCbo_flush(const DecodedInst* di)
+{
+  if (not isRvzicbom())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef PrivilegeMode PM;
+  PM pm = privilegeMode();
+
+  URV menv = 0, senv = 0;
+  peekCsr(CsrNumber::MENVCFG, menv);
+  peekCsr(CsrNumber::SENVCFG, senv);
+
+  unsigned mcbcfe = (menv >> 6) & 1;
+  unsigned scbcfe = (senv >> 6) & 1;
+
+  if ( (pm != PM::Machine and not mcbcfe) or
+       (pm == PM::User and not scbcfe) )
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Check for exception.
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_flush: check for exception" << '\n';
+      firstTime = false;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCbo_inval(const DecodedInst* di)
+{
+  if (not isRvzicbom())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef PrivilegeMode PM;
+  PM pm = privilegeMode();
+
+  URV menv = 0, senv = 0;
+  peekCsr(CsrNumber::MENVCFG, menv);
+  peekCsr(CsrNumber::SENVCFG, senv);
+
+  unsigned mcbie = (menv >> 4) & 3;
+  unsigned scbie = (senv >> 4) & 3;
+
+  if ( (pm != PM::Machine and mcbie == 0) or
+       (pm == PM::User and scbie == 0) )
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Check for exception.
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_inval: check for exception" << '\n';
+      firstTime = false;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCbo_zero(const DecodedInst* di)
+{
+  if (not isRvzicboz())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  typedef PrivilegeMode PM;
+  PM pm = privilegeMode();
+
+  URV menv = 0, senv = 0;
+  peekCsr(CsrNumber::MENVCFG, menv);
+  peekCsr(CsrNumber::SENVCFG, senv);
+
+  unsigned mcbze = (menv >> 7) & 1;
+  unsigned scbze = (senv >> 7) & 1;
+
+  if ( (pm != PM::Machine and not mcbze) or
+       (pm == PM::User and not scbze) )
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Translate virtual addr and check for exception.
+  uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t physAddr = virtAddr;
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_zero: check for exception" << '\n';
+      firstTime = false;
+    }
+
+  assert((cacheLineSize_ % 8) == 0);
+  for (unsigned i = 0; i < cacheLineSize_; i+= 8)
+    memory_.poke(physAddr + i, uint64_t(0), true /*usePma*/);
 }
 
 

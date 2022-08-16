@@ -1149,6 +1149,9 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sip and mip)
     sip->tie(mip->valuePtr_); // Sip is a shadow if mip
 
+  mask = 0x1d;
+  defineCsr("senvcfg",    Csrn::SENVCFG,    !mand, !imp, 0, mask, mask);
+
   // Supervisor Protection and Translation 
   defineCsr("satp",       Csrn::SATP,       !mand, !imp, 0, wam, wam);
 }

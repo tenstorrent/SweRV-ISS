@@ -53,9 +53,7 @@ printLdSt(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
   unsigned rd = di.op0(), rs1 = di.op1();
   int32_t imm = di.op2As<int32_t>();
 
-  const InstEntry* entry = di.instEntry();
-
-  stream << std::left << std::setw(8) << entry->name() << ' ';
+  stream << std::left << std::setw(8) << di.name() << ' ';
 
   const char* sign = imm < 0? "-" : "";
   if (imm < 0)
@@ -64,7 +62,7 @@ printLdSt(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
   // Keep least sig 12 bits.
   imm = imm & 0xfff;
 
-  stream << (entry->isFp() ? hart.fpRegName(rd) : hart.intRegName(rd))
+  stream << (di.isFp() ? hart.fpRegName(rd) : hart.intRegName(rd))
 	 << ", " << sign << "0x" << std::hex << imm
 	 << "(" << hart.intRegName(rs1) << ")" << std::dec;
 }
@@ -77,16 +75,15 @@ static
 void
 printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 {
-  const InstEntry* entry = di.instEntry();
   if (di.isLoad() or di.isStore())
     {
       printLdSt(hart, out, di);
       return;
     }
 
-  unsigned width = std::max(size_t(9), entry->name().size() + 1);
+  unsigned width = std::max(size_t(9), di.name().size() + 1);
 
-  out << std::left << std::setw(width) << entry->name();
+  out << std::left << std::setw(width) << di.name();
   unsigned opCount = di.operandCount();
 
   const char* sep = "";
@@ -116,7 +113,7 @@ printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 	}
     }
 
-  if (entry->hasRoundingMode())
+  if (di.instEntry()->hasRoundingMode())
     out << sep << roundingModeString(RoundingMode(di.roundingMode()));
 }
 
@@ -186,7 +183,7 @@ printCsr(Hart<URV>& hart, std::ostream& stream,	 const DecodedInst& di)
 {
   unsigned rd = di.op0(), csrn = di.op2();
 
-  stream << std::left << std::setw(9) << di.instEntry()->name();
+  stream << std::left << std::setw(9) << di.name();
   stream << hart.intRegName(rd) << ", ";
 
   auto csr = hart.findCsr(CsrNumber(csrn));
@@ -234,7 +231,7 @@ printBranch3(const Hart<URV>& hart, std::ostream& stream,
 {
   unsigned rs1 = di.op0(), rs2 = di.op1();
 
-  stream << std::left << std::setw(8) << di.instEntry()->name() << ' ';
+  stream << std::left << std::setw(8) << di.name() << ' ';
   stream << hart.intRegName(rs1) << ", " << hart.intRegName(rs2) << ", . ";
 
   char sign = '+';
@@ -259,7 +256,7 @@ printBranch2(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
   unsigned rs1 = di.op0();
   int32_t imm = di.op2As<int32_t>();
 
-  stream << std::left << std::setw(8) << di.instEntry()->name() << ' ';
+  stream << std::left << std::setw(8) << di.name() << ' ';
   stream << hart.intRegName(rs1) << ", . ";
 
   char sign = '+';
@@ -278,7 +275,7 @@ void
 printFence(const Hart<URV>& /*hart*/, std::ostream& stream,
 	   const DecodedInst& di)
 {
-  stream << std::left << std::setw(8) << di.instEntry()->name() << ' ';
+  stream << std::left << std::setw(8) << di.name() << ' ';
 
   std::string pred, succ;
 
@@ -306,7 +303,7 @@ printAmo(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
   unsigned rd = di.op0(), rs1 = di.op1(), rs2 = di.op2();
   bool aq = di.isAtomicAcquire(), rl = di.isAtomicRelease();
 
-  stream << di.instEntry()->name();
+  stream << di.name();
 
   if (aq)
     stream << ".aq";
@@ -379,11 +376,11 @@ void
 printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 {
   uint32_t opcode7 = di.inst() & 0x7f;  // Least sig 7 bits
-  InstId id = di.instEntry()->instId();
+  InstId id = di.instId();
 
   if (opcode7 == 0x7 or opcode7 == 0x27)
     {  // Vector load store
-      std::string name = di.instEntry()->name();
+      std::string name = di.name();
       if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
 	name = insertFieldCountInName(name, di.vecFieldCount(), 2);
       else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or
@@ -409,7 +406,7 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 
   if (id == InstId::vsetvli or id == InstId::vsetivli)
     {
-      out << di.instEntry()->name() << ' ' << hart.intRegName(di.op0()) << ", ";
+      out << di.name() << ' ' << hart.intRegName(di.op0()) << ", ";
       if (id == InstId::vsetivli)
 	out << di.op1();
       else
@@ -430,7 +427,7 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       return;
     }
 
-  std::string name = di.instEntry()->name();
+  std::string name = di.name();
   if (id >= InstId::vmadc_vvm and id <= InstId::vmsbc_vxm and not di.isMasked())
     name = name.substr(0, name.size() - 1);
   out << name;
@@ -475,6 +472,17 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 	  
 
 template <typename URV>
+static
+void
+printCbo(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
+{
+  unsigned width = std::max(size_t(9), di.name().size() + 1);
+  out << std::left << std::setw(width) << di.name();
+  out << "0(" << hart.intRegName(di.ithOperand(0)) << ")";
+}
+
+
+template <typename URV>
 void
 Hart<URV>::disassembleInst(uint32_t inst, std::ostream& stream)
 {
@@ -501,7 +509,7 @@ template <typename URV>
 void
 Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 {
-  InstId id = di.instEntry()->instId();
+  InstId id = di.instId();
   switch(id)
     {
     case InstId::illegal:
@@ -794,6 +802,13 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 
     case InstId::fsriw:
       printRdRs1Rs3Imm(*this, out, "fsriw", di);
+      break;
+
+    case InstId::cbo_clean:
+    case InstId::cbo_flush:
+    case InstId::cbo_inval:
+    case InstId::cbo_zero:
+      printCbo(*this, out, di);
       break;
 
     default:

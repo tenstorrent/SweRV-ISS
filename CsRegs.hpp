@@ -197,6 +197,8 @@ namespace WdRiscv
       // Supervisor Protection and Translation 
       SATP = 0x180,
 
+      SENVCFG = 0x10a,
+
       // Hypervisor registers
       HSTATUS = 0x600,
       HEDELEG = 0x602,
