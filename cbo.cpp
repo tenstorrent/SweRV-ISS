@@ -22,6 +22,64 @@ using namespace WdRiscv;
 
 
 template <typename URV>
+ExceptionCause
+Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
+{
+  uint64_t mask = uint64_t(cacheLineSize_) - 1;
+  addr &= ~mask;  // Make addr a multiple of cache line size.
+
+  addr = URV(addr);   // Truncate to 32 bits in 32-bit mode.
+
+  ExceptionCause cause = ExceptionCause::NONE;
+
+  // Address translation
+  if (isRvs())
+    {
+      PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
+      if (mode != PrivilegeMode::Machine)
+        {
+          uint64_t pa = 0;
+          cause = isRead ? virtMem_.translateForLoad(addr, mode, pa) :
+                           virtMem_.translateForStore(addr, mode, pa);
+          if (cause != ExceptionCause::NONE)
+            return cause;
+          addr = pa;
+        }
+    }
+
+  // Physical memory protection.
+  if (pmpEnabled_)
+    {
+      assert((cacheLineSize_ % 8) == 0);
+      if (isRead)
+	{
+	  for (unsigned i = 0; i < cacheLineSize_; i += 8)
+	    {
+	      uint64_t dwa = addr + i*8;  // Double word address
+	      Pmp pmp = pmpManager_.accessPmp(dwa);
+	      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_) and
+		  not isAddrMemMapped(dwa))
+		return ExceptionCause::LOAD_ACC_FAULT;
+	    }
+	}
+      else
+	{
+	  for (unsigned i = 0; i < cacheLineSize_; i += 8)
+	    {
+	      uint64_t dwa = addr + i*8;  // Double word address
+	      Pmp pmp = pmpManager_.accessPmp(dwa);
+	      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_) and
+		  not isAddrMemMapped(dwa))
+		return ExceptionCause::STORE_ACC_FAULT;
+	    }
+	}
+    }
+
+  return ExceptionCause::NONE;
+}
+
+
+template <typename URV>
 void
 Hart<URV>::execCbo_clean(const DecodedInst* di)
 {
@@ -48,13 +106,13 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
       return;
     }
 
-  // Check for exception.
-  static bool firstTime = true;
-  if (firstTime)
-    {
-      std::cerr << "execCbo_clean: check for exception" << '\n';
-      firstTime = false;
-    }
+  uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t physAddr = virtAddr;
+  bool isRead = false;
+
+  auto cause = determineCboException(physAddr, isRead);
+  if (cause != ExceptionCause::NONE)
+    initiateStoreException(cause, virtAddr);
 }
 
 
@@ -85,13 +143,13 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
       return;
     }
 
-  // Check for exception.
-  static bool firstTime = true;
-  if (firstTime)
-    {
-      std::cerr << "execCbo_flush: check for exception" << '\n';
-      firstTime = false;
-    }
+  uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t physAddr = virtAddr;
+  bool isRead = false;
+
+  auto cause = determineCboException(physAddr, isRead);
+  if (cause != ExceptionCause::NONE)
+    initiateStoreException(cause, virtAddr);
 }
 
 
@@ -122,13 +180,18 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
       return;
     }
 
-  // Check for exception.
-  static bool firstTime = true;
-  if (firstTime)
-    {
-      std::cerr << "execCbo_inval: check for exception" << '\n';
-      firstTime = false;
-    }
+  // If we are doing a flush then we require write access. If we are
+  // doing an invalidate then we only require read access.
+  bool isFlush = ( (pm != PM::Machine and mcbie == 1) or
+		   (pm == PM::User and scbie == 1) );
+  bool isRead = not isFlush;
+
+  uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t physAddr = virtAddr;
+
+  auto cause = determineCboException(physAddr, isRead);
+  if (cause != ExceptionCause::NONE)
+    initiateStoreException(cause, virtAddr);
 }
 
 
@@ -162,14 +225,15 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   // Translate virtual addr and check for exception.
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t physAddr = virtAddr;
-  static bool firstTime = true;
-  if (firstTime)
+
+  bool isRead = false;
+  auto cause = determineCboException(physAddr, isRead);
+  if (cause != ExceptionCause::NONE)
     {
-      std::cerr << "execCbo_zero: check for exception" << '\n';
-      firstTime = false;
+      initiateStoreException(cause, virtAddr);
+      return;
     }
 
-  assert((cacheLineSize_ % 8) == 0);
   for (unsigned i = 0; i < cacheLineSize_; i+= 8)
     memory_.poke(physAddr + i, uint64_t(0), true /*usePma*/);
 }
