@@ -10171,6 +10171,12 @@ template <typename URV>
 void
 Hart<URV>::execCbo_clean(const DecodedInst* di)
 {
+  if (not isRvzicbom())
+    {
+      illegalInst(di);
+      return;
+    }
+
   typedef PrivilegeMode PM;
   PM pm = privilegeMode();
 
@@ -10187,7 +10193,14 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+
   // Check for exception.
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_clean: check for exception" << '\n';
+      firstTime = false;
+    }
 }
 
 
@@ -10195,6 +10208,12 @@ template <typename URV>
 void
 Hart<URV>::execCbo_flush(const DecodedInst* di)
 {
+  if (not isRvzicbom())
+    {
+      illegalInst(di);
+      return;
+    }
+
   typedef PrivilegeMode PM;
   PM pm = privilegeMode();
 
@@ -10213,6 +10232,12 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
     }
 
   // Check for exception.
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_flush: check for exception" << '\n';
+      firstTime = false;
+    }
 }
 
 
@@ -10220,6 +10245,12 @@ template <typename URV>
 void
 Hart<URV>::execCbo_inval(const DecodedInst* di)
 {
+  if (not isRvzicbom())
+    {
+      illegalInst(di);
+      return;
+    }
+
   typedef PrivilegeMode PM;
   PM pm = privilegeMode();
 
@@ -10238,12 +10269,12 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
     }
 
   // Check for exception.
-
-  if ( (pm != PM::Machine and mcbie == 1) or
-       (pm == PM::User and scbie ==1) )
-    ;  // Flush;
-  else
-    ;  // Invalidate
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_inval: check for exception" << '\n';
+      firstTime = false;
+    }
 }
 
 
@@ -10251,6 +10282,12 @@ template <typename URV>
 void
 Hart<URV>::execCbo_zero(const DecodedInst* di)
 {
+  if (not isRvzicboz())
+    {
+      illegalInst(di);
+      return;
+    }
+
   typedef PrivilegeMode PM;
   PM pm = privilegeMode();
 
@@ -10271,7 +10308,12 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   // Translate virtual addr and check for exception.
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t physAddr = virtAddr;
-  assert(0 && "check for exception");
+  static bool firstTime = true;
+  if (firstTime)
+    {
+      std::cerr << "execCbo_zero: check for exception" << '\n';
+      firstTime = false;
+    }
 
   assert((cacheLineSize_ % 8) == 0);
   for (unsigned i = 0; i < cacheLineSize_; i+= 8)
