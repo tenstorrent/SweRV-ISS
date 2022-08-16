@@ -1764,6 +1764,9 @@ namespace WdRiscv
     /// translated physical address.
     ExceptionCause determineLoadException(uint64_t& addr, unsigned ldSize);
 
+    /// Helepr to the cache block operaion (cbo) instructions.
+    ExceptionCause determineCboException(uint64_t& addr, bool isRead);
+
     /// Implement part of TIF protocol for writing the "tohost" magical
     /// location.
     template<typename STORE_TYPE>
