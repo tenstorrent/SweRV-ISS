@@ -1506,7 +1506,7 @@ namespace WdRiscv
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to
-    /// PMPADDR0, ... 15 o PMPADDR15). Return true on success setting
+    /// PMPADDR0, ... 63 to PMPADDR63). Return true on success setting
     /// type, mode, locked, low and high to the corresponding values
     /// associated with the entry. If entry mode is off the low and
     /// hight will be set to zero. Return false on failure (entry

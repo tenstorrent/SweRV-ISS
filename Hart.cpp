@@ -218,31 +218,31 @@ Hart<URV>::countImplementedPmpRegisters() const
   unsigned count = 0;
 
   unsigned num = unsigned(CsrNumber::PMPADDR0);
-  for (unsigned ix = 0; ix < 16; ++ix, ++num)
+  for (unsigned ix = 0; ix < 64; ++ix, ++num)
     if (csRegs_.isImplemented(CsrNumber(num)))
       count++;
 
-  if (count and count < 16)
+  if (count and count < 64)
     std::cerr << "Warning: Some but not all PMPADDR CSRs are implemented\n";
 
   unsigned cfgCount = 0;
   if (mxlen_ == 32)
     {
       num = unsigned(CsrNumber::PMPCFG0);
-      for (unsigned ix = 0; ix < 4; ++ix, ++num)
+      for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 4)
+      if (count and cfgCount != 15)
         std::cerr << "Warning: Physical memory protection enabled but not all "
                   << "of the config register (PMPCFG) are implemented\n";
     }
   else
     {
       num = unsigned(CsrNumber::PMPCFG0);
-      for (unsigned ix = 0; ix < 2; ++ix, num += 2)
+      for (unsigned ix = 0; ix < 16; ++ix, num += 2)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 2)
+      if (count and cfgCount != 8)
         std::cerr << "Warning: Physical memory protection enabled but not all "
                   << "of the config register (PMPCFG) are implemented\n";
     }
@@ -364,7 +364,7 @@ Hart<URV>::updateMemoryProtection()
 {
   pmpManager_.reset();
 
-  const unsigned count = 16;
+  const unsigned count = 64;
   unsigned impCount = 0;  // Count of implemented PMP registers
 
   for (unsigned ix = 0; ix < count; ++ix)
@@ -398,7 +398,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
   mode = Pmp::Mode::None;
   locked = false;
 
-  if (entryIx >= 16)
+  if (entryIx >= 64)
     return false;
   
   CsrNumber csrn = CsrNumber(unsigned(CsrNumber::PMPADDR0) + entryIx);
@@ -2531,9 +2531,9 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
       dcsrStep_ = (val >> 2) & 1;
       dcsrStepIe_ = (val >> 11) & 1;
     }
-  else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG3)
+  else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG15)
     updateMemoryProtection();
-  else if (csr >= CsrNumber::PMPADDR0 and csr <= CsrNumber::PMPADDR15)
+  else if (csr >= CsrNumber::PMPADDR0 and csr <= CsrNumber::PMPADDR63)
     {
       unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csr);
       auto type = Pmp::Type((config >> 3) & 3);
@@ -10434,9 +10434,9 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
       dcsrStep_ = (csrVal >> 2) & 1;
       dcsrStepIe_ = (csrVal >> 11) & 1;
     }
-  else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG3)
+  else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG15)
     updateMemoryProtection();
-  else if (csr >= CsrNumber::PMPADDR0 and csr <= CsrNumber::PMPADDR15)
+  else if (csr >= CsrNumber::PMPADDR0 and csr <= CsrNumber::PMPADDR63)
     {
       unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csr);
       auto type = Pmp::Type((config >> 3) & 3);
