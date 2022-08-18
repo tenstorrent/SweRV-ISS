@@ -233,18 +233,18 @@ Hart<URV>::countImplementedPmpRegisters() const
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
       if (count and cfgCount != 15)
-        std::cerr << "Warning: Physical memory protection enabled but not all "
-                  << "of the config register (PMPCFG) are implemented\n";
+        std::cerr << "Warning: Physical memory protection enabled but only "
+                  << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
     }
   else
     {
       num = unsigned(CsrNumber::PMPCFG0);
-      for (unsigned ix = 0; ix < 16; ++ix, num += 2)
+      for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 8)
-        std::cerr << "Warning: Physical memory protection enabled but not all "
-                  << "of the config register (PMPCFG) are implemented\n";
+      if (count and cfgCount != 8)  // Only even numbered CFG CSRs implemented.
+        std::cerr << "Warning: Physical memory protection enabled but only "
+		  << cfgCount << "/8" << " PMPCFG CSRs implemented.\n";
     }
 
   return count;
