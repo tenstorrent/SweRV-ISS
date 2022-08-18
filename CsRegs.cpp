@@ -894,9 +894,10 @@ CsRegs<URV>::defineMachineRegs()
 
   // Bits corresponding to reserved interrupts are hardwired to zero
   // in medeleg.
-  URV userBits = ( (URV(1) << unsigned(InterruptCause::RESERVED0)) |
-                   (URV(1) << unsigned(InterruptCause::RESERVED1)) |
-                   (URV(1) << unsigned(InterruptCause::RESERVED2)) );
+  URV userBits = ( (URV(1) << unsigned(ExceptionCause::RESERVED0)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED1)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED2)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED3)));
   mask = wam & ~ userBits;
   defineCsr("medeleg", Csrn::MEDELEG, !mand, !imp, 0, mask, mask);
 
