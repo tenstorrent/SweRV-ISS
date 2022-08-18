@@ -1603,6 +1603,15 @@ namespace WdRiscv
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
 
+    /// Return true if it is legal to execute a vector instruction and
+    /// mark MSTATUS.VS dirty if it is.
+    bool checkVecExec()
+    {
+      if (not isVecLegal()) return false;
+      if (mstatusVs_ != FpFs::Dirty) markVsDirty();
+      return true;
+    }
+
     // Update cached values of mstatus.mpp and mstatus.mprv and
     // mstatus.fs ...  This is called when mstatus is written/poked.
     void updateCachedMstatusFields();
@@ -3223,7 +3232,8 @@ namespace WdRiscv
     void execVnclip_wi(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorLoad(const DecodedInst*, ElementWidth, bool faultOnFirstOnly);
+    [[nodiscard]]
+    bool vectorLoad(const DecodedInst*, ElementWidth, bool faultOnFirstOnly);
 
     void execVle8_v(const DecodedInst*);
     void execVle16_v(const DecodedInst*);
@@ -3235,7 +3245,8 @@ namespace WdRiscv
     void execVle1024_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorStore(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorStore(const DecodedInst*, ElementWidth);
 
     void execVse8_v(const DecodedInst*);
     void execVse16_v(const DecodedInst*);
@@ -3250,7 +3261,8 @@ namespace WdRiscv
     void execVsm_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorLoadWholeReg(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorLoadWholeReg(const DecodedInst*, ElementWidth);
 
     void execVlre8_v(const DecodedInst*);
     void execVlre16_v(const DecodedInst*);
@@ -3261,7 +3273,8 @@ namespace WdRiscv
     void execVlre512_v(const DecodedInst*);
     void execVlre1024_v(const DecodedInst*);
 
-    void vectorStoreWholeReg(const DecodedInst*, GroupMultiplier);
+    [[nodiscard]]
+    bool vectorStoreWholeReg(const DecodedInst*, GroupMultiplier);
 
     void execVs1r_v(const DecodedInst*);
     void execVs2r_v(const DecodedInst*);
@@ -3278,7 +3291,8 @@ namespace WdRiscv
     void execVle1024ff_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorLoadStrided(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorLoadStrided(const DecodedInst*, ElementWidth);
 
     void execVlse8_v(const DecodedInst*);
     void execVlse16_v(const DecodedInst*);
@@ -3290,7 +3304,8 @@ namespace WdRiscv
     void execVlse1024_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorStoreStrided(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorStoreStrided(const DecodedInst*, ElementWidth);
 
     void execVsse8_v(const DecodedInst*);
     void execVsse16_v(const DecodedInst*);
@@ -3302,7 +3317,8 @@ namespace WdRiscv
     void execVsse1024_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorLoadIndexed(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorLoadIndexed(const DecodedInst*, ElementWidth);
 
     void execVloxei8_v(const DecodedInst*);
     void execVloxei16_v(const DecodedInst*);
@@ -3314,7 +3330,8 @@ namespace WdRiscv
     void execVluxei64_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorStoreIndexed(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorStoreIndexed(const DecodedInst*, ElementWidth);
 
     void execVsoxei8_v(const DecodedInst*);
     void execVsoxei16_v(const DecodedInst*);
@@ -3326,7 +3343,8 @@ namespace WdRiscv
     void execVsuxei64_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorLoadSeg(const DecodedInst*, ElementWidth, unsigned fields,
+    [[nodiscard]]
+    bool vectorLoadSeg(const DecodedInst*, ElementWidth, unsigned fields,
 		       uint64_t stride, bool faultOnFirstOnly);
 
     void execVlsege8_v(const DecodedInst*);
@@ -3339,7 +3357,8 @@ namespace WdRiscv
     void execVlsege1024_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorStoreSeg(const DecodedInst*, ElementWidth, unsigned fields,
+    [[nodiscard]]
+    bool vectorStoreSeg(const DecodedInst*, ElementWidth, unsigned fields,
 			uint64_t stride);
 
     void execVssege8_v(const DecodedInst*);
@@ -3370,7 +3389,8 @@ namespace WdRiscv
     void execVsssege1024_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorLoadSegIndexed(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorLoadSegIndexed(const DecodedInst*, ElementWidth);
 
     void execVluxsegei8_v(const DecodedInst*);
     void execVluxsegei16_v(const DecodedInst*);
@@ -3382,7 +3402,8 @@ namespace WdRiscv
     void execVluxsegei1024_v(const DecodedInst*);
 
     template <typename ELEM_TYPE>
-    void vectorStoreSegIndexed(const DecodedInst*, ElementWidth);
+    [[nodiscard]]
+    bool vectorStoreSegIndexed(const DecodedInst*, ElementWidth);
 
     void execVsuxsegei8_v(const DecodedInst*);
     void execVsuxsegei16_v(const DecodedInst*);

@@ -542,16 +542,6 @@ namespace WdRiscv
 
   private:
 
-    /// Return the start index of vector operations. This is a cached
-    /// value of the VSTART CSR.
-    uint32_t startIndex() const
-    { return start_; }
-
-    /// Set the start index of vector operations. This is a cached
-    /// value of of the VSTART CSR.
-    void setStartIndex(uint32_t start)
-    { start_ = start; }
-
     /// Map an vector group multiplier to a flag indicating whether given
     /// group is supported.
     typedef std::vector<bool> GroupFlags;
@@ -566,7 +556,6 @@ namespace WdRiscv
     uint32_t bytesInRegFile_ = 0;
     uint8_t* data_ = nullptr;
 
-    uint32_t start_ = 0;                           // Cached VSTART
     uint32_t elems_ = 0;                           // Cached VL
     ElementWidth sew_ = ElementWidth::Byte;        // Cached VTYPE.SEW
     GroupMultiplier group_ = GroupMultiplier::One; // Cached VTYPE.VLMUL
