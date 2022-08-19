@@ -10807,6 +10807,13 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group) or
+      not checkDestSourceOverlap(vcout, 8, vs2, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vs1 % eg) or (vs2 % eg))
     {
@@ -10848,6 +10855,12 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
+    {
+      illegalInst(di);
+      return;
+    }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
@@ -10893,6 +10906,12 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
     {
@@ -10937,6 +10956,13 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group) or
+      not checkDestSourceOverlap(vbout, 8, vs2, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vs1 % eg) or (vs2 % eg))
     {
@@ -10979,6 +11005,11 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group))
+    {
+      illegalInst(di);
+      return;
+    }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
