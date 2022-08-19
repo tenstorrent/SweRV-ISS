@@ -894,9 +894,10 @@ CsRegs<URV>::defineMachineRegs()
 
   // Bits corresponding to reserved interrupts are hardwired to zero
   // in medeleg.
-  URV userBits = ( (URV(1) << unsigned(InterruptCause::RESERVED0)) |
-                   (URV(1) << unsigned(InterruptCause::RESERVED1)) |
-                   (URV(1) << unsigned(InterruptCause::RESERVED2)) );
+  URV userBits = ( (URV(1) << unsigned(ExceptionCause::RESERVED0)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED1)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED2)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED3)));
   mask = wam & ~ userBits;
   defineCsr("medeleg", Csrn::MEDELEG, !mand, !imp, 0, mask, mask);
 
@@ -1112,19 +1113,23 @@ CsRegs<URV>::defineSupervisorRegs()
 
   using Csrn = CsrNumber;
 
-  // Only bits sie, spie, upie, ube, spp, fs, xs, sum, mxr, and sd of
-  // sstatus are writeable.
-  uint64_t mask = 0x800de162;
+  // Only fields TSR, TW, TVM, MXR, SUM, FS, VS, SPP, SPIE, and SIE are writeable.
+  uint64_t mask     = 0x00766722;
+  uint64_t pokeMask = 0x80766722;  // Filed SD is pokable.
   if (not rv32_)
-    mask = 0x80000000000de762L;
-  defineCsr("sstatus",    Csrn::SSTATUS,    !mand, !imp, 0, mask, mask);
+    {
+      mask     = 0x0000000000766722L;
+      pokeMask = 0x8000000000766722L;
+    }
+  defineCsr("sstatus",    Csrn::SSTATUS,    !mand, !imp, 0, mask, pokeMask);
 
   auto sstatus = findCsr(Csrn::SSTATUS);
   if (sstatus)
     {
-      // Some bits in mstatus are not readable in status.
-      uint64_t readMask = 0x80000003000de762L;
-      sstatus->setReadMask(readMask);
+      // SSTATUS tied to MSTATUS but not all bits are readable.
+      sstatus->setReadMask(0x00766722L);
+      if constexpr (sizeof(URV) == 8)
+	sstatus->setReadMask(0x0000000300766722L);
     }
 
   // SSTATUS shadows MSTATUS
