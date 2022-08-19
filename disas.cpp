@@ -186,11 +186,13 @@ printCsr(Hart<URV>& hart, std::ostream& stream,	 const DecodedInst& di)
   stream << std::left << std::setw(9) << di.name();
   stream << hart.intRegName(rd) << ", ";
 
+  std::string name;
   auto csr = hart.findCsr(CsrNumber(csrn));
   if (csr)
-    stream << csr->getName();
-  else
-    stream << "illegal";
+    name = csr->getName();
+  if (name.empty())
+    name = std::string("c") + std::to_string(csrn);
+  stream << name;
 
   if (di.ithOperandType(1) == OperandType::Imm)
     stream << ", 0x" << std::hex << di.op1() << std::dec;

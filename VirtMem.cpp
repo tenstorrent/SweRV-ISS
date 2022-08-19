@@ -294,8 +294,11 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
           fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
 		  pte.write(), pte.exec(), pte.user(), pte.global(),
 		  pte.accessed(), pte.dirty());
-          fprintf(attFile_, "leaf: %d, pa:0x%jx\n", leaf,
+          fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
 		  uintmax_t(pte.ppn()) * pageSize_);
+	  if (leaf)
+	    fprintf(attFile_, " s:%s", ii == 2 ? "1G" : (ii == 1 ? "2M" : "4K"));
+	  fprintf(attFile_, "\n\n");
         }
 
       if (read)
@@ -445,8 +448,11 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
           fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
 		  pte.write(), pte.exec(), pte.user(), pte.global(),
 		  pte.accessed(), pte.dirty());
-          fprintf(attFile_, "leaf: %d, pa:0x%jx\n\n", leaf,
+          fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
 		  uintmax_t(pte.ppn()) * pageSize_);
+	  if (leaf)
+	    fprintf(attFile_, " s:%s", ii == 2 ? "1G" : (ii == 1 ? "2M" : "4K"));
+	  fprintf(attFile_, "\n\n");
         }
 
       if (read)

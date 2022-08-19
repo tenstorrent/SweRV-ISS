@@ -161,7 +161,7 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
           
   value = csr->read();
 
-  if (number >= CsrNumber::PMPADDR0 and number <= CsrNumber::PMPADDR15)
+  if (number >= CsrNumber::PMPADDR0 and number <= CsrNumber::PMPADDR63)
     value = adjustPmpValue(number, value);
 
   return true;
@@ -365,7 +365,7 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
 
   if (number >= CsrNumber::MHPMEVENT3 and number <= CsrNumber::MHPMEVENT31)
     value = legalizeMhpmevent(number, value);
-  else if (number >= CsrNumber::PMPCFG0 and number <= CsrNumber::PMPCFG3)
+  else if (number >= CsrNumber::PMPCFG0 and number <= CsrNumber::PMPCFG15)
     {
       URV prev = 0;
       peek(number, prev);
@@ -894,9 +894,10 @@ CsRegs<URV>::defineMachineRegs()
 
   // Bits corresponding to reserved interrupts are hardwired to zero
   // in medeleg.
-  URV userBits = ( (URV(1) << unsigned(InterruptCause::RESERVED0)) |
-                   (URV(1) << unsigned(InterruptCause::RESERVED1)) |
-                   (URV(1) << unsigned(InterruptCause::RESERVED2)) );
+  URV userBits = ( (URV(1) << unsigned(ExceptionCause::RESERVED0)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED1)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED2)) |
+                   (URV(1) << unsigned(ExceptionCause::RESERVED3)));
   mask = wam & ~ userBits;
   defineCsr("medeleg", Csrn::MEDELEG, !mand, !imp, 0, mask, mask);
 
@@ -928,44 +929,52 @@ CsRegs<URV>::defineMachineRegs()
   // to defined interrupts are modifiable.
   defineCsr("mip", CsrNumber::MIP, mand, imp, 0, rom, mieMask);
 
-  // Physical memory protection. PMPCFG1 and PMPCFG3 are present only
+  // Physical memory protection. Odd PMPCFG are present only
   // in 32-bit implementations.
   uint64_t cfgMask = 0x9f9f9f9f;
   if (not rv32_)
     cfgMask = 0x9f9f9f9f9f9f9f9fL;
   defineCsr("pmpcfg0",   Csrn::PMPCFG0,   !mand, imp, 0, cfgMask, cfgMask);
   defineCsr("pmpcfg2",   Csrn::PMPCFG2,   !mand, imp, 0, cfgMask, cfgMask);
+  defineCsr("pmpcfg4",   Csrn::PMPCFG4,   !mand, imp, 0, cfgMask, cfgMask);
+  defineCsr("pmpcfg6",   Csrn::PMPCFG6,   !mand, imp, 0, cfgMask, cfgMask);
+  defineCsr("pmpcfg8",   Csrn::PMPCFG8,   !mand, imp, 0, cfgMask, cfgMask);
+  defineCsr("pmpcfg10",  Csrn::PMPCFG10,  !mand, imp, 0, cfgMask, cfgMask);
+  defineCsr("pmpcfg12",  Csrn::PMPCFG12,  !mand, imp, 0, cfgMask, cfgMask);
+  defineCsr("pmpcfg14",  Csrn::PMPCFG14,  !mand, imp, 0, cfgMask, cfgMask);
   if (rv32_)
     {
       defineCsr("pmpcfg1",   Csrn::PMPCFG1,   !mand, imp, 0, cfgMask, cfgMask);
       defineCsr("pmpcfg3",   Csrn::PMPCFG3,   !mand, imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg5",   Csrn::PMPCFG5,   !mand, imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg7",   Csrn::PMPCFG7,   !mand, imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg9",   Csrn::PMPCFG9,   !mand, imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg11",  Csrn::PMPCFG11,  !mand, imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg13",  Csrn::PMPCFG13,  !mand, imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg15",  Csrn::PMPCFG15,  !mand, imp, 0, cfgMask, cfgMask);
     }
   else
     {
       defineCsr("pmpcfg1",   Csrn::PMPCFG1,   !mand, !imp, 0, cfgMask, cfgMask);
       defineCsr("pmpcfg3",   Csrn::PMPCFG3,   !mand, !imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg5",   Csrn::PMPCFG5,   !mand, !imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg7",   Csrn::PMPCFG7,   !mand, !imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg9",   Csrn::PMPCFG9,   !mand, !imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg11",  Csrn::PMPCFG11,  !mand, !imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg13",  Csrn::PMPCFG13,  !mand, !imp, 0, cfgMask, cfgMask);
+      defineCsr("pmpcfg15",  Csrn::PMPCFG15,  !mand, !imp, 0, cfgMask, cfgMask);
     }
 
   uint64_t pmpMask = 0xffffffff;
   if (not rv32_)
     pmpMask = 0x003f'ffff'ffff'ffffL; // Top 10 bits are zeros
 
-  defineCsr("pmpaddr0",  Csrn::PMPADDR0,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr1",  Csrn::PMPADDR1,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr2",  Csrn::PMPADDR2,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr3",  Csrn::PMPADDR3,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr4",  Csrn::PMPADDR4,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr5",  Csrn::PMPADDR5,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr6",  Csrn::PMPADDR6,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr7",  Csrn::PMPADDR7,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr8",  Csrn::PMPADDR8,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr9",  Csrn::PMPADDR9,  !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr10", Csrn::PMPADDR10, !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr11", Csrn::PMPADDR11, !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr12", Csrn::PMPADDR12, !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr13", Csrn::PMPADDR13, !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr14", Csrn::PMPADDR14, !mand, imp, 0, pmpMask, pmpMask);
-  defineCsr("pmpaddr15", Csrn::PMPADDR15, !mand, imp, 0, pmpMask, pmpMask);
+  for (unsigned i = 0; i < 64; ++i)
+    {
+      std::string name = std::string("pmpaddr") + std::to_string(i);
+      Csrn num = Csrn{unsigned(Csrn::PMPADDR0) + i};
+      defineCsr(name, num,  !mand, imp, 0, pmpMask, pmpMask);
+    }
 
   defineCsr("menvcfg", Csrn::MENVCFG, mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
   if (rv32_)
@@ -1422,7 +1431,7 @@ CsRegs<URV>::peek(CsrNumber number, URV& value) const
 
   value = csr->read();
 
-  if (number >= CsrNumber::PMPADDR0 and number <= CsrNumber::PMPADDR15)
+  if (number >= CsrNumber::PMPADDR0 and number <= CsrNumber::PMPADDR63)
     value = adjustPmpValue(number, value);
 
   return true;
@@ -1484,7 +1493,7 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
 
   if (number >= CsrNumber::MHPMEVENT3 and number <= CsrNumber::MHPMEVENT31)
     value = legalizeMhpmevent(number, value);
-  else if (number >= CsrNumber::PMPCFG0 and number <= CsrNumber::PMPCFG3)
+  else if (number >= CsrNumber::PMPCFG0 and number <= CsrNumber::PMPCFG15)
     {
       URV prev = 0;
       peek(number, prev);
@@ -1601,20 +1610,20 @@ template <typename URV>
 unsigned
 CsRegs<URV>::getPmpConfigByteFromPmpAddr(CsrNumber csrn) const
 {
-  if (csrn < CsrNumber::PMPADDR0 or csrn > CsrNumber::PMPADDR15)
+  if (csrn < CsrNumber::PMPADDR0 or csrn > CsrNumber::PMPADDR63)
     return 0;
 
   unsigned pmpIx = unsigned(csrn) - unsigned(CsrNumber::PMPADDR0);
 
   // Determine rank of config register corresponding to pmpIx.
-  unsigned cfgOffset = pmpIx / 4; // 0, 1, 2, or 3.
+  unsigned cfgOffset = pmpIx / 4; // 0, 1, 2, ... or 15.
 
   // Identify byte within config register.
   unsigned byteIx = pmpIx % 4;
 
   if (not rv32_)
     {
-      cfgOffset = (cfgOffset / 2) * 2;  // 0 or 2
+      cfgOffset = (cfgOffset / 2) * 2;  // 0, 2, 4, ... or 14
       byteIx = pmpIx % 8;
     }
 
@@ -1632,7 +1641,7 @@ template <typename URV>
 URV
 CsRegs<URV>::adjustPmpValue(CsrNumber csrn, URV value) const
 {
-  if (csrn < CsrNumber::PMPADDR0 or csrn > CsrNumber::PMPADDR15)
+  if (csrn < CsrNumber::PMPADDR0 or csrn > CsrNumber::PMPADDR63)
     return value;   // Not a PMPADDR CSR.
 
   if (pmpG_ == 0)
@@ -1701,7 +1710,7 @@ template <typename URV>
 bool
 CsRegs<URV>::isPmpaddrLocked(CsrNumber csrn) const
 {
-  if (csrn < CsrNumber::PMPADDR0 or csrn > CsrNumber::PMPADDR15)
+  if (csrn < CsrNumber::PMPADDR0 or csrn > CsrNumber::PMPADDR63)
     return false;   // Not a PMPADDR CSR.
 
   unsigned byte = getPmpConfigByteFromPmpAddr(csrn);
@@ -1711,7 +1720,7 @@ CsRegs<URV>::isPmpaddrLocked(CsrNumber csrn) const
 
   // If the next PMPADDR is top-of-range and is locked, then the
   // current PMADDR is considered to be locked.
-  if (csrn >= CsrNumber::PMPADDR15)
+  if (csrn >= CsrNumber::PMPADDR63)
     return false;  // No next PMPADDR register.
 
   CsrNumber csrn2 = CsrNumber(unsigned(csrn) + 1);
