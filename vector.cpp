@@ -564,12 +564,13 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned group
 template <typename URV>
 inline
 bool
-Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1, unsigned groupX8)
+Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
+			    unsigned groupX8, unsigned vstart)
 {
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  if ((op1 & mask) == 0)
+  if ((op1 & mask) == 0 and vstart == 0)
     {
       vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for scalar operands.
       vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
@@ -577,7 +578,7 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1, unsigned groupX
       return true;
     }
 
-  // Vector operand not a multiple of emul: illegal.
+  // Vector operand not a multiple of emul or non-zero vstart: illegal.
   illegalInst(di);
   return false;
 }
@@ -5498,7 +5499,7 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5567,7 +5568,7 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5636,7 +5637,7 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5705,7 +5706,7 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5774,7 +5775,7 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5843,7 +5844,7 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5912,7 +5913,7 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5981,7 +5982,7 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -6063,7 +6064,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -6103,7 +6104,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22370,7 +22371,7 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22444,7 +22445,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22525,7 +22526,7 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22605,7 +22606,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22690,7 +22691,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22776,7 +22777,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
