@@ -13681,17 +13681,19 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = 0;
-              cause = determineLoadException(addr, 8);
+	      uint64_t physAddr = addr + n;
+              cause = determineLoadException(physAddr, 8);
               if (cause != ExceptionCause::NONE)
                 break;
-              memory_.read(addr + n, dword);
+              memory_.read(physAddr, dword);
               elem <<= 64;
               elem |= dword;
             }
         }
       else
         {
-	  cause = determineLoadException(addr, sizeof(elem));
+	  uint64_t physAddr = addr;
+	  cause = determineLoadException(physAddr, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
             memory_.read(addr, elem);
         }
@@ -13846,7 +13848,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
             {
               uint64_t dword = uint64_t(elem);
               bool forced = false;
-	      uint64_t dwordAddr = URV(addr + n);
+	      uint64_t dwordAddr = addr + n;
               cause = determineStoreException(dwordAddr, dword, forced);
               if (cause != ExceptionCause::NONE)
                 break;
@@ -14384,9 +14386,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
         }
       else
         {
-          cause = determineLoadException(addr, sizeof(elem));
+	  uint64_t eaddr = addr;
+          cause = determineLoadException(eaddr, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(addr, elem);
+            memory_.read(eaddr, elem);
         }
 
       if (cause != ExceptionCause::NONE)
@@ -14700,7 +14703,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  return false;
 	}
 
-      uint64_t eaddr = URV(addr + offset);
+      uint64_t eaddr = addr + offset;
 
       auto cause = determineLoadException(eaddr, elemSize);
       if (cause == ExceptionCause::NONE)
@@ -14885,7 +14888,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
-      uint64_t eaddr = URV(addr + offset), data = 0;
+      uint64_t eaddr = addr + offset, data = 0;
 
       auto cause = ExceptionCause::NONE;
       bool forced = false;
@@ -15585,7 +15588,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	      continue;
 	    }
 
-	  uint64_t physAddr = URV(faddr);
+	  uint64_t physAddr = faddr;
           auto cause = determineLoadException(physAddr, elemSize);
 	  if (cause == ExceptionCause::NONE)
 	    {
@@ -15759,7 +15762,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
-      uint64_t faddr = URV(addr + offset), data = 0;
+      uint64_t faddr = addr + offset, data = 0;
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
