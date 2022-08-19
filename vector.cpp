@@ -439,7 +439,7 @@ template <typename URV>
 bool
 Hart<URV>::checkMaskableInst(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -564,12 +564,13 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned group
 template <typename URV>
 inline
 bool
-Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1, unsigned groupX8)
+Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
+			    unsigned groupX8, unsigned vstart)
 {
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  if ((op1 & mask) == 0)
+  if ((op1 & mask) == 0 and vstart == 0)
     {
       vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for scalar operands.
       vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
@@ -577,7 +578,7 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1, unsigned groupX
       return true;
     }
 
-  // Vector operand not a multiple of emul: illegal.
+  // Vector operand not a multiple of emul or non-zero vstart: illegal.
   illegalInst(di);
   return false;
 }
@@ -598,7 +599,7 @@ checkDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
   if (src >= dest + destGroup or dest >= src + srcGroup)
     return true;  // No overlap.
 
-  // Destination eew > soure eew: Overlap ok if source group is >=
+  // Destination eew > source eew: Overlap ok if source group is >=
   // 1 and overlap is at last register in dest.
   if (destGroupX8 > srcGroupX8)
     return srcGroupX8 >= 8 and src == dest + destGroup - 1;
@@ -627,10 +628,10 @@ hasDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
-				 unsigned groupX8)
+Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
+				 unsigned src, unsigned groupX8)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -639,13 +640,15 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned o
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  if (not checkDestSourceOverlap(op0, 8, op1, groupX8))
+  // Destination eew is 1 which is less than source, overlap ok only
+  // if it is in the 1st source register (dest == src).
+  if (hasDestSourceOverlap(dest, 8, src, groupX8) and dest != src)
     {
       illegalInst(di);
       return false;
     }
 
-  if ((op1 & mask) == 0)
+  if ((dest & mask) == 0)
     {
       vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
       vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
@@ -664,7 +667,7 @@ bool
 Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -918,7 +921,7 @@ template <typename URV>
 void
 Hart<URV>::execVsetvli(const DecodedInst* di)
 {
-  if (not isVecLegal())
+  if (not checkVecExec())
     {
       illegalInst(di);
       return;
@@ -930,6 +933,7 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
   
   URV vtypeVal = imm;
   vsetvl(rd, rs1, vtypeVal);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -937,7 +941,7 @@ template <typename URV>
 void
 Hart<URV>::execVsetivli(const DecodedInst* di)
 {
-  if (not isVecLegal())
+  if (not checkVecExec())
     {
       illegalInst(di);
       return;
@@ -991,6 +995,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 
   // Update cached vtype fields in vecRegs_.
   vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -998,17 +1003,18 @@ template <typename URV>
 void
 Hart<URV>::execVsetvl(const DecodedInst* di)
 {
-  if (not isVecLegal())
+  if (not checkVecExec())
     {
       illegalInst(di);
       return;
     }
-  
+
   unsigned rd = di->op0();
   unsigned rs1 = di->op1();
 
   URV vtypeVal = intRegs_.read(di->op2());
   vsetvl(rd, rs1, vtypeVal);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1052,7 +1058,7 @@ Hart<URV>::execVadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   
@@ -1066,11 +1072,12 @@ Hart<URV>::execVadd_vv(const DecodedInst* di)
     case EW::Half:   vadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1114,7 +1121,7 @@ Hart<URV>::execVadd_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -1130,11 +1137,12 @@ Hart<URV>::execVadd_vx(const DecodedInst* di)
     case EW::Half:   vadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1148,7 +1156,7 @@ Hart<URV>::execVadd_vi(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -1162,11 +1170,12 @@ Hart<URV>::execVadd_vi(const DecodedInst* di)
     case EW::Half:   vadd_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vadd_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vadd_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1211,7 +1220,7 @@ Hart<URV>::execVsub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -1225,11 +1234,12 @@ Hart<URV>::execVsub_vv(const DecodedInst* di)
     case EW::Half: vsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1273,7 +1283,7 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -1287,11 +1297,12 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
     case EW::Half: vsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1335,7 +1346,7 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), vs1 = di->op1(), rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -1349,11 +1360,12 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
     case EW::Half: vrsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vrsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1399,7 +1411,7 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -1413,11 +1425,12 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
     case EW::Half: vrsub_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vrsub_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vrsub_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1474,7 +1487,7 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1486,11 +1499,12 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
     case EW::Half: vwadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1512,7 +1526,7 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1524,11 +1538,12 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
     case EW::Half: vwadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1585,7 +1600,7 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1599,11 +1614,12 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwadd_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1625,7 +1641,7 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1639,11 +1655,12 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1700,7 +1717,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1713,12 +1730,13 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
     case EW::Byte: vwsub_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked); break;
     case EW::Half: vwsub_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwsub_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1740,7 +1758,7 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1753,12 +1771,13 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
     case EW::Byte:  vwsub_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
     case EW::Half:  vwsub_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vwsub_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1815,7 +1834,7 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1827,11 +1846,12 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
     case EW::Half: vwsub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1853,7 +1873,7 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1865,11 +1885,12 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
     case EW::Half: vwsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1926,7 +1947,7 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -1938,11 +1959,12 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
     case EW::Half: vwadd_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -1964,7 +1986,7 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -1976,11 +1998,12 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
     case EW::Half: vwadd_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2002,7 +2025,7 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -2015,12 +2038,13 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<uint16_t>(vd, vs1, uint8_t(e2), group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<uint32_t>(vd, vs1, uint16_t(e2), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<uint64_t>(vd, vs1, uint32_t(e2), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2042,7 +2066,7 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -2055,12 +2079,13 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<int16_t>(vd, vs1, int8_t(e2),  group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<int32_t>(vd, vs1, int16_t(e2), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<int64_t>(vd, vs1, int32_t(e2), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2082,7 +2107,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -2095,12 +2120,13 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<uint16_t>(vd, vs1, -uint16_t(uint8_t(e2)),  group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<uint32_t>(vd, vs1, -uint32_t(uint16_t(e2)), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<uint64_t>(vd, vs1, -uint64_t(uint32_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2122,7 +2148,7 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -2135,12 +2161,13 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<int16_t>(vd, vs1, -int16_t(int8_t(e2)),  group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<int32_t>(vd, vs1, -int32_t(int16_t(e2)), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<int64_t>(vd, vs1, -int64_t(int32_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2197,7 +2224,7 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -2209,11 +2236,12 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
     case EW::Half: vwsub_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2235,7 +2263,7 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -2247,11 +2275,12 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
     case EW::Half: vwsub_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2294,7 +2323,7 @@ Hart<URV>::execVmseq_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -2306,11 +2335,12 @@ Hart<URV>::execVmseq_vv(const DecodedInst* di)
     case EW::Half:   vmseq_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmseq_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmseq_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2351,7 +2381,7 @@ Hart<URV>::execVmseq_vx(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -2367,11 +2397,12 @@ Hart<URV>::execVmseq_vx(const DecodedInst* di)
     case EW::Half:   vmseq_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmseq_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmseq_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2381,7 +2412,7 @@ Hart<URV>::execVmseq_vi(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -2397,11 +2428,12 @@ Hart<URV>::execVmseq_vi(const DecodedInst* di)
     case EW::Half:   vmseq_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmseq_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmseq_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2444,7 +2476,7 @@ Hart<URV>::execVmsne_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -2456,11 +2488,12 @@ Hart<URV>::execVmsne_vv(const DecodedInst* di)
     case EW::Half:   vmsne_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmsne_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmsne_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2501,7 +2534,7 @@ Hart<URV>::execVmsne_vx(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -2517,11 +2550,12 @@ Hart<URV>::execVmsne_vx(const DecodedInst* di)
     case EW::Half:   vmsne_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsne_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsne_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2531,7 +2565,7 @@ Hart<URV>::execVmsne_vi(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -2547,11 +2581,12 @@ Hart<URV>::execVmsne_vi(const DecodedInst* di)
     case EW::Half:   vmsne_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsne_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsne_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2594,7 +2629,7 @@ Hart<URV>::execVmsltu_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -2606,11 +2641,12 @@ Hart<URV>::execVmsltu_vv(const DecodedInst* di)
     case EW::Half:   vmslt_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2653,7 +2689,7 @@ Hart<URV>::execVmsltu_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
@@ -2667,11 +2703,12 @@ Hart<URV>::execVmsltu_vx(const DecodedInst* di)
     case EW::Half:   vmslt_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2683,7 +2720,7 @@ Hart<URV>::execVmslt_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -2695,11 +2732,12 @@ Hart<URV>::execVmslt_vv(const DecodedInst* di)
     case EW::Half:   vmslt_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2711,7 +2749,7 @@ Hart<URV>::execVmslt_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
@@ -2725,11 +2763,12 @@ Hart<URV>::execVmslt_vx(const DecodedInst* di)
     case EW::Half:   vmslt_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2772,7 +2811,7 @@ Hart<URV>::execVmsleu_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -2784,11 +2823,12 @@ Hart<URV>::execVmsleu_vv(const DecodedInst* di)
     case EW::Half:   vmsle_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2832,7 +2872,7 @@ Hart<URV>::execVmsleu_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
@@ -2846,11 +2886,12 @@ Hart<URV>::execVmsleu_vx(const DecodedInst* di)
     case EW::Half:   vmsle_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2860,7 +2901,7 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -2877,11 +2918,12 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
     case EW::Half:   vmsle_vx<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2893,7 +2935,7 @@ Hart<URV>::execVmsle_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -2905,11 +2947,12 @@ Hart<URV>::execVmsle_vv(const DecodedInst* di)
     case EW::Half:   vmsle_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2919,7 +2962,7 @@ Hart<URV>::execVmsle_vx(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -2935,11 +2978,12 @@ Hart<URV>::execVmsle_vx(const DecodedInst* di)
     case EW::Half:   vmsle_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -2949,7 +2993,7 @@ Hart<URV>::execVmsle_vi(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -2965,11 +3009,12 @@ Hart<URV>::execVmsle_vi(const DecodedInst* di)
     case EW::Half:   vmsle_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3012,7 +3057,7 @@ Hart<URV>::execVmsgtu_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
@@ -3026,11 +3071,12 @@ Hart<URV>::execVmsgtu_vx(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3040,7 +3086,7 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3057,11 +3103,12 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3073,7 +3120,7 @@ Hart<URV>::execVmsgt_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
@@ -3087,11 +3134,12 @@ Hart<URV>::execVmsgt_vx(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3101,7 +3149,7 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3117,11 +3165,12 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3166,7 +3215,7 @@ Hart<URV>::execVminu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3180,11 +3229,12 @@ Hart<URV>::execVminu_vv(const DecodedInst* di)
     case EW::Half:   vminu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vminu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vminu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3232,7 +3282,7 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3246,11 +3296,12 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
     case EW::Half:   vminu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vminu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vminu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3295,7 +3346,7 @@ Hart<URV>::execVmin_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3309,11 +3360,12 @@ Hart<URV>::execVmin_vv(const DecodedInst* di)
     case EW::Half:   vmin_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmin_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmin_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3358,7 +3410,7 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3372,11 +3424,12 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
     case EW::Half:   vmin_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vmin_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vmin_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3421,7 +3474,7 @@ Hart<URV>::execVmaxu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3435,11 +3488,12 @@ Hart<URV>::execVmaxu_vv(const DecodedInst* di)
     case EW::Half:   vmaxu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmaxu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmaxu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3487,7 +3541,7 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3501,11 +3555,12 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
     case EW::Half:   vmaxu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vmaxu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vmaxu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3550,7 +3605,7 @@ Hart<URV>::execVmax_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3564,11 +3619,12 @@ Hart<URV>::execVmax_vv(const DecodedInst* di)
     case EW::Half:   vmax_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmax_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmax_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3613,7 +3669,7 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3627,11 +3683,12 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
     case EW::Half:   vmax_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vmax_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vmax_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3676,7 +3733,7 @@ Hart<URV>::execVand_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3690,11 +3747,12 @@ Hart<URV>::execVand_vv(const DecodedInst* di)
     case EW::Half:   vand_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vand_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vand_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3741,7 +3799,7 @@ Hart<URV>::execVand_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3755,11 +3813,12 @@ Hart<URV>::execVand_vx(const DecodedInst* di)
     case EW::Half:   vand_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vand_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vand_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3807,7 +3866,7 @@ Hart<URV>::execVand_vi(const DecodedInst* di)
   unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3821,11 +3880,12 @@ Hart<URV>::execVand_vi(const DecodedInst* di)
     case EW::Half: vand_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vand_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vand_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3870,7 +3930,7 @@ Hart<URV>::execVor_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3884,11 +3944,12 @@ Hart<URV>::execVor_vv(const DecodedInst* di)
     case EW::Half: vor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -3935,7 +3996,7 @@ Hart<URV>::execVor_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -3949,11 +4010,12 @@ Hart<URV>::execVor_vx(const DecodedInst* di)
     case EW::Half: vor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4001,7 +4063,7 @@ Hart<URV>::execVor_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4015,11 +4077,12 @@ Hart<URV>::execVor_vi(const DecodedInst* di)
     case EW::Half: vor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4064,7 +4127,7 @@ Hart<URV>::execVxor_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4078,11 +4141,12 @@ Hart<URV>::execVxor_vv(const DecodedInst* di)
     case EW::Half: vxor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vxor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vxor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4129,7 +4193,7 @@ Hart<URV>::execVxor_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4143,11 +4207,12 @@ Hart<URV>::execVxor_vx(const DecodedInst* di)
     case EW::Half: vxor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vxor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vxor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4195,7 +4260,7 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4209,11 +4274,12 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
     case EW::Half: vxor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vxor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vxor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4261,7 +4327,7 @@ Hart<URV>::execVsll_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4275,11 +4341,12 @@ Hart<URV>::execVsll_vv(const DecodedInst* di)
     case EW::Half: vsll_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsll_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsll_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4329,7 +4396,7 @@ Hart<URV>::execVsll_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4346,11 +4413,12 @@ Hart<URV>::execVsll_vx(const DecodedInst* di)
     case EW::Half: vsll_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vsll_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vsll_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4365,7 +4433,7 @@ Hart<URV>::execVsll_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   URV imm = di->op2();  // Unsigned -- zero extended.
 
-  unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned gp = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4379,11 +4447,12 @@ Hart<URV>::execVsll_vi(const DecodedInst* di)
     case EW::Half:  vsll_vx<int16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vsll_vx<int32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vsll_vx<int64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4431,7 +4500,7 @@ Hart<URV>::execVsrl_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4445,11 +4514,12 @@ Hart<URV>::execVsrl_vv(const DecodedInst* di)
     case EW::Half: vsr_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsr_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsr_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4499,7 +4569,7 @@ Hart<URV>::execVsrl_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4516,11 +4586,12 @@ Hart<URV>::execVsrl_vx(const DecodedInst* di)
     case EW::Half:  vsr_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vsr_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vsr_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4535,7 +4606,7 @@ Hart<URV>::execVsrl_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   URV imm = di->op2();   // Unsigned -- zero extended.
 
-  unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned gp = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4549,11 +4620,12 @@ Hart<URV>::execVsrl_vi(const DecodedInst* di)
     case EW::Half:  vsr_vx<uint16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vsr_vx<uint32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vsr_vx<uint64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4567,7 +4639,7 @@ Hart<URV>::execVsra_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4581,11 +4653,12 @@ Hart<URV>::execVsra_vv(const DecodedInst* di)
     case EW::Half:  vsr_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vsr_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsr_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4599,7 +4672,7 @@ Hart<URV>::execVsra_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4616,11 +4689,12 @@ Hart<URV>::execVsra_vx(const DecodedInst* di)
     case EW::Half:  vsr_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vsr_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vsr_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4635,7 +4709,7 @@ Hart<URV>::execVsra_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   URV imm = di->op2();   // Unsigned -- zero extended
 
-  unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned gp = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4649,11 +4723,12 @@ Hart<URV>::execVsra_vi(const DecodedInst* di)
     case EW::Half:  vsr_vx<int16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vsr_vx<int32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vsr_vx<int64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4704,7 +4779,7 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4724,11 +4799,12 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
     case EW::Half: vnsr_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vnsr_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4782,7 +4858,7 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4805,11 +4881,12 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
     case EW::Half:  vnsr_wx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4824,7 +4901,7 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   URV imm = di->op2();   // Unsigned -- zero extended.
 
-  unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned gp = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4844,11 +4921,12 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
     case EW::Half:  vnsr_wx<uint16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vnsr_wx<uint32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vnsr_wx<uint64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4862,7 +4940,7 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4882,11 +4960,12 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
     case EW::Half:  vnsr_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4900,7 +4979,7 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4917,11 +4996,12 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
     case EW::Half:  vnsr_wx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -4936,7 +5016,7 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
   URV imm = di->op2();   // Unsigned -- zero extended
 
-  unsigned gp = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned gp = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -4956,11 +5036,12 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
     case EW::Half:  vnsr_wx<int16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vnsr_wx<int32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vnsr_wx<int64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5006,7 +5087,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vv(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -5014,7 +5095,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
@@ -5036,11 +5117,12 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
     case EW::Half:  vrgather_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vrgather_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrgather_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5084,14 +5166,14 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vx(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
@@ -5112,11 +5194,12 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
     case EW::Half:  vrgather_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vrgather_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrgather_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5154,7 +5237,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vi(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -5162,7 +5245,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
 
   uint32_t vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
@@ -5183,11 +5266,12 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
     case EW::Half:  vrgather_vi<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:  vrgather_vi<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vrgather_vi<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5234,7 +5318,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -5242,7 +5326,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   unsigned widthInBytes = vecRegs_.elementWidthInBytes(sew);
@@ -5285,11 +5369,12 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
     case EW::Half: vrgatherei16_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vrgatherei16_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrgatherei16_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5328,7 +5413,7 @@ template <typename URV>
 void
 Hart<URV>::execVcompress_vm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -5338,7 +5423,7 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -5359,11 +5444,12 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
     case EW::Half: vcompress_vm<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vcompress_vm<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vcompress_vm<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5410,12 +5496,12 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5427,11 +5513,12 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
     case EW::Half:  vredsum_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredsum_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5478,12 +5565,12 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5495,11 +5582,12 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
     case EW::Half:  vredand_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredand_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredand_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5546,12 +5634,12 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5563,11 +5651,12 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
     case EW::Half:  vredor_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredor_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredor_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5614,12 +5703,12 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5631,11 +5720,12 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
     case EW::Half:  vredxor_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredxor_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredxor_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5682,12 +5772,12 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5699,11 +5789,12 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
     case EW::Half:  vredminu_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredminu_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredminu_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5750,12 +5841,12 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5767,11 +5858,12 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
     case EW::Half:  vredmin_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredmin_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredmin_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5818,12 +5910,12 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5835,11 +5927,12 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
     case EW::Half:  vredmaxu_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredmaxu_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredmaxu_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5886,12 +5979,12 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(), start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(), start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5903,11 +5996,12 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
     case EW::Half:  vredmax_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredmax_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredmax_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -5961,7 +6055,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
@@ -5972,7 +6066,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -5983,8 +6077,9 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
     case EW::Byte:  vwredsum_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Half:  vwredsum_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vwredsum_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6000,7 +6095,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
@@ -6011,7 +6106,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -6022,8 +6117,9 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
     case EW::Byte:  vwredsum_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Half:  vwredsum_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vwredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6031,13 +6127,13 @@ template <typename URV>
 void
 Hart<URV>::execVmand_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6067,6 +6163,7 @@ Hart<URV>::execVmand_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6074,13 +6171,13 @@ template <typename URV>
 void
 Hart<URV>::execVmnand_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6110,6 +6207,7 @@ Hart<URV>::execVmnand_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6117,13 +6215,13 @@ template <typename URV>
 void
 Hart<URV>::execVmandnot_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6153,6 +6251,7 @@ Hart<URV>::execVmandnot_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6160,13 +6259,13 @@ template <typename URV>
 void
 Hart<URV>::execVmxor_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6196,6 +6295,7 @@ Hart<URV>::execVmxor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6203,13 +6303,13 @@ template <typename URV>
 void
 Hart<URV>::execVmor_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6239,6 +6339,7 @@ Hart<URV>::execVmor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6246,13 +6347,13 @@ template <typename URV>
 void
 Hart<URV>::execVmnor_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6282,6 +6383,7 @@ Hart<URV>::execVmnor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6289,13 +6391,13 @@ template <typename URV>
 void
 Hart<URV>::execVmornot_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6325,6 +6427,7 @@ Hart<URV>::execVmornot_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6332,13 +6435,13 @@ template <typename URV>
 void
 Hart<URV>::execVmxnor_mm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6368,6 +6471,7 @@ Hart<URV>::execVmxnor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6375,13 +6479,13 @@ template <typename URV>
 void
 Hart<URV>::execVpopc_m(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  uint32_t start = vecRegs_.startIndex();
+  uint32_t start = csRegs_.peekVstart();
   if (start > 0)
     {
       illegalInst(di);
@@ -6402,6 +6506,7 @@ Hart<URV>::execVpopc_m(const DecodedInst* di)
     }
 
   intRegs_.write(rd, count);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6409,13 +6514,13 @@ template <typename URV>
 void
 Hart<URV>::execVfirst_m(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  uint32_t start = vecRegs_.startIndex();
+  uint32_t start = csRegs_.peekVstart();
   if (start > 0)
     {
       illegalInst(di);
@@ -6440,6 +6545,7 @@ Hart<URV>::execVfirst_m(const DecodedInst* di)
     }
 
   intRegs_.write(rd, first);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6447,13 +6553,13 @@ template <typename URV>
 void
 Hart<URV>::execVmsbf_m(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  uint32_t start = vecRegs_.startIndex();
+  uint32_t start = csRegs_.peekVstart();
   if (start > 0)
     {
       illegalInst(di);
@@ -6490,6 +6596,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6497,13 +6604,13 @@ template <typename URV>
 void
 Hart<URV>::execVmsif_m(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  uint32_t start = vecRegs_.startIndex();
+  uint32_t start = csRegs_.peekVstart();
   if (start > 0)
     {
       illegalInst(di);
@@ -6541,6 +6648,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6548,13 +6656,13 @@ template <typename URV>
 void
 Hart<URV>::execVmsof_m(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
-  uint32_t start = vecRegs_.startIndex();
+  uint32_t start = csRegs_.peekVstart();
   if (start > 0)
     {
       illegalInst(di);
@@ -6598,6 +6706,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6605,14 +6714,14 @@ template <typename URV>
 void
 Hart<URV>::execViota_m(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
     }
 
   // Spec does not explicitly state this.   FIX double check.
-  uint32_t start = vecRegs_.startIndex();
+  uint32_t start = csRegs_.peekVstart();
   if (start > 0)
     {
       illegalInst(di);
@@ -6649,15 +6758,16 @@ Hart<URV>::execViota_m(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(sum)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(sum)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(sum)); break;
-        case ElementWidth::Word4:  illegalInst(di); break;
-        case ElementWidth::Word8:  illegalInst(di); break;
-        case ElementWidth::Word16: illegalInst(di); break;
-        case ElementWidth::Word32: illegalInst(di); break;
+        case ElementWidth::Word4:  illegalInst(di); return;
+        case ElementWidth::Word8:  illegalInst(di); return;
+        case ElementWidth::Word16: illegalInst(di); return;
+        case ElementWidth::Word32: illegalInst(di); return;
         }
 
       if (sourceSet)
         sum++;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6665,7 +6775,7 @@ template <typename URV>
 void
 Hart<URV>::execVid_v(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -6673,7 +6783,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
 
   // Spec does not mention vstart > 0. Got a clarification saying it
   // is ok not to take an exception in that case.
-  uint32_t start = vecRegs_.startIndex();
+  uint32_t start = csRegs_.peekVstart();
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -6704,12 +6814,13 @@ Hart<URV>::execVid_v(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(ix)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(ix)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(ix)); break;
-        case ElementWidth::Word4:  illegalInst(di); break;
-        case ElementWidth::Word8:  illegalInst(di); break;
-        case ElementWidth::Word16: illegalInst(di); break;
-        case ElementWidth::Word32: illegalInst(di); break;
+        case ElementWidth::Word4:  illegalInst(di); return;
+        case ElementWidth::Word8:  illegalInst(di); return;
+        case ElementWidth::Word16: illegalInst(di); return;
+        case ElementWidth::Word32: illegalInst(di); return;
         }
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6759,7 +6870,7 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -6781,11 +6892,12 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
     case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6799,7 +6911,7 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -6821,11 +6933,12 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
     case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6838,7 +6951,7 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -6884,11 +6997,12 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 	vecRegs_.write(vd, 0, group, int64_t(replacement));
       break;
 
-    case ElementWidth::Word4:  illegalInst(di); break;
-    case ElementWidth::Word8: illegalInst(di); break;
-    case ElementWidth::Word16: illegalInst(di); break;
-    case ElementWidth::Word32: illegalInst(di); break;
+    case ElementWidth::Word4:  illegalInst(di); return;
+    case ElementWidth::Word8: illegalInst(di); return;
+    case ElementWidth::Word16: illegalInst(di); return;
+    case ElementWidth::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6933,7 +7047,7 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -6949,11 +7063,12 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
     case EW::Half:   vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word:   vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2:  vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -6967,7 +7082,7 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -6983,11 +7098,12 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
     case EW::Half: vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7000,7 +7116,7 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7040,11 +7156,12 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
 	vecRegs_.write(vd, elems-1, group, int64_t(replacement));
       break;
 
-    case ElementWidth::Word4: illegalInst(di); break;
-    case ElementWidth::Word8: illegalInst(di); break;
-    case ElementWidth::Word16: illegalInst(di); break;
-    case ElementWidth::Word32: illegalInst(di); break;
+    case ElementWidth::Word4: illegalInst(di); return;
+    case ElementWidth::Word8: illegalInst(di); return;
+    case ElementWidth::Word16: illegalInst(di); return;
+    case ElementWidth::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7057,7 +7174,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7078,7 +7195,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
     {
     case ElementWidth::Byte:
       illegalInst(di);
-      break;
+      return;
 
     case ElementWidth::Half:
       {
@@ -7114,8 +7231,9 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7128,7 +7246,7 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7143,7 +7261,7 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
     {
     case ElementWidth::Byte:
       illegalInst(di);
-      break;
+      return;
 
     case ElementWidth::Half:
       {
@@ -7179,8 +7297,9 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7224,7 +7343,7 @@ Hart<URV>::execVmul_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7238,11 +7357,12 @@ Hart<URV>::execVmul_vv(const DecodedInst* di)
     case EW::Half: vmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7287,7 +7407,7 @@ Hart<URV>::execVmul_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(), vs1 = di->op1(), rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7301,11 +7421,12 @@ Hart<URV>::execVmul_vx(const DecodedInst* di)
     case EW::Half: vmul_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmul_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmul_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7350,7 +7471,7 @@ Hart<URV>::execVmulh_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7364,11 +7485,12 @@ Hart<URV>::execVmulh_vv(const DecodedInst* di)
     case EW::Half: vmulh_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7413,7 +7535,7 @@ Hart<URV>::execVmulh_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7427,11 +7549,12 @@ Hart<URV>::execVmulh_vx(const DecodedInst* di)
     case EW::Half: vmulh_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7445,7 +7568,7 @@ Hart<URV>::execVmulhu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7459,11 +7582,12 @@ Hart<URV>::execVmulhu_vv(const DecodedInst* di)
     case EW::Half: vmulh_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7508,7 +7632,7 @@ Hart<URV>::execVmulhu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7522,11 +7646,12 @@ Hart<URV>::execVmulhu_vx(const DecodedInst* di)
     case EW::Half: vmulhu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulhu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7574,7 +7699,7 @@ Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7588,11 +7713,12 @@ Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
     case EW::Half: vmulhsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulhsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7640,7 +7766,7 @@ Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7654,11 +7780,12 @@ Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
     case EW::Half: vmulhsu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulhsu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7705,7 +7832,7 @@ Hart<URV>::execVmadd_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7719,11 +7846,12 @@ Hart<URV>::execVmadd_vv(const DecodedInst* di)
     case EW::Half: vmadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7769,7 +7897,7 @@ Hart<URV>::execVmadd_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7783,11 +7911,12 @@ Hart<URV>::execVmadd_vx(const DecodedInst* di)
     case EW::Half:  vmadd_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmadd_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmadd_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -7833,7 +7962,7 @@ Hart<URV>::execVnmsub_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7847,11 +7976,12 @@ Hart<URV>::execVnmsub_vv(const DecodedInst* di)
     case EW::Half: vnmsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vnmsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7897,7 +8027,7 @@ Hart<URV>::execVnmsub_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7911,11 +8041,12 @@ Hart<URV>::execVnmsub_vx(const DecodedInst* di)
     case EW::Half:  vnmsub_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnmsub_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsub_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -7962,7 +8093,7 @@ Hart<URV>::execVmacc_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -7976,11 +8107,12 @@ Hart<URV>::execVmacc_vv(const DecodedInst* di)
     case EW::Half: vmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmacc_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8026,7 +8158,7 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8043,11 +8175,12 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
     case EW::Half:  vmacc_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmacc_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmacc_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8094,7 +8227,7 @@ Hart<URV>::execVnmsac_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8108,11 +8241,12 @@ Hart<URV>::execVnmsac_vv(const DecodedInst* di)
     case EW::Half: vnmsac_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vnmsac_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsac_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8158,7 +8292,7 @@ Hart<URV>::execVnmsac_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8172,11 +8306,12 @@ Hart<URV>::execVnmsac_vx(const DecodedInst* di)
     case EW::Half:  vnmsac_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnmsac_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsac_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8226,7 +8361,7 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8247,11 +8382,12 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
     case EW::Half: vwmulu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmulu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmulu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8300,7 +8436,7 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8322,11 +8458,12 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
     case EW::Half: vwmulu_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmulu_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulu_vx<uint64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8375,7 +8512,7 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8396,11 +8533,12 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
     case EW::Half: vwmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8450,7 +8588,7 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8473,11 +8611,12 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
     case EW::Half: vwmul_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmul_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8529,7 +8668,7 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8549,11 +8688,12 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
     case EW::Half: vwmulsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmulsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8606,7 +8746,7 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8628,11 +8768,12 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
     case EW::Half: vwmulsu_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmulsu_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8683,7 +8824,7 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
@@ -8701,11 +8842,12 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
     case EW::Half: vwmacc_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmacc_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8756,7 +8898,7 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8781,11 +8923,12 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
     case EW::Half: vwmaccu_vx<uint16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccu_vx<uint32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccu_vx<uint64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8801,7 +8944,7 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   // Double wide legal.
   if (not vecRegs_.isDoubleWideLegal(sew, group))
@@ -8820,11 +8963,12 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
     case EW::Half: vwmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8873,7 +9017,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -8898,11 +9042,12 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
     case EW::Half:  vwmacc_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word:  vwmacc_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -8957,7 +9102,7 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
@@ -8975,11 +9120,12 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
     case EW::Half: vwmaccsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9032,7 +9178,7 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9057,11 +9203,12 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
     case EW::Half: vwmaccsu_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccsu_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9114,7 +9261,7 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9139,11 +9286,12 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
     case EW::Half: vwmaccus_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccus_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccus_vx<int64_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9190,7 +9338,7 @@ Hart<URV>::execVdivu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9204,11 +9352,12 @@ Hart<URV>::execVdivu_vv(const DecodedInst* di)
     case EW::Half: vdivu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vdivu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdivu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9258,7 +9407,7 @@ Hart<URV>::execVdivu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9272,8 +9421,9 @@ Hart<URV>::execVdivu_vx(const DecodedInst* di)
     case EW::Half:  vdivu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vdivu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vdivu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9328,7 +9478,7 @@ Hart<URV>::execVdiv_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9342,11 +9492,12 @@ Hart<URV>::execVdiv_vv(const DecodedInst* di)
     case EW::Half: vdiv_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vdiv_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9401,7 +9552,7 @@ Hart<URV>::execVdiv_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9415,11 +9566,12 @@ Hart<URV>::execVdiv_vx(const DecodedInst* di)
     case EW::Half: vdiv_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vdiv_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9466,7 +9618,7 @@ Hart<URV>::execVremu_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9480,11 +9632,12 @@ Hart<URV>::execVremu_vv(const DecodedInst* di)
     case EW::Half: vremu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vremu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9534,7 +9687,7 @@ Hart<URV>::execVremu_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9548,8 +9701,9 @@ Hart<URV>::execVremu_vx(const DecodedInst* di)
     case EW::Half:  vremu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vremu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vv<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9604,7 +9758,7 @@ Hart<URV>::execVrem_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9618,11 +9772,12 @@ Hart<URV>::execVrem_vv(const DecodedInst* di)
     case EW::Half: vrem_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vrem_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrem_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9676,7 +9831,7 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -9690,11 +9845,12 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
     case EW::Half: vremu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vremu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9790,19 +9946,20 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vsext<int16_t,int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word: vsext<int32_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9850,7 +10007,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
@@ -9868,15 +10025,16 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
-    case EW::Half: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
+    case EW::Half: illegalInst(di); return;
     case EW::Word: vsext<int32_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -9924,7 +10082,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmul(di, vd, group))
     return;
@@ -9935,11 +10093,12 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
     case EW::Half: illegalInst(di); return;
     case EW::Word: illegalInst(di); return;
     case EW::Word2: vsext<int64_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10019,7 +10178,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
@@ -10037,15 +10196,16 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vzext<uint16_t,uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word: vzext<uint32_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10093,7 +10253,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
@@ -10111,15 +10271,16 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
-    case EW::Half: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
+    case EW::Half: illegalInst(di); return;
     case EW::Word: vzext<uint32_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10167,22 +10328,23 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmul(di, vd, group))
     return;
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
-    case EW::Half: illegalInst(di); break;
-    case EW::Word: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
+    case EW::Half: illegalInst(di); return;
+    case EW::Word: illegalInst(di); return;
     case EW::Word2: vzext<uint64_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10438,7 +10600,7 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10452,11 +10614,12 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
     case EW::Half: vadc_vvm<uint16_t>(vd, vs1, vs2, vcin, group, start, elems); break;
     case EW::Word: vadc_vvm<uint32_t>(vd, vs1, vs2, vcin, group, start, elems); break;
     case EW::Word2: vadc_vvm<uint64_t>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10464,7 +10627,7 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vxm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10478,7 +10641,7 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10494,11 +10657,12 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
     case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
     case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10506,7 +10670,7 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vim(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10520,7 +10684,7 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10536,11 +10700,12 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
     case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
     case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10548,7 +10713,7 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vvm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10562,7 +10727,7 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10576,11 +10741,12 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
     case EW::Half: vsbc_vvm<uint16_t>(vd, vs1, vs2, vbin, group, start, elems); break;
     case EW::Word: vsbc_vvm<uint32_t>(vd, vs1, vs2, vbin, group, start, elems); break;
     case EW::Word2: vsbc_vvm<uint64_t>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10588,7 +10754,7 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vxm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10602,7 +10768,7 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10618,11 +10784,12 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
     case EW::Half: vsbc_vxm<uint16_t>(vd, vs1, e2, vbin, group, start, elems); break;
     case EW::Word: vsbc_vxm<uint32_t>(vd, vs1, int32_t(e2), vbin, group, start, elems); break;
     case EW::Word2: vsbc_vxm<uint64_t>(vd, vs1, int64_t(e2), vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10630,7 +10797,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10639,9 +10806,16 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group) or
+      not checkDestSourceOverlap(vcout, 8, vs2, group))
+    {
+      illegalInst(di);
+      return;
+    }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vs1 % eg) or (vs2 % eg))
@@ -10660,11 +10834,12 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
     case EW::Half: vmadc_vvm<uint16_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
     case EW::Word: vmadc_vvm<uint32_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vvm<uint64_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10672,7 +10847,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10680,9 +10855,15 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
+    {
+      illegalInst(di);
+      return;
+    }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
@@ -10702,11 +10883,12 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
     case EW::Half: vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
     case EW::Word: vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vxm<uint64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10714,7 +10896,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10723,9 +10905,15 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
+    {
+      illegalInst(di);
+      return;
+    }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
@@ -10745,11 +10933,12 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
     case EW::Half: vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
     case EW::Word: vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vxm<uint64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10757,7 +10946,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10766,9 +10955,16 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group) or
+      not checkDestSourceOverlap(vbout, 8, vs2, group))
+    {
+      illegalInst(di);
+      return;
+    }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vs1 % eg) or (vs2 % eg))
@@ -10787,11 +10983,12 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
     case EW::Half: vmsbc_vvm<uint16_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
     case EW::Word: vmsbc_vvm<uint32_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vvm<uint64_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10799,7 +10996,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10808,9 +11005,14 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vbin = 0;
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group))
+    {
+      illegalInst(di);
+      return;
+    }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
@@ -10830,11 +11032,12 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
     case EW::Half: vmsbc_vxm<uint16_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
     case EW::Word: vmsbc_vxm<uint32_t>(vbout, vs1, int32_t(e2), borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vxm<uint64_t>(vbout, vs1, int64_t(e2), borrow, vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10868,7 +11071,7 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vvm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10881,7 +11084,7 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10895,11 +11098,12 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
     case EW::Half: vmerge_vvm<int16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vmerge_vvm<int32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vmerge_vvm<int64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10932,7 +11136,7 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vxm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or not di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or not di->isMasked())
     {
       illegalInst(di);
       return;
@@ -10945,7 +11149,7 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -10961,11 +11165,12 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
     case EW::Half: vmerge_vxm<int16_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word: vmerge_vxm<int32_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -10973,7 +11178,7 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vim(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
+  if (not checkVecExec() or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return;
@@ -10988,7 +11193,7 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11002,11 +11207,12 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
     case EW::Half: vmerge_vxm<int16_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word: vmerge_vxm<int32_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11014,7 +11220,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_x_s(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11068,8 +11274,9 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
 
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11077,7 +11284,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_s_x(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11108,8 +11315,9 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
       break;
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11117,7 +11325,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11139,7 +11347,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
     {
     case ElementWidth::Byte:
       illegalInst(di);
-      break;
+      return;
 
     case ElementWidth::Half:
       if (not isZfhLegal())
@@ -11176,8 +11384,9 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11185,7 +11394,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11199,7 +11408,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
     {
     case EW::Byte:
       illegalInst(di);
-      break;
+      return;
     case EW::Half:
       if (not isZfhLegal())
 	illegalInst(di);
@@ -11229,8 +11438,9 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
       break;
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11263,7 +11473,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not isVecLegal()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
     {
       illegalInst(di);
       return;
@@ -11271,7 +11481,7 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11285,11 +11495,12 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
     case EW::Half: vmv_v_v<int16_t>(vd, vs1, group, start, elems); break;
     case EW::Word: vmv_v_v<int32_t>(vd, vs1, group, start, elems); break;
     case EW::Word2: vmv_v_v<int64_t>(vd, vs1, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11313,7 +11524,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_x(const DecodedInst* di)
 {
-  if (di->isMasked() or (not isVecLegal()) or not (vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()) or not (vecRegs_.legalConfig()))
     {
       illegalInst(di);
       return;
@@ -11321,7 +11532,7 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
 
   unsigned vd = di->op0();
   unsigned rs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11337,11 +11548,12 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
     case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
     case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11349,14 +11561,14 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_i(const DecodedInst* di)
 {
-  if (di->isMasked() or (not isVecLegal()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
     {
       illegalInst(di);
       return;
     }
 
   unsigned vd = di->op0();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11372,11 +11584,12 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
     case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
     case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11384,7 +11597,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv1r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not isVecLegal()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
     {
       illegalInst(di);
       return;
@@ -11404,6 +11617,7 @@ Hart<URV>::execVmv1r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 1*8);  // Grouping of 1.
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11411,7 +11625,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv2r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not isVecLegal()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
     {
       illegalInst(di);
       return;
@@ -11437,6 +11651,7 @@ Hart<URV>::execVmv2r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 2*8);    // Grouping of 2
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11444,7 +11659,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv4r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not isVecLegal()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
     {
       illegalInst(di);
       return;
@@ -11470,6 +11685,7 @@ Hart<URV>::execVmv4r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 4*8);  // Grouping of 4.
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11477,7 +11693,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv8r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not isVecLegal()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
     {
       illegalInst(di);
       return;
@@ -11503,6 +11719,7 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 8*8);  // Grouping of 8.
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11553,7 +11770,7 @@ Hart<URV>::execVsaddu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11567,11 +11784,12 @@ Hart<URV>::execVsaddu_vv(const DecodedInst* di)
     case EW::Half:   vsaddu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsaddu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11622,7 +11840,7 @@ Hart<URV>::execVsaddu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11638,11 +11856,12 @@ Hart<URV>::execVsaddu_vx(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11656,7 +11875,7 @@ Hart<URV>::execVsaddu_vi(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11670,11 +11889,12 @@ Hart<URV>::execVsaddu_vi(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11731,7 +11951,7 @@ Hart<URV>::execVsadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11745,11 +11965,12 @@ Hart<URV>::execVsadd_vv(const DecodedInst* di)
     case EW::Half:   vsadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11806,7 +12027,7 @@ Hart<URV>::execVsadd_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11822,11 +12043,12 @@ Hart<URV>::execVsadd_vx(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11840,7 +12062,7 @@ Hart<URV>::execVsadd_vi(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11854,11 +12076,12 @@ Hart<URV>::execVsadd_vi(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11909,7 +12132,7 @@ Hart<URV>::execVssubu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11923,11 +12146,12 @@ Hart<URV>::execVssubu_vv(const DecodedInst* di)
     case EW::Half:   vssubu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssubu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssubu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -11978,7 +12202,7 @@ Hart<URV>::execVssubu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11994,11 +12218,12 @@ Hart<URV>::execVssubu_vx(const DecodedInst* di)
     case EW::Half:   vssubu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssubu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssubu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12055,7 +12280,7 @@ Hart<URV>::execVssub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12069,11 +12294,12 @@ Hart<URV>::execVssub_vv(const DecodedInst* di)
     case EW::Half:   vssub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12130,7 +12356,7 @@ Hart<URV>::execVssub_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12146,11 +12372,12 @@ Hart<URV>::execVssub_vx(const DecodedInst* di)
     case EW::Half:   vssub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12243,7 +12470,7 @@ Hart<URV>::execVaadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12257,11 +12484,12 @@ Hart<URV>::execVaadd_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12274,7 +12502,7 @@ Hart<URV>::execVaaddu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12288,11 +12516,12 @@ Hart<URV>::execVaaddu_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12345,7 +12574,7 @@ Hart<URV>::execVaadd_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12361,11 +12590,12 @@ Hart<URV>::execVaadd_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12378,7 +12608,7 @@ Hart<URV>::execVaaddu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12394,11 +12624,12 @@ Hart<URV>::execVaaddu_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12451,7 +12682,7 @@ Hart<URV>::execVasub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12465,11 +12696,12 @@ Hart<URV>::execVasub_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12482,7 +12714,7 @@ Hart<URV>::execVasubu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12496,11 +12728,12 @@ Hart<URV>::execVasubu_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12553,7 +12786,7 @@ Hart<URV>::execVasub_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12569,11 +12802,12 @@ Hart<URV>::execVasub_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12586,7 +12820,7 @@ Hart<URV>::execVasubu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12602,11 +12836,12 @@ Hart<URV>::execVasubu_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12673,7 +12908,7 @@ Hart<URV>::execVsmul_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12687,11 +12922,12 @@ Hart<URV>::execVsmul_vv(const DecodedInst* di)
     case EW::Half:   vsmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12758,7 +12994,7 @@ Hart<URV>::execVsmul_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12774,11 +13010,12 @@ Hart<URV>::execVsmul_vx(const DecodedInst* di)
     case EW::Half:   vsmul_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsmul_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsmul_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12832,7 +13069,7 @@ Hart<URV>::execVssrl_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12846,11 +13083,12 @@ Hart<URV>::execVssrl_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12903,7 +13141,7 @@ Hart<URV>::execVssrl_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12919,11 +13157,12 @@ Hart<URV>::execVssrl_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12936,7 +13175,7 @@ Hart<URV>::execVssrl_vi(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12950,11 +13189,12 @@ Hart<URV>::execVssrl_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12967,7 +13207,7 @@ Hart<URV>::execVssra_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -12981,11 +13221,12 @@ Hart<URV>::execVssra_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -12998,7 +13239,7 @@ Hart<URV>::execVssra_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13014,11 +13255,12 @@ Hart<URV>::execVssra_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13031,7 +13273,7 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13045,11 +13287,12 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13116,7 +13359,7 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13136,11 +13379,12 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13206,7 +13450,7 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13228,11 +13472,12 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13245,7 +13490,7 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13265,11 +13510,12 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13282,7 +13528,7 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13302,11 +13548,12 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13319,7 +13566,7 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13341,11 +13588,12 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13358,7 +13606,7 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -13378,17 +13626,18 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 {
   vecRegs_.ldStAddr_.clear();
@@ -13401,21 +13650,21 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
-    return;
+    return false;
 
   uint64_t addr = intRegs_.read(rs1);
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
 
   // FIX TODO: check permissions, translate, ....
@@ -13435,28 +13684,29 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = 0;
-              cause = determineLoadException(addr, 8);
+	      uint64_t physAddr = addr + n;
+              cause = determineLoadException(physAddr, 8);
               if (cause != ExceptionCause::NONE)
                 break;
-              memory_.read(addr + n, dword);
+              memory_.read(physAddr, dword);
               elem <<= 64;
               elem |= dword;
             }
         }
       else
         {
-	  cause = determineLoadException(addr, sizeof(elem));
+	  uint64_t physAddr = addr;
+	  cause = determineLoadException(physAddr, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(addr, elem);
+            memory_.read(physAddr, elem);
         }
 
       if (cause != ExceptionCause::NONE)
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           if (ix == 0 or not faultFirst)
             initiateLoadException(cause, addr);
-          break;
+          return false;
         }
 
       if (not vecRegs_.write(vd, ix, groupX8, elem))
@@ -13465,6 +13715,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       vecRegs_.ldStSize_ = sizeof(elem);
       vecRegs_.ldStAddr_.push_back(addr);
     }
+  return true;
 }
 
 
@@ -13474,7 +13725,9 @@ Hart<URV>::execVle8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint8_t>(di, ElementWidth::Byte, false);
+  if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13484,7 +13737,9 @@ Hart<URV>::execVle16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint16_t>(di, ElementWidth::Half, false);
+  if (not vectorLoad<uint16_t>(di, ElementWidth::Half, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13494,7 +13749,9 @@ Hart<URV>::execVle32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint32_t>(di, ElementWidth::Word, false);
+  if (not vectorLoad<uint32_t>(di, ElementWidth::Word, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13504,7 +13761,9 @@ Hart<URV>::execVle64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint64_t>(di, ElementWidth::Word2, false);
+  if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13542,7 +13801,7 @@ Hart<URV>::execVle1024_v(const DecodedInst* di)
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -13558,17 +13817,17 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), errors = 0;
   uint64_t addr = intRegs_.read(rs1);
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
 
   // TODO check permissions, translate, ....
@@ -13592,7 +13851,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
             {
               uint64_t dword = uint64_t(elem);
               bool forced = false;
-	      uint64_t dwordAddr = URV(addr + n);
+	      uint64_t dwordAddr = addr + n;
               cause = determineStoreException(dwordAddr, dword, forced);
               if (cause != ExceptionCause::NONE)
                 break;
@@ -13618,14 +13877,15 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 
       if (cause != ExceptionCause::NONE)
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateStoreException(cause, addr);
-          break;
+	  assert(errors == 0);
+          return false;
         }
     }
 
   assert(errors == 0);
+  return true;
 }
 
 
@@ -13633,7 +13893,9 @@ template <typename URV>
 void
 Hart<URV>::execVse8_v(const DecodedInst* di)
 {
-  vectorStore<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorStore<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13641,7 +13903,9 @@ template <typename URV>
 void
 Hart<URV>::execVse16_v(const DecodedInst* di)
 {
-  vectorStore<uint16_t>(di, ElementWidth::Half);
+  if (not vectorStore<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13649,7 +13913,9 @@ template <typename URV>
 void
 Hart<URV>::execVse32_v(const DecodedInst* di)
 {
-  vectorStore<uint32_t>(di, ElementWidth::Word);
+  if (not vectorStore<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13657,7 +13923,9 @@ template <typename URV>
 void
 Hart<URV>::execVse64_v(const DecodedInst* di)
 {
-  vectorStore<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorStore<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13697,7 +13965,7 @@ template <typename URV>
 void
 Hart<URV>::execVlm_v(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -13713,11 +13981,15 @@ Hart<URV>::execVlm_v(const DecodedInst* di)
   vecRegs_.groupMultiplier(GroupMultiplier::One);
 
   // Do load bytes.
-  vectorLoad<uint8_t>(di, ElementWidth::Byte, false);
+  bool ok = vectorLoad<uint8_t>(di, ElementWidth::Byte, false);
 
   vecRegs_.elemCount(elems); // Restore elem count.
   vecRegs_.elemWidth(ew); // Restore elem width.
   vecRegs_.groupMultiplier(gm); // Restore group multiplier
+
+  if (not ok)
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13725,7 +13997,7 @@ template <typename URV>
 void
 Hart<URV>::execVsm_v(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -13741,17 +14013,21 @@ Hart<URV>::execVsm_v(const DecodedInst* di)
   vecRegs_.groupMultiplier(GroupMultiplier::One);
   
   // Do store bytes.
-  vectorStore<uint8_t>(di, ElementWidth::Byte);
+  bool ok = vectorStore<uint8_t>(di, ElementWidth::Byte);
 
   vecRegs_.elemCount(elems); // Restore elem count.
   vecRegs_.elemWidth(ew); // Restore elem width.
   vecRegs_.groupMultiplier(gm); // Restore group multiplier
+
+  if (not ok)
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -13761,13 +14037,13 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   GroupMultiplier gm = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, gm);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
-  if ((not isVecLegal()) or badConfig or di->isMasked())
+  if ((not checkVecExec()) or badConfig or di->isMasked())
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
-  unsigned vd = di->op0(), rs1 = di->op1(), errors = 0;
+  unsigned vd = di->op0(), rs1 = di->op1();
   URV addr = intRegs_.read(rs1);
 
   unsigned start = 0;
@@ -13777,39 +14053,47 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
     {
-      bool exception = false;
+      auto cause = ExceptionCause::NONE;
       ELEM_TYPE elem = 0;
       if constexpr (sizeof(elem) > 8)
         {
-          for (unsigned n = 0; n < sizeof(elem) and not exception; n += 8)
+          for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = 0;
-              memory_.read(addr + n, dword);
+	      uint64_t physAddr = addr + n;
+              cause = determineLoadException(physAddr, 8);
+              if (cause != ExceptionCause::NONE)
+                break;
+              memory_.read(physAddr, dword);
               elem <<= 64;
               elem |= dword;
             }
         }
       else
-        memory_.read(addr, elem);
+	{
+	  uint64_t physAddr = addr;
+	  cause = determineLoadException(physAddr, sizeof(elem));
+	  if (cause == ExceptionCause::NONE)
+            memory_.read(physAddr, elem);
+	}
 
-      if (exception)
+      if (cause != ExceptionCause::NONE)
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          break;
+          return false;
         }
 
       if (not vecRegs_.write(vd, ix, groupX8, elem))
         {
-          errors++;
-          break;
+          assert(0);
+          return false;
         }
 
       vecRegs_.ldStSize_ = sizeof(elem);
       vecRegs_.ldStAddr_.push_back(addr);
     }
 
-  assert(errors == 0);
+  return true;
 }
 
 
@@ -13817,7 +14101,9 @@ template <typename URV>
 void
 Hart<URV>::execVlre8_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorLoadWholeReg<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13825,7 +14111,9 @@ template <typename URV>
 void
 Hart<URV>::execVlre16_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<uint16_t>(di, ElementWidth::Half);
+  if (not vectorLoadWholeReg<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13833,7 +14121,9 @@ template <typename URV>
 void
 Hart<URV>::execVlre32_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<uint32_t>(di, ElementWidth::Word);
+  if (not vectorLoadWholeReg<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13841,7 +14131,9 @@ template <typename URV>
 void
 Hart<URV>::execVlre64_v(const DecodedInst* di)
 {
-  vectorLoadWholeReg<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorLoadWholeReg<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13878,7 +14170,7 @@ Hart<URV>::execVlre1024_v(const DecodedInst* di)
 
 
 template <typename URV>
-void
+bool
 Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 {
   vecRegs_.ldStAddr_.clear();
@@ -13886,44 +14178,49 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 
   unsigned groupX8 = vecRegs_.groupMultiplierX8(gm);
   ElementWidth eew = ElementWidth::Byte;
-  if (not isVecLegal()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
+  if (not checkVecExec()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
-  unsigned vd = di->op0(), rs1 = di->op1(), errors = 0;
+  unsigned vd = di->op0(), rs1 = di->op1();
   URV addr = intRegs_.read(rs1);
 
   unsigned start = 0;
-  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / 8;
+  unsigned elemSize = 1;
+  unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemSize / 8;
 
   // TODO check permissions, translate, ....
-  for (unsigned ix = start; ix < elemCount; ++ix, ++addr)
+  for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
     {
-      bool exception = false;
       uint8_t elem = 0;
       if (not vecRegs_.read(vd, ix, groupX8, elem))
         {
-          errors++;
-          break;
+          assert(0);
+          return false;
         }
 
-      memory_.write(hartIx_, addr, elem);
+      uint64_t physAddr = addr;
+      bool forced = false;
+      auto cause = determineStoreException(physAddr, elem, forced);
+      if (cause == ExceptionCause::NONE)
+	{
+	  memory_.write(hartIx_, physAddr, elem);
 
-      vecRegs_.ldStSize_ = sizeof(elem);
-      vecRegs_.ldStAddr_.push_back(addr);
-      vecRegs_.stData_.push_back(elem);
-
-      if (exception)
+	  vecRegs_.ldStSize_ = sizeof(elem);
+	  vecRegs_.ldStAddr_.push_back(addr);
+	  vecRegs_.stData_.push_back(elem);
+	}
+      else
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          break;
+          initiateStoreException(cause, addr);
+          return false;
         }
     }
 
-  assert(errors == 0);
+  return true;
 }
 
 
@@ -13931,7 +14228,9 @@ template <typename URV>
 void
 Hart<URV>::execVs1r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg(di, GroupMultiplier::One);
+  if (not vectorStoreWholeReg(di, GroupMultiplier::One))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13939,7 +14238,9 @@ template <typename URV>
 void
 Hart<URV>::execVs2r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg(di, GroupMultiplier::Two);
+  if (not vectorStoreWholeReg(di, GroupMultiplier::Two))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13947,7 +14248,9 @@ template <typename URV>
 void
 Hart<URV>::execVs4r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg(di, GroupMultiplier::Four);
+  if (not vectorStoreWholeReg(di, GroupMultiplier::Four))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13955,7 +14258,9 @@ template <typename URV>
 void
 Hart<URV>::execVs8r_v(const DecodedInst* di)
 {
-  vectorStoreWholeReg(di, GroupMultiplier::Eight);
+  if (not vectorStoreWholeReg(di, GroupMultiplier::Eight))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13965,7 +14270,9 @@ Hart<URV>::execVle8ff_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint8_t>(di, ElementWidth::Byte, true);
+  if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13975,7 +14282,9 @@ Hart<URV>::execVle16ff_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint16_t>(di, ElementWidth::Half, true);
+  if (not vectorLoad<uint16_t>(di, ElementWidth::Half, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13985,7 +14294,9 @@ Hart<URV>::execVle32ff_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint32_t>(di, ElementWidth::Word, true);
+  if (not vectorLoad<uint32_t>(di, ElementWidth::Word, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -13995,7 +14306,9 @@ Hart<URV>::execVle64ff_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoad<uint64_t>(di, ElementWidth::Word2, true);
+  if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14033,7 +14346,7 @@ Hart<URV>::execVle1024ff_v(const DecodedInst* di)
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -14049,18 +14362,18 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(), rs1 = di->op1(), rs2 = di->op2(), errors = 0;
+  unsigned vd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
   uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
 
   // TODO check permissions, translate, ....
@@ -14083,7 +14396,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 	      uint64_t eaddr = addr + n;
               cause = determineLoadException(eaddr, 8);
               if (cause != ExceptionCause::NONE)
-                break;
+                return false;
               memory_.read(eaddr, dword);
               elem <<= 64;
               elem |= dword;
@@ -14091,30 +14404,30 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
         }
       else
         {
-          cause = determineLoadException(addr, sizeof(elem));
+	  uint64_t eaddr = addr;
+          cause = determineLoadException(eaddr, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(addr, elem);
+            memory_.read(eaddr, elem);
         }
 
       if (cause != ExceptionCause::NONE)
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateLoadException(cause, addr);
-          break;
+          return false;
         }
 
       if (not vecRegs_.write(vd, ix, groupX8, elem))
         {
-          errors++;
-          break;
+          assert(0);
+          return false;
         }
 
       vecRegs_.ldStSize_ = sizeof(elem);
       vecRegs_.ldStAddr_.push_back(addr);
     }
 
-  assert(errors == 0);
+  return true;
 }
 
 
@@ -14124,7 +14437,9 @@ Hart<URV>::execVlse8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadStrided<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorLoadStrided<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14134,7 +14449,9 @@ Hart<URV>::execVlse16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadStrided<uint16_t>(di, ElementWidth::Half);
+  if (not vectorLoadStrided<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14144,7 +14461,9 @@ Hart<URV>::execVlse32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadStrided<uint32_t>(di, ElementWidth::Word);
+  if (not vectorLoadStrided<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14154,7 +14473,9 @@ Hart<URV>::execVlse64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadStrided<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorLoadStrided<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14192,7 +14513,7 @@ Hart<URV>::execVlse1024_v(const DecodedInst* di)
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -14208,18 +14529,18 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(), rs1 = di->op1(), rs2 = di->op2(), errors = 0;
+  unsigned vd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
   uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
 
   // TODO check permissions, translate, ....
@@ -14231,8 +14552,8 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
       ELEM_TYPE elem = 0;
       if (not vecRegs_.read(vd, ix, groupX8, elem))
         {
-          errors++;
-          break;
+          assert(0);
+          return false;
         }
 
       auto cause = ExceptionCause::NONE;
@@ -14246,7 +14567,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	      bool force = false;
               cause = determineStoreException(eaddr, dword, force);
               if (cause != ExceptionCause::NONE)
-                break;
+                return false;
               memory_.write(hartIx_, eaddr, dword);
               elem >>= 64;
             }
@@ -14268,14 +14589,13 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 
       if (cause != ExceptionCause::NONE)
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateStoreException(cause, addr);
-          break;
+          return false;
         }
     }
 
-  assert(errors == 0);
+  return true;
 }
 
 
@@ -14283,7 +14603,9 @@ template <typename URV>
 void
 Hart<URV>::execVsse8_v(const DecodedInst* di)
 {
-  vectorStoreStrided<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorStoreStrided<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14291,7 +14613,9 @@ template <typename URV>
 void
 Hart<URV>::execVsse16_v(const DecodedInst* di)
 {
-  vectorStoreStrided<uint16_t>(di, ElementWidth::Half);
+  if (not vectorStoreStrided<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14299,7 +14623,9 @@ template <typename URV>
 void
 Hart<URV>::execVsse32_v(const DecodedInst* di)
 {
-  vectorStoreStrided<uint32_t>(di, ElementWidth::Word);
+  if (not vectorStoreStrided<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14307,7 +14633,9 @@ template <typename URV>
 void
 Hart<URV>::execVsse64_v(const DecodedInst* di)
 {
-  vectorStoreStrided<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorStoreStrided<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14345,7 +14673,7 @@ Hart<URV>::execVsse1024_v(const DecodedInst* di)
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -14360,21 +14688,21 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
-    return;
+    return false;
 
   uint64_t addr = intRegs_.read(rs1);
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
 
   // TODO check permissions, translate, ....
@@ -14388,35 +14716,39 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       uint64_t offset = 0;
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
+	{
+	  assert(0);
+	  return false;
+	}
 
-      uint64_t eaddr = URV(addr + offset);
+      uint64_t vaddr = addr + offset;
+      uint64_t paddr = vaddr;
 
-      auto cause = determineLoadException(eaddr, elemSize);
+      auto cause = determineLoadException(vaddr, elemSize);
       if (cause == ExceptionCause::NONE)
 	{
 	  if (elemSize == 1)
 	    {
 	      uint8_t x = 0;
-	      memory_.read(eaddr, x);
+	      memory_.read(paddr, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else if (elemSize == 2)
 	    {
 	      uint16_t x = 0;
-	      memory_.read(eaddr, x);
+	      memory_.read(paddr, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else if (elemSize == 4)
 	    {
 	      uint32_t x = 0;
-	      memory_.read(eaddr, x);
+	      memory_.read(paddr, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else if (elemSize == 8)
 	    {
 	      uint64_t x = 0;
-	      memory_.read(eaddr, x);
+	      memory_.read(paddr, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else
@@ -14424,15 +14756,15 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
       else
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, eaddr);
-          break;
+          initiateLoadException(cause, vaddr);
+          return false;
         }
 
       vecRegs_.ldStSize_ = elemSize;
-      vecRegs_.ldStAddr_.push_back(eaddr);
+      vecRegs_.ldStAddr_.push_back(vaddr);
     }
+  return true;
 }
 
 
@@ -14442,7 +14774,9 @@ Hart<URV>::execVloxei8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14452,7 +14786,9 @@ Hart<URV>::execVloxei16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorLoadIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14462,7 +14798,9 @@ Hart<URV>::execVloxei32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorLoadIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14472,7 +14810,9 @@ Hart<URV>::execVloxei64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14482,7 +14822,9 @@ Hart<URV>::execVluxei8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14492,7 +14834,9 @@ Hart<URV>::execVluxei16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorLoadIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14502,7 +14846,9 @@ Hart<URV>::execVluxei32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorLoadIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14512,13 +14858,15 @@ Hart<URV>::execVluxei64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -14533,20 +14881,20 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
-    return;
+    return false;
 
   uint64_t addr = intRegs_.read(rs1);
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount(), elemSize = elemWidth / 8;
 
   // TODO check permissions, translate, ....
@@ -14559,7 +14907,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
-      uint64_t eaddr = URV(addr + offset), data = 0;
+      uint64_t vaddr = addr + offset, data = 0;
+      uint64_t paddr = vaddr;
 
       auto cause = ExceptionCause::NONE;
       bool forced = false;
@@ -14567,36 +14916,36 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint8_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(eaddr, x, forced);
+	  cause = determineStoreException(paddr, x, forced);
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, eaddr, x);
+	    memory_.write(hartIx_, paddr, x);
 	  data = x;
 	}
       else if (elemSize == 2)
 	{
 	  uint16_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(eaddr, x, forced);
+	  cause = determineStoreException(paddr, x, forced);
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, eaddr, x);
+	    memory_.write(hartIx_, paddr, x);
 	  data = x;
 	}
       else if (elemSize == 4)
 	{
 	  uint32_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(eaddr, x, forced);
+	  cause = determineStoreException(paddr, x, forced);
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, eaddr, x);
+	    memory_.write(hartIx_, paddr, x);
 	  data = x;
 	}
       else if (elemSize == 8)
 	{
 	  uint64_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(eaddr, x, forced);
+	  cause = determineStoreException(paddr, x, forced);
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, eaddr, x);
+	    memory_.write(hartIx_, paddr, x);
 	  data = x;
 	}
       else
@@ -14604,16 +14953,17 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
       if (cause != ExceptionCause::NONE)
         {
-          vecRegs_.setStartIndex(ix);
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, eaddr);
-          break;
+          initiateStoreException(cause, vaddr);
+          return false;
         }
 
       vecRegs_.ldStSize_ = elemSize;
-      vecRegs_.ldStAddr_.push_back(eaddr);
+      vecRegs_.ldStAddr_.push_back(vaddr);
       vecRegs_.stData_.push_back(data);
     }
+
+  return true;
 }
 
 
@@ -14621,7 +14971,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei8_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14629,7 +14981,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei16_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorStoreIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14637,7 +14991,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei32_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorStoreIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14645,7 +15001,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei64_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14653,7 +15011,9 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei8_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14661,7 +15021,9 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei16_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorStoreIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14669,7 +15031,9 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei32_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorStoreIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14677,13 +15041,15 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei64_v(const DecodedInst* di)
 {
-  vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 			 unsigned fieldCount, uint64_t stride, bool faultFirst)
 {
@@ -14698,20 +15064,20 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
-    return;
+    return false;
 
   uint64_t addr = intRegs_.read(rs1);
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
@@ -14719,7 +15085,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   if (vd + fieldCount*eg > 32)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   unsigned elemSize = sizeof(ELEM_TYPE);
@@ -14738,17 +15104,17 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    }
 
 	  ELEM_TYPE elem(0);
-	  auto cause = determineLoadException(faddr, sizeof(elem));
+	  uint64_t physAddr = faddr;
+	  auto cause = determineLoadException(physAddr, sizeof(elem));
 
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(faddr, elem);
+            memory_.read(physAddr, elem);
 	  else
 	    {
-	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
 		initiateLoadException(cause, faddr);
-	      return;
+	      return false;
 	    }
 
 	  if (not vecRegs_.write(dvg, ix, groupX8, elem))
@@ -14758,6 +15124,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  vecRegs_.ldStAddr_.push_back(faddr);
 	}
     }
+
+  return true;
 }
 
 
@@ -14770,7 +15138,9 @@ Hart<URV>::execVlsege8_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
-  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14783,7 +15153,9 @@ Hart<URV>::execVlsege16_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
-  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14796,7 +15168,9 @@ Hart<URV>::execVlsege32_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
-  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14809,7 +15183,9 @@ Hart<URV>::execVlsege64_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
-  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14847,7 +15223,7 @@ Hart<URV>::execVlsege1024_v(const DecodedInst* di)
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 			  unsigned fieldCount, uint64_t stride)
 {
@@ -14862,20 +15238,20 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
-    return;
+    return false;
 
   uint64_t addr = intRegs_.read(rs1);
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount(), elemSize = sizeof(ELEM_TYPE);
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
@@ -14883,7 +15259,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   if (vd + fieldCount*eg > 32)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
@@ -14901,10 +15277,11 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	    assert(0);
 
 	  bool forced = false;
-	  auto cause = determineStoreException(faddr, elem, forced);
+	  uint64_t physAddr = faddr;
+	  auto cause = determineStoreException(physAddr, elem, forced);
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memory_.write(hartIx_, faddr, elem);
+	      memory_.write(hartIx_, physAddr, elem);
 
 	      vecRegs_.ldStSize_ = sizeof(elem);
 	      vecRegs_.ldStAddr_.push_back(faddr);
@@ -14912,13 +15289,14 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	    }
 	  else
 	    {
-	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      initiateStoreException(cause, faddr);
-	      return;
+	      return false;
 	    }
 	}
     }
+
+  return true;
 }
 
 
@@ -14928,7 +15306,9 @@ Hart<URV>::execVssege8_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
-  vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+  if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14938,7 +15318,9 @@ Hart<URV>::execVssege16_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
-  vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+  if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14948,7 +15330,9 @@ Hart<URV>::execVssege32_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
-  vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+  if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -14958,7 +15342,9 @@ Hart<URV>::execVssege64_v(const DecodedInst* di)
 {
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
-  vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+  if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15003,7 +15389,9 @@ Hart<URV>::execVlssege8_v(const DecodedInst* di)
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15016,7 +15404,9 @@ Hart<URV>::execVlssege16_v(const DecodedInst* di)
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15029,7 +15419,9 @@ Hart<URV>::execVlssege32_v(const DecodedInst* di)
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15042,7 +15434,9 @@ Hart<URV>::execVlssege64_v(const DecodedInst* di)
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false);
+  if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15084,7 +15478,9 @@ Hart<URV>::execVsssege8_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride);
+  if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15094,7 +15490,9 @@ Hart<URV>::execVsssege16_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride);
+  if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15104,7 +15502,9 @@ Hart<URV>::execVsssege32_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride);
+  if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15114,7 +15514,9 @@ Hart<URV>::execVsssege64_v(const DecodedInst* di)
 {
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
-  vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride);
+  if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15152,7 +15554,7 @@ Hart<URV>::execVsssege1024_v(const DecodedInst* di)
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -15167,20 +15569,20 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
-    return;
+    return false;
 
   uint64_t addr = intRegs_.read(rs1);
-  unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
+  unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
   unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
@@ -15188,7 +15590,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   if (vd + fieldCount*eg > 32)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -15208,7 +15610,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	      continue;
 	    }
 
-	  uint64_t physAddr = URV(faddr);
+	  uint64_t physAddr = faddr;
           auto cause = determineLoadException(physAddr, elemSize);
 	  if (cause == ExceptionCause::NONE)
 	    {
@@ -15241,16 +15643,17 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 	  else
 	    {
-	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      initiateLoadException(cause, faddr);
-	      return;
+	      return false;
 	    }
 
 	  vecRegs_.ldStSize_ = elemSize;
-	  vecRegs_.ldStAddr_.push_back(physAddr);
+	  vecRegs_.ldStAddr_.push_back(faddr);
 	}
     }
+
+  return true;
 }
 
 
@@ -15260,7 +15663,9 @@ Hart<URV>::execVluxsegei8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15270,7 +15675,9 @@ Hart<URV>::execVluxsegei16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15280,7 +15687,9 @@ Hart<URV>::execVluxsegei32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15290,7 +15699,9 @@ Hart<URV>::execVluxsegei64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15328,7 +15739,7 @@ Hart<URV>::execVluxsegei1024_v(const DecodedInst* di)
 
 template <typename URV>
 template <typename ELEM_TYPE>
-void
+bool
 Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
   vecRegs_.ldStAddr_.clear();
@@ -15343,20 +15754,20 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not isVecLegal() or badConfig)
+  if (not checkVecExec() or badConfig)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
-    return;
+    return false;
 
   uint64_t addr = intRegs_.read(rs1);
-  unsigned start = vecRegs_.startIndex(), elemSize = elemWidth / 8;
+  unsigned start = csRegs_.peekVstart(), elemSize = elemWidth / 8;
   unsigned elemCount = vecRegs_.elemCount(), fieldCount = di->vecFieldCount();
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
@@ -15364,7 +15775,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   if (vd + fieldCount*eg > 32)
     {
       illegalInst(di);
-      return;
+      return false;
     }
 
   for (unsigned ix = start; ix < elemCount; ++ix)
@@ -15373,7 +15784,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
-      uint64_t faddr = URV(addr + offset), data = 0;
+      uint64_t faddr = addr + offset, data = 0;
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
@@ -15383,41 +15794,42 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
 	  auto cause = ExceptionCause::NONE;
 	  bool forced = false;
+	  uint64_t physAddr = faddr;
 
 	  if (elemSize == 1)
 	    {
 	      uint8_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(faddr, x, forced);
+	      cause = determineStoreException(physAddr, x, forced);
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, faddr, x);
+		memory_.write(hartIx_, physAddr, x);
 	      data = x;
 	    }
 	  else if (elemSize == 2)
 	    {
 	      uint16_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(faddr, x, forced);
+	      cause = determineStoreException(physAddr, x, forced);
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, faddr, x);
+		memory_.write(hartIx_, physAddr, x);
 	      data = x;
 	    }
 	  else if (elemSize == 4)
 	    {
 	      uint32_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(faddr, x, forced);
+	      cause = determineStoreException(physAddr, x, forced);
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, faddr, x);
+		memory_.write(hartIx_, physAddr, x);
 	      data = x;
 	    }
 	  else if (elemSize == 8)
 	    {
 	      uint64_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(faddr, x, forced);
+	      cause = determineStoreException(physAddr, x, forced);
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, faddr, x);
+		memory_.write(hartIx_, physAddr, x);
 	      data = x;
 	    }
 	  else
@@ -15425,10 +15837,9 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
 	  if (cause != ExceptionCause::NONE)
 	    {
-	      vecRegs_.setStartIndex(ix);
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      initiateStoreException(cause, faddr);
-	      break;
+	      return false;
 	    }
 
 	  vecRegs_.ldStSize_ = elemSize;
@@ -15436,6 +15847,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  vecRegs_.stData_.push_back(data);
 	}
     }
+
+  return true;
 }
 
 
@@ -15443,7 +15856,9 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei8_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15451,7 +15866,9 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei16_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15459,7 +15876,9 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei32_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15467,7 +15886,9 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei64_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15509,7 +15930,9 @@ Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15519,7 +15942,9 @@ Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15529,7 +15954,9 @@ Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15539,7 +15966,9 @@ Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15579,7 +16008,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte);
+  if (not vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15587,7 +16018,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half);
+  if (not vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15595,7 +16028,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word);
+  if (not vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15603,7 +16038,9 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
 {
-  vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2);
+  if (not vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15648,7 +16085,9 @@ Hart<URV>::execVlsege8ff_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
-  vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, true);
+  if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15661,7 +16100,9 @@ Hart<URV>::execVlsege16ff_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
-  vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, true);
+  if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15674,7 +16115,9 @@ Hart<URV>::execVlsege32ff_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
-  vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, true);
+  if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -15687,7 +16130,9 @@ Hart<URV>::execVlsege64ff_v(const DecodedInst* di)
 
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
-  vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, true);
+  if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, true))
+    return;
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16158,7 +16603,7 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -16176,6 +16621,7 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16220,7 +16666,7 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -16238,6 +16684,7 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16281,7 +16728,7 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -16299,6 +16746,7 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16343,7 +16791,7 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -16361,6 +16809,7 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16405,7 +16854,7 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -16423,6 +16872,7 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16485,7 +16935,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -16499,6 +16949,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16561,7 +17012,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -16574,6 +17025,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16636,7 +17088,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -16650,6 +17102,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16712,7 +17165,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -16725,6 +17178,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16786,7 +17240,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -16800,6 +17254,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16860,7 +17315,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -16873,6 +17328,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -16934,7 +17390,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -16947,6 +17403,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17007,7 +17464,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
-  unsigned start = vecRegs_.startIndex();
+  unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
   typedef ElementWidth EW;
@@ -17020,6 +17477,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17063,7 +17521,7 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17081,6 +17539,7 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17125,7 +17584,7 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17143,6 +17602,7 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17186,7 +17646,7 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17204,6 +17664,7 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17248,7 +17709,7 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17266,6 +17727,7 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17310,7 +17772,7 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17328,6 +17790,7 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17377,7 +17840,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17401,6 +17864,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17451,7 +17915,7 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17475,6 +17939,7 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17538,7 +18003,7 @@ Hart<URV>::execVfmadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17553,6 +18018,7 @@ Hart<URV>::execVfmadd_vv(const DecodedInst* di)
     case EW::Word2:  vfmadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -17603,7 +18069,7 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17618,6 +18084,7 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
     case EW::Word2: vfmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17671,7 +18138,7 @@ Hart<URV>::execVfnmadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17686,6 +18153,7 @@ Hart<URV>::execVfnmadd_vv(const DecodedInst* di)
     case EW::Word2:  vfnmadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -17736,7 +18204,7 @@ Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17751,6 +18219,7 @@ Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
     case EW::Word2: vfnmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17804,7 +18273,7 @@ Hart<URV>::execVfmsub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17819,6 +18288,7 @@ Hart<URV>::execVfmsub_vv(const DecodedInst* di)
     case EW::Word2:  vfmsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -17869,7 +18339,7 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17884,6 +18354,7 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
     case EW::Word2: vfmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -17937,7 +18408,7 @@ Hart<URV>::execVfnmsub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -17952,6 +18423,7 @@ Hart<URV>::execVfnmsub_vv(const DecodedInst* di)
     case EW::Word2:  vfnmsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -18002,7 +18474,7 @@ Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18017,6 +18489,7 @@ Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
     case EW::Word2: vfnmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -18070,7 +18543,7 @@ Hart<URV>::execVfmacc_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18085,6 +18558,7 @@ Hart<URV>::execVfmacc_vv(const DecodedInst* di)
     case EW::Word2:  vfmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -18138,7 +18612,7 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18165,6 +18639,7 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
 
     default: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -18218,7 +18693,7 @@ Hart<URV>::execVfnmacc_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18233,6 +18708,7 @@ Hart<URV>::execVfnmacc_vv(const DecodedInst* di)
     case EW::Word2:  vfnmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -18283,7 +18759,7 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  v2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18298,6 +18774,7 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
     case EW::Word2: vfnmacc_vf<double> (vd, f1, v2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -18351,7 +18828,7 @@ Hart<URV>::execVfmsac_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18366,6 +18843,7 @@ Hart<URV>::execVfmsac_vv(const DecodedInst* di)
     case EW::Word2:  vfmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -18416,7 +18894,7 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18431,6 +18909,7 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
     case EW::Word2: vfmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -18484,7 +18963,7 @@ Hart<URV>::execVfnmsac_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18499,6 +18978,7 @@ Hart<URV>::execVfnmsac_vv(const DecodedInst* di)
     case EW::Word2:  vfnmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -18549,7 +19029,7 @@ Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  f1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18564,6 +19044,7 @@ Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
     case EW::Word2: vfnmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -18624,7 +19105,7 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18644,6 +19125,7 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
     case EW::Word:   vfwmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -18700,7 +19182,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18720,6 +19202,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
     case EW::Word: vfwmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -18780,7 +19263,7 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18800,6 +19283,7 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
     case EW::Word: vfwnmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -18856,7 +19340,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18876,6 +19360,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
     case EW::Word: vfwnmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -18936,7 +19421,7 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -18956,6 +19441,7 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
     case EW::Word:   vfwmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 template <typename URV>
@@ -19012,7 +19498,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19032,6 +19518,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
     case EW::Word: vfwmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19092,7 +19579,7 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19112,6 +19599,7 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
     case EW::Word: vfwnmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19169,7 +19657,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19189,6 +19677,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
     case EW::Word: vfwnmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19235,7 +19724,7 @@ Hart<URV>::execVfsqrt_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19250,6 +19739,7 @@ Hart<URV>::execVfsqrt_v(const DecodedInst* di)
     case EW::Word2: vfsqrt_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19284,7 +19774,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or not di->isMasked() or
+  if (not checkVecExec() or not vecRegs_.legalConfig() or not di->isMasked() or
       di->op0() == 0)
     {
       illegalInst(di);
@@ -19292,7 +19782,7 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
     }
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19319,6 +19809,7 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
 
     default: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19346,14 +19837,14 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_v_f(const DecodedInst* di)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
   unsigned vd = di->op0(),  rs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19380,6 +19871,7 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
 
     default: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19429,7 +19921,7 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -19437,12 +19929,13 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vmfeq_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfeq_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfeq_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); break;
+    default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19491,7 +19984,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19506,6 +19999,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
     case EW::Word2: vmfeq_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19555,7 +20049,7 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -19563,12 +20057,13 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vmfne_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfne_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfne_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); break;
+    default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19617,7 +20112,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19632,6 +20127,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
     case EW::Word2: vmfne_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19678,7 +20174,7 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -19686,12 +20182,13 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vmflt_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmflt_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmflt_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19737,7 +20234,7 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19750,8 +20247,9 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
     case EW::Half:  vmflt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmflt_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmflt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19798,7 +20296,7 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemCount(), start = vecRegs_.startIndex();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
   if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
@@ -19806,12 +20304,13 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vmfle_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmfle_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmfle_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19857,7 +20356,7 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19870,8 +20369,9 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
     case EW::Half:  vmfle_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfle_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfle_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19917,7 +20417,7 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19930,8 +20430,9 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
     case EW::Half:  vmfgt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfgt_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfgt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -19977,7 +20478,7 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
 {
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -19990,8 +20491,9 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
     case EW::Half:  vmfge_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfge_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfge_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20036,7 +20538,7 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20046,12 +20548,13 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfclass_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfclass_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:         illegalInst(di); break;
+    default:         illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20557,7 +21060,7 @@ Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20567,15 +21070,16 @@ Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20621,7 +21125,7 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20631,15 +21135,16 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20653,7 +21158,7 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20663,15 +21168,16 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20685,7 +21191,7 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20695,15 +21201,16 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20751,7 +21258,7 @@ Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20761,15 +21268,16 @@ Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfcvt_f_xu_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_xu_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_xu_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20817,7 +21325,7 @@ Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20827,15 +21335,16 @@ Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfcvt_f_x_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_x_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_x_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20885,7 +21394,7 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20901,11 +21410,12 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20955,7 +21465,7 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -20971,11 +21481,12 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -20990,7 +21501,7 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21006,11 +21517,12 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21024,7 +21536,7 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21040,11 +21552,12 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21098,7 +21611,7 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21128,8 +21641,9 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
       break;
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21183,7 +21697,7 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21213,8 +21727,9 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
       break;
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21267,7 +21782,7 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21283,11 +21798,12 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfwcvt_f_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21341,7 +21857,7 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21369,8 +21885,9 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
       if (not isDpLegal()) { illegalInst(di); return; }
       vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked);
       break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21424,7 +21941,7 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21454,8 +21971,9 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
       break;
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21472,7 +21990,7 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21502,8 +22020,9 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
       break;
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21520,7 +22039,7 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21550,8 +22069,9 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
       break;
     default:
       illegalInst(di);
-      break;
+      return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21602,7 +22122,7 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21618,14 +22138,15 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21676,7 +22197,7 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21692,14 +22213,15 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21749,7 +22271,7 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21765,14 +22287,15 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    default:         illegalInst(di); break;
+    default:         illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21792,7 +22315,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -21808,14 +22331,15 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); break;
+    case EW::Byte: illegalInst(di); return;
     case EW::Half: vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); break;
+    default:       illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21864,12 +22388,12 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -21877,18 +22401,19 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredsum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -21937,12 +22462,12 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -21950,18 +22475,19 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredosum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22017,12 +22543,12 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22030,17 +22556,18 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfredmin_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmin_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmin_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22096,12 +22623,12 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22109,17 +22636,18 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfredmax_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmax_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmax_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22174,7 +22702,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
@@ -22185,7 +22713,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22193,18 +22721,19 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfwredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22259,7 +22788,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
@@ -22270,7 +22799,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
       return;
     }
 
-  if (not checkRedOpVsEmul(di, vs1, group))
+  if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
     return;
@@ -22278,18 +22807,19 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfwredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word2:  illegalInst(di); return;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22351,7 +22881,7 @@ Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22366,6 +22896,7 @@ Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
     case EW::Word2: vfrsqrt7_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22417,7 +22948,7 @@ Hart<URV>::execVfrec7_v(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22432,6 +22963,7 @@ Hart<URV>::execVfrec7_v(const DecodedInst* di)
     case EW::Word2: vfrec7_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22483,7 +23015,7 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22493,17 +23025,18 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); break;
+    case EW::Byte:   illegalInst(di); return;
     case EW::Half:   vfmin_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmin_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmin_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); break;
-    case EW::Word8:  illegalInst(di); break;
-    case EW::Word16: illegalInst(di); break;
-    case EW::Word32: illegalInst(di); break;
+    case EW::Word4:  illegalInst(di); return;
+    case EW::Word8:  illegalInst(di); return;
+    case EW::Word16: illegalInst(di); return;
+    case EW::Word32: illegalInst(di); return;
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22555,7 +23088,7 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22572,6 +23105,7 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22623,7 +23157,7 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22633,14 +23167,15 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfmax_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfmax_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfmax_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22692,7 +23227,7 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22709,6 +23244,7 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22753,7 +23289,7 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22763,14 +23299,15 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfsgnj_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnj_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnj_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22815,7 +23352,7 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22832,6 +23369,7 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22877,7 +23415,7 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22887,14 +23425,15 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfsgnjn_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjn_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjn_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -22940,7 +23479,7 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -22957,6 +23496,7 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -23007,7 +23547,7 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -23017,14 +23557,15 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); break;
+    case EW::Byte:  illegalInst(di); return;
     case EW::Half:  vfsgnjx_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjx_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjx_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); break;
+    default:        illegalInst(di); return;
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 
@@ -23076,7 +23617,7 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = vecRegs_.startIndex();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -23093,6 +23634,7 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
     }
 
   markFsDirty();
+  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
 }
 
 

@@ -1616,6 +1616,7 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
 
 
 #include <termios.h>
+#undef VSTART
 
 static bool
 hasPendingInput(int fd)
@@ -2559,7 +2560,6 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
-
   return true;
 }
 
@@ -2833,6 +2833,7 @@ static
 const char*
 privilegeModeToStr(PrivilegeMode pm)
 {
+  return "";
   if (pm == PrivilegeMode::Machine)    return "M";
   if (pm == PrivilegeMode::Supervisor) return "S";
   if (pm == PrivilegeMode::User)       return "U";
@@ -10412,6 +10413,12 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
     if (not isFpLegal())
       return false;
 
+  if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
+      csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
+      csr == CsrNumber::VLENB)
+    if (not isVecLegal())
+      return false;
+
   return true;
 }
 
@@ -10472,6 +10479,22 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
   // Update cached values of MSTATUS MPP and MPRV.
   if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
     updateCachedMstatusFields();
+
+  // Update cached value of VTYPE
+  if (csr == CsrNumber::VTYPE)
+    {
+      bool vill = (csrVal >> (8*sizeof(URV) - 1)) & 1;
+      bool ma = (csrVal >> 7) & 1;
+      bool ta = (csrVal >> 6) & 1;
+      GroupMultiplier gm = GroupMultiplier(csrVal & 7);
+      ElementWidth ew = ElementWidth((csrVal >> 3) & 7);
+      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+    }
+
+  if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
+      csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
+      csr == CsrNumber::VLENB)
+    markVsDirty();
 
   // Csr was written. If it was minstret, compensate for
   // auto-increment that will be done by run, runUntilAddress or
@@ -11451,6 +11474,7 @@ Hart<URV>::markVsDirty()
   URV val = csRegs_.peekMstatus();
   MstatusFields<URV> fields(val);
   fields.bits_.VS = unsigned(FpFs::Dirty);
+  fields.bits_.SD = 1;
 
   csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
 
