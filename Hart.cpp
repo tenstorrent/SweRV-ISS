@@ -1429,10 +1429,11 @@ Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
       Pmp pmp = pmpManager_.accessPmp(addr);
       if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_) and
           not isAddrMemMapped(addr))
-        {
-          return ExceptionCause::LOAD_ACC_FAULT;
-        }
+	return ExceptionCause::LOAD_ACC_FAULT;
     }
+
+  if (not memory_.checkRead(addr, ldSize))
+    return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 
   // Fault dictated by test-bench.
   if (forceAccessFail_)
