@@ -259,6 +259,7 @@ Hart<URV>::markFsDirty()
   URV val = csRegs_.peekMstatus();
   MstatusFields<URV> fields(val);
   fields.bits_.FS = unsigned(FpFs::Dirty);
+  fields.bits_.SD = 1;
 
   csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
 

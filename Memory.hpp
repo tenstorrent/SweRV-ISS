@@ -168,6 +168,32 @@ namespace WdRiscv
       return false;
     }
 
+    /// Return true if read will be successful if tried. 
+    bool checkRead(size_t address, unsigned readSize)
+    {
+      Pma pma1 = pmaMgr_.getPma(address);
+      if (not pma1.isRead())
+	return false;
+
+      if (address & (readSize - 1))  // If address is misaligned
+	{
+          Pma pma2 = pmaMgr_.getPma(address + readSize - 1);
+          if (pma1 != pma2)
+            return false;
+	}
+
+      // Memory mapped region accessible only with word-size read.
+      if (pma1.isMemMappedReg())
+        {
+          if (readSize != 4)
+            return false;
+          if ((address & 3) != 0)
+            return false;
+        }
+
+      return true;
+    }
+
     /// Return true if write will be successful if tried. Do not
     /// write.  Change value to the maksed value if write is to a
     /// memory mapped register.

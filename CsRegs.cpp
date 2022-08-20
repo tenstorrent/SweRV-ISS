@@ -1113,16 +1113,24 @@ CsRegs<URV>::defineSupervisorRegs()
 
   using Csrn = CsrNumber;
 
-  // Only bits sie, spie, upie, ube, spp, fs, xs, sum, mxr, uxl (rv64) and sd of
-  // sstatus are writeable.  The non-writeable bits read zero.
-  uint64_t mask = 0x800de162;
+  // Only fields TSR, TW, TVM, MXR, SUM, FS, VS, SPP, SPIE, and SIE are writeable.
+  uint64_t mask     = 0x00766722;
+  uint64_t pokeMask = 0x80766722;  // Filed SD is pokable.
   if (not rv32_)
-    mask = 0x80000003000de162L;
-  defineCsr("sstatus",    Csrn::SSTATUS,    !mand, !imp, 0, mask, mask);
+    {
+      mask     = 0x0000000000766722L;
+      pokeMask = 0x8000000000766722L;
+    }
+  defineCsr("sstatus",    Csrn::SSTATUS,    !mand, !imp, 0, mask, pokeMask);
 
   auto sstatus = findCsr(Csrn::SSTATUS);
   if (sstatus)
-    sstatus->setReadMask(mask);
+    {
+      // SSTATUS tied to MSTATUS but not all bits are readable.
+      sstatus->setReadMask(0x00766722L);
+      if constexpr (sizeof(URV) == 8)
+	sstatus->setReadMask(0x0000000300766722L);
+    }
 
   // SSTATUS shadows MSTATUS
   auto mstatus = findCsr(Csrn::MSTATUS);
