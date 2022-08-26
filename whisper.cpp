@@ -900,7 +900,8 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.consoleIoSym)
     hart.setConsoleIoSymbol(*args.consoleIoSym);
 
-  // Load ELF files. Entry point of first file sets the start PC uness in raw mode.
+  // Load ELF files. Entry point of first file sets the start PC
+  // unless in raw mode.
   bool firstElf = true;
   size_t entryPoint = 0;
   for (const auto& target : args.expandedTargets)
