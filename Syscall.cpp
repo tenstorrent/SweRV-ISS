@@ -1080,7 +1080,6 @@ Syscall<URV>::emulate()
 	return copyOk? rc : SRV(-1);
       }
 
-
     case 214: // brk
        {
      	  URV newBrk = a0;
@@ -1096,6 +1095,8 @@ Syscall<URV>::emulate()
      	  return rc;
        }
 
+    case 226: //  mprotect
+      return 0;
 
     case 57: // close
       {
