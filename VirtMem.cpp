@@ -218,7 +218,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
     }
   else if (mode_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-47 muse equal bit 47
+      // Part 1 of address translation: Bits 63-47 must equal bit 47
       uint64_t mask = (va >> 47) & 1;
       if (mask)
         mask = 0xffff;  // Least sig 16 bits set
