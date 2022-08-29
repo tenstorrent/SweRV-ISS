@@ -1080,6 +1080,9 @@ Syscall<URV>::emulate()
 	return copyOk? rc : SRV(-1);
       }
 
+    case 98:  // futex
+      return 0;
+
     case 214: // brk
        {
      	  URV newBrk = a0;
