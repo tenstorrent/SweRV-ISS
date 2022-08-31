@@ -1217,7 +1217,7 @@ Syscall<URV>::emulate()
 	int rc = uname(&uts);
         if (rc >= 0)
           {
-            strcpy(uts.release, "5.14.0");
+            strcpy(uts.release, "5.16.0");
             size_t len = writeHartMemory(hart_, reinterpret_cast<char*>(&uts),
                                          rvBuff, sizeof(uts));
             if (len)
