@@ -236,6 +236,7 @@ struct Args
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
+  bool tracePtw = false;   // Enable printing of page table walk info in log.
 
   // Expand each target program string into program name and args.
   void expandTargets();
@@ -469,6 +470,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Enable interactive mode.")
 	("traceload", po::bool_switch(&args.traceLdSt),
 	 "Enable tracing of load/store instruction data address (deprecated -- now always on).")
+	("traceptw", po::bool_switch(&args.tracePtw),
+	 "Enable printing of page table walk information in log.")
 	("triggers", po::bool_switch(&args.triggers),
 	 "Enable debug triggers (triggers are on in interactive and server modes)")
 	("counters", po::bool_switch(&args.counters),
@@ -1034,6 +1037,9 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   // Print load-instruction data-address when tracing instructions.
   // if (args.traceLdSt)  // Deprecated -- now always on.
+
+  if (args.tracePtw)
+    hart.tracePtw(true);
 
   // Setup periodic external interrupts.
   if (args.alarmInterval)

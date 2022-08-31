@@ -1156,6 +1156,17 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  // Trace page table walk in log.
+  tag = "trace_ptw";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ ->at(tag), flag))
+        hart.tracePtw(flag);
+      else
+        errors++;
+    }
+
   // Reservation size in bytes for the load-reserve (LR) instruction.
   // Default is 4 for rv32 and 8 for rv64. A reservation size smaller
   // than default has no effect.

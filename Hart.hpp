@@ -1547,6 +1547,10 @@ namespace WdRiscv
     void enableInstructionLineTrace()
     { instrLineTrace_ = true; }
 
+    /// Enable disable page-table-walk info in log.
+    void tracePtw(bool flag)
+    { tracePtw_ = flag; }
+
   protected:
 
     /// Helper to reset: reset floating point related structures.
@@ -4189,6 +4193,7 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     bool targetProgFinished_ = false;
     bool useElfSymbols_ = true;
+    bool tracePtw_ = false;          // Trace paget table walk.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
 

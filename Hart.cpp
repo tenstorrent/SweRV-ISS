@@ -2988,6 +2988,28 @@ static std::mutex printInstTraceMutex;
 
 extern void (*tracerExtension)(void*);
 
+
+template <typename URV>
+static
+void
+printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
+		   const std::vector<uint64_t>& addresses)
+{
+  fputs(tag, out);
+  fputs(":", out);
+  const char* sep = "";
+  for (auto addr : addresses)
+    {
+      URV pte = 0;
+      hart.peekMemory(addr, pte, true);
+      uint64_t pte64 = pte;
+      fputs(sep, out);
+      fprintf(out, "0x%lx=0x%lx", addr, pte64);
+      sep = ",";
+    }
+}
+
+
 template <typename URV>
 void
 Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
@@ -3201,15 +3223,27 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       pending = true;
     }
 
-  if (pending) 
-    fprintf(out, "\n");
-  else
+  if (not pending) 
+    formatInstTrace<URV>(out, tag, hartIx_, lastPriv_, currPc_, instBuff, 'r', 0, 0,
+			 tmp.c_str());  // No change: emit X0 as modified reg.
+
+  if (tracePtw_)
     {
-      // No diffs: Generate an x0 record.
-      formatInstTrace<URV>(out, tag, hartIx_, lastPriv_, currPc_, instBuff, 'r', 0, 0,
-			  tmp.c_str());
-      fprintf(out, "\n");
+      auto& instrPte = virtMem_.getInstrPteAddrs();
+      if (not instrPte.empty())
+	{
+	  fputs("  +\n", out);
+	  printPageTableWalk(out, *this, "iptw", instrPte);
+	}
+
+      auto& dataPte = virtMem_.getDataPteAddrs();
+      if (not dataPte.empty())
+	{
+	  fputs("  +\n", out);
+	  printPageTableWalk(out, *this, "dptw", dataPte);
+	}
     }
+  fputs("\n", out);
 }
 
 
