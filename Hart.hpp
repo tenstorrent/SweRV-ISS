@@ -1425,6 +1425,28 @@ namespace WdRiscv
                           bool fetch, bool load, bool store) const
     { virtMem_.getPageTableWalk(entries, fetch, load, store); }
 
+    /// Fill the addresses vector (cleared on entry) with the
+    /// addresses of instruction/data the page table entries
+    /// referenced by the instruction/data page table walk of the last
+    /// executed instruction or make it empty if no page table walk
+    /// took place.
+    void getPageTableWalkAddresses(bool instruction, std::vector<uint64_t>& addresses) const
+    { addresses = instruction? virtMem_.getInstrPteAddrs() : virtMem_.getDataPteAddrs(); }
+
+    /// Get the paget table entries of the page table walk of the last
+    /// executed instruction (see getPageTableAlkAddresses).
+    void getPageTableWalkEntries(bool instruction, std::vector<uint64_t>& ptes) const
+    {
+      auto& addrs = instruction? virtMem_.getInstrPteAddrs() : virtMem_.getDataPteAddrs();
+      ptes.clear();
+      for (auto addr : addrs)
+	{
+	  URV pte = 0;
+	  peekMemory(addr, pte, true);
+	  ptes.push_back(pte);
+	}
+    }
+
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
     { csRegs_.enablePerModeCounterControl(flag); }

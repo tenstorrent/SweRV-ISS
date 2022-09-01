@@ -893,6 +893,31 @@ specialResourceToStr(uint64_t v)
 }
 
 
+template <typename URV>
+void
+doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
+{
+  bool isInstr = reply.flags & 1;
+  bool isAddr = reply.flags & 2;
+
+  std::vector<uint64_t> items;
+  if (isAddr)
+    hart.getPageTableWalkAddresses(isInstr, items);
+  else
+    hart.getPageTableWalkEntries(isInstr, items);
+  if (items.size() > 5)
+    {
+      std::cerr << "doPageTableWalk: Walk too long: " << items.size() << " entries\n";
+      reply.type = Invalid;
+      return;
+    }
+
+  reply.size = items.size();
+  if (items.size())
+    memcpy(reply.buffer, items.data(), items.size()*sizeof(uint64_t));
+}
+
+
 // Server mode loop: Receive command and send reply till a quit
 // command is received. Return true on successful termination (quit
 // received). Return false otherwise.
@@ -1130,6 +1155,10 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 		      fprintf(commandLog, "\n");
 		    }
 		}
+	      break;
+
+	    case PageTableWalk:
+	      doPageTableWalk(hart, reply);
 	      break;
 
 	    default:
