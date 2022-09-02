@@ -1518,6 +1518,20 @@ HartConfig::getXlen(unsigned& xlen) const
 {
   if (config_ -> count("xlen"))
     return getJsonUnsigned("xlen", config_ -> at("xlen"), xlen);
+  std::string isa;
+  if (not getIsa(isa))
+    return false;
+  if (isa.size() >= 4 and isa.at(0) == 'r' and isa.at(1) == 'v')
+    {
+      int len = atoi(isa.c_str() + 2);
+      if (len == 32 or len == 64)
+	{
+	  xlen = len;
+	  return true;
+	}
+      std::cerr << "Invalid register width in isa string ("
+		<< isa << ") in config file -- ignored\n";
+    }
   return false;
 }
 
