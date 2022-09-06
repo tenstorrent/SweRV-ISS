@@ -941,7 +941,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
         {
           filename = binaryFile.substr(0, end);
           std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
-          offs = strtoull(offsStr.c_str(), NULL, 0);
+          offs = strtoull(offsStr.c_str(), nullptr, 0);
         }
       else
         std::cerr << "Binary " << binaryFile << " does not have an address, will use address 0x0\n";
@@ -962,7 +962,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
         {
           filename = args.kernelFile.substr(0, end);
           std::string offsStr = args.kernelFile.substr(end + 1, args.kernelFile.length());
-          offs = strtoull(offsStr.c_str(), NULL, 0);
+          offs = strtoull(offsStr.c_str(), nullptr, 0);
         }
 
       if (args.verbose)
@@ -1270,7 +1270,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 	}
     }
 
-  if (args.trace and traceFile == NULL)
+  if (args.trace and traceFile == nullptr)
     traceFile = stdout;
   if (traceFile and not doGzip)
     setlinebuf(traceFile);  // Make line-buffered.

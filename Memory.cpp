@@ -833,10 +833,25 @@ Memory::loadSnapshot(const std::string & filename,
   size_t remainingSize = 0;
   for (auto& blk: used_blocks)
     {
-      uint8_t * buffer = data_+blk.first;
+      if (blk.first >= size_)
+	{
+	  std::cerr << "Memory::loadSnapshot: Block address (0x" << std::hex << blk.first
+		    << ") out of bounds (0x" << std::hex << size_ << ")\n" << std::dec;
+	  success = false;
+	  break;
+	}
       remainingSize = blk.second;
-      assert(prev_addr<=blk.first);
-      prev_addr = blk.first+blk.second;
+      if (remainingSize > size_ or size_ - remainingSize < blk.first)
+	{
+	  std::cerr << "Memory::loadSnapshot: Block at (0x" << std::hex << blk.first
+		    << ") extends beyond memory bound\n";
+	  success = false;
+	  break;
+	}
+
+      uint8_t* buffer = data_ + blk.first;
+      assert(prev_addr <= blk.first);
+      prev_addr = blk.first + blk.second;
       std::cout << "*";
       while (remainingSize) // read in chunk due to gzread limitation
         {
@@ -852,7 +867,7 @@ Memory::loadSnapshot(const std::string & filename,
           remainingSize -= resp;
           buffer += resp;
         }
-      if(not success)
+      if (not success)
         break;
     }
 
@@ -861,8 +876,6 @@ Memory::loadSnapshot(const std::string & filename,
               << " failed: " << gzerror(gzin, nullptr) << "\n";
   else if (remainingSize > 0)
     std::cerr << "Memory::loadSnapshot: Warning: Snapshot data size smaller than memory size\n";
-  else if (not gzeof(gzin))
-    std::cerr << "Memory::loadSnapshot: Warning: Snapshot data size larger than memory size\n";
 
   gzclose(gzin);
   std::cout << "\nloadSnapshot finished\n";
