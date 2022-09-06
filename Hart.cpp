@@ -2171,7 +2171,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
 	{
 	  throw CoreException(CoreException::Stop,
 			      "64 consecutive illegal instructions",
-			      0, 0);
+			      0, 3);
 	}
 
       counterAtLastIllegal_ = instCounter_;
@@ -3260,7 +3260,10 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (not traceHeaderPrinted_)
     {
       traceHeaderPrinted_ = true;
-      fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid\n");
+      fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid");
+      if (isRvs())
+	fprintf(out, ", iptw, dptw");
+      fprintf(out, "\n");
     }
 
   // Program counter.
@@ -3452,6 +3455,34 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Hart Id.
   fprintf(out, ",%x", sysHartIndex());
+
+  // Page table walk.
+  if (isRvs())
+    {
+      fputs(",", out);
+      std::vector<uint64_t> addrs, entries;
+      getPageTableWalkAddresses(true, addrs);
+      getPageTableWalkAddresses(true, entries);
+      const char* sep = "";
+      size_t n = std::min(addrs.size(), entries.size());
+      for (size_t i = 0; i < n; ++i)
+	{
+	  fprintf(out, "%s%lx=%lx", sep, addrs.at(i), entries.at(i));
+	  sep = ";";
+	}
+
+      fputs(",", out);
+      getPageTableWalkAddresses(false, addrs);
+      getPageTableWalkAddresses(false, entries);
+      sep = "";
+      n = std::min(addrs.size(), entries.size());
+      for (size_t i = 0; i < n; ++i)
+	{
+	  fprintf(out, "%s%lx=%lx", sep, addrs.at(i), entries.at(i));
+	  sep = ";";
+	}
+    }
+
   fputc('\n', out);
 }
 
