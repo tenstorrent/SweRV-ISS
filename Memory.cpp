@@ -781,7 +781,7 @@ Memory::saveSnapshot(const std::string& filename,
   bool success = true;
   for (auto& blk: used_blocks)
     {
-      uint8_t* buffer = data_+blk.first;
+      uint8_t* buffer = data_ + blk.first;
       size_t remainingSize = blk.second;
       assert(prev_addr<=blk.first);
       prev_addr = blk.first+blk.second;
@@ -952,14 +952,6 @@ Memory::saveInstructionAddressTrace(const std::string& path) const
   if (not instrLineTrace_)
     return true;
   return saveAddressTrace("instruction", instrLineMap_, path);
-}
-
-
-void
-Memory::copy(const Memory& other)
-{
-  size_t n = std::min(size_, other.size_);
-  memcpy(data_, other.data_, n);
 }
 
 

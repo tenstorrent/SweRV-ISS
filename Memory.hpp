@@ -455,11 +455,6 @@ namespace WdRiscv
     static bool collectElfRiscvTags(const std::string& file,
                                     std::vector<std::string>& tags);
 
-    /// Copy data from the given memory into this memory. If the two
-    /// memories have different sizes then copy data from location
-    /// zero up to n-1 where n is the minimum of the sizes.
-    void copy(const Memory& other);
-
     /// Return true if given path corresponds to an ELF file and set
     /// the given flags according to the contents of the file.  Return
     /// false leaving the flags unmodified if file does not exist,
