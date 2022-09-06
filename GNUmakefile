@@ -85,6 +85,12 @@ $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
 			 $(soft_float_lib)
 	$(CXX) -o $@ $^ $(LINK_DIRS) $(LINK_LIBS) -Wl,-export-dynamic
 
+# Rule to make whisper.cpp.o
+$(BUILD_DIR)/whisper.cpp.o:  .FORCE
+	@if [ ! -d "$(dir $@)" ]; then $(MKDIR_P) $(dir $@); fi
+	sha=`git rev-parse --verify HEAD || echo unknown`; echo $$sha; \
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DGIT_SHA="$$sha" -c -o $@ whisper.cpp
+
 # List of all CPP sources needed for librvcore.a
 RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
             Memory.cpp Hart.cpp InstEntry.cpp Triggers.cpp \
@@ -138,5 +144,7 @@ help:
 cscope:
 	( find . \( -name \*.cpp -or -name \*.hpp -or -name \*.c -or -name \*.h \) -print | xargs cscope -b ) && cscope -d && $(RM) cscope.out
 
-.PHONY: install clean help cscope
+.FORCE:
+
+.PHONY: install clean help cscope .FORCE
 
