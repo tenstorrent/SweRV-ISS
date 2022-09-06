@@ -88,7 +88,7 @@ $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
 # Rule to make whisper.cpp.o
 $(BUILD_DIR)/whisper.cpp.o:  .FORCE
 	@if [ ! -d "$(dir $@)" ]; then $(MKDIR_P) $(dir $@); fi
-	sha=`git rev-parse --verify HEAD || echo unknown`; echo $$sha; \
+	sha=`git rev-parse --verify HEAD || echo unknown`; \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DGIT_SHA="$$sha" -c -o $@ whisper.cpp
 
 # List of all CPP sources needed for librvcore.a
