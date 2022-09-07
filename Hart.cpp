@@ -2171,7 +2171,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
 	{
 	  throw CoreException(CoreException::Stop,
 			      "64 consecutive illegal instructions",
-			      0, 3);
+			      0, 0 /*3*/);  // Exit code should be 3.
 	}
 
       counterAtLastIllegal_ = instCounter_;
