@@ -1575,6 +1575,10 @@ namespace WdRiscv
 
   protected:
 
+    /// Set current privilege mode.
+    void setPrivilegeMode(PrivilegeMode m)
+    { privMode_ = m; }
+
     /// Helper to reset: reset floating point related structures.
     /// No-op if no  floating point extension is enabled.
     void resetFloat();

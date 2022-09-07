@@ -111,10 +111,11 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       return false;
     }
 
-  // write Program Order and Program Counter and program break.
-  ofs << "po " << std::dec << getInstructionCount() << "\n";
+  // Write Privilege Mode, Program Order, Program Break, and Program Counter.
+  ofs << "pm " << std::dec << unsigned(privilegeMode()) << '\n';
+  ofs << "po " << std::dec << getInstructionCount() << '\n';
   ofs << "pb 0x" << std::hex << syscall_.targetProgramBreak() << '\n';
-  ofs << "pc 0x" << std::hex << peekPc() << "\n";
+  ofs << "pc 0x" << std::hex << peekPc() << '\n';
 
   // write integer registers
   for (unsigned i = 1; i < 32; i++)
@@ -278,6 +279,19 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
             break; // error: parse failed
           pokePc(val);
         }
+      else if (type == "pm")  // Prrivilege Mode
+	{
+	  if (not loadSnapshotValue(iss, val))
+	    break;
+	  if (val == 0)
+	    setPrivilegeMode(PrivilegeMode::User);
+	  else if (val == 1)
+	    setPrivilegeMode(PrivilegeMode::Supervisor);
+	  else if (val == 3)
+	    setPrivilegeMode(PrivilegeMode::Machine);
+	  else 
+	    break; // error.
+	}
       else if (type == "po")  // Program order
         {
           if (not loadSnapshotValue(iss, val))
