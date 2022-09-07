@@ -3261,7 +3261,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     {
       traceHeaderPrinted_ = true;
       fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid");
-      if (isRvs() and tracePtw_)
+      if (isRvs())
 	fprintf(out, ", iptw, dptw");
       fprintf(out, "\n");
     }
@@ -3457,7 +3457,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   fprintf(out, ",%x", sysHartIndex());
 
   // Page table walk.
-  if (isRvs() and tracePtw_)
+  if (isRvs())
     {
       fputs(",", out);
       std::vector<uint64_t> addrs, entries;
