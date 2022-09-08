@@ -897,8 +897,9 @@ Memory::loadSnapshot(const std::string & filename,
           size_t currentChunk = std::min(remainingSize, maxChunk);
           int resp = gzread(gzin, temp.data(), currentChunk);
 	  int words = resp / 4;
-	  for (int i = 0; i < words; ++i)
-	    poke(blk.first + i*4, temp.at(i));
+	  uint64_t addr = blk.first;
+	  for (int i = 0; i < words; ++i, addr += 4)
+	    poke(addr, temp.at(i));
           if (resp == 0)
             {
               success = gzeof(gzin);
