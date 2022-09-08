@@ -598,12 +598,27 @@ namespace WdRiscv
         entries.assign(pageTableWalkForStore_.begin(), pageTableWalkForStore_.end());
     }
 
+    /// Return the addresses of the instruction page table entries
+    /// used in the last page table walk. Return empty vector if the
+    /// last executed instruction did not induce an instruction page
+    /// table walk.
+    const std::vector<uint64_t>& getInstrPteAddrs() const
+    { return pteInstrAddr_; }
+
+    /// Return the addresses of the data page table entries used in
+    /// the last page table walk. Return empty vector if the last
+    /// executed instruction did not induce a data page table walk.
+    const std::vector<uint64_t>& getDataPteAddrs() const
+    { return pteDataAddr_; }
+
     /// Clear trace of page table walk
     void clearPageTableWalk()
     {
       pageTableWalkForFetch_.clear();
       pageTableWalkForLoad_.clear();
       pageTableWalkForStore_.clear();
+      pteInstrAddr_.clear();
+      pteDataAddr_.clear();
     }
 
   protected:
@@ -692,13 +707,13 @@ namespace WdRiscv
     std::vector<PteType> pageTableWalkForFetch_;
     std::vector<PteType> pageTableWalkForLoad_;
     std::vector<PteType> pageTableWalkForStore_;
+    // Addresses of PTEs used in most recent insruction an data translations.
+    std::vector<uint64_t> pteInstrAddr_;
+    std::vector<uint64_t> pteDataAddr_;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
 
-    // Addresses of PTEs used in most recent insruction an data translations.
-    std::vector<uint64_t> pteInstrAddr_;
-    std::vector<uint64_t> pteDataAddr_;
   };
 
 }

@@ -218,7 +218,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
     }
   else if (mode_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-47 muse equal bit 47
+      // Part 1 of address translation: Bits 63-47 must equal bit 47
       uint64_t mask = (va >> 47) & 1;
       if (mask)
         mask = 0xffff;  // Least sig 16 bits set
@@ -231,7 +231,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
       // Part 1 of address translation: Bits 63-57 muse equal bit 56
       uint64_t mask = (va >> 56) & 1;
       if (mask)
-        mask = 0x3f;  // Least sig 7 bits set
+        mask = 0x7f;  // Least sig 7 bits set
       if ((va >> 57) != mask)
         return pageFaultType(read, write, exec);
       cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, tmpTlbEntry);

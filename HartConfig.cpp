@@ -1156,6 +1156,17 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  // Trace page table walk in log.
+  tag = "trace_ptw";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (getJsonBoolean(tag, config_ ->at(tag), flag))
+        hart.tracePtw(flag);
+      else
+        errors++;
+    }
+
   // Reservation size in bytes for the load-reserve (LR) instruction.
   // Default is 4 for rv32 and 8 for rv64. A reservation size smaller
   // than default has no effect.
@@ -1507,6 +1518,20 @@ HartConfig::getXlen(unsigned& xlen) const
 {
   if (config_ -> count("xlen"))
     return getJsonUnsigned("xlen", config_ -> at("xlen"), xlen);
+  std::string isa;
+  if (not getIsa(isa))
+    return false;
+  if (isa.size() >= 4 and isa.at(0) == 'r' and isa.at(1) == 'v')
+    {
+      int len = atoi(isa.c_str() + 2);
+      if (len == 32 or len == 64)
+	{
+	  xlen = len;
+	  return true;
+	}
+      std::cerr << "Invalid register width in isa string ("
+		<< isa << ") in config file -- ignored\n";
+    }
   return false;
 }
 

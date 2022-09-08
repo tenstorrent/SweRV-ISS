@@ -1080,6 +1080,8 @@ Syscall<URV>::emulate()
 	return copyOk? rc : SRV(-1);
       }
 
+    case 98:  // futex
+      return 0;
 
     case 214: // brk
        {
@@ -1096,6 +1098,8 @@ Syscall<URV>::emulate()
      	  return rc;
        }
 
+    case 226: //  mprotect
+      return 0;
 
     case 57: // close
       {
@@ -1213,7 +1217,7 @@ Syscall<URV>::emulate()
 	int rc = uname(&uts);
         if (rc >= 0)
           {
-            strcpy(uts.release, "5.14.0");
+            strcpy(uts.release, "5.16.0");
             size_t len = writeHartMemory(hart_, reinterpret_cast<char*>(&uts),
                                          rvBuff, sizeof(uts));
             if (len)
