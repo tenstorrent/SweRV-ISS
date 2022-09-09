@@ -151,11 +151,12 @@ System<URV>::mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag,
 template <typename URV>
 bool
 System<URV>::mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t addr,
-		    const std::vector<uint8_t>& data)
+			const std::vector<uint8_t>& data,
+			const std::vector<bool>& mask)
 {
   if (not mcm_)
     return false;
-  return mcm_->mergeBufferWrite(hart, time, addr, data);
+  return mcm_->mergeBufferWrite(hart, time, addr, data, mask);
 }
 
 

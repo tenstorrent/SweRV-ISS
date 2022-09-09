@@ -185,9 +185,11 @@ namespace WdRiscv
     /// size). The rtlData vector must be of size n or larger where n
     /// is the merge buffer line size. The rtlData bytes will be
     /// placed in memory in consecutive locations starting with
-    /// physAddr.
+    /// physAddr. If not-empty, the mask vector contains a flag that
+    /// is set for each byte of rtlData that is written by the RTL.
     bool mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t pysAddr,
-		    const std::vector<uint8_t>& rtlData);
+		    const std::vector<uint8_t>& rtlData,
+		    const std::vector<bool>& mask);
 
     bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		     uint64_t addr, unsigned size, uint64_t data);

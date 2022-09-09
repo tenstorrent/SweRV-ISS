@@ -1865,7 +1865,8 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
       data.resize(lineSize);
     }
 		     
-  return system_.mcmMbWrite(hart, this->time_, addr, data);
+  std::vector<bool> mask;
+  return system_.mcmMbWrite(hart, this->time_, addr, data, mask);
 }
 
 

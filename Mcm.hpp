@@ -132,7 +132,8 @@ namespace WdRiscv
     /// placed in memory in consecutive locations starting with
     /// physAddr.
     bool mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
-			  const std::vector<uint8_t>& rtlData);
+			  const std::vector<uint8_t>& rtlData,
+			  const std::vector<bool>& mask);
 
     /// Insert a write operation for the given instruction into the
     /// merge buffer removing it from the store buffer. Return true on

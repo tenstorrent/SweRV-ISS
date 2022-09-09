@@ -1140,10 +1140,19 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 		}
 	      else
 		{
+		  std::vector<bool> mask;
+		  if (msg.flags)
+		    mask.resize(msg.size);
+
 		  std::vector<uint8_t> data(msg.size);
 		  for (size_t i = 0; i < msg.size; ++i)
-		    data[i] = msg.buffer[i];
-		  if (not system_.mcmMbWrite(hart, msg.time, msg.address, data))
+		    {
+		      data.at(i) = msg.buffer[i];
+		      if (msg.flags)
+			mask.at(i) = msg.tag[i/8] & (1 << (i%8));
+		    }
+
+		  if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
 		    reply.type = Invalid;
 
 		  if (commandLog)

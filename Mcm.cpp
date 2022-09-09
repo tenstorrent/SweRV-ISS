@@ -537,7 +537,8 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
 template <typename URV>
 bool
 Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
-			   const std::vector<uint8_t>& rtlData)
+			   const std::vector<uint8_t>& rtlData,
+			   const std::vector<bool>& rtlMask)
 {
   if (not updateTime("Mcm::mergeBufferWrite", time))
     return false;
@@ -606,13 +607,24 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   else
     {   // Compare covered writes.
       for (unsigned i = 0; i < lineSize_; ++i)
-	if (mask.at(i) and (line.at(i) != rtlData.at(i)))
-	  {
-	    reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
-			   rtlData.at(i), line.at(i));
-	    result = false;
-	    break;
-	  }
+	{
+	  if (mask.at(i) and (line.at(i) != rtlData.at(i)))
+	    {
+	      reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
+			     rtlData.at(i), line.at(i));
+	      result = false;
+	      break;
+	    }
+	  if (not rtlMask.empty() and mask.at(i) != rtlMask.at(i))
+	    {
+	      cerr << "Error: Mismatch on merge buffer update time=" << time
+		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
+		   << (physAddr + i) << std::dec << " rtl=" << rtlMask.at(i)
+		   << " whisper=" << mask.at(i) << '\n';
+	      result = false;
+	      break;
+	    }
+	}
     }
 
   auto& instrVec = hartInstrVecs_.at(hartIx);
