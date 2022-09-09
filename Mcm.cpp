@@ -565,7 +565,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       line.at(i) = byte;
     }
 
-  // Apply pending writes to our line.
+  // Apply pending writes to our line. Compute mask of updated bytes.
+  std::vector<bool> mask(lineSize_);
   uint64_t lineEnd = physAddr + lineSize_;
   for (const auto& write : coveredWrites)
     {
@@ -576,7 +577,10 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	}
       unsigned ix = write.physAddr_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
-	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
+	{
+	  line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
+	  mask.at(ix+i) = true;
+	}
     }
 
   // Put our line back in memory (use poke words to accomodate clint).
@@ -601,26 +605,14 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     }
   else
     {   // Compare covered writes.
-      for (const auto& write : coveredWrites)
-	{
-	  for (unsigned i = 0; i < write.size_; ++i)
-	    {
-	      uint64_t addr = write.physAddr_ + i;
-	      uint64_t offset = addr - physAddr;
-	      if (offset < rtlData.size() and offset < lineSize_)
-		{
-		  uint8_t rtlByte = rtlData.at(offset);
-		  uint8_t byte = line.at(offset);
-		  if (byte != rtlByte)
-		    {
-		      reportMismatch(hart.hartId(), time, "merge buffer write", addr,
-				     rtlByte, byte);
-		      result = false;
-		      break;
-		    }
-		}
-	    }
-	}
+      for (unsigned i = 0; i < lineSize_; ++i)
+	if (mask.at(i) and (line.at(i) != rtlData.at(i)))
+	  {
+	    reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
+			   rtlData.at(i), line.at(i));
+	    result = false;
+	    break;
+	  }
     }
 
   auto& instrVec = hartInstrVecs_.at(hartIx);
