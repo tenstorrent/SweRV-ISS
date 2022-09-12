@@ -1161,6 +1161,12 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 			      hartId, msg.time, msg.address);
 		      for (uint8_t item :  data)
 			fprintf(commandLog, "%02x", item);
+		      if (msg.flags)
+			{
+			  fprintf(commandLog, " 0x");
+			  for (size_t i = 0; i < msg.size / 8; ++i)
+			    fprintf(commandLog, "%02x", msg.tag[i]);
+			}
 		      fprintf(commandLog, "\n");
 		    }
 		}

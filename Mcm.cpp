@@ -615,7 +615,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	      result = false;
 	      break;
 	    }
-	  if (not rtlMask.empty() and mask.at(i) != rtlMask.at(i))
+	  if (not rtlMask.empty() and i < rtlMask.size() and mask.at(i) != rtlMask.at(i))
 	    {
 	      cerr << "Error: Mismatch on merge buffer update time=" << time
 		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
