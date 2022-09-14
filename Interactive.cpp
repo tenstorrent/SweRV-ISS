@@ -901,7 +901,7 @@ Interactive<URV>::disassCommand(Hart<URV>& hart, const std::string& line,
       std::string item = tokens.at(2);
       std::string name;  // item (if a symbol) or function name containing item
       ElfSymbol symbol;
-      if (hart.findElfSymbol(item, symbol))
+      if (system_.findElfSymbol(item, symbol))
 	name = item;
       else
 	{
@@ -1632,7 +1632,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "symbols")
     {
-      hart.printElfSymbols(std::cout);
+      system_.printElfSymbols(std::cout);
       return true;
     }
 

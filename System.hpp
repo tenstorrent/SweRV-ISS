@@ -152,6 +152,18 @@ namespace WdRiscv
       return true;
     }
 
+    /// Print the ELF symbols on the given stream. Output format:
+    /// <name> <value>
+    void printElfSymbols(std::ostream& out) const
+    { memory_->printElfSymbols(out); }
+
+    /// Locate the given ELF symbol (symbols are collected for every
+    /// loaded ELF file) returning true if symbol is found and false
+    /// otherwise. Set value to the corresponding value if symbol is
+    /// found.
+    bool findElfSymbol(const std::string& symbol, ElfSymbol& value) const
+    { return memory_->findElfSymbol(symbol, value); }
+
     /// Save snapshot (registers, memory etc) into given directory
     /// which should alread exist. Return true on success.
     bool saveSnapshot(Hart<URV>& hart, const std::string& dirPath);

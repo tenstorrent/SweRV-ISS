@@ -589,24 +589,12 @@ namespace WdRiscv
     /// found in the ELF file.
     bool loadElfFile(const std::string& file, uint64_t& entryPoint);
 
-    /// Locate the given ELF symbol (symbols are collected for every
-    /// loaded ELF file) returning true if symbol is found and false
-    /// otherwise. Set value to the corresponding value if symbol is
-    /// found.
-    bool findElfSymbol(const std::string& symbol, ElfSymbol& value) const
-    { return memory_.findElfSymbol(symbol, value); }
-
     /// Locate the ELF function containing the give address returning true
     /// on success and false on failure.  If successful set name to the
     /// corresponding function name and symbol to the corresponding symbol
     /// value.
     bool findElfFunction(URV addr, std::string& name, ElfSymbol& value) const
     { return memory_.findElfFunction(addr, name, value); }
-
-    /// Print the ELF symbols on the given stream. Output format:
-    /// <name> <value>
-    void printElfSymbols(std::ostream& out) const
-    { memory_.printElfSymbols(out); }
 
     /// Set val to the value of the byte at the given address
     /// returning true on success and false if address is out of
@@ -4215,7 +4203,6 @@ namespace WdRiscv
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     bool targetProgFinished_ = false;
-    bool useElfSymbols_ = true;
     bool tracePtw_ = false;          // Trace paget table walk.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;

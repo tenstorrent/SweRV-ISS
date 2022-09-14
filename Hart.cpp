@@ -658,19 +658,19 @@ Hart<URV>::loadElfFile(const std::string& file, uint64_t& entryPoint)
 
   ElfSymbol sym;
 
-  if (not toHostSym_.empty() and this->findElfSymbol(toHostSym_, sym))
+  if (not toHostSym_.empty() and memory_.findElfSymbol(toHostSym_, sym))
     this->setToHostAddress(sym.addr_);
 
-  if (not fromHostSym_.empty() and this->findElfSymbol(fromHostSym_, sym))
+  if (not fromHostSym_.empty() and memory_.findElfSymbol(fromHostSym_, sym))
     this->setFromHostAddress(sym.addr_);
 
-  if (not consoleIoSym_.empty() and this->findElfSymbol(consoleIoSym_, sym))
+  if (not consoleIoSym_.empty() and memory_.findElfSymbol(consoleIoSym_, sym))
     this->setConsoleIo(URV(sym.addr_));
 
-  if (this->findElfSymbol("__global_pointer$", sym))
+  if (memory_.findElfSymbol("__global_pointer$", sym))
     this->pokeIntReg(RegGp, URV(sym.addr_));
 
-  if (this->findElfSymbol("_end", sym))   // For newlib/linux emulation.
+  if (memory_.findElfSymbol("_end", sym))   // For newlib/linux emulation.
     this->setTargetProgramBreak(URV(sym.addr_));
   else
     this->setTargetProgramBreak(URV(end));
@@ -4180,7 +4180,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   // Set environ for newlib. This is superfluous for Linux.
   URV ea = sp + ix*sizeof(URV);  // Address of envp array
   ElfSymbol sym;
-  if (findElfSymbol("environ", sym))
+  if (memory_.findElfSymbol("environ", sym))
     memory_.poke(URV(sym.addr_), ea);
 
   // Push envp entries on the stack.
