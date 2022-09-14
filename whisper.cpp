@@ -18,13 +18,8 @@
 #include <thread>
 #include <optional>
 #include <atomic>
-#if defined(__cpp_lib_filesystem)
-  #include <filesystem>
-  namespace FileSystem = std::filesystem;
-#else
-  #include <experimental/filesystem>
-  namespace FileSystem = std::experimental::filesystem;
-#endif
+#include <filesystem>
+namespace FileSystem = std::filesystem;
 
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
