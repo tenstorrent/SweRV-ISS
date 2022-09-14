@@ -1665,20 +1665,17 @@ Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& usedBlocks)
 {
   usedBlocks.clear();
 
-  auto memSize = hart_.getMemorySize();
-  if (sizeof(size_t) > 4 and memSize <= size_t(1) << 32)
+  // Up to 16 GB, snapshot the whole memory.
+  uint64_t memSize = hart_.getMemorySize();
+  if (memSize <= 0x400000000L)
     {
       usedBlocks.push_back(AddrLen{0, memSize});
       return;
     }
 
+  // This does not work for raw mode. This does not work if
+  // stack size exeeds 8 Mb.
   const uint64_t maxStackSize = 1024*1024*8;
-  if (memSize <= (maxStackSize + progBreak_))
-    {
-      usedBlocks.push_back(AddrLen{0, memSize});
-      return;
-    }
-
   usedBlocks.push_back(AddrLen{0, progBreak_});
   for(auto& it:mmap_blocks_)
     if(not it.second.free)

@@ -802,7 +802,7 @@ sanitizeStackPointer(Hart<URV>& hart, bool verbose)
 template <typename URV>
 static
 bool
-loadSnapshot(Hart<URV>& hart, const std::string& snapDir)
+loadSnapshot(System<URV>& system, Hart<URV>& hart, const std::string& snapDir)
 {
   using std::cerr;
 
@@ -827,7 +827,7 @@ loadSnapshot(Hart<URV>& hart, const std::string& snapDir)
       return false;
     }
 
-  if (not hart.loadSnapshot(path))
+  if (not system.loadSnapshot(path, hart))
     {
       cerr << "Error: Failed to load sanpshot from dir " << snapDir << '\n';
       return false;
@@ -982,7 +982,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     hart.enableInstructionFrequency(true);
 
   if (not args.loadFrom.empty())
-    if (not loadSnapshot(hart, args.loadFrom))
+    if (not loadSnapshot(system, hart, args.loadFrom))
       errors++;
 
   if (not args.stdoutFile.empty())
@@ -1486,7 +1486,7 @@ snapshotRun(System<URV>& system, FILE* traceFile,
                 std::cerr << "Error: Failed to create snapshot directory " << path << '\n';
                 return false;
               }
-          if (not hart.saveSnapshot(path))
+          if (not system.saveSnapshot(hart, path))
             {
               std::cerr << "Error: Failed to save a snapshot\n";
               return false;

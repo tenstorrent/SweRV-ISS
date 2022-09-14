@@ -126,7 +126,7 @@ namespace WdRiscv
     ~Hart();
 
     /// Return count of integer registers.
-    size_t intRegCount() const
+    unsigned intRegCount() const
     { return intRegs_.size(); }
 
     /// Return the name of the given integer register. Return an
@@ -146,19 +146,19 @@ namespace WdRiscv
 
     /// Return count of floating point registers. Return zero if
     /// extension f is not enabled.
-    size_t fpRegCount() const
+    unsigned fpRegCount() const
     { return isRvf()? fpRegs_.size() : 0; }
 
     /// Return count of vector registers. Return zero if extension v
     /// is not enabled.
-    size_t vecRegCount() const
+    unsigned vecRegCount() const
     { return isRvv()? vecRegs_.size() : 0; }
 
-    ssize_t vecRegSize() const
+    unsigned vecRegSize() const
     { return isRvv()? vecRegs_.bytesPerRegister() : 0; }
 
     /// Return size of memory in bytes.
-    size_t memorySize() const
+    uint64_t memorySize() const
     { return memory_.size(); }
 
     /// Return the value of the program counter.
@@ -445,11 +445,11 @@ namespace WdRiscv
     /// execute the instruction at that address. If file is non-null
     /// then print thereon tracing information after each executed
     /// instruction. Similar to method run with respect to tohost.
-    bool runUntilAddress(size_t address, FILE* file = nullptr);
+    bool runUntilAddress(uint64_t address, FILE* file = nullptr);
 
     /// Helper to runUntiAddress: Same as runUntilAddress but does not
     /// print run-time and instructions per second.
-    bool untilAddress(size_t address, FILE* file = nullptr);
+    bool untilAddress(uint64_t address, FILE* file = nullptr);
 
     /// Define the program counter value at which the run method will
     /// stop.
@@ -577,7 +577,7 @@ namespace WdRiscv
     /// Load the binary file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exist,
     /// or cannot be opened.
-    bool loadBinaryFile(const std::string& file, size_t addr)
+    bool loadBinaryFile(const std::string& file, uint64_t addr)
     { return memory_.loadBinaryFile(file, addr); }
 
     /// Load the given ELF file and place its contents in memory.
@@ -587,7 +587,7 @@ namespace WdRiscv
     /// the to-host-address is not set then set it to the value
     /// corresponding to the to-host-symbol if such that symbol is
     /// found in the ELF file.
-    bool loadElfFile(const std::string& file, size_t& entryPoint);
+    bool loadElfFile(const std::string& file, uint64_t& entryPoint);
 
     /// Locate the given ELF symbol (symbols are collected for every
     /// loaded ELF file) returning true if symbol is found and false
@@ -612,31 +612,31 @@ namespace WdRiscv
     /// returning true on success and false if address is out of
     /// bounds. Memory is little-endian. Bypass physical memory
     /// attribute checking if usePma is false.
-    bool peekMemory(size_t addr, uint8_t& val, bool usePma) const;
+    bool peekMemory(uint64_t addr, uint8_t& val, bool usePma) const;
 
     /// Half-word version of the preceding method.
-    bool peekMemory(size_t addr, uint16_t& val, bool usePma) const;
+    bool peekMemory(uint64_t addr, uint16_t& val, bool usePma) const;
 
     /// Word version of the preceding method.
-    bool peekMemory(size_t addr, uint32_t& val, bool usePma) const;
+    bool peekMemory(uint64_t addr, uint32_t& val, bool usePma) const;
 
     /// Double-word version of the preceding method.
-    bool peekMemory(size_t addr, uint64_t& val, bool usePma) const;
+    bool peekMemory(uint64_t addr, uint64_t& val, bool usePma) const;
 
     /// Set the memory byte at the given address to the given value.
     /// Return true on success and false on failure (address out of
     /// bounds, location not mapped, location not writable etc...)
     /// Bypass physical memory attribute checking if usePma is false.
-    bool pokeMemory(size_t addr, uint8_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint8_t val, bool usePma);
 
     /// Half-word version of the preceding method.
-    bool pokeMemory(size_t address, uint16_t val, bool usePma);
+    bool pokeMemory(uint64_t address, uint16_t val, bool usePma);
 
     /// Word version of the preceding method.
-    bool pokeMemory(size_t addr, uint32_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint32_t val, bool usePma);
 
     /// Double-word version of the preceding method.
-    bool pokeMemory(size_t addr, uint64_t val, bool usePma);
+    bool pokeMemory(uint64_t addr, uint64_t val, bool usePma);
 
     /// Define value of program counter after a reset.
     void defineResetPc(URV addr)
@@ -655,14 +655,14 @@ namespace WdRiscv
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.
-    void setToHostAddress(size_t address);
+    void setToHostAddress(uint64_t address);
 
     /// Special target program symbol writing to which stops the
     /// simulated program.
     void setTohostSymbol(const std::string& sym)
     { toHostSym_ = sym; }
 
-    void setFromHostAddress(size_t addr)
+    void setFromHostAddress(uint64_t addr)
     { fromHost_ = addr; fromHostValid_ = true; }
 
     void setFromHostSymbol(const std::string& sym)
@@ -679,7 +679,7 @@ namespace WdRiscv
     /// Set address to the special address writing to which stops the
     /// simulation. Return true on success and false on failure (no
     /// such address defined).
-    bool getToHostAddress(size_t& address) const
+    bool getToHostAddress(uint64_t& address) const
     { if (toHostValid_) address = toHost_; return toHostValid_; }
 
     /// Program counter.
@@ -788,7 +788,7 @@ namespace WdRiscv
 
     /// Read instruction at given address. Return true on success and
     /// false if address is out of memory bounds.
-    bool readInst(size_t address, uint32_t& instr);
+    bool readInst(uint64_t address, uint32_t& instr);
 
     /// Set instruction count limit: When running with tracing the
     /// run and the runUntil methods will stop if the retired instruction
@@ -811,7 +811,7 @@ namespace WdRiscv
 
     /// Define a memory mapped register. Address must be within an
     /// area already defined using defineMemoryMappedRegisterArea.
-    bool defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask);
+    bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
 
     /// Direct this hart to take an instruction access fault exception
     /// within the next singleStep invocation.
@@ -1048,28 +1048,28 @@ namespace WdRiscv
 
     /// Return true if given address is in the data closed coupled
     /// memory of this hart.
-    bool isAddrInDccm(size_t addr) const
+    bool isAddrInDccm(uint64_t addr) const
     { return memory_.pmaMgr_.isAddrInDccm(addr); }
 
     /// Return true if given address is cacheable.
-    bool isAddrCacheable(size_t addr) const;
+    bool isAddrCacheable(uint64_t addr) const;
 
     /// Return true if given address is in the memory mapped registers
     /// area of this hart.
-    bool isAddrMemMapped(size_t addr) const
+    bool isAddrMemMapped(uint64_t addr) const
     { return memory_.pmaMgr_.isAddrMemMapped(addr); }
 
     /// Return true if given address is in a readable page.
-    bool isAddrReadable(size_t addr) const
+    bool isAddrReadable(uint64_t addr) const
     { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isRead(); }
 
     /// Return true if page of given address is in instruction closed
     /// coupled memory.
-    bool isAddrInIccm(size_t addr) const
+    bool isAddrInIccm(uint64_t addr) const
     { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isIccm(); }
 
     /// Return true if given data (ld/st) address is external to the hart.
-    bool isDataAddressExternal(size_t addr) const
+    bool isDataAddressExternal(uint64_t addr) const
     { return memory_.isDataAddressExternal(addr); }
 
     /// Return true if given extension is statically enabled (enabled my
@@ -1240,7 +1240,7 @@ namespace WdRiscv
     void setEaCompatibleWithBase(bool flag)
     { eaCompatWithBase_ = flag; }
 
-    size_t getMemorySize() const
+    uint64_t getMemorySize() const
     { return memory_.size(); }
 
     /// Return the index of this hart within the system. Harts are
@@ -1301,12 +1301,6 @@ namespace WdRiscv
     std::vector<uint64_t> getSnapshotPeriods() const
     { return snapshotPeriods_; }
 
-    /// save snapshot (registers, memory etc)
-    bool saveSnapshot(const std::string& dirPath);
-
-    /// Load snapshot (registers, memory etc)
-    bool loadSnapshot(const std::string& dirPath);
-
     /// Redirect the given output file descriptor (typically that of
     /// stdout or stderr) to the given file. Return true on success
     /// and false on failure.
@@ -1340,7 +1334,7 @@ namespace WdRiscv
     }
 
     /// Return the memory page size (e.g. 4096).
-    size_t pageSize() const
+    uint64_t pageSize() const
     { return memory_.pageSize(); }
 
     /// Set the physical memory protection grain size (which must
@@ -1572,6 +1566,15 @@ namespace WdRiscv
     /// Enable disable page-table-walk info in log.
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
+
+    Syscall<URV>& getSyscall()
+    { return syscall_; }
+
+    /// Save snapshot of registers (PC, integer, floating point, CSR) into file
+    bool saveSnapshotRegs(const std::string& path);
+
+    // Load snapshot of registers (PC, integer, floating point, CSR) into file
+    bool loadSnapshotRegs(const std::string& path);
 
   protected:
 
@@ -2039,7 +2042,7 @@ namespace WdRiscv
 
     /// Return true if given address is an idempotent region of
     /// memory.
-    bool isAddrIdempotent(size_t addr) const;
+    bool isAddrIdempotent(uint64_t addr) const;
 
     /// Check address associated with an atomic memory operation (AMO)
     /// instruction. Return true if AMO access is allowed. Return
@@ -3985,7 +3988,7 @@ namespace WdRiscv
 	  wide_(false), fp_(false)
       { }
 
-      LoadInfo(unsigned size, size_t addr, unsigned regIx, uint64_t prev,
+      LoadInfo(unsigned size, uint64_t addr, unsigned regIx, uint64_t prev,
 	       bool isWide, unsigned tag, bool fp)
 	: size_(size), addr_(addr), regIx_(regIx), tag_(tag), prevData_(prev),
 	  valid_(true), wide_(isWide), fp_(fp)
@@ -3995,7 +3998,7 @@ namespace WdRiscv
       void makeInvalid() { valid_ = false; fp_ = false; }
 
       unsigned size_ = 0;
-      size_t addr_ = 0;
+      uint64_t addr_ = 0;
       unsigned regIx_ = 0;
       unsigned tag_ = 0;
       uint64_t prevData_ = 0;
@@ -4023,12 +4026,6 @@ namespace WdRiscv
       bool idempotent_;
       bool cacheable_;
     };
-
-    /// Save snapshot of registers (PC, integer, floating point, CSR) into file
-    bool saveSnapshotRegs(const std::string& path);
-
-    // Load snapshot of registers (PC, integer, floating point, CSR) into file
-    bool loadSnapshotRegs(const std::string& path);
 
     // Set the program counter to the given value after clearing the
     // least significant bit.

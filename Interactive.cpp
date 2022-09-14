@@ -1008,7 +1008,7 @@ Interactive<URV>::elfCommand(Hart<URV>& hart, const std::string& line,
 
   std::string filePath = tokens.at(1);
 
-  size_t entryPoint = 0;
+  uint64_t entryPoint = 0;
 
   if (not hart.loadElfFile(filePath, entryPoint))
     return false;

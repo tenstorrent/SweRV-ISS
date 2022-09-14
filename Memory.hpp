@@ -41,12 +41,12 @@ namespace WdRiscv
   /// Location and size of an ELF file symbol.
   struct ElfSymbol
   {
-    ElfSymbol(size_t addr = 0, size_t size = 0)
+    ElfSymbol(uint64_t addr = 0, uint64_t size = 0)
       : addr_(addr), size_(size)
     { }
 
-    size_t addr_ = 0;
-    size_t size_ = 0;
+    uint64_t addr_ = 0;
+    uint64_t size_ = 0;
   };
 
 
@@ -61,7 +61,7 @@ namespace WdRiscv
     /// Constructor: define a memory of the given size initialized to
     /// zero. Given memory size (byte count) must be a multiple of 4
     /// otherwise, it is truncated to a multiple of 4.
-    Memory(size_t size, size_t pageSize = 4*1024);
+    Memory(uint64_t size, uint64_t pageSize = 4*1024);
 
     /// Destructor.
     ~Memory();
@@ -72,7 +72,7 @@ namespace WdRiscv
     { reservations_.resize(count); lastWriteData_.resize(count); }
 
     /// Return memory size in bytes.
-    size_t size() const
+    uint64_t size() const
     { return size_; }
 
     /// Read an unsigned integer value of type T from memory at the
@@ -83,7 +83,7 @@ namespace WdRiscv
     /// memory-mapped-register and the access size is different than
     /// 4.
     template <typename T>
-    bool read(size_t address, T& value) const
+    bool read(uint64_t address, T& value) const
     {
       if (readIo(address, value))
 	return true;
@@ -139,7 +139,7 @@ namespace WdRiscv
     /// fetch. Return true on success and false if address is not
     /// executable or if an iccm boundary is corssed.
     template <typename T>
-    bool readInst(size_t address, T& value) const
+    bool readInst(uint64_t address, T& value) const
     {
       Pma pma = pmaMgr_.getPma(address);
       if (pma.isExec())
@@ -169,7 +169,7 @@ namespace WdRiscv
     }
 
     /// Return true if read will be successful if tried. 
-    bool checkRead(size_t address, unsigned readSize)
+    bool checkRead(uint64_t address, unsigned readSize)
     {
       Pma pma1 = pmaMgr_.getPma(address);
       if (not pma1.isRead())
@@ -198,7 +198,7 @@ namespace WdRiscv
     /// write.  Change value to the maksed value if write is to a
     /// memory mapped register.
     template <typename T>
-    bool checkWrite(size_t address, T& value)
+    bool checkWrite(uint64_t address, T& value)
     {
       Pma pma1 = pmaMgr_.getPma(address);
       if (not pma1.isWrite())
@@ -231,7 +231,7 @@ namespace WdRiscv
     /// inaccessible regions or if the write crosses memory region of
     /// different attributes.
     template <typename T>
-    bool write(unsigned sysHartIx, size_t address, T value)
+    bool write(unsigned sysHartIx, uint64_t address, T value)
     {
       if (writeIo(address, value))
 	return true;
@@ -332,25 +332,25 @@ namespace WdRiscv
     /// Write half-word (2 bytes) to given address. Return true on
     /// success. Return false if address is out of bounds or is not
     /// writable.
-    bool writeHalfWord(unsigned sysHartIx, size_t address, uint16_t value)
+    bool writeHalfWord(unsigned sysHartIx, uint64_t address, uint16_t value)
     { return write(sysHartIx, address, value); }
 
     /// Read word (4 bytes) from given address into value. Return true
     /// on success.  Return false if address is out of bounds or is
     /// not writable.
-    bool writeWord(unsigned sysHartIx, size_t address, uint32_t value)
+    bool writeWord(unsigned sysHartIx, uint64_t address, uint32_t value)
     { return write(sysHartIx, address, value); }
 
     /// Read a double-word (8 bytes) from given address into
     /// value. Return true on success. Return false if address is out
     /// of bounds.
-    bool writeDoubleWord(unsigned sysHartIx, size_t address, uint64_t value)
+    bool writeDoubleWord(unsigned sysHartIx, uint64_t address, uint64_t value)
     { return write(sysHartIx, address, value); }
 
     /// Similar to read but ignore physical-memory-attributes if
     /// usePma is false.
     template <typename T>
-    bool peek(size_t address, T& value, bool usePma) const
+    bool peek(uint64_t address, T& value, bool usePma) const
     {
       if (address + sizeof(T) > size_)
         return false;
@@ -406,7 +406,7 @@ namespace WdRiscv
     /// Load the binary file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exist,
     /// or cannot be opened.
-    bool loadBinaryFile(const std::string& file, size_t addr);
+    bool loadBinaryFile(const std::string& file, uint64_t addr);
 
     /// Load the given ELF file and set memory locations accordingly.
     /// Return true on success. Return false if file does not exists,
@@ -417,7 +417,7 @@ namespace WdRiscv
     /// the largest address. Extract symbol names and corresponding
     /// addresses and sizes into the memory symbols map.
     bool loadElfFile(const std::string& file, unsigned registerWidth,
-		     size_t& entryPoint, size_t& end);
+		     uint64_t& entryPoint, uint64_t& end);
 
     /// Locate the given ELF symbol (symbols are collected for every
     /// loaded ELF file) returning true if symbol is found and false
@@ -429,7 +429,7 @@ namespace WdRiscv
     /// on success and false on failure.  If successful set name to the
     /// corresponding function name and symbol to the corresponding symbol
     /// value.
-    bool findElfFunction(size_t addr, std::string& name, ElfSymbol& value) const;
+    bool findElfFunction(uint64_t addr, std::string& name, ElfSymbol& value) const;
 
     /// Print the ELF symbols on the given stream. Output format:
     /// <name> <value>
@@ -445,7 +445,7 @@ namespace WdRiscv
     /// the ELF file does not exist or cannot be read (in which
     /// case min and max address are left unmodified).
     static bool getElfFileAddressBounds(const std::string& file,
-					size_t& minAddr, size_t& maxAddr);
+					uint64_t& minAddr, uint64_t& maxAddr);
 
     /// Collect RISCV architecture attributes from given ELF file.
     /// The toolchain encodes the architecture string used at
@@ -497,27 +497,57 @@ namespace WdRiscv
     /// Define write memory callback. This (along with
     /// defineReadMemoryCallback) allows the caller to bypass the
     /// memory model with their own.
-    void defineWriteMemoryCallback(
-         std::function<bool(uint64_t, unsigned, uint64_t)> callback )
-    {
-      writeCallback_ = callback;
-    }
+    void defineWriteMemoryCallback(std::function<bool(uint64_t, unsigned, uint64_t)> callback)
+    { writeCallback_ = callback; }
 
+    /// Enable tracing of memory data lines referenced by current
+    /// run. A memory data line is typically 64-bytes long and corresponds to
+    /// a cachable line.
     void enableDataLineTrace(const std::string& path)
     { dataLineTrace_ = true; dataLineFile_ = path; }
 
+    /// Enable tracing of memory instruction fetch lines referenced by
+    /// current run. A memory line is typically 64-bytes long and
+    /// corresponds to a cachable line.
     void enableInstructionLineTrace(const std::string& path)
     { instrLineTrace_ = true;  instrLineFile_ = path; }
 
     void registerIoDevice(IoDevice* dev)
     { assert(dev); ioDevs_.push_back(dev); }
 
+    /// Take a snapshot of the entire simulated memory into binary
+    /// file. Return true on success or false on failure
+    bool saveSnapshot(const std::string& filename,
+                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
+
+    /// Load the simulated memory from snapshot binary file. Return
+    /// true on success or false on failure
+    bool loadSnapshot(const std::string& filename,
+                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
+
+    /// Save tags of cache to the given file (sorted in descending
+    /// order by age) returning true on success and false on
+    /// failure. Return true if no cache is present.
+    bool saveCacheSnapshot(const std::string& path);
+
+    /// Load tags of cache from the given file returning true on success
+    /// and false on failure. Return true if no cache is present.
+    bool loadCacheSnapshot(const std::string& path);
+
+    /// If address tracing enabled, then write the accumulated data
+    /// addresses into the given file.
+    bool saveDataAddressTrace(const std::string& path) const;
+
+    /// If instruction tracing enabled, then write the accumulated
+    /// addresses into the given file.
+    bool saveInstructionAddressTrace(const std::string& path) const;
+
   protected:
 
     /// Same as write but effects not recorded in last-write info and
     /// physical memory attributes are ignored if usePma is false.
     template <typename T>
-    bool poke(size_t address, T value, bool usePma = true)
+    bool poke(uint64_t address, T value, bool usePma = true)
     {
       if (address + sizeof(T) > size_)
         return false;
@@ -558,7 +588,7 @@ namespace WdRiscv
     /// is used to initialize memory. If address is in
     /// memory-mapped-register region, then both mem-mapped-register
     /// and external memory are written.
-    bool specialInitializeByte(size_t address, uint8_t value);
+    bool specialInitializeByte(uint64_t address, uint8_t value);
 
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
@@ -568,21 +598,21 @@ namespace WdRiscv
     }
 
     /// Return the page size.
-    size_t pageSize() const
+    uint64_t pageSize() const
     { return pageSize_; }
 
     /// Return the number of the page containing the given address.
-    size_t getPageIx(size_t addr) const
+    uint64_t getPageIx(uint64_t addr) const
     { return addr >> pageShift_; }
 
     /// Return start address of page containing given address.
-    size_t getPageStartAddr(size_t addr) const
+    uint64_t getPageStartAddr(uint64_t addr) const
     { return (addr >> pageShift_) << pageShift_; }
 
     /// Return true if CCM (iccm or dccm) configuration defined by
     /// addr/size is valid. Return false otherwise. Tag parameter
     /// ("iccm"/"dccm"/"pic") is used with error messages.
-    bool checkCcmConfig(const std::string& tag, size_t addr, size_t size) const;
+    bool checkCcmConfig(const std::string& tag, uint64_t addr, uint64_t size) const;
 
     /// Reset (to zero) all memory mapped registers.
     void resetMemoryMappedRegisters();
@@ -590,10 +620,10 @@ namespace WdRiscv
     /// Define write mask for a memory-mapped register with given
     /// address.  Return true on success and false if the address is
     /// not within a memory-mapped area.
-    bool defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask);
+    bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
 
     /// Read a memory mapped register.
-    bool readRegister(size_t addr, uint32_t& value) const
+    bool readRegister(uint64_t addr, uint32_t& value) const
     {
       return pmaMgr_.readRegister(addr, value);
     }
@@ -601,12 +631,12 @@ namespace WdRiscv
     /// Return memory mapped mask associated with the word containing
     /// the given address. Return all 1 if given address is not a
     /// memory mapped register.
-    uint32_t getMemoryMappedMask(size_t addr) const
+    uint32_t getMemoryMappedMask(uint64_t addr) const
     { return pmaMgr_.getMemMappedMask(addr); }
 
     /// Perform masking for a write to a memory mapped register.
     /// Return masked value.
-    uint32_t doRegisterMasking(size_t addr, uint32_t value) const
+    uint32_t doRegisterMasking(uint64_t addr, uint32_t value) const
     {
       uint32_t mask = getMemoryMappedMask(addr);
       value = value & mask;
@@ -614,7 +644,7 @@ namespace WdRiscv
     }
 
     /// Write a memory mapped register.
-    bool writeRegister(unsigned sysHartIx, size_t addr, uint32_t value)
+    bool writeRegister(unsigned sysHartIx, uint64_t addr, uint32_t value)
     {
       value = doRegisterMasking(addr, value);
 
@@ -629,7 +659,7 @@ namespace WdRiscv
     }
 
     /// Return true if given data address is external to the core.
-    bool isDataAddressExternal(size_t addr) const
+    bool isDataAddressExternal(uint64_t addr) const
     {
       Pma pma = pmaMgr_.getPma(addr);
       return not (pma.isDccm() or pma.isMemMappedReg());
@@ -638,7 +668,7 @@ namespace WdRiscv
     /// Track LR instructin resrvations.
     struct Reservation
     {
-      size_t addr_ = 0;
+      uint64_t addr_ = 0;
       unsigned size_ = 0;
       bool valid_ = false;
     };
@@ -647,10 +677,10 @@ namespace WdRiscv
     /// bytes and belonging to harts other than the given hart-id. The
     /// memory tracks one reservation per hart indexed by local hart
     /// ids.
-    void invalidateOtherHartLr(unsigned sysHartIx, size_t addr,
+    void invalidateOtherHartLr(unsigned sysHartIx, uint64_t addr,
                                unsigned storeSize)
     {
-      for (size_t i = 0; i < reservations_.size(); ++i)
+      for (uint64_t i = 0; i < reservations_.size(); ++i)
         {
           if (i == sysHartIx) continue;
           auto& res = reservations_[i];
@@ -664,9 +694,9 @@ namespace WdRiscv
     /// Invalidate LR reservations matching address of poked/written
     /// bytes. The memory tracks one reservation per hart indexed by
     /// local hart ids.
-    void invalidateLrs(size_t addr, unsigned storeSize)
+    void invalidateLrs(uint64_t addr, unsigned storeSize)
     {
-      for (size_t i = 0; i < reservations_.size(); ++i)
+      for (uint64_t i = 0; i < reservations_.size(); ++i)
         {
           auto& res = reservations_[i];
           if (addr >= res.addr_ and (addr - res.addr_) < res.size_)
@@ -681,7 +711,7 @@ namespace WdRiscv
     { reservations_.at(sysHartIx).valid_ = false; }
 
     /// Make a LR reservation for the given hart.
-    void makeLr(unsigned sysHartIx, size_t addr, unsigned size)
+    void makeLr(unsigned sysHartIx, uint64_t addr, unsigned size)
     {
       auto& res = reservations_.at(sysHartIx);
       res.addr_ = addr;
@@ -700,37 +730,10 @@ namespace WdRiscv
 
     /// Load contents of given ELF segment into memory.
     /// This is a helper to loadElfFile.
-    bool loadElfSegment(ELFIO::elfio& reader, int segment, size_t& end);
+    bool loadElfSegment(ELFIO::elfio& reader, int segment, uint64_t& end);
 
     /// Helper to loadElfFile: Collet ELF symbols.
     void collectElfSymbols(ELFIO::elfio& reader);
-
-    /// Take a snapshot of the entire simulated memory into binary
-    /// file. Return true on success or false on failure
-    bool saveSnapshot(const std::string& filename,
-                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
-
-    /// Load the simulated memory from snapshot binary file. Return
-    /// true on success or false on failure
-    bool loadSnapshot(const std::string& filename,
-                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
-
-    /// Save tags of cache to the given file (sorted in descending
-    /// order by age) returning true on success and false on
-    /// failure. Return true if no cache is present.
-    bool saveCacheSnapshot(const std::string& path);
-
-    /// Load tags of cache from the given file returning true on success
-    /// and false on failure. Return true if no cache is present.
-    bool loadCacheSnapshot(const std::string& path);
-
-    /// If address tracing enabled, then write the accumulated data
-    /// addresses into the given file.
-    bool saveDataAddressTrace(const std::string& path) const;
-
-    /// If instruction tracing enabled, then write the accumulated
-    /// addresses into the given file.
-    bool saveInstructionAddressTrace(const std::string& path) const;
 
     bool saveAddressTrace(const std::string& tag,
 			  const std::unordered_map<uint64_t, uint64_t>& lineMap,
@@ -750,14 +753,14 @@ namespace WdRiscv
     struct LastWriteData
     {
       unsigned size_ = 0;
-      size_t addr_ = 0;
+      uint64_t addr_ = 0;
       uint64_t value_ = 0;
     };
 
-    size_t size_;        // Size of memory in bytes.
+    uint64_t size_;        // Size of memory in bytes.
     uint8_t* data_;      // Pointer to memory data.
 
-    size_t pageSize_      = 4*1024;    // Must be a power of 2.
+    uint64_t pageSize_    = 4*1024;    // Must be a power of 2.
     unsigned pageShift_   = 12;        // Shift address by this to get page no.
     unsigned regionShift_ = 28;        // Shift address by this to get region no.
     unsigned regionMask_  = 0xf;       // This should depend on mem size.

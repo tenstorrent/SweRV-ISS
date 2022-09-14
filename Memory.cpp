@@ -249,7 +249,7 @@ Memory::loadBinaryFile(const std::string& fileName, size_t addr)
 
 
 bool
-Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
+Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
 {
   const ELFIO::segment* seg = reader.segments[segIx];
   ELFIO::Elf64_Addr paddr = seg->get_physical_address();
@@ -339,7 +339,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
 
 #endif
 
-  end = paddr + size_t(segSize);
+  end = paddr + uint64_t(segSize);
   return true;
 }
 
@@ -526,7 +526,7 @@ Memory::collectElfSymbols(ELFIO::elfio& reader)
 
 bool
 Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
-		    size_t& entryPoint, size_t& end)
+		    uint64_t& entryPoint, uint64_t& end)
 {
   entryPoint = 0;
   end = 0;
@@ -659,9 +659,8 @@ Memory::printElfSymbols(std::ostream& out) const
 
 
 bool
-Memory::getElfFileAddressBounds(const std::string& fileName, size_t& minAddr,
-				size_t& maxAddr)
-
+Memory::getElfFileAddressBounds(const std::string& fileName, uint64_t& minAddr,
+				uint64_t& maxAddr)
 {
   ELFIO::elfio reader;
 
@@ -767,7 +766,7 @@ Memory::saveSnapshot(const std::string& filename,
 
   // Open binary file for write (compressed) and check success.
   std::cout << "saveSnapshot starts..\n";
-  gzFile gzout = gzopen(filename.c_str(), "wb");
+  gzFile gzout = gzopen(filename.c_str(), "wb2");
   if (not gzout)
     {
       std::cerr << "Memory::saveSnapshot failed - cannot open " << filename
@@ -778,7 +777,6 @@ Memory::saveSnapshot(const std::string& filename,
   std::vector<uint32_t> temp;  // To collect sparse memory data.
 
   // write the simulated memory into the file and check success
-  // loop over blocks
   uint64_t prevAddr = 0;
   bool success = true;
   for (auto& blk: usedBlocks)
