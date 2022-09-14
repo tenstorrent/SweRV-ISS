@@ -249,7 +249,7 @@ Memory::loadBinaryFile(const std::string& fileName, size_t addr)
 
 
 bool
-Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
+Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
 {
   const ELFIO::segment* seg = reader.segments[segIx];
   ELFIO::Elf64_Addr paddr = seg->get_physical_address();
@@ -339,7 +339,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, size_t& end)
 
 #endif
 
-  end = paddr + size_t(segSize);
+  end = paddr + uint64_t(segSize);
   return true;
 }
 
@@ -526,7 +526,7 @@ Memory::collectElfSymbols(ELFIO::elfio& reader)
 
 bool
 Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
-		    size_t& entryPoint, size_t& end)
+		    uint64_t& entryPoint, uint64_t& end)
 {
   entryPoint = 0;
   end = 0;
@@ -659,9 +659,8 @@ Memory::printElfSymbols(std::ostream& out) const
 
 
 bool
-Memory::getElfFileAddressBounds(const std::string& fileName, size_t& minAddr,
-				size_t& maxAddr)
-
+Memory::getElfFileAddressBounds(const std::string& fileName, uint64_t& minAddr,
+				uint64_t& maxAddr)
 {
   ELFIO::elfio reader;
 
@@ -761,13 +760,13 @@ Memory::isSymbolInElfFile(const std::string& path, const std::string& target)
 
 bool
 Memory::saveSnapshot(const std::string& filename,
-                     const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks)
+                     const std::vector<std::pair<uint64_t,uint64_t>>& usedBlocks)
 {
-  constexpr size_t max_chunk = size_t(1) << 30;
+  constexpr size_t maxChunk = size_t(1) << 28;
 
   // Open binary file for write (compressed) and check success.
   std::cout << "saveSnapshot starts..\n";
-  gzFile gzout = gzopen(filename.c_str(), "wb");
+  gzFile gzout = gzopen(filename.c_str(), "wb2");
   if (not gzout)
     {
       std::cerr << "Memory::saveSnapshot failed - cannot open " << filename
@@ -775,28 +774,60 @@ Memory::saveSnapshot(const std::string& filename,
       return false;
     }
 
+  std::vector<uint32_t> temp;  // To collect sparse memory data.
+
   // write the simulated memory into the file and check success
-  // loop over blocks
-  uint64_t prev_addr = 0;
+  uint64_t prevAddr = 0;
   bool success = true;
-  for (auto& blk: used_blocks)
+  for (auto& blk: usedBlocks)
     {
-      uint8_t* buffer = data_+blk.first;
+      if (blk.first >= size_)
+	{
+	  std::cerr << "Memory::saveSnapshot: Block address (0x" << std::hex << blk.first
+		    << ") out of bounds (0x" << std::hex << size_ << ")\n" << std::dec;
+	  success = false;
+	  break;
+	}
       size_t remainingSize = blk.second;
-      assert(prev_addr<=blk.first);
-      prev_addr = blk.first+blk.second;
+      if (remainingSize > size_ or size_ - remainingSize < blk.first)
+	{
+	  std::cerr << "Memory::saveSnapshot: Block at (0x" << std::hex << blk.first
+		    << ") extends beyond memory bound\n";
+	  success = false;
+	  break;
+	}
+
+      assert(prevAddr <= blk.first);
+      prevAddr = blk.first + blk.second;
+
+#ifdef MEM_CALLBACKS
+      temp.resize(remainingSize);
+      assert((blk.first & 3) == 0);
+      assert((remainingSize & 3) == 0);
+      size_t wordCount = remainingSize / 4;
+      uint64_t addr = blk.first;
+      for (size_t i = 0; i < wordCount; ++i, addr += 4)
+	{
+	  uint32_t x = 0;
+	  peek(addr, x, false);
+	  temp.at(i) = x;
+	}
+      uint8_t* buffer = reinterpret_cast<uint8_t*>(temp.data());
+#else
+      uint8_t* buffer = data_ + blk.first;
+#endif
       std::cout << "*";
       while (remainingSize)  // write in chunk due to limitation of gzwrite
         {
           std::cout << "-";
           fflush(stdout);
-          size_t current_chunk = std::min(remainingSize, max_chunk);
-          int resp = gzwrite(gzout, buffer, current_chunk);
-          success = resp > 0 and size_t(resp) == current_chunk;
+          size_t currentChunk = std::min(remainingSize, maxChunk);
+          int resp = gzwrite(gzout, buffer, currentChunk);
+          success = resp > 0 and size_t(resp) == currentChunk;
           if (not success)
             break;
-          remainingSize -= current_chunk;
-          buffer += current_chunk;
+          remainingSize -= currentChunk;
+          buffer += currentChunk;
         }
       if (not success)
         break;
@@ -813,9 +844,9 @@ Memory::saveSnapshot(const std::string& filename,
 
 bool
 Memory::loadSnapshot(const std::string & filename,
-                     const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks)
+                     const std::vector<std::pair<uint64_t,uint64_t>>& usedBlocks)
 {
-  constexpr size_t max_chunk = size_t(1) << 30;
+  constexpr size_t maxChunk = size_t(1) << 28;  // This must match saveSnapshot
   std::cout << "loadSnapshot starts..\n";
 
   // open binary file for read (decompress) and check success
@@ -827,32 +858,56 @@ Memory::loadSnapshot(const std::string & filename,
       return false;
     }
 
+  std::vector<uint32_t> temp;
+
   // read (decompress) file into simulated memory and check success
   bool success = true;
-  uint64_t prev_addr = 0;
+  uint64_t prevAddr = 0;
   size_t remainingSize = 0;
-  for (auto& blk: used_blocks)
+  for (auto& blk: usedBlocks)
     {
-      uint8_t * buffer = data_+blk.first;
+      if (blk.first >= size_)
+	{
+	  std::cerr << "Memory::loadSnapshot: Block address (0x" << std::hex << blk.first
+		    << ") out of bounds (0x" << std::hex << size_ << ")\n" << std::dec;
+	  success = false;
+	  break;
+	}
       remainingSize = blk.second;
-      assert(prev_addr<=blk.first);
-      prev_addr = blk.first+blk.second;
+      if (remainingSize > size_ or size_ - remainingSize < blk.first)
+	{
+	  std::cerr << "Memory::loadSnapshot: Block at (0x" << std::hex << blk.first
+		    << ") extends beyond memory bound\n";
+	  success = false;
+	  break;
+	}
+
+      assert((blk.first & 3) == 0);
+      assert((remainingSize & 3) == 0);
+      assert(prevAddr <= blk.first);
+      temp.resize(remainingSize/4);
+      prevAddr = blk.first + blk.second;
+      uint64_t addr = blk.first;
+
       std::cout << "*";
       while (remainingSize) // read in chunk due to gzread limitation
         {
           std::cout << "-";
           fflush(stdout);
-          size_t current_chunk = std::min(remainingSize, max_chunk);
-          int resp = gzread(gzin, buffer, current_chunk);
+          size_t currentChunk = std::min(remainingSize, maxChunk);
+          int resp = gzread(gzin, temp.data(), currentChunk);
+	  int words = resp / 4;
+	  for (int i = 0; i < words; ++i, addr += 4)
+	    if (temp.at(i))
+	      poke(addr, temp.at(i));
           if (resp == 0)
             {
               success = gzeof(gzin);
               break;
             }
           remainingSize -= resp;
-          buffer += resp;
         }
-      if(not success)
+      if (not success)
         break;
     }
 
@@ -861,8 +916,6 @@ Memory::loadSnapshot(const std::string & filename,
               << " failed: " << gzerror(gzin, nullptr) << "\n";
   else if (remainingSize > 0)
     std::cerr << "Memory::loadSnapshot: Warning: Snapshot data size smaller than memory size\n";
-  else if (not gzeof(gzin))
-    std::cerr << "Memory::loadSnapshot: Warning: Snapshot data size larger than memory size\n";
 
   gzclose(gzin);
   std::cout << "\nloadSnapshot finished\n";
@@ -939,14 +992,6 @@ Memory::saveInstructionAddressTrace(const std::string& path) const
   if (not instrLineTrace_)
     return true;
   return saveAddressTrace("instruction", instrLineMap_, path);
-}
-
-
-void
-Memory::copy(const Memory& other)
-{
-  size_t n = std::min(size_, other.size_);
-  memcpy(data_, other.data_, n);
 }
 
 

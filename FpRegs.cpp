@@ -193,7 +193,7 @@ FpRegs::reset(bool hasHalf, bool hasSingle, bool hasDouble)
       // F extension present without D. Reset to NAN-boxed
       // single-precision zeros.
       for (size_t i = 0; i < regs_.size(); ++i)
-	writeSingle(i, 0);
+	writeSingle(i, 0.0f);
     }
   else if (hasHalf)
     {

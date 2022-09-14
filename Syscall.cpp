@@ -1661,71 +1661,26 @@ Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
 // TBD FIX: Needs improvement.
 template<typename URV>
 void
-Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& used_blocks)
+Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& usedBlocks)
 {
-  static const uint64_t max_stack_size = 1024*1024*8;
-  auto mem_size = hart_.getMemorySize();
-  used_blocks.clear();
-  if (mem_size<=(max_stack_size+progBreak_))
+  usedBlocks.clear();
+
+  // Up to 16 GB, snapshot the whole memory.
+  uint64_t memSize = hart_.getMemorySize();
+  if (memSize <= 0x400000000L)
     {
-      used_blocks.push_back(AddrLen{0, mem_size});
+      usedBlocks.push_back(AddrLen{0, memSize});
       return;
     }
-  used_blocks.push_back(AddrLen{0, progBreak_});
+
+  // This does not work for raw mode. This does not work if
+  // stack size exeeds 8 Mb.
+  const uint64_t maxStackSize = 1024*1024*8;
+  usedBlocks.push_back(AddrLen{0, progBreak_});
   for(auto& it:mmap_blocks_)
     if(not it.second.free)
-      used_blocks.push_back(AddrLen{it.first, it.second.length});
-  used_blocks.push_back(AddrLen{hart_.getMemorySize()-max_stack_size,
-                                max_stack_size});
-}
-
-
-template<typename URV>
-bool
-Syscall<URV>::loadUsedMemBlocks(const std::string& filename,
-                                std::vector<AddrLen>& used_blocks)
-{
-  // open file for read, check success
-  used_blocks.clear();
-  std::ifstream ifs(filename);
-  if (not ifs)
-    {
-      std::cerr << "Syscall::loadUsedMemBlocks failed - cannot open "
-                << filename << " for read\n";
-      return false;
-    }
-  std::string line;
-  mmap_blocks_.clear();
-  while (std::getline(ifs, line))
-    {
-      std::istringstream iss(line);
-      uint64_t addr, length;
-      iss >> addr;
-      iss >> length;
-      used_blocks.push_back(AddrLen{addr, length});
-    }
-
-  return true;
-}
-
-
-template<typename URV>
-bool
-Syscall<URV>::saveUsedMemBlocks(const std::string& filename,
-                                std::vector<AddrLen>& used_blocks)
-{
-  // open file for write, check success
-  std::ofstream ofs(filename, std::ios::trunc);
-  if (not ofs)
-    {
-      std::cerr << "Syscall::saveUsedMemBlocks failed - cannot open "
-                << filename << " for write\n";
-      return false;
-    }
-  getUsedMemBlocks(used_blocks);
-  for (auto& it: used_blocks)
-    ofs << it.first << " " << it.second << "\n";
-  return true;
+      usedBlocks.push_back(AddrLen{it.first, it.second.length});
+  usedBlocks.push_back(AddrLen{memSize - maxStackSize, maxStackSize});
 }
 
 

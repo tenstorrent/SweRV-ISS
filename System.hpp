@@ -152,6 +152,14 @@ namespace WdRiscv
       return true;
     }
 
+    /// Save snapshot (registers, memory etc) into given directory
+    /// which should alread exist. Return true on success.
+    bool saveSnapshot(Hart<URV>& hart, const std::string& dirPath);
+
+    /// Load snapshot (registers, memory etc) from the given drectory.
+    /// Return true on succes.
+    bool loadSnapshot(const std::string& dirPath, Hart<URV>& hart);
+
     /// Write contents of memory accessed by current run in verilog
     /// hex format to the file at the given path. Return true on
     /// success and false on failure. Currently this will write the
@@ -185,9 +193,11 @@ namespace WdRiscv
     /// size). The rtlData vector must be of size n or larger where n
     /// is the merge buffer line size. The rtlData bytes will be
     /// placed in memory in consecutive locations starting with
-    /// physAddr.
+    /// physAddr. If not-empty, the mask vector contains a flag that
+    /// is set for each byte of rtlData that is written by the RTL.
     bool mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t pysAddr,
-		    const std::vector<uint8_t>& rtlData);
+		    const std::vector<uint8_t>& rtlData,
+		    const std::vector<bool>& mask);
 
     bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		     uint64_t addr, unsigned size, uint64_t data);

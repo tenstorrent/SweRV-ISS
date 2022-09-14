@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <vector>
 #include <unordered_map>
 
 
@@ -47,6 +48,10 @@ namespace WdRiscv
     /// Write the contents of the memory to a verilog hex file. Return
     /// true on success and false on failure.
     bool writeHexFile(const std::string& path) const;
+
+    /// Fill the given vector with the addresses/sizes of the
+    /// used memory areas (pages) sorted in ascending order.
+    void getUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& vec) const;
 
   protected:
 

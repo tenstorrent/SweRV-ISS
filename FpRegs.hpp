@@ -402,6 +402,9 @@ namespace WdRiscv
       lastWrittenReg_ = i;
     }
 
+    /// Disallow write double using a standard conversion from float.
+    void writeDouble(unsigned i, float) = delete;
+
     /// Read a single precision floating point number from the ith
     /// register.  If the register width is greater than 32 bits, this
     /// will recover the least significant 32 bits (it assumes that
@@ -412,6 +415,9 @@ namespace WdRiscv
     /// Write a single precision number into the ith register. NAN-box
     /// the number if the register is 64-bit wide.
     void writeSingle(unsigned i, float x);
+
+    /// Disallow write double using a standard conversion from double.
+    void writeSingle(unsigned i, double) = delete;
 
     /// Similar to readSingle but for for half precision.
     Float16 readHalf(unsigned i) const;

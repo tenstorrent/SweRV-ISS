@@ -132,7 +132,8 @@ namespace WdRiscv
     /// placed in memory in consecutive locations starting with
     /// physAddr.
     bool mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
-			  const std::vector<uint8_t>& rtlData);
+			  const std::vector<uint8_t>& rtlData,
+			  const std::vector<bool>& mask);
 
     /// Insert a write operation for the given instruction into the
     /// merge buffer removing it from the store buffer. Return true on
@@ -235,6 +236,13 @@ namespace WdRiscv
 
   protected:
 
+    typedef std::vector<MemoryOp> MemoryOpVec;
+
+    // Remove from hartPendingWrites_ the writes matching the RTL line
+    // addresses and place them sorted by instr tag in coveredWrites.
+    bool collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,
+			      MemoryOpVec& coveredWrites);
+
     /// Forward from a store to a read op. Return true on success.
     /// Return false if instr is not retired, is canceled, is not a
     /// store, is amo or does not match range address of op.  Mask is
@@ -306,7 +314,6 @@ namespace WdRiscv
       
 
     typedef std::vector<McmInstr> McmInstrVec;
-    typedef std::vector<MemoryOp> MemoryOpVec;
 
     typedef std::vector<uint64_t> RegTimeVec; // Map reg index to time.
     typedef std::vector<uint64_t> RegProducer; // Map reg index to instr tag.

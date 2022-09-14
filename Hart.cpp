@@ -232,7 +232,7 @@ Hart<URV>::countImplementedPmpRegisters() const
       for (unsigned ix = 0; ix < 16; ++ix, ++num)
         if (csRegs_.isImplemented(CsrNumber(num)))
           cfgCount++;
-      if (count and cfgCount != 15)
+      if (count and cfgCount != 16)
         std::cerr << "Warning: Physical memory protection enabled but only "
                   << cfgCount << "/16" << " PMPCFG CSRs implemented\n";
     }
@@ -648,11 +648,11 @@ Hart<URV>::loadHexFile(const std::string& file)
 
 template <typename URV>
 bool
-Hart<URV>::loadElfFile(const std::string& file, size_t& entryPoint)
+Hart<URV>::loadElfFile(const std::string& file, uint64_t& entryPoint)
 {
   unsigned registerWidth = sizeof(URV)*8;
 
-  size_t end = 0;
+  uint64_t end = 0;
   if (not memory_.loadElfFile(file, registerWidth, entryPoint, end))
     return false;
 
@@ -681,7 +681,7 @@ Hart<URV>::loadElfFile(const std::string& file, size_t& entryPoint)
 
 template <typename URV>
 bool
-Hart<URV>::peekMemory(size_t address, uint8_t& val, bool usePma) const
+Hart<URV>::peekMemory(uint64_t address, uint8_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
 }
@@ -689,7 +689,7 @@ Hart<URV>::peekMemory(size_t address, uint8_t& val, bool usePma) const
 
 template <typename URV>
 bool
-Hart<URV>::peekMemory(size_t address, uint16_t& val, bool usePma) const
+Hart<URV>::peekMemory(uint64_t address, uint16_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
 }
@@ -697,7 +697,7 @@ Hart<URV>::peekMemory(size_t address, uint16_t& val, bool usePma) const
 
 template <typename URV>
 bool
-Hart<URV>::peekMemory(size_t address, uint32_t& val, bool usePma) const
+Hart<URV>::peekMemory(uint64_t address, uint32_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
 }
@@ -705,7 +705,7 @@ Hart<URV>::peekMemory(size_t address, uint32_t& val, bool usePma) const
 
 template <typename URV>
 bool
-Hart<URV>::peekMemory(size_t address, uint64_t& val, bool usePma) const
+Hart<URV>::peekMemory(uint64_t address, uint64_t& val, bool usePma) const
 {
   uint32_t high = 0, low = 0;
 
@@ -721,7 +721,7 @@ Hart<URV>::peekMemory(size_t address, uint64_t& val, bool usePma) const
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(size_t addr, uint8_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
@@ -739,7 +739,7 @@ Hart<URV>::pokeMemory(size_t addr, uint8_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(size_t addr, uint16_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
@@ -757,7 +757,7 @@ Hart<URV>::pokeMemory(size_t addr, uint16_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(size_t addr, uint32_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
 {
   // We allow poke to bypass masking for memory mapped registers
   // otherwise, there is no way for external driver to clear bits that
@@ -786,7 +786,7 @@ Hart<URV>::pokeMemory(size_t addr, uint32_t val, bool usePma)
 
 template <typename URV>
 bool
-Hart<URV>::pokeMemory(size_t addr, uint64_t val, bool usePma)
+Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
@@ -842,7 +842,7 @@ Hart<URV>::clearPendingNmi()
 
 template <typename URV>
 void
-Hart<URV>::setToHostAddress(size_t address)
+Hart<URV>::setToHostAddress(uint64_t address)
 {
   toHost_ = URV(address);
   toHostValid_ = true;
@@ -938,7 +938,7 @@ Hart<URV>::execAndi(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::isAddrIdempotent(size_t addr) const
+Hart<URV>::isAddrIdempotent(uint64_t addr) const
 {
   if (pmaOverride_)
     {
@@ -957,7 +957,7 @@ Hart<URV>::isAddrIdempotent(size_t addr) const
 
 template <typename URV>
 bool
-Hart<URV>::isAddrCacheable(size_t addr) const
+Hart<URV>::isAddrCacheable(uint64_t addr) const
 {
   if (pmaOverride_)
     {
@@ -1339,7 +1339,7 @@ Hart<URV>::determineMisalStoreException(URV addr, unsigned accessSize) const
   if (not misalDataOk_)
     return ExceptionCause::STORE_ADDR_MISAL;
 
-  size_t addr2 = addr + accessSize - 1;
+  uint64_t addr2 = addr + accessSize - 1;
 
   // Misaligned access to PIC.
   if (isAddrMemMapped(addr))
@@ -1924,7 +1924,7 @@ Hart<URV>::execSw(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::readInst(size_t address, uint32_t& inst)
+Hart<URV>::readInst(uint64_t address, uint32_t& inst)
 {
   inst = 0;
 
@@ -1948,7 +1948,7 @@ Hart<URV>::readInst(size_t address, uint32_t& inst)
 
 template <typename URV>
 bool
-Hart<URV>::defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask)
+Hart<URV>::defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask)
 {
   return memory_.defineMemoryMappedRegisterWriteMask(addr, mask);
 }
@@ -2171,7 +2171,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
 	{
 	  throw CoreException(CoreException::Stop,
 			      "64 consecutive illegal instructions",
-			      0, 0);
+			      0, 0 /*3*/);  // Exit code should be 3.
 	}
 
       counterAtLastIllegal_ = instCounter_;
@@ -3068,7 +3068,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   else if (not vecRegs_.ldStAddr_.empty())
     {
       std::ostringstream oss;
-      for (size_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
+      for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
 	{
 	  if (i > 0)
 	    oss << ";";
@@ -3260,7 +3260,10 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (not traceHeaderPrinted_)
     {
       traceHeaderPrinted_ = true;
-      fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid\n");
+      fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid");
+      if (isRvs())
+	fprintf(out, ", iptw, dptw");
+      fprintf(out, "\n");
     }
 
   // Program counter.
@@ -3389,7 +3392,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     }
   else if (not vecRegs_.ldStAddr_.empty())
     {
-      for (size_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
+      for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
 	{
 	  if (i > 0)
 	    fputc(';', out);
@@ -3452,6 +3455,34 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Hart Id.
   fprintf(out, ",%x", sysHartIndex());
+
+  // Page table walk.
+  if (isRvs())
+    {
+      fputs(",", out);
+      std::vector<uint64_t> addrs, entries;
+      getPageTableWalkAddresses(true, addrs);
+      getPageTableWalkAddresses(true, entries);
+      const char* sep = "";
+      uint64_t n = std::min(addrs.size(), entries.size());
+      for (uint64_t i = 0; i < n; ++i)
+	{
+	  fprintf(out, "%s%lx=%lx", sep, addrs.at(i), entries.at(i));
+	  sep = ";";
+	}
+
+      fputs(",", out);
+      getPageTableWalkAddresses(false, addrs);
+      getPageTableWalkAddresses(false, entries);
+      sep = "";
+      n = std::min(addrs.size(), entries.size());
+      for (uint64_t i = 0; i < n; ++i)
+	{
+	  fprintf(out, "%s%lx=%lx", sep, addrs.at(i), entries.at(i));
+	  sep = ";";
+	}
+    }
+
   fputc('\n', out);
 }
 
@@ -4069,9 +4100,9 @@ inline
 void
 Hart<URV>::setTargetProgramBreak(URV addr)
 {
-  size_t progBreak = addr;
+  uint64_t progBreak = addr;
 
-  size_t pageAddr = memory_.getPageStartAddr(addr);
+  uint64_t pageAddr = memory_.getPageStartAddr(addr);
   if (pageAddr != addr)
     progBreak = pageAddr + memory_.pageSize();
 
@@ -4319,7 +4350,7 @@ reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
 	    << (instCount > 1? "s" : "") << " in "
 	    << (boost::format("%.2fs") % elapsed);
   if (elapsed > 0)
-    std::cerr << "  " << size_t(double(instCount)/elapsed) << " inst/s";
+    std::cerr << "  " << uint64_t(double(instCount)/elapsed) << " inst/s";
   std::cerr << '\n';
 }
 
@@ -4457,7 +4488,7 @@ static std::mutex execMutex;
 
 template <typename URV>
 bool
-Hart<URV>::untilAddress(size_t address, FILE* traceFile)
+Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 {
   std::string instStr;
   instStr.reserve(128);
@@ -4579,7 +4610,7 @@ Hart<URV>::untilAddress(size_t address, FILE* traceFile)
 
 template <typename URV>
 bool
-Hart<URV>::runUntilAddress(size_t address, FILE* traceFile)
+Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 {
   struct timeval t0;
   gettimeofday(&t0, nullptr);

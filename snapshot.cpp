@@ -22,85 +22,6 @@ using namespace WdRiscv;
 
 template <typename URV>
 bool
-Hart<URV>::saveSnapshot(const std::string& dir)
-{
-  FileSystem::path dirPath = dir;
-  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
-
-  FileSystem::path regPath = dirPath / "registers";
-  if (not saveSnapshotRegs(regPath.string()))
-    return false;
-
-  FileSystem::path usedBlocksPath = dirPath / "usedblocks";
-  if (not syscall_.saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
-    return false;
-
-  FileSystem::path memPath = dirPath / "memory";
-  if (not memory_.saveSnapshot(memPath.string(), usedBlocks))
-    return false;
-
-  FileSystem::path fdPath = dirPath / "fd";
-  if (not syscall_.saveFileDescriptors(fdPath.string()))
-    return false;
-
-  FileSystem::path mmapPath = dirPath / "mmap";
-  if (not syscall_.saveMmap(mmapPath.string()))
-    return false;
-
-  FileSystem::path cachePath = dirPath / "cache";
-  if (not memory_.saveCacheSnapshot(cachePath))
-    return false;
-
-  FileSystem::path dtracePath = dirPath / "data-lines";
-  if (not memory_.saveDataAddressTrace(dtracePath))
-    return false;
-
-  FileSystem::path itracePath = dirPath / "instr-lines";
-  if (not memory_.saveInstructionAddressTrace(itracePath))
-    return false;
-
-  return true;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::loadSnapshot(const std::string& dir)
-{
-  FileSystem::path dirPath = dir;
-  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
-
-  FileSystem::path regPath = dirPath / "registers";
-  if (not loadSnapshotRegs(regPath.string()))
-    return false;
-
-  FileSystem::path usedBlocksPath = dirPath / "usedblocks";
-  if (not syscall_.loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
-    return false;
-
-  FileSystem::path mmapPath = dirPath / "mmap";
-  if (not syscall_.loadMmap(mmapPath.string()))
-    return false;
-
-  FileSystem::path memPath = dirPath / "memory";
-  if (not memory_.loadSnapshot(memPath.string(), usedBlocks))
-    return false;
-
-  FileSystem::path fdPath = dirPath / "fd";
-  if (not syscall_.loadFileDescriptors(fdPath.string()))
-    return false;
-
-  FileSystem::path cachePath = dirPath / "cache";
-  if (FileSystem::is_regular_file(cachePath))
-    if (not memory_.loadCacheSnapshot(cachePath.string()))
-      return false;
-
-  return true;
-}
-
-
-template <typename URV>
-bool
 Hart<URV>::saveSnapshotRegs(const std::string & filename)
 {
   // open file for write, check success
@@ -111,10 +32,11 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       return false;
     }
 
-  // write Program Order and Program Counter and program break.
-  ofs << "po " << std::dec << getInstructionCount() << "\n";
+  // Write Privilege Mode, Program Order, Program Break, and Program Counter.
+  ofs << "pm " << std::dec << unsigned(privilegeMode()) << '\n';
+  ofs << "po " << std::dec << getInstructionCount() << '\n';
   ofs << "pb 0x" << std::hex << syscall_.targetProgramBreak() << '\n';
-  ofs << "pc 0x" << std::hex << peekPc() << "\n";
+  ofs << "pc 0x" << std::hex << peekPc() << '\n';
 
   // write integer registers
   for (unsigned i = 1; i < 32; i++)
@@ -262,6 +184,8 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
   unsigned num = 0;
   uint64_t val = 0;
   bool error = false;
+  auto privMode = PrivilegeMode::Machine;
+
   while(std::getline(ifs, line))
     {
       lineNum++;
@@ -278,6 +202,19 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
             break; // error: parse failed
           pokePc(val);
         }
+      else if (type == "pm")  // Prrivilege Mode
+	{
+	  if (not loadSnapshotValue(iss, val))
+	    break;
+	  if (val == 0)
+	    privMode = PrivilegeMode::User;
+	  else if (val == 1)
+	    privMode = PrivilegeMode::Supervisor;
+	  else if (val == 3)
+	    privMode = PrivilegeMode::Machine;
+	  else 
+	    break; // error.
+	}
       else if (type == "po")  // Program order
         {
           if (not loadSnapshotValue(iss, val))
@@ -329,6 +266,8 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
         break;  // error: parse failed
       error = false;
     }
+
+  setPrivilegeMode(privMode);
 
   if (error)
     {

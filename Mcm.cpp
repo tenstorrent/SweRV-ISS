@@ -458,60 +458,60 @@ reportMismatch(uint64_t hartId, uint64_t time, std::string tag, uint64_t addr,
 }
 
 
-template <typename URV>
-bool
-Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
-			   const std::vector<uint8_t>& rtlData)
+static bool
+checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAddr)
 {
-  if (not updateTime("Mcm::mergeBufferWrite", time))
-    return false;
-
-  if (lineSize_ == 0)
+  if (lineSize == 0)
     {
       cerr << "Merge buffer write attempted when merge buffer is disabled\n";
       return false;
     }
 
-  if (rtlData.size() > lineSize_)
+  if (rtlLineSize > lineSize)
     {
-      cerr << "Mcm::mergeBufferWrite: write line size > cache line size\n";
-      assert(0 && "Mcm::mergeBufferWrite: write line size > cache line size");
+      cerr << "Merge buffer write: RTL line size (" << rtlLineSize << ") greater than"
+	   << " cache line size (" << lineSize << ")\n";
+      return false;
     }
 
-  // Read our memory. Apply pending writes. Compare to reference. Commit to
-  // our memory.
-  if ((physAddr % lineSize_) != 0)
+  if ((physAddr % lineSize) != 0)
     {
-      cerr << "Mcm::mergeBufferWrite: address not a multiple of line size\n";
-      assert(0 && "Mcm::mergeBufferWrite: address not a multiple of line size");
+      cerr << "Merge buffer write: address (0x" << std::hex << physAddr << ") "
+	   << "not a multiple of line size (" << std::dec << lineSize << ")\n";
+      return false;
     }
 
+  return true;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,
+			       MemoryOpVec& coveredWrites)
+{
   unsigned hartIx = hart.sysHartIndex();
+  auto& pendingWrites = hartPendingWrites_.at(hartIx);
+  size_t pendingSize = 0;  // pendingWrite size after removal of matching writes
 
-  std::vector<MemoryOp> coveredWrites;
+  uint64_t lineEnd = lineBegin + lineSize_;
 
-  uint64_t lineEnd = physAddr + lineSize_;
-
-  // Collect pending-writes matching merge buffer address in coveredWrites
-  // removing them from the pending-write vector.
-  size_t pendingSize = 0;  // Pending size after removal of matchign writes
-  auto& writesVec = hartPendingWrites_.at(hartIx);
-  for (size_t i = 0; i < writesVec.size(); ++i)
+  for (size_t i = 0; i < pendingWrites.size(); ++i)
     {
-      auto& write = writesVec.at(i);
-      if (write.physAddr_ >= physAddr and write.physAddr_ < lineEnd)
+      auto& write = pendingWrites.at(i);
+      if (write.physAddr_ >= lineBegin and write.physAddr_ < lineEnd)
 	{
 	  write.time_ = time;
 	  if (write.physAddr_ + write.size_  > lineEnd)
 	    {
 	      cerr << "Mcm::mergeBufferWrite: Error: Store address out of line bounds\n";
-	      assert(0 && "Mcm::mergeBufferWrite: Store address out of line bounds");
+	      return false;
 	    }
 	  McmInstr* instr = findOrAddInstr(hartIx, write.instrTag_);
 	  if (not instr or instr->isCanceled())
 	    {
 	      cerr << "Mcm::mergeBufferWrite: Write for an invalid store\n";
-	      assert(0 && "Mcm::mergeBufferWrite: Write for an invalid store");
+	      return false;
 	    }
 	  instr->addMemOp(sysMemOps_.size());
 	  sysMemOps_.push_back(write);
@@ -520,17 +520,40 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       else
 	{
 	  if (i != pendingSize)
-	    writesVec.at(pendingSize) = writesVec.at(i);
+	    pendingWrites.at(pendingSize) = pendingWrites.at(i);
 	  pendingSize++;
 	}
     }
-  writesVec.resize(pendingSize);
+  pendingWrites.resize(pendingSize);
 
   std::sort(coveredWrites.begin(), coveredWrites.end(),
 	    [](const MemoryOp& a, const MemoryOp& b) {
 	      return a.instrTag_ < b.instrTag_;
 	    });
+  return true;
+}
 
+
+template <typename URV>
+bool
+Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
+			   const std::vector<uint8_t>& rtlData,
+			   const std::vector<bool>& rtlMask)
+{
+  if (not updateTime("Mcm::mergeBufferWrite", time))
+    return false;
+  if (not checkBufferWriteParams(lineSize_, rtlData.size(), physAddr))
+    return false;
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  // Remove from hartPendingWrites_ the writes matching the RTL line
+  // addresses and place them sorted by instr tag in coveredWrites.
+  std::vector<MemoryOp> coveredWrites;
+  if (not collectCoveredWrites(hart, time, physAddr, coveredWrites))
+    return false;
+
+  // Read our memory corresponding to RTL line addresses.
   std::vector<uint8_t> line(lineSize_, 0);
   for (unsigned i = 0; i < lineSize_; ++i)
     {
@@ -538,24 +561,30 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       if (not hart.peekMemory(physAddr + i, byte, true /*usePma*/))
 	{
 	  cerr << "Mcm::mergeBufferWrite: Failed to query memory\n";
-	  assert(0 && "Mcm::mergeBufferWrite: Failed to query memory");
+	  return false;
 	}
       line.at(i) = byte;
     }
 
+  // Apply pending writes to our line. Compute mask of updated bytes.
+  std::vector<bool> mask(lineSize_);
+  uint64_t lineEnd = physAddr + lineSize_;
   for (const auto& write : coveredWrites)
     {
       if ((write.physAddr_ < physAddr) or (write.physAddr_ + write.size_ > lineEnd))
 	{
 	  cerr << "Mcm::mergeBufferWrite: Store address out of line bound\n";
-	  assert(0 && "Mcm::mergeBufferWrite: Store address out of line bound");
+	  return false;
 	}
       unsigned ix = write.physAddr_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
-	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
+	{
+	  line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
+	  mask.at(ix+i) = true;
+	}
     }
 
-  // Poke words to accomodate clint.
+  // Put our line back in memory (use poke words to accomodate clint).
   for (unsigned i = 0; i < lineSize_; i += 4)
     {
       uint32_t word = *((uint32_t*) (line.data() + i));
@@ -577,24 +606,23 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     }
   else
     {   // Compare covered writes.
-      for (const auto& write : coveredWrites)
+      for (unsigned i = 0; i < lineSize_; ++i)
 	{
-	  for (unsigned i = 0; i < write.size_; ++i)
+	  if (mask.at(i) and (line.at(i) != rtlData.at(i)))
 	    {
-	      uint64_t addr = write.physAddr_ + i;
-	      uint64_t offset = addr - physAddr;
-	      if (offset < rtlData.size() and offset < lineSize_)
-		{
-		  uint8_t rtlByte = rtlData.at(offset);
-		  uint8_t byte = line.at(offset);
-		  if (byte != rtlByte)
-		    {
-		      reportMismatch(hart.hartId(), time, "merge buffer write", addr,
-				     rtlByte, byte);
-		      result = false;
-		      break;
-		    }
-		}
+	      reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
+			     rtlData.at(i), line.at(i));
+	      result = false;
+	      break;
+	    }
+	  if (not rtlMask.empty() and i < rtlMask.size() and mask.at(i) != rtlMask.at(i))
+	    {
+	      cerr << "Error: Mismatch on merge buffer update time=" << time
+		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
+		   << (physAddr + i) << std::dec << " rtl=" << rtlMask.at(i)
+		   << " whisper=" << mask.at(i) << '\n';
+	      result = false;
+	      break;
 	    }
 	}
     }
@@ -610,7 +638,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
       if (not instr)
 	{
 	  cerr << "Mcm::mergeBufferWrite: Covered instruction tag is invalid\n";
-	  assert(0 && "Mcm::mergeBufferWrite: Covered instruction tag is invalid");
+	  return false;
 	}
       if (checkStoreComplete(*instr))
 	{
@@ -623,7 +651,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	  if (not instr->complete_)
 	    {
 	      cerr << "Mcm::mergeBufferWrite: sc instruction written before complete\n";
-	      assert(0 && "Mcm::mergeBufferWrite: sc instruction written before complete");
+	      return false;
 	    }
 	  for (uint64_t tag = instr->tag_ + 1; tag < instrVec.size(); ++tag)
 	    if (instrVec.at(tag).retired_)

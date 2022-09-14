@@ -262,9 +262,16 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 792;
+  unsigned subversion = 793;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
+#ifdef GIT_SHA
+  #define xstr(x) str(x)
+  #define str(x) #x
+  std::cout << "Git SHA: " << xstr(GIT_SHA) << '\n';
+  #undef str
+  #undef xstr
+#endif
 }
 
 
@@ -299,7 +306,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
   if (varMap.count("fromhost"))
     {
       auto numStr = varMap["fromhost"].as<std::string>();
-      if (not parseCmdLineNumber("fromhost", numStr, args.toHost))
+      if (not parseCmdLineNumber("fromhost", numStr, args.fromHost))
 	ok = false;
     }
 
@@ -795,7 +802,7 @@ sanitizeStackPointer(Hart<URV>& hart, bool verbose)
 template <typename URV>
 static
 bool
-loadSnapshot(Hart<URV>& hart, const std::string& snapDir)
+loadSnapshot(System<URV>& system, Hart<URV>& hart, const std::string& snapDir)
 {
   using std::cerr;
 
@@ -820,7 +827,7 @@ loadSnapshot(Hart<URV>& hart, const std::string& snapDir)
       return false;
     }
 
-  if (not hart.loadSnapshot(path))
+  if (not system.loadSnapshot(path, hart))
     {
       cerr << "Error: Failed to load sanpshot from dir " << snapDir << '\n';
       return false;
@@ -941,7 +948,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
         {
           filename = binaryFile.substr(0, end);
           std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
-          offs = strtoull(offsStr.c_str(), NULL, 0);
+          offs = strtoull(offsStr.c_str(), nullptr, 0);
         }
       else
         std::cerr << "Binary " << binaryFile << " does not have an address, will use address 0x0\n";
@@ -962,7 +969,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
         {
           filename = args.kernelFile.substr(0, end);
           std::string offsStr = args.kernelFile.substr(end + 1, args.kernelFile.length());
-          offs = strtoull(offsStr.c_str(), NULL, 0);
+          offs = strtoull(offsStr.c_str(), nullptr, 0);
         }
 
       if (args.verbose)
@@ -975,7 +982,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     hart.enableInstructionFrequency(true);
 
   if (not args.loadFrom.empty())
-    if (not loadSnapshot(hart, args.loadFrom))
+    if (not loadSnapshot(system, hart, args.loadFrom))
       errors++;
 
   if (not args.stdoutFile.empty())
@@ -1270,7 +1277,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 	}
     }
 
-  if (args.trace and traceFile == NULL)
+  if (args.trace and traceFile == nullptr)
     traceFile = stdout;
   if (traceFile and not doGzip)
     setlinebuf(traceFile);  // Make line-buffered.
@@ -1479,7 +1486,7 @@ snapshotRun(System<URV>& system, FILE* traceFile,
                 std::cerr << "Error: Failed to create snapshot directory " << path << '\n';
                 return false;
               }
-          if (not hart.saveSnapshot(path))
+          if (not system.saveSnapshot(hart, path))
             {
               std::cerr << "Error: Failed to save a snapshot\n";
               return false;

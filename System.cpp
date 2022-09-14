@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 #include "Hart.hpp"
 #include "Core.hpp"
 #include "System.hpp"
@@ -106,6 +108,139 @@ System<URV>::writeAccessedMemory(const std::string& path) const
 }
 
 
+bool
+saveUsedMemBlocks(const std::string& filename,
+		  std::vector<std::pair<uint64_t, uint64_t>>& blocks)
+{
+  std::ofstream ofs(filename, std::ios::trunc);
+  if (not ofs)
+    {
+      std::cerr << "saveUsedMemBlocks failed - cannot open "
+                << filename << " for write\n";
+      return false;
+    }
+  for (auto& it: blocks)
+    ofs << it.first << " " << it.second << "\n";
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
+{
+  std::filesystem::path dirPath = dir;
+
+  std::filesystem::path regPath = dirPath / "registers";
+  if (not hart.saveSnapshotRegs(regPath.string()))
+    return false;
+
+  auto& syscall = hart.getSyscall();
+
+  std::filesystem::path usedBlocksPath = dirPath / "usedblocks";
+  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
+  if (sparseMem_)
+    sparseMem_->getUsedBlocks(usedBlocks);
+  else
+    syscall.getUsedMemBlocks(usedBlocks);
+  if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
+    return false;
+
+  std::filesystem::path memPath = dirPath / "memory";
+  if (not memory_->saveSnapshot(memPath.string(), usedBlocks))
+    return false;
+
+  std::filesystem::path fdPath = dirPath / "fd";
+  if (not syscall.saveFileDescriptors(fdPath.string()))
+    return false;
+
+  std::filesystem::path mmapPath = dirPath / "mmap";
+  if (not syscall.saveMmap(mmapPath.string()))
+    return false;
+
+  std::filesystem::path cachePath = dirPath / "cache";
+  if (not memory_->saveCacheSnapshot(cachePath))
+    return false;
+
+  std::filesystem::path dtracePath = dirPath / "data-lines";
+  if (not memory_->saveDataAddressTrace(dtracePath))
+    return false;
+
+  std::filesystem::path itracePath = dirPath / "instr-lines";
+  if (not memory_->saveInstructionAddressTrace(itracePath))
+    return false;
+
+  return true;
+}
+
+
+static
+bool
+loadUsedMemBlocks(const std::string& filename,
+		  std::vector<std::pair<uint64_t, uint64_t>>& blocks)
+{
+  blocks.clear();
+  std::ifstream ifs(filename);
+  if (not ifs)
+    {
+      std::cerr << "loadUsedMemBlocks failed - cannot open "
+                << filename << " for read\n";
+      return false;
+    }
+
+  typedef std::pair<uint64_t, uint64_t> Pair;
+
+  std::string line;
+  while (std::getline(ifs, line))
+    {
+      std::istringstream iss(line);
+      uint64_t addr, length;
+      iss >> addr;
+      iss >> length;
+      blocks.push_back(Pair{addr, length});
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
+{
+  std::filesystem::path dirPath = dir;
+  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
+
+  std::filesystem::path regPath = dirPath / "registers";
+  if (not hart.loadSnapshotRegs(regPath.string()))
+    return false;
+
+  auto& syscall = hart.getSyscall();
+  std::filesystem::path usedBlocksPath = dirPath / "usedblocks";
+  if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
+    return false;
+
+  std::filesystem::path mmapPath = dirPath / "mmap";
+  if (not syscall.loadMmap(mmapPath.string()))
+    return false;
+
+  std::filesystem::path memPath = dirPath / "memory";
+  if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
+    return false;
+
+  std::filesystem::path fdPath = dirPath / "fd";
+  if (not syscall.loadFileDescriptors(fdPath.string()))
+    return false;
+
+  std::filesystem::path cachePath = dirPath / "cache";
+  if (std::filesystem::is_regular_file(cachePath))
+    if (not memory_->loadCacheSnapshot(cachePath.string()))
+      return false;
+
+  return true;
+}
+
+
 template <typename URV>
 bool
 System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
@@ -151,11 +286,12 @@ System<URV>::mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag,
 template <typename URV>
 bool
 System<URV>::mcmMbWrite(Hart<URV>& hart, uint64_t time, uint64_t addr,
-		    const std::vector<uint8_t>& data)
+			const std::vector<uint8_t>& data,
+			const std::vector<bool>& mask)
 {
   if (not mcm_)
     return false;
-  return mcm_->mergeBufferWrite(hart, time, addr, data);
+  return mcm_->mergeBufferWrite(hart, time, addr, data, mask);
 }
 
 

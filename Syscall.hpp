@@ -94,9 +94,6 @@ namespace WdRiscv
 
     void getUsedMemBlocks(std::vector<AddrLen>& used_blocks);
 
-    bool loadUsedMemBlocks(const std::string& path, std::vector<AddrLen>& used_blocks);
-    bool saveUsedMemBlocks(const std::string& path, std::vector<AddrLen>& used_blocks);
-
     bool saveMmap(const std::string & filename);
 
     bool loadMmap(const std::string & filename);

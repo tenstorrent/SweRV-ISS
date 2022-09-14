@@ -1008,7 +1008,7 @@ Interactive<URV>::elfCommand(Hart<URV>& hart, const std::string& line,
 
   std::string filePath = tokens.at(1);
 
-  size_t entryPoint = 0;
+  uint64_t entryPoint = 0;
 
   if (not hart.loadElfFile(filePath, entryPoint))
     return false;
@@ -1807,10 +1807,10 @@ bool
 Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
 				 const std::vector<std::string>& tokens)
 {
-  // Format: mbwrite <physical-address> <rtl-data>
+  // Format: mbwrite <physical-address> <rtl-data> [<mask>]
   // Data is up to 64 bytes (each byte is 2 hex digits) with least significant
   // byte (rightmost two hex digits) corresponding to smallest address.
-  if (tokens.size() != 3)
+  if (tokens.size() != 3 and tokens.size() != 4)
     {
       std::cerr << "Invalid mbwrite command: " << line << '\n';
       std::cerr << "  Expecting: mbwrite <addr> <data>\n";
@@ -1827,7 +1827,7 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
   if (not (boost::starts_with(hexDigits, "0x") or
 	   boost::starts_with(hexDigits, "0X")))
     {
-      std::cerr << "Error: mbwrite data must begin with 0x:" << hexDigits << '\n';
+      std::cerr << "Error: mbwrite data must begin with 0x: " << hexDigits << '\n';
       return false;
     }
   hexDigits = hexDigits.substr(2);
@@ -1865,7 +1865,38 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
       data.resize(lineSize);
     }
 		     
-  return system_.mcmMbWrite(hart, this->time_, addr, data);
+  std::vector<bool> mask;
+  if (tokens.size() == 4)
+    {
+      hexDigits = tokens.at(3);
+      if (not (boost::starts_with(hexDigits, "0x")) or
+	  not (boost::starts_with(hexDigits, "0x")))
+	{
+	  std::cerr << "Error mbwrtie mask myst begin with 0x: " << hexDigits << '\n';
+	  return false;
+	}
+      hexDigits = hexDigits.substr(2);
+      if ((hexDigits.size() & 1) == 1)
+	{
+	  std::cerr << "Error: mbwrite hex digit count must be even\n";
+	  return false;
+	}
+      for (size_t i = 0; i < hexDigits.size(); i += 2)
+	{
+	  std::string byteStr = hexDigits.substr(i, 2);
+	  char* end = nullptr;
+	  unsigned value = strtoul(byteStr.c_str(), &end, 16);
+	  if (end and *end)
+	    {
+	      std::cerr << "Error: Invalid hex digit(s) in mbwrite data: "
+			<< byteStr << '\n';
+	      return false;
+	    }
+	  mask.push_back(value);
+	}
+    }
+
+  return system_.mcmMbWrite(hart, this->time_, addr, data, mask);
 }
 
 

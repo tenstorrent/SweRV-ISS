@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <cstdio>
+#include <algorithm>
 #include "SparseMem.hpp"
 
 
@@ -172,4 +173,39 @@ SparseMem::writeHexFile(const std::string& path) const
   fclose(out);
 
   return ok;
+}
+
+
+void
+SparseMem::getUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& vec) const
+{
+  vec.clear();
+  vec.reserve(pageMap_.size());
+
+  typedef std::pair<uint64_t, uint64_t> Pair;
+
+  for (auto kv : pageMap_)
+    vec.push_back(Pair{kv.first*pageSize_, pageSize_});
+
+  std::sort(vec.begin(), vec.end(), [] (const Pair& a, const Pair& b) {
+    return a.first < b.first;
+  });
+
+  // Merge adjacent pages into blocks.
+  size_t blockIx = 0;  // Index of block being expanded
+  for (size_t i = 1; i < vec.size(); ++i)
+    {
+      auto& block = vec.at(blockIx);
+      if (block.first + block.second == vec.at(i).first)
+	{
+	  block.second += vec.at(i).second;
+	  vec.at(i).second = 0;  // Mark for deletion.
+	}
+      else
+	blockIx = i;
+    }
+
+  // Delete merged pages.
+  auto newEnd = std::remove_if(vec.begin(), vec.end(), [](const Pair& x) { return x.second == 0; });
+  vec.resize(newEnd - vec.begin());
 }
