@@ -884,11 +884,13 @@ Memory::loadSnapshot(const std::string & filename,
 	  break;
 	}
 
-      temp.resize(remainingSize);
       assert((blk.first & 3) == 0);
       assert((remainingSize & 3) == 0);
       assert(prevAddr <= blk.first);
+      temp.resize(remainingSize/4);
       prevAddr = blk.first + blk.second;
+      uint64_t addr = blk.first;
+
       std::cout << "*";
       while (remainingSize) // read in chunk due to gzread limitation
         {
@@ -897,9 +899,9 @@ Memory::loadSnapshot(const std::string & filename,
           size_t currentChunk = std::min(remainingSize, maxChunk);
           int resp = gzread(gzin, temp.data(), currentChunk);
 	  int words = resp / 4;
-	  uint64_t addr = blk.first;
 	  for (int i = 0; i < words; ++i, addr += 4)
-	    poke(addr, temp.at(i));
+	    if (temp.at(i))
+	      poke(addr, temp.at(i));
           if (resp == 0)
             {
               success = gzeof(gzin);

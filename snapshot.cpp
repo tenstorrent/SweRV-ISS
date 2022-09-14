@@ -263,6 +263,8 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
   unsigned num = 0;
   uint64_t val = 0;
   bool error = false;
+  auto privMode = PrivilegeMode::Machine;
+
   while(std::getline(ifs, line))
     {
       lineNum++;
@@ -284,11 +286,11 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	  if (not loadSnapshotValue(iss, val))
 	    break;
 	  if (val == 0)
-	    setPrivilegeMode(PrivilegeMode::User);
+	    privMode = PrivilegeMode::User;
 	  else if (val == 1)
-	    setPrivilegeMode(PrivilegeMode::Supervisor);
+	    privMode = PrivilegeMode::Supervisor;
 	  else if (val == 3)
-	    setPrivilegeMode(PrivilegeMode::Machine);
+	    privMode = PrivilegeMode::Machine;
 	  else 
 	    break; // error.
 	}
@@ -343,6 +345,8 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
         break;  // error: parse failed
       error = false;
     }
+
+  setPrivilegeMode(privMode);
 
   if (error)
     {

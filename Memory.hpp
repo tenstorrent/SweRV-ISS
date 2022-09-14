@@ -435,7 +435,8 @@ namespace WdRiscv
     /// <name> <value>
     void printElfSymbols(std::ostream& out) const;
 
-    /// Enable/disable errors on unmapped memory when loading ELF files.
+    /// Enable/disable errors on unmapped memory when loading
+    /// ELF/hex/binary files.
     void checkUnmappedElf(bool flag)
     { checkUnmappedElf_ = flag; }
 

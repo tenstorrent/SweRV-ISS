@@ -1661,22 +1661,29 @@ Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
 // TBD FIX: Needs improvement.
 template<typename URV>
 void
-Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& used_blocks)
+Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& usedBlocks)
 {
-  static const uint64_t max_stack_size = 1024*1024*8;
-  auto mem_size = hart_.getMemorySize();
-  used_blocks.clear();
-  if (mem_size<=(max_stack_size+progBreak_))
+  usedBlocks.clear();
+
+  auto memSize = hart_.getMemorySize();
+  if (sizeof(size_t) > 4 and memSize <= size_t(1) << 32)
     {
-      used_blocks.push_back(AddrLen{0, mem_size});
+      usedBlocks.push_back(AddrLen{0, memSize});
       return;
     }
-  used_blocks.push_back(AddrLen{0, progBreak_});
+
+  const uint64_t maxStackSize = 1024*1024*8;
+  if (memSize <= (maxStackSize + progBreak_))
+    {
+      usedBlocks.push_back(AddrLen{0, memSize});
+      return;
+    }
+
+  usedBlocks.push_back(AddrLen{0, progBreak_});
   for(auto& it:mmap_blocks_)
     if(not it.second.free)
-      used_blocks.push_back(AddrLen{it.first, it.second.length});
-  used_blocks.push_back(AddrLen{hart_.getMemorySize()-max_stack_size,
-                                max_stack_size});
+      usedBlocks.push_back(AddrLen{it.first, it.second.length});
+  usedBlocks.push_back(AddrLen{memSize - maxStackSize, maxStackSize});
 }
 
 
