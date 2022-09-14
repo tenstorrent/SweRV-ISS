@@ -306,7 +306,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
   if (varMap.count("fromhost"))
     {
       auto numStr = varMap["fromhost"].as<std::string>();
-      if (not parseCmdLineNumber("fromhost", numStr, args.toHost))
+      if (not parseCmdLineNumber("fromhost", numStr, args.fromHost))
 	ok = false;
     }
 

@@ -1684,55 +1684,6 @@ Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& usedBlocks)
 }
 
 
-template<typename URV>
-bool
-Syscall<URV>::loadUsedMemBlocks(const std::string& filename,
-                                std::vector<AddrLen>& used_blocks)
-{
-  // open file for read, check success
-  used_blocks.clear();
-  std::ifstream ifs(filename);
-  if (not ifs)
-    {
-      std::cerr << "Syscall::loadUsedMemBlocks failed - cannot open "
-                << filename << " for read\n";
-      return false;
-    }
-  std::string line;
-  mmap_blocks_.clear();
-  while (std::getline(ifs, line))
-    {
-      std::istringstream iss(line);
-      uint64_t addr, length;
-      iss >> addr;
-      iss >> length;
-      used_blocks.push_back(AddrLen{addr, length});
-    }
-
-  return true;
-}
-
-
-template<typename URV>
-bool
-Syscall<URV>::saveUsedMemBlocks(const std::string& filename,
-                                std::vector<AddrLen>& used_blocks)
-{
-  // open file for write, check success
-  std::ofstream ofs(filename, std::ios::trunc);
-  if (not ofs)
-    {
-      std::cerr << "Syscall::saveUsedMemBlocks failed - cannot open "
-                << filename << " for write\n";
-      return false;
-    }
-  getUsedMemBlocks(used_blocks);
-  for (auto& it: used_blocks)
-    ofs << it.first << " " << it.second << "\n";
-  return true;
-}
-
-
 template <typename URV>
 bool
 Syscall<URV>::saveMmap(const std::string & filename)

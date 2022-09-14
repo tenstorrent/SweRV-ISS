@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <iostream>
+#include <fstream>
 #include <filesystem>
 #include "Hart.hpp"
 #include "Core.hpp"
@@ -107,20 +108,42 @@ System<URV>::writeAccessedMemory(const std::string& path) const
 }
 
 
+bool
+saveUsedMemBlocks(const std::string& filename,
+		  std::vector<std::pair<uint64_t, uint64_t>>& blocks)
+{
+  std::ofstream ofs(filename, std::ios::trunc);
+  if (not ofs)
+    {
+      std::cerr << "saveUsedMemBlocks failed - cannot open "
+                << filename << " for write\n";
+      return false;
+    }
+  for (auto& it: blocks)
+    ofs << it.first << " " << it.second << "\n";
+  return true;
+}
+
+
 template <typename URV>
 bool
 System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
 {
   std::filesystem::path dirPath = dir;
-  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
 
   std::filesystem::path regPath = dirPath / "registers";
   if (not hart.saveSnapshotRegs(regPath.string()))
     return false;
 
   auto& syscall = hart.getSyscall();
+
   std::filesystem::path usedBlocksPath = dirPath / "usedblocks";
-  if (not syscall.saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
+  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
+  if (sparseMem_)
+    sparseMem_->getUsedBlocks(usedBlocks);
+  else
+    syscall.getUsedMemBlocks(usedBlocks);
+  if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
 
   std::filesystem::path memPath = dirPath / "memory";
@@ -151,6 +174,36 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
 }
 
 
+static
+bool
+loadUsedMemBlocks(const std::string& filename,
+		  std::vector<std::pair<uint64_t, uint64_t>>& blocks)
+{
+  blocks.clear();
+  std::ifstream ifs(filename);
+  if (not ifs)
+    {
+      std::cerr << "loadUsedMemBlocks failed - cannot open "
+                << filename << " for read\n";
+      return false;
+    }
+
+  typedef std::pair<uint64_t, uint64_t> Pair;
+
+  std::string line;
+  while (std::getline(ifs, line))
+    {
+      std::istringstream iss(line);
+      uint64_t addr, length;
+      iss >> addr;
+      iss >> length;
+      blocks.push_back(Pair{addr, length});
+    }
+
+  return true;
+}
+
+
 template <typename URV>
 bool
 System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
@@ -164,7 +217,7 @@ System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
 
   auto& syscall = hart.getSyscall();
   std::filesystem::path usedBlocksPath = dirPath / "usedblocks";
-  if (not syscall.loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
+  if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
 
   std::filesystem::path mmapPath = dirPath / "mmap";
