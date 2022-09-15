@@ -816,8 +816,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   uint32_t inst = 0;
   hart.readInst(hart.peekPc(), inst);
 
-  // Get privilege mode.
-  int privMode = int(hart.privilegeMode());
+  unsigned pm = unsigned(hart.privilegeMode());
 
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
@@ -849,10 +848,12 @@ Server<URV>::stepCommand(const WhisperMessage& req,
 		     hasPost, reply);
 
   // Send privilege mode, incremental floating point flags, and trap info
-  // in flags: 2 bits for priv mode, 4 bits for fp flags, 1 bit for trap.
+  // in flags: 2 bits for priv mode, 4 bits for fp flags, 1 bit for trap,
+  // 1 bit if target program stopped.
   unsigned fpFlags = hart.lastFpFlags();
   unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
-  reply.flags = (privMode & 3) | ((fpFlags & 0xf) >> 2) | (trap << 6);
+  unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
+  reply.flags = (pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) | (stop << 7);;
 
   return true;
 }
