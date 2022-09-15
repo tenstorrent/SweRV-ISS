@@ -2176,8 +2176,9 @@ namespace WdRiscv
     void execMret(const DecodedInst*);
     void execUret(const DecodedInst*);
     void execSret(const DecodedInst*);
-
     void execWfi(const DecodedInst*);
+
+    void execDret(const DecodedInst*);
 
     void execSfence_vma(const DecodedInst*);
 

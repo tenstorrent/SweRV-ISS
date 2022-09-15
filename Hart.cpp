@@ -5634,6 +5634,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&uret,
      &&sret,
      &&wfi,
+     &&dret,
      &&sfence_vma,
      &&c_addi4spn,
      &&c_fld,
@@ -7093,6 +7094,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  wfi:
   execWfi(di);
+  return;
+
+ dret:
+  execDret(di);
   return;
 
  sfence_vma:
@@ -10386,6 +10391,32 @@ void
 Hart<URV>::execWfi(const DecodedInst*)
 {
   return;   // Currently implemented as a no-op.
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execDret(const DecodedInst* di)
+{
+  if (not debugMode_)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  debugMode_ = false;
+
+  URV value = 0;
+  if (not peekCsr(CsrNumber::DPC, value))
+    assert(0);
+  setPc(value);
+
+  URV dcsr = 0;
+  if (not peekCsr(CsrNumber::DCSR, dcsr))
+    assert(0);
+  unsigned mode = dcsr & 3;
+  PrivilegeMode pm = PrivilegeMode{mode};
+  setPrivilegeMode(pm);
 }
 
 

@@ -246,6 +246,9 @@ namespace WdRiscv
      sret,
      wfi,
 
+     // Debug
+     dret,
+
      // Supervisor
      sfence_vma,
 
