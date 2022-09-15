@@ -900,77 +900,38 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     sanitizeStackPointer(hart, args.verbose);
 
   if (args.toHostSym)
-    hart.setTohostSymbol(*args.toHostSym);
+    system.setTohostSymbol(*args.toHostSym);
 
   if (args.consoleIoSym)
-    hart.setConsoleIoSymbol(*args.consoleIoSym);
+    system.setConsoleIoSymbol(*args.consoleIoSym);
 
   // Load ELF files. Entry point of first file sets the start PC
   // unless in raw mode.
-  bool firstElf = true;
-  size_t entryPoint = 0;
-  for (const auto& target : args.expandedTargets)
+  if (hart.sysHartIndex() == 0)
     {
-      const auto& elfFile = target.front();
-      if (args.verbose)
-	std::cerr << "Loading ELF file " << elfFile << '\n';
-      if (hart.loadElfFile(elfFile, entryPoint))
-	{
-	  if (firstElf and not args.raw)
-	    hart.pokePc(URV(entryPoint));
-	}
-      else
+      StringVec paths;
+      for (const auto& target : args.expandedTargets)
+	paths.push_back(target.at(0));
+      if (not system.loadElfFiles(paths, args.raw, args.verbose))
 	errors++;
-      firstElf = false;
     }
 
   // Load HEX files.
-  for (const auto& hexFile : args.hexFiles)
-    {
-      if (args.verbose)
-	std::cerr << "Loading HEX file " << hexFile << '\n';
-      if (not hart.loadHexFile(hexFile))
-	errors++;
-    }
+  if (not system.loadHexFiles(args.hexFiles, args.verbose))
+    errors++;
 
   // Load binary files
-  for (const auto& binaryFile : args.binaryFiles)
-    {
-      std::string filename = binaryFile;
-      size_t offs = 0;
-      auto end = binaryFile.find(":");
-      if (end != std::string::npos)
-        {
-          filename = binaryFile.substr(0, end);
-          std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
-          offs = strtoull(offsStr.c_str(), nullptr, 0);
-        }
-      else
-        std::cerr << "Binary " << binaryFile << " does not have an address, will use address 0x0\n";
-
-      if (args.verbose)
-	std::cerr << "Loading binary " << filename << " at address 0x" << std::hex << offs << '\n';
-      if (not hart.loadBinaryFile(filename, offs))
-        errors++;
-    }
+  uint64_t offset = 0;
+  if (not system.loadBinaryFiles(args.binaryFiles, offset, args.verbose))
+    errors++;
 
   if (not args.kernelFile.empty())
     {
-      std::string filename = args.kernelFile;
-      size_t offs = URV(entryPoint) + ((hart.isRv64()) ? 0x200000 : 0x400000);
-      auto end = args.kernelFile.find(":");
-      // check for user offset
-      if (end != std::string::npos)
-        {
-          filename = args.kernelFile.substr(0, end);
-          std::string offsStr = args.kernelFile.substr(end + 1, args.kernelFile.length());
-          offs = strtoull(offsStr.c_str(), nullptr, 0);
-        }
-
-      if (args.verbose)
-	std::cerr << "Loading kernel image " << filename << " at address 0x" << std::hex << offs << '\n';
-      if (not hart.loadBinaryFile(filename, offs))
-        errors++;
+      // Default kernel file offset. FIX: make a parameter.
+      std::vector<std::string> files{args.kernelFile};
+      offset = hart.isRv64() ? 0x80200000 : 0x80400000;
+      if (not system.loadBinaryFiles(files, offset, args.verbose))
+	errors++;
     }
 
   if (not args.instFreqFile.empty())
@@ -1792,11 +1753,12 @@ session(const Args& args, const HartConfig& config)
 	if (not hart.configIsa(isa, updateMisa))
 	  return false;
       hart.reset();
-
-      if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
-	if (not args.interactive)
-	  return false;
     }
+
+  for (unsigned i = 0; i < system.hartCount(); ++i)
+    if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
+      if (not args.interactive)
+	return false;
 
   bool result = sessionRun(system, args, traceFile, commandLog);
 

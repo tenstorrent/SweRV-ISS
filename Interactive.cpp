@@ -1010,7 +1010,8 @@ Interactive<URV>::elfCommand(Hart<URV>& hart, const std::string& line,
 
   uint64_t entryPoint = 0;
 
-  if (not hart.loadElfFile(filePath, entryPoint))
+  std::vector<std::string> files = { filePath };
+  if (not system_.loadElfFiles(files, false /*raw*/, false /*verbose*/))
     return false;
 
   hart.pokePc(URV(entryPoint));
@@ -1021,7 +1022,7 @@ Interactive<URV>::elfCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::hexCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::hexCommand(Hart<URV>& , const std::string& line,
 			     const std::vector<std::string>& tokens)
 {
   if (tokens.size() != 2)
@@ -1031,12 +1032,8 @@ Interactive<URV>::hexCommand(Hart<URV>& hart, const std::string& line,
       return false;
     }
 
-  std::string fileName = tokens.at(1);
-
-  if (not hart.loadHexFile(fileName))
-    return false;
-
-  return true;
+  std::vector<std::string> fileNames = { tokens.at(1) };
+  return system_.loadHexFiles(fileNames, false /*verbse*/);
 }
 
 

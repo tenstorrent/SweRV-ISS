@@ -108,6 +108,110 @@ System<URV>::writeAccessedMemory(const std::string& path) const
 }
 
 
+template <typename URV>
+bool
+System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool verbose)
+{
+  unsigned registerWidth = sizeof(URV)*8;
+  uint64_t end = 0, entry = 0, gp = 0;
+  unsigned errors = 0;
+  ElfSymbol sym;
+
+  for (const auto& file : files)
+    {
+      if (verbose)
+	std::cerr << "Loading ELF file " << file << '\n';
+      uint64_t end0 = 0, entry0 = 0;
+      if (not memory_->loadElfFile(file, registerWidth, entry0, end0))
+	errors++;
+      else
+	{
+	  if (not entry)
+	    entry = entry0;
+
+	  if (memory_->findElfSymbol("_end", sym))   // For newlib/linux emulation.
+	    end = std::max(end, sym.addr_);
+	  else
+	    end = std::max(end, end0);
+
+	  if (not gp and memory_->findElfSymbol("__global_pointer$", sym))
+	    gp = sym.addr_;
+	}
+    }
+
+  for (auto hart : sysHarts_)
+    {
+      if (not toHostSym_.empty() and memory_->findElfSymbol(toHostSym_, sym))
+	hart->setToHostAddress(sym.addr_);
+      if (not fromHostSym_.empty() and memory_->findElfSymbol(fromHostSym_, sym))
+	hart->setFromHostAddress(sym.addr_);
+      if (not consoleIoSym_.empty() and memory_->findElfSymbol(consoleIoSym_, sym))
+	hart->setConsoleIo(URV(sym.addr_));
+      hart->setTargetProgramBreak(end);
+
+      if (not raw)
+	{
+	  if (not hart->peekIntReg(RegGp) and gp)
+	    hart->pokeIntReg(RegGp, URV(gp));
+	  if (entry)
+	    hart->pokePc(URV(entry));
+	}
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::loadHexFiles(const std::vector<std::string>& files, bool verbose)
+{
+  unsigned errors = 0;
+  for (const auto& file : files)
+    {
+      if (verbose)
+	std::cerr << "Loading HEX file " << file << '\n';
+      if (not memory_->loadHexFile(file))
+	errors++;
+    }
+  return errors == 0;
+}
+
+
+template <typename URV>
+bool
+System<URV>::loadBinaryFiles(const std::vector<std::string>& files,
+			     uint64_t defOffset, bool verbose)
+{
+  unsigned errors = 0;
+
+  for (const auto& binaryFile : files)
+    {
+      std::string filename = binaryFile;
+      uint64_t offset = defOffset;
+      auto end = binaryFile.find(":");
+      if (end != std::string::npos)
+        {
+          filename = binaryFile.substr(0, end);
+          std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
+          offset = strtoull(offsStr.c_str(), nullptr, 0);
+        }
+      else
+        std::cerr << "Binary file " << binaryFile << " does not have an address, will use address 0x"
+		  << std::hex << offset << std::dec << '\n';
+
+      if (verbose)
+	std::cerr << "Loading binary " << filename << " at address 0x" << std::hex
+		  << offset << std::dec << '\n';
+
+      if (not memory_->loadBinaryFile(filename, offset))
+        errors++;
+    }
+
+  return errors == 0;
+}
+
+
 bool
 saveUsedMemBlocks(const std::string& filename,
 		  std::vector<std::pair<uint64_t, uint64_t>>& blocks)

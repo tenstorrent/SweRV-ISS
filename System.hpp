@@ -164,6 +164,30 @@ namespace WdRiscv
     bool findElfSymbol(const std::string& symbol, ElfSymbol& value) const
     { return memory_->findElfSymbol(symbol, value); }
 
+    /// Load the given ELF files into memory. Return true on succes
+    /// and false on failure. If not raw, and a hart PC is non-zero
+    /// then set that PC to the first non-zero ELF entry point found.
+    /// Similary set the global pointer regiser to the value of the
+    /// ELF __global_pointer$ symbol.
+    bool loadElfFiles(const std::vector<std::string>& files, bool raw, bool verbose);
+
+    /// Load the given hex files and set memory locations accordingly.
+    /// Return true on success. Return false if file does not exists,
+    /// cannot be opened or contains malformed data.
+    /// File format: A line either contains @address where address
+    /// is a hexadecimal memory address or one or more space separated
+    /// tokens each consisting of two hexadecimal digits.
+    bool loadHexFiles(const std::vector<std::string>& files, bool verbose);
+
+    /// Load the binary files and set memory locations accordingly.
+    /// Return true on success. Return false if file does not exist,
+    /// or cannot be opened. A file is loaded at the given default
+    /// offset unless the filename has the form <path>:<value>
+    /// where value is an integer in which case the effective file
+    /// name will be <path> and the load addres will be <value>.
+    bool loadBinaryFiles(const std::vector<std::string>& files,
+			 uint64_t defOffset, bool verbose);
+
     /// Save snapshot (registers, memory etc) into given directory
     /// which should alread exist. Return true on success.
     bool saveSnapshot(Hart<URV>& hart, const std::string& dirPath);
@@ -177,6 +201,21 @@ namespace WdRiscv
     /// success and false on failure. Currently this will write the
     /// contents of accessed pages.
     bool writeAccessedMemory(const std::string& path) const;
+
+    /// Special target program symbol writing to which stops the
+    /// simulated program or performs console io.
+    void setTohostSymbol(const std::string& sym)
+    { toHostSym_ = sym; }
+
+    /// Special target program symbol writing to which provide
+    /// host data (console input) to the simulated hart.
+    void setFromHostSymbol(const std::string& sym)
+    { fromHostSym_ = sym; }
+
+    /// Special target program symbol writing/reading to/from which
+    /// writes/reads to/from the console.
+    void setConsoleIoSymbol(const std::string& sym)
+    { consoleIoSym_ = sym; }
 
     /// Enable memory consistency model. This is relevant in
     /// server/interactive where RTL monitor or interactive command
@@ -231,5 +270,8 @@ namespace WdRiscv
     SparseMem* sparseMem_ = nullptr;
     Mcm<URV>* mcm_ = nullptr;
     unsigned mbSize_ = 64;  // Merge buffer size.
+    std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
+    std::string fromHostSym_ = "fromhost";
+    std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
   };
 }
