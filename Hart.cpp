@@ -10398,7 +10398,17 @@ template <typename URV>
 void
 Hart<URV>::execDret(const DecodedInst* di)
 {
-  if (not debugMode_)
+  auto dcsr = csRegs_.getImplementedCsr(CsrNumber::DCSR);
+  auto dpc = csRegs_.getImplementedCsr(CsrNumber::DPC);
+  if (not dcsr or not dpc)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // The dret instruction is only valid if debug is on. However, if dcsr is
+  // not marked debug-only, then allow dret in any mode.
+  if (not debugMode_ and dcsr->isDebug())
     {
       illegalInst(di);
       return;
@@ -10407,14 +10417,12 @@ Hart<URV>::execDret(const DecodedInst* di)
   debugMode_ = false;
 
   URV value = 0;
-  if (not peekCsr(CsrNumber::DPC, value))
-    assert(0);
+  peekCsr(CsrNumber::DPC, value);
   setPc(value);
 
-  URV dcsr = 0;
-  if (not peekCsr(CsrNumber::DCSR, dcsr))
-    assert(0);
-  unsigned mode = dcsr & 3;
+  value = 0;
+  peekCsr(CsrNumber::DCSR, value);
+  unsigned mode = value & 3;
   PrivilegeMode pm = PrivilegeMode{mode};
   setPrivilegeMode(pm);
 }
