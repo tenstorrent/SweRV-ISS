@@ -1158,7 +1158,7 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 
 		  if (commandLog)
 		    {
-		      fprintf(commandLog, "hart=%d time=%ld, mbwrite 0x%lx 0x",
+		      fprintf(commandLog, "hart=%d time=%ld mbwrite 0x%lx 0x",
 			      hartId, msg.time, msg.address);
 		      for (uint8_t item :  data)
 			fprintf(commandLog, "%02x", item);

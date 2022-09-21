@@ -1723,6 +1723,7 @@ session(const Args& args, const HartConfig& config)
     system.enableInstructionLineTrace(args.instrLines);
 
   if (args.hexFiles.empty() and args.expandedTargets.empty()
+      and args.binaryFiles.empty() and args.kernelFile.empty()
       and not args.interactive)
     {
       std::cerr << "No program file specified.\n";

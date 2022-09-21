@@ -684,7 +684,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -702,7 +702,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -724,7 +724,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
 
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   URV adjusted = val;
   if (addr >= clintStart_ and addr < clintLimit_)
@@ -749,7 +749,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   if (memory_.poke(addr, val, usePma))
     {
