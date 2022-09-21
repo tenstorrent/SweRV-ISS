@@ -425,8 +425,19 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply)
 	  reply.value = hart.lastInstructionTrapped()? 1 : 0;
 	else
 	  ok = false;
-	if (ok)
-	  return true;
+        if (ok)
+          return true;
+        else
+          break;
+      }
+    case 'i':
+      {
+        uint32_t inst;
+        if (hart.readInst(hart.peekPc(), inst))
+          {
+            reply.value = inst;
+            return true;
+          }
       }
     }
 
