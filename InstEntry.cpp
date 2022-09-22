@@ -1439,6 +1439,10 @@ InstTable::setupInstVec()
       { "wfi", InstId::wfi, 0x10500073, 0xffffffff,
 	RvExtension::I, RvFormat::I },
 
+      // Debug.
+      { "dret", InstId::dret, 0x7b200073, 0xffffffff,
+	RvExtension::I, RvFormat::I },
+
       // Supervisor
       { "sfence.vma", InstId::sfence_vma, 0x12000073, 0xfe007fff,
         RvExtension::S, RvFormat::I,

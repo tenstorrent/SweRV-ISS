@@ -566,47 +566,12 @@ namespace WdRiscv
     const VecRegs& vecRegs() const
     { return vecRegs_; }
 
-    /// Load the given hex file and set memory locations accordingly.
-    /// Return true on success. Return false if file does not exists,
-    /// cannot be opened or contains malformed data.
-    /// File format: A line either contains @address where address
-    /// is a hexadecimal memory address or one or more space separated
-    /// tokens each consisting of two hexadecimal digits.
-    bool loadHexFile(const std::string& file);
-
-    /// Load the binary file and set memory locations accordingly.
-    /// Return true on success. Return false if file does not exist,
-    /// or cannot be opened.
-    bool loadBinaryFile(const std::string& file, uint64_t addr)
-    { return memory_.loadBinaryFile(file, addr); }
-
-    /// Load the given ELF file and place its contents in memory.
-    /// Return true on success. Return false if file does not exists,
-    /// cannot be opened or contains malformed data. On success, set
-    /// entryPoint to the program entry-point of the loaded file. If
-    /// the to-host-address is not set then set it to the value
-    /// corresponding to the to-host-symbol if such that symbol is
-    /// found in the ELF file.
-    bool loadElfFile(const std::string& file, uint64_t& entryPoint);
-
-    /// Locate the given ELF symbol (symbols are collected for every
-    /// loaded ELF file) returning true if symbol is found and false
-    /// otherwise. Set value to the corresponding value if symbol is
-    /// found.
-    bool findElfSymbol(const std::string& symbol, ElfSymbol& value) const
-    { return memory_.findElfSymbol(symbol, value); }
-
     /// Locate the ELF function containing the give address returning true
     /// on success and false on failure.  If successful set name to the
     /// corresponding function name and symbol to the corresponding symbol
     /// value.
     bool findElfFunction(URV addr, std::string& name, ElfSymbol& value) const
     { return memory_.findElfFunction(addr, name, value); }
-
-    /// Print the ELF symbols on the given stream. Output format:
-    /// <name> <value>
-    void printElfSymbols(std::ostream& out) const
-    { memory_.printElfSymbols(out); }
 
     /// Set val to the value of the byte at the given address
     /// returning true on success and false if address is out of
@@ -657,21 +622,8 @@ namespace WdRiscv
     /// address of the instruction is identical to the given address.
     void setToHostAddress(uint64_t address);
 
-    /// Special target program symbol writing to which stops the
-    /// simulated program.
-    void setTohostSymbol(const std::string& sym)
-    { toHostSym_ = sym; }
-
     void setFromHostAddress(uint64_t addr)
     { fromHost_ = addr; fromHostValid_ = true; }
-
-    void setFromHostSymbol(const std::string& sym)
-    { fromHostSym_ = sym; }
-
-    /// Special target program symbol writing/reading to/from which
-    /// writes/reads to/from the console.
-    void setConsoleIoSymbol(const std::string& sym)
-    { consoleIoSym_ = sym; }
 
     /// Undefine address to which a write will stop the simulator
     void clearToHostAddress();
@@ -2224,8 +2176,9 @@ namespace WdRiscv
     void execMret(const DecodedInst*);
     void execUret(const DecodedInst*);
     void execSret(const DecodedInst*);
-
     void execWfi(const DecodedInst*);
+
+    void execDret(const DecodedInst*);
 
     void execSfence_vma(const DecodedInst*);
 
@@ -4105,13 +4058,9 @@ namespace WdRiscv
 
     URV toHost_ = 0;             // Writing to this stops the simulator.
     bool toHostValid_ = false;   // True if toHost_ is valid.
-    std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
 
     URV fromHost_ = 0;
     bool fromHostValid_ = false;
-    std::string fromHostSym_ = "fromhost";
-
-    std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
 
     URV conIo_ = 0;              // Writing a byte to this writes to console.
     bool conIoValid_ = false;    // True if conIo_ is valid.
@@ -4215,7 +4164,6 @@ namespace WdRiscv
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     bool targetProgFinished_ = false;
-    bool useElfSymbols_ = true;
     bool tracePtw_ = false;          // Trace paget table walk.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;

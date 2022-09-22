@@ -1021,6 +1021,18 @@ namespace WdRiscv
 
   protected:
 
+    /// Clear VSTART CSR. Record write if value changes.
+    void clearVstart()
+    {
+      auto& csr = regs_.at(size_t(CsrNumber::VSTART));
+      auto prev = csr.read();
+      if (prev != 0)
+	{
+	  csr.write(0);
+	  recordWrite(CsrNumber::VSTART);
+	}
+    }
+
     /// Fast peek method for MIP.
     URV peekMip() const
     {

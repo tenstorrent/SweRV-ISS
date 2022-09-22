@@ -198,7 +198,7 @@ namespace WdRiscv
 
     uint64_t earliestOpTime(const McmInstr& instr) const
     {
-      if (not instr.complete_)
+      if (not instr.complete_ and instr.memOps_.empty())
 	{
 	  std::cerr << "Mcm::earliestOpTime: Called on an incomplete instruction\n";
 	  assert(0 && "Mcm::earliestOpTime: Incomplete instr");

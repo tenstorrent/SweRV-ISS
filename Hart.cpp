@@ -640,47 +640,6 @@ Hart<URV>::updateCachedMstatusFields()
 
 template <typename URV>
 bool
-Hart<URV>::loadHexFile(const std::string& file)
-{
-  return memory_.loadHexFile(file);
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::loadElfFile(const std::string& file, uint64_t& entryPoint)
-{
-  unsigned registerWidth = sizeof(URV)*8;
-
-  uint64_t end = 0;
-  if (not memory_.loadElfFile(file, registerWidth, entryPoint, end))
-    return false;
-
-  ElfSymbol sym;
-
-  if (not toHostSym_.empty() and this->findElfSymbol(toHostSym_, sym))
-    this->setToHostAddress(sym.addr_);
-
-  if (not fromHostSym_.empty() and this->findElfSymbol(fromHostSym_, sym))
-    this->setFromHostAddress(sym.addr_);
-
-  if (not consoleIoSym_.empty() and this->findElfSymbol(consoleIoSym_, sym))
-    this->setConsoleIo(URV(sym.addr_));
-
-  if (this->findElfSymbol("__global_pointer$", sym))
-    this->pokeIntReg(RegGp, URV(sym.addr_));
-
-  if (this->findElfSymbol("_end", sym))   // For newlib/linux emulation.
-    this->setTargetProgramBreak(URV(sym.addr_));
-  else
-    this->setTargetProgramBreak(URV(end));
-
-  return true;
-}
-
-
-template <typename URV>
-bool
 Hart<URV>::peekMemory(uint64_t address, uint8_t& val, bool usePma) const
 {
   return memory_.peek(address, val, usePma);
@@ -725,7 +684,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint8_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -743,7 +702,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint16_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -765,7 +724,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
 
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   URV adjusted = val;
   if (addr >= clintStart_ and addr < clintLimit_)
@@ -790,7 +749,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint64_t val, bool usePma)
 {
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
-  memory_.invalidateLrs(addr, sizeof(val));
+  memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -1859,7 +1818,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	      if ((addr & 7) == 0)
 		hart->clintAlarm_ = storeVal;
 
-	      // A tif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
 	      if (fromHostValid_ and hasPendingInput(fileno(stdin)))
 		{
 		  uint64_t v = 0;
@@ -2171,7 +2130,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
 	{
 	  throw CoreException(CoreException::Stop,
 			      "64 consecutive illegal instructions",
-			      0, 0 /*3*/);  // Exit code should be 3.
+			      0, 3);
 	}
 
       counterAtLastIllegal_ = instCounter_;
@@ -4180,7 +4139,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   // Set environ for newlib. This is superfluous for Linux.
   URV ea = sp + ix*sizeof(URV);  // Address of envp array
   ElfSymbol sym;
-  if (findElfSymbol("environ", sym))
+  if (memory_.findElfSymbol("environ", sym))
     memory_.poke(URV(sym.addr_), ea);
 
   // Push envp entries on the stack.
@@ -5675,6 +5634,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&uret,
      &&sret,
      &&wfi,
+     &&dret,
      &&sfence_vma,
      &&c_addi4spn,
      &&c_fld,
@@ -7134,6 +7094,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  wfi:
   execWfi(di);
+  return;
+
+ dret:
+  execDret(di);
   return;
 
  sfence_vma:
@@ -10427,6 +10391,40 @@ void
 Hart<URV>::execWfi(const DecodedInst*)
 {
   return;   // Currently implemented as a no-op.
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execDret(const DecodedInst* di)
+{
+  auto dcsr = csRegs_.getImplementedCsr(CsrNumber::DCSR);
+  auto dpc = csRegs_.getImplementedCsr(CsrNumber::DPC);
+  if (not dcsr or not dpc)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // The dret instruction is only valid if debug is on. However, if dcsr is
+  // not marked debug-only, then allow dret in any mode.
+  if (not debugMode_ and dcsr->isDebug())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  debugMode_ = false;
+
+  URV value = 0;
+  peekCsr(CsrNumber::DPC, value);
+  setPc(value);
+
+  value = 0;
+  peekCsr(CsrNumber::DCSR, value);
+  unsigned mode = value & 3;
+  PrivilegeMode pm = PrivilegeMode{mode};
+  setPrivilegeMode(pm);
 }
 
 

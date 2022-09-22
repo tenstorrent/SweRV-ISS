@@ -17,13 +17,8 @@
 #include <fstream>
 #include <sstream>
 
-#if defined(__cpp_lib_filesystem)
-  #include <filesystem>
-  namespace FileSystem = std::filesystem;
-#else
-  #include <experimental/filesystem>
-  namespace FileSystem = std::experimental::filesystem;
-#endif
+#include <filesystem>
+namespace FileSystem = std::filesystem;
 
 #include <cstring>
 #include <ctime>

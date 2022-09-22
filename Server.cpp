@@ -425,8 +425,19 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply)
 	  reply.value = hart.lastInstructionTrapped()? 1 : 0;
 	else
 	  ok = false;
-	if (ok)
-	  return true;
+        if (ok)
+          return true;
+        else
+          break;
+      }
+    case 'i':
+      {
+        uint32_t inst;
+        if (hart.readInst(hart.peekPc(), inst))
+          {
+            reply.value = inst;
+            return true;
+          }
       }
     }
 
@@ -816,8 +827,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   uint32_t inst = 0;
   hart.readInst(hart.peekPc(), inst);
 
-  // Get privilege mode.
-  int privMode = int(hart.privilegeMode());
+  unsigned pm = unsigned(hart.privilegeMode());
 
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
@@ -849,10 +859,12 @@ Server<URV>::stepCommand(const WhisperMessage& req,
 		     hasPost, reply);
 
   // Send privilege mode, incremental floating point flags, and trap info
-  // in flags: 2 bits for priv mode, 4 bits for fp flags, 1 bit for trap.
+  // in flags: 2 bits for priv mode, 4 bits for fp flags, 1 bit for trap,
+  // 1 bit if target program stopped.
   unsigned fpFlags = hart.lastFpFlags();
   unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
-  reply.flags = (privMode & 3) | ((fpFlags & 0xf) >> 2) | (trap << 6);
+  unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
+  reply.flags = (pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) | (stop << 7);;
 
   return true;
 }
@@ -1157,7 +1169,7 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 
 		  if (commandLog)
 		    {
-		      fprintf(commandLog, "hart=%d time=%ld, mbwrite 0x%lx 0x",
+		      fprintf(commandLog, "hart=%d time=%ld mbwrite 0x%lx 0x",
 			      hartId, msg.time, msg.address);
 		      for (uint8_t item :  data)
 			fprintf(commandLog, "%02x", item);
