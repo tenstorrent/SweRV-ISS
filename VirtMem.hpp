@@ -583,21 +583,6 @@ namespace WdRiscv
     template <typename PTE, typename VA>
     void printEntries(std::ostream& os, uint64_t addr, std::string path) const;
 
-    typedef boost::variant<Pte32, Pte39, Pte48, Pte57> PteType;
-
-    /// Support for tracing: return page table walk trace for fetch/load/store
-    void getPageTableWalk(std::vector<PteType>& entries, bool fetch,
-                          bool load, bool store) const
-    {
-      assert(fetch or load or store);
-      if (fetch)
-        entries.assign(pageTableWalkForFetch_.begin(), pageTableWalkForFetch_.end());
-      else if (load)
-        entries.assign(pageTableWalkForLoad_.begin(), pageTableWalkForLoad_.end());
-      else
-        entries.assign(pageTableWalkForStore_.begin(), pageTableWalkForStore_.end());
-    }
-
     /// Return the addresses of the instruction page table entries
     /// used in the last page table walk. Return empty vector if the
     /// last executed instruction did not induce an instruction page
@@ -614,9 +599,6 @@ namespace WdRiscv
     /// Clear trace of page table walk
     void clearPageTableWalk()
     {
-      pageTableWalkForFetch_.clear();
-      pageTableWalkForLoad_.clear();
-      pageTableWalkForStore_.clear();
       pteInstrAddr_.clear();
       pteDataAddr_.clear();
     }
@@ -702,18 +684,12 @@ namespace WdRiscv
 
     FILE* attFile_ = nullptr;
 
-    // Keep track of page table walk of fetch/load/store. Will be empty
-    // if no walk.
-    std::vector<PteType> pageTableWalkForFetch_;
-    std::vector<PteType> pageTableWalkForLoad_;
-    std::vector<PteType> pageTableWalkForStore_;
     // Addresses of PTEs used in most recent insruction an data translations.
     std::vector<uint64_t> pteInstrAddr_;
     std::vector<uint64_t> pteDataAddr_;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
-
   };
 
 }

@@ -1365,12 +1365,6 @@ namespace WdRiscv
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
 
-    /// Set entries to the page table walk for fetch/load/store of last executed
-    /// instruction. Will be empty if there was no walk.
-    void getPageTableWalk(std::vector<VirtMem::PteType>& entries,
-                          bool fetch, bool load, bool store) const
-    { virtMem_.getPageTableWalk(entries, fetch, load, store); }
-
     /// Fill the addresses vector (cleared on entry) with the
     /// addresses of instruction/data the page table entries
     /// referenced by the instruction/data page table walk of the last
