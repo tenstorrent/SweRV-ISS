@@ -933,7 +933,7 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
   
   URV vtypeVal = imm;
   vsetvl(rd, rs1, vtypeVal);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -995,7 +995,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 
   // Update cached vtype fields in vecRegs_.
   vecRegs_.updateConfig(ew, gm, ma, ta, vill);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1014,7 +1014,7 @@ Hart<URV>::execVsetvl(const DecodedInst* di)
 
   URV vtypeVal = intRegs_.read(di->op2());
   vsetvl(rd, rs1, vtypeVal);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1077,7 +1077,7 @@ Hart<URV>::execVadd_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1142,7 +1142,7 @@ Hart<URV>::execVadd_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1175,7 +1175,7 @@ Hart<URV>::execVadd_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1239,7 +1239,7 @@ Hart<URV>::execVsub_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1302,7 +1302,7 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1365,7 +1365,7 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1430,7 +1430,7 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1504,7 +1504,7 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1543,7 +1543,7 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1619,7 +1619,7 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1660,7 +1660,7 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1736,7 +1736,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1777,7 +1777,7 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1851,7 +1851,7 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1890,7 +1890,7 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -1964,7 +1964,7 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2003,7 +2003,7 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2044,7 +2044,7 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2085,7 +2085,7 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2126,7 +2126,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2167,7 +2167,7 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2241,7 +2241,7 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2280,7 +2280,7 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2340,7 +2340,7 @@ Hart<URV>::execVmseq_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2402,7 +2402,7 @@ Hart<URV>::execVmseq_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2433,7 +2433,7 @@ Hart<URV>::execVmseq_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2493,7 +2493,7 @@ Hart<URV>::execVmsne_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2555,7 +2555,7 @@ Hart<URV>::execVmsne_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2586,7 +2586,7 @@ Hart<URV>::execVmsne_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2646,7 +2646,7 @@ Hart<URV>::execVmsltu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2708,7 +2708,7 @@ Hart<URV>::execVmsltu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2737,7 +2737,7 @@ Hart<URV>::execVmslt_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2768,7 +2768,7 @@ Hart<URV>::execVmslt_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2828,7 +2828,7 @@ Hart<URV>::execVmsleu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2891,7 +2891,7 @@ Hart<URV>::execVmsleu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2923,7 +2923,7 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2952,7 +2952,7 @@ Hart<URV>::execVmsle_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -2983,7 +2983,7 @@ Hart<URV>::execVmsle_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3014,7 +3014,7 @@ Hart<URV>::execVmsle_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3076,7 +3076,7 @@ Hart<URV>::execVmsgtu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3108,7 +3108,7 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3139,7 +3139,7 @@ Hart<URV>::execVmsgt_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3170,7 +3170,7 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3234,7 +3234,7 @@ Hart<URV>::execVminu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3301,7 +3301,7 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3365,7 +3365,7 @@ Hart<URV>::execVmin_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3429,7 +3429,7 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3493,7 +3493,7 @@ Hart<URV>::execVmaxu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3560,7 +3560,7 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3624,7 +3624,7 @@ Hart<URV>::execVmax_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3688,7 +3688,7 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3752,7 +3752,7 @@ Hart<URV>::execVand_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3818,7 +3818,7 @@ Hart<URV>::execVand_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3885,7 +3885,7 @@ Hart<URV>::execVand_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -3949,7 +3949,7 @@ Hart<URV>::execVor_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4015,7 +4015,7 @@ Hart<URV>::execVor_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4082,7 +4082,7 @@ Hart<URV>::execVor_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4146,7 +4146,7 @@ Hart<URV>::execVxor_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4212,7 +4212,7 @@ Hart<URV>::execVxor_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4279,7 +4279,7 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4346,7 +4346,7 @@ Hart<URV>::execVsll_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4418,7 +4418,7 @@ Hart<URV>::execVsll_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4452,7 +4452,7 @@ Hart<URV>::execVsll_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4519,7 +4519,7 @@ Hart<URV>::execVsrl_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4591,7 +4591,7 @@ Hart<URV>::execVsrl_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4625,7 +4625,7 @@ Hart<URV>::execVsrl_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4658,7 +4658,7 @@ Hart<URV>::execVsra_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4694,7 +4694,7 @@ Hart<URV>::execVsra_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4728,7 +4728,7 @@ Hart<URV>::execVsra_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4804,7 +4804,7 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4886,7 +4886,7 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4926,7 +4926,7 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -4965,7 +4965,7 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5001,7 +5001,7 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5041,7 +5041,7 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5122,7 +5122,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5199,7 +5199,7 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5271,7 +5271,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5374,7 +5374,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5449,7 +5449,7 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5518,7 +5518,7 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5587,7 +5587,7 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5656,7 +5656,7 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5725,7 +5725,7 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5794,7 +5794,7 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5863,7 +5863,7 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -5932,7 +5932,7 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6001,7 +6001,7 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6079,7 +6079,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
     case EW::Word:  vwredsum_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6119,7 +6119,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
     case EW::Word:  vwredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6163,7 +6163,7 @@ Hart<URV>::execVmand_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6207,7 +6207,7 @@ Hart<URV>::execVmnand_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6251,7 +6251,7 @@ Hart<URV>::execVmandnot_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6295,7 +6295,7 @@ Hart<URV>::execVmxor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6339,7 +6339,7 @@ Hart<URV>::execVmor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6383,7 +6383,7 @@ Hart<URV>::execVmnor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6427,7 +6427,7 @@ Hart<URV>::execVmornot_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6471,7 +6471,7 @@ Hart<URV>::execVmxnor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6506,7 +6506,7 @@ Hart<URV>::execVpopc_m(const DecodedInst* di)
     }
 
   intRegs_.write(rd, count);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6545,7 +6545,7 @@ Hart<URV>::execVfirst_m(const DecodedInst* di)
     }
 
   intRegs_.write(rd, first);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6596,7 +6596,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6648,7 +6648,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6706,7 +6706,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6767,7 +6767,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
       if (sourceSet)
         sum++;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6820,7 +6820,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
         case ElementWidth::Word32: illegalInst(di); return;
         }
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6897,7 +6897,7 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -6938,7 +6938,7 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7002,7 +7002,7 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
     case ElementWidth::Word16: illegalInst(di); return;
     case ElementWidth::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7068,7 +7068,7 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7103,7 +7103,7 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7161,7 +7161,7 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
     case ElementWidth::Word16: illegalInst(di); return;
     case ElementWidth::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7233,7 +7233,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7299,7 +7299,7 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7362,7 +7362,7 @@ Hart<URV>::execVmul_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7426,7 +7426,7 @@ Hart<URV>::execVmul_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7490,7 +7490,7 @@ Hart<URV>::execVmulh_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7554,7 +7554,7 @@ Hart<URV>::execVmulh_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7587,7 +7587,7 @@ Hart<URV>::execVmulhu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7651,7 +7651,7 @@ Hart<URV>::execVmulhu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7718,7 +7718,7 @@ Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7785,7 +7785,7 @@ Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7851,7 +7851,7 @@ Hart<URV>::execVmadd_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -7916,7 +7916,7 @@ Hart<URV>::execVmadd_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -7981,7 +7981,7 @@ Hart<URV>::execVnmsub_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8046,7 +8046,7 @@ Hart<URV>::execVnmsub_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8112,7 +8112,7 @@ Hart<URV>::execVmacc_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8180,7 +8180,7 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8246,7 +8246,7 @@ Hart<URV>::execVnmsac_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8311,7 +8311,7 @@ Hart<URV>::execVnmsac_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8387,7 +8387,7 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8463,7 +8463,7 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8538,7 +8538,7 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8616,7 +8616,7 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8693,7 +8693,7 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8773,7 +8773,7 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8847,7 +8847,7 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8928,7 +8928,7 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -8968,7 +8968,7 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9047,7 +9047,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9125,7 +9125,7 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9208,7 +9208,7 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9291,7 +9291,7 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9357,7 +9357,7 @@ Hart<URV>::execVdivu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9423,7 +9423,7 @@ Hart<URV>::execVdivu_vx(const DecodedInst* di)
     case EW::Word2: vdivu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9497,7 +9497,7 @@ Hart<URV>::execVdiv_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9571,7 +9571,7 @@ Hart<URV>::execVdiv_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9637,7 +9637,7 @@ Hart<URV>::execVremu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9703,7 +9703,7 @@ Hart<URV>::execVremu_vx(const DecodedInst* di)
     case EW::Word2: vremu_vv<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9777,7 +9777,7 @@ Hart<URV>::execVrem_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9850,7 +9850,7 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -9959,7 +9959,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10034,7 +10034,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10098,7 +10098,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10205,7 +10205,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10280,7 +10280,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10344,7 +10344,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10619,7 +10619,7 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10662,7 +10662,7 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10705,7 +10705,7 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10746,7 +10746,7 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10789,7 +10789,7 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10839,7 +10839,7 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10888,7 +10888,7 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10938,7 +10938,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -10988,7 +10988,7 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11037,7 +11037,7 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11103,7 +11103,7 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11170,7 +11170,7 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11212,7 +11212,7 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11276,7 +11276,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11317,7 +11317,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11386,7 +11386,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11440,7 +11440,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11500,7 +11500,7 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11553,7 +11553,7 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11589,7 +11589,7 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11617,7 +11617,7 @@ Hart<URV>::execVmv1r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 1*8);  // Grouping of 1.
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11651,7 +11651,7 @@ Hart<URV>::execVmv2r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 2*8);    // Grouping of 2
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11685,7 +11685,7 @@ Hart<URV>::execVmv4r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 4*8);  // Grouping of 4.
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11719,7 +11719,7 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 8*8);  // Grouping of 8.
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11789,7 +11789,7 @@ Hart<URV>::execVsaddu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11861,7 +11861,7 @@ Hart<URV>::execVsaddu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11894,7 +11894,7 @@ Hart<URV>::execVsaddu_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -11970,7 +11970,7 @@ Hart<URV>::execVsadd_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12048,7 +12048,7 @@ Hart<URV>::execVsadd_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12081,7 +12081,7 @@ Hart<URV>::execVsadd_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12151,7 +12151,7 @@ Hart<URV>::execVssubu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12223,7 +12223,7 @@ Hart<URV>::execVssubu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12299,7 +12299,7 @@ Hart<URV>::execVssub_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12377,7 +12377,7 @@ Hart<URV>::execVssub_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12489,7 +12489,7 @@ Hart<URV>::execVaadd_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12521,7 +12521,7 @@ Hart<URV>::execVaaddu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12595,7 +12595,7 @@ Hart<URV>::execVaadd_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12629,7 +12629,7 @@ Hart<URV>::execVaaddu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12701,7 +12701,7 @@ Hart<URV>::execVasub_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12733,7 +12733,7 @@ Hart<URV>::execVasubu_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12807,7 +12807,7 @@ Hart<URV>::execVasub_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12841,7 +12841,7 @@ Hart<URV>::execVasubu_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -12927,7 +12927,7 @@ Hart<URV>::execVsmul_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13015,7 +13015,7 @@ Hart<URV>::execVsmul_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13088,7 +13088,7 @@ Hart<URV>::execVssrl_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13162,7 +13162,7 @@ Hart<URV>::execVssrl_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13194,7 +13194,7 @@ Hart<URV>::execVssrl_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13226,7 +13226,7 @@ Hart<URV>::execVssra_vv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13260,7 +13260,7 @@ Hart<URV>::execVssra_vx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13292,7 +13292,7 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13384,7 +13384,7 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13477,7 +13477,7 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13515,7 +13515,7 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13553,7 +13553,7 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13593,7 +13593,7 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13631,7 +13631,7 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13727,7 +13727,7 @@ Hart<URV>::execVle8_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13739,7 +13739,7 @@ Hart<URV>::execVle16_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint16_t>(di, ElementWidth::Half, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13751,7 +13751,7 @@ Hart<URV>::execVle32_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint32_t>(di, ElementWidth::Word, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13763,7 +13763,7 @@ Hart<URV>::execVle64_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13895,7 +13895,7 @@ Hart<URV>::execVse8_v(const DecodedInst* di)
 {
   if (not vectorStore<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13905,7 +13905,7 @@ Hart<URV>::execVse16_v(const DecodedInst* di)
 {
   if (not vectorStore<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13915,7 +13915,7 @@ Hart<URV>::execVse32_v(const DecodedInst* di)
 {
   if (not vectorStore<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13925,7 +13925,7 @@ Hart<URV>::execVse64_v(const DecodedInst* di)
 {
   if (not vectorStore<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -13989,7 +13989,7 @@ Hart<URV>::execVlm_v(const DecodedInst* di)
 
   if (not ok)
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14021,7 +14021,7 @@ Hart<URV>::execVsm_v(const DecodedInst* di)
 
   if (not ok)
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14103,7 +14103,7 @@ Hart<URV>::execVlre8_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14113,7 +14113,7 @@ Hart<URV>::execVlre16_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14123,7 +14123,7 @@ Hart<URV>::execVlre32_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14133,7 +14133,7 @@ Hart<URV>::execVlre64_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14230,7 +14230,7 @@ Hart<URV>::execVs1r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::One))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14240,7 +14240,7 @@ Hart<URV>::execVs2r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::Two))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14250,7 +14250,7 @@ Hart<URV>::execVs4r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::Four))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14260,7 +14260,7 @@ Hart<URV>::execVs8r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::Eight))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14272,7 +14272,7 @@ Hart<URV>::execVle8ff_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14284,7 +14284,7 @@ Hart<URV>::execVle16ff_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint16_t>(di, ElementWidth::Half, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14296,7 +14296,7 @@ Hart<URV>::execVle32ff_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint32_t>(di, ElementWidth::Word, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14308,7 +14308,7 @@ Hart<URV>::execVle64ff_v(const DecodedInst* di)
     return;
   if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14439,7 +14439,7 @@ Hart<URV>::execVlse8_v(const DecodedInst* di)
     return;
   if (not vectorLoadStrided<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14451,7 +14451,7 @@ Hart<URV>::execVlse16_v(const DecodedInst* di)
     return;
   if (not vectorLoadStrided<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14463,7 +14463,7 @@ Hart<URV>::execVlse32_v(const DecodedInst* di)
     return;
   if (not vectorLoadStrided<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14475,7 +14475,7 @@ Hart<URV>::execVlse64_v(const DecodedInst* di)
     return;
   if (not vectorLoadStrided<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14605,7 +14605,7 @@ Hart<URV>::execVsse8_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14615,7 +14615,7 @@ Hart<URV>::execVsse16_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14625,7 +14625,7 @@ Hart<URV>::execVsse32_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14635,7 +14635,7 @@ Hart<URV>::execVsse64_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14776,7 +14776,7 @@ Hart<URV>::execVloxei8_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14788,7 +14788,7 @@ Hart<URV>::execVloxei16_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14800,7 +14800,7 @@ Hart<URV>::execVloxei32_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14812,7 +14812,7 @@ Hart<URV>::execVloxei64_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14824,7 +14824,7 @@ Hart<URV>::execVluxei8_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14836,7 +14836,7 @@ Hart<URV>::execVluxei16_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14848,7 +14848,7 @@ Hart<URV>::execVluxei32_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14860,7 +14860,7 @@ Hart<URV>::execVluxei64_v(const DecodedInst* di)
     return;
   if (not vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14973,7 +14973,7 @@ Hart<URV>::execVsoxei8_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14983,7 +14983,7 @@ Hart<URV>::execVsoxei16_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -14993,7 +14993,7 @@ Hart<URV>::execVsoxei32_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15003,7 +15003,7 @@ Hart<URV>::execVsoxei64_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15013,7 +15013,7 @@ Hart<URV>::execVsuxei8_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15023,7 +15023,7 @@ Hart<URV>::execVsuxei16_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15033,7 +15033,7 @@ Hart<URV>::execVsuxei32_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15043,7 +15043,7 @@ Hart<URV>::execVsuxei64_v(const DecodedInst* di)
 {
   if (not vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15140,7 +15140,7 @@ Hart<URV>::execVlsege8_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15155,7 +15155,7 @@ Hart<URV>::execVlsege16_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15170,7 +15170,7 @@ Hart<URV>::execVlsege32_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15185,7 +15185,7 @@ Hart<URV>::execVlsege64_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15308,7 +15308,7 @@ Hart<URV>::execVssege8_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15320,7 +15320,7 @@ Hart<URV>::execVssege16_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15332,7 +15332,7 @@ Hart<URV>::execVssege32_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15344,7 +15344,7 @@ Hart<URV>::execVssege64_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15391,7 +15391,7 @@ Hart<URV>::execVlssege8_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15406,7 +15406,7 @@ Hart<URV>::execVlssege16_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15421,7 +15421,7 @@ Hart<URV>::execVlssege32_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15436,7 +15436,7 @@ Hart<URV>::execVlssege64_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15480,7 +15480,7 @@ Hart<URV>::execVsssege8_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15492,7 +15492,7 @@ Hart<URV>::execVsssege16_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15504,7 +15504,7 @@ Hart<URV>::execVsssege32_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15516,7 +15516,7 @@ Hart<URV>::execVsssege64_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15665,7 +15665,7 @@ Hart<URV>::execVluxsegei8_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15677,7 +15677,7 @@ Hart<URV>::execVluxsegei16_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15689,7 +15689,7 @@ Hart<URV>::execVluxsegei32_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15701,7 +15701,7 @@ Hart<URV>::execVluxsegei64_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15858,7 +15858,7 @@ Hart<URV>::execVsuxsegei8_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15868,7 +15868,7 @@ Hart<URV>::execVsuxsegei16_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15878,7 +15878,7 @@ Hart<URV>::execVsuxsegei32_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15888,7 +15888,7 @@ Hart<URV>::execVsuxsegei64_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15932,7 +15932,7 @@ Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15944,7 +15944,7 @@ Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15956,7 +15956,7 @@ Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -15968,7 +15968,7 @@ Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
     return;
   if (not vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16010,7 +16010,7 @@ Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16020,7 +16020,7 @@ Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16030,7 +16030,7 @@ Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16040,7 +16040,7 @@ Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
 {
   if (not vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16087,7 +16087,7 @@ Hart<URV>::execVlsege8ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16102,7 +16102,7 @@ Hart<URV>::execVlsege16ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16117,7 +16117,7 @@ Hart<URV>::execVlsege32ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16132,7 +16132,7 @@ Hart<URV>::execVlsege64ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, true))
     return;
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16621,7 +16621,7 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16684,7 +16684,7 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16746,7 +16746,7 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16809,7 +16809,7 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16872,7 +16872,7 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -16949,7 +16949,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17025,7 +17025,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17102,7 +17102,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17178,7 +17178,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17254,7 +17254,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17328,7 +17328,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17403,7 +17403,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17477,7 +17477,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17539,7 +17539,7 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17602,7 +17602,7 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17664,7 +17664,7 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17727,7 +17727,7 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17790,7 +17790,7 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17864,7 +17864,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -17939,7 +17939,7 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18018,7 +18018,7 @@ Hart<URV>::execVfmadd_vv(const DecodedInst* di)
     case EW::Word2:  vfmadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -18084,7 +18084,7 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
     case EW::Word2: vfmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18153,7 +18153,7 @@ Hart<URV>::execVfnmadd_vv(const DecodedInst* di)
     case EW::Word2:  vfnmadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -18219,7 +18219,7 @@ Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
     case EW::Word2: vfnmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18288,7 +18288,7 @@ Hart<URV>::execVfmsub_vv(const DecodedInst* di)
     case EW::Word2:  vfmsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -18354,7 +18354,7 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
     case EW::Word2: vfmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18423,7 +18423,7 @@ Hart<URV>::execVfnmsub_vv(const DecodedInst* di)
     case EW::Word2:  vfnmsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -18489,7 +18489,7 @@ Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
     case EW::Word2: vfnmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18558,7 +18558,7 @@ Hart<URV>::execVfmacc_vv(const DecodedInst* di)
     case EW::Word2:  vfmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -18639,7 +18639,7 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
 
     default: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18708,7 +18708,7 @@ Hart<URV>::execVfnmacc_vv(const DecodedInst* di)
     case EW::Word2:  vfnmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -18774,7 +18774,7 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
     case EW::Word2: vfnmacc_vf<double> (vd, f1, v2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18843,7 +18843,7 @@ Hart<URV>::execVfmsac_vv(const DecodedInst* di)
     case EW::Word2:  vfmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -18909,7 +18909,7 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
     case EW::Word2: vfmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -18978,7 +18978,7 @@ Hart<URV>::execVfnmsac_vv(const DecodedInst* di)
     case EW::Word2:  vfnmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -19044,7 +19044,7 @@ Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
     case EW::Word2: vfnmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19125,7 +19125,7 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
     case EW::Word:   vfwmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -19202,7 +19202,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
     case EW::Word: vfwmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19283,7 +19283,7 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
     case EW::Word: vfwnmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -19360,7 +19360,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
     case EW::Word: vfwnmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19441,7 +19441,7 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
     case EW::Word:   vfwmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 template <typename URV>
@@ -19518,7 +19518,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
     case EW::Word: vfwmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19599,7 +19599,7 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
     case EW::Word: vfwnmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19677,7 +19677,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
     case EW::Word: vfwnmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
     default: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19739,7 +19739,7 @@ Hart<URV>::execVfsqrt_v(const DecodedInst* di)
     case EW::Word2: vfsqrt_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19809,7 +19809,7 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
 
     default: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19871,7 +19871,7 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
 
     default: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19935,7 +19935,7 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
     case EW::Word2:  vmfeq_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -19999,7 +19999,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
     case EW::Word2: vmfeq_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20063,7 +20063,7 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
     case EW::Word2:  vmfne_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20127,7 +20127,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
     case EW::Word2: vmfne_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20188,7 +20188,7 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
     case EW::Word2: vmflt_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20249,7 +20249,7 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
     case EW::Word2: vmflt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20310,7 +20310,7 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
     case EW::Word2: vmfle_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20371,7 +20371,7 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
     case EW::Word2: vmfle_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20432,7 +20432,7 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
     case EW::Word2: vmfgt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20493,7 +20493,7 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
     case EW::Word2: vmfge_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -20554,7 +20554,7 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
     case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
     default:         illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21079,7 +21079,7 @@ Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21144,7 +21144,7 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21177,7 +21177,7 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21210,7 +21210,7 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21277,7 +21277,7 @@ Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21344,7 +21344,7 @@ Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
     case EW::Word16: illegalInst(di); return;
     case EW::Word32: illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21415,7 +21415,7 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
     case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21486,7 +21486,7 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
     case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21522,7 +21522,7 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
     case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21557,7 +21557,7 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
     case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21643,7 +21643,7 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21729,7 +21729,7 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21803,7 +21803,7 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
     case EW::Word: vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21887,7 +21887,7 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
       break;
     default:       illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -21973,7 +21973,7 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22022,7 +22022,7 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22071,7 +22071,7 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22146,7 +22146,7 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22221,7 +22221,7 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22295,7 +22295,7 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22339,7 +22339,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22413,7 +22413,7 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22487,7 +22487,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22567,7 +22567,7 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22647,7 +22647,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22733,7 +22733,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22819,7 +22819,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f, false /*invalid*/);
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22896,7 +22896,7 @@ Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
     case EW::Word2: vfrsqrt7_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -22963,7 +22963,7 @@ Hart<URV>::execVfrec7_v(const DecodedInst* di)
     case EW::Word2: vfrec7_v<double> (vd, vs1, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23036,7 +23036,7 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23105,7 +23105,7 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23175,7 +23175,7 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23244,7 +23244,7 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23307,7 +23307,7 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23369,7 +23369,7 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23433,7 +23433,7 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23496,7 +23496,7 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23565,7 +23565,7 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
@@ -23634,7 +23634,7 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
     }
 
   markFsDirty();
-  csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, 0);
+  csRegs_.clearVstart();
 }
 
 
