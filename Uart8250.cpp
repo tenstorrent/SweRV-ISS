@@ -45,9 +45,10 @@ Uart8250::read(uint64_t addr)
 	    std::lock_guard<std::mutex> lock(mutex_);
 	    uint32_t res = byte_;
 
-	    setInterruptPending(false);
 	    byte_ = 0;
 	    lsr_ &= ~1;  // Clear least sig bit
+	    iir_ |= 1;   // Set least sig bit indicating no interrupt.
+	    setInterruptPending(false);
 	    return res;
 	  }
 
@@ -162,6 +163,7 @@ Uart8250::monitorStdin()
 		std::cerr << "Uart8250::monitorStdin: unexpected fail on read\n";
 	      byte_ = c;
 	      lsr_ |= 1;  // Set least sig bit of line status.
+	      iir_ &= ~1;  // Clear bit 0 indicating interrupt is pending.
 	      setInterruptPending(true);
 	      std::cerr << "Uart monitor: " << c << '\n';
 	    }
