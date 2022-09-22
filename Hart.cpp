@@ -1818,7 +1818,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	      if ((addr & 7) == 0)
 		hart->clintAlarm_ = storeVal;
 
-	      // A tif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
 	      if (fromHostValid_ and hasPendingInput(fileno(stdin)))
 		{
 		  uint64_t v = 0;
