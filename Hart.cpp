@@ -2520,6 +2520,9 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
+  if (csr == CsrNumber::MIP)
+    mipPoked_ = true;
+
   return true;
 }
 
@@ -4975,7 +4978,8 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	break;
       }
 
-  if (hasClint())
+  // If mie poked exernally we avoid over-writing it for 1 instruction.
+  if (hasClint() and not mipPoked_)
     {
       // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
       if (instCounter_ >= clintAlarm_)
@@ -4984,6 +4988,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
       csRegs_.poke(CsrNumber::MIP, mipVal);
     }
+  mipPoked_ = false;
 
   bool hasAlarm = alarmLimit_ != ~uint64_t(0);
   if (hasAlarm)
