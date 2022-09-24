@@ -4982,7 +4982,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
   if (hasClint() and not mipPoked_)
     {
       // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
-      if (instCounter_ >= clintAlarm_)
+      if (instCounter_ >= clintAlarm_*10)
 	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER)) | (URV(1) << URV(InterruptCause::S_TIMER));
       else
 	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
