@@ -4159,7 +4159,7 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
-    bool mipPoked_ = true;           // Prevent MIP pokes from being clobbered by CLINT.
+    bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
 

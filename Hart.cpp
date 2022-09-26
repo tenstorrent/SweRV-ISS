@@ -4950,40 +4950,44 @@ template <typename URV>
 bool
 Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 {
-  URV mipVal = csRegs_.peekMip();
-
-  for (auto dev : memory_.ioDevs_)
-    if (dev->isInterruptPending())
-      {
-	mipVal |=  (URV(1) << URV(InterruptCause::M_EXTERNAL)) | (URV(1) << URV(InterruptCause::S_EXTERNAL));
-	csRegs_.poke(CsrNumber::MIP, mipVal);
-	break;
-      }
-
-  // If mie poked exernally we avoid over-writing it for 1 instruction.
-  if (hasClint() and not mipPoked_)
+  // If mip poked exernally we avoid over-writing it for 1 instruction.
+  if (not mipPoked_)
     {
-      // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
-      if ((instCounter_ >> counterToTimeShift) >= clintAlarm_)
-	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER)) | (URV(1) << URV(InterruptCause::S_TIMER));
-      else
-	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
-      csRegs_.poke(CsrNumber::MIP, mipVal);
+      URV mipVal = csRegs_.peekMip();
+      URV prev = mipVal;
+
+      for (auto dev : memory_.ioDevs_)
+	if (dev->isInterruptPending())
+	  {
+	    mipVal |=  (URV(1) << URV(InterruptCause::M_EXTERNAL)) | (URV(1) << URV(InterruptCause::S_EXTERNAL));
+	    dev->setInterruptPending(false);
+	  }
+
+      if (hasClint())
+	{
+	  // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
+	  if ((instCounter_ >> counterToTimeShift) >= clintAlarm_)
+	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER)) | (URV(1) << URV(InterruptCause::S_TIMER));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
+	}
+
+      bool hasAlarm = alarmLimit_ != ~uint64_t(0);
+      if (hasAlarm)
+	{
+	  if (instCounter_ >= alarmLimit_)
+	    {
+	      alarmLimit_ += alarmInterval_;
+	      mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
+	    }
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+	}
+
+      if (mipVal != prev)
+	csRegs_.poke(CsrNumber::MIP, mipVal);
     }
   mipPoked_ = false;
-
-  bool hasAlarm = alarmLimit_ != ~uint64_t(0);
-  if (hasAlarm)
-    {
-      if (instCounter_ >= alarmLimit_)
-	{
-	  alarmLimit_ += alarmInterval_;
-	  mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
-	}
-      else
-	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-      csRegs_.poke(CsrNumber::MIP, mipVal);
-    }
 
   if (debugStepMode_ and not dcsrStepIe_)
     return false;

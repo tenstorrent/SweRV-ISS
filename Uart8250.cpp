@@ -161,6 +161,8 @@ Uart8250::monitorStdin()
 	      char c;
 	      if (::read(fd, &c, sizeof(c)) != 1)
 		std::cerr << "Uart8250::monitorStdin: unexpected fail on read\n";
+	      putchar(c);
+	      fflush(stdout);
 	      byte_ = c;
 	      lsr_ |= 1;  // Set least sig bit of line status.
 	      iir_ &= ~1;  // Clear bit 0 indicating interrupt is pending.
