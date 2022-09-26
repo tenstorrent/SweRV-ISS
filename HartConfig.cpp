@@ -1495,6 +1495,22 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
   if (enableMcm and not system.enableMcm(mbLineSize, checkAll))
     return false;
 
+  tag = "uart";
+  if (config_ -> count(tag))
+    {
+      auto& uart = config_ -> at(tag);
+      if (not uart.count("address") or not uart.count("size"))
+	{
+	  std::cerr << "Invalid uart entry in config file: missing address/size entry.\n";
+	  return false;
+	}
+      uint64_t addr = 0, size = 0;
+      if (not getJsonUnsigned(tag + ".address", uart.at("address"), addr) or
+	  not getJsonUnsigned(tag + ".size", uart.at("size"), size))
+	return false;
+      system.defineUart(addr, size);
+    }
+
   return finalizeCsrConfig(system);
 }
 

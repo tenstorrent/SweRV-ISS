@@ -18,6 +18,9 @@ namespace WdRiscv
     {
     }
 
+    virtual ~IoDevice()
+    { }
+
     /// Read a word from the device. Return 0 if address is outside
     /// the device range.
     virtual uint32_t read(uint64_t addr) = 0;

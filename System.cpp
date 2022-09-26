@@ -21,6 +21,7 @@
 #include "Mcm.hpp"
 #include "Uart8250.hpp"
 
+
 using namespace WdRiscv;
 
 
@@ -74,7 +75,16 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
   mem.defineWriteMemoryCallback(writef);
 #endif
 
-  // mem.registerIoDevice(new Uart8250(0x1000000, 0x100));
+}
+
+
+template <typename URV>
+void
+System<URV>::defineUart(uint64_t addr, uint64_t size)
+{
+  auto uart = new Uart8250(addr, size);
+  ioDevs_.push_back(uart);
+  memory_->registerIoDevice(uart);
 }
 
 
@@ -86,6 +96,9 @@ System<URV>::~System()
 
   delete mcm_;
   mcm_ = nullptr;
+
+  for (auto dev : ioDevs_)
+    delete dev;
 }
 
 

@@ -165,7 +165,6 @@ Uart8250::monitorStdin()
 	      lsr_ |= 1;  // Set least sig bit of line status.
 	      iir_ &= ~1;  // Clear bit 0 indicating interrupt is pending.
 	      setInterruptPending(true);
-	      std::cerr << "Uart monitor: " << c << '\n';
 	    }
 	}
 
