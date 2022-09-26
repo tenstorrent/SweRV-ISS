@@ -1877,13 +1877,15 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
 }
 
 
+#include <termios.h>
+
+
 int
 main(int argc, char* argv[])
 {
   Args args;
   if (not parseCmdLineArgs(argc, argv, args))
     return 1;
-
   if (args.help)
     return 0;
 
@@ -1896,8 +1898,10 @@ main(int argc, char* argv[])
     if (not config.loadConfigFile(args.configFile))
       return 1;
 
-  unsigned regWidth = determineRegisterWidth(args, config);
+  struct termios term;
+  tcgetattr(STDIN_FILENO, &term);  // Save terminal state.
 
+  unsigned regWidth = determineRegisterWidth(args, config);
   bool ok = true;
 
   try
@@ -1919,5 +1923,6 @@ main(int argc, char* argv[])
       ok = false;
     }
 	
+  tcsetattr(STDIN_FILENO, 0, &term);  // Restore terminal state.
   return ok? 0 : 1;
 }
