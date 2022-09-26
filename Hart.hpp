@@ -225,6 +225,12 @@ namespace WdRiscv
     /// bound.
     bool pokeCsr(CsrNumber csr, URV val);
 
+    /// Similar to pokeCsr but meant for server/interactive code: Keep
+    /// track of external MIP pokes to avoid cloberring them with internal
+    /// ones.
+    bool externalPokeCsr(CsrNumber csr, URV val)
+    { if (csr == CsrNumber::MIP) mipPoked_ = true; return pokeCsr(csr, val); }
+
     /// Put in value the bytes of the given vector register (most
     /// significant byte first). Return true on success, return false
     /// if reg is out of bounds.

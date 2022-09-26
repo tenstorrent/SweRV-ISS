@@ -828,7 +828,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       auto csr = hart.findCsr(addrStr);
       if (csr)
 	{
-	  if (hart.pokeCsr(csr->getNumber(), value))
+	  if (hart.externalPokeCsr(csr->getNumber(), value))
 	    return true;
 	  std::cerr << "Failed to write CSR " << addrStr << '\n';
 	  return false;

@@ -2526,9 +2526,6 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
-  if (csr == CsrNumber::MIP)
-    mipPoked_ = true;
-
   return true;
 }
 
