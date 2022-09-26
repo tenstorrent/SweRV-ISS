@@ -1424,6 +1424,13 @@ Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
 }
 
 
+/// Shift executed instruction counter by this amount to produce a
+/// fake timer value. For example, if shift amout is 3, we are
+/// dividing instruction count by 8 (2 to power 3) to produce a timer
+/// value.
+unsigned counterToTimeShift = 3;
+
+
 template <typename URV>
 template <typename LOAD_TYPE>
 inline
@@ -1471,9 +1478,9 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
   if (addr >= clintStart_ and addr < clintLimit_ and addr - clintStart_ >= 0xbff8)
     {    // Fake time: use instruction count
       if ((addr & 7) == 0)  // Multiple of 8
-	narrow = instCounter_;  
+	narrow = instCounter_ >> counterToTimeShift;
       else if ((addr & 3) == 0)  // multiple of 4
-	narrow = instCounter_ >> 32;
+	narrow = instCounter_ >> (32 + counterToTimeShift);
     }
   else
     {
@@ -1586,7 +1593,6 @@ hasPendingInput(int fd)
   if (firstTime)
     {
       firstTime = false;
-      
       struct termios term;
       tcgetattr(fd, &term);
       cfmakeraw(&term);
@@ -4366,30 +4372,6 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
   return success;
 }
 
-#include <termios.h>
-static
-bool
-isInputPending(int fd)
-{
-  static bool firstTime = true;
-  if (firstTime)
-    {
-      firstTime = false;
-      struct termios term;
-      tcgetattr(fileno(stdin), &term);
-      cfmakeraw(&term);
-      tcsetattr(fileno(stdin), 0, &term);
-    }
-
-  struct pollfd pfds[1];
-  pfds[0].fd = fd;
-  pfds[0].events = POLLIN;
-  pfds[0].revents = 0;
-  if (poll(pfds, 1, 0) == 1)
-    return pfds[0].revents & POLLIN;
-  return false;
-}
-
 
 template <typename URV>
 inline
@@ -4473,7 +4455,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
       if (enableGdb_ and ++gdbCount >= gdbLimit)
         {
           gdbCount = 0;
-          if (isInputPending(gdbInputFd_))
+          if (hasPendingInput(gdbInputFd_))
             {
               handleExceptionForGdb(*this, gdbInputFd_);
               continue;
@@ -4982,7 +4964,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
   if (hasClint() and not mipPoked_)
     {
       // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
-      if (instCounter_ >= clintAlarm_*10)
+      if ((instCounter_ >> counterToTimeShift) >= clintAlarm_)
 	mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER)) | (URV(1) << URV(InterruptCause::S_TIMER));
       else
 	mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
