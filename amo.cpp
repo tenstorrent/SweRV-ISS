@@ -177,10 +177,8 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 
   if (hasActiveTrigger())
     {
-      typedef TriggerTiming Timing;
-
       bool isLd = true;
-      if (ldStAddrTriggerHit(virtAddr, Timing::Before, isLd,
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, isLd,
                              privMode_, isInterruptEnabled()))
 	triggerTripped_ = true;
       if (triggerTripped_)
@@ -193,22 +191,15 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   unsigned ldSize = sizeof(LOAD_TYPE);
   uint64_t addr = virtAddr;
   auto cause = determineLoadException(addr, ldSize);
-  if (cause != ExceptionCause::NONE)
-    {
-      if (cause == ExceptionCause::LOAD_ADDR_MISAL and
-	  misalAtomicCauseAccessFault_)
-        {
-          cause = ExceptionCause::LOAD_ACC_FAULT;
-        }
-    }
+  if (cause == ExceptionCause::LOAD_ADDR_MISAL and misalAtomicCauseAccessFault_)
+    cause = ExceptionCause::LOAD_ACC_FAULT;
+
   ldStPhysAddr_ = addr;
 
   // Check if invalid unless cacheable.
   if (amoInCacheableOnly_ and not isAddrCacheable(addr))
     if (cause == ExceptionCause::NONE)
-      {
-        cause = ExceptionCause::LOAD_ACC_FAULT;
-      }
+      cause = ExceptionCause::LOAD_ACC_FAULT;
 
   // Address outside DCCM causes an exception (this is swerv specific).
   bool fail = amoInDccmOnly_ and not isAddrInDccm(addr);
@@ -219,15 +210,8 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 
   fail = fail or not memory_.pmaMgr_.getPma(addr).isRsrv();
 
-  if (fail)
-    {
-      // AMO secondary cause has priority over ECC.
-      if (cause == ExceptionCause::NONE)
-        {
-          // Per spec cause is store-access-fault.
-          cause = ExceptionCause::LOAD_ACC_FAULT;
-        }
-    }
+  if (fail and cause == ExceptionCause::NONE)
+    cause = ExceptionCause::LOAD_ACC_FAULT;
 
   if (cause != ExceptionCause::NONE)
     {
@@ -258,7 +242,6 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
     value = SRV(LOAD_TYPE(uval)); // Sign extend.
 
   intRegs_.write(rd, value);
-
   return true;
 }
 
@@ -322,34 +305,20 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   uint64_t addr = virtAddr;
   auto cause = determineStoreException(addr, storeVal);
-
+  ldStPhysAddr_ = addr;
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
       misalAtomicCauseAccessFault_)
-    {
-      cause = ExceptionCause::STORE_ACC_FAULT;
-    }
-  ldStPhysAddr_ = addr;
+    cause = ExceptionCause::STORE_ACC_FAULT;
 
   // Check if invalid unless cacheable.
   if (amoInCacheableOnly_ and not isAddrCacheable(addr))
     if (cause == ExceptionCause::NONE)
-      {
-        cause = ExceptionCause::STORE_ACC_FAULT;
-      }
+      cause = ExceptionCause::STORE_ACC_FAULT;
 
   bool fail = misal or (amoInDccmOnly_ and not isAddrInDccm(addr));
+  fail = fail or not memory_.pmaMgr_.getPma(addr).isRsrv();
 
-  if (fail)
-    {
-      // AMO secondary cause has priority over ECC.
-      if (cause == ExceptionCause::NONE)
-        {
-          // Per spec cause is store-access-fault.
-          cause = ExceptionCause::STORE_ACC_FAULT;
-        }
-    }
-
-  if (not memory_.pmaMgr_.getPma(addr).isRsrv() and cause == ExceptionCause::NONE)
+  if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::STORE_ACC_FAULT;
 
   // If no exception: consider store-data  trigger
@@ -391,7 +360,6 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
     assert(0);
 
   invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
-
   return true;
 }
 
