@@ -236,16 +236,17 @@ namespace WdRiscv
       if (writeIo(address, value))
 	return true;
 
+      auto& lwd = lastWriteData_.at(sysHartIx);
+      lwd.size_ = 0;
+      lwd.addr_ = address;
+      lwd.value_ = value;
+
 #ifdef FAST_SLOPPY
       if (address + sizeof(T) > size_)
         return false;
+      if (dataLineTrace_)
+	traceDataLine(address);
       sysHartIx = sysHartIx; // Avoid unused var warning.
-      *(reinterpret_cast<T*>(data_ + address)) = value;
-
-      auto& lwd = lastWriteData_.at(sysHartIx);
-      lwd.size_ = sizeof(T);
-      lwd.addr_ = address;
-      lwd.value_ = value;
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
@@ -257,31 +258,23 @@ namespace WdRiscv
 	{
           Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
           if (pma1 != pma2)
-            return false;
+	    return false;
 	}
 
       // Memory mapped region accessible only with word-size write.
       if (pma1.isMemMappedReg())
         {
           if constexpr (sizeof(T) != 4)
-            return false;
+	    return false;
           return writeRegister(sysHartIx, address, value);
 	}
 
-      auto& lwd = lastWriteData_.at(sysHartIx);
-      lwd.size_ = sizeof(T);
-      lwd.addr_ = address;
-      lwd.value_ = value;
-
+      if (dataLineTrace_)
+	traceDataLine(address);
   #ifdef MEM_CALLBACKS
-      uint64_t val = 0;
-      readCallback_(address, sizeof(T), val);
-      val = value;
+      uint64_t val = value;
       if (not writeCallback_(address, sizeof(T), val))
-        {
-          lwd.size_ = 0;
-          return false;
-        }
+	return false;
   #else
       *(reinterpret_cast<T*>(data_ + address)) = value;
   #endif
@@ -295,9 +288,7 @@ namespace WdRiscv
 	      cache_->insert(address + sizeof(T) - 1);
 	}
 
-      if (dataLineTrace_)
-	traceDataLine(address);
-
+      lwd.size_ = sizeof(T);
       return true;
     }
 
@@ -647,11 +638,14 @@ namespace WdRiscv
     bool writeRegister(unsigned sysHartIx, uint64_t addr, uint32_t value)
     {
       value = doRegisterMasking(addr, value);
+      auto& lwd = lastWriteData_.at(sysHartIx);
 
       if (not pmaMgr_.writeRegister(addr, value))
-        return false;
+	{
+	  lwd.size_ = 0;
+	  return false;
+	}
 
-      auto& lwd = lastWriteData_.at(sysHartIx);
       lwd.size_ = 4;
       lwd.addr_ = addr;
       lwd.value_ = value;
