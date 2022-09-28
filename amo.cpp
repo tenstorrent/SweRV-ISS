@@ -32,16 +32,15 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
   URV mask = URV(accessSize) - 1;
 
   auto cause = ExceptionCause::NONE;
-  bool forcedFail = false;
   if (accessSize == 4)
     {
       uint32_t storeVal = 0;
-      cause = determineStoreException(addr, storeVal, forcedFail);
+      cause = determineStoreException(addr, storeVal);
     }
   else
     {
       uint64_t storeVal = 0;
-      cause = determineStoreException(addr, storeVal, forcedFail);
+      cause = determineStoreException(addr, storeVal);
     }
 
   if (cause == ExceptionCause::STORE_ADDR_MISAL)
@@ -322,8 +321,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   misalignedLdSt_ = misal;
 
   uint64_t addr = virtAddr;
-  bool forcedFail = false;
-  auto cause = determineStoreException(addr, storeVal, forcedFail);
+  auto cause = determineStoreException(addr, storeVal);
 
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
       misalAtomicCauseAccessFault_)

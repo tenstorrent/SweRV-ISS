@@ -1394,10 +1394,6 @@ Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
   if (not memory_.checkRead(addr, ldSize))
     return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 
-  // Fault dictated by test-bench.
-  if (forceAccessFail_)
-    return ExceptionCause::LOAD_ACC_FAULT;
-
   return ExceptionCause::NONE;
 }
 
@@ -1701,8 +1697,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   // Determine if a store exception is possible.
   STORE_TYPE maskedVal = storeVal;  // Masked store value.
   uint64_t addr = virtAddr;
-  bool forcedFail = false;
-  ExceptionCause cause = determineStoreException(addr, maskedVal, forcedFail);
+  ExceptionCause cause = determineStoreException(addr, maskedVal);
   ldStPhysAddr_ = addr;
 
   // Consider store-data trigger if there is no trap or if the trap is
@@ -1951,18 +1946,6 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return false;
     }
 
-  if (forceFetchFail_)
-    {
-      if (triggerTripped_)
-        return false;
-      forceFetchFail_ = false;
-      readInst(addr, inst);
-      URV info = pc_ + forceFetchFailOffset_;
-      auto cause = ExceptionCause::INST_ACC_FAULT;
-      initiateException(cause, pc_, info);
-      return false;
-    }
-
   if ((addr & 3) == 0)   // Word aligned
     {
       if (not memory_.readInst(addr, inst))
@@ -2064,7 +2047,6 @@ Hart<URV>::fetchInstPostTrigger(URV virtAddr, uint64_t& physAddr,
   // Fetch failed: take pending trigger-exception.
   URV info = virtAddr;
   takeTriggerAction(traceFile, virtAddr, info, instCounter_, true);
-  forceFetchFail_ = false;
 
   return false;
 }
@@ -2158,8 +2140,6 @@ template <typename URV>
 void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 {
-  forceAccessFail_ = false;
-
   cancelLr(); // Clear LR reservation (if any).
 
   PrivilegeMode origMode = privMode_;
@@ -5093,13 +5073,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       ++cycleCount_;
 
-      // A ld/st must be seen within 2 steps of a forced access fault.
-      if (forceAccessFail_ and (instCounter_ > forceAccessFailMark_ + 1))
-	{
-	  std::cerr << "Spurious exception command from test-bench.\n";
-	  forceAccessFail_ = false;
-	}
-
       if (hasException_ or hasInterrupt_)
 	{
 	  if (doStats)
@@ -5147,16 +5120,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       logStop(ce, instCounter_, traceFile);
     }
-}
-
-
-template <typename URV>
-void
-Hart<URV>::postDataAccessFault(URV offset)
-{
-  forceAccessFail_ = true;
-  forceAccessFailOffset_ = offset;
-  forceAccessFailMark_ = instCounter_;
 }
 
 
@@ -9646,13 +9609,6 @@ template <typename URV>
 void
 Hart<URV>::enterDebugMode(URV pc, bool /*force*/)
 {
-  if (forceAccessFail_)
-    {
-      std::cerr << "Entering debug mode with a pending forced exception from"
-		<< " test-bench. Exception cleared.\n";
-      forceAccessFail_ = false;
-    }
-
   // This method is used by the test-bench to make the simulator
   // follow it into debug-halt or debug-stop mode. Do nothing if the
   // simulator got into debug mode on its own.
@@ -10814,10 +10770,8 @@ Hart<URV>::execLhu(const DecodedInst* di)
 template <typename URV>
 template <typename STORE_TYPE>
 ExceptionCause
-Hart<URV>::determineStoreException(uint64_t& addr, STORE_TYPE& storeVal, 
-                                   bool& forcedFail)
+Hart<URV>::determineStoreException(uint64_t& addr, STORE_TYPE& storeVal)
 {
-  forcedFail = false;
   unsigned stSize = sizeof(STORE_TYPE);
 
   addr = URV(addr);  // Truncate to 32 bits in 32-bit mode.
@@ -10868,13 +10822,6 @@ Hart<URV>::determineStoreException(uint64_t& addr, STORE_TYPE& storeVal,
       if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_) and
           not isAddrMemMapped(addr))
 	return ExceptionCause::STORE_ACC_FAULT;
-    }
-
-  // Fault dictated by test-bench
-  if (forceAccessFail_)
-    {
-      forcedFail = true;
-      return ExceptionCause::STORE_ACC_FAULT;
     }
 
   return ExceptionCause::NONE;
@@ -11590,36 +11537,36 @@ WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, uint64_t);
 
 template
 ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint8_t>(uint64_t&, uint8_t&, bool&);
+WdRiscv::Hart<uint32_t>::determineStoreException<uint8_t>(uint64_t&, uint8_t&);
 
 template
 ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint16_t>(uint64_t&, uint16_t&, bool&);
+WdRiscv::Hart<uint32_t>::determineStoreException<uint16_t>(uint64_t&, uint16_t&);
 
 template
 ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint32_t>(uint64_t&, uint32_t&, bool&);
+WdRiscv::Hart<uint32_t>::determineStoreException<uint32_t>(uint64_t&, uint32_t&);
 
 template
 ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint64_t>(uint64_t&, uint64_t&, bool&);
+WdRiscv::Hart<uint32_t>::determineStoreException<uint64_t>(uint64_t&, uint64_t&);
 
 
 template
 ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint8_t>(uint64_t&, uint8_t&, bool&);
+WdRiscv::Hart<uint64_t>::determineStoreException<uint8_t>(uint64_t&, uint8_t&);
 
 template
 ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint16_t>(uint64_t&, uint16_t&, bool&);
+WdRiscv::Hart<uint64_t>::determineStoreException<uint16_t>(uint64_t&, uint16_t&);
 
 template
 ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint32_t>(uint64_t&, uint32_t&, bool&);
+WdRiscv::Hart<uint64_t>::determineStoreException<uint32_t>(uint64_t&, uint32_t&);
 
 template
 ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint64_t>(uint64_t&, uint64_t&, bool&);
+WdRiscv::Hart<uint64_t>::determineStoreException<uint64_t>(uint64_t&, uint64_t&);
 
 
 template class WdRiscv::Hart<uint32_t>;

@@ -771,17 +771,6 @@ namespace WdRiscv
     /// area already defined using defineMemoryMappedRegisterArea.
     bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
 
-    /// Direct this hart to take an instruction access fault exception
-    /// within the next singleStep invocation.
-    void postInstAccessFault(URV offset)
-    { forceFetchFail_ = true; forceFetchFailOffset_ = offset; }
-
-    /// Direct this hart to take a data access fault exception within
-    /// the subsequent singleStep invocation executing a load/store
-    /// instruction or take an NMI (double-bit-ecc) within the
-    /// subsequent interrupt if fast-interrupt is enabled.
-    void postDataAccessFault(URV offset);
-
     /// Return count of traps (exceptions or interrupts) seen by this
     /// hart.
     uint64_t getTrapCount() const
@@ -1782,8 +1771,7 @@ namespace WdRiscv
     /// mapped register masking.
     template<typename STORE_TYPE>
     ExceptionCause determineStoreException(uint64_t& addr,
-					   STORE_TYPE& storeVal,
-                                           bool& forced);
+					   STORE_TYPE& storeVal);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
@@ -4117,11 +4105,6 @@ namespace WdRiscv
     uint64_t scCount_ = 0;    // Count of dispatched store-conditional instructions.
     uint64_t scSuccess_ = 0;  // Count of successful SC (store accomplished).
     unsigned lrResSize_ = sizeof(URV); // LR reservation size.
-    bool forceAccessFail_ = false;  // Force load/store access fault.
-    bool forceFetchFail_ = false;   // Force fetch access fault.
-    URV forceAccessFailOffset_ = 0;
-    URV forceFetchFailOffset_ = 0;
-    uint64_t forceAccessFailMark_ = 0; // Instruction at which forced fail is seen.
 
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
