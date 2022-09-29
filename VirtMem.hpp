@@ -24,6 +24,7 @@
 namespace WdRiscv
 {
 
+
   /// Structure to unpack the fields of a 32-bit page table entry.
   struct Pte32Bits
   {
@@ -601,6 +602,29 @@ namespace WdRiscv
     {
       pteInstrAddr_.clear();
       pteDataAddr_.clear();
+    }
+
+    static const char* pageSize(Mode m, uint32_t level)
+    {
+      if (m == Mode::Bare)
+        return "";
+      if (m == Mode::Sv32)
+        {
+          if (level == 0)
+            return "4K";
+          else
+            return "4M";
+        }
+
+      switch (level)
+        {
+          case 0: return "4K";
+          case 1: return "2M";
+          case 2: return "1G";
+          case 3: return "512G";
+          case 4: return "256T";
+          default: return "";
+        }
     }
 
   protected:

@@ -297,7 +297,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
           fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
 		  uintmax_t(pte.ppn()) * pageSize_);
 	  if (leaf)
-	    fprintf(attFile_, " s:%s", ii == 2 ? "1G" : (ii == 1 ? "2M" : "4K"));
+            fprintf(attFile_, " s:%s", VirtMem::pageSize(mode_, ii));
 	  fprintf(attFile_, "\n\n");
         }
 
@@ -444,7 +444,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
           fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
 		  uintmax_t(pte.ppn()) * pageSize_);
 	  if (leaf)
-	    fprintf(attFile_, " s:%s", ii == 2 ? "1G" : (ii == 1 ? "2M" : "4K"));
+            fprintf(attFile_, " s:%s", pageSize(mode_, ii));
 	  fprintf(attFile_, "\n\n");
         }
 
