@@ -2014,6 +2014,10 @@ namespace WdRiscv
     /// greater than XLEN-1 returning false; otherwise return true.
     bool checkShiftImmediate(const DecodedInst* di, URV imm);
 
+    /// Report the number of retired instruction count and the simulation
+    /// rate.
+    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
+
     /// Helper to the run methods: Log (on the standard error) the
     /// cause of a stop signaled with an exception. Return true if
     /// program finished successfully, return false otherwise.  If
