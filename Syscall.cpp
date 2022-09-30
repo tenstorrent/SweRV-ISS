@@ -16,10 +16,6 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-
-#include <filesystem>
-namespace FileSystem = std::filesystem;
-
 #include <cstring>
 #include <ctime>
 #include <sys/times.h>
@@ -36,6 +32,7 @@ namespace FileSystem = std::filesystem;
 
 #include "Hart.hpp"
 #include "Syscall.hpp"
+#include "Filesystem.hpp"
 
 
 using namespace WdRiscv;
@@ -298,7 +295,7 @@ Syscall<URV>::redirectOutputDescriptor(int fd, const std::string& path)
   fdIsRead_[fd] = false;
   fdPath_[fd] = path;
 
-  auto absPath = FileSystem::absolute(path);
+  auto absPath = Filesystem::absolute(path);
   writePaths_.insert(absPath.string());
 
   return true;
@@ -376,7 +373,7 @@ Syscall<URV>::registerLinuxFd(int linuxFd, const std::string& path, bool isRead)
   fdIsRead_[riscvFd] = isRead;
   fdPath_[riscvFd] = path;
 
-  auto absPath = FileSystem::absolute(path);
+  auto absPath = Filesystem::absolute(path);
   if (isRead)
     readPaths_.insert(absPath.string());
   else
@@ -1510,7 +1507,7 @@ Syscall<URV>::loadFileDescriptors(const std::string& path)
       else
         {
           int newFd = -1;
-          if (FileSystem::is_regular_file(fdPath))
+          if (Filesystem::is_regular_file(fdPath))
             {
               newFd = open(fdPath.c_str(), O_RDWR);
               if (lseek(newFd, position, SEEK_SET) == off_t(-1))
