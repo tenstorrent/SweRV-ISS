@@ -50,10 +50,6 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
       return cause;
     }
 
-  // Check if invalid unless cacheable.
-  if (amoInCacheableOnly_ and not isAddrCacheable(addr))
-    return ExceptionCause::STORE_ACC_FAULT;
-
   // Address must be word aligned for word access and double-word
   // aligned for double-word access.
   if ((addr & mask) != 0)
@@ -196,11 +192,6 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 
   ldStPhysAddr_ = addr;
 
-  // Check if invalid unless cacheable.
-  if (amoInCacheableOnly_ and not isAddrCacheable(addr))
-    if (cause == ExceptionCause::NONE)
-      cause = ExceptionCause::LOAD_ACC_FAULT;
-
   // Address outside DCCM causes an exception (this is swerv specific).
   bool fail = amoInDccmOnly_ and not isAddrInDccm(addr);
 
@@ -309,11 +300,6 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
       misalAtomicCauseAccessFault_)
     cause = ExceptionCause::STORE_ACC_FAULT;
-
-  // Check if invalid unless cacheable.
-  if (amoInCacheableOnly_ and not isAddrCacheable(addr))
-    if (cause == ExceptionCause::NONE)
-      cause = ExceptionCause::STORE_ACC_FAULT;
 
   bool fail = misal or (amoInDccmOnly_ and not isAddrInDccm(addr));
   fail = fail or not memory_.pmaMgr_.getPma(addr).isRsrv();

@@ -520,7 +520,6 @@ void
 Hart<URV>::reset(bool resetMemoryMappedRegs)
 {
   privMode_ = PrivilegeMode::Machine;
-  hasDefaultIdempotent_ = false;
 
   intRegs_.reset();
   csRegs_.reset();
@@ -577,10 +576,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   alarmLimit_ = alarmInterval_? alarmInterval_ + instCounter_ : ~uint64_t(0);
   consecutiveIllegalCount_ = 0;
-
-  // Make all idempotent override entries invalid.
-  for (auto& entry : pmaOverrideVec_)
-    entry.reset();
 
   // Trigger software interrupt in hart 0 on reset.
   if (clintSiOnReset_ and hartIx_ == 0)
@@ -891,43 +886,6 @@ Hart<URV>::execAndi(const DecodedInst* di)
   SRV imm = di->op2As<SRV>();
   URV v = intRegs_.read(di->op1()) & imm;
   intRegs_.write(di->op0(), v);
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::isAddrIdempotent(uint64_t addr) const
-{
-  if (pmaOverride_)
-    {
-      for (const auto& entry : pmaOverrideVec_)
-        if (entry.matches(addr))
-          return entry.idempotent_;
-    }
-
-  if (hasDefaultIdempotent_)
-    return defaultIdempotent_;
-
-  Pma pma = memory_.pmaMgr_.getPma(addr);
-  return pma.isIdempotent();
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::isAddrCacheable(uint64_t addr) const
-{
-  if (pmaOverride_)
-    {
-      for (const auto& entry : pmaOverrideVec_)
-        if (entry.matches(addr))
-          return entry.cacheable_;
-    }
-
-  if (hasDefaultCacheable_)
-    return defaultCacheable_;
-
-  return false;
 }
 
 

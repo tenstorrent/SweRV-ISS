@@ -999,7 +999,8 @@ namespace WdRiscv
     { return memory_.pmaMgr_.isAddrInDccm(addr); }
 
     /// Return true if given address is cacheable.
-    bool isAddrCacheable(uint64_t addr) const;
+    bool isAddrCacheable(uint64_t addr) const
+    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isCacheable(); }
 
     /// Return true if given address is in the memory mapped registers
     /// area of this hart.
@@ -1210,15 +1211,6 @@ namespace WdRiscv
     void tieSharedCsrsTo(Hart<URV>& target)
     { return csRegs_.tieSharedCsrsTo(target.csRegs_); }
 
-    /// Return true if non-maskable interrupts (NMIs) are enabled for
-    /// this hart.
-    bool isNmiEnabled() const
-    { return nmiEnabled_; }
-
-    /// Enable delivery of NMIs to this hart.
-    bool enableNmi(bool flag)
-    { return nmiEnabled_ = flag; }
-
     /// Record given CSR number for later reporting of CSRs modified by
     /// an instruction.
     void recordCsrWrite(CsrNumber csr)
@@ -1407,47 +1399,6 @@ namespace WdRiscv
     /// Callback to invoke before the execution of an instruction.
     void registerPreInst(std::function<void(Hart<URV>&, bool&, bool&)> callback)
     { preInst_ = callback; }
-
-    /// Define physical memory attribute override regions. If region
-    /// count is greater than zero then the defined regions override
-    /// the MRAC CSR.
-    void definePmaOverrideRegions(unsigned regionCount)
-    {
-      pmaOverrideVec_.resize(regionCount);
-      pmaOverride_ = regionCount > 0;
-    }
-
-    /// Set the default idempotent attribute for addresses that do
-    /// not match any entries in the MACO CSRs.
-    void setDefaultIdempotent(bool flag)
-    {
-      hasDefaultIdempotent_ = true;
-      defaultIdempotent_ = flag;
-    }
-
-    /// Set the default cachable attribute for addresses that do
-    /// not match any entries in the MACO CSRs.
-    void setDefaultCacheable(bool flag)
-    {
-      hasDefaultCacheable_ = true;
-      defaultCacheable_ = flag;
-    }
-
-    /// Define a physical memory attribute override region with given
-    /// index. An address greater than or equal to start and less than
-    /// or equal end is assigned given idempotency/cachability
-    /// attributes.  An address matching multiple regions get the
-    /// attributes of the first region it matches. Return true on
-    /// success and false if regionIx is out of bounds.
-    bool definePmaOverride(unsigned ix, uint64_t start,
-                           uint64_t end, bool idempotent,
-                           bool cacheable)
-    {
-      if (ix >= pmaOverrideVec_.size())
-        return false;
-      pmaOverrideVec_.at(ix) = PmaOverride(start, end, idempotent, cacheable);
-      return true;
-    }
 
     /// Define physical memory attribute region. Region addresses are between
     /// low and high inclusive. To define a 1024-byte region at address zero
@@ -1909,7 +1860,6 @@ namespace WdRiscv
     /// Start a non-maskable interrupt.
     void initiateNmi(URV cause, URV pc);
 
-    /// Code common to fast-interrupt and non-maskable-interrupt. Do
     /// interrupts without considering the delegation registers.
     void undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc);
 
@@ -1982,7 +1932,8 @@ namespace WdRiscv
 
     /// Return true if given address is an idempotent region of
     /// memory.
-    bool isAddrIdempotent(uint64_t addr) const;
+    bool isAddrIdempotent(uint64_t addr) const
+    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isIdempotent(); }
 
     /// Check address associated with an atomic memory operation (AMO)
     /// instruction. Return true if AMO access is allowed. Return
@@ -3952,26 +3903,6 @@ namespace WdRiscv
       bool fp_ = false;
     };
 
-    struct PmaOverride
-    {
-      PmaOverride(uint64_t start = 0, uint64_t end = 0,
-                  bool idempotent = false, bool cacheable = false)
-        : start_(start), end_(end), idempotent_(idempotent),
-          cacheable_(cacheable)
-      { }
-
-      bool matches(uint64_t addr) const
-      { return end_ > start_ and start_ <= addr and addr <= end_; }
-
-      void reset ()
-      { start_ = end_ = 0; idempotent_ = false; cacheable_ = false; }
-
-      uint64_t start_;
-      uint64_t end_;
-      bool idempotent_;
-      bool cacheable_;
-    };
-
     // Set the program counter to the given value after clearing the
     // least significant bit.
     void setPc(URV value)
@@ -4070,7 +4001,6 @@ namespace WdRiscv
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
     bool nmiPending_ = false;
     NmiCause nmiCause_ = NmiCause::UNKNOWN;
-    bool nmiEnabled_ = true;
 
     // These must be cleared before each instruction when triggers enabled.
     bool hasException_ = 0;      // True if current inst has an exception.
@@ -4189,15 +4119,6 @@ namespace WdRiscv
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.
     PmpManager pmpManager_;
-
-    bool defaultIdempotent_ = false;
-    bool hasDefaultIdempotent_ = false;
-
-    bool defaultCacheable_ = false;
-    bool hasDefaultCacheable_ = false;
-
-    bool pmaOverride_ = false;
-    std::vector<PmaOverride> pmaOverrideVec_;
 
     VirtMem virtMem_;
     Isa isa_;
