@@ -1314,15 +1314,6 @@ Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
           addr = pa;
         }
     }
-  else
-    {
-      // Out of MPU range
-      bool isReadable = isAddrReadable(addr);
-      if (isReadable and misal)
-	isReadable = isAddrReadable(addr + ldSize - 1);
-      if (not isReadable)
-	return ExceptionCause::LOAD_ACC_FAULT;
-    }
 
   // Misaligned resulting in access fault exception.
   if (misal and cause != ExceptionCause::NONE)
