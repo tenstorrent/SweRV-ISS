@@ -1408,11 +1408,10 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 
   ULT narrow = 0;   // Unsigned narrow loaded value
   if (addr >= clintStart_ and addr < clintLimit_ and addr - clintStart_ >= 0xbff8)
-    {    // Fake time: use instruction count
-      if ((addr & 7) == 0)  // Multiple of 8
-	narrow = instCounter_ >> counterToTimeShift;
-      else if ((addr & 3) == 0)  // multiple of 4
-	narrow = instCounter_ >> (32 + counterToTimeShift);
+    {
+      uint64_t tm = instCounter_ >> counterToTimeShift; // Fake time: instr count
+      tm = tm >> (addr - 0xbff8) * 8;
+      narrow = tm;
     }
   else
     {
