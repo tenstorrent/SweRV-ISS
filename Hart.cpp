@@ -1257,10 +1257,6 @@ Hart<URV>::determineMisalStoreException(URV addr, unsigned accessSize) const
 
   uint64_t addr2 = addr + accessSize - 1;
 
-  // Misaligned access to PIC.
-  if (isAddrMemMapped(addr))
-    return ExceptionCause::STORE_ACC_FAULT;
-
   // Misaligned access to a region with side effect.
   if (not isAddrIdempotent(addr) or not isAddrIdempotent(addr2))
     return ExceptionCause::STORE_ADDR_MISAL;
@@ -1328,13 +1324,6 @@ Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
 	return ExceptionCause::LOAD_ACC_FAULT;
     }
 
-  // PIC access
-  if (isAddrMemMapped(addr))
-    {
-      if (privMode_ != PrivilegeMode::Machine)
-	return ExceptionCause::LOAD_ACC_FAULT;
-    }
-
   // Misaligned resulting in access fault exception.
   if (misal and cause != ExceptionCause::NONE)
     return cause;
@@ -1343,8 +1332,7 @@ Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(addr);
-      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_) and
-          not isAddrMemMapped(addr))
+      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
 	return ExceptionCause::LOAD_ACC_FAULT;
     }
 
@@ -10042,17 +10030,11 @@ Hart<URV>::determineStoreException(uint64_t& addr, STORE_TYPE& storeVal)
   if (not writeOk)
     return ExceptionCause::STORE_ACC_FAULT;
 
-  // PIC access
-  if (isAddrMemMapped(addr))
-    if (privMode_ != PrivilegeMode::Machine)
-      return ExceptionCause::STORE_ACC_FAULT;
-
   // Physical memory protection.
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(addr);
-      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_) and
-          not isAddrMemMapped(addr))
+      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
 	return ExceptionCause::STORE_ACC_FAULT;
     }
 
