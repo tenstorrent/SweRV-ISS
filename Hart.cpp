@@ -1647,15 +1647,14 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
     triggerTripped_ = true;
 
   // Determine if a store exception is possible.
-  STORE_TYPE maskedVal = storeVal;  // Masked store value.
   uint64_t addr = virtAddr;
-  ExceptionCause cause = determineStoreException(addr, maskedVal);
+  ExceptionCause cause = determineStoreException(addr, ldStSize_);
   ldStPhysAddr1_ = addr;
 
   // Consider store-data trigger if there is no trap or if the trap is
   // due to an external cause.
   if (hasTrig and cause == ExceptionCause::NONE)
-    if (ldStDataTriggerHit(maskedVal, timing, isLd, privMode_,
+    if (ldStDataTriggerHit(storeVal, timing, isLd, privMode_,
                            isInterruptEnabled()))
       triggerTripped_ = true;
   if (triggerTripped_)
@@ -9995,17 +9994,14 @@ Hart<URV>::execLhu(const DecodedInst* di)
 
 
 template <typename URV>
-template <typename STORE_TYPE>
 ExceptionCause
-Hart<URV>::determineStoreException(uint64_t& addr, STORE_TYPE& storeVal)
+Hart<URV>::determineStoreException(uint64_t& addr, unsigned stSize)
 {
-  unsigned stSize = sizeof(STORE_TYPE);
-
   addr = URV(addr);  // Truncate to 32 bits in 32-bit mode.
 
   // Misaligned store to io section causes an exception. Crossing
   // dccm to non-dccm causes an exception.
-  constexpr unsigned alignMask = sizeof(STORE_TYPE) - 1;
+  unsigned alignMask = stSize - 1;
   bool misal = addr & alignMask;
   misalignedLdSt_ = misal;
 
@@ -10754,40 +10750,6 @@ WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, uint32_t);
 template
 bool
 WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, uint64_t);
-
-
-template
-ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint8_t>(uint64_t&, uint8_t&);
-
-template
-ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint16_t>(uint64_t&, uint16_t&);
-
-template
-ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint32_t>(uint64_t&, uint32_t&);
-
-template
-ExceptionCause
-WdRiscv::Hart<uint32_t>::determineStoreException<uint64_t>(uint64_t&, uint64_t&);
-
-
-template
-ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint8_t>(uint64_t&, uint8_t&);
-
-template
-ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint16_t>(uint64_t&, uint16_t&);
-
-template
-ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint32_t>(uint64_t&, uint32_t&);
-
-template
-ExceptionCause
-WdRiscv::Hart<uint64_t>::determineStoreException<uint64_t>(uint64_t&, uint64_t&);
 
 
 template class WdRiscv::Hart<uint32_t>;

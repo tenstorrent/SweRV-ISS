@@ -1763,9 +1763,8 @@ namespace WdRiscv
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
-    template<typename STORE_TYPE>
     ExceptionCause determineStoreException(uint64_t& addr,
-					   STORE_TYPE& storeVal);
+					   unsigned stSize);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
