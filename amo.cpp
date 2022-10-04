@@ -70,7 +70,7 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStAddr_;
   ldStSize_ = 4;
   ldStAtomic_ = true;
 
@@ -83,7 +83,7 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 
   uint64_t addr = virtAddr;
   auto cause = validateAmoAddr(addr, ldStSize_);
-  ldStPhysAddr_ = addr;
+  ldStPhysAddr1_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
@@ -123,7 +123,7 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStAddr_;
   ldStSize_ = 8;
   ldStAtomic_ = true;
 
@@ -136,7 +136,7 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
 
   uint64_t addr = virtAddr;
   auto cause = validateAmoAddr(addr, ldStSize_);
-  ldStPhysAddr_ = addr;
+  ldStPhysAddr1_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
@@ -167,7 +167,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   URV virtAddr = intRegs_.read(rs1);
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStAddr_;
   ldStSize_ = sizeof(LOAD_TYPE);
   ldStAtomic_ = true;
 
@@ -185,12 +185,12 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
   unsigned ldSize = sizeof(LOAD_TYPE);
-  uint64_t addr = virtAddr;
-  auto cause = determineLoadException(addr, ldSize);
+  uint64_t addr = virtAddr, addr2 = virtAddr;
+  auto cause = determineLoadException(addr, addr2, ldSize);
   if (cause == ExceptionCause::LOAD_ADDR_MISAL and misalAtomicCauseAccessFault_)
     cause = ExceptionCause::LOAD_ACC_FAULT;
 
-  ldStPhysAddr_ = addr;
+  ldStPhysAddr1_ = addr;
 
   // Address outside DCCM causes an exception (this is swerv specific).
   bool fail = amoInDccmOnly_ and not isAddrInDccm(addr);
@@ -206,7 +206,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateLoadException(cause, virtAddr);
+      initiateLoadException(cause, addr);
       return false;
     }
 
@@ -254,7 +254,7 @@ Hart<URV>::execLr_w(const DecodedInst* di)
     return;
 
   unsigned size = 4;
-  uint64_t resAddr = ldStPhysAddr_; 
+  uint64_t resAddr = ldStPhysAddr1_; 
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of
@@ -275,7 +275,7 @@ bool
 Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
   ldStAtomic_ = true;
 
@@ -296,7 +296,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   uint64_t addr = virtAddr;
   auto cause = determineStoreException(addr, storeVal);
-  ldStPhysAddr_ = addr;
+  ldStPhysAddr1_ = addr;
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
       misalAtomicCauseAccessFault_)
     cause = ExceptionCause::STORE_ACC_FAULT;
@@ -536,7 +536,7 @@ Hart<URV>::execLr_d(const DecodedInst* di)
     return;
 
   unsigned size = 8;
-  uint64_t resAddr = ldStPhysAddr_; 
+  uint64_t resAddr = ldStPhysAddr1_; 
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of

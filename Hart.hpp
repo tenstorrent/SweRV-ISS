@@ -711,7 +711,7 @@ namespace WdRiscv
     {
       if (not ldStWrite_)
 	return 0;
-      addr = ldStPhysAddr_;
+      addr = ldStPhysAddr1_;
       value = ldStData_;
       return ldStSize_;
     }
@@ -735,7 +735,7 @@ namespace WdRiscv
       if (ldStSize_ == 0)
 	return 0;
       virtAddr = ldStAddr_;
-      physAddr = ldStPhysAddr_;
+      physAddr = ldStPhysAddr1_;
       return ldStSize_;
     }
 
@@ -1470,6 +1470,44 @@ namespace WdRiscv
 
   protected:
 
+    /// Read an item that may span 2 phsical pages.  If pa1 is the same as pa2
+    /// then the item is in one page: do a simple read.  If pa1 is different
+    /// from pa2, then the item crosses a page boundary: read the most sig
+    /// bytes from pa1 and the remaining from pa2.
+    template <typename LOAD_TYPE>
+    void memRead(uint64_t pa1, uint64_t pa2, LOAD_TYPE& value)
+    {
+      if (pa1 == pa2)
+	{
+	  if (not memory_.read(pa1, value))
+	    assert(0);
+	  return;
+	}
+      unsigned size = sizeof(value);
+      unsigned size1 = size - (pa1 & (size - 1));
+      unsigned size2 = size - size1;
+      if (size1 == 4 and size2 == 4)
+	{
+	  uint32_t val1 = 0, val2 = 0;
+	  if (not memory_.read(pa1, val1) or not memory_.read(pa2, val2))
+	    assert(0);
+	  value = (uint64_t(val1) << 32) | val2;
+	  return;
+	}
+
+      value = 0;
+      uint8_t byte = 0;
+      for (unsigned i = 0; i < size1; ++i)
+	if (memory_.read(pa1 + i, byte))
+	  value |= LOAD_TYPE(byte) << 8*i;
+	else assert(0);
+      for (unsigned i = 0; i < size2; ++i)
+	if (memory_.read(pa2 + i, byte))
+	  value |= LOAD_TYPE(byte) << 8*i;
+	else assert(0);
+    }
+
+
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)
     { privMode_ = m; }
@@ -1694,9 +1732,14 @@ namespace WdRiscv
 
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and
-    /// address translation is successful, then addr is changed to the
-    /// translated physical address.
-    ExceptionCause determineLoadException(uint64_t& addr, unsigned ldSize);
+    /// address translation is successful, then addr1 is changed to
+    /// the translated physical address and addr2 to the physical
+    /// address of the subsequent page in the case of page-crossing
+    /// access. If there is an exception, the addr1 is set to the
+    /// virtual address causing the trap. If no address translation or
+    /// no page crossing, then addr2 will be equal to addr1.
+    ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
+					  unsigned ldSize);
 
     /// Helepr to the cache block operaion (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, bool isRead);
@@ -4056,8 +4099,8 @@ namespace WdRiscv
     uint32_t prevPerfControl_ = ~0; // Value before current instruction.
 
     URV ldStAddr_ = 0;              // Addr of data of most recent ld/st inst.
-    URV ldStTrapAddr_ = 0;
-    uint64_t ldStPhysAddr_ = 0;
+    uint64_t ldStPhysAddr1_ = 0;    // Physical address
+    uint64_t ldStPhysAddr2_ = 0;    // Physical address of 2nd page across page boundary.
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing
     uint64_t ldStPrevData_ = 0;

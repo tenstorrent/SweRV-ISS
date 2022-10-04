@@ -13677,6 +13677,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	}
 
       auto cause = ExceptionCause::NONE;
+      uint64_t pa1 = 0, pa2 = 0; // Physical addresses or faulting virtual addresses.
 
       ELEM_TYPE elem = 0;
       if constexpr (sizeof(elem) > 8)
@@ -13684,28 +13685,28 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = 0;
-	      uint64_t physAddr = addr + n;
-              cause = determineLoadException(physAddr, 8);
+	      pa1 = pa2 = addr + n;
+	      cause = determineLoadException(pa1, pa2, 8);
               if (cause != ExceptionCause::NONE)
                 break;
-              memory_.read(physAddr, dword);
+	      memRead(pa1, pa2, dword);
               elem <<= 64;
               elem |= dword;
             }
         }
       else
         {
-	  uint64_t physAddr = addr;
-	  cause = determineLoadException(physAddr, sizeof(elem));
+	  pa1 = pa2 = addr;
+	  cause = determineLoadException(pa1, pa2, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(physAddr, elem);
+            memRead(pa1, pa2, elem);
         }
 
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           if (ix == 0 or not faultFirst)
-            initiateLoadException(cause, addr);
+            initiateLoadException(cause, pa1);
           return false;
         }
 
@@ -14048,31 +14049,32 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
 
-  // TODO check permissions, translate, ....
   for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
     {
       auto cause = ExceptionCause::NONE;
+      uint64_t pa1 = 0, pa2 = 0; // Physical addresses or faulting virtual addresses.
+
       ELEM_TYPE elem = 0;
       if constexpr (sizeof(elem) > 8)
         {
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = 0;
-	      uint64_t physAddr = addr + n;
-              cause = determineLoadException(physAddr, 8);
+	      pa1 = pa2 = addr + n;
+              cause = determineLoadException(pa1, pa2, 8);
               if (cause != ExceptionCause::NONE)
                 break;
-              memory_.read(physAddr, dword);
+              memRead(pa1, pa2, dword);
               elem <<= 64;
               elem |= dword;
             }
         }
       else
 	{
-	  uint64_t physAddr = addr;
-	  cause = determineLoadException(physAddr, sizeof(elem));
+	  pa1 = pa2 = addr;
+	  cause = determineLoadException(pa1, pa2, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(physAddr, elem);
+            memRead(pa1, pa2, elem);
 	}
 
       if (cause != ExceptionCause::NONE)
@@ -14383,6 +14385,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 	}
 
       auto cause = ExceptionCause::NONE;
+      uint64_t pa1 = 0, pa2 = 0; // Physical addresses or faulting virtual addresses.
 
       ELEM_TYPE elem = 0;
       if constexpr (sizeof(elem) > 8)
@@ -14390,27 +14393,27 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = 0;
-	      uint64_t eaddr = addr + n;
-              cause = determineLoadException(eaddr, 8);
+	      pa1 = pa2 = addr + n;
+              cause = determineLoadException(pa1, pa2, 8);
               if (cause != ExceptionCause::NONE)
                 return false;
-              memory_.read(eaddr, dword);
+              memRead(pa1, pa2, dword);
               elem <<= 64;
               elem |= dword;
             }
         }
       else
         {
-	  uint64_t eaddr = addr;
-          cause = determineLoadException(eaddr, sizeof(elem));
+	  pa1 = pa2 = addr;
+          cause = determineLoadException(pa1, pa2, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(eaddr, elem);
+            memRead(pa1, pa2, elem);
         }
 
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, addr);
+          initiateLoadException(cause, pa1);
           return false;
         }
 
@@ -14717,33 +14720,33 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
 
       uint64_t vaddr = addr + offset;
-      uint64_t paddr = vaddr;
+      uint64_t pa1 = 0, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
 
-      auto cause = determineLoadException(vaddr, elemSize);
+      auto cause = determineLoadException(pa1, pa2, elemSize);
       if (cause == ExceptionCause::NONE)
 	{
 	  if (elemSize == 1)
 	    {
 	      uint8_t x = 0;
-	      memory_.read(paddr, x);
+	      memRead(pa1, pa2, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else if (elemSize == 2)
 	    {
 	      uint16_t x = 0;
-	      memory_.read(paddr, x);
+	      memRead(pa1, pa2, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else if (elemSize == 4)
 	    {
 	      uint32_t x = 0;
-	      memory_.read(paddr, x);
+	      memRead(pa1, pa2, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else if (elemSize == 8)
 	    {
 	      uint64_t x = 0;
-	      memory_.read(paddr, x);
+	      memRead(pa1, pa2, x);
 	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
 	    }
 	  else
@@ -14752,7 +14755,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, vaddr);
+          initiateLoadException(cause, pa1);
           return false;
         }
 
@@ -15098,16 +15101,16 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    }
 
 	  ELEM_TYPE elem(0);
-	  uint64_t physAddr = faddr;
-	  auto cause = determineLoadException(physAddr, sizeof(elem));
+	  uint64_t pa1 = 0, pa2 = faddr; // Physical addresses or faulting virtual addresses.
+	  auto cause = determineLoadException(pa1, pa2, sizeof(elem));
 
 	  if (cause == ExceptionCause::NONE)
-            memory_.read(physAddr, elem);
+            memRead(pa1, pa2, elem);
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
-		initiateLoadException(cause, faddr);
+		initiateLoadException(cause, pa1);
 	      return false;
 	    }
 
@@ -15603,32 +15606,32 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	      continue;
 	    }
 
-	  uint64_t physAddr = faddr;
-          auto cause = determineLoadException(physAddr, elemSize);
+	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
+          auto cause = determineLoadException(pa1, pa2, elemSize);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      if (elemSize == 1)
 		{
 		  uint8_t x = 0;
-		  memory_.read(physAddr, x);
+		  memRead(pa1, pa2, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 2)
 		{
 		  uint16_t x = 0;
-		  memory_.read(physAddr, x);
+		  memRead(pa1, pa2, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 4)
 		{
 		  uint32_t x = 0;
-		  memory_.read(physAddr, x);
+		  memRead(pa1, pa2, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else if (elemSize == 8)
 		{
 		  uint64_t x = 0;
-		  memory_.read(physAddr, x);
+		  memRead(pa1, pa2, x);
 		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
 		}
 	      else
@@ -15637,7 +15640,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(cause, faddr);
+	      initiateLoadException(cause, pa1);
 	      return false;
 	    }
 

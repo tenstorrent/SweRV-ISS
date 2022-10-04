@@ -1283,11 +1283,10 @@ Hart<URV>::initiateStoreException(ExceptionCause cause, URV addr)
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineLoadException(uint64_t& addr1, unsigned ldSize)
+Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldSize)
 {
   addr1 = URV(addr1);      // Truncate to 32 bits in 32-bit mode.
-  uint64_t addr2 = addr1;  // Phys addr of 2nd page when crossing page boundary.
-  ldStTrapAddr_ = addr2;
+  addr2 = URV(addr1);      // Phys addr of 2nd page when crossing page boundary.
 
   // Misaligned load from io section triggers an exception. Crossing
   // dccm to non-dccm causes an exception.
@@ -1312,10 +1311,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, unsigned ldSize)
 	  uint64_t va = addr1;  // Virtual address
 	  cause = virtMem_.translateForLoad2(va, ldSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
-	    {
-	      ldStTrapAddr_ = addr1;
-	      return cause;
-	    }
+	    return cause;
         }
     }
 
@@ -1392,7 +1388,7 @@ bool
 Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
   ldStSize_ = sizeof(LOAD_TYPE);
 
 #ifdef FAST_SLOPPY
@@ -1409,19 +1405,21 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
   // Unsigned version of LOAD_TYPE
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
-  uint64_t addr = virtAddr;
-  auto cause = determineLoadException(addr, ldStSize_);
+  uint64_t addr1 = virtAddr;
+  uint64_t addr2 = addr1;
+  auto cause = determineLoadException(addr1, addr2, ldStSize_);
   if (cause != ExceptionCause::NONE)
     {
       if (triggerTripped_)
         return false;
-      initiateLoadException(cause, virtAddr);
+      initiateLoadException(cause, addr1);
       return false;
     }
-  ldStPhysAddr_ = addr;
+  ldStPhysAddr1_ = addr1;
+  ldStPhysAddr2_ = addr2;
 
   // Loading from console-io does a standard input read.
-  if (conIoValid_ and addr == conIo_ and enableConIn_ and not triggerTripped_)
+  if (conIoValid_ and addr1 == conIo_ and enableConIn_ and not triggerTripped_)
     {
       SRV val = fgetc(stdin);
       data = val;
@@ -1429,10 +1427,10 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
     }
 
   ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr >= clintStart_ and addr < clintLimit_ and addr - clintStart_ >= 0xbff8)
+  if (addr1 >= clintStart_ and addr1 < clintLimit_ and addr1 - clintStart_ >= 0xbff8)
     {
       uint64_t tm = instCounter_ >> counterToTimeShift; // Fake time: instr count
-      tm = tm >> (addr - 0xbff8) * 8;
+      tm = tm >> (addr1 - 0xbff8) * 8;
       narrow = tm;
     }
   else
@@ -1441,17 +1439,14 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
       if (mcm_)
 	{
 	  uint64_t mcmVal = 0;
-	  if (mcm_->getCurrentLoadValue(*this, addr, ldStSize_, mcmVal))
+	  if (mcm_->getCurrentLoadValue(*this, addr1, ldStSize_, mcmVal))
 	    {
 	      narrow = mcmVal;
 	      hasMcmVal = true;
 	    }
 	}
-      if (not hasMcmVal and not memory_.read(addr, narrow))
-	{
-	  assert(0);
-	  return false;
-	}
+      if (not hasMcmVal)
+	memRead(addr1, addr2, narrow);
     }
 
   data = narrow;
@@ -1510,7 +1505,7 @@ bool
 Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
 {
   ldStAddr_ = addr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr_ = addr;
+  ldStPhysAddr1_ = addr;
   ldStSize_ = sizeof(STORE_TYPE);
   ldStData_ = storeVal;
 
@@ -1639,7 +1634,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
@@ -1655,7 +1650,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   STORE_TYPE maskedVal = storeVal;  // Masked store value.
   uint64_t addr = virtAddr;
   ExceptionCause cause = determineStoreException(addr, maskedVal);
-  ldStPhysAddr_ = addr;
+  ldStPhysAddr1_ = addr;
 
   // Consider store-data trigger if there is no trap or if the trap is
   // due to an external cause.
@@ -4567,9 +4562,9 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
   if (ldStWrite_)
     {
       record.memSize = ldStSize_;
-      record.memAddr = ldStPhysAddr_;
+      record.memAddr = ldStPhysAddr1_;
       record.memValue = ldStData_;
-      uint64_t addr = ldStPhysAddr_;
+      uint64_t addr = ldStPhysAddr1_;
       uint64_t value = ldStPrevData_;
       for (size_t i = 0; i < ldStSize_; ++i, ++addr)
 	{

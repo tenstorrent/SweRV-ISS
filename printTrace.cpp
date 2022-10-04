@@ -310,7 +310,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       if (pending)
 	fprintf(out, "  +\n");
       formatInstTrace<URV>(out, tag, hartIx_, lastPriv_, currPc_, instBuff, 'm',
-			   URV(ldStPhysAddr_), URV(ldStData_), tmp.c_str());
+			   URV(ldStPhysAddr1_), URV(ldStData_), tmp.c_str());
       pending = true;
     }
 
