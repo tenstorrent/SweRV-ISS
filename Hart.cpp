@@ -1292,7 +1292,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 
   // Misaligned load from io section triggers an exception. Crossing
   // dccm to non-dccm causes an exception.
-  unsigned alignMask = ldSize - 1;
+  uint64_t alignMask = ldSize - 1;
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
