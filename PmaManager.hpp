@@ -201,13 +201,16 @@ namespace WdRiscv
     bool writeRegister(uint64_t addr, uint32_t value);
 
     /// Similar to writeRgister but no masking is applied to value.
-    bool writeRegisterNoMask(uint64_t addr, uint32_t value);
+    bool pokeRegister(uint64_t addr, uint32_t value);
 
     /// Set the value of the memory mapped regiser byte at addr to the
     /// given value applying masking and returning true if addr is
     /// valid. Return false if addr is not a memory mapped reg leaving
     /// vlaue unmodified.
     bool writeRegisterByte(uint64_t addr, uint8_t value);
+
+    /// Similar to writeRgisterByte but no masking is applied to value.
+    bool pokeRegisterByte(uint64_t addr, uint8_t value);
 
   private:
 

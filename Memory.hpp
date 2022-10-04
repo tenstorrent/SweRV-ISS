@@ -195,18 +195,16 @@ namespace WdRiscv
     }
 
     /// Return true if write will be successful if tried. Do not
-    /// write.  Change value to the maksed value if write is to a
-    /// memory mapped register.
-    template <typename T>
-    bool checkWrite(uint64_t address, T& value)
+    /// write.
+    bool checkWrite(uint64_t address, unsigned writeSize)
     {
       Pma pma1 = pmaMgr_.getPma(address);
       if (not pma1.isWrite())
 	return false;
 
-      if (address & (sizeof(T) - 1))  // If address is misaligned
+      if (address & (writeSize - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+          Pma pma2 = pmaMgr_.getPma(address + writeSize - 1);
           if (pma1 != pma2)
             return false;
 	}
@@ -214,11 +212,10 @@ namespace WdRiscv
       // Memory mapped region accessible only with word-size write.
       if (pma1.isMemMappedReg())
         {
-          if constexpr (sizeof(T) != 4)
+          if (writeSize != 4)
             return false;
           if ((address & 3) != 0)
             return false;
-          value = doRegisterMasking(address, value);
         }
 
       return true;
@@ -547,9 +544,15 @@ namespace WdRiscv
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.isMemMappedReg())
         {
-          if constexpr (sizeof(T) != 4)
-            return false;
-          return pmaMgr_.writeRegisterNoMask(address, value);
+          if (sizeof(T) == 4)
+	    return pmaMgr_.pokeRegister(address, value);
+	  for (unsigned i = 0; i < sizeof(T); ++i)
+	    {
+	      uint8_t byte = (value >> (i*8)) & 0xff;
+	      if (not pmaMgr_.pokeRegisterByte(address + i, byte))
+		return false;
+	    }
+	  return true;
         }
 
       if (usePma)

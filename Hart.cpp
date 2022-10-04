@@ -10033,7 +10033,7 @@ Hart<URV>::determineStoreException(uint64_t& addr, STORE_TYPE& storeVal)
         }
     }
 
-  writeOk = memory_.checkWrite(addr, storeVal);
+  writeOk = memory_.checkWrite(addr, stSize);
   if (not writeOk)
     return ExceptionCause::STORE_ACC_FAULT;
 
