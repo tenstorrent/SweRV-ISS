@@ -1283,20 +1283,22 @@ Hart<URV>::initiateStoreException(ExceptionCause cause, URV addr)
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
+Hart<URV>::determineLoadException(uint64_t& addr1, unsigned ldSize)
 {
-  addr = URV(addr);   // Truncate to 32 bits in 32-bit mode.
+  addr1 = URV(addr1);      // Truncate to 32 bits in 32-bit mode.
+  uint64_t addr2 = addr1;  // Phys addr of 2nd page when crossing page boundary.
+  ldStTrapAddr_ = addr2;
 
   // Misaligned load from io section triggers an exception. Crossing
   // dccm to non-dccm causes an exception.
   unsigned alignMask = ldSize - 1;
-  bool misal = addr & alignMask;
+  bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
   ExceptionCause cause = ExceptionCause::NONE;
   if (misal)
     {
-      cause = determineMisalLoadException(addr, ldSize);
+      cause = determineMisalLoadException(addr1, ldSize);
       if (cause == ExceptionCause::LOAD_ADDR_MISAL)
         return cause;  // Misaligned resulting in misaligned-adddress-exception
     }
@@ -1307,11 +1309,13 @@ Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
       PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-          uint64_t pa = 0;
-          cause = virtMem_.translateForLoad(addr, mode, pa);
+	  uint64_t va = addr1;  // Virtual address
+	  cause = virtMem_.translateForLoad2(va, ldSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
-            return cause;
-          addr = pa;
+	    {
+	      ldStTrapAddr_ = addr1;
+	      return cause;
+	    }
         }
     }
 
@@ -1319,16 +1323,34 @@ Hart<URV>::determineLoadException(uint64_t& addr, unsigned ldSize)
   if (misal and cause != ExceptionCause::NONE)
     return cause;
 
-  // Physical memory protection.
+  // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(addr);
+      Pmp pmp = pmpManager_.accessPmp(addr1);
       if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
 	return ExceptionCause::LOAD_ACC_FAULT;
+      if (misal or addr1 != addr2)
+	{
+	  pmp = pmpManager_.accessPmp(addr2);
+	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+	    return ExceptionCause::LOAD_ACC_FAULT;
+	}
     }
 
-  if (not memory_.checkRead(addr, ldSize))
-    return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+  if (not misal)
+    {
+      if (not memory_.checkRead(addr1, ldSize))
+	return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+    }
+  else
+    {
+      unsigned size1 = ldSize - (addr1 & (ldSize - 1));
+      if (not memory_.checkRead(addr1, addr1 & (ldSize - 1)))
+	return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+      uint64_t aa = addr1 == addr2? addr1 : addr2;
+      if (not memory_.checkRead(aa, ldSize - size1))
+	return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+    }
 
   return ExceptionCause::NONE;
 }

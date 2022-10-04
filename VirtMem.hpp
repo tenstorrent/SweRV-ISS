@@ -545,18 +545,42 @@ namespace WdRiscv
     /// check for read access if the read flag is true (similary also
     /// check for write access is the write flag is true ...).  Return
     /// encoutered exception on failure or ExceptionType::NONE on
-    /// success.
+    /// success. Does not check for page crossing.
     ExceptionCause translate(uint64_t va, PrivilegeMode pm, bool read,
                              bool write, bool exec, uint64_t& pa);
 
     /// Same as translate but only check for execute access.
     ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, uint64_t& pa);
 
+    /// Same as translate but only check for execute access and page
+    /// crossing.  On success pa1 has the physical address and pa2 has
+    /// a copy of pa1 or the physical address of the subsequent page
+    /// if the access crosses a page boundary. On Fail pa1 has the
+    /// virtual faulting address.
+    ExceptionCause translateForFetch2(uint64_t va, unsigned size, PrivilegeMode pm,
+				      uint64_t& pa1, uint64_t& pa2);
+
     /// Same as translate but only check for read access.
     ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, uint64_t& pa);
 
+    /// Same as translate but only check for read access and page
+    /// crossing.  On success pa1 has the physical address and pa2 has
+    /// a copy of pa1 or the physical address of the subsequent page
+    /// if the access crosses a page boundary. On Fail pa1 has the
+    /// virtual faulting address.
+    ExceptionCause translateForLoad2(uint64_t va, unsigned size, PrivilegeMode pm,
+				     uint64_t& pa1, uint64_t& pa2);
+
     /// Same as translate but only check for write access.
     ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+
+    /// Same as translate but only check for write access and page
+    /// crossing.  On success pa1 has the physical address and pa2 has
+    /// a copy of pa1 or the physical address of the subsequent page
+    /// if the access crosses a page boundary. On Fail pa1 has the
+    /// virtual faulting address.
+    ExceptionCause translateForStore2(uint64_t va, unsigned size, PrivilegeMode pm,
+				      uint64_t& pa1, uint64_t& pa2);
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)

@@ -4056,6 +4056,7 @@ namespace WdRiscv
     uint32_t prevPerfControl_ = ~0; // Value before current instruction.
 
     URV ldStAddr_ = 0;              // Addr of data of most recent ld/st inst.
+    URV ldStTrapAddr_ = 0;
     uint64_t ldStPhysAddr_ = 0;
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing

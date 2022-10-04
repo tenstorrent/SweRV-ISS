@@ -83,6 +83,34 @@ VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 }
 
 
+ExceptionCause
+VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
+			    uint64_t& pa1, uint64_t& pa2)
+{
+  pa1 = pa2 = va;
+  auto cause = translateForFetch(va, priv, pa1);
+  if (cause != ExceptionCause::NONE)
+    return cause;
+
+  pa2 = pa1;
+  unsigned excess = va & (size - 1);  // va modulo size
+
+  if (excess == 0)
+    return ExceptionCause::NONE;
+
+  // Misaligned acces. Check if crossing page boundary.
+  uint64_t n1 = pageNumber(va);
+  uint64_t n2 = pageNumber(va + size - 1);
+  if (n1 == n2)
+    return ExceptionCause::NONE;  // Not page crossing
+
+  cause = translateForFetch(va + size - 1, priv, pa2);
+  if (cause != ExceptionCause::NONE)
+    pa1 = pa2 = va + size - excess;
+
+  return cause;
+}
+
 
 ExceptionCause
 VirtMem::translateForLoad(uint64_t va, PrivilegeMode priv, uint64_t& pa)
@@ -121,6 +149,35 @@ VirtMem::translateForLoad(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 
 
 ExceptionCause
+VirtMem::translateForLoad2(uint64_t va, unsigned size, PrivilegeMode priv,
+			   uint64_t& pa1, uint64_t& pa2)
+{
+  pa1 = pa2 = va;
+  auto cause = translateForLoad(va, priv, pa1);
+  if (cause != ExceptionCause::NONE)
+    return cause;
+
+  pa2 = pa1;
+  unsigned excess = va & (size - 1);  // va modulo size
+
+  if (excess == 0)
+    return ExceptionCause::NONE;
+
+  // Misaligned acces. Check if crossing page boundary.
+  uint64_t n1 = pageNumber(va);
+  uint64_t n2 = pageNumber(va + size - 1);
+  if (n1 == n2)
+    return ExceptionCause::NONE;  // Not page crossing
+
+  cause = translateForLoad(va + size - 1, priv, pa2);
+  if (cause != ExceptionCause::NONE)
+    pa1 = pa2 = va + size - excess;
+
+  return cause;
+}
+
+
+ExceptionCause
 VirtMem::translateForStore(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 {
   if (mode_ == Bare)
@@ -153,6 +210,35 @@ VirtMem::translateForStore(uint64_t va, PrivilegeMode priv, uint64_t& pa)
     }
 
   return pageTableWalkUpdateTlb(va, priv, false, true, false, pa);
+}
+
+
+ExceptionCause
+VirtMem::translateForStore2(uint64_t va, unsigned size, PrivilegeMode priv,
+			    uint64_t& pa1, uint64_t& pa2)
+{
+  pa1 = pa2 = va;
+  auto cause = translateForStore(va, priv, pa1);
+  if (cause != ExceptionCause::NONE)
+    return cause;
+
+  pa2 = pa1;
+  unsigned excess = va & (size - 1);  // va modulo size
+
+  if (excess == 0)
+    return ExceptionCause::NONE;
+
+  // Misaligned acces. Check if crossing page boundary.
+  uint64_t n1 = pageNumber(va);
+  uint64_t n2 = pageNumber(va + size - 1);
+  if (n1 == n2)
+    return ExceptionCause::NONE;  // Not page crossing
+
+  cause = translateForStore(va + size - 1, priv, pa2);
+  if (cause != ExceptionCause::NONE)
+    pa1 = pa2 = va + size - excess;
+
+  return cause;
 }
 
 
