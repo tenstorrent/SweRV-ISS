@@ -31,7 +31,8 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
 {
   URV mask = URV(accessSize) - 1;
 
-  auto cause = determineStoreException(addr, accessSize);
+  uint64_t addr2 = addr;
+  auto cause = determineStoreException(addr, addr2, accessSize);
 
   if (cause == ExceptionCause::STORE_ADDR_MISAL)
     {
@@ -61,6 +62,7 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
+  ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = 4;
   ldStAtomic_ = true;
 
@@ -74,11 +76,12 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
   uint64_t addr = virtAddr;
   auto cause = validateAmoAddr(addr, ldStSize_);
   ldStPhysAddr1_ = addr;
+  ldStPhysAddr2_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr);
+        initiateLoadException(cause, addr);
       return false;
     }
 
@@ -114,6 +117,7 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
+  ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = 8;
   ldStAtomic_ = true;
 
@@ -127,11 +131,12 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
   uint64_t addr = virtAddr;
   auto cause = validateAmoAddr(addr, ldStSize_);
   ldStPhysAddr1_ = addr;
+  ldStPhysAddr2_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, virtAddr);
+        initiateLoadException(cause, addr);
       return false;
     }
 
@@ -158,6 +163,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
+  ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(LOAD_TYPE);
   ldStAtomic_ = true;
 
@@ -174,29 +180,29 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   // Unsigned version of LOAD_TYPE
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
-  unsigned ldSize = sizeof(LOAD_TYPE);
-  uint64_t addr = virtAddr, addr2 = virtAddr;
-  auto cause = determineLoadException(addr, addr2, ldSize);
+  uint64_t addr1 = virtAddr, addr2 = virtAddr;
+  auto cause = determineLoadException(addr1, addr2, ldStSize_);
   if (cause == ExceptionCause::LOAD_ADDR_MISAL and misalAtomicCauseAccessFault_)
     cause = ExceptionCause::LOAD_ACC_FAULT;
 
-  ldStPhysAddr1_ = addr;
+  ldStPhysAddr1_ = addr1;
+  ldStPhysAddr1_ = addr2;
 
   // Address outside DCCM causes an exception (this is swerv specific).
-  bool fail = amoInDccmOnly_ and not isAddrInDccm(addr);
+  bool fail = amoInDccmOnly_ and not isAddrInDccm(addr1);
 
   // Access must be naturally aligned.
-  if ((addr & (ldSize - 1)) != 0)
+  if ((addr1 & (ldStSize_ - 1)) != 0)
     fail = true;
 
-  fail = fail or not memory_.pmaMgr_.getPma(addr).isRsrv();
+  fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::LOAD_ACC_FAULT;
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateLoadException(cause, addr);
+      initiateLoadException(cause, virtAddr);
       return false;
     }
 
@@ -205,14 +211,14 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   if (mcm_)
     {
       uint64_t mcmVal = 0;
-      if (mcm_->getCurrentLoadValue(*this, addr, ldStSize_, mcmVal))
+      if (mcm_->getCurrentLoadValue(*this, addr1, ldStSize_, mcmVal))
 	{
 	  uval = mcmVal;
 	  hasMcmVal = true;
 	}
     }
 
-  if (not hasMcmVal and not memory_.read(addr, uval))
+  if (not hasMcmVal and not memory_.read(addr1, uval))
     {
       assert(0);
       return false;
@@ -244,7 +250,7 @@ Hart<URV>::execLr_w(const DecodedInst* di)
     return;
 
   unsigned size = 4;
-  uint64_t resAddr = ldStPhysAddr1_; 
+  uint64_t resAddr = ldStPhysAddr1_;
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of
@@ -266,6 +272,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
+  ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
   ldStAtomic_ = true;
 
@@ -284,15 +291,16 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   bool misal = virtAddr & alignMask;
   misalignedLdSt_ = misal;
 
-  uint64_t addr = virtAddr;
-  auto cause = determineStoreException(addr, sizeof(storeVal));
-  ldStPhysAddr1_ = addr;
+  uint64_t addr1 = virtAddr, addr2 = virtAddr;
+  auto cause = determineStoreException(addr1, addr2, sizeof(storeVal));
+  ldStPhysAddr1_ = addr1;
+  ldStPhysAddr2_ = addr2;
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
       misalAtomicCauseAccessFault_)
     cause = ExceptionCause::STORE_ACC_FAULT;
 
-  bool fail = misal or (amoInDccmOnly_ and not isAddrInDccm(addr));
-  fail = fail or not memory_.pmaMgr_.getPma(addr).isRsrv();
+  bool fail = misal or (amoInDccmOnly_ and not isAddrInDccm(addr1));
+  fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::STORE_ACC_FAULT;
@@ -311,19 +319,19 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
       return false;
     }
 
-  if (not memory_.hasLr(hartIx_, addr, sizeof(storeVal)))
+  if (not memory_.hasLr(hartIx_, addr1, sizeof(storeVal)))
     return false;
 
   STORE_TYPE prev = 0;
-  memory_.peek(addr, prev, false /*usePma*/);
+  memory_.peek(addr1, prev, false /*usePma*/);
   ldStData_ = storeVal;
   ldStPrevData_ = prev;
   ldStWrite_ = true;
 
   // If we write to special location, end the simulation.
-  if (toHostValid_ and addr == toHost_ and storeVal != 0)
+  if (toHostValid_ and addr1 == toHost_ and storeVal != 0)
     {
-      if (not memory_.write(hartIx_, addr, storeVal))
+      if (not memory_.write(hartIx_, addr1, storeVal))
 	assert(0);
       throw CoreException(CoreException::Stop, "write to to-host",
 			  toHost_, storeVal);
@@ -332,7 +340,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (mcm_)
     return true;  // Memory updated when merge buffer is written.
 
-  if (not memory_.write(hartIx_, addr, storeVal))
+  if (not memory_.write(hartIx_, addr1, storeVal))
     assert(0);
 
   invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));

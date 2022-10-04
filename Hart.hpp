@@ -1470,10 +1470,11 @@ namespace WdRiscv
 
   protected:
 
-    /// Read an item that may span 2 phsical pages.  If pa1 is the same as pa2
-    /// then the item is in one page: do a simple read.  If pa1 is different
-    /// from pa2, then the item crosses a page boundary: read the most sig
-    /// bytes from pa1 and the remaining from pa2.
+    /// Read an item that may span 2 physical pages. If pa1 is the
+    /// same as pa2 then the item is in one page: do a simple read. If
+    /// pa1 is different from pa2, then the item crosses a page
+    /// boundary: read the most sig bytes from pa1 and the remaining
+    /// bytes from pa2.
     template <typename LOAD_TYPE>
     void memRead(uint64_t pa1, uint64_t pa2, LOAD_TYPE& value)
     {
@@ -1505,6 +1506,67 @@ namespace WdRiscv
 	if (memory_.read(pa2 + i, byte))
 	  value |= LOAD_TYPE(byte) << 8*i;
 	else assert(0);
+    }
+
+
+    /// Write an item that may span 2 physical pages. See memRead.
+    template <typename STORE_TYPE>
+    void memWrite(uint64_t pa1, uint64_t pa2, STORE_TYPE value)
+    {
+      if (pa1 == pa2)
+	{
+	  if (not memory_.write(hartIx_, pa1, value))
+	    assert(0);
+	  return;
+	}
+      unsigned size = sizeof(value);
+      unsigned size1 = size - (pa1 & (size - 1));
+      unsigned size2 = size - size1;
+      if constexpr (sizeof(STORE_TYPE) == 8)
+	if (size1 == 4 and size2 == 4)
+	  {
+	    uint32_t val1 = value, val2 = value >> 32;
+	    if (not memory_.write(hartIx_, pa1, val1) or not memory_.write(hartIx_, pa2, val2))
+	      assert(0);
+	    return;
+	  }
+
+      for (unsigned i = 0; i < size1; ++i, value >>= 8)
+	if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
+	  assert(0);
+      for (unsigned i = 0; i < size2; ++i, value >>= 8)
+	if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
+	  assert(0);
+    }
+
+    /// Peek an item that may span 2 physical pages. See memRead.
+    template <typename LOAD_TYPE>
+    void memPeek(uint64_t pa1, uint64_t pa2, LOAD_TYPE& value, bool usePma)
+    {
+      if (pa1 == pa2)
+	{
+	  memory_.peek(pa1, value, usePma);
+	  return;
+	}
+      unsigned size = sizeof(value);
+      unsigned size1 = size - (pa1 & (size - 1));
+      unsigned size2 = size - size1;
+      if (size1 == 4 and size2 == 4)
+	{
+	  uint32_t val1 = 0, val2 = 0;
+	  memory_.peek(pa1, val1, usePma); memory_.peek(pa2, val2, usePma);
+	  value = (uint64_t(val1) << 32) | val2;
+	  return;
+	}
+
+      value = 0;
+      uint8_t byte = 0;
+      for (unsigned i = 0; i < size1; ++i)
+	if (memory_.peek(pa1 + i, byte, usePma))
+	  value |= LOAD_TYPE(byte) << 8*i;
+      for (unsigned i = 0; i < size2; ++i)
+	if (memory_.peek(pa2 + i, byte, usePma))
+	  value |= LOAD_TYPE(byte) << 8*i;
     }
 
 
@@ -1763,7 +1825,7 @@ namespace WdRiscv
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
-    ExceptionCause determineStoreException(uint64_t& addr,
+    ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
 					   unsigned stSize);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.

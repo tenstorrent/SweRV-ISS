@@ -1285,8 +1285,10 @@ template <typename URV>
 ExceptionCause
 Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldSize)
 {
-  addr1 = URV(addr1);      // Truncate to 32 bits in 32-bit mode.
-  addr2 = URV(addr1);      // Phys addr of 2nd page when crossing page boundary.
+  uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
+  uint64_t va2 = va1;
+  addr1 = va1;
+  addr2 = va2;  // Phys addr of 2nd page when crossing page boundary.
 
   // Misaligned load from io section triggers an exception. Crossing
   // dccm to non-dccm causes an exception.
@@ -1300,6 +1302,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       cause = determineMisalLoadException(addr1, ldSize);
       if (cause == ExceptionCause::LOAD_ADDR_MISAL)
         return cause;  // Misaligned resulting in misaligned-adddress-exception
+      va2 = (va1 + ldSize) & ~alignMask;
     }
 
   // Address translation
@@ -1308,8 +1311,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-	  uint64_t va = addr1;  // Virtual address
-	  cause = virtMem_.translateForLoad2(va, ldSize, mode, addr1, addr2);
+	  cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
 	    return cause;
         }
@@ -1324,12 +1326,18 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
     {
       Pmp pmp = pmpManager_.accessPmp(addr1);
       if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
-	return ExceptionCause::LOAD_ACC_FAULT;
+	{
+	  addr1 = va1;
+	  return ExceptionCause::LOAD_ACC_FAULT;
+	}
       if (misal or addr1 != addr2)
 	{
 	  pmp = pmpManager_.accessPmp(addr2);
 	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
-	    return ExceptionCause::LOAD_ACC_FAULT;
+	    {
+	      addr1 = va2;
+	      return ExceptionCause::LOAD_ACC_FAULT;
+	    }
 	}
     }
 
@@ -1340,12 +1348,18 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
     }
   else
     {
-      unsigned size1 = ldSize - (addr1 & (ldSize - 1));
-      if (not memory_.checkRead(addr1, addr1 & (ldSize - 1)))
-	return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
-      uint64_t aa = addr1 == addr2? addr1 : addr2;
-      if (not memory_.checkRead(aa, ldSize - size1))
-	return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+      uint64_t aligned = addr1 & ~alignMask;
+      if (not memory_.checkRead(aligned, ldSize))
+	{
+	  addr1 = va1;
+	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	}
+      uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+      if (not memory_.checkRead(next, ldSize))
+	{
+	  addr1 = va2;
+	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	}
     }
 
   return ExceptionCause::NONE;
@@ -1647,9 +1661,10 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
     triggerTripped_ = true;
 
   // Determine if a store exception is possible.
-  uint64_t addr = virtAddr;
-  ExceptionCause cause = determineStoreException(addr, ldStSize_);
-  ldStPhysAddr1_ = addr;
+  uint64_t addr1 = virtAddr, addr2 = virtAddr;
+  ExceptionCause cause = determineStoreException(addr1, addr2, ldStSize_);
+  ldStPhysAddr1_ = addr1;
+  ldStPhysAddr2_ = addr2;
 
   // Consider store-data trigger if there is no trap or if the trap is
   // due to an external cause.
@@ -1662,23 +1677,23 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateStoreException(cause, virtAddr);
+      initiateStoreException(cause, addr1);
       return false;
     }
 
   STORE_TYPE temp = 0;
-  memory_.peek(addr, temp, false /*usePma*/);
+  memPeek(addr1, addr2, temp, false /*usePma*/);
   ldStPrevData_ = temp;
 
   // If we write to special location, end the simulation.
-  if (toHostValid_ and addr == toHost_)
+  if (toHostValid_ and addr1 == toHost_)
     {
-      handleStoreToHost(addr, storeVal);
+      handleStoreToHost(addr1, storeVal);
       return true;
     }
 
   // If addr is special location, then write to console.
-  if (conIoValid_ and addr == conIo_)
+  if (conIoValid_ and addr1 == conIo_)
     {
       if (consoleOut_)
 	{
@@ -1689,7 +1704,9 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       return true;
     }
 
-  memory_.invalidateOtherHartLr(hartIx_, addr, ldStSize_);
+  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+  if (addr2 != addr1)
+    memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
   invalidateDecodeCache(virtAddr, ldStSize_);
 
   if (mcm_)
@@ -1699,27 +1716,23 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
       return true;  // Memory updated when merge buffer is written.
     }
 
-  if (addr >= clintStart_ and addr < clintLimit_)
+  if (addr1 >= clintStart_ and addr1 < clintLimit_)
     {
+      assert(addr1 == addr2);
       URV val = storeVal;
-      processClintWrite(addr, ldStSize_, val);
+      processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
     }
 
-  if (hasInterruptor_ and addr == interruptor_ and ldStSize_ == 4)
+  if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
     processInterruptorWrite(storeVal);
 
-  if (memory_.write(hartIx_, addr, storeVal))
-    {
-      ldStWrite_ = true;
-      memory_.peek(addr, temp, false /*usePma*/);
-      ldStData_ = temp;
-      return true;
-    }
+  memWrite(addr1, addr2, storeVal);
+  ldStWrite_ = true;
+  memPeek(addr1, addr2, temp, false /*usePma*/);
+  ldStData_ = temp;
+  return true;
 
-  // Store failed: Take exception. Should not happen but we are paranoid.
-  initiateStoreException(ExceptionCause::STORE_ACC_FAULT, virtAddr);
-  return false;
 #endif
 }
 
@@ -9995,25 +10008,26 @@ Hart<URV>::execLhu(const DecodedInst* di)
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineStoreException(uint64_t& addr, unsigned stSize)
+Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
+				   unsigned stSize)
 {
-  addr = URV(addr);  // Truncate to 32 bits in 32-bit mode.
+  uint64_t va1 = URV(addr1); // Virtual address. Truncate to 32-bits in 32-bit mode.
+  uint64_t va2 = va1;        // Used if crossing page boundary
+  addr1 = va1;
+  addr2 = va2;
 
-  // Misaligned store to io section causes an exception. Crossing
-  // dccm to non-dccm causes an exception.
-  unsigned alignMask = stSize - 1;
-  bool misal = addr & alignMask;
+  uint64_t alignMask = stSize - 1;
+  bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
   ExceptionCause cause = ExceptionCause::NONE;
   if (misal)
     {
-      cause = determineMisalStoreException(addr, stSize);
+      cause = determineMisalStoreException(addr1, stSize);
       if (cause == ExceptionCause::NONE)
         return cause;
+      va2 = (va1 + stSize) & ~alignMask;
     }
-
-  bool writeOk = false;
 
   // Address translation
   if (isRvs())
@@ -10021,24 +10035,56 @@ Hart<URV>::determineStoreException(uint64_t& addr, unsigned stSize)
       PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-          uint64_t pa = 0;
-          cause = virtMem_.translateForStore(addr, mode, pa);
+          cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
             return cause;
-          addr = pa;
         }
     }
 
-  writeOk = memory_.checkWrite(addr, stSize);
-  if (not writeOk)
-    return ExceptionCause::STORE_ACC_FAULT;
-
-  // Physical memory protection.
+  // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(addr);
+      Pmp pmp = pmpManager_.accessPmp(addr1);
       if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
-	return ExceptionCause::STORE_ACC_FAULT;
+	{
+	  addr1 = va1;
+	  return ExceptionCause::STORE_ACC_FAULT;
+	}
+      if (misal or addr1 != addr2)
+	{
+	  uint64_t aligned = addr1 & ~alignMask;
+	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
+  	  pmp = pmpManager_.accessPmp(next);
+	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+	    {
+	      addr1 = va2;
+	      return ExceptionCause::LOAD_ACC_FAULT;
+	    }
+	}
+    }
+
+  if (not misal)
+    {
+      if (not memory_.checkWrite(addr1, stSize))
+	{
+	  addr1 = va1;
+	  return ExceptionCause::STORE_ACC_FAULT;
+	}
+    }
+  else
+    {
+      uint64_t aligned = addr1 & ~alignMask;
+      if (not memory_.checkWrite(aligned, stSize))
+	{
+	  addr1 = va1;
+	  return ExceptionCause::STORE_ACC_FAULT;
+	}
+      uint64_t next = addr1 == addr2? aligned + stSize : addr2;
+      if (not memory_.checkRead(next, stSize))
+	{
+	  addr1 = va2;
+	  return ExceptionCause::STORE_ACC_FAULT;
+	}
     }
 
   return ExceptionCause::NONE;

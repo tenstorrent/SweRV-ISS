@@ -13845,31 +13845,31 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
         }
 
       auto cause = ExceptionCause::NONE;
+      uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
 
       if constexpr (sizeof(elem) > 8)
         {
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = uint64_t(elem);
-	      uint64_t dwordAddr = addr + n;
-              cause = determineStoreException(dwordAddr, sizeof(dword));
+	      pa1 = pa2 = addr + n;
+              cause = determineStoreException(pa1, pa2, sizeof(dword));
               if (cause != ExceptionCause::NONE)
                 break;
 
-              memory_.write(hartIx_, dwordAddr, dword);
+              memWrite(pa1, pa2, dword);
               elem >>= 64;
             }
         }
       else
         {
-	  uint64_t eaddr = addr;
-          cause = determineStoreException(eaddr, sizeof(elem));
+          cause = determineStoreException(pa1, pa2, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memory_.write(hartIx_, eaddr, elem);
+	      memWrite(pa1, pa2, elem);
 
 	      vecRegs_.ldStSize_ = sizeof(elem);
-	      vecRegs_.ldStAddr_.push_back(eaddr);
+	      vecRegs_.ldStAddr_.push_back(addr);
 	      vecRegs_.stData_.push_back(elem);
 	    }
         }
@@ -13877,7 +13877,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, addr);
+          initiateStoreException(cause, pa1);
 	  assert(errors == 0);
           return false;
         }
@@ -14201,12 +14201,11 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
           return false;
         }
 
-      uint64_t physAddr = addr;
-      auto cause = determineStoreException(physAddr, sizeof(elem));
+      uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
+      auto cause = determineStoreException(pa1, pa2, sizeof(elem));
       if (cause == ExceptionCause::NONE)
 	{
-	  memory_.write(hartIx_, physAddr, elem);
-
+	  memWrite(pa1, pa2, elem);
 	  vecRegs_.ldStSize_ = sizeof(elem);
 	  vecRegs_.ldStAddr_.push_back(addr);
 	  vecRegs_.stData_.push_back(elem);
@@ -14214,7 +14213,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, addr);
+          initiateStoreException(cause, pa1);
           return false;
         }
     }
@@ -14557,30 +14556,29 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
         }
 
       auto cause = ExceptionCause::NONE;
+      uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
 
       if constexpr (sizeof(elem) > 8)
         {
           for (unsigned n = 0; n < sizeof(elem); n += 8)
             {
               uint64_t dword = uint64_t(elem);
-	      uint64_t eaddr = addr + n;
-              cause = determineStoreException(eaddr, sizeof(dword));
+	      pa1 = pa2 = addr + n;
+              cause = determineStoreException(pa1, pa2, sizeof(dword));
               if (cause != ExceptionCause::NONE)
                 return false;
-              memory_.write(hartIx_, eaddr, dword);
+              memWrite(pa1, pa2, dword);
               elem >>= 64;
             }
         }
       else
 	{
-	  uint64_t eaddr = addr;
-	  cause = determineStoreException(eaddr, sizeof(elem));
+	  cause = determineStoreException(pa1, pa2, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memory_.write(hartIx_, eaddr, elem);
-
+	      memWrite(pa1, pa2, elem);
 	      vecRegs_.ldStSize_ = sizeof(elem);
-	      vecRegs_.ldStAddr_.push_back(eaddr);
+	      vecRegs_.ldStAddr_.push_back(addr);
 	      vecRegs_.stData_.push_back(elem);
 	    }
 	}
@@ -14588,7 +14586,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, addr);
+          initiateStoreException(cause, pa1);
           return false;
         }
     }
@@ -14906,43 +14904,43 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	assert(0);
 
       uint64_t vaddr = addr + offset, data = 0;
-      uint64_t paddr = vaddr;
+      uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
 
       auto cause = ExceptionCause::NONE;
       if (elemSize == 1)
 	{
 	  uint8_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(paddr, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x));
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, paddr, x);
+	    memWrite(pa1, pa2, x);
 	  data = x;
 	}
       else if (elemSize == 2)
 	{
 	  uint16_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(paddr, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x));
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, paddr, x);
+	    memWrite(pa1, pa2, x);
 	  data = x;
 	}
       else if (elemSize == 4)
 	{
 	  uint32_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(paddr, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x));
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, paddr, x);
+	    memWrite(pa1, pa2, x);
 	  data = x;
 	}
       else if (elemSize == 8)
 	{
 	  uint64_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(paddr, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x));
 	  if (cause == ExceptionCause::NONE)
-	    memory_.write(hartIx_, paddr, x);
+	    memWrite(pa1, pa2, x);
 	  data = x;
 	}
       else
@@ -14951,7 +14949,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, vaddr);
+          initiateStoreException(cause, pa1);
           return false;
         }
 
@@ -15265,6 +15263,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
+	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
+
 	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 	  if (masked and not vecRegs_.isActive(0, ix))
 	    continue;
@@ -15273,12 +15273,10 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  if (not vecRegs_.read(dvg, ix, groupX8, elem))
 	    assert(0);
 
-	  uint64_t physAddr = faddr;
-	  auto cause = determineStoreException(physAddr, sizeof(elem));
+	  auto cause = determineStoreException(pa1, pa2, sizeof(elem));
 	  if (cause == ExceptionCause::NONE)
 	    {
-	      memory_.write(hartIx_, physAddr, elem);
-
+	      memWrite(pa1, pa2, elem);
 	      vecRegs_.ldStSize_ = sizeof(elem);
 	      vecRegs_.ldStAddr_.push_back(faddr);
 	      vecRegs_.stData_.push_back(elem);
@@ -15286,7 +15284,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(cause, faddr);
+	      initiateStoreException(cause, pa1);
 	      return false;
 	    }
 	}
@@ -15789,42 +15787,42 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    continue;
 
 	  auto cause = ExceptionCause::NONE;
-	  uint64_t physAddr = faddr;
+	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
 
 	  if (elemSize == 1)
 	    {
 	      uint8_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(physAddr, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x));
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, physAddr, x);
+		memWrite(pa1, pa2, x);
 	      data = x;
 	    }
 	  else if (elemSize == 2)
 	    {
 	      uint16_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(physAddr, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x));
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, physAddr, x);
+		memWrite(pa1, pa2, x);
 	      data = x;
 	    }
 	  else if (elemSize == 4)
 	    {
 	      uint32_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(physAddr, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x));
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, physAddr, x);
+		memWrite(pa1, pa2, x);
 	      data = x;
 	    }
 	  else if (elemSize == 8)
 	    {
 	      uint64_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(physAddr, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x));
 	      if (cause == ExceptionCause::NONE)
-		memory_.write(hartIx_, physAddr, x);
+		memWrite(pa1, pa2, x);
 	      data = x;
 	    }
 	  else
@@ -15833,7 +15831,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  if (cause != ExceptionCause::NONE)
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(cause, faddr);
+	      initiateStoreException(cause, pa1);
 	      return false;
 	    }
 
