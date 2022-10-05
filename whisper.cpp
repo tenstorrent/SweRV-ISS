@@ -18,9 +18,6 @@
 #include <thread>
 #include <optional>
 #include <atomic>
-#include <filesystem>
-namespace FileSystem = std::filesystem;
-
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
@@ -39,6 +36,7 @@ namespace FileSystem = std::filesystem;
 #include "Server.hpp"
 #include "Interactive.hpp"
 #include "third_party/nlohmann/json.hpp"
+#include "Filesystem.hpp"
 
 
 using namespace WdRiscv;
@@ -801,22 +799,22 @@ loadSnapshot(System<URV>& system, Hart<URV>& hart, const std::string& snapDir)
 {
   using std::cerr;
 
-  if (not FileSystem::is_directory(snapDir))
+  if (not Filesystem::is_directory(snapDir))
     {
       cerr << "Error: Path is not a snapshot directory: " << snapDir << '\n';
       return false;
     }
 
-  FileSystem::path path(snapDir);
-  FileSystem::path regPath = path / "registers";
-  if (not FileSystem::is_regular_file(regPath))
+  Filesystem::path path(snapDir);
+  Filesystem::path regPath = path / "registers";
+  if (not Filesystem::is_regular_file(regPath))
     {
       cerr << "Error: Snapshot file does not exists: " << regPath << '\n';
       return false;
     }
 
-  FileSystem::path memPath = path / "memory";
-  if (not FileSystem::is_regular_file(regPath))
+  Filesystem::path memPath = path / "memory";
+  if (not Filesystem::is_regular_file(regPath))
     {
       cerr << "Error: Snapshot file does not exists: " << memPath << '\n';
       return false;
@@ -1435,9 +1433,9 @@ snapshotRun(System<URV>& system, FILE* traceFile,
           else
             pathStr = snapDir + std::to_string(snapPeriods[period++]);
 
-          FileSystem::path path(pathStr);
-          if (not FileSystem::is_directory(path))
-            if (not FileSystem::create_directories(path))
+          Filesystem::path path(pathStr);
+          if (not Filesystem::is_directory(path))
+            if (not Filesystem::create_directories(path))
               {
                 std::cerr << "Error: Failed to create snapshot directory " << path << '\n';
                 return false;
@@ -1877,13 +1875,15 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
 }
 
 
+#include <termios.h>
+
+
 int
 main(int argc, char* argv[])
 {
   Args args;
   if (not parseCmdLineArgs(argc, argv, args))
     return 1;
-
   if (args.help)
     return 0;
 
@@ -1896,8 +1896,10 @@ main(int argc, char* argv[])
     if (not config.loadConfigFile(args.configFile))
       return 1;
 
-  unsigned regWidth = determineRegisterWidth(args, config);
+  struct termios term;
+  tcgetattr(STDIN_FILENO, &term);  // Save terminal state.
 
+  unsigned regWidth = determineRegisterWidth(args, config);
   bool ok = true;
 
   try
@@ -1919,5 +1921,6 @@ main(int argc, char* argv[])
       ok = false;
     }
 	
+  tcsetattr(STDIN_FILENO, 0, &term);  // Restore terminal state.
   return ok? 0 : 1;
 }

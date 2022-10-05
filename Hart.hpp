@@ -225,6 +225,12 @@ namespace WdRiscv
     /// bound.
     bool pokeCsr(CsrNumber csr, URV val);
 
+    /// Similar to pokeCsr but meant for server/interactive code: Keep
+    /// track of external MIP pokes to avoid cloberring them with internal
+    /// ones.
+    bool externalPokeCsr(CsrNumber csr, URV val)
+    { if (csr == CsrNumber::MIP) mipPoked_ = true; return pokeCsr(csr, val); }
+
     /// Put in value the bytes of the given vector register (most
     /// significant byte first). Return true on success, return false
     /// if reg is out of bounds.
@@ -705,7 +711,7 @@ namespace WdRiscv
     {
       if (not ldStWrite_)
 	return 0;
-      addr = ldStPhysAddr_;
+      addr = ldStPhysAddr1_;
       value = ldStData_;
       return ldStSize_;
     }
@@ -729,7 +735,7 @@ namespace WdRiscv
       if (ldStSize_ == 0)
 	return 0;
       virtAddr = ldStAddr_;
-      physAddr = ldStPhysAddr_;
+      physAddr = ldStPhysAddr1_;
       return ldStSize_;
     }
 
@@ -764,17 +770,6 @@ namespace WdRiscv
     /// Define a memory mapped register. Address must be within an
     /// area already defined using defineMemoryMappedRegisterArea.
     bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
-
-    /// Direct this hart to take an instruction access fault exception
-    /// within the next singleStep invocation.
-    void postInstAccessFault(URV offset)
-    { forceFetchFail_ = true; forceFetchFailOffset_ = offset; }
-
-    /// Direct this hart to take a data access fault exception within
-    /// the subsequent singleStep invocation executing a load/store
-    /// instruction or take an NMI (double-bit-ecc) within the
-    /// subsequent interrupt if fast-interrupt is enabled.
-    void postDataAccessFault(URV offset);
 
     /// Return count of traps (exceptions or interrupts) seen by this
     /// hart.
@@ -1004,7 +999,8 @@ namespace WdRiscv
     { return memory_.pmaMgr_.isAddrInDccm(addr); }
 
     /// Return true if given address is cacheable.
-    bool isAddrCacheable(uint64_t addr) const;
+    bool isAddrCacheable(uint64_t addr) const
+    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isCacheable(); }
 
     /// Return true if given address is in the memory mapped registers
     /// area of this hart.
@@ -1215,15 +1211,6 @@ namespace WdRiscv
     void tieSharedCsrsTo(Hart<URV>& target)
     { return csRegs_.tieSharedCsrsTo(target.csRegs_); }
 
-    /// Return true if non-maskable interrupts (NMIs) are enabled for
-    /// this hart.
-    bool isNmiEnabled() const
-    { return nmiEnabled_; }
-
-    /// Enable delivery of NMIs to this hart.
-    bool enableNmi(bool flag)
-    { return nmiEnabled_ = flag; }
-
     /// Record given CSR number for later reporting of CSRs modified by
     /// an instruction.
     void recordCsrWrite(CsrNumber csr)
@@ -1365,12 +1352,6 @@ namespace WdRiscv
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
 
-    /// Set entries to the page table walk for fetch/load/store of last executed
-    /// instruction. Will be empty if there was no walk.
-    void getPageTableWalk(std::vector<VirtMem::PteType>& entries,
-                          bool fetch, bool load, bool store) const
-    { virtMem_.getPageTableWalk(entries, fetch, load, store); }
-
     /// Fill the addresses vector (cleared on entry) with the
     /// addresses of instruction/data the page table entries
     /// referenced by the instruction/data page table walk of the last
@@ -1418,47 +1399,6 @@ namespace WdRiscv
     /// Callback to invoke before the execution of an instruction.
     void registerPreInst(std::function<void(Hart<URV>&, bool&, bool&)> callback)
     { preInst_ = callback; }
-
-    /// Define physical memory attribute override regions. If region
-    /// count is greater than zero then the defined regions override
-    /// the MRAC CSR.
-    void definePmaOverrideRegions(unsigned regionCount)
-    {
-      pmaOverrideVec_.resize(regionCount);
-      pmaOverride_ = regionCount > 0;
-    }
-
-    /// Set the default idempotent attribute for addresses that do
-    /// not match any entries in the MACO CSRs.
-    void setDefaultIdempotent(bool flag)
-    {
-      hasDefaultIdempotent_ = true;
-      defaultIdempotent_ = flag;
-    }
-
-    /// Set the default cachable attribute for addresses that do
-    /// not match any entries in the MACO CSRs.
-    void setDefaultCacheable(bool flag)
-    {
-      hasDefaultCacheable_ = true;
-      defaultCacheable_ = flag;
-    }
-
-    /// Define a physical memory attribute override region with given
-    /// index. An address greater than or equal to start and less than
-    /// or equal end is assigned given idempotency/cachability
-    /// attributes.  An address matching multiple regions get the
-    /// attributes of the first region it matches. Return true on
-    /// success and false if regionIx is out of bounds.
-    bool definePmaOverride(unsigned ix, uint64_t start,
-                           uint64_t end, bool idempotent,
-                           bool cacheable)
-    {
-      if (ix >= pmaOverrideVec_.size())
-        return false;
-      pmaOverrideVec_.at(ix) = PmaOverride(start, end, idempotent, cacheable);
-      return true;
-    }
 
     /// Define physical memory attribute region. Region addresses are between
     /// low and high inclusive. To define a 1024-byte region at address zero
@@ -1529,6 +1469,106 @@ namespace WdRiscv
     bool loadSnapshotRegs(const std::string& path);
 
   protected:
+
+    /// Read an item that may span 2 physical pages. If pa1 is the
+    /// same as pa2 then the item is in one page: do a simple read. If
+    /// pa1 is different from pa2, then the item crosses a page
+    /// boundary: read the most sig bytes from pa1 and the remaining
+    /// bytes from pa2.
+    template <typename LOAD_TYPE>
+    void memRead(uint64_t pa1, uint64_t pa2, LOAD_TYPE& value)
+    {
+      if (pa1 == pa2)
+	{
+	  if (not memory_.read(pa1, value))
+	    assert(0);
+	  return;
+	}
+      unsigned size = sizeof(value);
+      unsigned size1 = size - (pa1 & (size - 1));
+      unsigned size2 = size - size1;
+      if (size1 == 4 and size2 == 4)
+	{
+	  uint32_t val1 = 0, val2 = 0;
+	  if (not memory_.read(pa1, val1) or not memory_.read(pa2, val2))
+	    assert(0);
+	  value = (uint64_t(val1) << 32) | val2;
+	  return;
+	}
+
+      value = 0;
+      uint8_t byte = 0;
+      for (unsigned i = 0; i < size1; ++i)
+	if (memory_.read(pa1 + i, byte))
+	  value |= LOAD_TYPE(byte) << 8*i;
+	else assert(0);
+      for (unsigned i = 0; i < size2; ++i)
+	if (memory_.read(pa2 + i, byte))
+	  value |= LOAD_TYPE(byte) << 8*i;
+	else assert(0);
+    }
+
+
+    /// Write an item that may span 2 physical pages. See memRead.
+    template <typename STORE_TYPE>
+    void memWrite(uint64_t pa1, uint64_t pa2, STORE_TYPE value)
+    {
+      if (pa1 == pa2)
+	{
+	  if (not memory_.write(hartIx_, pa1, value))
+	    assert(0);
+	  return;
+	}
+      unsigned size = sizeof(value);
+      unsigned size1 = size - (pa1 & (size - 1));
+      unsigned size2 = size - size1;
+      if constexpr (sizeof(STORE_TYPE) == 8)
+	if (size1 == 4 and size2 == 4)
+	  {
+	    uint32_t val1 = value, val2 = value >> 32;
+	    if (not memory_.write(hartIx_, pa1, val1) or not memory_.write(hartIx_, pa2, val2))
+	      assert(0);
+	    return;
+	  }
+
+      for (unsigned i = 0; i < size1; ++i, value >>= 8)
+	if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
+	  assert(0);
+      for (unsigned i = 0; i < size2; ++i, value >>= 8)
+	if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
+	  assert(0);
+    }
+
+    /// Peek an item that may span 2 physical pages. See memRead.
+    template <typename LOAD_TYPE>
+    void memPeek(uint64_t pa1, uint64_t pa2, LOAD_TYPE& value, bool usePma)
+    {
+      if (pa1 == pa2)
+	{
+	  memory_.peek(pa1, value, usePma);
+	  return;
+	}
+      unsigned size = sizeof(value);
+      unsigned size1 = size - (pa1 & (size - 1));
+      unsigned size2 = size - size1;
+      if (size1 == 4 and size2 == 4)
+	{
+	  uint32_t val1 = 0, val2 = 0;
+	  memory_.peek(pa1, val1, usePma); memory_.peek(pa2, val2, usePma);
+	  value = (uint64_t(val1) << 32) | val2;
+	  return;
+	}
+
+      value = 0;
+      uint8_t byte = 0;
+      for (unsigned i = 0; i < size1; ++i)
+	if (memory_.peek(pa1 + i, byte, usePma))
+	  value |= LOAD_TYPE(byte) << 8*i;
+      for (unsigned i = 0; i < size2; ++i)
+	if (memory_.peek(pa2 + i, byte, usePma))
+	  value |= LOAD_TYPE(byte) << 8*i;
+    }
+
 
     /// Set current privilege mode.
     void setPrivilegeMode(PrivilegeMode m)
@@ -1754,9 +1794,14 @@ namespace WdRiscv
 
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and
-    /// address translation is successful, then addr is changed to the
-    /// translated physical address.
-    ExceptionCause determineLoadException(uint64_t& addr, unsigned ldSize);
+    /// address translation is successful, then addr1 is changed to
+    /// the translated physical address and addr2 to the physical
+    /// address of the subsequent page in the case of page-crossing
+    /// access. If there is an exception, the addr1 is set to the
+    /// virtual address causing the trap. If no address translation or
+    /// no page crossing, then addr2 will be equal to addr1.
+    ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
+					  unsigned ldSize);
 
     /// Helepr to the cache block operaion (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, bool isRead);
@@ -1780,10 +1825,8 @@ namespace WdRiscv
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
-    template<typename STORE_TYPE>
-    ExceptionCause determineStoreException(uint64_t& addr,
-					   STORE_TYPE& storeVal,
-                                           bool& forced);
+    ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
+					   unsigned stSize);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
@@ -1921,7 +1964,6 @@ namespace WdRiscv
     /// Start a non-maskable interrupt.
     void initiateNmi(URV cause, URV pc);
 
-    /// Code common to fast-interrupt and non-maskable-interrupt. Do
     /// interrupts without considering the delegation registers.
     void undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc);
 
@@ -1994,7 +2036,8 @@ namespace WdRiscv
 
     /// Return true if given address is an idempotent region of
     /// memory.
-    bool isAddrIdempotent(uint64_t addr) const;
+    bool isAddrIdempotent(uint64_t addr) const
+    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isIdempotent(); }
 
     /// Check address associated with an atomic memory operation (AMO)
     /// instruction. Return true if AMO access is allowed. Return
@@ -2025,6 +2068,10 @@ namespace WdRiscv
     /// operands: Signal an illegal instruction if immediate value is
     /// greater than XLEN-1 returning false; otherwise return true.
     bool checkShiftImmediate(const DecodedInst* di, URV imm);
+
+    /// Report the number of retired instruction count and the simulation
+    /// rate.
+    void reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop);
 
     /// Helper to the run methods: Log (on the standard error) the
     /// cause of a stop signaled with an exception. Return true if
@@ -3960,26 +4007,6 @@ namespace WdRiscv
       bool fp_ = false;
     };
 
-    struct PmaOverride
-    {
-      PmaOverride(uint64_t start = 0, uint64_t end = 0,
-                  bool idempotent = false, bool cacheable = false)
-        : start_(start), end_(end), idempotent_(idempotent),
-          cacheable_(cacheable)
-      { }
-
-      bool matches(uint64_t addr) const
-      { return end_ > start_ and start_ <= addr and addr <= end_; }
-
-      void reset ()
-      { start_ = end_ = 0; idempotent_ = false; cacheable_ = false; }
-
-      uint64_t start_;
-      uint64_t end_;
-      bool idempotent_;
-      bool cacheable_;
-    };
-
     // Set the program counter to the given value after clearing the
     // least significant bit.
     void setPc(URV value)
@@ -4078,7 +4105,6 @@ namespace WdRiscv
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
     bool nmiPending_ = false;
     NmiCause nmiCause_ = NmiCause::UNKNOWN;
-    bool nmiEnabled_ = true;
 
     // These must be cleared before each instruction when triggers enabled.
     bool hasException_ = 0;      // True if current inst has an exception.
@@ -4117,11 +4143,6 @@ namespace WdRiscv
     uint64_t scCount_ = 0;    // Count of dispatched store-conditional instructions.
     uint64_t scSuccess_ = 0;  // Count of successful SC (store accomplished).
     unsigned lrResSize_ = sizeof(URV); // LR reservation size.
-    bool forceAccessFail_ = false;  // Force load/store access fault.
-    bool forceFetchFail_ = false;   // Force fetch access fault.
-    URV forceAccessFailOffset_ = 0;
-    URV forceFetchFailOffset_ = 0;
-    uint64_t forceAccessFailMark_ = 0; // Instruction at which forced fail is seen.
 
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
@@ -4139,7 +4160,8 @@ namespace WdRiscv
     uint32_t prevPerfControl_ = ~0; // Value before current instruction.
 
     URV ldStAddr_ = 0;              // Addr of data of most recent ld/st inst.
-    uint64_t ldStPhysAddr_ = 0;
+    uint64_t ldStPhysAddr1_ = 0;    // Physical address
+    uint64_t ldStPhysAddr2_ = 0;    // Physical address of 2nd page across page boundary.
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing
     uint64_t ldStPrevData_ = 0;
@@ -4165,6 +4187,7 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
+    bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
 
@@ -4201,15 +4224,6 @@ namespace WdRiscv
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.
     PmpManager pmpManager_;
-
-    bool defaultIdempotent_ = false;
-    bool hasDefaultIdempotent_ = false;
-
-    bool defaultCacheable_ = false;
-    bool hasDefaultCacheable_ = false;
-
-    bool pmaOverride_ = false;
-    std::vector<PmaOverride> pmaOverrideVec_;
 
     VirtMem virtMem_;
     Isa isa_;

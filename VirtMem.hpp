@@ -24,6 +24,7 @@
 namespace WdRiscv
 {
 
+
   /// Structure to unpack the fields of a 32-bit page table entry.
   struct Pte32Bits
   {
@@ -544,18 +545,42 @@ namespace WdRiscv
     /// check for read access if the read flag is true (similary also
     /// check for write access is the write flag is true ...).  Return
     /// encoutered exception on failure or ExceptionType::NONE on
-    /// success.
+    /// success. Does not check for page crossing.
     ExceptionCause translate(uint64_t va, PrivilegeMode pm, bool read,
                              bool write, bool exec, uint64_t& pa);
 
     /// Same as translate but only check for execute access.
     ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, uint64_t& pa);
 
+    /// Same as translate but only check for execute access and page
+    /// crossing.  On success pa1 has the physical address and pa2 has
+    /// a copy of pa1 or the physical address of the subsequent page
+    /// if the access crosses a page boundary. On Fail pa1 has the
+    /// virtual faulting address.
+    ExceptionCause translateForFetch2(uint64_t va, unsigned size, PrivilegeMode pm,
+				      uint64_t& pa1, uint64_t& pa2);
+
     /// Same as translate but only check for read access.
     ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, uint64_t& pa);
 
+    /// Same as translate but only check for read access and page
+    /// crossing.  On success pa1 has the physical address and pa2 has
+    /// a copy of pa1 or the physical address of the subsequent page
+    /// if the access crosses a page boundary. On Fail pa1 has the
+    /// virtual faulting address.
+    ExceptionCause translateForLoad2(uint64_t va, unsigned size, PrivilegeMode pm,
+				     uint64_t& pa1, uint64_t& pa2);
+
     /// Same as translate but only check for write access.
     ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+
+    /// Same as translate but only check for write access and page
+    /// crossing.  On success pa1 has the physical address and pa2 has
+    /// a copy of pa1 or the physical address of the subsequent page
+    /// if the access crosses a page boundary. On Fail pa1 has the
+    /// virtual faulting address.
+    ExceptionCause translateForStore2(uint64_t va, unsigned size, PrivilegeMode pm,
+				      uint64_t& pa1, uint64_t& pa2);
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
@@ -583,21 +608,6 @@ namespace WdRiscv
     template <typename PTE, typename VA>
     void printEntries(std::ostream& os, uint64_t addr, std::string path) const;
 
-    typedef boost::variant<Pte32, Pte39, Pte48, Pte57> PteType;
-
-    /// Support for tracing: return page table walk trace for fetch/load/store
-    void getPageTableWalk(std::vector<PteType>& entries, bool fetch,
-                          bool load, bool store) const
-    {
-      assert(fetch or load or store);
-      if (fetch)
-        entries.assign(pageTableWalkForFetch_.begin(), pageTableWalkForFetch_.end());
-      else if (load)
-        entries.assign(pageTableWalkForLoad_.begin(), pageTableWalkForLoad_.end());
-      else
-        entries.assign(pageTableWalkForStore_.begin(), pageTableWalkForStore_.end());
-    }
-
     /// Return the addresses of the instruction page table entries
     /// used in the last page table walk. Return empty vector if the
     /// last executed instruction did not induce an instruction page
@@ -614,11 +624,31 @@ namespace WdRiscv
     /// Clear trace of page table walk
     void clearPageTableWalk()
     {
-      pageTableWalkForFetch_.clear();
-      pageTableWalkForLoad_.clear();
-      pageTableWalkForStore_.clear();
       pteInstrAddr_.clear();
       pteDataAddr_.clear();
+    }
+
+    static const char* pageSize(Mode m, uint32_t level)
+    {
+      if (m == Mode::Bare)
+        return "";
+      if (m == Mode::Sv32)
+        {
+          if (level == 0)
+            return "4K";
+          else
+            return "4M";
+        }
+
+      switch (level)
+        {
+          case 0: return "4K";
+          case 1: return "2M";
+          case 2: return "1G";
+          case 3: return "512G";
+          case 4: return "256T";
+          default: return "";
+        }
     }
 
   protected:
@@ -702,18 +732,12 @@ namespace WdRiscv
 
     FILE* attFile_ = nullptr;
 
-    // Keep track of page table walk of fetch/load/store. Will be empty
-    // if no walk.
-    std::vector<PteType> pageTableWalkForFetch_;
-    std::vector<PteType> pageTableWalkForLoad_;
-    std::vector<PteType> pageTableWalkForStore_;
     // Addresses of PTEs used in most recent insruction an data translations.
     std::vector<uint64_t> pteInstrAddr_;
     std::vector<uint64_t> pteDataAddr_;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
-
   };
 
 }

@@ -33,6 +33,7 @@ namespace WdRiscv
   class Mcm;
 
   class DecodedInst;
+  class IoDevice;
 
   /// Model a system consisting of n cores with m-harts per core and a
   /// memory. The harts in the system are indexed from 0 to n*m -
@@ -217,6 +218,10 @@ namespace WdRiscv
     void setConsoleIoSymbol(const std::string& sym)
     { consoleIoSym_ = sym; }
 
+    /// Device a UART device at given address reserving given
+    /// size (in bytes) of address space for it.
+    void defineUart(uint64_t addr, uint64_t size);
+
     /// Enable memory consistency model. This is relevant in
     /// server/interactive where RTL monitor or interactive command
     /// may initiate out of order memory transactions. Behavior is
@@ -273,5 +278,6 @@ namespace WdRiscv
     std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
     std::string fromHostSym_ = "fromhost";
     std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
+    std::vector<IoDevice*> ioDevs_;
   };
 }

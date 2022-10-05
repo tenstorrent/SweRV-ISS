@@ -319,7 +319,7 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply)
     case 'c':
       {
 	URV val = static_cast<URV>(req.value);
-	if (hart.pokeCsr(CsrNumber(req.address), val))
+	if (hart.externalPokeCsr(CsrNumber(req.address), val))
 	  return true;
       }
       break;

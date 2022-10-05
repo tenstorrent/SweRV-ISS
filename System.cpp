@@ -14,12 +14,13 @@
 
 #include <iostream>
 #include <fstream>
-#include <filesystem>
+#include "Filesystem.hpp"
 #include "Hart.hpp"
 #include "Core.hpp"
 #include "System.hpp"
 #include "Mcm.hpp"
 #include "Uart8250.hpp"
+
 
 using namespace WdRiscv;
 
@@ -74,7 +75,16 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
   mem.defineWriteMemoryCallback(writef);
 #endif
 
-  // mem.registerIoDevice(new Uart8250(0x1000000, 0x100));
+}
+
+
+template <typename URV>
+void
+System<URV>::defineUart(uint64_t addr, uint64_t size)
+{
+  auto uart = new Uart8250(addr, size);
+  ioDevs_.push_back(uart);
+  memory_->registerIoDevice(uart);
 }
 
 
@@ -86,6 +96,9 @@ System<URV>::~System()
 
   delete mcm_;
   mcm_ = nullptr;
+
+  for (auto dev : ioDevs_)
+    delete dev;
 }
 
 
@@ -233,15 +246,15 @@ template <typename URV>
 bool
 System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
 {
-  std::filesystem::path dirPath = dir;
+  Filesystem::path dirPath = dir;
 
-  std::filesystem::path regPath = dirPath / "registers";
+  Filesystem::path regPath = dirPath / "registers";
   if (not hart.saveSnapshotRegs(regPath.string()))
     return false;
 
   auto& syscall = hart.getSyscall();
 
-  std::filesystem::path usedBlocksPath = dirPath / "usedblocks";
+  Filesystem::path usedBlocksPath = dirPath / "usedblocks";
   std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
   if (sparseMem_)
     sparseMem_->getUsedBlocks(usedBlocks);
@@ -250,27 +263,27 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
   if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
 
-  std::filesystem::path memPath = dirPath / "memory";
+  Filesystem::path memPath = dirPath / "memory";
   if (not memory_->saveSnapshot(memPath.string(), usedBlocks))
     return false;
 
-  std::filesystem::path fdPath = dirPath / "fd";
+  Filesystem::path fdPath = dirPath / "fd";
   if (not syscall.saveFileDescriptors(fdPath.string()))
     return false;
 
-  std::filesystem::path mmapPath = dirPath / "mmap";
+  Filesystem::path mmapPath = dirPath / "mmap";
   if (not syscall.saveMmap(mmapPath.string()))
     return false;
 
-  std::filesystem::path cachePath = dirPath / "cache";
+  Filesystem::path cachePath = dirPath / "cache";
   if (not memory_->saveCacheSnapshot(cachePath))
     return false;
 
-  std::filesystem::path dtracePath = dirPath / "data-lines";
+  Filesystem::path dtracePath = dirPath / "data-lines";
   if (not memory_->saveDataAddressTrace(dtracePath))
     return false;
 
-  std::filesystem::path itracePath = dirPath / "instr-lines";
+  Filesystem::path itracePath = dirPath / "instr-lines";
   if (not memory_->saveInstructionAddressTrace(itracePath))
     return false;
 
@@ -312,32 +325,32 @@ template <typename URV>
 bool
 System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
 {
-  std::filesystem::path dirPath = dir;
+  Filesystem::path dirPath = dir;
   std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
 
-  std::filesystem::path regPath = dirPath / "registers";
+  Filesystem::path regPath = dirPath / "registers";
   if (not hart.loadSnapshotRegs(regPath.string()))
     return false;
 
   auto& syscall = hart.getSyscall();
-  std::filesystem::path usedBlocksPath = dirPath / "usedblocks";
+  Filesystem::path usedBlocksPath = dirPath / "usedblocks";
   if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
 
-  std::filesystem::path mmapPath = dirPath / "mmap";
+  Filesystem::path mmapPath = dirPath / "mmap";
   if (not syscall.loadMmap(mmapPath.string()))
     return false;
 
-  std::filesystem::path memPath = dirPath / "memory";
+  Filesystem::path memPath = dirPath / "memory";
   if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
     return false;
 
-  std::filesystem::path fdPath = dirPath / "fd";
+  Filesystem::path fdPath = dirPath / "fd";
   if (not syscall.loadFileDescriptors(fdPath.string()))
     return false;
 
-  std::filesystem::path cachePath = dirPath / "cache";
-  if (std::filesystem::is_regular_file(cachePath))
+  Filesystem::path cachePath = dirPath / "cache";
+  if (Filesystem::is_regular_file(cachePath))
     if (not memory_->loadCacheSnapshot(cachePath.string()))
       return false;
 

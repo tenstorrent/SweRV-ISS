@@ -1495,6 +1495,22 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
   if (enableMcm and not system.enableMcm(mbLineSize, checkAll))
     return false;
 
+  tag = "uart";
+  if (config_ -> count(tag))
+    {
+      auto& uart = config_ -> at(tag);
+      if (not uart.count("address") or not uart.count("size"))
+	{
+	  std::cerr << "Invalid uart entry in config file: missing address/size entry.\n";
+	  return false;
+	}
+      uint64_t addr = 0, size = 0;
+      if (not getJsonUnsigned(tag + ".address", uart.at("address"), addr) or
+	  not getJsonUnsigned(tag + ".size", uart.at("size"), size))
+	return false;
+      system.defineUart(addr, size);
+    }
+
   return finalizeCsrConfig(system);
 }
 
@@ -1641,345 +1657,6 @@ HartConfig::clear()
 }
 
 
-// Meaning of the maco bits depend on the desing.
-// For 32-bit design we have Maco32Masks; Otherwise Maco64Masks.
-enum class Maco32Masks : uint32_t
-  {
-   Enable       = 1,
-   Lock         = 2,
-   SideEffect   = 4,
-   PreciseStore = 8
-  };
-
-enum class Maco64Masks : uint32_t
-  {
-   Enable       = 1,
-   Lock         = 2,
-   Cacheable    = 4,
-   SideEffect   = 8
-  };
-
-
-template <typename URV>
-void
-unpackMacoValue(URV value, URV mask, bool rv32, uint64_t& start, uint64_t& end,
-                bool& idempotent, bool& cacheable)
-{
-  start = end = 0;
-  bool enable = false;
-
-  if (rv32)
-    {
-      idempotent = (value & URV(Maco32Masks::SideEffect)) == 0;
-      cacheable = false;
-      enable = value & URV(Maco32Masks::Enable);
-    }
-  else
-    {
-      idempotent = (value & URV(Maco64Masks::SideEffect)) == 0;
-      cacheable = (value & URV(Maco64Masks::Cacheable));
-      enable = value & URV(Maco64Masks::Enable);
-    }
-
-  if (not enable)
-    return;  // Disabled: start same as end
-
-  // We want first zero starting from bit 7 and going towards most sig bit.
-  value |= 0x7f;  // Set least sig 7 bits to 1
-  if (((value & mask) >> 7) == ((mask | 0x7f) >> 7))
-    {
-      start = end = 0;   // Illegal setup: Address bits all set.
-      return;
-    }
-
-  unsigned rzi = __builtin_ctzl(~value);  // Rightmost-zero-bit-index.
-  start = (value >> rzi) << rzi; // Clear bits below rightmost zero bit.
-  uint64_t sizeM1 = (uint64_t(1) << (rzi + 1)) - 1;  // Size minus 1.
-  end = start + sizeM1;
-}
-
-
-/// Associate callbacks with write/poke of the maco0-maco4 CSRs.
-template <typename URV>
-void
-defineMacoSideEffects(System<URV>& system)
-{
-  bool rv32 = sizeof(URV) == 4;
-
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-
-      // Maco registers, if present, start at maco0 and are defined
-      // sequentially.  We allow up to 32.
-      unsigned macoIx = 0;
-      for ( ; macoIx < 32; ++macoIx)
-        {
-          auto name = std::string("maco") + std::to_string(macoIx);
-          auto csrPtr = hart->findCsr(name);
-          if (not csrPtr)
-            break;
-
-          // Define pre-write/pre-poke callback: If lock bit is set,
-          // then preserve CSR value
-	  std::weak_ptr<Hart<URV>> wHart(hart);
-          auto pre = [wHart, rv32] (Csr<URV>& csr, URV& val) -> void {
-		       auto hart = wHart.lock();
-		       if (not hart)
-			 return;  // Should not happen.
-                       URV previous = 0;
-		       hart->peekCsr(csr.getNumber(), previous);
-                       if (previous & URV(Maco32Masks::Lock))
-                         val = previous;  // Locked: keep previous value
-                       else if (not rv32)
-                         {
-                           // Combination side-effect/cacable not allowed
-                           bool side = val & URV(Maco64Masks::SideEffect);
-                           bool cache = val & URV(Maco64Masks::Cacheable);
-                           if (cache and side)
-                             val &= ~URV(Maco64Masks::Cacheable);
-                         }
-                      };
-
-          // Define post-write/post-poke callback. Upddate the idempotent
-          // regions of the hart.
-          auto post = [wHart, macoIx, rv32] (Csr<URV>& csr, URV val) -> void {
-		        auto hart = wHart.lock();
-			if (not hart)
-			  return;    // Should not happen.
-                        uint64_t start = 0, end = 0;
-                        bool idempotent = false, cacheable = false;
-                        URV mask = csr.getWriteMask();
-                        unpackMacoValue(val, mask, rv32, start, end, idempotent, cacheable);
-                        hart->definePmaOverride(macoIx, start, end, idempotent, cacheable);
-                      };
-
-          csrPtr->registerPrePoke(pre);
-          csrPtr->registerPreWrite(pre);
-
-          csrPtr->registerPostPoke(post);
-          csrPtr->registerPostWrite(post);
-        }
-
-      hart->definePmaOverrideRegions(macoIx);
-    }
-}
-
-
-/// Associate callbacks with write/poke of the mdac CSR. This is the
-/// default access control CSR used alongside the maco CSRs to define
-/// cachable/idempotent regions.
-template <typename URV>
-void
-defineMdacSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mdac");
-      if (not csrPtr)
-        continue;
-
-      auto pre = [] (Csr<URV>&, URV& val) -> void {
-                   // A value of 0b11 (io/cacheable) is invalid: Make it 0b10
-                   // (io/non-cacheable).
-                   URV mask = 0b11;
-                   if ((val & mask) == mask)
-                     val = (val & ~mask) | 0b10;
-                 };
-
-      std::weak_ptr<Hart<URV>> wHart(hart);
-
-      // Mdac is not shared between harts.
-      auto post = [wHart] (Csr<URV>&, URV val) -> void {
-		    auto hart = wHart.lock();
-		    if (not hart)
-		      return;  // Should not happen.
-                    bool idempotent = (val & 2) == 0;
-                    bool cacheable = (val & 1);
-                    hart->setDefaultIdempotent(idempotent);
-                    hart->setDefaultCacheable(cacheable);
-                  };
-
-      auto reset = [wHart] (Csr<URV>& csr) -> void {
-	  auto hart = wHart.lock();
-	  if (not hart)
-	    return;  // Should not happen.
-          URV val = csr.read();
-          bool idempotent = (val & 2) == 0;
-          bool cacheable = (val & 1);
-          hart->setDefaultIdempotent(idempotent);
-          hart->setDefaultCacheable(cacheable);
-        };
-
-      csrPtr->registerPrePoke(pre);
-      csrPtr->registerPreWrite(pre);
-
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-
-      csrPtr->registerPostReset(reset);
-    }
-}
-
-
-/// Associate callback with write/poke of mnmipdel to deletage
-/// non-maskable-interrupts to harts.
-template <typename URV>
-void
-defineMnmipdelSideEffects(System<URV>& system)
-{
-  for (unsigned ix = 0; ix < system.hartCount(); ++ix)
-    {
-      auto hart = system.ithHart(ix);
-      auto csrPtr = hart->findCsr("mnmipdel");
-      if (not csrPtr)
-        continue;
-
-      // Enable NMI for harts corresponding to set bits in mnmipdel.
-      auto post = [&system] (Csr<URV>& csr, URV val) -> void {
-                    if ((val & csr.getWriteMask()) == 0)
-                      return;
-                    for (unsigned i = 0; i < system.hartCount(); ++i)
-                      {
-                        auto ht = system.ithHart(i);
-                        bool enable = (val & (URV(1) << i)) != 0;
-                        ht->enableNmi(enable);
-                      }
-                  };
-
-      // If an attempt to change writeable bits to all-zero, keep
-      // previous value.
-      auto pre = [] (Csr<URV>& csr, URV& val) -> void {
-                   URV prev = csr.read();
-                   if ((val & csr.getWriteMask()) == 0)
-                     val = prev;
-                 };
-
-      // On reset, enable NMI in harts according to the bits of mnmipdel
-      std::weak_ptr<Hart<URV>> wHart(hart);
-      auto reset = [wHart] (Csr<URV>& csr) -> void {
-	           auto hart = wHart.lock();
-		   if (not hart)
-		     return;  // Should not happen.
-                   URV val = csr.read();
-                   URV id = hart->sysHartIndex();
-                   bool flag = (val & (URV(1) << id)) != 0;
-                   hart->enableNmi(flag);
-                 };
-
-      csrPtr->registerPostPoke(post);
-      csrPtr->registerPostWrite(post);
-
-      csrPtr->registerPrePoke(pre);
-      csrPtr->registerPreWrite(pre);
-
-      csrPtr->registerPostReset(reset);
-    }
-}
-
-
-/// Associate callback with write/poke of mpmpc
-template <typename URV>
-void
-defineMpmcSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mpmc");
-      if (not csrPtr)
-        continue;
-
-      std::weak_ptr<Hart<URV>> wHart(hart);
-
-      // Writing 3 to pmpc enables external interrupts unless in debug mode.
-      auto prePoke = [wHart] (Csr<URV>& csr, URV& val) -> void {
-		       auto hart = wHart.lock();
-		       if (not hart)
-			 return;  // Should not happen.
-                       if (hart->inDebugMode() or (val & 3) != 3 or
-                           (val & csr.getPokeMask()) == 0)
-                         return;
-                       URV mval = 0;
-                       if (not hart->peekCsr(CsrNumber::MSTATUS, mval))
-                         return;
-                       MstatusFields<URV> fields(mval);
-                       fields.bits_.MIE = 1;
-                       hart->pokeCsr(CsrNumber::MSTATUS, fields.value_);
-                     };
-
-      auto preWrite = [wHart] (Csr<URV>& csr, URV& val) -> void {
-		       auto hart = wHart.lock();
-		       if (not hart)
-			 return;  // Should not happen.
-                        if (hart->inDebugMode() or (val & 3) != 3 or
-                           (val & csr.getWriteMask()) == 0)
-                          return;
-                        URV mval = 0;
-                        if (not hart->peekCsr(CsrNumber::MSTATUS, mval))
-                          return;
-                       MstatusFields<URV> fields(mval);
-                       fields.bits_.MIE = 1;
-                       hart->pokeCsr(CsrNumber::MSTATUS, fields.value_);
-                       hart->recordCsrWrite(CsrNumber::MSTATUS);
-                     };
-
-
-      csrPtr->registerPrePoke(prePoke);
-      csrPtr->registerPreWrite(preWrite);
-    }
-}
-
-
-// Define callback to react to write/poke to mgpmc CSR. This is a
-// mon-standard WD CSR that is only in ehx1 and that controls the
-// performance counters. Mgpmc will not be present if mcountinhibit is
-// present.
-template <typename URV>
-void
-defineMgpmcSideEffects(System<URV>& system)
-{
-  for (unsigned i = 0; i < system.hartCount(); ++i)
-    {
-      auto hart = system.ithHart(i);
-      auto csrPtr = hart->findCsr("mgpmc");
-      if (not csrPtr)
-        continue;
-
-      std::weak_ptr<Hart<URV>> wHart(hart);
-
-      // For poke, the effect takes place immediately (next instruction
-      // will see the new control).
-      auto postPoke = [wHart] (Csr<URV>&, URV val) -> void {
-		        auto hart = wHart.lock();
-			if (not hart)
-			  return;  // Should not happen.
-                        bool enable = (val & 1) == 1;
-                        URV mask = enable? ~URV(0) : 0;
-                        mask |= 7; // cycle/time/instret not controlled by mgpmc
-                        hart->setPerformanceCounterControl(mask);
-                        hart->setPerformanceCounterControl(mask);
-                      };
-
-      // For write (invoked from current instruction), the effect
-      // takes place on the following instruction.
-      auto postWrite = [wHart] (Csr<URV>&, URV val) -> void {
-		        auto hart = wHart.lock();
-		        if (not hart)
-			  return;  // Should not happen.
-                        bool enable = (val & 1) == 1;
-                        URV mask = enable? ~URV(0) : 0;
-                        mask |= 7; // cycle/time/instret not controlled by mgpmc
-                        hart->setPerformanceCounterControl(mask);
-                       };
-
-      csrPtr->registerPostPoke(postPoke);
-      csrPtr->registerPostWrite(postWrite);
-    }
-}
-
-
 /// Associate callback with write/poke of mcounthinibit
 template <typename URV>
 void
@@ -2045,14 +1722,6 @@ HartConfig::finalizeCsrConfig(System<URV>& system) const
             hartPtr->tieSharedCsrsTo(*hart0);
         }
     }
-
-  // The following are WD non-standard CSRs. We implement their
-  // actions by associating callbacks with the write/poke CSR methods.
-  defineMnmipdelSideEffects(system);
-  defineMpmcSideEffects(system);
-  defineMgpmcSideEffects(system);
-  defineMacoSideEffects(system);
-  defineMdacSideEffects(system);
 
   // Define callback to react to write/poke to mcountinhibit CSR.
   defineMcountinhibitSideEffects(system);
@@ -2141,16 +1810,6 @@ HartConfig::finalizeCsrConfig<uint32_t>(System<uint32_t>&) const;
 
 template bool
 HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
-
-template void
-unpackMacoValue<uint32_t>(uint32_t value, uint32_t mask, bool rv32,
-                          uint64_t& start, uint64_t& end, bool& idempotent,
-                          bool& cacheable);
-
-template void
-unpackMacoValue<uint64_t>(uint64_t value, uint64_t mask, bool rv32,
-                          uint64_t& start, uint64_t& end, bool& idempotent,
-                          bool& cacheable);
 
 template bool
 HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,

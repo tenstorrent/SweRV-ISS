@@ -287,12 +287,6 @@ Interactive<URV>::peekAllIntRegs(Hart<URV>& hart, std::ostream& out)
 
 
 template <typename URV>
-extern void
-unpackMacoValue(URV value, URV mask, bool rv32, uint64_t& start, uint64_t& end,
-                bool& idempotent, bool& cacheable);
-
-
-template <typename URV>
 void
 Interactive<URV>::peekAllCsrs(Hart<URV>& hart, std::ostream& out)
 {
@@ -362,34 +356,6 @@ Interactive<URV>::peekAllCsrs(Hart<URV>& hart, std::ostream& out)
       out << 
         (boost::format("%7d %5s %4s %6s 0x%016x 0x%016x") % ix % typeStr %
          modeStr % lockStr % low % high) << '\n';
-    }
-
-  bool headerPrinted = false;
-  bool rv32 = sizeof(URV) == 4;
-
-  for (unsigned ix = 0; ix < 16; ++ix)
-    {
-      std::string name = std::string("maco") + std::to_string(ix);
-      auto maco = hart.findCsr(name);
-      URV value = 0;
-      if (maco and hart.peekCsr(maco->getNumber(), value))
-        {
-          if (not headerPrinted)
-            {
-              out << "\n";
-              out << "maco io cacheable low                high\n";
-              headerPrinted = true;
-            }
-          bool idempotent = false, cacheable = false;
-          uint64_t low = 0, high = 0;
-          unpackMacoValue(value, maco->getWriteMask(), rv32, low, high,
-                          idempotent, cacheable);
-          std::string ioStr = idempotent? "n" : "y";
-          std::string cacheStr = cacheable? "y" : "n";
-          out << 
-            (boost::format("%4d %2s %9s 0x%016x 0x%016x") % ix % ioStr %
-             cacheStr % low % high) << '\n';
-        }
     }
 }
 
@@ -828,7 +794,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       auto csr = hart.findCsr(addrStr);
       if (csr)
 	{
-	  if (hart.pokeCsr(csr->getNumber(), value))
+	  if (hart.externalPokeCsr(csr->getNumber(), value))
 	    return true;
 	  std::cerr << "Failed to write CSR " << addrStr << '\n';
 	  return false;

@@ -57,8 +57,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
 	    {
 	      uint64_t dwa = addr + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_) and
-		  not isAddrMemMapped(dwa))
+	      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
 		return ExceptionCause::LOAD_ACC_FAULT;
 	    }
 	}
@@ -68,8 +67,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
 	    {
 	      uint64_t dwa = addr + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_) and
-		  not isAddrMemMapped(dwa))
+	      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
 		return ExceptionCause::STORE_ACC_FAULT;
 	    }
 	}

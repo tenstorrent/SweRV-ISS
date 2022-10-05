@@ -102,7 +102,7 @@ PmaManager::writeRegister(uint64_t addr, uint32_t value)
 
 
 bool
-PmaManager::writeRegisterNoMask(uint64_t addr, uint32_t value)
+PmaManager::pokeRegister(uint64_t addr, uint32_t value)
 {
   addr = (addr >> 2) << 2;
   auto iter = memMappedRegs_.find(addr);
@@ -125,6 +125,24 @@ PmaManager::writeRegisterByte(uint64_t addr, uint8_t value)
   unsigned shift = byteIx * 8;
   uint32_t byteMask = 0xff << shift;
   uint32_t shiftedByte = (uint32_t(value) << shift) & iter->second.mask_;
+  iter->second.value_ = iter->second.value_ & ~byteMask;
+  iter->second.value_ = iter->second.value_ | shiftedByte;
+  return true;
+}
+
+
+bool
+PmaManager::pokeRegisterByte(uint64_t addr, uint8_t value)
+{
+  unsigned byteIx = addr & 3;
+  addr = (addr >> 2) << 2;
+  auto iter = memMappedRegs_.find(addr);
+  if (iter == memMappedRegs_.end())
+    return false;
+
+  unsigned shift = byteIx * 8;
+  uint32_t byteMask = 0xff << shift;
+  uint32_t shiftedByte = uint32_t(value) << shift;
   iter->second.value_ = iter->second.value_ & ~byteMask;
   iter->second.value_ = iter->second.value_ | shiftedByte;
   return true;
