@@ -862,6 +862,21 @@ Syscall<URV>::emulate()
         return rc < 0 ? SRV(-errno) : rc;
       }
 
+    case 48:       // faccessat
+      {
+        int dirfd = effectiveFd(SRV(a0));
+
+        uint64_t rvPath = a1;
+        char path[1024];
+        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+          return SRV(-EINVAL);
+
+        mode_t mode = a2;
+        int flags = 0; // Should be a3
+        int rc = faccessat(dirfd, path, mode, flags);
+        return rc < 0 ? SRV(-errno) : rc;
+      }
+
     case 49:       // chdir
       {
         uint64_t rvPath = a0;
