@@ -1471,8 +1471,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.isCanceled())
     {
-      cerr << "Mcm::ppoRule5: B instruction canceled\n";
-      assert(0 && "Mcm::ppoRule5: B instruction canceled");
+      cerr << "Mcm::ppoRule5: B instruction canceled tag=" << instrB.tag_ << '\n';
+      return false;
     }
 
   if (not instrB.isMemory())
