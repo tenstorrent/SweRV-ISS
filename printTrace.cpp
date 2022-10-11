@@ -150,14 +150,14 @@ formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId, PrivilegeM
   const char* pmStr = privilegeModeToStr(pm);
   if (width == 64)
     {
-      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx %016jx  %s",
+      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx %016jx %s",
 	      uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, uintmax_t(fpReg),
 	      uintmax_t(fpVal), assembly);
     }
   else
     {
       uint32_t val32 = fpVal;
-      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx         %08x  %s",
+      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx         %08x %s",
 	      uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, uintmax_t(fpReg),
 	      val32, assembly);
     }
