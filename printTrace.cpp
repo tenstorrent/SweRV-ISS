@@ -637,7 +637,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       fputs(",", out);
       std::vector<uint64_t> addrs, entries;
       getPageTableWalkAddresses(true, addrs);
-      getPageTableWalkAddresses(true, entries);
+      getPageTableWalkEntries(true, entries);
       const char* sep = "";
       uint64_t n = std::min(addrs.size(), entries.size());
       for (uint64_t i = 0; i < n; ++i)
@@ -648,7 +648,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
       fputs(",", out);
       getPageTableWalkAddresses(false, addrs);
-      getPageTableWalkAddresses(false, entries);
+      getPageTableWalkEntries(false, entries);
       sep = "";
       n = std::min(addrs.size(), entries.size());
       for (uint64_t i = 0; i < n; ++i)
