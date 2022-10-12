@@ -172,6 +172,7 @@ struct Args
   std::string stdinFile;       // Redirect target program stdin to this. 
   std::string dataLines;       // Output file for data address line tracing.
   std::string instrLines;      // Output file for instruction address line tracing.
+  std::string initStateFile;   // Output file for inital state of memory lines used in run.
   std::string kernelFile;      // Load kernel image at address.
   StringVec   regInits;        // Initial values of regs
   StringVec   targets;         // Target (ELF file) programs and associated
@@ -515,6 +516,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Generate data line address trace to the given file.")
 	("instrlines", po::value(&args.instrLines),
 	 "Generate instruction line address trace to the given file.")
+	("initstate", po::value(&args.initStateFile),
+	 "Generate to given file the initial state of accessed memory lines.")
 	("abinames", po::bool_switch(&args.abiNames),
 	 "Use ABI register names (e.g. sp instead of x2) in instruction disassembly.")
 	("newlib", po::bool_switch(&args.newlib),
@@ -1765,6 +1768,18 @@ session(const Args& args, const HartConfig& config)
     if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
       if (not args.interactive)
 	return false;
+
+  if (system.hartCount() > 1 and not args.initStateFile.empty())
+    {
+      std::cerr << "Initial line-state report (--initstate) valid only when hart count is 1\n";
+      return false;
+    }
+  else
+    {
+      auto& hart0 = *system.ithHart(0);
+      if (not hart0.setInitialStateFile(args.initStateFile))
+	return false;
+    }
 
   bool result = sessionRun(system, args, traceFile, commandLog);
 

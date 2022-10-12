@@ -511,6 +511,11 @@ namespace WdRiscv
       indexToHart_ = indexToHart;
     }
 
+    /// Set the output file in which to dump the state of accessed
+    /// memory lines. Return true on success and false if file cannot
+    /// be opened.
+    bool setInitialStateFile(const std::string& path);
+
     /// Disassemble given instruction putting results on the given
     /// stream.
     void disassembleInst(uint32_t inst, std::ostream&);
@@ -4259,6 +4264,9 @@ namespace WdRiscv
     FILE* bbFile_ = nullptr;
 
     Mcm<URV>* mcm_ = nullptr;
+
+    FILE* initStateFile_ = nullptr;
+    std::unordered_set<uint64_t> initStateLines_;
   };
 }
 

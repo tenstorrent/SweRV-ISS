@@ -535,6 +535,14 @@ namespace WdRiscv
     /// addresses into the given file.
     bool saveInstructionAddressTrace(const std::string& path) const;
 
+    /// Return the line number corresponding to the given address.
+    uint64_t getLineNumber(uint64_t addr) const
+    { return addr >> lineShift_; }
+
+    /// Return the memory/cache line size.
+    unsigned lineSize() const
+    { return 1 << lineShift_; }
+
   protected:
 
     /// Same as write but effects not recorded in last-write info and
