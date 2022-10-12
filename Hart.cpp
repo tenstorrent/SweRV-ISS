@@ -561,7 +561,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
     }
 
   resetVector();
-
   resetFloat();
 
   // Update cached values of mstatus.mpp and mstatus.mprv and mstatus.fs.
@@ -612,6 +611,16 @@ Hart<URV>::resetVector()
       GroupMultiplier gm = GroupMultiplier(value & 7);
       ElementWidth ew = ElementWidth((value >> 3) & 7);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+    }
+
+  // Set VS to initial in MSTATUS if linux/newlib emulation. This
+  // allows linux/newlib program to run without startup code.
+  if (isRvv() and (newlib_ or linux_))
+    {
+      URV val = csRegs_.peekMstatus();
+      MstatusFields<URV> fields(val);
+      fields.bits_.VS = unsigned(FpFs::Initial);
+      csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, fields.value_);
     }
 }
 
