@@ -1769,13 +1769,13 @@ session(const Args& args, const HartConfig& config)
       if (not args.interactive)
 	return false;
 
-  if (system.hartCount() > 1 and not args.initStateFile.empty())
+  if (not args.initStateFile.empty())
     {
-      std::cerr << "Initial line-state report (--initstate) valid only when hart count is 1\n";
-      return false;
-    }
-  else
-    {
+      if (system.hartCount() > 1)
+	{
+	  std::cerr << "Initial line-state report (--initstate) valid only when hart count is 1\n";
+	  return false;
+	}
       auto& hart0 = *system.ithHart(0);
       if (not hart0.setInitialStateFile(args.initStateFile))
 	return false;
