@@ -1065,50 +1065,23 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Use ABI register names (e.g. sp instead of x2).
+  bool flag = false;
   tag = "abi_names";
   if (config_ -> count(tag))
     {
-      bool abiNames = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), abiNames))
-        hart.enableAbiNames(abiNames);
-      else
-        errors++;
+      getJsonBoolean(tag, config_->at(tag), flag) or errors++;
+      hart.enableAbiNames(flag);
     }
 
   // Print memory address of load/store instruction in trace log.
   // tag = "print_load_store_address";  // Deprecated -- now always true.
 
-  // Atomic instructions illegal outside of DCCM.
-  tag = "amo_illegal_outside_dccm";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.setAmoInDccmOnly(flag);
-      else
-        errors++;
-    }
-
-  // Atomic instructions illegal outside cacheable regions.
-  tag = "amo_illegal_outside_cacheable";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.setAmoInCacheableOnly(flag);
-      else
-        errors++;
-    }
-
   // Trace page table walk in log.
   tag = "trace_ptw";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.tracePtw(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.tracePtw(flag);
     }
 
   // Reservation size in bytes for the load-reserve (LR) instruction.
@@ -1137,52 +1110,37 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_triggers";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableTriggers(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableTriggers(flag);
     }
 
   // Enable performance counters.
   tag = "enable_performance_counters";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enablePerformanceCounters(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePerformanceCounters(flag);
     }
 
   tag = "perf_count_atomic_load_store";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.perfCountAtomicLoadStore(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.perfCountAtomicLoadStore(flag);
     }
 
   tag = "perf_count_fp_load_store";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.perfCountFpLoadStore(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.perfCountFpLoadStore(flag);
     }
 
   tag = "enable_per_mode_counter_control";
   if (config_ -> count(tag))
     {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enablePerModeCounterControl(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePerModeCounterControl(flag);
     }
 
   for (auto ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin",
@@ -1201,47 +1159,30 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	std::cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
+  applyPerfEvents(hart, *config_, userMode, verbose) or errors++;
+  applyCsrConfig(hart, *config_, verbose) or errors++;
+  applyTriggerConfig(hart, *config_) or errors++;
+  applyVectorConfig(hart, *config_) or errors++;
 
   tag = "even_odd_trigger_chains";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.configEvenOddTriggerChaining(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configEvenOddTriggerChaining(flag);
     }
-
-  if (not applyPerfEvents(hart, *config_, userMode, verbose))
-    errors++;
-
-  if (not applyCsrConfig(hart, *config_, verbose))
-    errors++;
-
-  if (not applyTriggerConfig(hart, *config_))
-    errors++;
-
-  if (not applyVectorConfig(hart, *config_))
-    errors++;
 
   tag = "load_data_trigger";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.configLoadDataTrigger(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configLoadDataTrigger(flag);
     }
 
   tag = "exec_opcode_trigger";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.configExecOpcodeTrigger(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configExecOpcodeTrigger(flag);
     }
 
   tag = "memmap";
@@ -1285,11 +1226,8 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_misaligned_data";
   if (config_ -> count(tag))
     {
-      bool misal = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), misal))
-        hart.enableMisalignedData(misal);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableMisalignedData(flag);
     }
 
   tag = "force_rounding_mode";
@@ -1316,21 +1254,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_csv_log";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
-	errors++;
-      else
-	hart.enableCsvLog(flag);
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.enableCsvLog(flag);
     }
 
   tag = "page_fault_on_first_access";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
-        errors++;
-      else
-        hart.setFaultOnFirstAccess(flag);
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.setFaultOnFirstAccess(flag);
     }
 
   tag = "snapshot_periods";
