@@ -255,8 +255,7 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 	}
 
       if (conf.count("reset"))
-        if (not getJsonUnsigned(csrName + ".reset", conf.at("reset"), reset))
-          errors++;
+        getJsonUnsigned(csrName + ".reset", conf.at("reset"), reset) or errors++;
 
       if (conf.count("mask"))
 	{
@@ -271,20 +270,16 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 	}
 
       if (conf.count("poke_mask"))
-	if (not getJsonUnsigned(csrName + ".poke_mask", conf.at("poke_mask"), pokeMask))
-          errors++;
+	getJsonUnsigned(csrName + ".poke_mask", conf.at("poke_mask"), pokeMask) or errors++;
 
       if (conf.count("debug"))
-	if (not getJsonBoolean(csrName + ".bool", conf.at("debug"), isDebug))
-          errors++;
+	getJsonBoolean(csrName + ".debug", conf.at("debug"), isDebug) or errors++;
 
       if (conf.count("exists"))
-	if (not getJsonBoolean(csrName + ".bool", conf.at("exists"), exists))
-          errors++;
+	getJsonBoolean(csrName + ".exists", conf.at("exists"), exists) or errors++;
 
       if (conf.count("shared"))
-        if (not getJsonBoolean(csrName + ".bool", conf.at("shared"), shared))
-          errors++;
+        getJsonBoolean(csrName + ".shared", conf.at("shared"), shared) or errors++;
 
       // If number present and csr is not defined, then define a new
       // CSR; otherwise, configure.
