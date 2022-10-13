@@ -221,53 +221,6 @@ namespace WdRiscv
 }
 
 
-static
-bool
-validateStackChecker(const nlohmann::json& csrs)
-{
-  // If any of the stack checker CSRs is present then all must be
-  // present.
-  auto tags = { "mspcba", "mspcta", "mspcc" };
-  std::string present;
-  unsigned count = 0;
-  for (const auto& tag : tags)
-    if (csrs.count(tag))
-      {
-	present = tag;
-	count++;
-      }
-
-  if (count == 0)
-    return true;
-
-  if (count != tags.size())
-    {
-      std::cerr << "Error: Not all stack checker CSRs are defined:\n";
-      std::cerr << "  Defined: ";
-      std::string sep = "";
-      for (const auto& tag: tags)
-	if (csrs.count(tag))
-	  {
-	    std::cerr << sep << tag;
-	    sep = ", ";
-	  }
-
-      sep.clear();
-      std::cerr << "  Missing: ";
-      for (const auto& tag: tags)
-	if (not csrs.count(tag))
-	  {
-	    std::cerr << sep << tag;
-	    sep = ", ";
-	  }
-
-      return false;
-    }
-
-  return true;
-}
-
-
 template <typename URV>
 static
 bool
@@ -385,11 +338,6 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
       URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
       URV pokeMask0 = csr->getPokeMask();
 
-      if (csrName == "mhartstart")
-        if (hart.sysHartIndex() == 0 and (reset & 1) == 0)
-          std::cerr << "Warning: Bit corresponding to hart 0 is cleared "
-                    << "in reset value of mhartstart CSR -- Bit is ignored\n";
-
       if (csrName == "mhartid" or csrName == "vlenb")
         {
           std::cerr << "CSR " << csrName << " cannot be configured.\n";
@@ -420,7 +368,7 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 			  << isDebug << '\n';
 
 	      if (shared0 != shared)
-		std::cerr << "  shred: " << shared0 << " to "
+		std::cerr << "  shared: " << shared0 << " to "
 			  << shared << '\n';
 
 	      if (reset0 != reset)
@@ -437,10 +385,6 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 	    }
 	}
     }
-
-  // Stack checker.
-  if (not validateStackChecker(csrs))
-    errors++;
 
   return errors == 0;
 }

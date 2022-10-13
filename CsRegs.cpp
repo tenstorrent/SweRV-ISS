@@ -929,7 +929,7 @@ CsRegs<URV>::defineMachineRegs()
   // to defined interrupts are modifiable.
   defineCsr("mip", CsrNumber::MIP, mand, imp, 0, rom, mieMask);
 
-  // Physical memory protection. Odd PMPCFG are present only
+  // Physical memory protection. Odd-numbered PMPCFG are only present
   // in 32-bit implementations.
   uint64_t cfgMask = 0x9f9f9f9f;
   if (not rv32_)
