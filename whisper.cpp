@@ -1236,8 +1236,6 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 
   if (args.trace and traceFile == nullptr)
     traceFile = stdout;
-  if (traceFile and not doGzip)
-    setlinebuf(traceFile);  // Make line-buffered.
 
   if (not args.commandLogFile.empty())
     {

@@ -1413,7 +1413,7 @@ Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
 
 /// Dump initial state of a memory line to the given file.
 static void
-dumpInitState(FILE* file, char* tag, std::unordered_set<uint64_t>& dumpedLines,
+dumpInitState(FILE* file, const char* tag, std::unordered_set<uint64_t>& dumpedLines,
 	      uint64_t vaddr, uint64_t paddr, Memory& mem)
 {
   uint64_t pline = mem.getLineNumber(paddr);

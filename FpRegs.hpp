@@ -447,17 +447,17 @@ namespace WdRiscv
     bool findReg(const std::string& name, unsigned& ix) const;
 
     /// Return the name of the given register.
-    std::string regName(unsigned i, bool abiNames = false) const
+    const std::string& regName(unsigned i, bool abiNames = false) const
     {
       if (abiNames)
 	{
 	  if (i < numberToAbiName_.size())
 	    return numberToAbiName_[i];
-	  return std::string("f?");
+	  return unknown_;
 	}
       if (i < numberToName_.size())
 	return numberToName_[i];
-      return std::string("f?");
+      return unknown_;
     }
 
   protected:
@@ -558,6 +558,7 @@ namespace WdRiscv
     double originalValue_ = 0;     // Original value of last written reg.
     unsigned flen_ = 64;           // Floating point register width.
     uint64_t mask_ = ~uint64_t(0);
+    const std::string unknown_ = std::string("f?");
     std::unordered_map<std::string, FpRegNumber> nameToNumber_;
     std::vector<std::string> numberToAbiName_;
     std::vector<std::string> numberToName_;
