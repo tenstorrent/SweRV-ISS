@@ -440,6 +440,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   ok = ppoRule9(hart, *instr) and ok;
   ok = ppoRule10(hart, *instr) and ok;
   ok = ppoRule11(hart, *instr) and ok;
+  ok = ppoRule12(hart, *instr) and ok;
 
   updateDependencies(hart, *instr);
 
@@ -1634,8 +1635,8 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.isCanceled())
     {
-      cerr << "Mcm::ppoRule9: Instr B canceled\n";
-      assert(0 && "Mcm::ppoRule9: Instr B canceled");
+      cerr << "Mcm::ppoRule12: Instr B canceled: tag=" << instrB.tag_ << "\n";
+      return false;
     }
 
   if (not instrB.isMemory())
@@ -1673,8 +1674,8 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.isCanceled())
     {
-      cerr << "Mcm::ppoRule10: Instr B canceled\n";
-      assert(0 && "Mcm::ppoRule10: Instr B canceled");
+      cerr << "Mcm::ppoRule10: Instr B canceled: tag=" << instrB.tag_ << "\n";
+      return false;
     }
 
   if (not instrB.isMemory())
@@ -1682,6 +1683,7 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
 
+  // TBD FIX: this mixes integer and FP data registers -- incorrect.
   const auto& bdi = instrB.di_;
   unsigned dataReg = 0;
   if (bdi.isAmo())
@@ -1748,6 +1750,69 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
 
   return true;
 }
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 12: B is a load, there is a store M between A and B such that
+  // 1. B loads a value written by M
+  // 2. M has an address or data denpendency on A
+
+  if (instrB.isCanceled())
+    {
+      cerr << "Mcm::ppoRule12: Instr B canceled: tag=" << instrB.tag_ << "\n";
+      return false;
+    }
+
+  if (not instrB.isLoad_)
+    return true;  // NA: B is not a load.
+
+  unsigned hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  if (instrVec.empty() or instrB.tag_ == 0)
+    return true;  // Nothing before B in instruction order.
+
+  // Check all preceeding instructions for a non-finished store M with
+  // address overlapping that of B. This is expensive. We need to keep
+  // set of non-finished stores.
+  size_t ix = std::min(size_t(instrB.tag_), instrVec.size());
+  for ( ; ix ; --ix)
+    {
+      size_t mtag = ix - 1;
+      const auto& instrM = instrVec.at(mtag);
+      if (instrM.isCanceled() or not instrM.di_.isValid())
+	continue;
+
+      const auto& mdi = instrM.di_;
+      if ((not mdi.isStore() and not mdi.isAmo()) or instrM.complete_
+	  or not instrM.overlaps(instrB))
+	continue;
+
+      unsigned addrReg = mdi.op1();
+      auto apTag = hartRegProducers_.at(hartIx).at(addrReg); // address producer tag
+
+      // TBD FIX: this mixes integer and FP data registers -- incorrect.
+      unsigned dataReg = mdi.isAmo()? mdi.op2() : mdi.op0();
+      auto dpTag = hartRegProducers_.at(hartIx).at(dataReg); // data producer tag
+
+      for (auto aTag : { apTag, dpTag } )
+	{
+	  const auto& instrA = instrVec.at(aTag);
+	  if (instrA.di_.isValid())
+	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+	      {
+		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		     << aTag << " tag2=" << instrB.tag_ << '\n';
+		return false;
+	      }
+	}
+    }
+
+  return true;
+}
+
 
 
 template class WdRiscv::Mcm<uint32_t>;

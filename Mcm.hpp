@@ -182,6 +182,8 @@ namespace WdRiscv
 
     bool ppoRule11(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       if (not instr.complete_)
