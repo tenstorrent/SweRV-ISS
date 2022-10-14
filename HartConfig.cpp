@@ -414,7 +414,7 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 	  continue;
 	}
 
-      for (unsigned n = range.at(0); n < range.at(1); ++n)
+      for (unsigned n = range.at(0); n <= range.at(1); ++n)
 	{
 	  std::string strand = csrName + std::to_string(n);
 	  if (not applyCsrConfig(hart, strand, conf, verbose))

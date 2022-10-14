@@ -1348,11 +1348,11 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
     }
 
   // Instruction B must be a load/amo instruction.
-  const InstEntry* instEntry = instrB.di_.instEntry();
-  if (instEntry->isStore())
+  const DecodedInst& bdi = instrB.di_;
+  if (bdi.isStore())
     return true;  // NA: store instruction.
 
-  if (not instEntry->isLoad() and not instEntry->isAtomic())
+  if (not bdi.isLoad() and not bdi.isAtomic())
     return true;  // NA: must be load/amo.
 
   if (not instrB.complete_)
@@ -1386,7 +1386,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	  assert(0 && "Mcm::ppoRule3: Instruction A is not decoded.");
 	}
 
-      if (not instrA.di_.instEntry()->isAtomic())
+      if (not instrA.di_.isAtomic())
 	{
 	  clearMaskBitsForWrite(instrA, instrB, mask);
 	  if (mask == 0)
@@ -1418,7 +1418,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
       assert(0 && "Mcm::ppoRule4: Invalid/undecoded instruction\n");
     }
 
-  if (instr.di_.instEntry()->instId() != InstId::fence)
+  if (not instr.di_.isFence())
     return true;
 
   bool predRead = instr.di_.isFencePredRead();
@@ -1494,7 +1494,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
 
       bool fail = false;
-      if (instrA.di_.instEntry()->isAmo())
+      if (instrA.di_.isAmo())
 	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
       else if (not instrA.complete_)
 	fail = true; // Incomplete store might finish after B
@@ -1542,7 +1542,7 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 	}
 
       bool fail = false;
-      if (instrA.di_.instEntry()->isAmo())
+      if (instrA.di_.isAmo())
 	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
       else if (not instrA.complete_)
 	fail = true; // Incomplete store might finish after B
@@ -1581,7 +1581,7 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
       cerr << "Mcm::ppoRule8: Instr B undecoded\n";
       assert(0 && "Mcm::ppoRule8: Instr B undecoded");
     }
-  if (not instrB.di_.instEntry()->isSc())
+  if (not instrB.di_.isSc())
     return true;
 
   uint64_t addr = 0, value = 0;
@@ -1600,7 +1600,7 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
 	  cerr << "Mcm::ppoRule8: Instr A undecoded/invalid\n";
 	  assert(0 && "Mcm::ppoRule8: Instr B undecoded/invalid");
 	}
-      if (not instrA.di_.instEntry()->isLr())
+      if (not instrA.di_.isLr())
 	continue;
 
       bool fail = false;
@@ -1641,11 +1641,10 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
-  const auto& di = instrB.di_;
-  const auto instEntry = di.instEntry();
+  const auto& bdi = instrB.di_;
   unsigned addrReg = 0;
-  if (instEntry->isLoad() or instEntry->isStore() or instEntry->isAmo())
-    addrReg = di.op1();
+  if (bdi.isLoad() or bdi.isStore() or bdi.isAmo())
+    addrReg = bdi.op1();
 
   uint64_t time = hartRegTimes_.at(hart.sysHartIndex()).at(addrReg);
 
@@ -1683,13 +1682,12 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
 
-  const auto& di = instrB.di_;
-  const auto instEntry = di.instEntry();
+  const auto& bdi = instrB.di_;
   unsigned dataReg = 0;
-  if (instEntry->isAmo())
-    dataReg = di.op2();
-  else if (instEntry->isStore())
-    dataReg = di.op0();
+  if (bdi.isAmo())
+    dataReg = bdi.op2();
+  else if (bdi.isStore())
+    dataReg = bdi.op0();
   else
     return true;
 
@@ -1726,9 +1724,8 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
 
   unsigned hartIx = hart.sysHartIndex();
 
-  const auto& di = instrB.di_;
-  const auto instEntry = di.instEntry();
-  if (not instEntry->isStore() and not instEntry->isAmo())
+  const auto& bdi = instrB.di_;
+  if (not bdi.isStore() and not bdi.isAmo())
     return true;
 
   auto producerTag = hartBranchProducers_.at(hartIx);
