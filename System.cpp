@@ -126,7 +126,8 @@ bool
 System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool verbose)
 {
   unsigned registerWidth = sizeof(URV)*8;
-  uint64_t end = 0, entry = 0, gp = 0;
+  uint64_t end = 0, entry = 0;
+  uint64_t gp = 0, tp = 0; // gp: global-pointer, tp: thread-pointer
   unsigned errors = 0;
   ElfSymbol sym;
 
@@ -149,6 +150,9 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
 
 	  if (not gp and memory_->findElfSymbol("__global_pointer$", sym))
 	    gp = sym.addr_;
+
+	  if (not tp and memory_->findElfSection(".tdata", sym))
+	    tp = sym.addr_;
 	}
     }
 
@@ -166,6 +170,8 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
 	{
 	  if (not hart->peekIntReg(RegGp) and gp)
 	    hart->pokeIntReg(RegGp, URV(gp));
+	  if (not hart->peekIntReg(RegTp) and tp)
+	    hart->pokeIntReg(RegTp, URV(tp));
 	  if (entry)
 	    hart->pokePc(URV(entry));
 	}

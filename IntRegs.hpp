@@ -151,17 +151,17 @@ namespace WdRiscv
     bool findReg(const std::string& name, unsigned& ix) const;
 
     /// Return the name of the given register.
-    std::string regName(unsigned i, bool abiNames = false) const
+    const std::string& regName(unsigned i, bool abiNames = false) const
     {
       if (abiNames)
 	{
 	  if (i < numberToAbiName_.size())
 	    return numberToAbiName_[i];
-	  return std::string("x?");
+	  return unknown_;
 	}
       if (i < numberToName_.size())
 	return numberToName_[i];
-      return std::string("x?");
+      return unknown_;
     }
 
   protected:
@@ -201,6 +201,7 @@ namespace WdRiscv
     std::vector<URV> regs_;
     int lastWrittenReg_ = -1;  // Register accessed in most recent write.
     URV originalValue_ = 0;    // Original value of last written reg.
+    const std::string  unknown_ = std::string("x?");
     std::unordered_map<std::string, IntRegNumber> nameToNumber_;
     std::vector<std::string> numberToAbiName_;
     std::vector<std::string> numberToName_;

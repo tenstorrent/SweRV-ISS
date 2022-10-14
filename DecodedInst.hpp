@@ -199,9 +199,13 @@ namespace WdRiscv
     bool isFenceSuccOutput() const
     { return isFence() and ((inst_ >> 22) & 1); }
 
-    /// Return true if this is an AMO instruction.
+    /// Return true if this is an AMO instruction (atomic but not lr/sc).
     bool isAmo() const
     { return entry_ and entry_->isAmo(); }
+
+    /// Return true if this an atomic instruction (amo or lr/sc).
+    bool isAtomic() const
+    { return entry_ and entry_->isAtomic(); }
 
     /// Return true if this a floating point instruction.
     bool isFp() const
@@ -226,6 +230,14 @@ namespace WdRiscv
     /// Return true if this is a store instruction.
     bool isStore() const
     { return entry_ and entry_->isStore(); }
+
+    /// Return true if this is an lr (load reserve) instruction.
+    bool isLr() const
+    { return entry_ and entry_->isLr(); }
+
+    /// Return true if this is an sc (score conditional) instruction.
+    bool isSc() const
+    { return entry_ and entry_->isSc(); }
 
     /// Return true if this is a branch instruction.
     bool isBranch() const

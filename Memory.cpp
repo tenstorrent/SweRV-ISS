@@ -524,6 +524,20 @@ Memory::collectElfSymbols(ELFIO::elfio& reader)
 }
 
 
+void
+Memory::collectElfSections(ELFIO::elfio& reader)
+{
+  auto secCount = reader.sections.size();
+
+  for (int secIx = 0; secIx < secCount; ++secIx)
+    {
+      auto sec = reader.sections[secIx];
+      sections_[sec->get_name()] = ElfSymbol(sec->get_address(), sec->get_size());
+    }
+}
+
+
+
 bool
 Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
 		    uint64_t& entryPoint, uint64_t& end)
@@ -607,6 +621,9 @@ Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
   // Collect symbols.
   collectElfSymbols(reader);
 
+  // Collect address/size of sections.
+  collectElfSections(reader);
+
   // Get the program entry point.
   if (not errors)
     {
@@ -619,12 +636,23 @@ Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
 
 
 bool
-Memory::findElfSymbol(const std::string& symbol, ElfSymbol& value) const
+Memory::findElfSymbol(const std::string& name, ElfSymbol& symbol) const
 {
-  if (not symbols_.count(symbol))
+  if (not symbols_.count(name))
     return false;
 
-  value = symbols_.at(symbol);
+  symbol = symbols_.at(name);
+  return true;
+}
+
+
+bool
+Memory::findElfSection(const std::string& name, ElfSymbol& symbol) const
+{
+  if (not sections_.count(name))
+    return false;
+
+  symbol = sections_.at(name);
   return true;
 }
 

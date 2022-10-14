@@ -561,7 +561,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
     }
 
   resetVector();
-
   resetFloat();
 
   // Update cached values of mstatus.mpp and mstatus.mprv and mstatus.fs.
@@ -613,6 +612,16 @@ Hart<URV>::resetVector()
       ElementWidth ew = ElementWidth((value >> 3) & 7);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
+
+  // Set VS to initial in MSTATUS if linux/newlib emulation. This
+  // allows linux/newlib program to run without startup code.
+  if (isRvv() and (newlib_ or linux_))
+    {
+      URV val = csRegs_.peekMstatus();
+      MstatusFields<URV> fields(val);
+      fields.bits_.VS = unsigned(FpFs::Initial);
+      csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, fields.value_);
+    }
 }
 
 
@@ -629,6 +638,20 @@ Hart<URV>::updateCachedMstatusFields()
 
   virtMem_.setExecReadable(msf.bits_.MXR);
   virtMem_.setSupervisorAccessUser(msf.bits_.SUM);
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::setInitialStateFile(const std::string& path)
+{
+  initStateFile_ = fopen(path.c_str(), "w");
+  if (not initStateFile_)
+    {
+      std::cerr << "Failed to open '" << path << "' for output\n";
+      return false;
+    }
+  return true;
 }
 
 
@@ -1388,12 +1411,37 @@ Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
 }
 
 
+/// Dump initial state of a memory line to the given file.
+static void
+dumpInitState(FILE* file, const char* tag, std::unordered_set<uint64_t>& dumpedLines,
+	      uint64_t vaddr, uint64_t paddr, Memory& mem)
+{
+  uint64_t pline = mem.getLineNumber(paddr);
+  if (dumpedLines.find(pline) != dumpedLines.end())
+    return;  // Already dumped
+
+  dumpedLines.insert(pline);
+
+  uint64_t vline = mem.getLineNumber(vaddr);
+  unsigned lineSize = mem.lineSize();
+  fprintf(file, "%s,%0jx,%0jx,", tag, uintmax_t(vline*lineSize), uintmax_t(pline*lineSize));
+
+  uint64_t byteAddr = pline * lineSize + lineSize - 1;
+  for (unsigned i = 0; i < lineSize; ++i)
+    {
+      uint8_t byte = 0;
+      mem.peek(byteAddr--, byte, false);
+      fprintf(file, "%02x", unsigned(byte));
+    }
+  fprintf(file, "\n");
+}
+
+
 /// Shift executed instruction counter by this amount to produce a
 /// fake timer value. For example, if shift amout is 3, we are
 /// dividing instruction count by 8 (2 to power 3) to produce a timer
 /// value.
 unsigned counterToTimeShift = 3;
-
 
 template <typename URV>
 template <typename LOAD_TYPE>
@@ -1466,6 +1514,13 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
   data = narrow;
   if (not std::is_same<ULT, LOAD_TYPE>::value)
     data = int64_t(LOAD_TYPE(narrow)); // Loading signed: Sign extend.
+
+  if (initStateFile_)
+    {
+      dumpInitState(initStateFile_, "load", initStateLines_, virtAddr, addr1, memory_);
+      if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
+	dumpInitState(initStateFile_, "load", initStateLines_, virtAddr + ldStSize_, addr2 + ldStSize_, memory_);
+    }
 
   // Check for load-data-trigger.
   if (hasActiveTrigger())
@@ -1685,13 +1740,6 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   memPeek(addr1, addr2, temp, false /*usePma*/);
   ldStPrevData_ = temp;
 
-  // If we write to special location, end the simulation.
-  if (toHostValid_ and addr1 == toHost_)
-    {
-      handleStoreToHost(addr1, storeVal);
-      return true;
-    }
-
   // If addr is special location, then write to console.
   if (conIoValid_ and addr1 == conIo_)
     {
@@ -1701,6 +1749,20 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 	  if (storeVal == '\n')
 	    fflush(consoleOut_);
 	}
+      return true;
+    }
+
+  if (initStateFile_)
+    {
+      dumpInitState(initStateFile_, "store", initStateLines_, virtAddr, addr1, memory_);
+      if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
+	dumpInitState(initStateFile_, "store", initStateLines_, virtAddr + ldStSize_, addr2 + ldStSize_, memory_);
+    }
+
+  // If we write to special location, end the simulation.
+  if (toHostValid_ and addr1 == toHost_)
+    {
+      handleStoreToHost(addr1, storeVal);
       return true;
     }
 
@@ -1932,6 +1994,9 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
             }
         }
 
+      if (initStateFile_)
+	dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, physAddr, memory_);
+
       return true;
     }
 
@@ -1956,6 +2021,8 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
         }
     }
 
+  if (initStateFile_)
+    dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, physAddr, memory_);
   inst = half;
   if (isCompressedInst(inst))
     return true;
@@ -1994,6 +2061,9 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
           return false;
         }
     }
+
+  if (initStateFile_)
+    dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, addr, memory_);
 
   inst = inst | (uint32_t(upperHalf) << 16);
   return true;
@@ -3719,6 +3789,16 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  ++cycleCount_;
 
+	  if (initStateFile_)
+	    {
+	      auto& instrPte = virtMem_.getInstrPteAddrs();
+	      for (auto addr : instrPte)
+		dumpInitState(initStateFile_, "ipt", initStateLines_, addr, addr, memory_);
+	      auto& dataPte = virtMem_.getDataPteAddrs();
+	      for (auto addr : dataPte)
+		dumpInitState(initStateFile_, "dpt", initStateLines_, addr, addr, memory_);
+	    }
+
 	  if (hasException_ or hasInterrupt_)
 	    {
               if (doStats)
@@ -4077,7 +4157,7 @@ Hart<URV>::run(FILE* file)
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
-		  or tracerExtension or hasInterruptor_);
+		  or tracerExtension or hasInterruptor_ or initStateFile_);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 

@@ -150,14 +150,14 @@ formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId, PrivilegeM
   const char* pmStr = privilegeModeToStr(pm);
   if (width == 64)
     {
-      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx %016jx  %s",
+      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx %016jx %s",
 	      uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, uintmax_t(fpReg),
 	      uintmax_t(fpVal), assembly);
     }
   else
     {
       uint32_t val32 = fpVal;
-      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx         %08x  %s",
+      fprintf(out, "#%jd %d %2s %016jx %8s f %016jx         %08x %s",
 	      uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, uintmax_t(fpReg),
 	      val32, assembly);
     }
@@ -422,13 +422,89 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 }
 
 
+// We use custom code for speed. This makes a big difference in
+// runtime for large traces.
+namespace Whisper
+{
+  class PrintBuffer
+  {
+  public:
+
+    PrintBuffer()
+      : pos_(0)
+    { }
+
+    // Append to buffer hexadecimal string representing given number.
+    inline
+    PrintBuffer& print(uint64_t num)
+    {                                                                                        
+      if (num == 0)                                                                          
+	buff_.at(pos_++) = '0';                                                              
+      else                                                                                   
+	{                                                                                    
+	  size_t beg = pos_;
+	  for ( ; num; num = num >> 4 )
+	    buff_.at(pos_++) = "0123456789abcdef"[num&0xf];
+	  std::reverse(buff_.begin() + beg, buff_.begin() + pos_);
+	}
+      return *this;
+    }
+
+    // Append to buffer copy of given string excluding null char
+    inline
+    PrintBuffer& print(const char* str)
+    {
+      if (str)
+	while (*str)
+	  buff_.at(pos_++) = *str++;
+      return *this;
+    }
+
+    // Append to buffer copy of given string excluding null char
+    inline
+    PrintBuffer& print(const std::string& str)
+    {
+      return print(str.c_str());
+    }
+
+    // Append char to buffer.
+    inline
+    PrintBuffer& printChar(char c)
+    {
+      buff_.at(pos_++) = c;
+      return *this;
+    }
+
+    // Write contents of buffer to given file.
+    inline
+    void write(FILE* out)
+    {
+      size_t n = fwrite(buff_.data(), pos_, 1, out);
+      assert(n == 1);
+    }
+
+    // Clear contents of buffer.
+    inline
+    void clear()
+    { pos_ = 0; }
+
+  private:
+    typedef std::array<char, 12*1024> Buff;
+
+    Buff buff_;
+    size_t pos_ = 0;
+  };
+}
+
+
+static std::unordered_map<uint32_t, std::string> disasMap;
+Whisper::PrintBuffer buffer;
+
+
 template <typename URV>
 void
 Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 {
-  if (not out)
-    return;
-
   // Serialize to avoid jumbled output.
   std::lock_guard<std::mutex> guard(printInstTraceMutex);
 
@@ -441,24 +517,26 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       fprintf(out, "\n");
     }
 
+  buffer.clear();
+
   // Program counter.
   uint64_t virtPc = di.address(), physPc = di.physAddress();
-  fprintf(out, "%lx", virtPc);
+  buffer.print(virtPc);
   if (physPc != virtPc)
-    fprintf(out, ":%lx", physPc);
+    buffer.printChar(':').print(physPc);
 
   // Instruction.
-  fprintf(out, ",%x,", di.inst());
+  buffer.printChar(',').print(di.inst()).printChar(',');
 
   // Changed integer register.
+  unsigned regCount = 0;
   int reg = lastIntReg();
   uint64_t val64 = 0;
-  const char* sep = "";
   if (reg > 0)
     {
       val64 = peekIntReg(reg);
-      fprintf(out, "x%d=%lx", reg, val64);
-      sep = ";";
+      buffer.print(intRegs_.regName(reg)).printChar('=').print(val64);
+      regCount++;
     }
 
   // Changed fp register.
@@ -466,16 +544,15 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (reg >= 0)
     {
       peekFpReg(reg, val64);
-      if (isRvd())
-	fprintf(out, "%sf%d=%lx", sep, reg, val64);
-      else
-	fprintf(out, "%sf%d=%x", sep, reg, uint32_t(val64));
-
+      if (not isRvd())
+	val64 = uint32_t(val64);  // Clear top 32 bits if only F extension.
+      if (regCount) buffer.printChar(';');
+      buffer.print(intRegs_.regName(reg)).printChar('=').print(val64);
       // Print incremental flags since FRM is sticky.
       unsigned fpFlags = lastFpFlags();
       if (fpFlags != 0)
-	fprintf(out, ";ff=%x", fpFlags);
-      sep = ";";
+	buffer.print(";ff=").print(fpFlags);
+      regCount++;
     }
 
   // Changed CSR register(s).
@@ -485,8 +562,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     {
       URV val = 0;
       peekCsr(csrn, val);
-      fprintf(out, "%sc%d=%lx", sep, unsigned(csrn), uint64_t(val));
-      sep = ";";
+      if (regCount) buffer.printChar(';');
+      buffer.printChar('c').print(std::to_string(unsigned(csrn))).printChar('=').print(val);
+      regCount++;
     }
 
   // Changed vector register group.
@@ -496,12 +574,17 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     {
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
 	{
-	  fprintf(out, "%sv%d=", sep, vecReg);
+	  if (regCount) buffer.printChar(';');
+	  buffer.printChar('v').print(std::to_string(vecReg)).printChar('=');
 	  const uint8_t* data = vecRegs_.getVecData(vecReg);
 	  unsigned byteCount = vecRegs_.bytesPerRegister();
 	  for (unsigned i = 0; i < byteCount; ++i)
-	    fprintf(out, "%02x", data[byteCount - 1 - i]);
-	  sep = ";";
+	    {
+	      unsigned byte = data[byteCount - 1 - i];
+	      if (byte < 16) buffer.printChar('0');
+	      buffer.print(byte);
+	    }
+	  regCount++;
 	}
     }
 
@@ -510,13 +593,13 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   bool hasTrap = hasInterrupt_ or hasException_;
   if (not hasTrap and instEntry->isBranch() and lastBranchTaken_)
     {
-      fprintf(out, "%spc=%lx", sep, uint64_t(pc_));
-      sep = ";";
+      if (regCount) buffer.printChar(';');
+      buffer.print("pc=").print(pc_);
     }
 
   // Source operands.
-  fputc(',', out);
-  sep = "";
+  buffer.printChar(',');
+  const char* sep = "";
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {
       auto mode = instEntry->ithOperandMode(i);
@@ -524,21 +607,22 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       if (mode == OperandMode::Read or mode == OperandMode::ReadWrite or
 	  type == OperandType::Imm)
 	{
+	  unsigned operand = di.ithOperand(i);
 	  if (type ==  OperandType::IntReg)
-	    fprintf(out, "%sx%d", sep, di.ithOperand(i));
+	    buffer.print(sep).print(intRegs_.regName(operand));
 	  else if (type ==  OperandType::FpReg)
-	    fprintf(out, "%sf%d", sep, di.ithOperand(i));
+	    buffer.print(sep).print(fpRegs_.regName(operand));
 	  else if (type == OperandType::CsReg)
-	    fprintf(out, "%sc%d", sep, di.ithOperand(i));
+	    buffer.print(sep).printChar('c').print(std::to_string(operand));
 	  else if (type == OperandType::VecReg)
 	    {
-	      fprintf(out, "%sv%d", sep, di.ithOperand(i));
+	      buffer.print(sep).printChar('v').print(std::to_string(operand));
 	      unsigned emul = i < vecRegs_.opsEmul_.size() ? vecRegs_.opsEmul_.at(i) : 1;
 	      if (emul >= 2 and emul <= 8)
-		fprintf(out, "m%d", emul);
+		buffer.printChar('m').print(emul);
 	    }
 	  else if (type == OperandType::Imm)
-	    fprintf(out, "%si%x", sep, di.ithOperand(i));
+	    buffer.print(sep).printChar('i').print(operand);
 	  sep = ";";
 	}
     }
@@ -547,118 +631,128 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (instEntry->hasRoundingMode())
     {
       RoundingMode rm = effectiveRoundingMode(di.roundingMode());
-      fprintf(out, "%srm=%x", sep, unsigned(rm));
+      buffer.print(sep).print("rm=").print(unsigned(rm));
       sep = ";";
     }
 
   // Memory
-  fputc(',', out);
+  buffer.printChar(',');
   uint64_t virtDataAddr = 0, physDataAddr = 0;
   bool load = false, store = false;
   if (lastLdStAddress(virtDataAddr, physDataAddr))
     {
       store = ldStWrite_;
       load = not store;
-      fprintf(out, "%lx", virtDataAddr);
+      buffer.print(virtDataAddr);
       if (physDataAddr != virtDataAddr)
-	fprintf(out, ":%lx", physDataAddr);
+	buffer.printChar(':').print(physDataAddr);
       if (store)
-	fprintf(out, "=%lx", ldStData_);
+	buffer.printChar('=').print(ldStData_);
     }
   else if (not vecRegs_.ldStAddr_.empty())
     {
       for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
 	{
 	  if (i > 0)
-	    fputc(';', out);
-	  fprintf(out, "%lx", vecRegs_.ldStAddr_.at(i));
+	    buffer.printChar(';');
+	  buffer.print(vecRegs_.ldStAddr_.at(i));
 	  if (i < vecRegs_.stData_.size())
-	    fprintf(out, "=%lx", vecRegs_.stData_.at(i));
+	    buffer.printChar('=').print(vecRegs_.stData_.at(i));
 	}
     }
 
   // Instruction information.
-  fputc(',', out);
+  buffer.printChar(',');
   RvExtension type = instEntry->extension();
   if (type == RvExtension::A)
-    fputc('a', out);
+    buffer.printChar('a');
   else if (load)
-    fputc('l', out);
+    buffer.printChar('l');
   else if (store)
-    fputc('s', out);
+    buffer.printChar('s');
   else if (instEntry->isBranch())
     {
       if (instEntry->isConditionalBranch())
-	fputs(lastBranchTaken_ ? "t" : "nt", out);
+	buffer.print(lastBranchTaken_ ? "t" : "nt");
       else
 	{
 	  if (di.isBranchToRegister() and
 	      di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
-	    fputc('r', out);
+	    buffer.printChar('r');
 	  else if (di.op0() == IntRegNumber::RegRa)
-	    fputc('c', out);
+	    buffer.printChar('c');
 	  else
-	    fputc('j', out);
+	    buffer.printChar('j');
 	}
     }
   else if (type == RvExtension::F or type == RvExtension::D or type == RvExtension::Zfh)
-    fputc('f', out);
+    buffer.printChar('f');
   else if (type == RvExtension::V)
-    fputc('v', out);
+    buffer.printChar('v');
 
   // Privilege mode.
-  if      (lastPriv_ == PrivilegeMode::Machine)    fputs(",m", out);
-  else if (lastPriv_ == PrivilegeMode::Supervisor) fputs(",s", out);
-  else if (lastPriv_ == PrivilegeMode::User)       fputs(",u", out);
-  else                                             fputs(",",  out);
+  if      (lastPriv_ == PrivilegeMode::Machine)    buffer.print(",m,");
+  else if (lastPriv_ == PrivilegeMode::Supervisor) buffer.print(",s,");
+  else if (lastPriv_ == PrivilegeMode::User)       buffer.print(",u,");
+  else                                             buffer.print(",,");
 
   // Interrupt/exception cause.
   if (hasTrap)
     {
       URV cause = 0;
       peekCsr(CsrNumber::MCAUSE, cause);
-      fprintf(out, ",%lx,", uint64_t(cause));
+      buffer.print(uint64_t(cause));
     }
-  else
-    fputs(",,", out);
+  buffer.printChar(',');
 
   // Disassembly.
-  std::string tmp;
-  disassembleInst(di, tmp);
-  std::replace(tmp.begin(), tmp.end(), ',', ';');
-  fputs(tmp.c_str(), out);
+  uint32_t inst = di.inst();
+  auto iter = disasMap.find(inst);
+  if (iter != disasMap.end())
+    {
+      auto& disas = iter->second;
+      buffer.print(disas);
+    }
+  else
+    {
+      std::string tmp;
+      disassembleInst(di, tmp);
+      std::replace(tmp.begin(), tmp.end(), ',', ';');
+      buffer.print(tmp);
+      disasMap[di.inst()] = tmp;
+    }
 
   // Hart Id.
-  fprintf(out, ",%x", sysHartIndex());
+  buffer.printChar(',').print(sysHartIndex());
 
   // Page table walk.
   if (isRvs())
     {
-      fputs(",", out);
+      buffer.printChar(',');
       std::vector<uint64_t> addrs, entries;
       getPageTableWalkAddresses(true, addrs);
-      getPageTableWalkAddresses(true, entries);
-      const char* sep = "";
+      getPageTableWalkEntries(true, entries);
+      sep = "";
       uint64_t n = std::min(addrs.size(), entries.size());
       for (uint64_t i = 0; i < n; ++i)
 	{
-	  fprintf(out, "%s%lx=%lx", sep, addrs.at(i), entries.at(i));
+	  buffer.print(sep).print(addrs.at(i)).printChar('=').print(entries.at(i));
 	  sep = ";";
 	}
 
-      fputs(",", out);
+      buffer.printChar(',');
       getPageTableWalkAddresses(false, addrs);
-      getPageTableWalkAddresses(false, entries);
+      getPageTableWalkEntries(false, entries);
       sep = "";
       n = std::min(addrs.size(), entries.size());
       for (uint64_t i = 0; i < n; ++i)
 	{
-	  fprintf(out, "%s%lx=%lx", sep, addrs.at(i), entries.at(i));
+	  buffer.print(sep).print(addrs.at(i)).printChar('=').print(entries.at(i));
 	  sep = ";";
 	}
     }
-
-  fputc('\n', out);
+  buffer.printChar('\n');
+  buffer.write(out);
 }
 
 

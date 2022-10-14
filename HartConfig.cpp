@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <boost/algorithm/string.hpp>
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
@@ -221,47 +222,147 @@ namespace WdRiscv
 }
 
 
+template <typename URV>
 static
 bool
-validateStackChecker(const nlohmann::json& csrs)
+applyCsrConfig(Hart<URV>& hart, const std::string& name, const nlohmann::json& conf, bool verbose)
 {
-  // If any of the stack checker CSRs is present then all must be
-  // present.
-  auto tags = { "mspcba", "mspcta", "mspcc" };
-  std::string present;
-  unsigned count = 0;
-  for (const auto& tag : tags)
-    if (csrs.count(tag))
-      {
-	present = tag;
-	count++;
-      }
+  unsigned errors = 0;
+  URV reset = 0, mask = 0, pokeMask = 0;
+  bool isDebug = false, exists = true, shared = false;
 
-  if (count == 0)
-    return true;
-
-  if (count != tags.size())
+  Csr<URV>* csr = hart.findCsr(name);
+  if (csr)
     {
-      std::cerr << "Error: Not all stack checker CSRs are defined:\n";
-      std::cerr << "  Defined: ";
-      std::string sep = "";
-      for (const auto& tag: tags)
-	if (csrs.count(tag))
-	  {
-	    std::cerr << sep << tag;
-	    sep = ", ";
-	  }
+      reset = csr->getResetValue();
+      mask = csr->getWriteMask();
+      pokeMask = csr->getPokeMask();
+      isDebug = csr->isDebug();
+    }
 
-      sep.clear();
-      std::cerr << "  Missing: ";
-      for (const auto& tag: tags)
-	if (not csrs.count(tag))
-	  {
-	    std::cerr << sep << tag;
-	    sep = ", ";
-	  }
+  if (conf.count("reset"))
+    getJsonUnsigned(name + ".reset", conf.at("reset"), reset) or errors++;
 
+  if (conf.count("mask"))
+    {
+      if (not getJsonUnsigned(name + ".mask", conf.at("mask"), mask))
+	errors++;
+
+      // If defining a non-standard CSR (as popposed to
+      // configuring an existing CSR) then default the poke-mask
+      // to the write-mask.
+      if (not csr)
+	pokeMask = mask;
+    }
+
+  if (conf.count("poke_mask"))
+    getJsonUnsigned(name + ".poke_mask", conf.at("poke_mask"), pokeMask) or errors++;
+
+  if (conf.count("debug"))
+    getJsonBoolean(name + ".debug", conf.at("debug"), isDebug) or errors++;
+
+  if (conf.count("exists"))
+    getJsonBoolean(name + ".exists", conf.at("exists"), exists) or errors++;
+
+  if (conf.count("shared"))
+    getJsonBoolean(name + ".shared", conf.at("shared"), shared) or errors++;
+
+  // If number present and csr is not defined, then define a new
+  // CSR; otherwise, configure.
+  if (conf.count("number"))
+    {
+      unsigned number = 0;
+      if (not getJsonUnsigned<unsigned>(name + ".number", conf.at("number"), number))
+	errors++;
+      else
+	{
+	  if (csr)
+	    {
+	      if (csr->getNumber() != CsrNumber(number))
+		{
+		  std::cerr << "Invalid config file entry for CSR "
+			    << name << ": Number (0x" << std::hex << number
+			    << ") does not match that of previous definition ("
+			    << "0x" << unsigned(csr->getNumber())
+			    << ")\n" << std::dec;
+		  return false;
+		}
+	      // If number matches we configure below
+	    }
+	  else if (hart.defineCsr(name, CsrNumber(number), exists,
+				  reset, mask, pokeMask, isDebug))
+	    {
+	      csr = hart.findCsr(name);
+	      assert(csr);
+	    }
+	  else
+	    {
+	      std::cerr << "Invalid config file CSR definition with name "
+			<< name << " and number 0x" << std::hex << number
+			<< ": Number already in use\n" << std::dec;
+	      return false;
+	    }
+	}
+    }
+
+  if (not csr)
+    {
+      std::cerr << "A CSR number must be provided in configuration of non-standard CSR "
+		<< name << '\n';
       return false;
+    }
+  bool exists0 = csr->isImplemented(), isDebug0 = csr->isDebug();
+  bool shared0 = csr->isShared();
+  URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
+  URV pokeMask0 = csr->getPokeMask();
+
+  if (name == "mhartid" or name == "vlenb")
+    {
+      std::cerr << "CSR " << name << " cannot be configured.\n";
+      std::cerr << "Ignoring " << name << " CSR configuration in config file.\n";
+      return false;
+    }
+
+  if (errors)
+    return false;
+
+  if (not hart.configCsr(name, exists, reset, mask, pokeMask, isDebug, shared))
+    {
+      std::cerr << "Invalid CSR (" << name << ") in config file.\n";
+      return false;
+    }
+  else if (verbose)
+    {
+      if (exists0 != exists or isDebug0 != isDebug or reset0 != reset or
+	  mask0 != mask or pokeMask0 != pokeMask)
+	{
+	  std::cerr << "Configuration of CSR (" << name <<
+	    ") changed in config file:\n";
+
+	  if (exists0 != exists)
+	    std::cerr << "  implemented: " << exists0 << " to "
+		      << exists << '\n';
+
+	  if (isDebug0 != isDebug)
+	    std::cerr << "  debug: " << isDebug0 << " to "
+		      << isDebug << '\n';
+
+	  if (shared0 != shared)
+	    std::cerr << "  shared: " << shared0 << " to "
+		      << shared << '\n';
+
+	  if (reset0 != reset)
+	    std::cerr << "  reset: 0x" << std::hex << reset0
+		      << " to 0x" << reset << '\n' << std::dec;
+
+	  if (mask0 != mask)
+	    std::cerr << "  mask: 0x" << std::hex << mask0
+		      << " to 0x" << mask << '\n' << std::dec;
+
+	  if (pokeMask0 != pokeMask)
+	    std::cerr << "  poke_mask: " << std::hex << pokeMask0
+		      << " to 0x" << pokeMask << '\n' << std::dec;
+	}
     }
 
   return true;
@@ -286,161 +387,43 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
   unsigned errors = 0;
   for (auto it = csrs.begin(); it != csrs.end(); ++it)
     {
-      const std::string& csrName = it.key();
+      const std::string csrName = it.key();
       const auto& conf = it.value();
 
-      URV reset = 0, mask = 0, pokeMask = 0;
-      bool isDebug = false, exists = true, shared = false;
-
-      Csr<URV>* csr = hart.findCsr(csrName);
-      if (csr)
+      std::string tag = "range";
+      if (not conf.count(tag))
 	{
-	  reset = csr->getResetValue();
-	  mask = csr->getWriteMask();
-	  pokeMask = csr->getPokeMask();
-	  isDebug = csr->isDebug();
+	  applyCsrConfig(hart, csrName, conf, verbose) or errors++;
+	  continue;
 	}
 
-      if (conf.count("reset"))
-        if (not getJsonUnsigned(csrName + ".reset", conf.at("reset"), reset))
-          errors++;
-
-      if (conf.count("mask"))
+      std::vector<unsigned> range;
+      if (not getJsonUnsignedVec("csr." + tag + ".range", conf.at(tag), range)
+	  or range.size() != 2 or range.at(0) > range.at(1))
 	{
-	  if (not getJsonUnsigned(csrName + ".mask", conf.at("mask"), mask))
-            errors++;
-
-	  // If defining a non-standard CSR (as popposed to
-	  // configuring an existing CSR) then default the poke-mask
-	  // to the write-mask.
-	  if (not csr)
-	    pokeMask = mask;
-	}
-
-      if (conf.count("poke_mask"))
-	if (not getJsonUnsigned(csrName + ".poke_mask", conf.at("poke_mask"), pokeMask))
-          errors++;
-
-      if (conf.count("debug"))
-	if (not getJsonBoolean(csrName + ".bool", conf.at("debug"), isDebug))
-          errors++;
-
-      if (conf.count("exists"))
-	if (not getJsonBoolean(csrName + ".bool", conf.at("exists"), exists))
-          errors++;
-
-      if (conf.count("shared"))
-        if (not getJsonBoolean(csrName + ".bool", conf.at("shared"), shared))
-          errors++;
-
-      // If number present and csr is not defined, then define a new
-      // CSR; otherwise, configure.
-      if (conf.count("number"))
-	{
-          unsigned number = 0;
-	  if (not getJsonUnsigned<unsigned>(csrName + ".number", conf.at("number"), number))
-            errors++;
-          else
-            {
-              if (csr)
-                {
-                  if (csr->getNumber() != CsrNumber(number))
-                    {
-                      std::cerr << "Invalid config file entry for CSR "
-                                << csrName << ": Number (0x" << std::hex << number
-                                << ") does not match that of previous definition ("
-                                << "0x" << unsigned(csr->getNumber())
-                                << ")\n" << std::dec;
-                      errors++;
-                      continue;
-                    }
-                  // If number matches we configure below
-                }
-              else if (hart.defineCsr(csrName, CsrNumber(number), exists,
-                                      reset, mask, pokeMask, isDebug))
-                {
-                  csr = hart.findCsr(csrName);
-                  assert(csr);
-                }
-              else
-                {
-                  std::cerr << "Invalid config file CSR definition with name "
-                            << csrName << " and number 0x" << std::hex << number
-                            << ": Number already in use\n" << std::dec;
-                  errors++;
-                  continue;
-                }
-            }
-        }
-
-      if (not csr)
-	{
-	  std::cerr << "A CSR number must be provided in configuration of non-standard CSR "
-		    << csrName << '\n';
+	  std::cerr << "Invalid range in CSR '" << csrName << "': " << conf.at(tag) << '\n';
 	  errors++;
 	  continue;
 	}
-      bool exists0 = csr->isImplemented(), isDebug0 = csr->isDebug();
-      bool shared0 = csr->isShared();
-      URV reset0 = csr->getResetValue(), mask0 = csr->getWriteMask();
-      URV pokeMask0 = csr->getPokeMask();
 
-      if (csrName == "mhartstart")
-        if (hart.sysHartIndex() == 0 and (reset & 1) == 0)
-          std::cerr << "Warning: Bit corresponding to hart 0 is cleared "
-                    << "in reset value of mhartstart CSR -- Bit is ignored\n";
-
-      if (csrName == "mhartid" or csrName == "vlenb")
-        {
-          std::cerr << "CSR " << csrName << " cannot be configured.\n";
-          std::cerr << "Ignoring " << csrName << " CSR configuration in config file.\n";
-          continue;
-        }
-
-      if (not hart.configCsr(csrName, exists, reset, mask, pokeMask,
-			     isDebug, shared))
+      if (range.at(1) - range.at(0) > 256)
 	{
-	  std::cerr << "Invalid CSR (" << csrName << ") in config file.\n";
+	  std::cerr << "Invalid range in CSR '" << csrName << "': " << conf.at(tag)
+		    << ": Range size greater than 256\n";
 	  errors++;
+	  continue;
 	}
-      else if (verbose)
+
+      for (unsigned n = range.at(0); n <= range.at(1); ++n)
 	{
-	  if (exists0 != exists or isDebug0 != isDebug or reset0 != reset or
-	      mask0 != mask or pokeMask0 != pokeMask)
+	  std::string strand = csrName + std::to_string(n);
+	  if (not applyCsrConfig(hart, strand, conf, verbose))
 	    {
-	      std::cerr << "Configuration of CSR (" << csrName <<
-		") changed in config file:\n";
-
-	      if (exists0 != exists)
-		std::cerr << "  implemented: " << exists0 << " to "
-			  << exists << '\n';
-
-	      if (isDebug0 != isDebug)
-		std::cerr << "  debug: " << isDebug0 << " to "
-			  << isDebug << '\n';
-
-	      if (shared0 != shared)
-		std::cerr << "  shred: " << shared0 << " to "
-			  << shared << '\n';
-
-	      if (reset0 != reset)
-		std::cerr << "  reset: 0x" << std::hex << reset0
-			  << " to 0x" << reset << '\n' << std::dec;
-
-	      if (mask0 != mask)
-		std::cerr << "  mask: 0x" << std::hex << mask0
-			  << " to 0x" << mask << '\n' << std::dec;
-
-	      if (pokeMask0 != pokeMask)
-		std::cerr << "  poke_mask: " << std::hex << pokeMask0
-			  << " to 0x" << pokeMask << '\n' << std::dec;
+	      errors++;
+	      break;
 	    }
 	}
     }
-
-  // Stack checker.
-  if (not validateStackChecker(csrs))
-    errors++;
 
   return errors == 0;
 }
@@ -1121,50 +1104,23 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Use ABI register names (e.g. sp instead of x2).
+  bool flag = false;
   tag = "abi_names";
   if (config_ -> count(tag))
     {
-      bool abiNames = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), abiNames))
-        hart.enableAbiNames(abiNames);
-      else
-        errors++;
+      getJsonBoolean(tag, config_->at(tag), flag) or errors++;
+      hart.enableAbiNames(flag);
     }
 
   // Print memory address of load/store instruction in trace log.
   // tag = "print_load_store_address";  // Deprecated -- now always true.
 
-  // Atomic instructions illegal outside of DCCM.
-  tag = "amo_illegal_outside_dccm";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.setAmoInDccmOnly(flag);
-      else
-        errors++;
-    }
-
-  // Atomic instructions illegal outside cacheable regions.
-  tag = "amo_illegal_outside_cacheable";
-  if (config_ -> count(tag))
-    {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.setAmoInCacheableOnly(flag);
-      else
-        errors++;
-    }
-
   // Trace page table walk in log.
   tag = "trace_ptw";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.tracePtw(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.tracePtw(flag);
     }
 
   // Reservation size in bytes for the load-reserve (LR) instruction.
@@ -1193,52 +1149,37 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_triggers";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enableTriggers(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableTriggers(flag);
     }
 
   // Enable performance counters.
   tag = "enable_performance_counters";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enablePerformanceCounters(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePerformanceCounters(flag);
     }
 
   tag = "perf_count_atomic_load_store";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.perfCountAtomicLoadStore(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.perfCountAtomicLoadStore(flag);
     }
 
   tag = "perf_count_fp_load_store";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.perfCountFpLoadStore(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.perfCountFpLoadStore(flag);
     }
 
   tag = "enable_per_mode_counter_control";
   if (config_ -> count(tag))
     {
-      bool flag = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), flag))
-        hart.enablePerModeCounterControl(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePerModeCounterControl(flag);
     }
 
   for (auto ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin",
@@ -1257,47 +1198,30 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	std::cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
+  applyPerfEvents(hart, *config_, userMode, verbose) or errors++;
+  applyCsrConfig(hart, *config_, verbose) or errors++;
+  applyTriggerConfig(hart, *config_) or errors++;
+  applyVectorConfig(hart, *config_) or errors++;
 
   tag = "even_odd_trigger_chains";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.configEvenOddTriggerChaining(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configEvenOddTriggerChaining(flag);
     }
-
-  if (not applyPerfEvents(hart, *config_, userMode, verbose))
-    errors++;
-
-  if (not applyCsrConfig(hart, *config_, verbose))
-    errors++;
-
-  if (not applyTriggerConfig(hart, *config_))
-    errors++;
-
-  if (not applyVectorConfig(hart, *config_))
-    errors++;
 
   tag = "load_data_trigger";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.configLoadDataTrigger(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configLoadDataTrigger(flag);
     }
 
   tag = "exec_opcode_trigger";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (getJsonBoolean(tag, config_ -> at(tag), flag))
-        hart.configExecOpcodeTrigger(flag);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.configExecOpcodeTrigger(flag);
     }
 
   tag = "memmap";
@@ -1341,11 +1265,8 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_misaligned_data";
   if (config_ -> count(tag))
     {
-      bool misal = true;
-      if (getJsonBoolean(tag, config_ ->at(tag), misal))
-        hart.enableMisalignedData(misal);
-      else
-        errors++;
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableMisalignedData(flag);
     }
 
   tag = "force_rounding_mode";
@@ -1372,21 +1293,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "enable_csv_log";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
-	errors++;
-      else
-	hart.enableCsvLog(flag);
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.enableCsvLog(flag);
     }
 
   tag = "page_fault_on_first_access";
   if (config_ -> count(tag))
     {
-      bool flag = false;
-      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
-        errors++;
-      else
-        hart.setFaultOnFirstAccess(flag);
+      getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
+      hart.setFaultOnFirstAccess(flag);
     }
 
   tag = "snapshot_periods";

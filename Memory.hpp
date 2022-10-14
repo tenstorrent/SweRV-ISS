@@ -407,11 +407,16 @@ namespace WdRiscv
     bool loadElfFile(const std::string& file, unsigned registerWidth,
 		     uint64_t& entryPoint, uint64_t& end);
 
-    /// Locate the given ELF symbol (symbols are collected for every
+    /// Locate an ELF symbol by name (symbols are collected for every
     /// loaded ELF file) returning true if symbol is found and false
-    /// otherwise. Set value to the corresponding value if symbol is
-    /// found.
-    bool findElfSymbol(const std::string& symbol, ElfSymbol& value) const;
+    /// otherwise. If found set result to the address/size of the ELF
+    /// symbol.
+    bool findElfSymbol(const std::string& name, ElfSymbol& result) const;
+
+    /// Locate an ELF section by name returning true if section is
+    /// found and false otherwise. If found set result to the
+    /// address/size of the ELF section.
+    bool findElfSection(const std::string& name, ElfSymbol& result) const;
 
     /// Locate the ELF function cotaining the give address returning true
     /// on success and false on failure.  If successful set name to the
@@ -529,6 +534,14 @@ namespace WdRiscv
     /// If instruction tracing enabled, then write the accumulated
     /// addresses into the given file.
     bool saveInstructionAddressTrace(const std::string& path) const;
+
+    /// Return the line number corresponding to the given address.
+    uint64_t getLineNumber(uint64_t addr) const
+    { return addr >> lineShift_; }
+
+    /// Return the memory/cache line size.
+    unsigned lineSize() const
+    { return 1 << lineShift_; }
 
   protected:
 
@@ -732,6 +745,9 @@ namespace WdRiscv
     /// Helper to loadElfFile: Collet ELF symbols.
     void collectElfSymbols(ELFIO::elfio& reader);
 
+    /// Helper to loadElfFile: Collet ELF sections.
+    void collectElfSections(ELFIO::elfio& reader);
+
     bool saveAddressTrace(const std::string& tag,
 			  const std::unordered_map<uint64_t, uint64_t>& lineMap,
 			  const std::string& path) const;
@@ -768,6 +784,7 @@ namespace WdRiscv
     bool checkUnmappedElf_ = true;
 
     std::unordered_map<std::string, ElfSymbol> symbols_;
+    std::unordered_map<std::string, ElfSymbol> sections_;
 
     std::vector<Reservation> reservations_;
     std::vector<LastWriteData> lastWriteData_;
