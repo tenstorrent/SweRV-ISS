@@ -214,8 +214,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   const auto instEntry = di.instEntry();
 
-  if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
-    return; // Destination is x0.
+  //if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
+  //return; // Destination is x0.
 
   uint64_t time = 0, tag = 0;
 
@@ -1123,6 +1123,37 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 
 
 template <typename URV>
+unsigned
+Mcm<URV>::effectiveRegIx(const DecodedInst& di, unsigned opIx) const
+{
+  auto type = di.ithOperandType(opIx);
+  switch (type)
+    {
+    case OperandType::IntReg:
+      return di.ithOperand(opIx) + intRegOffset_;
+
+    case OperandType::FpReg:
+      return di.ithOperand(opIx) + fpRegOffset_;
+
+    case OperandType::CsReg:
+      {
+	CsrNumber csr{di.ithOperand(opIx)};
+	if (csr == CsrNumber::FFLAGS or csr == CsrNumber::FRM)
+	  csr = CsrNumber::FCSR;
+	return unsigned(csr) + csRegOffset_;
+      }
+
+    case OperandType::VecReg:   // FIX: Not yet supported.
+    case OperandType::Imm:
+    case OperandType::None:
+      assert(0);
+      return 0;
+    }
+  return 0;
+}
+
+
+template <typename URV>
 void
 Mcm<URV>::identifyRegisters(const DecodedInst& di,
 			    std::vector<unsigned>& sourceRegs,
@@ -1160,34 +1191,14 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
       if (not isDest and not isSource)
 	continue;
 	
-      size_t regIx = 0;
-      switch(di.ithOperandType(i))
-	{
-	case OperandType::IntReg:
-	  regIx = di.ithOperand(i);
-	  if (regIx == 0)
-	    continue;  // x0
-	  break;
-	case OperandType::FpReg:
-	  regIx = di.ithOperand(i) + fpRegOffset_;
-	  break;
-	case OperandType::CsReg:
-	  if (isSource and skipCsr)
-	    continue;
-	  else
-	    {
-	      CsrNumber csr{di.ithOperand(i)};
-	      if (csr == CsrNumber::FFLAGS or csr == CsrNumber::FRM)
-		csr = CsrNumber::FCSR;
-	      regIx = unsigned(csr) + csRegOffset_;
-	    }
-	  break;
-	case OperandType::VecReg:   // FIX: Not yet supported.
-	case OperandType::Imm:
-	case OperandType::None:
-	  continue;
-	}
+      auto type = di.ithOperandType(i);
+      // FIX: Support VecReg
+      if (type == OperandType::VecReg or type == OperandType::Imm or type == OperandType::None)
+	continue;
+      if (isSource and type == OperandType::CsReg and skipCsr)
+	continue;
 
+      size_t regIx = effectiveRegIx(di, i);
       if (isDest)
 	destRegs.push_back(regIx);
       if (isSource)
@@ -1652,7 +1663,7 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& bdi = instrB.di_;
   unsigned addrReg = 0;
   if (bdi.isLoad() or bdi.isStore() or bdi.isAmo())
-    addrReg = bdi.op1();
+    addrReg = bdi.op1();  // This is always an integer register.
 
   uint64_t time = hartRegTimes_.at(hart.sysHartIndex()).at(addrReg);
 
@@ -1685,20 +1696,13 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
       return false;
     }
 
-  if (not instrB.isMemory())
-    return true;
+  const auto& bdi = instrB.di_;
+  if (not bdi.isStore() and not bdi.isAmo())
+    return true;  // Must be a store or amo
 
   unsigned hartIx = hart.sysHartIndex();
-
-  // TBD FIX: this mixes integer and FP data registers -- incorrect.
-  const auto& bdi = instrB.di_;
-  unsigned dataReg = 0;
-  if (bdi.isAmo())
-    dataReg = bdi.op2();
-  else if (bdi.isStore())
-    dataReg = bdi.op0();
-  else
-    return true;
+  unsigned doi = bdi.isAmo()? 2 : 0;  // Data-regiser operand index
+  unsigned dataReg = effectiveRegIx(bdi, doi);  // Data operand may be integer/fp/csr
 
   uint64_t time = hartRegTimes_.at(hartIx).at(dataReg);
 
@@ -1797,11 +1801,11 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	  or not instrM.overlaps(instrB))
 	continue;
 
-      unsigned addrReg = mdi.op1();
+      unsigned addrReg = effectiveRegIx(mdi, 1); // Address reg is operand 1 of instr.
       auto apTag = hartRegProducers_.at(hartIx).at(addrReg); // address producer tag
 
-      // TBD FIX: this mixes integer and FP data registers -- incorrect.
-      unsigned dataReg = mdi.isAmo()? mdi.op2() : mdi.op0();
+      unsigned doi = mdi.isAmo()? 2 : 0;  // Data-register operand index.
+      unsigned dataReg = effectiveRegIx(mdi, doi);
       auto dpTag = hartRegProducers_.at(hartIx).at(dataReg); // data producer tag
 
       for (auto aTag : { apTag, dpTag } )
