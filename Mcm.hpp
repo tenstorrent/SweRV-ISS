@@ -182,6 +182,8 @@ namespace WdRiscv
 
     bool ppoRule11(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       if (not instr.complete_)
@@ -304,6 +306,11 @@ namespace WdRiscv
     }
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
+
+    /// Map register number of operand opIx to a unique integer by adding
+    /// an offset: integer register have 0 offset, fp regs have 32, and
+    /// csr regs have 64.
+    unsigned effectiveRegIx(const DecodedInst& di, unsigned opIx) const;
 
   private:
 

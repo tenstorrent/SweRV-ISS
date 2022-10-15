@@ -214,8 +214,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   const auto instEntry = di.instEntry();
 
-  if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
-    return; // Destination is x0.
+  //if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
+  //return; // Destination is x0.
 
   uint64_t time = 0, tag = 0;
 
@@ -269,12 +269,19 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 	  }
     }
 
+  bool noSource = sourceRegs.empty();
+  if (noSource)
+    assert(tag == 0 and time == 0);
+
   for (auto regIx : destRegs)
-    if (time > regTimeVec.at(regIx))
-      {
-	regTimeVec.at(regIx) = time;
-	regProducer.at(regIx) = tag;
-      }
+    {
+      bool update = noSource or time > regTimeVec.at(regIx);
+      if (update)
+	{
+	  regTimeVec.at(regIx) = time;
+	  regProducer.at(regIx) = tag;
+	}
+    }
 }
 
 
@@ -440,6 +447,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   ok = ppoRule9(hart, *instr) and ok;
   ok = ppoRule10(hart, *instr) and ok;
   ok = ppoRule11(hart, *instr) and ok;
+  ok = ppoRule12(hart, *instr) and ok;
 
   updateDependencies(hart, *instr);
 
@@ -1115,6 +1123,37 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 
 
 template <typename URV>
+unsigned
+Mcm<URV>::effectiveRegIx(const DecodedInst& di, unsigned opIx) const
+{
+  auto type = di.ithOperandType(opIx);
+  switch (type)
+    {
+    case OperandType::IntReg:
+      return di.ithOperand(opIx) + intRegOffset_;
+
+    case OperandType::FpReg:
+      return di.ithOperand(opIx) + fpRegOffset_;
+
+    case OperandType::CsReg:
+      {
+	CsrNumber csr{di.ithOperand(opIx)};
+	if (csr == CsrNumber::FFLAGS or csr == CsrNumber::FRM)
+	  csr = CsrNumber::FCSR;
+	return unsigned(csr) + csRegOffset_;
+      }
+
+    case OperandType::VecReg:   // FIX: Not yet supported.
+    case OperandType::Imm:
+    case OperandType::None:
+      assert(0);
+      return 0;
+    }
+  return 0;
+}
+
+
+template <typename URV>
 void
 Mcm<URV>::identifyRegisters(const DecodedInst& di,
 			    std::vector<unsigned>& sourceRegs,
@@ -1152,34 +1191,14 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
       if (not isDest and not isSource)
 	continue;
 	
-      size_t regIx = 0;
-      switch(di.ithOperandType(i))
-	{
-	case OperandType::IntReg:
-	  regIx = di.ithOperand(i);
-	  if (regIx == 0)
-	    continue;  // x0
-	  break;
-	case OperandType::FpReg:
-	  regIx = di.ithOperand(i) + fpRegOffset_;
-	  break;
-	case OperandType::CsReg:
-	  if (isSource and skipCsr)
-	    continue;
-	  else
-	    {
-	      CsrNumber csr{di.ithOperand(i)};
-	      if (csr == CsrNumber::FFLAGS or csr == CsrNumber::FRM)
-		csr = CsrNumber::FCSR;
-	      regIx = unsigned(csr) + csRegOffset_;
-	    }
-	  break;
-	case OperandType::VecReg:   // FIX: Not yet supported.
-	case OperandType::Imm:
-	case OperandType::None:
-	  continue;
-	}
+      auto type = di.ithOperandType(i);
+      // FIX: Support VecReg
+      if (type == OperandType::VecReg or type == OperandType::Imm or type == OperandType::None)
+	continue;
+      if (isSource and type == OperandType::CsReg and skipCsr)
+	continue;
 
+      size_t regIx = effectiveRegIx(di, i);
       if (isDest)
 	destRegs.push_back(regIx);
       if (isSource)
@@ -1634,8 +1653,8 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.isCanceled())
     {
-      cerr << "Mcm::ppoRule9: Instr B canceled\n";
-      assert(0 && "Mcm::ppoRule9: Instr B canceled");
+      cerr << "Mcm::ppoRule12: Instr B canceled: tag=" << instrB.tag_ << "\n";
+      return false;
     }
 
   if (not instrB.isMemory())
@@ -1644,7 +1663,7 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
   const auto& bdi = instrB.di_;
   unsigned addrReg = 0;
   if (bdi.isLoad() or bdi.isStore() or bdi.isAmo())
-    addrReg = bdi.op1();
+    addrReg = bdi.op1();  // This is always an integer register.
 
   uint64_t time = hartRegTimes_.at(hart.sysHartIndex()).at(addrReg);
 
@@ -1673,23 +1692,17 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.isCanceled())
     {
-      cerr << "Mcm::ppoRule10: Instr B canceled\n";
-      assert(0 && "Mcm::ppoRule10: Instr B canceled");
+      cerr << "Mcm::ppoRule10: Instr B canceled: tag=" << instrB.tag_ << "\n";
+      return false;
     }
 
-  if (not instrB.isMemory())
-    return true;
+  const auto& bdi = instrB.di_;
+  if (not bdi.isStore() and not bdi.isAmo())
+    return true;  // Must be a store or amo
 
   unsigned hartIx = hart.sysHartIndex();
-
-  const auto& bdi = instrB.di_;
-  unsigned dataReg = 0;
-  if (bdi.isAmo())
-    dataReg = bdi.op2();
-  else if (bdi.isStore())
-    dataReg = bdi.op0();
-  else
-    return true;
+  unsigned doi = bdi.isAmo()? 2 : 0;  // Data-regiser operand index
+  unsigned dataReg = effectiveRegIx(bdi, doi);  // Data operand may be integer/fp/csr
 
   uint64_t time = hartRegTimes_.at(hartIx).at(dataReg);
 
@@ -1748,6 +1761,69 @@ Mcm<URV>::ppoRule11(Hart<URV>& hart, const McmInstr& instrB) const
 
   return true;
 }
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 12: B is a load, there is a store M between A and B such that
+  // 1. B loads a value written by M
+  // 2. M has an address or data denpendency on A
+
+  if (instrB.isCanceled())
+    {
+      cerr << "Mcm::ppoRule12: Instr B canceled: tag=" << instrB.tag_ << "\n";
+      return false;
+    }
+
+  if (not instrB.isLoad_)
+    return true;  // NA: B is not a load.
+
+  unsigned hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+  if (instrVec.empty() or instrB.tag_ == 0)
+    return true;  // Nothing before B in instruction order.
+
+  // Check all preceeding instructions for a non-finished store M with
+  // address overlapping that of B. This is expensive. We need to keep
+  // set of non-finished stores.
+  size_t ix = std::min(size_t(instrB.tag_), instrVec.size());
+  for ( ; ix ; --ix)
+    {
+      size_t mtag = ix - 1;
+      const auto& instrM = instrVec.at(mtag);
+      if (instrM.isCanceled() or not instrM.di_.isValid())
+	continue;
+
+      const auto& mdi = instrM.di_;
+      if ((not mdi.isStore() and not mdi.isAmo()) or instrM.complete_
+	  or not instrM.overlaps(instrB))
+	continue;
+
+      unsigned addrReg = effectiveRegIx(mdi, 1); // Address reg is operand 1 of instr.
+      auto apTag = hartRegProducers_.at(hartIx).at(addrReg); // address producer tag
+
+      unsigned doi = mdi.isAmo()? 2 : 0;  // Data-register operand index.
+      unsigned dataReg = effectiveRegIx(mdi, doi);
+      auto dpTag = hartRegProducers_.at(hartIx).at(dataReg); // data producer tag
+
+      for (auto aTag : { apTag, dpTag } )
+	{
+	  const auto& instrA = instrVec.at(aTag);
+	  if (instrA.di_.isValid())
+	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+	      {
+		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		     << aTag << " tag2=" << instrB.tag_ << '\n';
+		return false;
+	      }
+	}
+    }
+
+  return true;
+}
+
 
 
 template class WdRiscv::Mcm<uint32_t>;
