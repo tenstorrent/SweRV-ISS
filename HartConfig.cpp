@@ -1542,6 +1542,26 @@ HartConfig::getMemorySize(size_t& memSize) const
 
 
 bool
+HartConfig::getMcmLineSize(unsigned& ls) const
+{
+  std::string tag = "merge_buffer_line_size";
+  if (not config_ -> count(tag))
+    return false;
+  return getJsonUnsigned(tag, config_ -> at(tag), ls);
+}
+
+
+bool
+HartConfig::getMcmCheckAll(bool& ca) const
+{
+  std::string tag = "merge_buffer_check_all";
+  if (not config_ -> count(tag))
+    return false;
+  return getJsonUnsigned(tag, config_ -> at(tag), ca);
+}
+
+
+bool
 HartConfig::userModeEnabled() const
 {
   uint64_t resetVal = 0;

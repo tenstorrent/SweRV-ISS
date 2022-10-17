@@ -370,9 +370,8 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 {
   if (mcm_)
     {
-      assert(mcm_->mergeBufferLineSize() == mbLineSize);
-      std::cerr << "System::enableMcm: Already enabled\n";
-      return true;
+      delete mcm_;
+      mcm_ = nullptr;
     }
 
   if (mbLineSize != 0)
