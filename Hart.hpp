@@ -1653,7 +1653,7 @@ namespace WdRiscv
 
     /// Helper to reset: Enable/disable extensions based on the bits
     /// of the MISA CSR.
-    void processExtensions();
+    void processExtensions(bool verbose = true);
 
     /// Simulate a periodic external timer interrupt: Count-down the
     /// periodic counter. Return true if counter reaches zero (and
@@ -1860,6 +1860,10 @@ namespace WdRiscv
     /// on success and false on failure (csr does not exist or is not
     /// accessible).  is writeable.
     bool doCsrRead(const DecodedInst* di, CsrNumber csr, URV& csrVal);
+
+    /// This is called after a csr is written/poked to update the
+    /// procerssor state as a side effect to the csr change.
+    void postCsrUpdate(CsrNumber csr, URV val);
 
     /// Return true if one or more load-address/store-address trigger
     /// has a hit on the given address and given timing

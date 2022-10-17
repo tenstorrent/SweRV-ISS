@@ -252,7 +252,7 @@ Hart<URV>::countImplementedPmpRegisters() const
 
 template <typename URV>
 void
-Hart<URV>::processExtensions()
+Hart<URV>::processExtensions(bool verbose)
 {
   URV value = 0;
   peekCsr(CsrNumber::MISA, value);
@@ -270,9 +270,10 @@ Hart<URV>::processExtensions()
   flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
   if (flag and not rvf_)
     {
-      std::cerr << "Bit 3 (d) is set in the MISA register but f "
-		<< "extension (bit 5) is not enabled -- ignored\n";
       flag = false;
+      if (verbose)
+	std::cerr << "Bit 3 (d) is set in the MISA register but f "
+		  << "extension (bit 5) is not enabled -- ignored\n";
     }
   flag = flag and isa_.isEnabled(RvExtension::D);
   enableRvd(flag);
@@ -283,7 +284,7 @@ Hart<URV>::processExtensions()
     intRegs_.regs_.resize(16);
 
   flag = value & (URV(1) << ('i' - 'a'));
-  if (not flag and not rve_)
+  if (not flag and not rve_ and verbose)
     std::cerr << "Bit 8 (i extension) is cleared in the MISA register "
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
@@ -300,15 +301,16 @@ Hart<URV>::processExtensions()
   flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorMode(flag);
 
-  for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
-		  'q', 'r', 't', 'w', 'x', 'y', 'z' } )
-    {
-      unsigned bit = ec - 'a';
-      if (value & (URV(1) << bit))
-	std::cerr << "Bit " << bit << " (" << ec << ") set in the MISA "
-		  << "register but extension is not supported "
-		  << "-- ignored\n";
-    }
+  if (verbose)
+    for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
+		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )
+      {
+	unsigned bit = ec - 'a';
+	if (value & (URV(1) << bit))
+	  std::cerr << "Bit " << bit << " (" << ec << ") set in the MISA "
+		    << "register but extension is not supported "
+		    << "-- ignored\n";
+      }
 
   if (isa_.isEnabled(RvExtension::Zba))
     enableRvzba(true);
@@ -2491,17 +2493,11 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string& name) const
 
 
 template <typename URV>
-bool
-Hart<URV>::pokeCsr(CsrNumber csr, URV val)
-{ 
-  // Some/all bits of some CSRs are read only to CSR instructions but
-  // are modifiable. Use the poke method (instead of write) to make
-  // sure modifiable value are changed.
-  if (not csRegs_.poke(csr, val))
-    return false;
-
+void
+Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
+{
   // This makes sure that counters stop counting after corresponding
-  // event reg is poked.
+  // event reg is written.
   if (enableCounters_)
     if (csr >= CsrNumber::MHPMEVENT3 and csr <= CsrNumber::MHPMEVENT31)
       if (not csRegs_.applyPerfEventAssign())
@@ -2524,12 +2520,13 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
   else if (csr == CsrNumber::SATP)
     updateAddressTranslation();
   else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
-    markFsDirty();   // Update FS field of MSTATS if FCSR is written
+    markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
   // Update cached values of MSTATUS MPP and MPRV.
   if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
     updateCachedMstatusFields();
 
+  // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
     {
       bool vill = (val >> (8*sizeof(URV) - 1)) & 1;
@@ -2539,6 +2536,25 @@ Hart<URV>::pokeCsr(CsrNumber csr, URV val)
       ElementWidth ew = ElementWidth((val >> 3) & 7);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
+
+  if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
+      csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
+      csr == CsrNumber::VLENB)
+    markVsDirty();
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::pokeCsr(CsrNumber csr, URV val)
+{ 
+  // Some/all bits of some CSRs are read only to CSR instructions but
+  // are modifiable. Use the poke method (instead of write) to make
+  // sure modifiable value are changed.
+  if (not csRegs_.poke(csr, val))
+    return false;
+
+  postCsrUpdate(csr, val);
 
   return true;
 }
@@ -9753,7 +9769,7 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
 
 template <typename URV>
 void
-Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
+Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
                       unsigned intReg, URV intRegVal)
 {
   if (not isCsrWriteable(csr))
@@ -9772,56 +9788,12 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV csrVal,
   updatePerformanceCountersForCsr(*di);
 
   // Update CSR.
-  csRegs_.write(csr, privMode_, csrVal);
+  csRegs_.write(csr, privMode_, val);
 
   // Update integer register.
   intRegs_.write(intReg, intRegVal);
 
-  // This makes sure that counters stop counting after corresponding
-  // event reg is written.
-  if (enableCounters_)
-    if (csr >= CsrNumber::MHPMEVENT3 and csr <= CsrNumber::MHPMEVENT31)
-      if (not csRegs_.applyPerfEventAssign())
-        std::cerr << "Unexpected applyPerfAssign fail\n";
-
-  if (csr == CsrNumber::DCSR)
-    {
-      dcsrStep_ = (csrVal >> 2) & 1;
-      dcsrStepIe_ = (csrVal >> 11) & 1;
-    }
-  else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG15)
-    updateMemoryProtection();
-  else if (csr >= CsrNumber::PMPADDR0 and csr <= CsrNumber::PMPADDR63)
-    {
-      unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csr);
-      auto type = Pmp::Type((config >> 3) & 3);
-      if (type != Pmp::Type::Off)
-        updateMemoryProtection();
-    }
-  else if (csr == CsrNumber::SATP)
-    updateAddressTranslation();
-  else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
-    markFsDirty(); // Update FS field of MSTATS if FCSR is written
-
-  // Update cached values of MSTATUS MPP and MPRV.
-  if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
-    updateCachedMstatusFields();
-
-  // Update cached value of VTYPE
-  if (csr == CsrNumber::VTYPE)
-    {
-      bool vill = (csrVal >> (8*sizeof(URV) - 1)) & 1;
-      bool ma = (csrVal >> 7) & 1;
-      bool ta = (csrVal >> 6) & 1;
-      GroupMultiplier gm = GroupMultiplier(csrVal & 7);
-      ElementWidth ew = ElementWidth((csrVal >> 3) & 7);
-      vecRegs_.updateConfig(ew, gm, ma, ta, vill);
-    }
-
-  if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
-      csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
-      csr == CsrNumber::VLENB)
-    markVsDirty();
+  postCsrUpdate(csr, val);
 
   // Csr was written. If it was minstret, compensate for
   // auto-increment that will be done by run, runUntilAddress or
