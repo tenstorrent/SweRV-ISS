@@ -2541,6 +2541,13 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
       csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
       csr == CsrNumber::VLENB)
     markVsDirty();
+
+  if (csr == CsrNumber::MISA)
+    {
+      auto reg = csRegs_.findCsr(csr);
+      if (reg->prevValue() != val)
+	processExtensions(false);
+    }
 }
 
 
