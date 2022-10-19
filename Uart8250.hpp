@@ -40,6 +40,7 @@ namespace WdRiscv
     uint8_t fcr_ = 0;     // Fifo control
     uint8_t dll_ = 0x1;   // Divisor latch lsb
     uint8_t dlm_ = 0x1;   // Divisor latch msb
+    uint8_t psd_ = 0;     // Pre-scaler division
 
     std::thread stdinThread_;
     std::atomic<bool> terminate_ = false;

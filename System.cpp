@@ -20,6 +20,7 @@
 #include "System.hpp"
 #include "Mcm.hpp"
 #include "Uart8250.hpp"
+#include "Uartsf.hpp"
 
 
 using namespace WdRiscv;
@@ -82,7 +83,7 @@ template <typename URV>
 void
 System<URV>::defineUart(uint64_t addr, uint64_t size)
 {
-  auto uart = new Uart8250(addr, size);
+  auto uart = new Uartsf(addr, size);
   ioDevs_.push_back(uart);
   memory_->registerIoDevice(uart);
 }
