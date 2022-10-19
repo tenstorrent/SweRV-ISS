@@ -230,13 +230,16 @@ namespace WdRiscv
     template <typename T>
     bool write(unsigned sysHartIx, uint64_t address, T value)
     {
-      if (writeIo(address, value))
-	return true;
-
       auto& lwd = lastWriteData_.at(sysHartIx);
       lwd.size_ = 0;
       lwd.addr_ = address;
       lwd.value_ = value;
+
+      if (writeIo(address, value))
+	{
+	  lwd.size_ = sizeof(value);
+	  return true;
+	}
 
 #ifdef FAST_SLOPPY
       if (address + sizeof(T) > size_)

@@ -36,6 +36,10 @@ Uart8250::read(uint64_t addr)
   uint64_t offset = (addr - address()) / 4;
   bool dlab = lcr_ & 0x80;
 
+  static FILE* out = nullptr;
+  if (not out)
+    out = fopen("uart.log", "w");
+
   if (dlab == 0)
     {
       switch (offset)
@@ -44,7 +48,11 @@ Uart8250::read(uint64_t addr)
 	  {
 	    std::lock_guard<std::mutex> lock(mutex_);
 	    uint32_t res = byte_;
-
+	    if (res and out)
+	      {
+		fprintf(out, "Uart input consumed: %c\n", res);
+		fflush(out);
+	      }
 	    byte_ = 0;
 	    lsr_ &= ~1;  // Clear least sig bit
 	    iir_ |= 1;   // Set least sig bit indicating no interrupt.
@@ -166,7 +174,7 @@ Uart8250::monitorStdin()
 	      byte_ = c;
 	      lsr_ |= 1;  // Set least sig bit of line status.
 	      iir_ &= ~1;  // Clear bit 0 indicating interrupt is pending.
-	      setInterruptPending(true);
+	      // setInterruptPending(true);
 	    }
 	}
 
