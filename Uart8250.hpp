@@ -31,7 +31,7 @@ namespace WdRiscv
     uint32_t byte_ = 0;  // Pending input byte.
 
     uint8_t ier_ = 0;     // Interrupt enable
-    uint8_t iir_ = 0;     // Interrupt id
+    uint8_t iir_ = 1;     // Interrupt id
     uint8_t lcr_ = 0;     // Line control
     uint8_t mcr_ = 0;     // Modem control
     uint8_t lsr_ = 0x60;  // Line satus
@@ -40,6 +40,7 @@ namespace WdRiscv
     uint8_t fcr_ = 0;     // Fifo control
     uint8_t dll_ = 0x1;   // Divisor latch lsb
     uint8_t dlm_ = 0x1;   // Divisor latch msb
+    uint8_t psd_ = 0;     // Pre-scaler division
 
     std::thread stdinThread_;
     std::atomic<bool> terminate_ = false;

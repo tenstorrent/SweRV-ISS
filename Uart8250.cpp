@@ -1,5 +1,4 @@
 #include <iostream>
-#include <cstdio>
 #include <unistd.h>
 #include <poll.h>
 #include <termios.h>
@@ -29,7 +28,6 @@ Uart8250::~Uart8250()
 }
 
 
-
 uint32_t
 Uart8250::read(uint64_t addr)
 {
@@ -44,7 +42,6 @@ Uart8250::read(uint64_t addr)
 	  {
 	    std::lock_guard<std::mutex> lock(mutex_);
 	    uint32_t res = byte_;
-
 	    byte_ = 0;
 	    lsr_ &= ~1;  // Clear least sig bit
 	    iir_ |= 1;   // Set least sig bit indicating no interrupt.
@@ -67,16 +64,9 @@ Uart8250::read(uint64_t addr)
 	{
 	case 0: return dll_;
 	case 1: return dlm_;
-	case 2: return iir_;
-	case 3: return lcr_;
-	case 4: return mcr_;
-	case 5: return lsr_;
-	case 6: return msr_;
-	case 7: return scr_;
 	}
     }
 
-  std::cerr << "Uart reading addr 0x" << std::hex << addr << '\n';
   assert(0);
   return 0;
 }
@@ -121,12 +111,7 @@ Uart8250::write(uint64_t addr, uint32_t value)
 	{
 	case 0: dll_ = value; break;
 	case 1: dlm_ = value; break;
-	case 2: fcr_ = value; break;
-	case 3: lcr_ = value; break;
-	case 4: mcr_ = value; break;
-	case 5: break;
-	case 6: break;
-	case 7: scr_ = value; break;
+	case 5: psd_ = value; break;
 	default:
 	  std::cerr << "Uart writing addr 0x" << std::hex << addr << '\n';
 	  assert(0);
@@ -166,7 +151,7 @@ Uart8250::monitorStdin()
 	      byte_ = c;
 	      lsr_ |= 1;  // Set least sig bit of line status.
 	      iir_ &= ~1;  // Clear bit 0 indicating interrupt is pending.
-	      setInterruptPending(true);
+	      // setInterruptPending(true);
 	    }
 	}
 

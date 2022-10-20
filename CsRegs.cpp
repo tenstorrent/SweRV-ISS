@@ -296,6 +296,21 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
 
 
 template <typename URV>
+URV
+legalizeMisa(URV v)
+{
+  if ((v & (1 << ('I' - 'A'))) == 0)
+    {
+      if ((v & (1 << ('E' - 'A'))) != 0)
+	return v;  // I off, E On
+      v |= (1 << ('I' - 'A'));  // I & E off, turn I on
+    }
+
+  return v;
+}
+
+
+template <typename URV>
 bool
 CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
 {
@@ -373,6 +388,9 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
     }
   else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
     value = legalizeMstatusValue(value);
+  else if (number == CsrNumber::MISA)
+    value = legalizeMisa(value);
+   
 
   csr->write(value);
   recordWrite(number);
@@ -1509,6 +1527,8 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
     }
   else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
     value = legalizeMstatusValue(value);
+  else if (number == CsrNumber::MISA)
+    value = legalizeMisa(value);
 
   csr->poke(value);
 

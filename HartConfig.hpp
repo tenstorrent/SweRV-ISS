@@ -98,6 +98,14 @@ namespace WdRiscv
     /// not contain a memory size configuration.
     bool getMemorySize(size_t& memSize) const;
 
+    /// Set lineSize to the merge buffer line size returning true on
+    /// success and false on failure (config is missing).
+    bool getMcmLineSize(unsigned& lineSize) const;
+
+    /// Set checkAll to the merge buffer check all flag returning true
+    /// on success and false on failure (config is missing).
+    bool getMcmCheckAll(bool& checkAll) const;
+
     /// Set hartIdOffset to the hart-id offset configuration field
     /// returning true on success and false on failure. Cores will be
     /// associated with start ids 0, hartIdOffset, 2*hartIdOffset, ...

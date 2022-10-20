@@ -14718,7 +14718,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
 
       uint64_t vaddr = addr + offset;
-      uint64_t pa1 = 0, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
+      uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
 
       auto cause = determineLoadException(pa1, pa2, elemSize);
       if (cause == ExceptionCause::NONE)
@@ -15099,7 +15099,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    }
 
 	  ELEM_TYPE elem(0);
-	  uint64_t pa1 = 0, pa2 = faddr; // Physical addresses or faulting virtual addresses.
+	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
 	  auto cause = determineLoadException(pa1, pa2, sizeof(elem));
 
 	  if (cause == ExceptionCause::NONE)

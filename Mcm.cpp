@@ -478,7 +478,7 @@ checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAdd
   if (rtlLineSize > lineSize)
     {
       cerr << "Merge buffer write: RTL line size (" << rtlLineSize << ") greater than"
-	   << " cache line size (" << lineSize << ")\n";
+	   << " reference line size (" << lineSize << ")\n";
       return false;
     }
 

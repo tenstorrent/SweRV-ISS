@@ -199,6 +199,7 @@ struct Args
   std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
   std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
   std::optional<uint64_t> syscallSlam;
+  std::optional<unsigned> mcmls;
 
   unsigned regWidth = 32;
   unsigned harts = 1;
@@ -227,6 +228,8 @@ struct Args
   bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
   bool fastExt = false;    // True if fast external interrupt dispatch enabled.
   bool unmappedElfOk = false;
+  bool mcm = false;        // Memory consistency checks
+  bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
@@ -378,6 +381,13 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
     {
       auto numStr = varMap["syscallslam"].as<std::string>();
       if (not parseCmdLineNumber("syscallslam", numStr, args.syscallSlam))
+        ok = false;
+    }
+
+  if (varMap.count("mcmls"))
+    {
+      auto numStr = varMap["mcmls"].as<std::string>();
+      if (not parseCmdLineNumber("mcmls", numStr, args.mcmls))
         ok = false;
     }
 
@@ -578,6 +588,15 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "with a sequence of pairs of double words designating addresses and "
          "corresponding values. A zero/zero pair will indicate the end of "
          "sequence.")
+	("mcm", po::bool_switch(&args.mcm),
+	 "Enabe memory consistency checks. This is meaningful in server/interactive "
+	 "mode.")
+	("mcmca", po::bool_switch(&args.mcmca),
+	 "Check all bytes of the memory consistency check merge buffer. If not used "
+	 "we only check the bytes inserted into the merge buffer.")
+	("mcmls", po::value<std::string>(),
+	 "Memory consitency checker merge buffer line size. If set to zero then "
+	 "write operations are not buffered and will happen as soon a received.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
          "Terminate multi-threaded run when any hart finishes (default is to wait "
          "for all harts.)")
@@ -1057,6 +1076,21 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (args.csv)
     hart.enableCsvLog(args.csv);
+
+  
+  if (args.mcm)
+    {
+      unsigned mcmLineSize = 64;
+      config.getMcmLineSize(mcmLineSize);
+      if (args.mcmls)
+	mcmLineSize = *args.mcmls;
+      bool checkAll = false;
+      config.getMcmCheckAll(checkAll);
+      if (args.mcmca)
+	checkAll = true;
+      if (not system.enableMcm(mcmLineSize, checkAll))
+	errors++;
+    }
 
   if (not args.snapshotPeriods.empty())
     {
