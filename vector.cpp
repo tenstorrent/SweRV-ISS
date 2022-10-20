@@ -8163,10 +8163,7 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (not checkVecOpsVsEmul(di, vd, vs2, vs2, group))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -8909,10 +8906,7 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Spec says sign extend.
 
@@ -9028,10 +9022,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
 
@@ -9189,10 +9180,7 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
 
@@ -9272,10 +9260,7 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   URV e1 = intRegs_.read(rs1);
 
