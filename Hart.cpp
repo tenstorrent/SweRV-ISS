@@ -1679,15 +1679,12 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
       if (storeVal & 1)
 	throw CoreException(CoreException::Stop, "write to to-host",
 			    toHost_, val);
-      else
-	assert(0);
     }
   else
     {
       ldStWrite_ = true;
       ldStData_ = storeVal;
       memory_.write(hartIx_, physAddr, storeVal);
-      assert(0);
     }
 }
 
