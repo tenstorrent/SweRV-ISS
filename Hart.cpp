@@ -3916,7 +3916,7 @@ bool
 Hart<URV>::simpleRun()
 {
   // For speed: do not record/clear CSR changes.
-  enableCsrTrace_ = false;
+  csRegs_.enableRecordWrite(false);
 
   bool success = true;
 
@@ -3946,7 +3946,7 @@ Hart<URV>::simpleRun()
       success = logStop(ce, 0, nullptr);
     }
 
-  enableCsrTrace_ = true;
+  csRegs_.enableRecordWrite(true);
 
   if (bbFile_)
     dumpBasicBlocks();
@@ -4050,9 +4050,10 @@ Hart<URV>::simpleRunWithLimit()
 
   while (noUserStop and instCounter_ < limit) 
     {
+      hasException_ = hasInterrupt_ = false;
       currPc_ = pc_;
       ++instCounter_;
-	  cycleCount_++;
+      ++cycleCount_;
 
       if (checkInterrupt and processExternalInterrupt(nullptr, instStr))
 	continue;
@@ -4071,6 +4072,10 @@ Hart<URV>::simpleRunWithLimit()
 
       pc_ += di->instSize();
       execute(di);
+
+      if (not (hasException_ or hasInterrupt_))
+	if (minstretEnabled())
+	  ++retiredInsts_;
 
       if (instrLineTrace_)
 	memory_.traceInstructionLine(currPc_);

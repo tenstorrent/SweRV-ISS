@@ -862,6 +862,8 @@ template <typename URV>
 void
 CsRegs<URV>::recordWrite(CsrNumber num)
 {
+  if (not recordWrite_)
+    return;
   auto& lwr = lastWrittenRegs_;
   if (std::find(lwr.begin(), lwr.end(), num) == lwr.end())
     lwr.push_back(num);

@@ -1078,6 +1078,9 @@ namespace WdRiscv
     /// getLastWrittenRegs method.
     void recordWrite(CsrNumber num);
 
+    void enableRecordWrite(bool flag)
+    { recordWrite_ = flag; }
+
     /// Clear the remembered indices of the CSR register(s) written by
     /// the last instruction.
     void clearLastWrittenRegs()
@@ -1237,6 +1240,7 @@ namespace WdRiscv
     bool supervisorModeEnabled_ = false;
 
     bool perModeCounterControl_ = false;
+    bool recordWrite_ = false;
   };
 
 
