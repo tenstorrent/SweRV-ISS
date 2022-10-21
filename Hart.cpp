@@ -301,6 +301,15 @@ Hart<URV>::processExtensions(bool verbose)
   flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorMode(flag);
 
+
+  URV epcMask = rvc_? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
+  auto epc = csRegs_.findCsr(CsrNumber::MEPC);
+  if (epc)
+    epc->setReadMask(epcMask);
+  epc = csRegs_.findCsr(CsrNumber::SEPC);
+  if (epc)
+    epc->setReadMask(epcMask);
+
   if (verbose)
     for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
 		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )
@@ -3907,7 +3916,7 @@ bool
 Hart<URV>::simpleRun()
 {
   // For speed: do not record/clear CSR changes.
-  enableCsrTrace_ = false;
+  csRegs_.enableRecordWrite(false);
 
   bool success = true;
 
@@ -3937,7 +3946,7 @@ Hart<URV>::simpleRun()
       success = logStop(ce, 0, nullptr);
     }
 
-  enableCsrTrace_ = true;
+  csRegs_.enableRecordWrite(true);
 
   if (bbFile_)
     dumpBasicBlocks();
@@ -4041,9 +4050,10 @@ Hart<URV>::simpleRunWithLimit()
 
   while (noUserStop and instCounter_ < limit) 
     {
+      hasException_ = hasInterrupt_ = false;
       currPc_ = pc_;
       ++instCounter_;
-	  cycleCount_++;
+      ++cycleCount_;
 
       if (checkInterrupt and processExternalInterrupt(nullptr, instStr))
 	continue;
@@ -4062,6 +4072,10 @@ Hart<URV>::simpleRunWithLimit()
 
       pc_ += di->instSize();
       execute(di);
+
+      if (not (hasException_ or hasInterrupt_))
+	if (minstretEnabled())
+	  ++retiredInsts_;
 
       if (instrLineTrace_)
 	memory_.traceInstructionLine(currPc_);

@@ -1219,7 +1219,7 @@ namespace WdRiscv
     /// Record given CSR number for later reporting of CSRs modified by
     /// an instruction.
     void recordCsrWrite(CsrNumber csr)
-    { if (enableCsrTrace_) csRegs_.recordWrite(csr); }
+    { csRegs_.recordWrite(csr); }
 
     /// Enable/disable performance counters.
     void setPerformanceCounterControl(uint32_t control)
@@ -4158,7 +4158,6 @@ namespace WdRiscv
     bool enableTriggers_ = false;   // Enable debug triggers.
     bool enableGdb_ = false;        // Enable gdb mode.
     int gdbTcpPort_ = -1;           // Enable gdb mode.
-    bool enableCsrTrace_ = true;    // False in fast (simpleRun) mode.
     bool abiNames_ = false;         // Use ABI register names when true.
     bool newlib_ = false;           // Enable newlib system calls.
     bool linux_ = false;            // Enable linux system calls.
