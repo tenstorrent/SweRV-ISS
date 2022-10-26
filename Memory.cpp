@@ -913,7 +913,7 @@ Memory::loadSnapshot(const std::string & filename,
       assert((blk.first & 3) == 0);
       assert((remainingSize & 3) == 0);
       assert(prevAddr <= blk.first);
-      temp.resize(remainingSize/4);
+      temp.resize(maxChunk);
       prevAddr = blk.first + blk.second;
       uint64_t addr = blk.first;
 
@@ -926,8 +926,14 @@ Memory::loadSnapshot(const std::string & filename,
           int resp = gzread(gzin, temp.data(), currentChunk);
 	  int words = resp / 4;
 	  for (int i = 0; i < words; ++i, addr += 4)
-	    if (temp.at(i))
-	      poke(addr, temp.at(i));
+	    {
+	      // Avoid poking zero pages to maintain sparsity.
+	      uint32_t prev = 0;
+	      peek(addr, prev, false);
+	      uint32_t curr = temp.at(i);
+	      if (curr != prev)
+		poke(addr, curr);
+	    }
           if (resp == 0)
             {
               success = gzeof(gzin);
