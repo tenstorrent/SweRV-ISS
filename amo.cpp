@@ -46,6 +46,9 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
   if ((addr & mask) != 0)
     return ExceptionCause::STORE_ACC_FAULT;
 
+  if (cause != ExceptionCause::NONE)
+    return cause;
+
   Pma pma = memory_.pmaMgr_.getPma(addr);
   if (not pma.isAmo())
     return ExceptionCause::STORE_ACC_FAULT;
@@ -195,7 +198,8 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   if ((addr1 & (ldStSize_ - 1)) != 0)
     fail = true;
 
-  fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
+  if (cause == ExceptionCause::NONE)
+    fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::LOAD_ACC_FAULT;
@@ -300,7 +304,8 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
     cause = ExceptionCause::STORE_ACC_FAULT;
 
   bool fail = misal or (amoInDccmOnly_ and not isAddrInDccm(addr1));
-  fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
+  if (cause == ExceptionCause::NONE)
+    fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::STORE_ACC_FAULT;
