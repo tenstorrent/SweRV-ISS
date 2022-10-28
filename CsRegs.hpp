@@ -1241,7 +1241,7 @@ namespace WdRiscv
     bool supervisorModeEnabled_ = false;
 
     bool perModeCounterControl_ = false;
-    bool recordWrite_ = false;
+    bool recordWrite_ = true;
   };
 
 
