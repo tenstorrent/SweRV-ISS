@@ -382,9 +382,10 @@ namespace WdRiscv
       TDATA3  = 0x7a3,
 
       // Debug mode registers.
-      DCSR     = 0x7b0,
-      DPC      = 0x7b1,
-      DSCRATCH = 0x7b2,
+      DCSR      = 0x7b0,
+      DPC       = 0x7b1,
+      DSCRATCH1 = 0x7b2,
+      DSCRATCH2 = 0x7b3,
 
       // Vector extension register.
       VSTART   = 0x008,

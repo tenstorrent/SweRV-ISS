@@ -1349,7 +1349,9 @@ CsRegs<URV>::defineDebugRegs()
   URV dpcMask = ~URV(1);
   defineCsr("dpc", CsrNumber::DPC, !mand, imp, 0, dpcMask, dpcMask, isDebug);
 
-  defineCsr("dscratch", CsrNumber::DSCRATCH, !mand, !imp, 0, wam, wam,
+  defineCsr("dscratch1", CsrNumber::DSCRATCH1, !mand, !imp, 0, wam, wam,
+	    isDebug);
+  defineCsr("dscratch2", CsrNumber::DSCRATCH2, !mand, !imp, 0, wam, wam,
 	    isDebug);
 }
 
