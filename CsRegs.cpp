@@ -1147,9 +1147,9 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sstatus)
     {
       // SSTATUS tied to MSTATUS but not all bits are readable.
-      sstatus->setReadMask(0x00766722L);
+      sstatus->setReadMask(0x80766722L);
       if constexpr (sizeof(URV) == 8)
-	sstatus->setReadMask(0x0000000300766722L);
+	sstatus->setReadMask(0x8000000300766722L);
     }
 
   // SSTATUS shadows MSTATUS
