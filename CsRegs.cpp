@@ -126,8 +126,8 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
   if (mode < csr->privilegeMode())
     return false;
 
-  if (csr->isDebug())
-    return false; // Debug-mode register is not accessible by a CSR instruction.
+  if (csr->isDebug() and not inDebugMode())
+    return false; // Debug-mode register.
 
   if (number >= CsrNumber::TDATA1 and number <= CsrNumber::TDATA3)
     return readTdata(number, mode, value);
@@ -321,8 +321,8 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
   if (mode < csr->privilegeMode() or csr->isReadOnly())
     return false;
 
-  if (csr->isDebug())
-    return false; // Debug-mode register is not accessible by a CSR instruction.
+  if (csr->isDebug() and not inDebugMode())
+    return false; // Debug-mode register.
 
   if (isPmpaddrLocked(number))
     {
@@ -436,8 +436,8 @@ CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
   if (csr->isReadOnly())
     return false;
 
-  if (csr->isDebug())
-    return false;  // Debug-mode register is not accessible by a CSR instruction.
+  if (csr->isDebug() and not inDebugMode())
+    return false;  // Debug-mode register.
 
   return true;
 }

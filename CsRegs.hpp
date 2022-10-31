@@ -1014,6 +1014,14 @@ namespace WdRiscv
     /// a write/poke to MCOUNTEREN.
     void updateCounterPrivilege();
 
+    /// Enter/exit debug mode based given a flag value of true/false.
+    void enterDebug(bool flag)
+    { debugMode_ = flag; }
+
+    /// Return true if hart (and this register file) are in debug mode.
+    bool inDebugMode() const
+    { return debugMode_; }
+
     bool readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const;
     
     bool writeTdata(CsrNumber number, PrivilegeMode mode, URV value);
@@ -1242,6 +1250,7 @@ namespace WdRiscv
 
     bool perModeCounterControl_ = false;
     bool recordWrite_ = true;
+    bool debugMode_ = false;
   };
 
 
