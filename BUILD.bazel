@@ -19,7 +19,7 @@ cc_library(
     hdrs          = hdrs,
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
     deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat"],
-    linkopts      = ["-lstdc++fs", "-lpthread", "-lz", "-ldl"],
+    linkopts      = ["-lstdc++fs", "-lpthread", "-lz", "-ldl", "-lrt"],
     visibility    = ["//visibility:public"],
 )
 

@@ -1297,6 +1297,11 @@ namespace WdRiscv
     void enableVectorMode(bool flag)
     { rvv_ = flag; csRegs_.enableVectorMode(flag); }
 
+    /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
+    /// causes us to enter a privilege mode not Machine.
+    void enableClearMprvOnRet(bool flag)
+    { clearMprvOnRet_ = flag; }
+
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
     void enableMisalignedData(bool flag)
@@ -1309,6 +1314,14 @@ namespace WdRiscv
     /// Return current trap vector mode.
     TrapVectorMode tvecMode() const
     { return tvecMode_; }
+
+    /// Defer interrupts received (to be taken later). This is for testbench
+    /// to control when interrupts are handled without affecting architectural state.
+    void setDeferredInterrupts(URV val)
+    { deferredInterrupts_ = val; }
+
+    URV deferredInterrupts()
+    { return deferredInterrupts_; }
 
     /// This is for performance modeling. Enable a highest level cache
     /// with given size, line size, and set associativity.  Any
@@ -1377,6 +1390,19 @@ namespace WdRiscv
 	  peekMemory(addr, pte, true);
 	  ptes.push_back(pte);
 	}
+    }
+
+    /// Get the PMP registers accessed by last executed instruction
+    void getPmpsAccessed(std::vector<std::pair<uint32_t, Pmp>>& pmps) const
+    {
+      auto& pmpIxs = pmpManager_.getPmpTrace();
+      pmps.clear();
+      for (auto& ix : pmpIxs)
+        {
+          auto pmp = pmpManager_.peekPmp(ix);
+          auto traced = std::make_pair(ix, pmp);
+          pmps.push_back(traced);
+        }
     }
 
     /// Enable per-privilege-mode performance-counter control.
@@ -4108,6 +4134,9 @@ namespace WdRiscv
     bool clintSiOnReset_ = false;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
 
+    // True if we want to defer an interrupt for later. By default, take immediately.
+    URV deferredInterrupts_ = 0;
+
     bool  hasInterruptor_ = false;
     uint64_t interruptor_ = 0;
 
@@ -4183,6 +4212,8 @@ namespace WdRiscv
     PrivilegeMode mstatusMpp_ = PrivilegeMode::Machine; // Cached mstatus.mpp.
     bool mstatusMprv_ = false;                          // Cached mstatus.mprv.
     FpFs mstatusFs_ = FpFs::Off;                        // Cahced mstatus.fs.
+
+    bool clearMprvOnRet_ = true;
 
     FpFs mstatusVs_ = FpFs::Off;
 
