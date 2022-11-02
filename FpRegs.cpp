@@ -142,36 +142,20 @@ Float16::fromFloat(float val)
 FpRegs::FpRegs(unsigned regCount)
   : regs_(regCount, 0)
 {
-  numberToName_.resize(32);
-
-  for (unsigned ix = 0; ix < 32; ++ix)
-    {
-      std::string name = "f" + std::to_string(ix);
-      nameToNumber_[name] = FpRegNumber(ix);
-      numberToName_.at(ix) = name;
-    }
-
-  numberToAbiName_ = { "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7",
-		       "fs0", "fs1", "fa0", "fa1", "fa2", "fa3", "fa4", "fa5",
-		       "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7",
-		       "fs8", "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11" };
-
-  for (unsigned ix = 0; ix < 32; ++ix)
-    {
-      std::string abiName = numberToAbiName_.at(ix);
-      nameToNumber_[abiName] = FpRegNumber(ix);
-    }
 }
 
 
 bool
 FpRegs::findReg(const std::string& name, unsigned& ix) const
 {
-  const auto iter = nameToNumber_.find(name);
-  if (iter == nameToNumber_.end())
+  unsigned i = 0;
+  if (not regNames_.findReg(name, i))
     return false;
 
-  ix = iter->second;
+  if (i >= regs_.size())
+    return false;
+
+  ix = i;
   return true;
 }
 
