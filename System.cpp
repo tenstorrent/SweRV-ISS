@@ -170,11 +170,23 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
       if (not raw)
 	{
 	  if (not hart->peekIntReg(RegGp) and gp)
-	    hart->pokeIntReg(RegGp, URV(gp));
+	    {
+              if (verbose)
+                std::cerr << "Setting register gp to 0x" << std::hex << gp << std::dec << '\n';    
+	      hart->pokeIntReg(RegGp, URV(gp));
+	    }
 	  if (not hart->peekIntReg(RegTp) and tp)
-	    hart->pokeIntReg(RegTp, URV(tp));
+	    {
+              if (verbose)
+                std::cerr << "Setting register tp to 0x" << std::hex << tp << std::dec << '\n';   
+	      hart->pokeIntReg(RegTp, URV(tp));
+	    }
 	  if (entry)
-	    hart->pokePc(URV(entry));
+	    {
+	      if (verbose)
+                std::cerr << "Setting PC to 0x" << std::hex << entry << std::dec << '\n';
+	      hart->pokePc(URV(entry));
+	    }
 	}
     }
 
