@@ -1098,7 +1098,7 @@ Syscall<URV>::emulate()
             rc = progBreak_;
           else
             {
-              for (URV addr = newBrk; addr<progBreak_; addr++)
+              for (URV addr = progBreak_; addr < newBrk; addr++)
                 hart_.pokeMemory(addr, uint8_t(0), true /*usePma*/);
               rc = progBreak_ = newBrk;
             }
