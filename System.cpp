@@ -165,6 +165,9 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
 	hart->setFromHostAddress(sym.addr_);
       if (not consoleIoSym_.empty() and memory_->findElfSymbol(consoleIoSym_, sym))
 	hart->setConsoleIo(URV(sym.addr_));
+
+      if (verbose)
+	std::cerr << "Setting program break to 0x" << std::hex << end << std::dec << '\n';
       hart->setTargetProgramBreak(end);
 
       if (not raw)
