@@ -1245,13 +1245,18 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                 {
                   fprintf(commandLog, "hart=%d time=%ld mbwrite 0x%lx 0x",
                           hartId, msg.time, msg.address);
+		  std::reverse(data.begin(), data.end()); // Print lowest address data on the right.
                   for (uint8_t item :  data)
                     fprintf(commandLog, "%02x", item);
                   if (msg.flags)
                     {
                       fprintf(commandLog, " 0x");
+		      data.clear();
                       for (size_t i = 0; i < msg.size / 8; ++i)
-                        fprintf(commandLog, "%02x", msg.tag[i]);
+			data.push_back(msg.tag[i]);
+		      std::reverse(data.begin(), data.end());
+		      for (uint8_t item : data)
+                        fprintf(commandLog, "%02x", item);
                     }
                   fprintf(commandLog, "\n");
                 }
