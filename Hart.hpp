@@ -131,12 +131,12 @@ namespace WdRiscv
 
     /// Return the name of the given integer register. Return an
     /// abi-name (e.g. sp) if abi names are enabled.
-    std::string intRegName(unsigned regIx) const
+    const std::string& intRegName(unsigned regIx) const
     { return intRegs_.regName(regIx, abiNames_); }
 
     /// Return the name of the given floating point register. Return an
     /// abi-name (e.g. fa0) if abi names are enabled.
-    std::string fpRegName(unsigned regIx) const
+    const std::string& fpRegName(unsigned regIx) const
     { return fpRegs_.regName(regIx, abiNames_); }
 
     /// Return the name (e.g. x1) or the abi-name (e.g. ra) of the
