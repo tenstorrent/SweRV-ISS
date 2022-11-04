@@ -139,11 +139,6 @@ namespace WdRiscv
     const std::string& fpRegName(unsigned regIx) const
     { return fpRegs_.regName(regIx, abiNames_); }
 
-    /// Return the name (e.g. x1) or the abi-name (e.g. ra) of the
-    /// given integer register.
-    std::string intRegName(unsigned regIx, bool abiName) const
-    { return intRegs_.regName(regIx, abiName); }
-
     /// Return count of floating point registers. Return zero if
     /// extension f is not enabled.
     unsigned fpRegCount() const
