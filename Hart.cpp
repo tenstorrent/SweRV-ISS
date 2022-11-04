@@ -161,6 +161,13 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
 
   csRegs_.configCsr(CsrNumber::MHARTID, implemented, hartId, mask, pokeMask,
                     debug, shared);
+
+  // Give disassembler a way to get abi-names of CSRs.
+  auto callback = [this](unsigned ix) {
+    auto csr = this->findCsr(CsrNumber(ix));
+    return csr? csr->getName() : std::string();
+  };
+  disas_.setCsrNameCallback(callback);
 }
 
 

@@ -36,6 +36,7 @@
 #include "VirtMem.hpp"
 #include "Isa.hpp"
 #include "Decoder.hpp"
+#include "Disassembler.hpp"
 
 
 namespace WdRiscv
@@ -132,12 +133,12 @@ namespace WdRiscv
     /// Return the name of the given integer register. Return an
     /// abi-name (e.g. sp) if abi names are enabled.
     const std::string& intRegName(unsigned regIx) const
-    { return intRegs_.regName(regIx, abiNames_); }
+    { return disas_.intRegName(regIx); }
 
     /// Return the name of the given floating point register. Return an
     /// abi-name (e.g. fa0) if abi names are enabled.
     const std::string& fpRegName(unsigned regIx) const
-    { return fpRegs_.regName(regIx, abiNames_); }
+    { return disas_.fpRegName(regIx); }
 
     /// Return count of floating point registers. Return zero if
     /// extension f is not enabled.
@@ -511,21 +512,15 @@ namespace WdRiscv
     /// be opened.
     bool setInitialStateFile(const std::string& path);
 
-    /// Disassemble given instruction putting results on the given
-    /// stream.
-    void disassembleInst(uint32_t inst, std::ostream&);
-
-    /// Disassemble given instruction putting results on the given
-    /// stream.
-    void disassembleInst(const DecodedInst& di, std::ostream&);
+    /// Disassemble given instruction putting results into the given
+    /// string.
+    void disassembleInst(uint32_t inst, std::string& str)
+    { disas_.disassembleInst(inst, decoder_, str); }
 
     /// Disassemble given instruction putting results into the given
     /// string.
-    void disassembleInst(uint32_t inst, std::string& str);
-
-    /// Disassemble given instruction putting results into the given
-    /// string.
-    void disassembleInst(const DecodedInst& di, std::string& str);
+    void disassembleInst(const DecodedInst& di, std::string& str)
+    { disas_.disassembleInst(di, str); }
 
     /// Decode given instruction returning a pointer to the
     /// instruction information and filling op0, op1 and op2 with the
@@ -969,11 +964,11 @@ namespace WdRiscv
     /// Enable use of ABI register names (e.g. sp instead of x2) in
     /// instruction disassembly.
     void enableAbiNames(bool flag)
-    { abiNames_ = flag; }
+    { disas_.enableAbiNames(flag); }
 
     /// Return true if ABI register names are enabled.
     bool abiNames() const
-    { return abiNames_; }
+    { return disas_.abiNames(); }
 
     /// Enable emulation of newlib system calls.
     void enableNewlib(bool flag)
@@ -4159,7 +4154,6 @@ namespace WdRiscv
     bool enableTriggers_ = false;   // Enable debug triggers.
     bool enableGdb_ = false;        // Enable gdb mode.
     int gdbTcpPort_ = -1;           // Enable gdb mode.
-    bool abiNames_ = false;         // Use ABI register names when true.
     bool newlib_ = false;           // Enable newlib system calls.
     bool linux_ = false;            // Enable linux system calls.
     bool amoInDccmOnly_ = false;
@@ -4239,6 +4233,7 @@ namespace WdRiscv
     VirtMem virtMem_;
     Isa isa_;
     Decoder decoder_;
+    Disassembler disas_;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;
