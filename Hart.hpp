@@ -2016,29 +2016,6 @@ namespace WdRiscv
     /// modify pc_.
     void execute(const DecodedInst* di);
 
-    /// Helper to decode: Decode instructions associated with opcode
-    /// 1010011.
-    const InstEntry& decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			      uint32_t& op2);
-
-    /// Helper to decode: Decode instructions associated with opcode
-    /// 1010111.
-    const InstEntry& decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1,
-                               uint32_t& op2, uint32_t& op3);
-
-    /// Helper to decode: Decode vector instructions associated with
-    /// opcode 0100111. For whole register or segment load, fieldCount
-    /// is set to the register count or segment field count.
-    const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12,
-				    uint32_t& fieldCount);
-
-    /// Helper to decode: Decode vector instructions associated with
-    /// opcode 0000111. For whole register or segment store,
-    /// fieldCount is set to the register count or segment field
-    /// count.
-    const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12,
-				   uint32_t& fieldCount);
-
     /// Helper to disassembleInst32: Disassemble instructions
     /// associated with opcode 1010011.
     void disassembleFp(uint32_t inst, std::ostream& stream);
