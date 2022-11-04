@@ -255,7 +255,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
   ELFIO::Elf64_Addr paddr = seg->get_physical_address();
   ELFIO::Elf_Xword segSize = seg->get_file_size(); // Size in file.
   end = 0;
-  if (seg->get_type() != PT_LOAD)
+  if (seg->get_type() != PT_LOAD and seg->get_type() != PT_TLS)
     return true;
 
   if (paddr + segSize > size_)
@@ -339,7 +339,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
 
 #endif
 
-  end = paddr + uint64_t(segSize);
+  end = paddr + uint64_t(seg->get_memory_size());
   return true;
 }
 
