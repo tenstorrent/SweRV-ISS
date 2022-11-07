@@ -968,20 +968,28 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     hart.enableInstructionFrequency(true);
 
   if (not args.loadFrom.empty())
-    if (not loadSnapshot(system, hart, args.loadFrom))
-      errors++;
+    {
+      if (not loadSnapshot(system, hart, args.loadFrom))
+	errors++;
 
-  if (not args.stdoutFile.empty())
-    if (not hart.redirectOutputDescriptor(STDOUT_FILENO, args.stdoutFile))
-      errors++;
+      if (not args.stdoutFile.empty() or not args.stderrFile.empty() or
+	  not args.stdinFile.empty())
+	std::cerr << "Info: Options --stdin, --stdout, and --stderr are ignored with --loadfrom\n";
+    }
+  else
+    {
+      if (not args.stdoutFile.empty())
+	if (not hart.redirectOutputDescriptor(STDOUT_FILENO, args.stdoutFile))
+	  errors++;
 
-  if (not args.stderrFile.empty())
-    if (not hart.redirectOutputDescriptor(STDERR_FILENO, args.stderrFile))
-      errors++;
+      if (not args.stderrFile.empty())
+	if (not hart.redirectOutputDescriptor(STDERR_FILENO, args.stderrFile))
+	  errors++;
 
-  if (not args.stdinFile.empty())
-    if (not hart.redirectInputDescriptor(STDIN_FILENO, args.stdinFile))
-      errors++;
+      if (not args.stdinFile.empty())
+	if (not hart.redirectInputDescriptor(STDIN_FILENO, args.stdinFile))
+	  errors++;
+    }
 
   // Command line to-host overrides that of ELF and config file.
   if (args.toHost)
