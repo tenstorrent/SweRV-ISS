@@ -309,7 +309,7 @@ Syscall<URV>::redirectInputDescriptor(int fd, const std::string& path)
   if (fdMap_.count(fd))
     {
       std::cerr << "Hart::redirectOutputDecritpor: Error: File decriptor " << fd
-                << " alrady used.\n";
+                << " already used.\n";
       return false;
     }
 
