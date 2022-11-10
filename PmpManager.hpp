@@ -90,7 +90,10 @@ namespace WdRiscv
 
     /// Return string representation of the given PMP mode.
     static std::string toString(Mode m);
-      
+
+    /// Return integer representation of the given PMP configuration.
+    uint8_t val() const
+    { return (locked_ << 7) | (0 << 5) | ((uint8_t(type_) & 3) << 3) | (mode_ & 7); }
 
   protected:
 
@@ -142,6 +145,20 @@ namespace WdRiscv
       return Pmp();
     }
 
+    /// Return the physical memory protection object (pmp) associated
+    /// with a given index. Return a no-access object if the given index
+    /// is out of range.
+    Pmp peekPmp(size_t ix) const
+    {
+      for (auto& region : regions_)
+        {
+          auto pmp = region.pmp_;
+          if (pmp.pmpIndex() == ix)
+            return pmp;
+        }
+      return Pmp();
+    }
+
     /// Similar to getPmp but it also updates the access count associated with
     /// each PMP entry.
     inline Pmp accessPmp(uint64_t addr) const
@@ -154,6 +171,7 @@ namespace WdRiscv
 	    auto ix = pmp.pmpIndex();
 	    accessCount_.at(ix)++;
 	    typeCount_.at(ix)++;
+            pmpTrace_.push_back(ix);
 	    return pmp;
 	  }
       return Pmp();
@@ -178,6 +196,13 @@ namespace WdRiscv
     /// Print statistics on the given file.
     bool printStats(const std::string& path) const;
 
+    /// Return the access count of PMPs used in most recent instruction.
+    const std::vector<uint64_t>& getPmpTrace() const
+    { return pmpTrace_; }
+
+    void clearPmpTrace()
+    { pmpTrace_.clear(); }
+
   private:
 
     struct Region
@@ -191,5 +216,8 @@ namespace WdRiscv
     bool enabled_ = false;
     mutable std::vector<uint64_t> accessCount_;  // PMP entry access count.
     mutable std::vector<uint64_t> typeCount_;  // PMP type access count.
+
+    // PMPs used in most recent instruction
+    mutable std::vector<uint64_t> pmpTrace_;
   };
 }

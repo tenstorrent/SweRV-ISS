@@ -31,7 +31,7 @@ Decoder::~Decoder()
 
 
 void
-Decoder::decode(uint64_t addr, uint64_t physAddr, uint32_t inst, DecodedInst& di)
+Decoder::decode(uint64_t addr, uint64_t physAddr, uint32_t inst, DecodedInst& di) const
 {
   // For vector load/store ops, op3 captures the number of fields
   // (non-zero for segmented, and whole-register ld/st).
@@ -57,7 +57,7 @@ Decoder::decode(uint64_t addr, uint64_t physAddr, uint32_t inst, DecodedInst& di
 
 
 const InstEntry&
-Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
+Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) const
 {
   RFormInst rform(inst);
 
@@ -257,7 +257,7 @@ isMaskedVec(uint32_t inst)
 // Least sig 7 bits already determined to be: 1010111
 const InstEntry&
 Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
-		   uint32_t& op3)
+		   uint32_t& op3) const
 {
   RFormInst rform(inst);
   unsigned f3 = rform.bits.funct3, f6 = rform.top6();
@@ -810,7 +810,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 
 
 const InstEntry&
-Decoder::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
+Decoder::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount) const
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   unsigned mop = (imm12 >> 6) & 3;     // Bits 6 & 7 of imm12
@@ -1018,7 +1018,7 @@ Decoder::decodeVecLoad(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 
 
 const InstEntry&
-Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
+Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount) const
 {
   unsigned lumop = imm12 & 0x1f;       // Bits 0 to 4 of imm12
   // unsigned vm = (imm12 >> 5) & 1;      // Bit 5 of imm12
@@ -1178,7 +1178,7 @@ Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount)
 
 
 const InstEntry&
-Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2)
+Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) const
 {
   uint16_t quadrant = inst & 0x3;
   uint16_t funct3 =  uint16_t(inst >> 13);    // Bits 15 14 and 13
@@ -1834,7 +1834,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 
 const InstEntry&
 Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
-		uint32_t& op3)
+		uint32_t& op3) const
 {
 #pragma GCC diagnostic ignored "-Wpedantic"
 

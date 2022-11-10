@@ -382,9 +382,10 @@ namespace WdRiscv
       TDATA3  = 0x7a3,
 
       // Debug mode registers.
-      DCSR     = 0x7b0,
-      DPC      = 0x7b1,
-      DSCRATCH = 0x7b2,
+      DCSR      = 0x7b0,
+      DPC       = 0x7b1,
+      DSCRATCH0 = 0x7b2,
+      DSCRATCH1 = 0x7b3,
 
       // Vector extension register.
       VSTART   = 0x008,
@@ -1013,6 +1014,14 @@ namespace WdRiscv
     /// a write/poke to MCOUNTEREN.
     void updateCounterPrivilege();
 
+    /// Enter/exit debug mode based given a flag value of true/false.
+    void enterDebug(bool flag)
+    { debugMode_ = flag; }
+
+    /// Return true if hart (and this register file) are in debug mode.
+    bool inDebugMode() const
+    { return debugMode_; }
+
     bool readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const;
     
     bool writeTdata(CsrNumber number, PrivilegeMode mode, URV value);
@@ -1240,7 +1249,8 @@ namespace WdRiscv
     bool supervisorModeEnabled_ = false;
 
     bool perModeCounterControl_ = false;
-    bool recordWrite_ = false;
+    bool recordWrite_ = true;
+    bool debugMode_ = false;
   };
 
 

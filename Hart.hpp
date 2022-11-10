@@ -36,6 +36,7 @@
 #include "VirtMem.hpp"
 #include "Isa.hpp"
 #include "Decoder.hpp"
+#include "Disassembler.hpp"
 
 
 namespace WdRiscv
@@ -131,18 +132,13 @@ namespace WdRiscv
 
     /// Return the name of the given integer register. Return an
     /// abi-name (e.g. sp) if abi names are enabled.
-    std::string intRegName(unsigned regIx) const
-    { return intRegs_.regName(regIx, abiNames_); }
+    const std::string& intRegName(unsigned regIx) const
+    { return disas_.intRegName(regIx); }
 
     /// Return the name of the given floating point register. Return an
     /// abi-name (e.g. fa0) if abi names are enabled.
-    std::string fpRegName(unsigned regIx) const
-    { return fpRegs_.regName(regIx, abiNames_); }
-
-    /// Return the name (e.g. x1) or the abi-name (e.g. ra) of the
-    /// given integer register.
-    std::string intRegName(unsigned regIx, bool abiName) const
-    { return intRegs_.regName(regIx, abiName); }
+    const std::string& fpRegName(unsigned regIx) const
+    { return disas_.fpRegName(regIx); }
 
     /// Return count of floating point registers. Return zero if
     /// extension f is not enabled.
@@ -516,21 +512,15 @@ namespace WdRiscv
     /// be opened.
     bool setInitialStateFile(const std::string& path);
 
-    /// Disassemble given instruction putting results on the given
-    /// stream.
-    void disassembleInst(uint32_t inst, std::ostream&);
-
-    /// Disassemble given instruction putting results on the given
-    /// stream.
-    void disassembleInst(const DecodedInst& di, std::ostream&);
+    /// Disassemble given instruction putting results into the given
+    /// string.
+    void disassembleInst(uint32_t inst, std::string& str)
+    { disas_.disassembleInst(inst, decoder_, str); }
 
     /// Disassemble given instruction putting results into the given
     /// string.
-    void disassembleInst(uint32_t inst, std::string& str);
-
-    /// Disassemble given instruction putting results into the given
-    /// string.
-    void disassembleInst(const DecodedInst& di, std::string& str);
+    void disassembleInst(const DecodedInst& di, std::string& str)
+    { disas_.disassembleInst(di, str); }
 
     /// Decode given instruction returning a pointer to the
     /// instruction information and filling op0, op1 and op2 with the
@@ -974,11 +964,11 @@ namespace WdRiscv
     /// Enable use of ABI register names (e.g. sp instead of x2) in
     /// instruction disassembly.
     void enableAbiNames(bool flag)
-    { abiNames_ = flag; }
+    { disas_.enableAbiNames(flag); }
 
     /// Return true if ABI register names are enabled.
     bool abiNames() const
-    { return abiNames_; }
+    { return disas_.abiNames(); }
 
     /// Enable emulation of newlib system calls.
     void enableNewlib(bool flag)
@@ -1297,6 +1287,11 @@ namespace WdRiscv
     void enableVectorMode(bool flag)
     { rvv_ = flag; csRegs_.enableVectorMode(flag); }
 
+    /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
+    /// causes us to enter a privilege mode not Machine.
+    void enableClearMprvOnRet(bool flag)
+    { clearMprvOnRet_ = flag; }
+
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
     void enableMisalignedData(bool flag)
@@ -1309,6 +1304,14 @@ namespace WdRiscv
     /// Return current trap vector mode.
     TrapVectorMode tvecMode() const
     { return tvecMode_; }
+
+    /// Defer interrupts received (to be taken later). This is for testbench
+    /// to control when interrupts are handled without affecting architectural state.
+    void setDeferredInterrupts(URV val)
+    { deferredInterrupts_ = val; }
+
+    URV deferredInterrupts()
+    { return deferredInterrupts_; }
 
     /// This is for performance modeling. Enable a highest level cache
     /// with given size, line size, and set associativity.  Any
@@ -1377,6 +1380,19 @@ namespace WdRiscv
 	  peekMemory(addr, pte, true);
 	  ptes.push_back(pte);
 	}
+    }
+
+    /// Get the PMP registers accessed by last executed instruction
+    void getPmpsAccessed(std::vector<std::pair<uint32_t, Pmp>>& pmps) const
+    {
+      auto& pmpIxs = pmpManager_.getPmpTrace();
+      pmps.clear();
+      for (auto& ix : pmpIxs)
+        {
+          auto pmp = pmpManager_.peekPmp(ix);
+          auto traced = std::make_pair(ix, pmp);
+          pmps.push_back(traced);
+        }
     }
 
     /// Enable per-privilege-mode performance-counter control.
@@ -1989,29 +2005,6 @@ namespace WdRiscv
     /// Execute decoded instruction. Branch/jump instructions will
     /// modify pc_.
     void execute(const DecodedInst* di);
-
-    /// Helper to decode: Decode instructions associated with opcode
-    /// 1010011.
-    const InstEntry& decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			      uint32_t& op2);
-
-    /// Helper to decode: Decode instructions associated with opcode
-    /// 1010111.
-    const InstEntry& decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1,
-                               uint32_t& op2, uint32_t& op3);
-
-    /// Helper to decode: Decode vector instructions associated with
-    /// opcode 0100111. For whole register or segment load, fieldCount
-    /// is set to the register count or segment field count.
-    const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12,
-				    uint32_t& fieldCount);
-
-    /// Helper to decode: Decode vector instructions associated with
-    /// opcode 0000111. For whole register or segment store,
-    /// fieldCount is set to the register count or segment field
-    /// count.
-    const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12,
-				   uint32_t& fieldCount);
 
     /// Helper to disassembleInst32: Disassemble instructions
     /// associated with opcode 1010011.
@@ -4108,6 +4101,9 @@ namespace WdRiscv
     bool clintSiOnReset_ = false;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
 
+    // True if we want to defer an interrupt for later. By default, take immediately.
+    URV deferredInterrupts_ = 0;
+
     bool  hasInterruptor_ = false;
     uint64_t interruptor_ = 0;
 
@@ -4158,7 +4154,6 @@ namespace WdRiscv
     bool enableTriggers_ = false;   // Enable debug triggers.
     bool enableGdb_ = false;        // Enable gdb mode.
     int gdbTcpPort_ = -1;           // Enable gdb mode.
-    bool abiNames_ = false;         // Use ABI register names when true.
     bool newlib_ = false;           // Enable newlib system calls.
     bool linux_ = false;            // Enable linux system calls.
     bool amoInDccmOnly_ = false;
@@ -4183,6 +4178,8 @@ namespace WdRiscv
     PrivilegeMode mstatusMpp_ = PrivilegeMode::Machine; // Cached mstatus.mpp.
     bool mstatusMprv_ = false;                          // Cached mstatus.mprv.
     FpFs mstatusFs_ = FpFs::Off;                        // Cahced mstatus.fs.
+
+    bool clearMprvOnRet_ = true;
 
     FpFs mstatusVs_ = FpFs::Off;
 
@@ -4236,6 +4233,7 @@ namespace WdRiscv
     VirtMem virtMem_;
     Isa isa_;
     Decoder decoder_;
+    Disassembler disas_;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

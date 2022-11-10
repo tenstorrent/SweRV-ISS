@@ -126,8 +126,8 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
   if (mode < csr->privilegeMode())
     return false;
 
-  if (csr->isDebug())
-    return false; // Debug-mode register is not accessible by a CSR instruction.
+  if (csr->isDebug() and not inDebugMode())
+    return false; // Debug-mode register.
 
   if (number >= CsrNumber::TDATA1 and number <= CsrNumber::TDATA3)
     return readTdata(number, mode, value);
@@ -321,8 +321,8 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
   if (mode < csr->privilegeMode() or csr->isReadOnly())
     return false;
 
-  if (csr->isDebug())
-    return false; // Debug-mode register is not accessible by a CSR instruction.
+  if (csr->isDebug() and not inDebugMode())
+    return false; // Debug-mode register.
 
   if (isPmpaddrLocked(number))
     {
@@ -436,8 +436,8 @@ CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
   if (csr->isReadOnly())
     return false;
 
-  if (csr->isDebug())
-    return false;  // Debug-mode register is not accessible by a CSR instruction.
+  if (csr->isDebug() and not inDebugMode())
+    return false;  // Debug-mode register.
 
   return true;
 }
@@ -1147,9 +1147,9 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sstatus)
     {
       // SSTATUS tied to MSTATUS but not all bits are readable.
-      sstatus->setReadMask(0x00766722L);
+      sstatus->setReadMask(0x80766722L);
       if constexpr (sizeof(URV) == 8)
-	sstatus->setReadMask(0x0000000300766722L);
+	sstatus->setReadMask(0x8000000300766722L);
     }
 
   // SSTATUS shadows MSTATUS
@@ -1349,7 +1349,9 @@ CsRegs<URV>::defineDebugRegs()
   URV dpcMask = ~URV(1);
   defineCsr("dpc", CsrNumber::DPC, !mand, imp, 0, dpcMask, dpcMask, isDebug);
 
-  defineCsr("dscratch", CsrNumber::DSCRATCH, !mand, !imp, 0, wam, wam,
+  defineCsr("dscratch0", CsrNumber::DSCRATCH0, !mand, !imp, 0, wam, wam,
+	    isDebug);
+  defineCsr("dscratch1", CsrNumber::DSCRATCH1, !mand, !imp, 0, wam, wam,
 	    isDebug);
 }
 

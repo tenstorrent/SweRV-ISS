@@ -161,6 +161,13 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
 
   csRegs_.configCsr(CsrNumber::MHARTID, implemented, hartId, mask, pokeMask,
                     debug, shared);
+
+  // Give disassembler a way to get abi-names of CSRs.
+  auto callback = [this](unsigned ix) {
+    auto csr = this->findCsr(CsrNumber(ix));
+    return csr? csr->getName() : std::string();
+  };
+  disas_.setCsrNameCallback(callback);
 }
 
 
@@ -3442,6 +3449,7 @@ Hart<URV>::clearTraceData()
   syscall_.clearMemoryChanges();
   vecRegs_.clearTraceData();
   virtMem_.clearPageTableWalk();
+  pmpManager_.clearPmpTrace();
   lastBranchTaken_ = false;
 }
 
@@ -4226,7 +4234,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
 
   URV mip = csRegs_.peekMip();
   URV mie = csRegs_.peekMie();
-  if ((mie & mip) == 0)
+  if ((mie & mip & ~deferredInterrupts_) == 0)
     return false;  // Nothing enabled that is also pending.
 
   typedef InterruptCause IC;
@@ -4297,7 +4305,8 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	{
 	  // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
 	  if ((instCounter_ >> counterToTimeShift) >= clintAlarm_)
-	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER)) | (URV(1) << URV(InterruptCause::S_TIMER));
+	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER))
+                            | (URV(1) << URV(InterruptCause::S_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
 	}
@@ -9541,7 +9550,7 @@ Hart<URV>::execMret(const DecodedInst* di)
   fields.bits_.MIE = fields.bits_.MPIE;
   fields.bits_.MPP = unsigned(PrivilegeMode::User);
   fields.bits_.MPIE = 1;
-  if (savedMode != PrivilegeMode::Machine)
+  if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
 
   // ... and putting it back
@@ -9606,7 +9615,7 @@ Hart<URV>::execSret(const DecodedInst* di)
   fields.bits_.SIE = fields.bits_.SPIE;
   fields.bits_.SPP = 0;
   fields.bits_.SPIE = 1;
-  if (savedMode != PrivilegeMode::Machine)
+  if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
 
   // ... and putting it back
@@ -10075,7 +10084,6 @@ Hart<URV>::execLhu(const DecodedInst* di)
     intRegs_.write(di->op0(), data);
 }
 
-
 template <typename URV>
 ExceptionCause
 Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
@@ -10094,7 +10102,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   if (misal)
     {
       cause = determineMisalStoreException(addr1, stSize);
-      if (cause == ExceptionCause::NONE)
+      if (cause == ExceptionCause::STORE_ADDR_MISAL)
         return cause;
       va2 = (va1 + stSize) & ~alignMask;
     }
@@ -10125,7 +10133,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
   	  pmp = pmpManager_.accessPmp(next);
-	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+	  if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
 	    {
 	      addr1 = va2;
 	      return ExceptionCause::LOAD_ACC_FAULT;
@@ -10150,7 +10158,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  return ExceptionCause::STORE_ACC_FAULT;
 	}
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-      if (not memory_.checkRead(next, stSize))
+      if (not memory_.checkWrite(next, stSize))
 	{
 	  addr1 = va2;
 	  return ExceptionCause::STORE_ACC_FAULT;

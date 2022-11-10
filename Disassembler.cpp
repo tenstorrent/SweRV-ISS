@@ -1,4 +1,4 @@
-// Copyright 2020 Western Digital Corporation or its affiliates.
+// Copyright 2022 Tenstorrent Corporation or its affiliates.
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 #include <iostream>
 #include <sstream>
 #include <cstring>
-#include "Hart.hpp"
+#include "FpRegs.hpp"
+#include "VecRegs.hpp"
+#include "Decoder.hpp"
+#include "Disassembler.hpp"
 #include "instforms.hpp"
 
 
@@ -45,10 +48,9 @@ roundingModeString(RoundingMode mode)
 
 /// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form:  inst reg1, imm(reg2)
-template <typename URV>
 static
 void
-printLdSt(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
+printLdSt(const Disassembler& disas, std::ostream& stream, const DecodedInst& di)
 {
   unsigned rd = di.op0(), rs1 = di.op1();
   int32_t imm = di.op2As<int32_t>();
@@ -62,22 +64,21 @@ printLdSt(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
   // Keep least sig 12 bits.
   imm = imm & 0xfff;
 
-  stream << (di.isFp() ? hart.fpRegName(rd) : hart.intRegName(rd))
+  stream << (di.isFp() ? disas.fpRegName(rd) : disas.intRegName(rd))
 	 << ", " << sign << "0x" << std::hex << imm
-	 << "(" << hart.intRegName(rs1) << ")" << std::dec;
+	 << "(" << disas.intRegName(rs1) << ")" << std::dec;
 }
 
 
 /// Helper to disassemble method. Print on the given stream the
 /// disassembly of the given instruction.
-template <typename URV>
 static
 void
-printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
+printInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
   if (di.isLoad() or di.isStore())
     {
-      printLdSt(hart, out, di);
+      printLdSt(disas, out, di);
       return;
     }
 
@@ -96,10 +97,10 @@ printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       switch (type)
 	{
 	case OperandType::IntReg:
-	  out << hart.intRegName(di.ithOperand(i));
+	  out << disas.intRegName(di.ithOperand(i));
 	  break;
 	case OperandType::FpReg:
-	  out << hart.fpRegName(di.ithOperand(i));
+	  out << disas.fpRegName(di.ithOperand(i));
 	  break;
 	case OperandType::VecReg:
 	  out << "v" << di.ithOperand(i);
@@ -120,47 +121,44 @@ printInst(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 
 /// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form: inst rd, rs2, rs1, rs3
-template <typename URV>
 static
 void
-printRdRs2Rs1Rs3(const Hart<URV>& hart, std::ostream& stream, const char* inst,
-                 const DecodedInst& di)
+printRdRs2Rs1Rs3(const Disassembler& disas, std::ostream& stream,
+		 const char* inst, const DecodedInst& di)
 {
   unsigned rd = di.op0(), rs1 = di.op1(), rs2 = di.op2(), rs3 = di.op3();
 
   // Print instruction in a 9 character field.
   stream << std::left << std::setw(9) << inst;
 
-  stream << hart.intRegName(rd) << ", " << hart.intRegName(rs2)
-         << ", " << hart.intRegName(rs1) << ", " << hart.intRegName(rs3);
+  stream << disas.intRegName(rd) << ", " << disas.intRegName(rs2)
+         << ", " << disas.intRegName(rs1) << ", " << disas.intRegName(rs3);
 }
 
 
 /// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form: inst rd, rs1, rs3, rs2
-template <typename URV>
 static
 void
-printRdRs1Rs3Rs2(const Hart<URV>& hart, std::ostream& stream, const char* inst,
-                 const DecodedInst& di)
+printRdRs1Rs3Rs2(const Disassembler& disas, std::ostream& stream,
+		 const char* inst, const DecodedInst& di)
 {
   unsigned rd = di.op0(), rs1 = di.op1(), rs2 = di.op2(), rs3 = di.op3();
 
   // Print instruction in a 9 character field.
   stream << std::left << std::setw(9) << inst;
 
-  stream << hart.intRegName(rd) << ", " << hart.intRegName(rs1)
-         << ", " << hart.intRegName(rs3) << ", " << hart.intRegName(rs2);
+  stream << disas.intRegName(rd) << ", " << disas.intRegName(rs1)
+         << ", " << disas.intRegName(rs3) << ", " << disas.intRegName(rs2);
 }
 
 
 /// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form: inst rd, rs1, rs3, immed
-template <typename URV>
 static
 void
-printRdRs1Rs3Imm(const Hart<URV>& hart, std::ostream& stream, const char* inst,
-                   const DecodedInst& di)
+printRdRs1Rs3Imm(const Disassembler& disas, std::ostream& stream,
+		 const char* inst, const DecodedInst& di)
 {
   unsigned rd = di.op0(), rs1 = di.op1(), rs3 = di.op2();
   unsigned imm = di.op3();
@@ -168,52 +166,44 @@ printRdRs1Rs3Imm(const Hart<URV>& hart, std::ostream& stream, const char* inst,
   // Print instruction in a 9 character field.
   stream << std::left << std::setw(9) << inst;
 
-  stream << hart.intRegName(rd) << ", " << hart.intRegName(rs1)
-         << ", " << hart.intRegName(rs3) << ", 0x" << std::hex << imm
+  stream << disas.intRegName(rd) << ", " << disas.intRegName(rs1)
+         << ", " << disas.intRegName(rs3) << ", 0x" << std::hex << imm
          << std::dec;
 }
 
 
 /// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form: csrinst rd, csrn, rs1
-template <typename URV>
 static
 void
-printCsr(Hart<URV>& hart, std::ostream& stream,	 const DecodedInst& di)
+printCsr(const Disassembler& disas, std::ostream& stream,
+	 const DecodedInst& di)
 {
   unsigned rd = di.op0(), csrn = di.op2();
 
   stream << std::left << std::setw(9) << di.name();
-  stream << hart.intRegName(rd) << ", ";
-
-  std::string name;
-  auto csr = hart.findCsr(CsrNumber(csrn));
-  if (csr)
-    name = csr->getName();
-  if (name.empty())
-    name = std::string("c") + std::to_string(csrn);
-  stream << name;
+  stream << disas.intRegName(rd) << ", ";
+  stream << disas.csRegName(csrn);
 
   if (di.ithOperandType(1) == OperandType::Imm)
     stream << ", 0x" << std::hex << di.op1() << std::dec;
   else
-    stream << ", " << hart.intRegName(di.op1());
+    stream << ", " << disas.intRegName(di.op1());
 }
 
 
 /// Helper to disassemble method. Print on the given stream given
 /// instruction which is of the form: inst reg, imm where inst is a
 /// compressed instruction.
-template <typename URV>
 static
 void
-printRegImm(const Hart<URV>& hart, std::ostream& stream, const char* inst,
-	    unsigned rs1, int32_t imm)
+printRegImm(const Disassembler& disas, std::ostream& stream,
+	    const char* inst, unsigned rs1, int32_t imm)
 {
   // Print instruction in a 8 character field.
   stream << std::left << std::setw(8) << inst << ' ';
 
-  stream << hart.intRegName(rs1) << ", ";
+  stream << disas.intRegName(rs1) << ", ";
 
   if (imm < 0)
     stream << "-0x" << std::hex << (-imm) << std::dec;
@@ -225,16 +215,15 @@ printRegImm(const Hart<URV>& hart, std::ostream& stream, const char* inst,
 /// Helper to disassemble method. Print on the given stream given 3
 /// operand branch instruction which is of the form: inst reg, reg,
 /// imm where imm is a 12 bit constant.
-template <typename URV>
 static
 void
-printBranch3(const Hart<URV>& hart, std::ostream& stream,
+printBranch3(const Disassembler& disas, std::ostream& stream,
 	     const DecodedInst& di)
 {
   unsigned rs1 = di.op0(), rs2 = di.op1();
 
   stream << std::left << std::setw(8) << di.name() << ' ';
-  stream << hart.intRegName(rs1) << ", " << hart.intRegName(rs2) << ", . ";
+  stream << disas.intRegName(rs1) << ", " << disas.intRegName(rs2) << ", . ";
 
   char sign = '+';
   int32_t imm = di.op2As<int32_t>();
@@ -250,16 +239,15 @@ printBranch3(const Hart<URV>& hart, std::ostream& stream,
 
 /// Helper to disassemble method. Print on the given stream given
 /// 2 operand  branch instruction which is of the form: inst reg, imm.
-template <typename URV>
 static
 void
-printBranch2(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
+printBranch2(const Disassembler& disas, std::ostream& stream, const DecodedInst& di)
 {
   unsigned rs1 = di.op0();
   int32_t imm = di.op2As<int32_t>();
 
   stream << std::left << std::setw(8) << di.name() << ' ';
-  stream << hart.intRegName(rs1) << ", . ";
+  stream << disas.intRegName(rs1) << ", . ";
 
   char sign = '+';
   if (imm < 0)
@@ -271,10 +259,9 @@ printBranch2(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
 }
 
 
-template <typename URV>
 static
 void
-printFence(const Hart<URV>& /*hart*/, std::ostream& stream,
+printFence(const Disassembler& , std::ostream& stream,
 	   const DecodedInst& di)
 {
   stream << std::left << std::setw(8) << di.name() << ' ';
@@ -297,10 +284,9 @@ printFence(const Hart<URV>& /*hart*/, std::ostream& stream,
 
 
 /// Helper to disassemble method.
-template <typename URV>
 static
 void
-printAmo(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
+printAmo(const Disassembler& disas, std::ostream& stream, const DecodedInst& di)
 {
   unsigned rd = di.op0(), rs1 = di.op1(), rs2 = di.op2();
   bool aq = di.isAtomicAcquire(), rl = di.isAtomicRelease();
@@ -313,16 +299,15 @@ printAmo(const Hart<URV>& hart, std::ostream& stream, const DecodedInst& di)
   if (rl)
     stream << ".rl";
 
-  stream << ' ' << hart.intRegName(rd) << ", " << hart.intRegName(rs2) << ", ("
-	 << hart.intRegName(rs1) << ")";
+  stream << ' ' << disas.intRegName(rd) << ", " << disas.intRegName(rs2) << ", ("
+	 << disas.intRegName(rs1) << ")";
 }
 
 
 /// Helper to disassemble method.
-template <typename URV>
 static
 void
-printLr(const Hart<URV>& hart, std::ostream& stream, const char* inst,
+printLr(const Disassembler& disas, std::ostream& stream, const char* inst,
 	const DecodedInst& di)
 {
   unsigned rd = di.op0(), rs1 = di.op1();
@@ -336,15 +321,14 @@ printLr(const Hart<URV>& hart, std::ostream& stream, const char* inst,
   if (rl)
     stream << ".rl";
 
-  stream << ' ' << hart.intRegName(rd) << ", (" << hart.intRegName(rs1) << ")";
+  stream << ' ' << disas.intRegName(rd) << ", (" << disas.intRegName(rs1) << ")";
 }
 
 
 /// Helper to disassemble method.
-template <typename URV>
 static
 void
-printSc(const Hart<URV>& hart, std::ostream& stream, const char* inst,
+printSc(const Disassembler& disas, std::ostream& stream, const char* inst,
 	const DecodedInst& di)
 {
   unsigned rd = di.op0(), rs1 = di.op1(), rs2 = di.op2();
@@ -358,8 +342,8 @@ printSc(const Hart<URV>& hart, std::ostream& stream, const char* inst,
   if (rl)
     stream << ".rl";
 
-  stream << ' ' << hart.intRegName(rd) << ", " << hart.intRegName(rs2)
-	 << ", (" << hart.intRegName(rs1) << ")";
+  stream << ' ' << disas.intRegName(rd) << ", " << disas.intRegName(rs2)
+	 << ", (" << disas.intRegName(rs1) << ")";
 }
 
 
@@ -372,10 +356,9 @@ insertFieldCountInName(const std::string& name, unsigned count, unsigned n)
 }
 
 
-template <typename URV>
 static
 void
-printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
+printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
   uint32_t opcode7 = di.inst() & 0x7f;  // Least sig 7 bits
   InstId id = di.instId();
@@ -393,11 +376,11 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       else if (id >= InstId::vluxsegei8_v and id <= InstId::vsoxsegei1024_v)
 	name = insertFieldCountInName(name, di.vecFieldCount(), 7);
       out << name << " v" << di.op0();
-      out << ", ("  << hart.intRegName(di.op1()) << ")";
+      out << ", ("  << disas.intRegName(di.op1()) << ")";
       if (di.operandCount() == 3)
 	{
 	  if (di.ithOperandType(2) == OperandType::IntReg)
-	    out << ", " << hart.intRegName(di.ithOperand(2));
+	    out << ", " << disas.intRegName(di.ithOperand(2));
 	  else
 	    out << ", v" << di.op2();
 	}
@@ -408,11 +391,11 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 
   if (id == InstId::vsetvli or id == InstId::vsetivli)
     {
-      out << di.name() << ' ' << hart.intRegName(di.op0()) << ", ";
+      out << di.name() << ' ' << disas.intRegName(di.op0()) << ", ";
       if (id == InstId::vsetivli)
 	out << di.op1();
       else
-	out << hart.intRegName(di.op1());
+	out << disas.intRegName(di.op1());
       out << ", ";
       std::string mm = ((di.op2() >> 7) & 1) ? "ma" : "mu";
       std::string tt = ((di.op2() >> 6) & 1) ? "ta" : "tu";
@@ -424,8 +407,8 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 
   if (id == InstId::vsetvl)
     {
-      out << "vsetvl " << hart.intRegName(di.op0()) << ", "
-	  << hart.intRegName(di.op1()) << ", " << hart.intRegName(di.op2());
+      out << "vsetvl " << disas.intRegName(di.op0()) << ", "
+	  << disas.intRegName(di.op1()) << ", " << disas.intRegName(di.op2());
       return;
     }
 
@@ -444,10 +427,10 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
       switch (type)
 	{
 	case OperandType::IntReg:
-	  out << hart.intRegName(di.ithOperand(i));
+	  out << disas.intRegName(di.ithOperand(i));
 	  break;
 	case OperandType::FpReg:
-	  out << hart.fpRegName(di.ithOperand(i));
+	  out << disas.fpRegName(di.ithOperand(i));
 	  break;
 	case OperandType::VecReg:
 	  out << "v" << di.ithOperand(i);
@@ -473,43 +456,37 @@ printVecInst(Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
 }
 	  
 
-template <typename URV>
 static
 void
-printCbo(const Hart<URV>& hart, std::ostream& out, const DecodedInst& di)
+printCbo(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
   unsigned width = std::max(size_t(9), di.name().size() + 1);
   out << std::left << std::setw(width) << di.name();
-  out << "0(" << hart.intRegName(di.ithOperand(0)) << ")";
+  out << "0(" << disas.intRegName(di.ithOperand(0)) << ")";
 }
 
 
-template <typename URV>
 void
-Hart<URV>::disassembleInst(uint32_t inst, std::ostream& stream)
-{
-  DecodedInst di;
-  uint64_t physPc = pc_;
-  decode(pc_, physPc, inst, di);
-  disassembleInst(di, stream);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::disassembleInst(uint32_t inst, std::string& str)
+Disassembler::disassembleInst(uint32_t inst, const Decoder& decoder,
+			      std::string& str)
 {
   str.clear();
-
-  std::ostringstream oss;
-  disassembleInst(inst, oss);
-  str = oss.str();
+  DecodedInst di;
+  decoder.decode(0, 0, inst, di);
+  disassembleInst(di, str);
 }
 
 
-template <typename URV>
 void
-Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
+Disassembler::disassembleInst(const DecodedInst& di, std::string& str)
+{
+  str.clear();
+  disassemble(di, str);
+}
+
+
+void
+Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
 {
   InstId id = di.instId();
   switch(id)
@@ -824,17 +801,20 @@ Hart<URV>::disassembleInst(const DecodedInst& di, std::ostream& out)
 }
 
 
-template <typename URV>
 void
-Hart<URV>::disassembleInst(const DecodedInst& di, std::string& str)
+Disassembler::disassemble(const DecodedInst& di, std::string& str)
 {
-  str.clear();
-
-  std::ostringstream oss;
-  disassembleInst(di, oss);
-  str = oss.str();
+  uint32_t inst = di.inst();
+  auto iter = disasMap_.find(inst);
+  if (iter != disasMap_.end())
+    {
+      str = iter->second;
+    }
+  else
+    {
+      std::ostringstream oss;
+      disassembleUncached(di, oss);
+      str = oss.str();
+      disasMap_[di.inst()] = str;
+    }
 }
-
-
-template class WdRiscv::Hart<uint32_t>;
-template class WdRiscv::Hart<uint64_t>;

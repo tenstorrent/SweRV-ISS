@@ -42,12 +42,12 @@ namespace WdRiscv
     /// op2 will be set. If inst is not a valid instruction , then we
     /// return a reference to the illegal-instruction info.
     const InstEntry& decode(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			    uint32_t& op2, uint32_t& op3);
+			    uint32_t& op2, uint32_t& op3) const;
 
     /// Similar to the preceding decode method but with decoded data
     /// placed in the given DecodedInst object.
     void decode(uint64_t addr, uint64_t physAddr, uint32_t inst,
-		DecodedInst& decodedInst);
+		DecodedInst& decodedInst) const;
 
     /// Return the 32-bit instruction corresponding to the given 16-bit
     /// compressed instruction. Return an illegal 32-bit opcode if given
@@ -91,23 +91,23 @@ namespace WdRiscv
 
     /// Decode a floating point instruction.
     const InstEntry& decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			      uint32_t& op2);
+			      uint32_t& op2) const;
 
     /// Decode a vector instruction.
     const InstEntry& decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1,
-			       uint32_t& op2, uint32_t& op3);
+			       uint32_t& op2, uint32_t& op3) const;
 
     /// Decode a vector load instruction.
     const InstEntry& decodeVecLoad(uint32_t f3, uint32_t imm12,
-				   uint32_t& fieldCount);
+				   uint32_t& fieldCount) const;
 
     /// Decode a vector store instruction.
     const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12,
-				    uint32_t& fieldCount);
+				    uint32_t& fieldCount) const;
 
     /// Decode a compressed instruction.
     const InstEntry& decode16(uint16_t inst, uint32_t& op0, uint32_t& op1,
-			      uint32_t& op2);
+			      uint32_t& op2) const;
 
   private:
 

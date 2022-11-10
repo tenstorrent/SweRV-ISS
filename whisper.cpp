@@ -24,7 +24,13 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <sys/mman.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <dlfcn.h>
 #include <csignal>
@@ -234,6 +240,7 @@ struct Args
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
   bool tracePtw = false;   // Enable printing of page table walk info in log.
+  bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
 
   // Expand each target program string into program name and args.
   void expandTargets();
@@ -259,7 +266,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 794;
+  unsigned subversion = 795;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -450,7 +457,10 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	("commandlog", po::value(&args.commandLogFile),
 	 "Enable logging of interactive/socket commands to the given file.")
 	("server", po::value(&args.serverFile),
-	 "Interactive server mode. Put server hostname and port in file.")
+	 "Interactive server mode. Put server hostname and port in file. If shared memory "
+         "is enabled, file is memory mapped filename")
+        ("shm", po::bool_switch(&args.shm),
+         "Enable shared memory IPC for server mode (default mode uses socket).")
 	("startpc,s", po::value<std::string>(),
 	 "Set program entry point. If not specified, use entry point of the "
 	 "most recently loaded ELF file.")
@@ -958,20 +968,28 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     hart.enableInstructionFrequency(true);
 
   if (not args.loadFrom.empty())
-    if (not loadSnapshot(system, hart, args.loadFrom))
-      errors++;
+    {
+      if (not loadSnapshot(system, hart, args.loadFrom))
+	errors++;
 
-  if (not args.stdoutFile.empty())
-    if (not hart.redirectOutputDescriptor(STDOUT_FILENO, args.stdoutFile))
-      errors++;
+      if (not args.stdoutFile.empty() or not args.stderrFile.empty() or
+	  not args.stdinFile.empty())
+	std::cerr << "Info: Options --stdin, --stdout, and --stderr are ignored with --loadfrom\n";
+    }
+  else
+    {
+      if (not args.stdoutFile.empty())
+	if (not hart.redirectOutputDescriptor(STDOUT_FILENO, args.stdoutFile))
+	  errors++;
 
-  if (not args.stderrFile.empty())
-    if (not hart.redirectOutputDescriptor(STDERR_FILENO, args.stderrFile))
-      errors++;
+      if (not args.stderrFile.empty())
+	if (not hart.redirectOutputDescriptor(STDERR_FILENO, args.stderrFile))
+	  errors++;
 
-  if (not args.stdinFile.empty())
-    if (not hart.redirectInputDescriptor(STDIN_FILENO, args.stdinFile))
-      errors++;
+      if (not args.stdinFile.empty())
+	if (not hart.redirectInputDescriptor(STDIN_FILENO, args.stdinFile))
+	  errors++;
+    }
 
   // Command line to-host overrides that of ELF and config file.
   if (args.toHost)
@@ -1210,6 +1228,60 @@ runServer(System<URV>& system, const std::string& serverFile,
   close(newSoc);
   close(soc);
 
+  return ok;
+}
+
+/// Open a shared memory region and write name to given server file.
+/// Return true on success and false on failure
+template <typename URV>
+static
+bool
+runServerShm(System<URV>& system, const std::string& serverFile,
+	  FILE* traceFile, FILE* commandLog)
+{
+  std::string path = "/" + serverFile;
+  int fd = shm_open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+  if (fd < 0)
+    {
+      perror("Failed to open shared memory file");
+      return false;
+    }
+  if (ftruncate(fd, 4096) < 0)
+    {
+      perror("Failed ftruncate on shared memory file");
+      return false;
+    }
+
+  char* shm = (char*) mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (shm == MAP_FAILED)
+    {
+      perror("Failed mmap");
+      return false;
+    }
+
+  bool ok = true;
+
+  try
+    {
+      Server<URV> server(system);
+      ok = server.interact(shm, traceFile, commandLog);
+    }
+  catch(...)
+    {
+      ok = false;
+    }
+
+  close(fd);
+  if (munmap(shm, 4096) < 0)
+    {
+      perror("Failed to unmap");
+      return false;
+    }
+  if (shm_unlink(path.c_str()) < 0)
+    {
+      perror("Failed shm unlink");
+      return false;
+    }
   return ok;
 }
 
@@ -1584,7 +1656,8 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
     }
 
   if (serverMode)
-    return runServer(system, args.serverFile, traceFile, cmdLog);
+    return (args.shm)? runServerShm(system, args.serverFile, traceFile, cmdLog) :
+                       runServer(system, args.serverFile, traceFile, cmdLog);
 
   if (args.interactive)
     {

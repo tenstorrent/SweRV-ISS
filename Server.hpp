@@ -15,6 +15,7 @@
 #pragma once
 
 #include "System.hpp"
+#include "WhisperMessage.h"
 
 
 namespace WdRiscv
@@ -52,6 +53,11 @@ namespace WdRiscv
     /// received). Return false otherwise.
     bool interact(int soc, FILE* traceFile, FILE* commandLog);
 
+    bool interact(char* shm, FILE* traceFile, FILE* commandLog);
+
+    bool interact(const WhisperMessage& msg, WhisperMessage& reply,
+                  FILE* traceFile, FILE* commandLog);
+
   protected:
 
     /// Process changes of a single-step command. Put the changes in the
@@ -78,6 +84,7 @@ namespace WdRiscv
     bool checkHart(const WhisperMessage& reg, const std::string& command,
                    WhisperMessage& reply);
 
+    std::vector<WhisperMessage> pendingChanges_;
     System<URV>& system_;
   };
 

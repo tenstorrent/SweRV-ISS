@@ -497,7 +497,6 @@ namespace Whisper
 }
 
 
-static std::unordered_map<uint32_t, std::string> disasMap;
 Whisper::PrintBuffer buffer;
 
 
@@ -514,6 +513,8 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid");
       if (isRvs())
 	fprintf(out, ", iptw, dptw");
+      if (pmpEnabled_)
+        fprintf(out, ", pmp");
       fprintf(out, "\n");
     }
 
@@ -706,21 +707,11 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   buffer.printChar(',');
 
   // Disassembly.
-  uint32_t inst = di.inst();
-  auto iter = disasMap.find(inst);
-  if (iter != disasMap.end())
-    {
-      auto& disas = iter->second;
-      buffer.print(disas);
-    }
-  else
-    {
-      std::string tmp;
-      disassembleInst(di, tmp);
-      std::replace(tmp.begin(), tmp.end(), ',', ';');
-      buffer.print(tmp);
-      disasMap[di.inst()] = tmp;
-    }
+  std::string tmp;
+  disassembleInst(di, tmp);
+  for (size_t i = 0; i < tmp.size(); ++i)
+    if (tmp[i] == ',') tmp[i] = ';';
+  buffer.print(tmp);
 
   // Hart Id.
   buffer.printChar(',').print(sysHartIndex());
@@ -751,6 +742,21 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	  sep = ";";
 	}
     }
+
+  // PMP
+  if (pmpEnabled_)
+    {
+      buffer.printChar(',');
+      std::vector<std::pair<uint32_t, Pmp>> pmps;
+      getPmpsAccessed(pmps);
+      sep = "";
+      for (auto& pmp : pmps)
+        {
+          buffer.print(sep).print(pmp.first).printChar('=').print(pmp.second.val());
+          sep = ";";
+        }
+    }
+
   buffer.printChar('\n');
   buffer.write(out);
 }

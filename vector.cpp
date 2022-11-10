@@ -648,7 +648,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
       return false;
     }
 
-  if ((dest & mask) == 0)
+  if ((src & mask) == 0)
     {
       vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
       vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging

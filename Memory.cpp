@@ -339,7 +339,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
 
 #endif
 
-  end = paddr + uint64_t(segSize);
+  end = paddr + uint64_t(seg->get_memory_size());
   return true;
 }
 

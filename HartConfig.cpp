@@ -225,11 +225,15 @@ namespace WdRiscv
 template <typename URV>
 static
 bool
-applyCsrConfig(Hart<URV>& hart, const std::string& name, const nlohmann::json& conf, bool verbose)
+applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& conf, bool verbose)
 {
   unsigned errors = 0;
   URV reset = 0, mask = 0, pokeMask = 0;
   bool isDebug = false, exists = true, shared = false;
+
+  std::string name = nm;
+  if (name == "dscratch")
+    name +=  "0";
 
   Csr<URV>* csr = hart.findCsr(name);
   if (csr)
@@ -1339,6 +1343,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
       else
         hart.setTlbSize(size);
+    }
+
+  tag = "clear_mprv_on_ret";
+  if (config_ -> count(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableClearMprvOnRet(flag);
     }
 
   return errors == 0;

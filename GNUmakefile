@@ -22,7 +22,7 @@ BOOST_LIB_DIR := $(wildcard $(BOOST_DIR)/stage/lib $(BOOST_DIR)/lib)
 BOOST_LIBS := boost_program_options
 
 # Add extra dependency libraries here
-EXTRA_LIBS := -lpthread -lm -lz -ldl -lstdc++fs -static-libstdc++
+EXTRA_LIBS := -lpthread -lm -lz -ldl -lstdc++fs -static-libstdc++ -lrt
 
 ifdef SOFT_FLOAT
   override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include
@@ -95,7 +95,7 @@ $(BUILD_DIR)/whisper.cpp.o:  .FORCE
 RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
             Memory.cpp Hart.cpp InstEntry.cpp Triggers.cpp \
             PerfRegs.cpp gdb.cpp HartConfig.cpp \
-            Server.cpp Interactive.cpp disas.cpp printTrace.cpp \
+            Server.cpp Interactive.cpp Disassembler.cpp printTrace.cpp \
 	    Syscall.cpp PmaManager.cpp DecodedInst.cpp snapshot.cpp \
 	    PmpManager.cpp VirtMem.cpp Core.cpp System.cpp Cache.cpp \
 	    Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
