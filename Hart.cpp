@@ -3716,7 +3716,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
     {
       uint32_t ix = (addr >> 1) & decodeCacheMask_;
       DecodedInst* di = &decodeCache_[ix];
-      if (not di->isValid() or di->address() != pc_)
+      if (not di->isValid() or di->address() != pc_ or isRvs())
         fetchOk = fetchInst(addr, physAddr, inst);
       else
         inst = di->inst();
@@ -4067,7 +4067,7 @@ Hart<URV>::simpleRunWithLimit()
       // Fetch/decode unless match in decode cache.
       uint32_t ix = (pc_ >> 1) & decodeCacheMask_;
       DecodedInst* di = &decodeCache_[ix];
-      if (not di->isValid() or di->address() != pc_)
+      if (not di->isValid() or di->address() != pc_ or isRvs())
         {
           uint32_t inst = 0;
 	  uint64_t physPc = 0;
