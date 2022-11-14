@@ -258,12 +258,12 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
   if (seg->get_type() != PT_LOAD)
     return true;
 
-  if (paddr + segSize > size_)
+  if (paddr + seg->get_memory_size() > size_)
     {
-      std::cerr << "End of ELF segment " << segIx << " ("
-                << (paddr+segSize)
-                << ") is beyond end of simulated memory ("
-                << size_ << ")\n";
+      std::cerr << "End of ELF segment " << segIx << " (0x"
+                << std::hex << (paddr+segSize)
+                << ") is beyond end of simulated memory (0x"
+                << size_ << ")\n" << std::dec;
       if (checkUnmappedElf_)
         return false;
     }
