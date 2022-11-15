@@ -1266,9 +1266,12 @@ CsRegs<URV>::defineHypervisorRegs()
   defineCsr("henvcfg",     Csrn::HENVCFG,     !mand, !imp, 0, wam, wam);
   defineCsr("henvcfgh",    Csrn::HENVCFGH,    !mand, !imp, 0, wam, wam);
   defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, wam, wam);
-  defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
   defineCsr("htimedelta",  Csrn::HTIMEDELTA,  !mand, !imp, 0, wam, wam);
   defineCsr("htimedeltah", Csrn::HTIMEDELTAH, !mand, !imp, 0, wam, wam);
+
+  // This may be already defined with trigger CSRs.
+  if (not nameToNumber_.count("hcontext"))
+    defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
 }
 
 
@@ -1283,10 +1286,16 @@ CsRegs<URV>::defineDebugRegs()
   using Csrn = CsrNumber;
 
   // Debug/Trace registers.
-  defineCsr("tselect", Csrn::TSELECT, !mand, imp,  0, wam, wam);
-  defineCsr("tdata1",  Csrn::TDATA1,  !mand, imp,  0, wam, wam);
-  defineCsr("tdata2",  Csrn::TDATA2,  !mand, imp,  0, wam, wam);
-  defineCsr("tdata3",  Csrn::TDATA3,  !mand, !imp, 0, wam, wam);
+  defineCsr("scontext", Csrn::SCONTEXT, !mand, !imp, 0, wam, wam);
+  defineCsr("tselect",  Csrn::TSELECT,  !mand, imp,  0, wam, wam);
+  defineCsr("tdata1",   Csrn::TDATA1,   !mand, imp,  0, wam, wam);
+  defineCsr("tdata2",   Csrn::TDATA2,   !mand, imp,  0, wam, wam);
+  defineCsr("tdata3",   Csrn::TDATA3,   !mand, !imp, 0, wam, wam);
+  defineCsr("tinfo",    Csrn::TINFO,    !mand, !imp, 0, wam, wam);
+  defineCsr("tcontrol", Csrn::TCONTROL, !mand, !imp, 0, wam, wam);
+  defineCsr("mcontext", Csrn::MCONTEXT, !mand, !imp, 0, wam, wam);
+  if (not nameToNumber_.count("hcontext"))
+    defineCsr("hcontext", Csrn::HCONTEXT, !mand, !imp, 0, wam, wam);
 
   // Define triggers.
   unsigned triggerCount = 4;
