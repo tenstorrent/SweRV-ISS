@@ -14,7 +14,6 @@ static
 const char*
 privilegeModeToStr(PrivilegeMode pm)
 {
-  return "";
   if (pm == PrivilegeMode::Machine)    return "M";
   if (pm == PrivilegeMode::Supervisor) return "S";
   if (pm == PrivilegeMode::User)       return "U";
