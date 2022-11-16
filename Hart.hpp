@@ -1784,13 +1784,6 @@ namespace WdRiscv
     bool takeTriggerAction(FILE* traceFile, URV epc, URV info,
 			   uint64_t& counter, bool beforeTiming);
 
-    /// Helper to load. Return NONE if no exception.
-    ExceptionCause determineMisalLoadException(URV addr, unsigned ldSize) const;
-
-    /// Helper to load. Return NONE if no exception.
-    ExceptionCause determineMisalStoreException(URV addr, unsigned stSize) const;
-
-
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.
     void initiateLoadException(ExceptionCause cause, URV addr);

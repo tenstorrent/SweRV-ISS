@@ -1279,34 +1279,6 @@ Hart<URV>::reportLrScStat(FILE* file) const
 
 
 template <typename URV>
-ExceptionCause
-Hart<URV>::determineMisalLoadException(URV /*addr*/, unsigned /*accessSize*/) const
-{
-  if (not misalDataOk_)
-    return ExceptionCause::LOAD_ADDR_MISAL;
-
-  return ExceptionCause::NONE;
-}
-
-
-template <typename URV>
-ExceptionCause
-Hart<URV>::determineMisalStoreException(URV addr, unsigned accessSize) const
-{
-  if (not misalDataOk_)
-    return ExceptionCause::STORE_ADDR_MISAL;
-
-  uint64_t addr2 = addr + accessSize - 1;
-
-  // Misaligned access to a region with side effect.
-  if (not isAddrIdempotent(addr) or not isAddrIdempotent(addr2))
-    return ExceptionCause::STORE_ADDR_MISAL;
-
-  return ExceptionCause::NONE;
-}
-
-
-template <typename URV>
 void
 Hart<URV>::initiateLoadException(ExceptionCause cause, URV addr)
 {
@@ -1340,9 +1312,8 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   ExceptionCause cause = ExceptionCause::NONE;
   if (misal)
     {
-      cause = determineMisalLoadException(addr1, ldSize);
-      if (cause == ExceptionCause::LOAD_ADDR_MISAL)
-        return cause;  // Misaligned resulting in misaligned-adddress-exception
+      if (not misalDataOk_)
+	return ExceptionCause::LOAD_ADDR_MISAL;
       va2 = (va1 + ldSize) & ~alignMask;
     }
 
@@ -10096,12 +10067,10 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
-  ExceptionCause cause = ExceptionCause::NONE;
   if (misal)
     {
-      cause = determineMisalStoreException(addr1, stSize);
-      if (cause == ExceptionCause::STORE_ADDR_MISAL)
-        return cause;
+      if (not misalDataOk_)
+	return ExceptionCause::STORE_ADDR_MISAL;
       va2 = (va1 + stSize) & ~alignMask;
     }
 
@@ -10111,7 +10080,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-          cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
+          auto cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
             return cause;
         }
