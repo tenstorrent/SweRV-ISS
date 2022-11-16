@@ -183,6 +183,7 @@ namespace WdRiscv
   };
 
 
+  /// Struct to unpack the fields of a page table entry for Sv48.
   struct Pte48Bits
   {
     unsigned valid_    : 1;
@@ -271,6 +272,7 @@ namespace WdRiscv
   };
 
 
+  /// Struct to unpack the fields of a page table entry for Sv57.
   struct Pte57Bits
   {
     unsigned valid_    : 1;
@@ -293,7 +295,7 @@ namespace WdRiscv
   } __attribute__((packed));
 
 
-  /// Page table entry for Sv48
+  /// Page table entry for Sv57
   union Pte57
   {
     Pte57Bits bits_;
