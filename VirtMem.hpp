@@ -48,33 +48,50 @@ namespace WdRiscv
     Pte32Bits bits_;
     uint32_t data_ = 0;
 
+    /// Constructor: Intialize from the the given data value.
     Pte32(uint32_t word) : data_(word)
     { }
 
+    /// Return true if valid bit is on in this PTE.
     bool valid() const      { return bits_.valid_; }
 
+    /// Return true if read permission bit is on in this PTE.
     bool read() const       { return bits_.read_; }
 
+    /// Return true if write permission bit is on in this PTE.
     bool write() const      { return bits_.write_; }
 
+    /// Return true if execute permission bit is on in this PTE.
     bool exec() const       { return bits_.exec_; }
 
+    /// Return true if this PTE is marked for user privilege.
     bool user() const       { return bits_.user_; }
 
+    /// Return true if this PTE is marked global.
     bool global() const     { return bits_.global_; }
 
+    /// Return true if this PTE is marked accessed.
     bool accessed() const   { return bits_.accessed_; }
 
+    /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
 
+    /// Physical page number in this PTE (see Sv32 PTE in the
+    /// privileged spec.)
     uint32_t ppn() const    { return ppn0() | (ppn1() << 10); }
 
+    /// Physical page number field 0 in this PTE (see Sv32 PTE in the
+    /// privileged spec.)
     uint32_t ppn0() const   { return bits_.ppn0_; }
 
+    /// Physical page number field 1 in this PTE (see Sv32 PTE in the
+    /// privileged spec.)
     uint32_t ppn1() const   { return bits_.ppn1_; }
 
+    /// Number of levels of an Sv32 PTE.
     uint32_t levels() const { return 2; }
 
+    /// Size in bytes of this object.
     uint32_t size() const   { return sizeof(data_); }
 
     /// Page based memory type. NA for Sv32.
@@ -83,6 +100,9 @@ namespace WdRiscv
     /// Naturally aligned power of 2 translation. NA for Sv32.
     bool hasNapot() const  { return false; }
 
+    /// Return the ith physical page number (PPN) field encoded in
+    /// this PTE. The index i must be smaller than the number of
+    /// levels of Sv32. See the Sv32 PTE in the privileged spec.
     uint32_t ppn(int i) const
     {
       if (i == 0) return ppn0();
@@ -90,6 +110,10 @@ namespace WdRiscv
       assert(0); return 0;
     }
 
+    /// Return the right shift amount to right justify the ith
+    /// physical page number (ppn) in a physical address for Sv32. The
+    /// index i must be smaller than the number of levels of Sv32. See
+    /// the Sv32 physical address in the privileged spec.
     uint32_t paPpnShift(int i) const
     {
       if (i == 0) return 12;
@@ -126,35 +150,54 @@ namespace WdRiscv
     Pte39Bits bits_;
     uint64_t data_ = 0;
 
+    /// Constructor: Intialize from the the given data value.
     Pte39(uint64_t data) : data_(data)
     { }
 
+    /// Return true if valid bit is on in this PTE.
     bool valid() const      { return bits_.valid_; }
 
+    /// Return true if read permission bit is on in this PTE.
     bool read() const       { return bits_.read_; }
 
+    /// Return true if write permission bit is on in this PTE.
     bool write() const      { return bits_.write_; }
 
+    /// Return true if execute permission bit is on in this PTE.
     bool exec() const       { return bits_.exec_; }
 
+    /// Return true if this PTE is marked for user privilege.
     bool user() const       { return bits_.user_; }
 
+    /// Return true if this PTE is marked global.
     bool global() const     { return bits_.global_; }
 
+    /// Return true if this PTE is marked accessed.
     bool accessed() const   { return bits_.accessed_; }
 
+    /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
 
+    /// Physical page number in this PTE (see Sv39 PTE in the
+    /// privileged spec.)
     uint64_t ppn() const    { return ppn0() | (ppn1() << 9) | (ppn2() << 18); }
 
+    /// Physical page number field 0 in this PTE (see Sv39 PTE in the
+    /// privileged spec.)
     uint64_t ppn0() const   { return bits_.ppn0_; }
 
+    /// Physical page number field 1 in this PTE (see Sv39 PTE in the
+    /// privileged spec.)
     uint64_t ppn1() const   { return bits_.ppn1_; }
 
+    /// Physical page number field 2 in this PTE (see Sv39 PTE in the
+    /// privileged spec.)
     uint64_t ppn2() const   { return bits_.ppn2_; }
 
+    /// Number of levels of an Sv39 PTE.
     uint32_t levels() const { return 3; }
 
+    /// Size in bytes of this object.
     uint32_t size() const   { return sizeof(data_); }
 
     /// Page based memory type.
@@ -163,6 +206,9 @@ namespace WdRiscv
     /// Naturally aligned power of 2 translation.
     bool hasNapot() const  { return bits_.n_; }
 
+    /// Return the ith physical page number (PPN) field encoded in
+    /// this PTE. The index i must be smaller than the number of
+    /// levels of Sv39. See the Sv39 PTE in the privileged spec.
     uint64_t ppn(int i) const
     {
       if (i == 0) { return ppn0(); }
@@ -172,6 +218,10 @@ namespace WdRiscv
       return 0;
     }
 
+    /// Return the right shift amount to right justify the ith
+    /// physical page number (ppn) in a physical address for Sv39. The
+    /// index i must be smaller than the number of levels of Sv39. See
+    /// the Sv39 physical address in the privileged spec.
     uint32_t paPpnShift(int i) const
     {
       if (i == 0) { return 12; }
@@ -211,37 +261,58 @@ namespace WdRiscv
     Pte48Bits bits_;
     uint64_t data_ = 0;
 
+    /// Constructor: Intialize from the the given data value.
     Pte48(uint64_t data) : data_(data)
     { }
 
+    /// Return true if valid bit is on in this PTE.
     bool valid() const      { return bits_.valid_; }
 
+    /// Return true if read permission bit is on in this PTE.
     bool read() const       { return bits_.read_; }
 
+    /// Return true if write permission bit is on in this PTE.
     bool write() const      { return bits_.write_; }
 
+    /// Return true if execute permission bit is on in this PTE.
     bool exec() const       { return bits_.exec_; }
 
+    /// Return true if this PTE is marked for user privilege.
     bool user() const       { return bits_.user_; }
 
+    /// Return true if this PTE is marked global.
     bool global() const     { return bits_.global_; }
 
+    /// Return true if this PTE is marked accessed.
     bool accessed() const   { return bits_.accessed_; }
 
+    /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
 
+    /// Physical page number in this PTE (see Sv48 PTE in the
+    /// privileged spec.)
     uint64_t ppn() const    { return ppn0() | (ppn1() << 9) | (ppn2() << 18) | (ppn3() << 27); }
 
+    /// Physical page number field 0 in this PTE (see Sv48 PTE in the
+    /// privileged spec.)
     uint64_t ppn0() const   { return bits_.ppn0_; }
 
+    /// Physical page number field 1 in this PTE (see Sv48 PTE in the
+    /// privileged spec.)
     uint64_t ppn1() const   { return bits_.ppn1_; }
 
+    /// Physical page number field 2 in this PTE (see Sv48 PTE in the
+    /// privileged spec.)
     uint64_t ppn2() const   { return bits_.ppn2_; }
 
+    /// Physical page number field 3 in this PTE (see Sv48 PTE in the
+    /// privileged spec.)
     uint64_t ppn3() const   { return bits_.ppn3_; }
 
+    /// Number of levels of an Sv48 PTE.
     uint32_t levels() const { return 4; }
 
+    /// Size in bytes of this object.
     uint32_t size() const   { return sizeof(data_); }
 
     /// Page based memory type.
@@ -250,6 +321,9 @@ namespace WdRiscv
     /// Naturally aligned power of 2 translation.
     bool hasNapot() const  { return bits_.n_; }
 
+    /// Return the ith physical page number (PPN) field encoded in
+    /// this PTE. The index i must be smaller than the number of
+    /// levels of Sv48. See the Sv48 PTE in the privileged spec.
     uint64_t ppn(int i) const
     {
       if (i == 0) { return ppn0(); }
@@ -260,6 +334,10 @@ namespace WdRiscv
       return 0;
     }
 
+    /// Return the right shift amount to right justify the ith
+    /// physical page number (ppn) in a physical address for Sv48. The
+    /// index i must be smaller than the number of levels of Sv48. See
+    /// the Sv48 physical address in the privileged spec.
     uint32_t paPpnShift(int i) const
     {
       if (i == 0) { return 12; }
@@ -301,39 +379,62 @@ namespace WdRiscv
     Pte57Bits bits_;
     uint64_t data_ = 0;
 
+    /// Constructor: Intialize from the the given data value.
     Pte57(uint64_t data) : data_(data)
     { }
 
+    /// Return true if valid bit is on in this PTE.
     bool valid() const      { return bits_.valid_; }
 
+    /// Return true if read permission bit is on in this PTE.
     bool read() const       { return bits_.read_; }
 
+    /// Return true if write permission bit is on in this PTE.
     bool write() const      { return bits_.write_; }
 
+    /// Return true if execute permission bit is on in this PTE.
     bool exec() const       { return bits_.exec_; }
 
+    /// Return true if this PTE is marked for user privilege.
     bool user() const       { return bits_.user_; }
 
+    /// Return true if this PTE is marked global.
     bool global() const     { return bits_.global_; }
 
+    /// Return true if this PTE is marked accessed.
     bool accessed() const   { return bits_.accessed_; }
 
+    /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
 
+    /// Physical page number in this PTE (see Sv57 PTE in the
+    /// privileged spec.)
     uint64_t ppn() const    { return ppn0() | (ppn1() << 9) | (ppn2() << 18) | (ppn3() << 27); }
 
+    /// Physical page number field 0 in this PTE (see Sv57 PTE in the
+    /// privileged spec.)
     uint64_t ppn0() const   { return bits_.ppn0_; }
 
+    /// Physical page number field 1 in this PTE (see Sv57 PTE in the
+    /// privileged spec.)
     uint64_t ppn1() const   { return bits_.ppn1_; }
 
+    /// Physical page number field 2 in this PTE (see Sv57 PTE in the
+    /// privileged spec.)
     uint64_t ppn2() const   { return bits_.ppn2_; }
 
+    /// Physical page number field 3 in this PTE (see Sv57 PTE in the
+    /// privileged spec.)
     uint64_t ppn3() const   { return bits_.ppn3_; }
 
+    /// Physical page number field 4 in this PTE (see Sv57 PTE in the
+    /// privileged spec.)
     uint64_t ppn4() const   { return bits_.ppn4_; }
 
+    /// Number of levels of an Sv57 PTE.
     uint32_t levels() const { return 5; }
 
+    /// Size in bytes of this object.
     uint32_t size() const   { return sizeof(data_); }
 
     /// Page based memory type.
@@ -342,6 +443,9 @@ namespace WdRiscv
     /// Naturally aligned power of 2 translation.
     bool hasNapot() const  { return bits_.n_; }
 
+    /// Return the ith physical page number (PPN) field encoded in
+    /// this PTE. The index i must be smaller than the number of
+    /// levels of Sv57. See the Sv57 PTE in the privileged spec.
     uint64_t ppn(int i) const
     {
       if (i == 0) { return ppn0(); }
@@ -353,6 +457,10 @@ namespace WdRiscv
       return 0;
     }
 
+    /// Return the right shift amount to right justify the ith
+    /// physical page number (ppn) in a physical address for Sv57. The
+    /// index i must be smaller than the number of levels of Sv57. See
+    /// the Sv57 physical address in the privileged spec.
     uint32_t paPpnShift(int i) const
     {
       if (i == 0) { return 12; }
