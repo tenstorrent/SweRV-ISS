@@ -1309,7 +1309,6 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
-  ExceptionCause cause = ExceptionCause::NONE;
   if (misal)
     {
       if (not misalDataOk_)
@@ -1323,15 +1322,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-	  cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
+	  auto cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
 	    return cause;
         }
     }
-
-  // Misaligned resulting in access fault exception.
-  if (misal and cause != ExceptionCause::NONE)
-    return cause;
 
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
@@ -1344,7 +1339,9 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 	}
       if (misal or addr1 != addr2)
 	{
-	  pmp = pmpManager_.accessPmp(addr2);
+	  uint64_t aligned = addr1 & ~alignMask;
+	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+	  pmp = pmpManager_.accessPmp(next);
 	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
 	    {
 	      addr1 = va2;
@@ -1356,7 +1353,10 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   if (not misal)
     {
       if (not memory_.checkRead(addr1, ldSize))
-	return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	{
+	  addr1 = va1;
+	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	}
     }
   else
     {
