@@ -1416,7 +1416,7 @@ Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
   fprintf(initStateFile_, "%s,%0jx,%0jx,", tag, uintmax_t(vline*lineSize), uintmax_t(pline*lineSize));
 
   uint64_t byteAddr = pline * lineSize + lineSize - 1;
-  for (unsigned i = 0; i < lineSize; ++i, ++byteAddr)
+  for (unsigned i = 0; i < lineSize; ++i, --byteAddr)
     {
       uint8_t byte = 0;
       memory_.peek(byteAddr, byte, false);
