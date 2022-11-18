@@ -736,6 +736,7 @@ namespace WdRiscv
     {
       pteInstrAddr_.clear();
       pteDataAddr_.clear();
+      clearPrevPte();
     }
 
     static const char* pageSize(Mode m, uint32_t level)
@@ -822,6 +823,25 @@ namespace WdRiscv
     void setFaultOnFirstAccess(bool flag)
     { faultOnFirstAccess_ = flag; }
 
+    /// Clear saved data for updated leaf level PTE.
+    void clearPrevPte()
+    { prevPteSize_ = 0; }
+
+    /// Remember value of page table entry modified by most recent translation.
+    /// This is for reporting intial memory state.
+    void setPrevPte(uint64_t addr, unsigned size, uint64_t value)
+    { prevPteAddr_ = addr; prevPteSize_ = size; prevPte_ = value; }
+
+    /// Set byte to the previous PTE value if address is within
+    /// the PTE entry updated by the last translation. Leave
+    /// byte unchanged otherwise.
+    void getPrevByte(uint64_t addr, uint8_t& byte)
+    {
+      if (prevPteSize_ == 0 or addr < prevPteAddr_ or addr >= prevPteAddr_ + prevPteSize_)
+	return;
+      byte = (prevPte_ >> ((addr - prevPteAddr_)*8)) & 0xff;
+    }
+
   private:
 
     Memory& memory_;
@@ -834,6 +854,10 @@ namespace WdRiscv
     unsigned hartIx_ = 0;
 
     uint64_t time_ = 0;  //  Access order
+
+    uint64_t prevPte_ = 0;  // Previous value (before update) of a leaf PTE.
+    uint64_t prevPteAddr_ = 0;
+    unsigned prevPteSize_ = 0;
 
     // Cached mstatus bits
     bool execReadable_ = false;  // MXR bit

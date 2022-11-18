@@ -1401,28 +1401,29 @@ Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
 
 
 /// Dump initial state of a memory line to the given file.
-static void
-dumpInitState(FILE* file, const char* tag, std::unordered_set<uint64_t>& dumpedLines,
-	      uint64_t vaddr, uint64_t paddr, Memory& mem)
+template <typename URV>
+void
+Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
 {
-  uint64_t pline = mem.getLineNumber(paddr);
-  if (dumpedLines.find(pline) != dumpedLines.end())
+  uint64_t pline = memory_.getLineNumber(paddr);
+  if (initStateLines_.find(pline) != initStateLines_.end())
     return;  // Already dumped
 
-  dumpedLines.insert(pline);
+  initStateLines_.insert(pline);
 
-  uint64_t vline = mem.getLineNumber(vaddr);
-  unsigned lineSize = mem.lineSize();
-  fprintf(file, "%s,%0jx,%0jx,", tag, uintmax_t(vline*lineSize), uintmax_t(pline*lineSize));
+  uint64_t vline = memory_.getLineNumber(vaddr);
+  unsigned lineSize = memory_.lineSize();
+  fprintf(initStateFile_, "%s,%0jx,%0jx,", tag, uintmax_t(vline*lineSize), uintmax_t(pline*lineSize));
 
   uint64_t byteAddr = pline * lineSize + lineSize - 1;
-  for (unsigned i = 0; i < lineSize; ++i)
+  for (unsigned i = 0; i < lineSize; ++i, ++byteAddr)
     {
       uint8_t byte = 0;
-      mem.peek(byteAddr--, byte, false);
-      fprintf(file, "%02x", unsigned(byte));
+      memory_.peek(byteAddr, byte, false);
+      virtMem_.getPrevByte(byteAddr, byte); // Get PTE value before PTE update.
+      fprintf(initStateFile_, "%02x", unsigned(byte));
     }
-  fprintf(file, "\n");
+  fprintf(initStateFile_, "\n");
 }
 
 
@@ -1506,9 +1507,9 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 
   if (initStateFile_)
     {
-      dumpInitState(initStateFile_, "load", initStateLines_, virtAddr, addr1, memory_);
+      dumpInitState("load", virtAddr, addr1);
       if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
-	dumpInitState(initStateFile_, "load", initStateLines_, virtAddr + ldStSize_, addr2 + ldStSize_, memory_);
+	dumpInitState("load", virtAddr + ldStSize_, addr2 + ldStSize_);
     }
 
   // Check for load-data-trigger.
@@ -1740,9 +1741,9 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
   if (initStateFile_)
     {
-      dumpInitState(initStateFile_, "store", initStateLines_, virtAddr, addr1, memory_);
+      dumpInitState("store", virtAddr, addr1);
       if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
-	dumpInitState(initStateFile_, "store", initStateLines_, virtAddr + ldStSize_, addr2 + ldStSize_, memory_);
+	dumpInitState("store", virtAddr + ldStSize_, addr2 + ldStSize_);
     }
 
   // If we write to special location, end the simulation.
@@ -1980,7 +1981,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
         }
 
       if (initStateFile_)
-	dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, physAddr, memory_);
+	dumpInitState("fetch", virtAddr, physAddr);
 
       return true;
     }
@@ -2007,7 +2008,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     }
 
   if (initStateFile_)
-    dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, physAddr, memory_);
+    dumpInitState("fetch", virtAddr, physAddr);
   inst = half;
   if (isCompressedInst(inst))
     return true;
@@ -2047,7 +2048,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     }
 
   if (initStateFile_)
-    dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, physAddr2, memory_);
+    dumpInitState("fetch", virtAddr, physAddr2);
 
   inst = inst | (uint32_t(upperHalf) << 16);
   return true;
@@ -3799,10 +3800,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    {
 	      auto& instrPte = virtMem_.getInstrPteAddrs();
 	      for (auto addr : instrPte)
-		dumpInitState(initStateFile_, "ipt", initStateLines_, addr, addr, memory_);
+		dumpInitState("ipt", addr, addr);
 	      auto& dataPte = virtMem_.getDataPteAddrs();
 	      for (auto addr : dataPte)
-		dumpInitState(initStateFile_, "dpt", initStateLines_, addr, addr, memory_);
+		dumpInitState("dpt", addr, addr);
 	    }
 
 	  if (hasException_ or hasInterrupt_)

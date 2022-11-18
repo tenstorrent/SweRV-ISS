@@ -4023,6 +4023,7 @@ namespace WdRiscv
 
     void countBasicBlocks(const DecodedInst* di);
     void dumpBasicBlocks();
+    void dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr);
 
   private:
 
