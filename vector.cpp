@@ -6060,12 +6060,6 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
@@ -6099,12 +6093,6 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
-
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
-    {
-      illegalInst(di);
-      return;
-    }
 
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
@@ -22685,12 +22673,6 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
   if (elems == 0)
@@ -22770,12 +22752,6 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
-
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
-    {
-      illegalInst(di);
-      return;
-    }
 
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
