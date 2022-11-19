@@ -736,7 +736,7 @@ namespace WdRiscv
     {
       pteInstrAddr_.clear();
       pteDataAddr_.clear();
-      clearPrevPte();
+      clearUpdatedPtes();
     }
 
     static const char* pageSize(Mode m, uint32_t level)
@@ -824,25 +824,36 @@ namespace WdRiscv
     { faultOnFirstAccess_ = flag; }
 
     /// Clear saved data for updated leaf level PTE.
-    void clearPrevPte()
-    { prevPteSize_ = 0; }
+    void clearUpdatedPtes()
+    { updatedPtes_.clear(); }
 
     /// Remember value of page table entry modified by most recent translation.
     /// This is for reporting intial memory state.
-    void setPrevPte(uint64_t addr, unsigned size, uint64_t value)
-    { prevPteAddr_ = addr; prevPteSize_ = size; prevPte_ = value; }
+    void saveUpdatedPte(uint64_t addr, unsigned size, uint64_t value)
+    { updatedPtes_.emplace(updatedPtes_.end(), addr, size, value); }
 
     /// Set byte to the previous PTE value if address is within
     /// the PTE entry updated by the last translation. Leave
     /// byte unchanged otherwise.
     void getPrevByte(uint64_t addr, uint8_t& byte)
     {
-      if (prevPteSize_ == 0 or addr < prevPteAddr_ or addr >= prevPteAddr_ + prevPteSize_)
-	return;
-      byte = (prevPte_ >> ((addr - prevPteAddr_)*8)) & 0xff;
+      for (auto& prev : updatedPtes_)
+	if (addr >= prev.addr_ and addr < prev.addr_ + prev.size_)
+	  byte = (prev.value_ >> ((addr - prev.addr_)*8)) & 0xff;
     }
 
   private:
+
+    struct UpdatedPte
+    {
+      UpdatedPte(uint64_t addr, unsigned size, uint64_t value)
+	: addr_(addr), size_(size), value_(value)
+      { }
+
+      uint64_t addr_ = 0;
+      unsigned size_ = 0;
+      uint64_t value_ = 0;
+    };
 
     Memory& memory_;
     uint64_t pageTableRootPage_ = 0;
@@ -855,9 +866,7 @@ namespace WdRiscv
 
     uint64_t time_ = 0;  //  Access order
 
-    uint64_t prevPte_ = 0;  // Previous value (before update) of a leaf PTE.
-    uint64_t prevPteAddr_ = 0;
-    unsigned prevPteSize_ = 0;
+    std::vector<UpdatedPte> updatedPtes_;
 
     // Cached mstatus bits
     bool execReadable_ = false;  // MXR bit
