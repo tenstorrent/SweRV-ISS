@@ -434,6 +434,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
       // Or B
       // B1. Set pte->accessed_ to 1 and, if a write, set pte->dirty_ to 1.
       // B2. Access fault if PMP violation.
+      saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);
       pte.bits_.accessed_ = 1;
       if (write)
         pte.bits_.dirty_ = 1;
@@ -578,6 +579,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	    return pageFaultType(read, write, exec);  // A
 
 	  // Or B
+	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);
 
 	  // B1. Check PMP. The privMode here is the effective one that
 	  // already accounts for MPRV.

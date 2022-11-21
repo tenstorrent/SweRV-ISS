@@ -1279,34 +1279,6 @@ Hart<URV>::reportLrScStat(FILE* file) const
 
 
 template <typename URV>
-ExceptionCause
-Hart<URV>::determineMisalLoadException(URV /*addr*/, unsigned /*accessSize*/) const
-{
-  if (not misalDataOk_)
-    return ExceptionCause::LOAD_ADDR_MISAL;
-
-  return ExceptionCause::NONE;
-}
-
-
-template <typename URV>
-ExceptionCause
-Hart<URV>::determineMisalStoreException(URV addr, unsigned accessSize) const
-{
-  if (not misalDataOk_)
-    return ExceptionCause::STORE_ADDR_MISAL;
-
-  uint64_t addr2 = addr + accessSize - 1;
-
-  // Misaligned access to a region with side effect.
-  if (not isAddrIdempotent(addr) or not isAddrIdempotent(addr2))
-    return ExceptionCause::STORE_ADDR_MISAL;
-
-  return ExceptionCause::NONE;
-}
-
-
-template <typename URV>
 void
 Hart<URV>::initiateLoadException(ExceptionCause cause, URV addr)
 {
@@ -1337,12 +1309,10 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
-  ExceptionCause cause = ExceptionCause::NONE;
   if (misal)
     {
-      cause = determineMisalLoadException(addr1, ldSize);
-      if (cause == ExceptionCause::LOAD_ADDR_MISAL)
-        return cause;  // Misaligned resulting in misaligned-adddress-exception
+      if (not misalDataOk_)
+	return ExceptionCause::LOAD_ADDR_MISAL;
       va2 = (va1 + ldSize) & ~alignMask;
     }
 
@@ -1352,15 +1322,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-	  cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
+	  auto cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
 	    return cause;
         }
     }
-
-  // Misaligned resulting in access fault exception.
-  if (misal and cause != ExceptionCause::NONE)
-    return cause;
 
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
@@ -1373,7 +1339,9 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 	}
       if (misal or addr1 != addr2)
 	{
-	  pmp = pmpManager_.accessPmp(addr2);
+	  uint64_t aligned = addr1 & ~alignMask;
+	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
+	  pmp = pmpManager_.accessPmp(next);
 	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
 	    {
 	      addr1 = va2;
@@ -1385,7 +1353,10 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   if (not misal)
     {
       if (not memory_.checkRead(addr1, ldSize))
-	return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	{
+	  addr1 = va1;
+	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	}
     }
   else
     {
@@ -1430,28 +1401,29 @@ Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
 
 
 /// Dump initial state of a memory line to the given file.
-static void
-dumpInitState(FILE* file, const char* tag, std::unordered_set<uint64_t>& dumpedLines,
-	      uint64_t vaddr, uint64_t paddr, Memory& mem)
+template <typename URV>
+void
+Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
 {
-  uint64_t pline = mem.getLineNumber(paddr);
-  if (dumpedLines.find(pline) != dumpedLines.end())
+  uint64_t pline = memory_.getLineNumber(paddr);
+  if (initStateLines_.find(pline) != initStateLines_.end())
     return;  // Already dumped
 
-  dumpedLines.insert(pline);
+  initStateLines_.insert(pline);
 
-  uint64_t vline = mem.getLineNumber(vaddr);
-  unsigned lineSize = mem.lineSize();
-  fprintf(file, "%s,%0jx,%0jx,", tag, uintmax_t(vline*lineSize), uintmax_t(pline*lineSize));
+  uint64_t vline = memory_.getLineNumber(vaddr);
+  unsigned lineSize = memory_.lineSize();
+  fprintf(initStateFile_, "%s,%0jx,%0jx,", tag, uintmax_t(vline*lineSize), uintmax_t(pline*lineSize));
 
   uint64_t byteAddr = pline * lineSize + lineSize - 1;
-  for (unsigned i = 0; i < lineSize; ++i)
+  for (unsigned i = 0; i < lineSize; ++i, --byteAddr)
     {
       uint8_t byte = 0;
-      mem.peek(byteAddr--, byte, false);
-      fprintf(file, "%02x", unsigned(byte));
+      memory_.peek(byteAddr, byte, false);
+      virtMem_.getPrevByte(byteAddr, byte); // Get PTE value before PTE update.
+      fprintf(initStateFile_, "%02x", unsigned(byte));
     }
-  fprintf(file, "\n");
+  fprintf(initStateFile_, "\n");
 }
 
 
@@ -1535,9 +1507,9 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 
   if (initStateFile_)
     {
-      dumpInitState(initStateFile_, "load", initStateLines_, virtAddr, addr1, memory_);
+      dumpInitState("load", virtAddr, addr1);
       if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
-	dumpInitState(initStateFile_, "load", initStateLines_, virtAddr + ldStSize_, addr2 + ldStSize_, memory_);
+	dumpInitState("load", virtAddr + ldStSize_, addr2 + ldStSize_);
     }
 
   // Check for load-data-trigger.
@@ -1769,9 +1741,9 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
   if (initStateFile_)
     {
-      dumpInitState(initStateFile_, "store", initStateLines_, virtAddr, addr1, memory_);
+      dumpInitState("store", virtAddr, addr1);
       if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
-	dumpInitState(initStateFile_, "store", initStateLines_, virtAddr + ldStSize_, addr2 + ldStSize_, memory_);
+	dumpInitState("store", virtAddr + ldStSize_, addr2 + ldStSize_);
     }
 
   // If we write to special location, end the simulation.
@@ -1960,7 +1932,7 @@ inline
 bool
 Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 {
-  uint64_t addr = virtAddr;
+  physAddr = virtAddr;
 
   // Inst address translation and memory protection is not affected by MPRV.
   bool instMprv = false;
@@ -1970,14 +1942,13 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       if (triggerTripped_)
         return false;
 
-      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, addr);
+      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, physAddr);
       if (cause != ExceptionCause::NONE)
         {
           initiateException(cause, virtAddr, virtAddr);
           return false;
         }
     }
-  physAddr = virtAddr;
 
   if (virtAddr & 1)
     {
@@ -1987,9 +1958,9 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return false;
     }
 
-  if ((addr & 3) == 0)   // Word aligned
+  if ((physAddr & 3) == 0)   // Word aligned
     {
-      if (not memory_.readInst(addr, inst))
+      if (not memory_.readInst(physAddr, inst))
         {
           if (triggerTripped_)
             return false;
@@ -1999,7 +1970,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
       if (pmpEnabled_)
         {
-          Pmp pmp = pmpManager_.accessPmp(addr);
+          Pmp pmp = pmpManager_.accessPmp(physAddr);
           if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
             {
               if (triggerTripped_)
@@ -2010,13 +1981,13 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
         }
 
       if (initStateFile_)
-	dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, physAddr, memory_);
+	dumpInitState("fetch", virtAddr, physAddr);
 
       return true;
     }
 
   uint16_t half;
-  if (not memory_.readInst(addr, half))
+  if (not memory_.readInst(physAddr, half))
     {
       if (triggerTripped_)
         return false;
@@ -2026,7 +1997,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(addr);
+      Pmp pmp = pmpManager_.accessPmp(physAddr);
       if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
         {
           if (triggerTripped_)
@@ -2037,14 +2008,15 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     }
 
   if (initStateFile_)
-    dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, physAddr, memory_);
+    dumpInitState("fetch", virtAddr, physAddr);
   inst = half;
   if (isCompressedInst(inst))
     return true;
 
+  uint64_t physAddr2 = physAddr + 2;
   if (isRvs() and privMode_ != PrivilegeMode::Machine)
     {
-      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, addr);
+      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, physAddr2);
       if (cause != ExceptionCause::NONE)
         {
           if (triggerTripped_)
@@ -2053,11 +2025,9 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
           return false;
         }
     }
-  else
-    addr += 2;
 
   uint16_t upperHalf;
-  if (not memory_.readInst(addr, upperHalf))
+  if (not memory_.readInst(physAddr2, upperHalf))
     {
       if (triggerTripped_)
         return false;
@@ -2067,7 +2037,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(addr);
+      Pmp pmp = pmpManager_.accessPmp(physAddr2);
       if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
         {
           if (triggerTripped_)
@@ -2078,7 +2048,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     }
 
   if (initStateFile_)
-    dumpInitState(initStateFile_, "fetch", initStateLines_, virtAddr, addr, memory_);
+    dumpInitState("fetch", virtAddr, physAddr2);
 
   inst = inst | (uint32_t(upperHalf) << 16);
   return true;
@@ -3718,7 +3688,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
     {
       uint32_t ix = (addr >> 1) & decodeCacheMask_;
       DecodedInst* di = &decodeCache_[ix];
-      if (not di->isValid() or di->address() != pc_)
+      if (not di->isValid() or di->address() != pc_ or isRvs())
         fetchOk = fetchInst(addr, physAddr, inst);
       else
         inst = di->inst();
@@ -3830,10 +3800,10 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    {
 	      auto& instrPte = virtMem_.getInstrPteAddrs();
 	      for (auto addr : instrPte)
-		dumpInitState(initStateFile_, "ipt", initStateLines_, addr, addr, memory_);
+		dumpInitState("ipt", addr, addr);
 	      auto& dataPte = virtMem_.getDataPteAddrs();
 	      for (auto addr : dataPte)
-		dumpInitState(initStateFile_, "dpt", initStateLines_, addr, addr, memory_);
+		dumpInitState("dpt", addr, addr);
 	    }
 
 	  if (hasException_ or hasInterrupt_)
@@ -4069,7 +4039,7 @@ Hart<URV>::simpleRunWithLimit()
       // Fetch/decode unless match in decode cache.
       uint32_t ix = (pc_ >> 1) & decodeCacheMask_;
       DecodedInst* di = &decodeCache_[ix];
-      if (not di->isValid() or di->address() != pc_)
+      if (not di->isValid() or di->address() != pc_ or isRvs())
         {
           uint32_t inst = 0;
 	  uint64_t physPc = 0;
@@ -10098,12 +10068,10 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
-  ExceptionCause cause = ExceptionCause::NONE;
   if (misal)
     {
-      cause = determineMisalStoreException(addr1, stSize);
-      if (cause == ExceptionCause::STORE_ADDR_MISAL)
-        return cause;
+      if (not misalDataOk_)
+	return ExceptionCause::STORE_ADDR_MISAL;
       va2 = (va1 + stSize) & ~alignMask;
     }
 
@@ -10113,7 +10081,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-          cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
+          auto cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
           if (cause != ExceptionCause::NONE)
             return cause;
         }

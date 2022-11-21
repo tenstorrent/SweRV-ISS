@@ -211,10 +211,27 @@ namespace WdRiscv
     bool isFp() const
     { return entry_ and entry_->isFp(); }
 
-    /// Return true if this a vector instruction.
+    /// Return true if this a vector instruction. This returns true
+    /// for all vector instructions including vector load/store.
     bool isVector() const
     { return entry_ and entry_->isVector(); }
     
+    /// Return true if this is a vector load instruction.
+    bool isVectorLoad() const
+    {
+      if (not isVector()) return false;
+      unsigned f3 = (inst() >> 12) & 7;
+      return (inst() & 0x7f) == 7 and (f3 == 0 or f3 >= 5);
+    }
+
+    /// Return true if this is a vector store instruction.
+    bool isVectorStore() const
+    {
+      if (not isVector()) return false;
+      unsigned f3 = (inst() >> 12) & 7;
+      return (inst() & 0x7f) == 0x27 and (f3 == 0 or f3 >= 5);
+    }
+
     /// Return true if this a multiply instruction.
     bool isMultiply() const
     { return entry_ and entry_->isMultiply(); }

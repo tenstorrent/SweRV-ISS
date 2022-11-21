@@ -376,10 +376,14 @@ namespace WdRiscv
       HPMCOUNTER31H = 0xc9f,
 
       // Debug/Trace registers.
-      TSELECT = 0x7a0,
-      TDATA1  = 0x7a1,
-      TDATA2  = 0x7a2,
-      TDATA3  = 0x7a3,
+      SCONTEXT = 0x5a8,
+      TSELECT  = 0x7a0,
+      TDATA1   = 0x7a1,
+      TDATA2   = 0x7a2,
+      TDATA3   = 0x7a3,
+      TINFO    = 0x7a4,
+      TCONTROL = 0x7a5,
+      MCONTEXT = 0x7a8,
 
       // Debug mode registers.
       DCSR      = 0x7b0,

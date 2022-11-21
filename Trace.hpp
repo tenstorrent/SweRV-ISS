@@ -91,6 +91,10 @@ namespace WdRiscv
       return trapped;
     }
 
+    /// True if traget program finished.
+    bool hasStop() const
+    { return hart_->hasTargetProgramFinished(); }
+
     /// Return size of data of last load/store/amo instruction or zero
     /// if last instrcution was not load/store/amo.  Set virtAddr and
     /// physAddr to the corresponding addresses if load/store/amo.

@@ -193,7 +193,7 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
 	}
     }
 
-  return true;
+  return errors == 0;
 }
 
 
