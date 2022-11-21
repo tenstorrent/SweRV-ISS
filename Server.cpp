@@ -552,7 +552,7 @@ collectSyscallMemChanges(Hart<URV>& hart,
           uint64_t val = 0;
           if (not hart.peekMemory(addr, val, true))
             {
-              std::cerr << "Peek-memory fail at 0x%x"
+              std::cerr << "Peek-memory fail at "
                         << (boost::format(hexForm) % addr)
                         << " in collectSyscallMemChanges\n";
               break;
@@ -577,7 +577,7 @@ collectSyscallMemChanges(Hart<URV>& hart,
 
           if (not ok)
             {
-              std::cerr << "Poke-memory fail at 0x%x"
+              std::cerr << "Poke-memory fail at "
                         << (boost::format(hexForm) % slamAddr)
                         << " in collectSyscallMemChanges\n";
               break;
