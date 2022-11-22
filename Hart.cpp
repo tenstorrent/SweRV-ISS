@@ -1635,6 +1635,10 @@ template <typename STORE_TYPE>
 void
 Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 {
+  ldStWrite_ = true;
+  ldStData_ = storeVal;
+  memory_.write(hartIx_, physAddr, storeVal);
+
   uint64_t val = storeVal;
   uint64_t data = (val << 16) >> 16;
   unsigned cmd = (val >> 48) & 0xff;
@@ -1661,18 +1665,9 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
     }
   else if (dev == 0 and cmd == 0)
     {
-      ldStWrite_ = true;
-      ldStData_ = storeVal;
-      memory_.write(hartIx_, physAddr, storeVal);
       if (storeVal & 1)
 	throw CoreException(CoreException::Stop, "write to to-host",
 			    toHost_, val);
-    }
-  else
-    {
-      ldStWrite_ = true;
-      ldStData_ = storeVal;
-      memory_.write(hartIx_, physAddr, storeVal);
     }
 }
 
