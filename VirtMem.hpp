@@ -76,6 +76,9 @@ namespace WdRiscv
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
 
+    /// Return true if this PTE is a leaf.
+    bool leaf() const       { return valid() and (read() or exec()); }
+
     /// Physical page number in this PTE (see Sv32 PTE in the
     /// privileged spec.)
     uint32_t ppn() const    { return ppn0() | (ppn1() << 10); }
@@ -177,6 +180,9 @@ namespace WdRiscv
 
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
+
+    /// Return true if this PTE is a leaf.
+    bool leaf() const       { return valid() and (read() or exec()); }
 
     /// Physical page number in this PTE (see Sv39 PTE in the
     /// privileged spec.)
@@ -288,6 +294,9 @@ namespace WdRiscv
 
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
+
+    /// Return true if this PTE is a leaf.
+    bool leaf() const       { return valid() and (read() or exec()); }
 
     /// Physical page number in this PTE (see Sv48 PTE in the
     /// privileged spec.)
@@ -406,6 +415,9 @@ namespace WdRiscv
 
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
+
+    /// Return true if this PTE is a leaf.
+    bool leaf() const       { return valid() and (read() or exec()); }
 
     /// Physical page number in this PTE (see Sv57 PTE in the
     /// privileged spec.)
