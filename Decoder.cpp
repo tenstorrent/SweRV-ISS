@@ -2607,6 +2607,10 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		    return instTable_.getEntry(InstId::ebreak);
 		  else if (op2 == 2)
 		    return instTable_.getEntry(InstId::uret);
+		  else if (op2 == 0x0d and op0 == 0 and op1 == 0)
+		    return instTable_.getEntry(InstId::wrs_nto);
+		  else if (op2 == 0x1d and op0 == 0 and op1 == 0)
+		    return instTable_.getEntry(InstId::wrs_sto);
 		}
 	      else if (funct7 == 9)
 		{
@@ -2633,10 +2637,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		    return instTable_.getEntry(InstId::sfence_inval_ir);
 		  return instTable_.getEntry(InstId::illegal);
 		}
-	      else if (op1 == 0x00d and op0 == 0 and op1 == 0)
-		return instTable_.getEntry(InstId::wrs_nto);
-	      else if (op1 == 0x01d and op0 == 0 and op1 == 0)
-		return instTable_.getEntry(InstId::wrs_sto);
 	      else if (op2 == 0x102 and op0 == 0 and op1 == 0)
 		return instTable_.getEntry(InstId::sret);
 	      else if (op2 == 0x302 and op0 == 0 and op1 == 0)
