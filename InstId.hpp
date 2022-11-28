@@ -971,6 +971,10 @@ namespace WdRiscv
      // Cache block zero (zicboz)
      cbo_zero,
 
-     maxId = cbo_zero
+     // Zawrs
+     wrs_nto,
+     wrs_sto,
+
+     maxId = wrs_sto
     };
 }

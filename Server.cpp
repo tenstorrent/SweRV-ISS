@@ -17,14 +17,9 @@
 #include <fstream>
 #include <map>
 #include <algorithm>
-#include <boost/format.hpp>
 #include <cstring>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-
-#define __STDC_FORMAT_MACROS
-#include <cinttypes>
-
 #include "WhisperMessage.h"
 #include "Hart.hpp"
 #include "Server.hpp"
@@ -32,23 +27,6 @@
 
 
 using namespace WdRiscv;
-
-
-/// Return format string suitable for printing an integer of type URV
-/// in hexadecimal form.
-template <typename URV>
-static
-const char*
-getHexForm()
-{
-  if (sizeof(URV) == 4)
-    return "0x%08x";
-  if (sizeof(URV) == 8)
-    return "0x%016x";
-  if (sizeof(URV) == 16)
-    return "0x%032x";
-  return "0x%x";
-}
 
 
 /// Unpack socket message (received in server mode) into the given
@@ -533,8 +511,6 @@ collectSyscallMemChanges(Hart<URV>& hart,
                          std::vector<WhisperMessage>& changes,
                          uint64_t slamAddr)
 {
-  auto hexForm = getHexForm<URV>(); // Format string for printing a hex val
-
   for (auto al : scVec)
     {
       uint64_t addr = al.first;
@@ -552,8 +528,7 @@ collectSyscallMemChanges(Hart<URV>& hart,
           uint64_t val = 0;
           if (not hart.peekMemory(addr, val, true))
             {
-              std::cerr << "Peek-memory fail at 0x%x"
-                        << (boost::format(hexForm) % addr)
+              std::cerr << "Peek-memory fail at 0x" << std::hex << addr << std::dec
                         << " in collectSyscallMemChanges\n";
               break;
             }
@@ -577,8 +552,7 @@ collectSyscallMemChanges(Hart<URV>& hart,
 
           if (not ok)
             {
-              std::cerr << "Poke-memory fail at 0x%x"
-                        << (boost::format(hexForm) % slamAddr)
+              std::cerr << "Poke-memory fail at 0x" << std::hex << slamAddr << std::dec
                         << " in collectSyscallMemChanges\n";
               break;
             }
@@ -1019,8 +993,6 @@ template <typename URV>
 bool
 Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* traceFile, FILE* commandLog)
 {
-  auto hexForm = getHexForm<URV>(); // Format string for printing a hex val
-
   // Initial resets do not reset memory mapped registers.
   bool resetMemoryMappedReg = false;
   reply = msg;
@@ -1050,14 +1022,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           if (commandLog)
             {
               if (msg.resource == 'p')
-                fprintf(commandLog, "hart=%d poke pc %s # ts=%s tag=%s\n", hartId,
-                        (boost::format(hexForm) % msg.value).str().c_str(),
-                        timeStamp.c_str(), msg.tag);
+                fprintf(commandLog, "hart=%d poke pc 0x%jx # ts=%s tag=%s\n", hartId,
+                        uintmax_t(msg.value), timeStamp.c_str(), msg.tag);
               else
-                fprintf(commandLog, "hart=%d poke %c %s %s # ts=%s tag=%s\n", hartId,
-                        msg.resource,
-                        (boost::format(hexForm) % msg.address).str().c_str(),
-                        (boost::format(hexForm) % msg.value).str().c_str(),
+                fprintf(commandLog, "hart=%d poke %c 0x%jx 0x%jx # ts=%s tag=%s\n", hartId,
+                        msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),
                         timeStamp.c_str(), msg.tag);
             }
           break;
@@ -1074,10 +1043,8 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                         hartId, specialResourceToStr(msg.address),
                         timeStamp.c_str(), msg.tag);
               else
-                fprintf(commandLog, "hart=%d peek %c %s # ts=%s tag=%s\n",
-                        hartId,
-                        msg.resource,
-                        (boost::format(hexForm) % msg.address).str().c_str(),
+                fprintf(commandLog, "hart=%d peek %c 0x%jx # ts=%s tag=%s\n",
+                        hartId, msg.resource, uintmax_t(msg.address),
                         timeStamp.c_str(), msg.tag);
             }
           break;
@@ -1144,9 +1111,8 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
             if (commandLog)
               {
                 if (msg.value != 0)
-                  fprintf(commandLog, "hart=%d reset %s # ts=%s\n", hartId,
-                          (boost::format(hexForm) % addr).str().c_str(),
-                          timeStamp.c_str());
+                  fprintf(commandLog, "hart=%d reset 0x%jx # ts=%s\n", hartId,
+                          uintmax_t(addr), timeStamp.c_str());
                 else
                   fprintf(commandLog, "hart=%d reset # ts=%s\n", hartId,
                           timeStamp.c_str());

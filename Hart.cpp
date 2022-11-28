@@ -358,6 +358,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicbom(true);
   if (isa_.isEnabled(RvExtension::Zicboz))
     enableRvzicboz(true);
+  if (isa_.isEnabled(RvExtension::Zawrs))
+    enableRvzawrs(true);
 }
 
 
@@ -1405,11 +1407,15 @@ template <typename URV>
 void
 Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
 {
+  bool isFetch = (*tag == 'f'); // If tag is "fetch"
+
+  auto& lineSet = isFetch? initInstrLines_ : initDataLines_;
+
   uint64_t pline = memory_.getLineNumber(paddr);
-  if (initStateLines_.find(pline) != initStateLines_.end())
+  if (lineSet.find(pline) != lineSet.end())
     return;  // Already dumped
 
-  initStateLines_.insert(pline);
+  lineSet.insert(pline);
 
   uint64_t vline = memory_.getLineNumber(vaddr);
   unsigned lineSize = memory_.lineSize();
@@ -1475,6 +1481,12 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
     {
       SRV val = fgetc(stdin);
       data = val;
+      return true;
+    }
+
+  if (toHostValid_ and addr1 == toHost_)
+    {
+      data = 0;
       return true;
     }
 
@@ -1635,6 +1647,10 @@ template <typename STORE_TYPE>
 void
 Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 {
+  ldStWrite_ = true;
+  ldStData_ = storeVal;
+  memory_.write(hartIx_, physAddr, storeVal);
+
   uint64_t val = storeVal;
   uint64_t data = (val << 16) >> 16;
   unsigned cmd = (val >> 48) & 0xff;
@@ -1661,18 +1677,9 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
     }
   else if (dev == 0 and cmd == 0)
     {
-      ldStWrite_ = true;
-      ldStData_ = storeVal;
-      memory_.write(hartIx_, physAddr, storeVal);
       if (storeVal & 1)
 	throw CoreException(CoreException::Stop, "write to to-host",
 			    toHost_, val);
-    }
-  else
-    {
-      ldStWrite_ = true;
-      ldStData_ = storeVal;
-      memory_.write(hartIx_, physAddr, storeVal);
     }
 }
 
@@ -5588,6 +5595,9 @@ Hart<URV>::execute(const DecodedInst* di)
      &&cbo_inval,
      &&cbo_zero,
 
+     &&wrs_nto,
+     &&wrs_sto,
+
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8886,6 +8896,14 @@ Hart<URV>::execute(const DecodedInst* di)
  cbo_zero:
   execCbo_zero(di);
   return;
+
+ wrs_nto:
+  execWrs_nto(di);
+  return;
+
+ wrs_sto:
+  execWrs_sto(di);
+  return;
 }
 
 
@@ -10768,6 +10786,30 @@ Hart<URV>::execRemuw(const DecodedInst* di)
 
   URV value = SRV(int32_t(word));  // Sign extend to 64-bits
   intRegs_.write(di->op0(), value);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execWrs_nto(const DecodedInst* di)
+{
+  if (not isRvzawrs())
+    {
+      illegalInst(di);
+      return;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execWrs_sto(const DecodedInst* di)
+{
+  if (not isRvzawrs())
+    {
+      illegalInst(di);
+      return;
+    }
 }
 
 
