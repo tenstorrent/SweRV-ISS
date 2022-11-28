@@ -4261,7 +4261,8 @@ namespace WdRiscv
     Mcm<URV>* mcm_ = nullptr;
 
     FILE* initStateFile_ = nullptr;
-    std::unordered_set<uint64_t> initStateLines_;
+    std::unordered_set<uint64_t> initInstrLines_;
+    std::unordered_set<uint64_t> initDataLines_;
   };
 }
 

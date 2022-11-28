@@ -1405,11 +1405,15 @@ template <typename URV>
 void
 Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
 {
+  bool isFetch = (*tag == 'f'); // If tag is "fetch"
+
+  auto& lineSet = isFetch? initInstrLines_ : initDataLines_;
+
   uint64_t pline = memory_.getLineNumber(paddr);
-  if (initStateLines_.find(pline) != initStateLines_.end())
+  if (lineSet.find(pline) != lineSet.end())
     return;  // Already dumped
 
-  initStateLines_.insert(pline);
+  lineSet.insert(pline);
 
   uint64_t vline = memory_.getLineNumber(vaddr);
   unsigned lineSize = memory_.lineSize();
