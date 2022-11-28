@@ -358,6 +358,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicbom(true);
   if (isa_.isEnabled(RvExtension::Zicboz))
     enableRvzicboz(true);
+  if (isa_.isEnabled(RvExtension::Zawrs))
+    enableRvzawrs(true);
 }
 
 
@@ -5593,6 +5595,9 @@ Hart<URV>::execute(const DecodedInst* di)
      &&cbo_inval,
      &&cbo_zero,
 
+     &&wrs_nto,
+     &&wrs_sto,
+
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8891,6 +8896,14 @@ Hart<URV>::execute(const DecodedInst* di)
  cbo_zero:
   execCbo_zero(di);
   return;
+
+ wrs_nto:
+  execWrs_nto(di);
+  return;
+
+ wrs_sto:
+  execWrs_sto(di);
+  return;
 }
 
 
@@ -10773,6 +10786,30 @@ Hart<URV>::execRemuw(const DecodedInst* di)
 
   URV value = SRV(int32_t(word));  // Sign extend to 64-bits
   intRegs_.write(di->op0(), value);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execWrs_nto(const DecodedInst* di)
+{
+  if (not isRvzawrs())
+    {
+      illegalInst(di);
+      return;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execWrs_sto(const DecodedInst* di)
+{
+  if (not isRvzawrs())
+    {
+      illegalInst(di);
+      return;
+    }
 }
 
 

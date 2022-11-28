@@ -905,6 +905,10 @@ namespace WdRiscv
     void enableRvzicboz(bool flag)
     { rvzicboz_ = flag; }
 
+    /// Enable/disable the zawrs (wait reservation store) extension.
+    void enableRvzawrs(bool flag)
+    { rvzawrs_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1075,6 +1079,10 @@ namespace WdRiscv
     /// Return true if the zicboz extension (cache block zero) is enabled.
     bool isRvzicboz() const
     { return rvzicboz_; }
+
+    /// Return true if the zicboz extension (wait reservation store) is enabled.
+    bool isRvzawrs() const
+    { return rvzawrs_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -3972,6 +3980,9 @@ namespace WdRiscv
     void execCbo_inval(const DecodedInst*);
     void execCbo_zero(const DecodedInst*);
 
+    void execWrs_nto(const DecodedInst*);
+    void execWrs_sto(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -4072,6 +4083,7 @@ namespace WdRiscv
     bool rvsvinval_ = false;     // True if extension svinval (TLB invalidate) enabled.
     bool rvzicbom_ = false;      // True if extension zicbom (cache block management) enabled.
     bool rvzicboz_ = false;      // True if extension zicboz (cache block zero) enabled.
+    bool rvzawrs_ = false;       // True if extension zawrs (wait reservation store) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.
