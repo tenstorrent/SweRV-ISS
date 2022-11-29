@@ -169,9 +169,12 @@ namespace WdRiscv
 	  {
 	    auto pmp = region.pmp_;
 	    auto ix = pmp.pmpIndex();
-	    accessCount_.at(ix)++;
-	    typeCount_.at(ix)++;
-            pmpTrace_.push_back(ix);
+	    if (trace_)
+	      {
+		accessCount_.at(ix)++;
+		typeCount_.at(ix)++;
+		pmpTrace_.push_back(ix);
+	      }
 	    return pmp;
 	  }
       return Pmp();
@@ -203,6 +206,10 @@ namespace WdRiscv
     void clearPmpTrace()
     { pmpTrace_.clear(); }
 
+    /// Collect stats if flag is true.
+    void enableTrace(bool flag)
+    { trace_ = flag; }
+
   private:
 
     struct Region
@@ -214,6 +221,7 @@ namespace WdRiscv
 
     std::vector<Region> regions_;
     bool enabled_ = false;
+    bool trace_ = true;   // Collect stats if true.
     mutable std::vector<uint64_t> accessCount_;  // PMP entry access count.
     mutable std::vector<uint64_t> typeCount_;  // PMP type access count.
 
