@@ -1433,12 +1433,6 @@ Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
 }
 
 
-/// Shift executed instruction counter by this amount to produce a
-/// fake timer value. For example, if shift amout is 3, we are
-/// dividing instruction count by 8 (2 to power 3) to produce a timer
-/// value.
-unsigned counterToTimeShift = 3;
-
 template <typename URV>
 template <typename LOAD_TYPE>
 inline
@@ -1493,7 +1487,7 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
   ULT narrow = 0;   // Unsigned narrow loaded value
   if (addr1 >= clintStart_ and addr1 < clintLimit_ and addr1 - clintStart_ >= 0xbff8)
     {
-      uint64_t tm = instCounter_ >> counterToTimeShift; // Fake time: instr count
+      uint64_t tm = instCounter_ >> counterToTimeShift_; // Fake time: instr count
       tm = tm >> (addr1 - 0xbff8) * 8;
       narrow = tm;
     }
@@ -4283,7 +4277,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       if (hasClint())
 	{
 	  // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
-	  if ((instCounter_ >> counterToTimeShift) >= clintAlarm_)
+	  if ((instCounter_ >> counterToTimeShift_) >= clintAlarm_)
 	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER))
                             | (URV(1) << URV(InterruptCause::S_TIMER));
 	  else
