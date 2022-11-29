@@ -3902,6 +3902,7 @@ Hart<URV>::simpleRun()
 {
   // For speed: do not record/clear CSR changes.
   csRegs_.enableRecordWrite(false);
+  pmpManager_.enableTrace(false);
 
   bool success = true;
 
@@ -3932,6 +3933,7 @@ Hart<URV>::simpleRun()
     }
 
   csRegs_.enableRecordWrite(true);
+  pmpManager_.enableTrace(true);
 
   if (bbFile_)
     dumpBasicBlocks();
