@@ -92,10 +92,10 @@ namespace WdRiscv
     uint32_t ppn1() const   { return bits_.ppn1_; }
 
     /// Number of levels of an Sv32 PTE.
-    uint32_t levels() const { return 2; }
+    static uint32_t levels() { return 2; }
 
     /// Size in bytes of this object.
-    uint32_t size() const   { return sizeof(data_); }
+    static uint32_t size()  { return sizeof(data_); }
 
     /// Page based memory type. NA for Sv32.
     uint32_t pbmt() const   { return 0; }
@@ -201,10 +201,10 @@ namespace WdRiscv
     uint64_t ppn2() const   { return bits_.ppn2_; }
 
     /// Number of levels of an Sv39 PTE.
-    uint32_t levels() const { return 3; }
+    static uint32_t levels() { return 3; }
 
     /// Size in bytes of this object.
-    uint32_t size() const   { return sizeof(data_); }
+    static uint32_t size()   { return sizeof(data_); }
 
     /// Page based memory type.
     uint32_t pbmt() const   { return bits_.pbmt_; }
@@ -319,10 +319,10 @@ namespace WdRiscv
     uint64_t ppn3() const   { return bits_.ppn3_; }
 
     /// Number of levels of an Sv48 PTE.
-    uint32_t levels() const { return 4; }
+    static uint32_t levels() { return 4; }
 
     /// Size in bytes of this object.
-    uint32_t size() const   { return sizeof(data_); }
+    static uint32_t size()   { return sizeof(data_); }
 
     /// Page based memory type.
     uint32_t pbmt() const   { return bits_.pbmt_; }
@@ -444,10 +444,10 @@ namespace WdRiscv
     uint64_t ppn4() const   { return bits_.ppn4_; }
 
     /// Number of levels of an Sv57 PTE.
-    uint32_t levels() const { return 5; }
+    static uint32_t levels() { return 5; }
 
     /// Size in bytes of this object.
-    uint32_t size() const   { return sizeof(data_); }
+    static uint32_t size()  { return sizeof(data_); }
 
     /// Page based memory type.
     uint32_t pbmt() const   { return bits_.pbmt_; }
