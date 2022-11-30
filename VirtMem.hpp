@@ -113,6 +113,11 @@ namespace WdRiscv
       assert(0); return 0;
     }
 
+    /// Set the physical phage number (ppn1,ppn0) to the least
+    /// significant 22 bits of value.
+    void setPpn(uint64_t value)
+    { bits_.ppn0_ = value & 0x3ff; bits_.ppn1_ = (value >> 10) & 0xfff; }
+
     /// Return the right shift amount to right justify the ith
     /// physical page number (ppn) in a physical address for Sv32. The
     /// index i must be smaller than the number of levels of Sv32. See
@@ -222,6 +227,15 @@ namespace WdRiscv
       if (i == 2) { return ppn2(); }
       assert(0);
       return 0;
+    }
+
+    /// Set the physical phage number (ppn2,ppn1,ppn0) to the least
+    /// significant 44 bits of value.
+    void setPpn(uint64_t value)
+    {
+      bits_.ppn0_ = value & 0x1ff;
+      bits_.ppn1_ = (value >> 9) & 0x1ff;
+      bits_.ppn2_ = (value >> 18) & 0x3ffffff;
     }
 
     /// Return the right shift amount to right justify the ith
@@ -341,6 +355,16 @@ namespace WdRiscv
       if (i == 3) { return ppn3(); }
       assert(0);
       return 0;
+    }
+
+    /// Set the physical phage number (ppn3,ppn2,ppn1,ppn0) to the least
+    /// significant 44 bits of value.
+    void setPpn(uint64_t value)
+    {
+      bits_.ppn0_ = value & 0x1ff;
+      bits_.ppn1_ = (value >> 9) & 0x1ff;
+      bits_.ppn2_ = (value >> 18) & 0x1ff;
+      bits_.ppn3_ = (value >> 27) & 0x1ffff;
     }
 
     /// Return the right shift amount to right justify the ith
@@ -467,6 +491,17 @@ namespace WdRiscv
       if (i == 4) { return ppn4(); }
       assert(0);
       return 0;
+    }
+
+    /// Set the physical phage number (ppn4,ppn3,ppn2,ppn1,ppn0) to the least
+    /// significant 44 bits of value.
+    void setPpn(uint64_t value)
+    {
+      bits_.ppn0_ = value & 0x1ff;
+      bits_.ppn1_ = (value >> 9) & 0x1ff;
+      bits_.ppn2_ = (value >> 18) & 0x1ff;
+      bits_.ppn3_ = (value >> 27) & 0x1ff;
+      bits_.ppn4_ = (value >> 36) & 0xff;
     }
 
     /// Return the right shift amount to right justify the ith
