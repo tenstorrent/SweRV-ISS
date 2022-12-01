@@ -1354,6 +1354,24 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableClearMprvOnRet(flag);
     }
 
+  tag = "log2_counter_to_time";
+  if (config_ ->count(tag))
+  {
+    unsigned factor = 0;
+    if (not getJsonUnsigned(tag, config_ -> at(tag), factor))
+      errors++;
+    else
+      {
+	if (factor <= 6)
+	  hart.setCounterToTimeShift(factor);
+	else
+	  {
+	    std::cerr << "Invalid log2_counter_to_time: " << factor << " (expecting <= 6)\n";
+	    errors++;
+	  }
+      }
+  }
+
   return errors == 0;
 }
 

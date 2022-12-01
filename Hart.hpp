@@ -1497,6 +1497,11 @@ namespace WdRiscv
     // Load snapshot of registers (PC, integer, floating point, CSR) into file
     bool loadSnapshotRegs(const std::string& path);
 
+    // Define the log2 of the factor by which to divide the instruction count
+    // to generate a time value. This is relevant to the clint. 
+    void setCounterToTimeShift(unsigned shift)
+    { counterToTimeShift_ = shift; }
+
   protected:
 
     /// Read an item that may span 2 physical pages. If pa1 is the
@@ -4275,6 +4280,12 @@ namespace WdRiscv
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;
     std::unordered_set<uint64_t> initDataLines_;
+
+    // Shift executed instruction counter by this amount to produce a
+    // fake timer value. For example, if shift amout is 3, we are
+    // dividing instruction count by 8 (2 to power 3) to produce a
+    // timer value.
+    unsigned counterToTimeShift_ = 0;
   };
 }
 

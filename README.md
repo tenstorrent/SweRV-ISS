@@ -568,16 +568,41 @@ Defines the PC address after a non-maskable-interrupt.
 ###  enable_triggers
 Enable support for debug triggers.
 
+# Memory Consistency Checks
+
+When run in server or interactive modes, Whisper will check the RISCV
+weak memory ordering rules. This feature is enabled by setting the
+"enable_memory_consitency" to "true" in the configuration file or by
+using "--mcm" on the command line. Whisper expects to be notified about
+read and write operations and it expects such operations to be
+associated with time stamps. Each memory instruction (load/store/amo)
+is associated with one or more memory read/write operation. A memory
+operation may occur before/after the corresponding instruction is
+retired. Memory operations from two different instructions may occur
+in a global memory order that is different than the program order of
+those instructions.
+
+A read operation has an address, a size, a data value, and an indication
+of whether or not the data was forwarded from inside the core or it came from the
+outside (cache memory etc...).
+
+A write operation has an address, a size, and data value. The operation signifies
+a transfer of the data to the store buffer.
+
+A merge buffer write implies transfer of data from the code to the
+external memory.
+
 # Limitations
 
-The MISA register is read only. It is not possible to change XLEN at
-run time by writing to the MISA register.
+It is not possible to change XLEN at run time by writing to the MISA
+register.
+
+Big endian mode is not supported.
 
 The "round to nearest break tie to max magnitude" rounding mode is not
 implemented unless you compile with the softfloat library: "make
 SOFT_FLOAT=1" in which case simulation of floating point instructions
 slows down significantly.
 
-Suppprted extensions: A, B, C, D, F, I, M, S, U, V, ZFH, ZBA, ZBB, and ZBS.
-
-
+Suppprted extensions: A, B, C, D, F, I, M, S, U, V, ZFH, ZBA, ZBB,
+ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ.
