@@ -323,8 +323,13 @@ applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& con
   if (name == "mhartid" or name == "vlenb")
     {
       std::cerr << "CSR " << name << " cannot be configured.\n";
-      std::cerr << "Ignoring " << name << " CSR configuration in config file.\n";
-      return false;
+      return true;
+    }
+
+  if (name == "sstatus")
+    {
+      std::cerr << "CSR sstatus is a shadow of mstatus and cannot be configured.\n";
+      return true;
     }
 
   if (errors)
@@ -335,7 +340,8 @@ applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& con
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
     }
-  else if (verbose)
+
+  if (verbose)
     {
       if (exists0 != exists or isDebug0 != isDebug or reset0 != reset or
 	  mask0 != mask or pokeMask0 != pokeMask)
