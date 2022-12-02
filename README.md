@@ -624,6 +624,7 @@ implemented unless you compile with the softfloat library:
 ```
    make SOFT_FLOAT=1
 ```
+
 in which case simulation of floating point instructions slows down
 significantly.
 
