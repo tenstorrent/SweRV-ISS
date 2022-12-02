@@ -49,7 +49,9 @@ simulator. In particular you would need:
 # Compiling Whisper
 
 On a Unix system, in the whisper directory, do the following:
+```
     make BOOST_DIR=x 
+```
 where x is the path to your boost library installation.
 
 
@@ -57,9 +59,9 @@ where x is the path to your boost library installation.
 
 Standalone C/assembly programs not requiring operating system support (such programs
 cannot do any I/O) should be compiled as follows:
-
+```
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -static -O3 -nostdlib -o test1 test1.c
-
+```
 
 The key switch in the above compilation command is "-nostdlib" which
 prevents the compiler from linking-in the standard C library.
@@ -74,7 +76,7 @@ command line option.
 Also note that without an operating system, the simulator does not
 know when the program finishes. It will execute instructions
 indefinitely. Consider the following test program:
-
+```
     int
     main(int argc, char* argv[])
     {
@@ -83,7 +85,7 @@ indefinitely. Consider the following test program:
       int z = x + y;
       return z;
     }
-
+```
 
 The simulator will start execution at the ELF file entry point
 (address corresponding to main) and will return to address 0 (initial
@@ -97,7 +99,7 @@ at the end of the program. This signals the simulator to terminate the
 program.
 
 Here's a modified version of the above program that stops once main is done:
-
+```
     #include <stdint.h>
 
     volatile uint32_t tohost = 0;
@@ -116,12 +118,12 @@ Here's a modified version of the above program that stops once main is done:
       main(0, 0);
       tohost = 1;
     }
-    
+```
 And here's how to compile and run the above program
-
+```
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -nostdlib -g -o test2 test2.c
     $ whisper test2
-
+```
 If no global variable named "tohost" is written by the program, the
 simulator will stop on its own if a sequence of 64 consecutive illegal
 instructions is encountered.
@@ -131,7 +133,7 @@ open, read and write) the user can compile with the newlib C library
 and use the simulator with the "--newlib" option.
 
 Here's a sample program:
-
+```
     #include <stdio.h>
 
     int
@@ -140,13 +142,13 @@ Here's a sample program:
        printf("hello world\n");
        return 0;
     }
-   
+```
 And here's how to compile and run it (assuming riscv32-unknown-elf-gcc
 was compiled with newlib):
-
+```
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -static -O3 -o test3 test3.c
     $ whisper --newlib test3
-
+```
 Note that in this case the simulator will intercept the exit system
 call invoked by the C library code and terminate the program
 accordingly. There is no need for the "tohost" mechanism.
@@ -156,17 +158,17 @@ accordingly. There is no need for the "tohost" mechanism.
 Running whisper with -h or --help will print a brief description of all the
 command line options. To run a RISCV program, prog, in whisper, one would
 issue the Linux command:
-
+```
     whisper prog
-   
+```
 which will run the program until it writes to the "tohost" location.
 
 A program compiled with the newlib C library need not have a "tohost"
 location. Such a program will run until it calls exit. Such a program
 would be run as follows:
-
+```
     whisper --newlib prog
-
+```
 
 ## Command Line Options
 
@@ -394,9 +396,9 @@ system calls. This allows simple programs to run and use the newlib C-library
 functions such as printf, fopen, fread, fwrite, fclose, malloc,
 free and exit. Here an example of running a program with limited
 C-library support:
-
+```
     $ whisper --newlib test3
-
+```
 And here is an example of passing the command line arguments arg1 and arg2
 to the to the target program test3:
 
