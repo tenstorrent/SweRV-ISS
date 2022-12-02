@@ -582,15 +582,27 @@ retired. Memory operations from two different instructions may occur
 in a global memory order that is different than the program order of
 those instructions.
 
-A read operation has an address, a size, a data value, and an indication
-of whether or not the data was forwarded from inside the core or it came from the
-outside (cache memory etc...).
+A read operation has an instruction tag, an address, a size, a data
+value, and an indication of whether or not the data was forwarded from
+inside the core (internal) or it came from the memory system
+(external). The interactive command for a read operation has the form:
 
-A write operation has an address, a size, and data value. The operation signifies
-a transfer of the data to the store buffer.
+   time=<time-stamp>  mread <tag> <addr> <size> <data> <ie>
 
-A merge buffer write implies transfer of data from the code to the
-external memory.
+A merge buffer insert has an instruction tag, an address, a size, and
+data value. The operation signifies a transfer of the data to the
+store buffer. The interactive command for a merge buffer insert has
+the form:
+
+   time=<time-stamp> mbinsert <tag> <addr> <size> <data>
+
+A merge buffer write implies the transfer of data from the merge buffer
+to the external memory. This is when the write operation becomes visible
+to the global memory system. The interactive command for a merge buffer
+write is:
+
+   time=<time-stamp> mbwrite <addr> <data>
+
 
 # Limitations
 
