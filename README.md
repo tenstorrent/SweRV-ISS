@@ -620,9 +620,12 @@ register.
 Big endian mode is not supported.
 
 The "round to nearest break tie to max magnitude" rounding mode is not
-implemented unless you compile with the softfloat library: "make
-SOFT_FLOAT=1" in which case simulation of floating point instructions
-slows down significantly.
+implemented unless you compile with the softfloat library:
+```
+   make SOFT_FLOAT=1
+```
+in which case simulation of floating point instructions slows down
+significantly.
 
 Suppprted extensions: A, B, C, D, F, I, M, S, U, V, ZFH, ZBA, ZBB,
 ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ.
