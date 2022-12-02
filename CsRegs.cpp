@@ -517,6 +517,11 @@ CsRegs<URV>::configCsr(CsrNumber csrNum, bool implemented, URV resetValue,
     {
       MstatusFields<URV> fields(csr.read());
       interruptEnable_ = fields.bits_.MIE;
+
+      // Update masks of sstatus.
+      auto& sstatus = regs_.at(size_t(CsrNumber::SSTATUS));
+      sstatus.setWriteMask(sstatus.getWriteMask() & csr.getWriteMask());
+      sstatus.setPokeMask(sstatus.getPokeMask() & csr.getPokeMask());
     }
 
   return true;
@@ -892,9 +897,9 @@ CsRegs<URV>::defineMachineRegs()
   // Machine status setup.
 
   // mstatus
-  //           S R        T T T M S M X  F  M  V  S M R S U M R S U
-  //           D E        S W V X U P S  S  P  S  P P E P P I E I I
-  //             S        R   M R M R       P     P I S I I E S E E
+  //           S R        T T T M S M X  F  M  V  S M U S U M R S U
+  //           D E        S W V X U P S  S  P  S  P P B P P I E I I
+  //             S        R   M R M R       P     P I E I I E S E E
   //                                V               E   E E
   URV mask = 0b0'00000000'1'1'1'1'1'1'11'11'11'11'1'1'0'1'0'1'0'1'0;
   URV val =  0b0'00000000'0'0'0'0'0'0'00'00'11'00'0'0'0'0'0'0'0'0'0;
@@ -1133,14 +1138,13 @@ CsRegs<URV>::defineSupervisorRegs()
 
   using Csrn = CsrNumber;
 
-  // Only fields TSR, TW, TVM, MXR, SUM, FS, VS, SPP, SPIE, and SIE are writeable.
-  uint64_t mask     = 0x00766722;
-  uint64_t pokeMask = 0x80766722;  // Filed SD is pokable.
-  if (not rv32_)
-    {
-      mask     = 0x0000000000766722L;
-      pokeMask = 0x8000000000766722L;
-    }
+  // sstatus
+  //           S R        T T T M S M X  F  M  V  S M U S R M R S R
+  //           D E        S W V X U P S  S  P  S  P P B P E I E I E
+  //             S        R   M R M R       P     P I E I S E S E S
+  //                                V               E   E  
+  URV mask = 0b0'00000000'0'0'0'1'1'0'11'11'00'11'1'0'0'1'0'0'0'1'0;
+  URV pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
   defineCsr("sstatus",    Csrn::SSTATUS,    !mand, !imp, 0, mask, pokeMask);
 
   auto sstatus = findCsr(Csrn::SSTATUS);
