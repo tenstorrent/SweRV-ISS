@@ -314,10 +314,10 @@ The following is a brief description of the command line options:
 
 Whisper is started in interactive mode using the "--interactive" command line option.
 Here's are some examples:
-
+```
     $ whisper --interactive
     $ whisper --interactive test1
-
+```
 In the second example, the program test1 is first loaded into the
 simulated memory.  In interactive mode the user can issue commands to
 control the execution of the target program and to set/examine the
@@ -401,15 +401,15 @@ C-library support:
 ```
 And here is an example of passing the command line arguments arg1 and arg2
 to the to the target program test3:
-
+```
     $ whisper --newlib "test3 arg1 arg2"
-
+```
 And examples of passing command line switches to a target program
 that requires them:
-
+```
     $ whisper --newlib "test4 -opt1 val1 -opt2"
     $ whisper --newlib --target "test4 -opt1 val1 -opt2"
-
+```
 # Debugging RISCV Programs Using Gdb and Whisper
 
 With the --gdb option, whisper will follow the gdb remote debugging
@@ -417,23 +417,27 @@ protocol.  This allows the user to debug a RISCV program using a
 cross-compiled gdb and whisper.  For example, to debug a RISCV program
 named xyz on a Linux x86 machine, we would start the (cross-compiled)
 RISCV gdb as follows: 
-
+```
     $ riscv-unknown-elf-gdb xyz
-
+```
 at the gdb prompt, we would connect to whisper by issuing a "target remote"
 gdb command as follows:
-
+```
     target remote | whisper --gdb xyz
-
+```
 
 # Configuring Whisper
 
 A JSON configuration file may be specified on the command line using the
 --configfile switch. Numeric parameters may be specified as integers or
 as strings. For example, a core count of 4 may be specified as:
+```
   "cores" : 4
+```
 or
+```
   "cores" : "4"
+```
 If expressed as a string, a numeric value may be prefixed with 0x to
 specify headecimal notation (JSON does not support hexadecimal notation
 for integers).
@@ -445,7 +449,7 @@ be specified using the strings "false", "False", "true", or "True".
 Command line options override settings in the configuration file.
 
 Here is a sample configuration file:
-
+```
     {
         "xlen" : 32,
         "isa" : "rv32imafd_zfh_zba_zbb_zbc_sbs",
@@ -466,7 +470,7 @@ Here is a sample configuration file:
              }
         }
     }
-
+```
 ## Configuration parameters
 
 ### cores
@@ -478,7 +482,9 @@ Integer register size in bits.
 ### isa
 Enable instruction set architecture (isa) features.
 Example:
+```
    "isa" : "rv32imaf"
+```
 
 ### memmap
 Object defining memory organization. Fields of memap:
@@ -489,7 +495,7 @@ Each entry is an object with a "low" and "high" addresses and an
 "attribs" array defining the physical memory attributes.
 
 Example:
-
+```
     "memmap" : { "size" : "0x100000000", "page_size" : 4096,
         "pma" : [
             {
@@ -502,7 +508,7 @@ Example:
             }
         ]
     }
-
+```
        
 ### num_mmode_perf_regs
 Number of implemented performance counters. If specified number is n,
@@ -550,12 +556,12 @@ The vector configuration is an object with the following fields:
 * max_bytes_per_elem: widest supported element size in bytes (no default).
 
 Example:
-
+```
     "vector" : {
        "bytes_per_vec" : 16,
        "max_bytes_per_elem" : 8
     }
-
+```
 ###  reset_vec
 Defines the program counter (PC) value after reset. The ELF file
 entry point will supersede the reset_vec value unless --raw is
