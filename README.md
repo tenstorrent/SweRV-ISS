@@ -49,7 +49,9 @@ simulator. In particular you would need:
 # Compiling Whisper
 
 On a Unix system, in the whisper directory, do the following:
+```
     make BOOST_DIR=x 
+```
 where x is the path to your boost library installation.
 
 
@@ -57,9 +59,9 @@ where x is the path to your boost library installation.
 
 Standalone C/assembly programs not requiring operating system support (such programs
 cannot do any I/O) should be compiled as follows:
-
+```
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -static -O3 -nostdlib -o test1 test1.c
-
+```
 
 The key switch in the above compilation command is "-nostdlib" which
 prevents the compiler from linking-in the standard C library.
@@ -74,7 +76,7 @@ command line option.
 Also note that without an operating system, the simulator does not
 know when the program finishes. It will execute instructions
 indefinitely. Consider the following test program:
-
+```
     int
     main(int argc, char* argv[])
     {
@@ -83,7 +85,7 @@ indefinitely. Consider the following test program:
       int z = x + y;
       return z;
     }
-
+```
 
 The simulator will start execution at the ELF file entry point
 (address corresponding to main) and will return to address 0 (initial
@@ -97,7 +99,7 @@ at the end of the program. This signals the simulator to terminate the
 program.
 
 Here's a modified version of the above program that stops once main is done:
-
+```
     #include <stdint.h>
 
     volatile uint32_t tohost = 0;
@@ -116,12 +118,12 @@ Here's a modified version of the above program that stops once main is done:
       main(0, 0);
       tohost = 1;
     }
-    
+```
 And here's how to compile and run the above program
-
+```
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -nostdlib -g -o test2 test2.c
     $ whisper test2
-
+```
 If no global variable named "tohost" is written by the program, the
 simulator will stop on its own if a sequence of 64 consecutive illegal
 instructions is encountered.
@@ -131,7 +133,7 @@ open, read and write) the user can compile with the newlib C library
 and use the simulator with the "--newlib" option.
 
 Here's a sample program:
-
+```
     #include <stdio.h>
 
     int
@@ -140,13 +142,13 @@ Here's a sample program:
        printf("hello world\n");
        return 0;
     }
-   
+```
 And here's how to compile and run it (assuming riscv32-unknown-elf-gcc
 was compiled with newlib):
-
+```
     $ riscv32-unknown-elf-gcc -mabi=ilp32 -march=rv32imc -static -O3 -o test3 test3.c
     $ whisper --newlib test3
-
+```
 Note that in this case the simulator will intercept the exit system
 call invoked by the C library code and terminate the program
 accordingly. There is no need for the "tohost" mechanism.
@@ -156,17 +158,17 @@ accordingly. There is no need for the "tohost" mechanism.
 Running whisper with -h or --help will print a brief description of all the
 command line options. To run a RISCV program, prog, in whisper, one would
 issue the Linux command:
-
+```
     whisper prog
-   
+```
 which will run the program until it writes to the "tohost" location.
 
 A program compiled with the newlib C library need not have a "tohost"
 location. Such a program will run until it calls exit. Such a program
 would be run as follows:
-
+```
     whisper --newlib prog
-
+```
 
 ## Command Line Options
 
@@ -312,10 +314,10 @@ The following is a brief description of the command line options:
 
 Whisper is started in interactive mode using the "--interactive" command line option.
 Here's are some examples:
-
+```
     $ whisper --interactive
     $ whisper --interactive test1
-
+```
 In the second example, the program test1 is first loaded into the
 simulated memory.  In interactive mode the user can issue commands to
 control the execution of the target program and to set/examine the
@@ -394,20 +396,20 @@ system calls. This allows simple programs to run and use the newlib C-library
 functions such as printf, fopen, fread, fwrite, fclose, malloc,
 free and exit. Here an example of running a program with limited
 C-library support:
-
+```
     $ whisper --newlib test3
-
+```
 And here is an example of passing the command line arguments arg1 and arg2
 to the to the target program test3:
-
+```
     $ whisper --newlib "test3 arg1 arg2"
-
+```
 And examples of passing command line switches to a target program
 that requires them:
-
+```
     $ whisper --newlib "test4 -opt1 val1 -opt2"
     $ whisper --newlib --target "test4 -opt1 val1 -opt2"
-
+```
 # Debugging RISCV Programs Using Gdb and Whisper
 
 With the --gdb option, whisper will follow the gdb remote debugging
@@ -415,23 +417,27 @@ protocol.  This allows the user to debug a RISCV program using a
 cross-compiled gdb and whisper.  For example, to debug a RISCV program
 named xyz on a Linux x86 machine, we would start the (cross-compiled)
 RISCV gdb as follows: 
-
+```
     $ riscv-unknown-elf-gdb xyz
-
+```
 at the gdb prompt, we would connect to whisper by issuing a "target remote"
 gdb command as follows:
-
+```
     target remote | whisper --gdb xyz
-
+```
 
 # Configuring Whisper
 
 A JSON configuration file may be specified on the command line using the
 --configfile switch. Numeric parameters may be specified as integers or
 as strings. For example, a core count of 4 may be specified as:
+```
   "cores" : 4
+```
 or
+```
   "cores" : "4"
+```
 If expressed as a string, a numeric value may be prefixed with 0x to
 specify headecimal notation (JSON does not support hexadecimal notation
 for integers).
@@ -443,7 +449,7 @@ be specified using the strings "false", "False", "true", or "True".
 Command line options override settings in the configuration file.
 
 Here is a sample configuration file:
-
+```
     {
         "xlen" : 32,
         "isa" : "rv32imafd_zfh_zba_zbb_zbc_sbs",
@@ -464,7 +470,7 @@ Here is a sample configuration file:
              }
         }
     }
-
+```
 ## Configuration parameters
 
 ### cores
@@ -476,7 +482,9 @@ Integer register size in bits.
 ### isa
 Enable instruction set architecture (isa) features.
 Example:
+```
    "isa" : "rv32imaf"
+```
 
 ### memmap
 Object defining memory organization. Fields of memap:
@@ -487,7 +495,7 @@ Each entry is an object with a "low" and "high" addresses and an
 "attribs" array defining the physical memory attributes.
 
 Example:
-
+```
     "memmap" : { "size" : "0x100000000", "page_size" : 4096,
         "pma" : [
             {
@@ -500,7 +508,7 @@ Example:
             }
         ]
     }
-
+```
        
 ### num_mmode_perf_regs
 Number of implemented performance counters. If specified number is n,
@@ -548,12 +556,12 @@ The vector configuration is an object with the following fields:
 * max_bytes_per_elem: widest supported element size in bytes (no default).
 
 Example:
-
+```
     "vector" : {
        "bytes_per_vec" : 16,
        "max_bytes_per_elem" : 8
     }
-
+```
 ###  reset_vec
 Defines the program counter (PC) value after reset. The ELF file
 entry point will supersede the reset_vec value unless --raw is
@@ -582,15 +590,27 @@ retired. Memory operations from two different instructions may occur
 in a global memory order that is different than the program order of
 those instructions.
 
-A read operation has an address, a size, a data value, and an indication
-of whether or not the data was forwarded from inside the core or it came from the
-outside (cache memory etc...).
-
-A write operation has an address, a size, and data value. The operation signifies
-a transfer of the data to the store buffer.
-
-A merge buffer write implies transfer of data from the code to the
-external memory.
+A read operation has an instruction tag, an address, a size, a data
+value, and an indication of whether or not the data was forwarded from
+inside the core (internal) or it came from the memory system
+(external). The interactive command for a read operation has the form:
+```
+   time=<time-stamp>  mread <tag> <addr> <size> <data> <ie>
+```
+A merge buffer insert has an instruction tag, an address, a size, and
+data value. The operation signifies a transfer of the data to the
+store buffer. The interactive command for a merge buffer insert has
+the form:
+```
+   time=<time-stamp> mbinsert <tag> <addr> <size> <data>
+```
+A merge buffer write implies the transfer of data from the merge buffer
+to the external memory. This is when the write operation becomes visible
+to the global memory system. The interactive command for a merge buffer
+write is:
+```
+   time=<time-stamp> mbwrite <addr> <data>
+```
 
 # Limitations
 
@@ -600,9 +620,13 @@ register.
 Big endian mode is not supported.
 
 The "round to nearest break tie to max magnitude" rounding mode is not
-implemented unless you compile with the softfloat library: "make
-SOFT_FLOAT=1" in which case simulation of floating point instructions
-slows down significantly.
+implemented unless you compile with the softfloat library:
+```
+   make SOFT_FLOAT=1
+```
+
+in which case simulation of floating point instructions slows down
+significantly.
 
 Suppprted extensions: A, B, C, D, F, I, M, S, U, V, ZFH, ZBA, ZBB,
 ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ.

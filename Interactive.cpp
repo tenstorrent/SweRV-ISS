@@ -1872,7 +1872,7 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
   if (tokens.size() != 5)
     {
       std::cerr << "Invalid minsert command: " << line << '\n';
-      std::cerr << "  Expecting: mbinsert <addr> size> <data>\n";
+      std::cerr << "  Expecting: mbinsert <tag> <addr> size> <data>\n";
       return false;
     }
 
