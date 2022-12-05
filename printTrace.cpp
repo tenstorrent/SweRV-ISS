@@ -403,18 +403,16 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 
   if (tracePtw_)
     {
-      auto& instrPte = virtMem_.getInstrPteAddrs();
-      if (not instrPte.empty())
+      for (const auto& walk : virtMem_.getFetchWalks())
 	{
 	  fputs("  +\n", out);
-	  printPageTableWalk(out, *this, "iptw", instrPte);
+	  printPageTableWalk(out, *this, "iptw", walk);
 	}
 
-      auto& dataPte = virtMem_.getDataPteAddrs();
-      if (not dataPte.empty())
+      for (const auto& walk : virtMem_.getDataWalks())
 	{
 	  fputs("  +\n", out);
-	  printPageTableWalk(out, *this, "dptw", dataPte);
+	  printPageTableWalk(out, *this, "dptw", walk);
 	}
     }
   fputs("\n", out);
@@ -720,8 +718,8 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     {
       buffer.printChar(',');
       std::vector<uint64_t> addrs, entries;
-      getPageTableWalkAddresses(true, addrs);
-      getPageTableWalkEntries(true, entries);
+      getPageTableWalkAddresses(true, 0, addrs);
+      getPageTableWalkEntries(true, 0, entries);
       sep = "";
       uint64_t n = std::min(addrs.size(), entries.size());
       for (uint64_t i = 0; i < n; ++i)
@@ -731,8 +729,8 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	}
 
       buffer.printChar(',');
-      getPageTableWalkAddresses(false, addrs);
-      getPageTableWalkEntries(false, entries);
+      getPageTableWalkAddresses(false, 0, addrs);
+      getPageTableWalkEntries(false, 0, entries);
       sep = "";
       n = std::min(addrs.size(), entries.size());
       for (uint64_t i = 0; i < n; ++i)

@@ -351,7 +351,9 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
   VA va(address);
 
   // Collect PTE addresses used in the translation process.
-  auto& addrTrace = exec ? pteInstrAddr_ : pteDataAddr_;
+  auto& walkVec = exec ? fetchWalks_ : dataWalks_;
+  if (trace_)
+    walkVec.resize(walkVec.size() + 1);
 
   if (attFile_)
     fprintf(attFile_, "VA: 0x%jx\n", uintmax_t(address));
@@ -367,7 +369,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
       uint32_t vpn = va.vpn(ii);
       pteAddr = root + vpn*pteSize;
       if (trace_)
-	addrTrace.push_back(pteAddr);
+	walkVec.back().push_back(pteAddr);
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -505,7 +507,9 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
   VA va(address);
 
   // Collect PTE addresses used in the translation process.
-  auto& addrTrace = exec ? pteInstrAddr_ : pteDataAddr_;
+  auto& walkVec = exec ? fetchWalks_ : dataWalks_;
+  if (trace_)
+    walkVec.resize(walkVec.size() + 1);
 
   if (attFile_)
     fprintf(attFile_, "VA: 0x%jx\n", uintmax_t(address));
@@ -515,7 +519,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
       if (trace_)
-	addrTrace.push_back(pteAddr);
+	walkVec.back().push_back(pteAddr);
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.

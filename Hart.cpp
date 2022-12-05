@@ -3799,12 +3799,12 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (initStateFile_)
 	    {
-	      auto& instrPte = virtMem_.getInstrPteAddrs();
-	      for (auto addr : instrPte)
-		dumpInitState("ipt", addr, addr);
-	      auto& dataPte = virtMem_.getDataPteAddrs();
-	      for (auto addr : dataPte)
-		dumpInitState("dpt", addr, addr);
+	      for (const auto& walk : virtMem_.getFetchWalks())
+		for (auto addr : walk)
+		  dumpInitState("ipt", addr, addr);
+	      for (const auto& walk : virtMem_.getDataWalks())
+		for (auto addr : walk)
+		  dumpInitState("dpt", addr, addr);
 	    }
 
 	  if (hasException_ or hasInterrupt_)
