@@ -1526,19 +1526,20 @@ namespace WdRiscv
 	  uint32_t val1 = 0, val2 = 0;
 	  if (not memory_.read(pa1, val1) or not memory_.read(pa2, val2))
 	    assert(0);
-	  value = (uint64_t(val1) << 32) | val2;
+	  value = (uint64_t(val2) << 32) | val1;
 	  return;
 	}
 
       value = 0;
       uint8_t byte = 0;
-      for (unsigned i = 0; i < size1; ++i)
+      unsigned destIx = 0;
+      for (unsigned i = 0; i < size1; ++i, ++destIx)
 	if (memory_.read(pa1 + i, byte))
-	  value |= LOAD_TYPE(byte) << 8*i;
+	  value |= LOAD_TYPE(byte) << 8*destIx;
 	else assert(0);
-      for (unsigned i = 0; i < size2; ++i)
+      for (unsigned i = 0; i < size2; ++i, ++destIx)
 	if (memory_.read(pa2 + i, byte))
-	  value |= LOAD_TYPE(byte) << 8*i;
+	  value |= LOAD_TYPE(byte) << 8*destIx;
 	else assert(0);
     }
 
@@ -1589,18 +1590,19 @@ namespace WdRiscv
 	{
 	  uint32_t val1 = 0, val2 = 0;
 	  memory_.peek(pa1, val1, usePma); memory_.peek(pa2, val2, usePma);
-	  value = (uint64_t(val1) << 32) | val2;
+	  value = (uint64_t(val2) << 32) | val1;
 	  return;
 	}
 
       value = 0;
       uint8_t byte = 0;
-      for (unsigned i = 0; i < size1; ++i)
+      unsigned destIx = 0;
+      for (unsigned i = 0; i < size1; ++i, ++destIx)
 	if (memory_.peek(pa1 + i, byte, usePma))
-	  value |= LOAD_TYPE(byte) << 8*i;
-      for (unsigned i = 0; i < size2; ++i)
+	  value |= LOAD_TYPE(byte) << 8*destIx;
+      for (unsigned i = 0; i < size2; ++i, ++destIx)
 	if (memory_.peek(pa2 + i, byte, usePma))
-	  value |= LOAD_TYPE(byte) << 8*i;
+	  value |= LOAD_TYPE(byte) << 8*destIx;
     }
 
 

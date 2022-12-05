@@ -104,9 +104,10 @@ VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
   if (n1 == n2)
     return ExceptionCause::NONE;  // Not page crossing
 
-  cause = translateForFetch(va + size - 1, priv, pa2);
+  uint64_t va2 = n2*pageSize_;
+  cause = translateForFetch(va2, priv, pa2);
   if (cause != ExceptionCause::NONE)
-    pa1 = pa2 = va + size - excess;
+    pa1 = pa2 = va2;
 
   return cause;
 }
@@ -169,9 +170,10 @@ VirtMem::translateForLoad2(uint64_t va, unsigned size, PrivilegeMode priv,
   if (n1 == n2)
     return ExceptionCause::NONE;  // Not page crossing
 
-  cause = translateForLoad(va + size - 1, priv, pa2);
+  uint64_t va2 = n2*pageSize_;
+  cause = translateForLoad(va2, priv, pa2);
   if (cause != ExceptionCause::NONE)
-    pa1 = pa2 = va + size - excess;
+    pa1 = pa2 = va2;
 
   return cause;
 }
@@ -234,9 +236,10 @@ VirtMem::translateForStore2(uint64_t va, unsigned size, PrivilegeMode priv,
   if (n1 == n2)
     return ExceptionCause::NONE;  // Not page crossing
 
-  cause = translateForStore(va + size - 1, priv, pa2);
+  uint64_t va2 = n2*pageSize_;
+  cause = translateForStore(va2, priv, pa2);
   if (cause != ExceptionCause::NONE)
-    pa1 = pa2 = va + size - excess;
+    pa1 = pa2 = va2;
 
   return cause;
 }
