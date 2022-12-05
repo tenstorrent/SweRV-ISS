@@ -3905,7 +3905,7 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim or bbFile_ or instrLineTrace_ or isRvs() or hasClint())
+          if (hasLim or bbFile_ or instrLineTrace_ or isRvs() or isRvu() or hasClint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4026,7 +4026,7 @@ bool
 Hart<URV>::simpleRunWithLimit()
 {
   uint64_t limit = instCountLim_;
-  bool checkInterrupt = isRvs() or hasClint();
+  bool checkInterrupt = isRvs() or isRvu() or hasClint();
   std::string instStr;
 
   while (noUserStop and instCounter_ < limit) 
