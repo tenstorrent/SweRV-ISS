@@ -42,6 +42,9 @@ namespace WdRiscv
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
             PmpManager& pmpMgr, unsigned tlbSize);
 
+    ~VirtMem()
+    { }
+
     /// Perform virtual to physical memory address translation and
     /// check for read access if the read flag is true (similary also
     /// check for write access is the write flag is true ...).  Return
@@ -221,7 +224,14 @@ namespace WdRiscv
     /// Remember value of page table entry modified by most recent translation.
     /// This is for reporting intial memory state.
     void saveUpdatedPte(uint64_t addr, unsigned size, uint64_t value)
-    { updatedPtes_.emplace(updatedPtes_.end(), addr, size, value); }
+    {
+      if (trace_)
+	updatedPtes_.emplace(updatedPtes_.end(), addr, size, value);
+    }
+
+    /// Eable/disable tracing of accessed page table entries.
+    void enableTrace(bool flag)
+    { trace_ = flag; }
 
     /// Set byte to the previous PTE value if address is within
     /// the PTE entry updated by the last translation. Leave
@@ -256,6 +266,8 @@ namespace WdRiscv
     unsigned hartIx_ = 0;
 
     uint64_t time_ = 0;  //  Access order
+
+    bool trace_ = true;
 
     std::vector<UpdatedPte> updatedPtes_;
 
