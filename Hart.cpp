@@ -264,12 +264,18 @@ Hart<URV>::processExtensions(bool verbose)
   URV value = 0;
   peekCsr(CsrNumber::MISA, value);
 
+  bool flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
+  enableSupervisorMode(flag);
+
+  flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
+  enableUserMode(flag);
+
   rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
 
   rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
   rvc_ = rvc_ and isa_.isEnabled(RvExtension::C);
 
-  bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
+  flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
   flag = flag and isa_.isEnabled(RvExtension::F);
   enableRvf(flag);
 
@@ -297,12 +303,6 @@ Hart<URV>::processExtensions(bool verbose)
 
   rvm_ = value & (URV(1) << ('m' - 'a'));
   rvm_ = rvm_ and isa_.isEnabled(RvExtension::M);
-
-  flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
-  enableSupervisorMode(flag);
-
-  flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
-  enableUserMode(flag);
 
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
   if (flag and not (rvf_ and rvd_))

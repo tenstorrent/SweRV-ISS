@@ -34,16 +34,8 @@ Hart<URV>::enableRvf(bool flag)
 {
   rvf_ = flag;
   csRegs_.enableRvf(flag);
-  if (flag)
-    {
-      if (mstatusFs_ == FpFs::Off)
-	setMstatusFs(FpFs::Initial);
-    }
-  else
-    {
-      if (mstatusFs_ != FpFs::Off)
-	setMstatusFs(FpFs::Off);
-    }
+  if (not flag)
+    setMstatusFs(FpFs::Off);
 }
 
 

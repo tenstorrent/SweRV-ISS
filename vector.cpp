@@ -442,16 +442,8 @@ Hart<URV>::enableVectorMode(bool flag)
   rvv_ = flag;
   csRegs_.enableVectorMode(flag);
 
-  if (flag)
-    {
-      if (mstatusVs_ == FpFs::Off)
-	setMstatusFs(FpFs::Initial);
-    }
-  else
-    {
-      if (mstatusVs_ != FpFs::Off)
-	setMstatusVs(FpFs::Off);
-    }
+  if (not flag)
+    setMstatusVs(FpFs::Off);
 }
 
 
