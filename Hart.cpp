@@ -305,9 +305,15 @@ Hart<URV>::processExtensions(bool verbose)
   enableUserMode(flag);
 
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
+  if (flag and not (rvf_ and rvd_))
+    {
+      flag = false;
+      if (verbose)
+	std::cerr << "Bit 21 (v) is set in the MISA register but the d/f "
+		  << "extensions are not enabled -- ignored\n";
+    }
   flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorMode(flag);
-
 
   URV epcMask = rvc_? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
   auto epc = csRegs_.findCsr(CsrNumber::MEPC);
