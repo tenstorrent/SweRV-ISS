@@ -9540,7 +9540,12 @@ Hart<URV>::execMret(const DecodedInst* di)
   MstatusFields<URV> fields(value);
   PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
   fields.bits_.MIE = fields.bits_.MPIE;
-  fields.bits_.MPP = unsigned(PrivilegeMode::User);
+  if (isRvu())
+    fields.bits_.MPP = unsigned(PrivilegeMode::User);
+  else if (isRvs())
+    fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
+  else
+    fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
   fields.bits_.MPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
@@ -9605,7 +9610,10 @@ Hart<URV>::execSret(const DecodedInst* di)
   PrivilegeMode savedMode = fields.bits_.SPP? PrivilegeMode::Supervisor :
     PrivilegeMode::User;
   fields.bits_.SIE = fields.bits_.SPIE;
-  fields.bits_.SPP = 0;
+  if (isRvu())
+    fields.bits_.SPP = 0; // User mode
+  else
+    fields.bits_.SPP = 1; // Supervisor mode
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
