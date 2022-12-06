@@ -550,7 +550,7 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Bare metal mode: Disble emulation of Linux/newlib system call emulation "
          "even if Linux/newlib symbols detected in the target ELF file.")
 	("elfisa", po::bool_switch(&args.elfisa),
-	 "Confiure reset value of MISA according to the RISCV architecture tag(s) "
+	 "Configure reset value of MISA according to the RISCV architecture tag(s) "
          "encoded into the laoded ELF file(s) if any.")
 	("fastext", po::bool_switch(&args.fastExt),
 	 "Enable fast external interrupt dispatch.")

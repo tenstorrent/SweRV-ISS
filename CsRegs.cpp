@@ -306,6 +306,12 @@ legalizeMisa(URV v)
       v |= (1 << ('I' - 'A'));  // I & E off, turn I on
     }
 
+  if ((v & (1 << ('F' - 'A'))) == 0)
+    v &= ~(URV(1) << ('D' - 'A'));  // D is off if F is off.
+
+  if ((v & (1 << ('F' - 'A'))) == 0 or (v & (1 << ('D' - 'A'))) == 0)
+    v &= ~(URV(1) << ('V' - 'A'));  // V is off if F or D is off.
+
   return v;
 }
 
