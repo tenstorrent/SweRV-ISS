@@ -436,6 +436,49 @@ using namespace WdRiscv;
 
 
 template <typename URV>
+void
+Hart<URV>::enableVectorMode(bool flag)
+{
+  rvv_ = flag;
+  csRegs_.enableVectorMode(flag);
+
+  if (flag)
+    {
+      if (mstatusVs_ == FpFs::Off)
+	setMstatusFs(FpFs::Initial);
+    }
+  else
+    {
+      if (mstatusVs_ != FpFs::Off)
+	setMstatusVs(FpFs::Off);
+    }
+}
+
+
+template <typename URV>
+inline
+void
+Hart<URV>::setMstatusVs(FpFs value)
+{
+  if (mstatusVs_ == value)
+    return;
+
+  URV val = csRegs_.peekMstatus();
+  MstatusFields<URV> fields(val);
+  fields.bits_.VS = unsigned(value);
+  fields.bits_.SD = 1;
+
+  csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
+
+  URV newVal = csRegs_.peekMstatus();
+  if (val != newVal)
+    recordCsrWrite(CsrNumber::MSTATUS);
+
+  updateCachedMstatusFields();
+}
+
+
+template <typename URV>
 bool
 Hart<URV>::checkMaskableInst(const DecodedInst* di)
 {

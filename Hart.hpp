@@ -800,8 +800,7 @@ namespace WdRiscv
     { rvzba_ = flag; }
 
     /// Enable/disable the f (floating point) extension.
-    void enableRvf(bool flag)
-    { rvf_ = flag; csRegs_.enableRvf(flag); }
+    void enableRvf(bool flag);
 
     /// Enable/disable the d (double-precision floating point) extension.
     void enableRvd(bool flag)
@@ -1292,8 +1291,7 @@ namespace WdRiscv
     { rvs_ = flag; csRegs_.enableSupervisorMode(flag); }
 
     /// Enable supervisor mode.
-    void enableVectorMode(bool flag)
-    { rvv_ = flag; csRegs_.enableVectorMode(flag); }
+    void enableVectorMode(bool flag);
 
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.
@@ -1647,15 +1645,23 @@ namespace WdRiscv
     bool isDpLegal() const
     { return isRvd() and isFpEnabled(); }
 
+    // Set the FS field of mstatus to the given value.
+    void setMstatusFs(FpFs value);
+
     // Mark FS field of mstatus as dirty.
-    void markFsDirty();
+    void markFsDirty()
+    { setMstatusFs(FpFs::Dirty); }
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
     { return mstatusVs_ != FpFs::Off; }
 
+    // Set the VS field of mstatus to the given value.
+    void setMstatusVs(FpFs value);
+
     // Mark VS field of mstatus as dirty.
-    void markVsDirty();
+    void markVsDirty()
+    { setMstatusVs(FpFs::Dirty); }
 
     // Return true if it is legal to execute a vector instruction: V
     // extension must be enabled and VS feild of MSTATUS must not be

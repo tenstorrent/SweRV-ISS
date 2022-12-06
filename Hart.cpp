@@ -10825,29 +10825,6 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
 }
 
 
-template <typename URV>
-inline
-void
-Hart<URV>::markVsDirty()
-{
-  if (mstatusVs_ == FpFs::Dirty)
-    return;
-
-  URV val = csRegs_.peekMstatus();
-  MstatusFields<URV> fields(val);
-  fields.bits_.VS = unsigned(FpFs::Dirty);
-  fields.bits_.SD = 1;
-
-  csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
-
-  URV newVal = csRegs_.peekMstatus();
-  if (val != newVal)
-    recordCsrWrite(CsrNumber::MSTATUS);
-
-  updateCachedMstatusFields();
-}
-
-
 template
 bool
 WdRiscv::Hart<uint32_t>::load<uint16_t>(uint64_t, uint64_t&);
