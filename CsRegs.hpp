@@ -243,11 +243,12 @@ namespace WdRiscv
 
       // Supervisor trap setup.
       SSTATUS = 0x100,
-      SEDELEG = 0x102,
-      SIDELEG = 0x103,
       SIE = 0x104,
       STVEC = 0x105,
       SCOUNTEREN = 0x106,
+
+      SENVCFG = 0x10a,
+
       // Supervisor Trap Handling 
       SSCRATCH = 0x140,
       SEPC = 0x141,
@@ -257,7 +258,6 @@ namespace WdRiscv
       // Supervisor Protection and Translation 
       SATP = 0x180,
 
-      SENVCFG = 0x10a,
 
       // Hypervisor registers
       HSTATUS = 0x600,
@@ -449,8 +449,7 @@ namespace WdRiscv
 	writeMask_(writeMask), pokeMask_(writeMask)
     {
       valuePtr_ = &value_;
-      initialMode_ = PrivilegeMode((number_ & 0x300) >> 8);
-      privMode_ = initialMode_;
+      privMode_ = PrivilegeMode((number_ & 0x300) >> 8);
     }
 
     /// Copy constructor is not available.
@@ -554,7 +553,7 @@ namespace WdRiscv
 
     /// Define the privilege mode of this CSR.
     void definePrivilegeMode(PrivilegeMode mode)
-    { initialMode_ = mode; privMode_ = mode; }
+    { privMode_ = mode; }
 
     /// Associate given location with the value of this CSR. The
     /// previous value of the CSR is lost. If given location is null
@@ -566,7 +565,6 @@ namespace WdRiscv
     void reset()
     {
       *valuePtr_ = initialValue_;
-      privMode_ = initialMode_;
       for (auto func : postReset_)
         func(*this);
     }
@@ -684,7 +682,6 @@ namespace WdRiscv
     bool debug_ = false;       // True if this is a debug-mode register.
     bool shared_ = false;      // True if this is shared among harts.
     URV initialValue_ = 0;
-    PrivilegeMode initialMode_ = PrivilegeMode::Machine;
     PrivilegeMode privMode_ = PrivilegeMode::Machine;
     URV value_ = 0;
     URV prev_ = 0;

@@ -174,11 +174,10 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 {
   supervisorModeEnabled_ = flag;
 
-  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SEDELEG, CsrNumber::SIDELEG,
-                      CsrNumber::STVEC, CsrNumber::SIE, CsrNumber::STVEC,
-                      CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
-                      CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
-                      CsrNumber::SATP, CsrNumber::MEDELEG, CsrNumber::MIDELEG } )
+  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
+		     CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
+		     CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
+		     CsrNumber::SATP, CsrNumber::MEDELEG, CsrNumber::MIDELEG } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -1167,9 +1166,6 @@ CsRegs<URV>::defineSupervisorRegs()
   auto mstatus = findCsr(Csrn::MSTATUS);
   if (sstatus and mstatus)
     sstatus->tie(mstatus->valuePtr_);
-
-  defineCsr("sedeleg",    Csrn::SEDELEG,    !mand, !imp, 0, wam, wam);
-  defineCsr("sideleg",    Csrn::SIDELEG,    !mand, !imp, 0, wam, wam);
 
   defineCsr("stvec",      Csrn::STVEC,      !mand, !imp, 0, wam, wam);
   defineCsr("scounteren", Csrn::SCOUNTEREN, !mand, !imp, 0, wam, wam);
