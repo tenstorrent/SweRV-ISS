@@ -33,6 +33,7 @@ CsRegs<URV>::CsRegs()
   defineSupervisorRegs();
   defineUserRegs();
   defineHypervisorRegs();
+  defineVirtualSupervisorRegs();
   defineDebugRegs();
   defineVectorRegs();
   defineFpRegs();
@@ -1279,6 +1280,28 @@ CsRegs<URV>::defineHypervisorRegs()
   // This may be already defined with trigger CSRs.
   if (not nameToNumber_.count("hcontext"))
     defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineVirtualSupervisorRegs()
+{
+  bool mand = true;    // Mandatory.
+  bool imp  = true;    // Implemented.
+  URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
+
+  using Csrn = CsrNumber;
+
+  defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, 0, wam, wam);
+  defineCsr("vsie",        Csrn::VSIE,        !mand, !imp, 0, wam, wam);
+  defineCsr("vstvec",      Csrn::VSTVEC,      !mand, !imp, 0, wam, wam);
+  defineCsr("vssratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
+  defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, wam, wam);
+  defineCsr("vscause",     Csrn::VSCAUSE,     !mand, !imp, 0, wam, wam);
+  defineCsr("vstval",      Csrn::VSTVAL,      !mand, !imp, 0, wam, wam);
+  defineCsr("vsip",        Csrn::VSIP,        !mand, !imp, 0, wam, wam);
+  defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
 }
 
 

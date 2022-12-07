@@ -110,50 +110,40 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   if constexpr (sizeof(URV) == 4)
     {
       URV* low = reinterpret_cast<URV*> (&retiredInsts_);
+      csRegs_.findCsr(CsrNumber::MINSTRET)->tie(low);
+      csRegs_.findCsr(CsrNumber::INSTRET)->tie(low);
+
       URV* high = low + 1;
-
-      auto& mirLow = csRegs_.regs_.at(size_t(CsrNumber::MINSTRET));
-      auto& irLow = csRegs_.regs_.at(size_t(CsrNumber::INSTRET));
-      mirLow.tie(low);
-      irLow.tie(low);
-
-      auto& mirHigh = csRegs_.regs_.at(size_t(CsrNumber::MINSTRETH));
-      auto& irHigh = csRegs_.regs_.at(size_t(CsrNumber::INSTRETH));
-      mirHigh.tie(high);
-      irHigh.tie(high);
+      csRegs_.findCsr(CsrNumber::MINSTRETH)->tie(high);
+      csRegs_.findCsr(CsrNumber::INSTRETH)->tie(high);
 
       low = reinterpret_cast<URV*> (&cycleCount_);
+      csRegs_.findCsr(CsrNumber::MCYCLE)->tie(low);
+      csRegs_.findCsr(CsrNumber::CYCLE)->tie(low);
+
       high = low + 1;
-
-      auto& mcycleLow = csRegs_.regs_.at(size_t(CsrNumber::MCYCLE));
-      auto& cycleLow = csRegs_.regs_.at(size_t(CsrNumber::CYCLE));
-      mcycleLow.tie(low);
-      cycleLow.tie(low);
-
-      auto& mcycleHigh = csRegs_.regs_.at(size_t(CsrNumber::MCYCLEH));
-      auto& cycleHigh = csRegs_.regs_.at(size_t(CsrNumber::CYCLEH));
-      mcycleHigh.tie(high);
-      cycleHigh.tie(high);
+      csRegs_.findCsr(CsrNumber::MCYCLEH)->tie(high);
+      csRegs_.findCsr(CsrNumber::CYCLEH)->tie(high);
 
       // TIME is a read-only shadow of MCYCLE.
-      csRegs_.regs_.at(size_t(CsrNumber::TIME)).tie(low);
-      csRegs_.regs_.at(size_t(CsrNumber::TIMEH)).tie(high);
+      csRegs_.findCsr(CsrNumber::TIME)->tie(low);
+      csRegs_.findCsr(CsrNumber::TIMEH)->tie(high);
     }
   else
     {
-      csRegs_.regs_.at(size_t(CsrNumber::MINSTRET)).tie(&retiredInsts_);
-      csRegs_.regs_.at(size_t(CsrNumber::MCYCLE)).tie(&cycleCount_);
+      csRegs_.findCsr(CsrNumber::MINSTRET)->tie(&retiredInsts_);
+      csRegs_.findCsr(CsrNumber::MCYCLE)->tie(&cycleCount_);
 
       // INSTRET and CYCLE are read-only shadows of MINSTRET and MCYCLE.
-      csRegs_.regs_.at(size_t(CsrNumber::INSTRET)).tie(&retiredInsts_);
-      csRegs_.regs_.at(size_t(CsrNumber::CYCLE)).tie(&cycleCount_);
+      csRegs_.findCsr(CsrNumber::INSTRET)->tie(&retiredInsts_);
+      csRegs_.findCsr(CsrNumber::CYCLE)->tie(&cycleCount_);
 
       // TIME is a read-only shadow of MCYCLE.
-      csRegs_.regs_.at(size_t(CsrNumber::TIME)).tie(&cycleCount_);
+      csRegs_.findCsr(CsrNumber::TIME)->tie(&cycleCount_);
     }
 
   // Tie the FCSR register to variable held in the hart.
-  csRegs_.regs_.at(size_t(CsrNumber::FCSR)).tie(&fcsrValue_);
+  csRegs_.findCsr(CsrNumber::FCSR)->tie(&fcsrValue_);
 
   // Configure MHARTID CSR.
   bool implemented = true, debug = false, shared = false;
