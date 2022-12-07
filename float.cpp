@@ -270,8 +270,6 @@ Hart<URV>::setMstatusFs(FpFs value)
   URV val = csRegs_.peekMstatus();
   MstatusFields<URV> fields(val);
   fields.bits_.FS = unsigned(value);
-  fields.bits_.SD = 1;
-
   csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
 
   URV newVal = csRegs_.peekMstatus();
