@@ -42,6 +42,9 @@ namespace WdRiscv
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
             PmpManager& pmpMgr, unsigned tlbSize);
 
+    ~VirtMem()
+    { }
+
     /// Perform virtual to physical memory address translation and
     /// check for read access if the read flag is true (similary also
     /// check for write access is the write flag is true ...).  Return
@@ -113,20 +116,26 @@ namespace WdRiscv
     /// used in the last page table walk. Return empty vector if the
     /// last executed instruction did not induce an instruction page
     /// table walk.
-    const std::vector<uint64_t>& getInstrPteAddrs() const
-    { return pteInstrAddr_; }
+    const std::vector<uint64_t>& getFetchWalks(unsigned ix) const
+    { return ix < fetchWalks_.size() ? fetchWalks_.at(ix) : emptyWalk_; }
 
     /// Return the addresses of the data page table entries used in
     /// the last page table walk. Return empty vector if the last
     /// executed instruction did not induce a data page table walk.
-    const std::vector<uint64_t>& getDataPteAddrs() const
-    { return pteDataAddr_; }
+    const std::vector<uint64_t>& getDataWalks(unsigned ix) const
+    { return ix < dataWalks_.size() ? dataWalks_.at(ix) : emptyWalk_; }
+
+    const std::vector<std::vector<uint64_t>>& getFetchWalks() const
+    { return fetchWalks_; }
+
+    const std::vector<std::vector<uint64_t>>& getDataWalks() const
+    { return dataWalks_; }
 
     /// Clear trace of page table walk
     void clearPageTableWalk()
     {
-      pteInstrAddr_.clear();
-      pteDataAddr_.clear();
+      fetchWalks_.clear();
+      dataWalks_.clear();
       clearUpdatedPtes();
     }
 
@@ -221,7 +230,14 @@ namespace WdRiscv
     /// Remember value of page table entry modified by most recent translation.
     /// This is for reporting intial memory state.
     void saveUpdatedPte(uint64_t addr, unsigned size, uint64_t value)
-    { updatedPtes_.emplace(updatedPtes_.end(), addr, size, value); }
+    {
+      if (trace_)
+	updatedPtes_.emplace(updatedPtes_.end(), addr, size, value);
+    }
+
+    /// Eable/disable tracing of accessed page table entries.
+    void enableTrace(bool flag)
+    { trace_ = flag; }
 
     /// Set byte to the previous PTE value if address is within
     /// the PTE entry updated by the last translation. Leave
@@ -257,6 +273,8 @@ namespace WdRiscv
 
     uint64_t time_ = 0;  //  Access order
 
+    bool trace_ = true;
+
     std::vector<UpdatedPte> updatedPtes_;
 
     // Cached mstatus bits
@@ -267,8 +285,10 @@ namespace WdRiscv
     FILE* attFile_ = nullptr;
 
     // Addresses of PTEs used in most recent insruction an data translations.
-    std::vector<uint64_t> pteInstrAddr_;
-    std::vector<uint64_t> pteDataAddr_;
+    typedef std::vector<uint64_t> Walk;
+    std::vector<Walk> fetchWalks_;       // Instruction fetch walks of last instruction.
+    std::vector<Walk> dataWalks_;    // Data access walks of last instruction.
+    const Walk emptyWalk_;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;

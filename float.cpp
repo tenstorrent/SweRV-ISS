@@ -30,6 +30,17 @@ using namespace WdRiscv;
 
 template <typename URV>
 void
+Hart<URV>::enableRvf(bool flag)
+{
+  rvf_ = flag;
+  csRegs_.enableRvf(flag);
+  if (not flag)
+    setMstatusFs(FpFs::Off);
+}
+
+
+template <typename URV>
+void
 Hart<URV>::resetFloat()
 {
   // Enable FP in MSTATUS.FS if f/d/zfh extension present and linux/newlib.
@@ -251,16 +262,14 @@ Hart<URV>::updateAccruedFpBits(double res, bool invalid)
 template <typename URV>
 inline
 void
-Hart<URV>::markFsDirty()
+Hart<URV>::setMstatusFs(FpFs value)
 {
-  if (mstatusFs_ == FpFs::Dirty)
+  if (mstatusFs_ == value)
     return;
 
   URV val = csRegs_.peekMstatus();
   MstatusFields<URV> fields(val);
-  fields.bits_.FS = unsigned(FpFs::Dirty);
-  fields.bits_.SD = 1;
-
+  fields.bits_.FS = unsigned(value);
   csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
 
   URV newVal = csRegs_.peekMstatus();

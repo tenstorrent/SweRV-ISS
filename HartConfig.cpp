@@ -341,6 +341,17 @@ applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& con
       return false;
     }
 
+  if (name == "misa")
+    {
+      // If an extension bit is writable, it should reset to 1.
+      URV extBits = (URV(1) << 26) - 1;
+      URV writeable = extBits & mask, writeableReset = extBits & mask & reset;
+      if (writeable != writeableReset)
+	std::cerr << "Warning: Reset value of MISA should be 0x"
+		  << std::hex << (reset | writeable) << std::dec
+		  << " to be comptible with write mask.\n";
+    }
+
   if (verbose)
     {
       if (exists0 != exists or isDebug0 != isDebug or reset0 != reset or

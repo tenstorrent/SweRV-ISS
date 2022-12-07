@@ -264,12 +264,18 @@ Hart<URV>::processExtensions(bool verbose)
   URV value = 0;
   peekCsr(CsrNumber::MISA, value);
 
+  bool flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
+  enableSupervisorMode(flag);
+
+  flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
+  enableUserMode(flag);
+
   rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
 
   rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
   rvc_ = rvc_ and isa_.isEnabled(RvExtension::C);
 
-  bool flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
+  flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
   flag = flag and isa_.isEnabled(RvExtension::F);
   enableRvf(flag);
 
@@ -298,16 +304,16 @@ Hart<URV>::processExtensions(bool verbose)
   rvm_ = value & (URV(1) << ('m' - 'a'));
   rvm_ = rvm_ and isa_.isEnabled(RvExtension::M);
 
-  flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
-  enableSupervisorMode(flag);
-
-  flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
-  enableUserMode(flag);
-
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
+  if (flag and not (rvf_ and rvd_))
+    {
+      flag = false;
+      if (verbose)
+	std::cerr << "Bit 21 (v) is set in the MISA register but the d/f "
+		  << "extensions are not enabled -- ignored\n";
+    }
   flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorMode(flag);
-
 
   URV epcMask = rvc_? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
   auto epc = csRegs_.findCsr(CsrNumber::MEPC);
@@ -3799,12 +3805,12 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  if (initStateFile_)
 	    {
-	      auto& instrPte = virtMem_.getInstrPteAddrs();
-	      for (auto addr : instrPte)
-		dumpInitState("ipt", addr, addr);
-	      auto& dataPte = virtMem_.getDataPteAddrs();
-	      for (auto addr : dataPte)
-		dumpInitState("dpt", addr, addr);
+	      for (const auto& walk : virtMem_.getFetchWalks())
+		for (auto addr : walk)
+		  dumpInitState("ipt", addr, addr);
+	      for (const auto& walk : virtMem_.getDataWalks())
+		for (auto addr : walk)
+		  dumpInitState("dpt", addr, addr);
 	    }
 
 	  if (hasException_ or hasInterrupt_)
@@ -3897,6 +3903,7 @@ Hart<URV>::simpleRun()
   // For speed: do not record/clear CSR changes.
   csRegs_.enableRecordWrite(false);
   pmpManager_.enableTrace(false);
+  virtMem_.enableTrace(false);
 
   bool success = true;
 
@@ -3905,7 +3912,7 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim or bbFile_ or instrLineTrace_ or isRvs() or hasClint())
+          if (hasLim or bbFile_ or instrLineTrace_ or isRvs() or isRvu() or hasClint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -3928,6 +3935,7 @@ Hart<URV>::simpleRun()
 
   csRegs_.enableRecordWrite(true);
   pmpManager_.enableTrace(true);
+  virtMem_.enableTrace(true);
 
   if (bbFile_)
     dumpBasicBlocks();
@@ -4026,7 +4034,7 @@ bool
 Hart<URV>::simpleRunWithLimit()
 {
   uint64_t limit = instCountLim_;
-  bool checkInterrupt = isRvs() or hasClint();
+  bool checkInterrupt = isRvs() or isRvu() or hasClint();
   std::string instStr;
 
   while (noUserStop and instCounter_ < limit) 
@@ -9532,7 +9540,12 @@ Hart<URV>::execMret(const DecodedInst* di)
   MstatusFields<URV> fields(value);
   PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
   fields.bits_.MIE = fields.bits_.MPIE;
-  fields.bits_.MPP = unsigned(PrivilegeMode::User);
+  if (isRvu())
+    fields.bits_.MPP = unsigned(PrivilegeMode::User);
+  else if (isRvs())
+    fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
+  else
+    fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
   fields.bits_.MPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
@@ -9597,7 +9610,10 @@ Hart<URV>::execSret(const DecodedInst* di)
   PrivilegeMode savedMode = fields.bits_.SPP? PrivilegeMode::Supervisor :
     PrivilegeMode::User;
   fields.bits_.SIE = fields.bits_.SPIE;
-  fields.bits_.SPP = 0;
+  if (isRvu())
+    fields.bits_.SPP = 0; // User mode
+  else
+    fields.bits_.SPP = 1; // Supervisor mode
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
@@ -10806,29 +10822,6 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-}
-
-
-template <typename URV>
-inline
-void
-Hart<URV>::markVsDirty()
-{
-  if (mstatusVs_ == FpFs::Dirty)
-    return;
-
-  URV val = csRegs_.peekMstatus();
-  MstatusFields<URV> fields(val);
-  fields.bits_.VS = unsigned(FpFs::Dirty);
-  fields.bits_.SD = 1;
-
-  csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
-
-  URV newVal = csRegs_.peekMstatus();
-  if (val != newVal)
-    recordCsrWrite(CsrNumber::MSTATUS);
-
-  updateCachedMstatusFields();
 }
 
 
