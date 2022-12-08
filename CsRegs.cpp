@@ -398,20 +398,13 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
   else if (number == CsrNumber::MISA)
     value = legalizeMisa(value);
    
+  // Write cannot modify SD bit of msatus: poke it.
+  if (number == CsrNumber::MSTATUS)
+    csr->poke(value);
+  else
+    csr->write(value);
 
-  csr->write(value);
   recordWrite(number);
-
-  if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
-    {
-      // Write cannot change SD. Update it with a poke.
-      MstatusFields<URV> msf(peekMstatus());
-      if (msf.bits_.FS == unsigned(FpFs::Dirty) or msf.bits_.XS == unsigned(FpFs::Dirty))
-        msf.bits_.SD = 1;
-      else
-        msf.bits_.SD = 0;
-      csr->poke(msf.value_);
-    }
 
   // Cache interrupt enable.
   if (number == CsrNumber::MSTATUS)
