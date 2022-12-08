@@ -356,8 +356,9 @@ namespace WdRiscv
     /// Configure vector unit of this hart.
     void configVector(unsigned bytesPerVec, unsigned minBytesPerElem,
 		      unsigned maxBytesPerElem,
-                      std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul)
-    { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul); }
+                      std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul,
+		      std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
+    { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul, maxSewPerLmul); }
 
     /// Return currently configured element width
     ElementWidth elemWidth() const

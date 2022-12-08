@@ -500,7 +500,8 @@ namespace WdRiscv
     /// newly configured file are initlaized to zero.
     void config(uint32_t bytesPerReg, uint32_t minBytesPerElem,
 		uint32_t maxBytesPerElem,
-                std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul);
+                std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul,
+		std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul);
 
     void reset();
 

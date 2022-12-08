@@ -612,7 +612,7 @@ Hart<URV>::resetVector()
     {
       if (vecRegs_.registerCount() == 0)
 	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
-			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/);
+			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
       csRegs_.configCsr("vlenb", true, bytesPerReg, 0, 0, false, false);
     }

@@ -763,10 +763,17 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
           const unsigned min = it.value();
           if (not VecRegs::to_lmul(lmul, group))
             {
-              std::cerr << "Invalid lmul setting: " << lmul << '\n';
+              std::cerr << "Invalid lmul setting in min_slew_per_lmul: " << lmul << '\n';
               errors++;
               continue;
             }
+	  if (group > GroupMultiplier::Eight)
+	    {
+	      std::cerr << "Invalid lmul setting in min_slew_per_lmul: " << lmul
+			<< " (expecting non-fractional group)\n";
+	      errors++;
+	      continue;
+	    }
 
           if (min < bytesPerElem.at(0) or min > bytesPerElem.at(1))
             {
@@ -787,8 +794,57 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         }
     }
 
+  tag = "max_sew_per_lmul";
+  std::unordered_map<GroupMultiplier, unsigned> maxSewPerLmul;
+  if (vconf.count(tag))
+    {
+      auto& maxSewMap = vconf.at(tag);
+      if (not maxSewMap.is_object())
+        {
+          std::cerr << "Invalid " << tag << " entry in config file (expecting an object)\n";
+          return false;
+        }
+      for (auto it = maxSewMap.begin(); it != maxSewMap.end(); it++)
+        {
+          GroupMultiplier group;
+          const std::string& lmul = it.key();
+          const unsigned max = it.value();
+          if (not VecRegs::to_lmul(lmul, group))
+            {
+              std::cerr << "Invalid lmul setting in max_slew_per_lmul: " << lmul << '\n';
+              errors++;
+              continue;
+            }
+	  if (group < GroupMultiplier::Eighth)
+	    {
+	      std::cerr << "Invalid lmul setting in max_slew_per_lmul: " << lmul
+			<< " (expecting fractional group)\n";
+	      errors++;
+	      continue;
+	    }
+
+          if (max < bytesPerElem.at(0) or max > bytesPerElem.at(1))
+            {
+              std::cerr << "Error: Config file " << tag << " ("
+                        << max << ") must be less than specified max"
+                        << " and greater than specified min\n";
+              errors++;
+            }
+
+          if (not isPowerOf2(max))
+            {
+              std::cerr << "Error: config file " << tag << " ("
+                        << max << ") is not a power of 2\n";
+              errors++;
+            }
+
+          maxSewPerLmul[group] = max;
+        }
+    }
+
   if (errors == 0)
-    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minSewPerLmul);
+    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minSewPerLmul,
+		      &maxSewPerLmul);
 
   return errors == 0;
 }
