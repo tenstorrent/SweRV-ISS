@@ -1430,9 +1430,6 @@ InstTable::setupInstVec()
       { "mret", InstId::mret, 0x30200073, 0xffffffff,
 	RvExtension::I, RvFormat::I },
 
-      { "uret", InstId::uret, 0x00200073, 0xffffffff,
-	RvExtension::I, RvFormat::I },
-
       { "sret", InstId::sret, 0x10200073, 0xffffffff,
 	RvExtension::I, RvFormat::I },
 

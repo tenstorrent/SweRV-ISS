@@ -1445,8 +1445,7 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/,
-                             privMode_, isInterruptEnabled()))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -1519,8 +1518,7 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
     {
       TriggerTiming timing = TriggerTiming::Before;
       bool isLoad = true;
-      if (ldStDataTriggerHit(narrow, timing, isLoad, privMode_,
-			     isInterruptEnabled()))
+      if (ldStDataTriggerHit(narrow, timing, isLoad))
 	triggerTripped_ = true;
     }
   if (triggerTripped_)
@@ -1695,8 +1693,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
   bool isLd = false;  // Not a load.
-  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd, privMode_,
-                                     isInterruptEnabled()))
+  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd))
     triggerTripped_ = true;
 
   // Determine if a store exception is possible.
@@ -1708,8 +1705,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   // Consider store-data trigger if there is no trap or if the trap is
   // due to an external cause.
   if (hasTrig and cause == ExceptionCause::NONE)
-    if (ldStDataTriggerHit(storeVal, timing, isLd, privMode_,
-                           isInterruptEnabled()))
+    if (ldStDataTriggerHit(storeVal, timing, isLd))
       triggerTripped_ = true;
   if (triggerTripped_)
     return false;
@@ -3668,9 +3664,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
 {
   // Process pre-execute address trigger and fetch instruction.
   bool hasTrig = hasActiveInstTrigger();
-  triggerTripped_ = (hasTrig and
-                     instAddrTriggerHit(addr, TriggerTiming::Before,
-                                        privMode_, isInterruptEnabled()));
+  triggerTripped_ = hasTrig and instAddrTriggerHit(addr, TriggerTiming::Before);
   // Fetch instruction.
   bool fetchOk = true;
   if (triggerTripped_)
@@ -3704,9 +3698,7 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
     }
 
   // Process pre-execute opcode trigger.
-  if (hasTrig and instOpcodeTriggerHit(inst, TriggerTiming::Before,
-                                       privMode_,
-                                       isInterruptEnabled()))
+  if (hasTrig and instOpcodeTriggerHit(inst, TriggerTiming::Before))
     triggerTripped_ = true;
 
   return true;
@@ -3832,9 +3824,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    accumulateInstructionStats(*di);
 	  printDecodedInstTrace(*di, instCounter_, instStr, traceFile);
 
-	  bool icountHit = (enableTriggers_ and
-			    icountTriggerHit(privMode_, isInterruptEnabled()));
-	  if (icountHit)
+	  if (enableTriggers_ and icountTriggerHit())
 	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
 	      return true;
           prevPerfControl_ = perfControl_;
@@ -4430,9 +4420,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 	accumulateInstructionStats(di);
       printInstTrace(inst, instCounter_, instStr, traceFile);
 
-      bool icountHit = (enableTriggers_ and 
-			icountTriggerHit(privMode_, isInterruptEnabled()));
-      if (icountHit)
+      if (enableTriggers_ and icountTriggerHit())
 	{
 	  takeTriggerAction(traceFile, pc_, pc_, instCounter_, false);
 	  return;
@@ -4915,7 +4903,6 @@ Hart<URV>::execute(const DecodedInst* di)
      &&fcvt_h_l,
      &&fcvt_h_lu,
      &&mret,
-     &&uret,
      &&sret,
      &&wfi,
      &&dret,
@@ -6369,10 +6356,6 @@ Hart<URV>::execute(const DecodedInst* di)
 
  mret:
   execMret(di);
-  return;
-
- uret:
-  execUret(di);
   return;
 
  sret:
@@ -9627,58 +9610,6 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   // Update privilege mode.
   privMode_ = savedMode;
-}
-
-
-template <typename URV>
-void
-Hart<URV>::execUret(const DecodedInst* di)
-{
-  if (not isRvu())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  if (privMode_ != PrivilegeMode::User)
-    {
-      illegalInst(di);
-      return;
-    }
-
-  if (triggerTripped_)
-    return;
-
-  // Restore privilege mode and interrupt enable by getting
-  // current value of MSTATUS, ...
-  URV value = 0;
-  if (not csRegs_.read(CsrNumber::USTATUS, privMode_, value))
-    {
-      illegalInst(di);
-      return;
-    }
-
-  // ... updating/unpacking its fields,
-  MstatusFields<URV> fields(value);
-  fields.bits_.UIE = fields.bits_.UPIE;
-  fields.bits_.UPIE = 1;
-
-  // ... and putting it back
-  if (not csRegs_.write(CsrNumber::USTATUS, privMode_, fields.value_))
-    {
-      illegalInst(di);
-      return;
-    }
-  updateCachedMstatusFields();
-
-  // Restore program counter from UEPC.
-  URV epc;
-  if (not csRegs_.read(CsrNumber::UEPC, privMode_, epc))
-    {
-      illegalInst(di);
-      return;
-    }
-  setPc(epc);
 }
 
 

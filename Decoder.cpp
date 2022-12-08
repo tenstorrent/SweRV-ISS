@@ -2597,7 +2597,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  case 0:
 	    {
 	      uint32_t funct7 = op2 >> 5;
-	      if (funct7 == 0) // ecall ebreak uret
+	      if (funct7 == 0) // ecall ebreak 
 		{
 		  if (op1 != 0 or op0 != 0)
 		    return instTable_.getEntry(InstId::illegal);
@@ -2605,8 +2605,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		    return instTable_.getEntry(InstId::ecall);
 		  else if (op2 == 1)
 		    return instTable_.getEntry(InstId::ebreak);
-		  else if (op2 == 2)
-		    return instTable_.getEntry(InstId::uret);
 		  else if (op2 == 0x0d and op0 == 0 and op1 == 0)
 		    return instTable_.getEntry(InstId::wrs_nto);
 		  else if (op2 == 0x1d and op0 == 0 and op1 == 0)

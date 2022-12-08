@@ -242,7 +242,6 @@ namespace WdRiscv
 
      // Privileged
      mret,
-     uret,
      sret,
      wfi,
 

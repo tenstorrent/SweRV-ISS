@@ -71,8 +71,7 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/,
-			     privMode_, isInterruptEnabled()))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -126,8 +125,7 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
 
   if (hasActiveTrigger())
     {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/,
-			     privMode_, isInterruptEnabled()))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, false /*isLoad*/))
 	triggerTripped_ = true;
     }
 
@@ -173,8 +171,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   if (hasActiveTrigger())
     {
       bool isLd = true;
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, isLd,
-                             privMode_, isInterruptEnabled()))
+      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, isLd))
 	triggerTripped_ = true;
       if (triggerTripped_)
 	return false;
@@ -286,8 +283,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   TriggerTiming timing = TriggerTiming::Before;
   bool isLoad = false;
   if (hasTrig)
-    if (ldStAddrTriggerHit(virtAddr, timing, isLoad, privMode_,
-                           isInterruptEnabled()))
+    if (ldStAddrTriggerHit(virtAddr, timing, isLoad))
       triggerTripped_ = true;
 
   // Misaligned store causes an exception.
@@ -312,8 +308,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   // If no exception: consider store-data  trigger
   if (cause == ExceptionCause::NONE and hasTrig)
-    if (ldStDataTriggerHit(storeVal, timing, isLoad, privMode_,
-                           isInterruptEnabled()))
+    if (ldStDataTriggerHit(storeVal, timing, isLoad))
       triggerTripped_ = true;
   if (triggerTripped_)
     return false;
