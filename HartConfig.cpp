@@ -672,6 +672,7 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
 }
 
 
+// Maximum SEW per LMUL is allowed by the spec for m1, m2, m4, and m8.
 bool
 processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
 		     std::unordered_map<GroupMultiplier, unsigned>& sewPerLmul)
@@ -720,6 +721,7 @@ processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
   return true;
 }
 
+// Maximum SEW per LMUL is allowed by the spec for mf8, mf4, and mf2.
 bool
 processMaxSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
 		     std::unordered_map<GroupMultiplier, unsigned>& sewPerLmul)
