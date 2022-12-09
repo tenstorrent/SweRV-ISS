@@ -703,8 +703,8 @@ processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
       if (mewb < minBytes or mewb > maxBytes)
 	{
 	  std::cerr << "Error: Config file min_sew_per_lmul ("
-		    << mewb << ") must be less than specified max"
-		    << " and greater than specified min\n";
+		    << mewb << ") must be in the range [" << minBytes
+		    << "," << maxBytes << "]\n";
 	  return false;
 	}
 
@@ -752,8 +752,8 @@ processMaxSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
       if (mewb < minBytes or mewb > maxBytes)
 	{
 	  std::cerr << "Error: Config file max_sew_per_lmul ("
-		    << mewb << ") must be less than specified max"
-		    << " and greater than specified min\n";
+		    << mewb << ") must be in the range [" << minBytes
+		    << "," << maxBytes << "]\n";
 	  return false;
 	}
 

@@ -155,44 +155,32 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
           continue;
 	}
 
-      // By default, make illegal for LMUL < SEWmin/ELEN. Can be overwritten
-      // by user minimum SEW config for each LMUL setting.
-      if (minLmul > 0)
-      {
-        GroupMultiplier minLmulEnum;
-        assert(groupNumberX8ToSymbol(minLmul, minLmulEnum));
-        minLmulEnum = (minLmulEnum == GroupMultiplier::One) ? GroupMultiplier::Half :
-                                          static_cast<GroupMultiplier>(unsigned(minLmulEnum) - 1);
-        for (unsigned i = unsigned(minLmulEnum); i != unsigned(GroupMultiplier::Reserved);)
-          {
-            groupFlags[i] = false;
-            i = (i == unsigned(GroupMultiplier::One)) ? unsigned(GroupMultiplier::Half) : i - 1;
-          }
-      }
+      // Make current elem width illegal for LMUL < SEWmin/ELEN.
+      for (unsigned lmulx8 = 1; lmulx8 < minLmul; lmulx8 *= 2)
+	{
+	  GroupMultiplier group;
+	  if (not groupNumberX8ToSymbol(lmulx8, group))
+	    assert(0);
+	  groupFlags.at(size_t(group)) = false;
+	}
 
       // Allow user to set a greater minimum sew for an LMUL setting than minBytesPerElem
       if (minSewPerLmul)
-        {
-          for (auto it = minSewPerLmul->begin(); it != minSewPerLmul->end(); ++it)
-          for (auto const& [group, min] : *minSewPerLmul)
-            {
-              assert(min >= minBytesPerElem_ and min <= maxBytesPerElem_);
-              if (min > bytes)
-                groupFlags[size_t(group)] = false;
-            }
-        }
+	for (auto const& [group, min] : *minSewPerLmul)
+	  {
+	    assert(min >= minBytesPerElem_ and min <= maxBytesPerElem_);
+	    if (min > bytes)
+	      groupFlags.at(size_t(group)) = false;
+	  }
 
       // Allow user to set a smaller maximu sew for an LMUL setting tan maxBytesPerElem
       if (maxSewPerLmul)
-        {
-          for (auto it = maxSewPerLmul->begin(); it != maxSewPerLmul->end(); ++it)
-          for (auto const& [group, max] : *maxSewPerLmul)
-            {
-              assert(max >= minBytesPerElem_ and max <= maxBytesPerElem_);
-              if (max < bytes)
-                groupFlags[size_t(group)] = false;
-            }
-        }
+	for (auto const& [group, max] : *maxSewPerLmul)
+	  {
+	    assert(max >= minBytesPerElem_ and max <= maxBytesPerElem_);
+	    if (max < bytes)
+	      groupFlags.at(size_t(group)) = false;
+	  }
     }
 
 
