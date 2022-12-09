@@ -55,7 +55,9 @@ VecRegs::~VecRegs()
 
 void
 VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
-		unsigned maxBytesPerElem, std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul)
+		unsigned maxBytesPerElem,
+		std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul,
+		std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
 {
   if (bytesPerReg > 4096)
     {
@@ -176,6 +178,18 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
             {
               assert(min >= minBytesPerElem_ and min <= maxBytesPerElem_);
               if (min > bytes)
+                groupFlags[size_t(group)] = false;
+            }
+        }
+
+      // Allow user to set a smaller maximu sew for an LMUL setting tan maxBytesPerElem
+      if (maxSewPerLmul)
+        {
+          for (auto it = maxSewPerLmul->begin(); it != maxSewPerLmul->end(); ++it)
+          for (auto const& [group, max] : *maxSewPerLmul)
+            {
+              assert(max >= minBytesPerElem_ and max <= maxBytesPerElem_);
+              if (max < bytes)
                 groupFlags[size_t(group)] = false;
             }
         }

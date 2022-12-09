@@ -33,6 +33,7 @@ CsRegs<URV>::CsRegs()
   defineSupervisorRegs();
   defineUserRegs();
   defineHypervisorRegs();
+  defineVirtualSupervisorRegs();
   defineDebugRegs();
   defineVectorRegs();
   defineFpRegs();
@@ -174,11 +175,10 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 {
   supervisorModeEnabled_ = flag;
 
-  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SEDELEG, CsrNumber::SIDELEG,
-                      CsrNumber::STVEC, CsrNumber::SIE, CsrNumber::STVEC,
-                      CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
-                      CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
-                      CsrNumber::SATP, CsrNumber::MEDELEG, CsrNumber::MIDELEG } )
+  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
+		     CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
+		     CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
+		     CsrNumber::SATP, CsrNumber::MEDELEG, CsrNumber::MIDELEG } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -398,20 +398,13 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
   else if (number == CsrNumber::MISA)
     value = legalizeMisa(value);
    
+  // Write cannot modify SD bit of msatus: poke it.
+  if (number == CsrNumber::MSTATUS)
+    csr->poke(value);
+  else
+    csr->write(value);
 
-  csr->write(value);
   recordWrite(number);
-
-  if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
-    {
-      // Write cannot change SD. Update it with a poke.
-      MstatusFields<URV> msf(peekMstatus());
-      if (msf.bits_.FS == unsigned(FpFs::Dirty) or msf.bits_.XS == unsigned(FpFs::Dirty))
-        msf.bits_.SD = 1;
-      else
-        msf.bits_.SD = 0;
-      csr->poke(msf.value_);
-    }
 
   // Cache interrupt enable.
   if (number == CsrNumber::MSTATUS)
@@ -1168,9 +1161,6 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sstatus and mstatus)
     sstatus->tie(mstatus->valuePtr_);
 
-  defineCsr("sedeleg",    Csrn::SEDELEG,    !mand, !imp, 0, wam, wam);
-  defineCsr("sideleg",    Csrn::SIDELEG,    !mand, !imp, 0, wam, wam);
-
   defineCsr("stvec",      Csrn::STVEC,      !mand, !imp, 0, wam, wam);
   defineCsr("scounteren", Csrn::SCOUNTEREN, !mand, !imp, 0, wam, wam);
 
@@ -1283,6 +1273,28 @@ CsRegs<URV>::defineHypervisorRegs()
   // This may be already defined with trigger CSRs.
   if (not nameToNumber_.count("hcontext"))
     defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineVirtualSupervisorRegs()
+{
+  bool mand = true;    // Mandatory.
+  bool imp  = true;    // Implemented.
+  URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
+
+  using Csrn = CsrNumber;
+
+  defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, 0, wam, wam);
+  defineCsr("vsie",        Csrn::VSIE,        !mand, !imp, 0, wam, wam);
+  defineCsr("vstvec",      Csrn::VSTVEC,      !mand, !imp, 0, wam, wam);
+  defineCsr("vssratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
+  defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, wam, wam);
+  defineCsr("vscause",     Csrn::VSCAUSE,     !mand, !imp, 0, wam, wam);
+  defineCsr("vstval",      Csrn::VSTVAL,      !mand, !imp, 0, wam, wam);
+  defineCsr("vsip",        Csrn::VSIP,        !mand, !imp, 0, wam, wam);
+  defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
 }
 
 
