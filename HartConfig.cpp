@@ -672,6 +672,102 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
 }
 
 
+bool
+processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
+		     std::unordered_map<GroupMultiplier, unsigned>& sewPerLmul)
+{
+  if (not jsonMap.is_object())
+    {
+      std::cerr << "Invalid min_sew_per_lmul entry in config file (expecting an object)\n";
+      return false;
+    }
+
+  for (auto it = jsonMap.begin(); it != jsonMap.end(); it++)
+    {
+      GroupMultiplier group;
+      const std::string& lmul = it.key();
+      const unsigned mewb = it.value();  // min element width in bytes
+      if (not VecRegs::to_lmul(lmul, group))
+	{
+	  std::cerr << "Invalid lmul setting in min_sew_per_lmul: " << lmul << '\n';
+	  return false;
+	}
+      if (group > GroupMultiplier::Eight)
+	{
+	  std::cerr << "Invalid lmul setting in min_sew_per_lmul: " << lmul
+		    << " (expecting non-fractional group)\n";
+	  return false;
+	}
+
+      if (mewb < minBytes or mewb > maxBytes)
+	{
+	  std::cerr << "Error: Config file min_sew_per_lmul ("
+		    << mewb << ") must be less than specified max"
+		    << " and greater than specified min\n";
+	  return false;
+	}
+
+      if (not isPowerOf2(mewb))
+	{
+	  std::cerr << "Error: config file min_sew_per_lmul ("
+		    << mewb << ") is not a power of 2\n";
+	  return false;
+	}
+
+      sewPerLmul[group] = mewb;
+    }
+
+  return true;
+}
+
+bool
+processMaxSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
+		     std::unordered_map<GroupMultiplier, unsigned>& sewPerLmul)
+{
+  if (not jsonMap.is_object())
+    {
+      std::cerr << "Invalid max_sew_per_lmul tag in config file (expecting an object)\n";
+      return false;
+    }
+
+  for (auto it = jsonMap.begin(); it != jsonMap.end(); it++)
+    {
+      GroupMultiplier group;
+      const std::string& lmul = it.key();
+      const unsigned mewb = it.value();  // max element width in bytes
+      if (not VecRegs::to_lmul(lmul, group))
+	{
+	  std::cerr << "Invalid lmul setting in max_sew_per_lmul: " << lmul << '\n';
+	  return false;
+	}
+      if (group < GroupMultiplier::Eighth)
+	{
+	  std::cerr << "Invalid lmul setting in max_sew_per_lmul: " << lmul
+		    << " (expecting fractional group)\n";
+	  return false;
+	}
+
+      if (mewb < minBytes or mewb > maxBytes)
+	{
+	  std::cerr << "Error: Config file max_sew_per_lmul ("
+		    << mewb << ") must be less than specified max"
+		    << " and greater than specified min\n";
+	  return false;
+	}
+
+      if (not isPowerOf2(mewb))
+	{
+	  std::cerr << "Error: config file max_sew_per_lmul  ("
+		    << mewb << ") is not a power of 2\n";
+	  return false;
+	}
+
+      sewPerLmul[group] = mewb;
+    }
+  return true;
+}
+
+
 template <typename URV>
 static
 bool
@@ -750,96 +846,18 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
   std::unordered_map<GroupMultiplier, unsigned> minSewPerLmul;
   if (vconf.count(tag))
     {
-      auto& minSewMap = vconf.at(tag);
-      if (not minSewMap.is_object())
-        {
-          std::cerr << "Invalid " << tag << " entry in config file (expecting an object)\n";
-          return false;
-        }
-      for (auto it = minSewMap.begin(); it != minSewMap.end(); it++)
-        {
-          GroupMultiplier group;
-          const std::string& lmul = it.key();
-          const unsigned min = it.value();
-          if (not VecRegs::to_lmul(lmul, group))
-            {
-              std::cerr << "Invalid lmul setting in min_slew_per_lmul: " << lmul << '\n';
-              errors++;
-              continue;
-            }
-	  if (group > GroupMultiplier::Eight)
-	    {
-	      std::cerr << "Invalid lmul setting in min_slew_per_lmul: " << lmul
-			<< " (expecting non-fractional group)\n";
-	      errors++;
-	      continue;
-	    }
-
-          if (min < bytesPerElem.at(0) or min > bytesPerElem.at(1))
-            {
-              std::cerr << "Error: Config file " << tag << " ("
-                        << min << ") must be less than specified max"
-                        << " and greater than specified min\n";
-              errors++;
-            }
-
-          if (not isPowerOf2(min))
-            {
-              std::cerr << "Error: config file " << tag << " ("
-                        << min << ") is not a power of 2\n";
-              errors++;
-            }
-
-          minSewPerLmul[group] = min;
-        }
+      if (not processMinSewPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				   minSewPerLmul))
+	errors++;
     }
 
   tag = "max_sew_per_lmul";
   std::unordered_map<GroupMultiplier, unsigned> maxSewPerLmul;
   if (vconf.count(tag))
     {
-      auto& maxSewMap = vconf.at(tag);
-      if (not maxSewMap.is_object())
-        {
-          std::cerr << "Invalid " << tag << " entry in config file (expecting an object)\n";
-          return false;
-        }
-      for (auto it = maxSewMap.begin(); it != maxSewMap.end(); it++)
-        {
-          GroupMultiplier group;
-          const std::string& lmul = it.key();
-          const unsigned max = it.value();
-          if (not VecRegs::to_lmul(lmul, group))
-            {
-              std::cerr << "Invalid lmul setting in max_slew_per_lmul: " << lmul << '\n';
-              errors++;
-              continue;
-            }
-	  if (group < GroupMultiplier::Eighth)
-	    {
-	      std::cerr << "Invalid lmul setting in max_slew_per_lmul: " << lmul
-			<< " (expecting fractional group)\n";
-	      errors++;
-	      continue;
-	    }
-
-          if (max < bytesPerElem.at(0) or max > bytesPerElem.at(1))
-            {
-              std::cerr << "Error: Config file " << tag << " ("
-                        << max << ") must be less than specified max"
-                        << " and greater than specified min\n";
-              errors++;
-            }
-
-          if (not isPowerOf2(max))
-            {
-              std::cerr << "Error: config file " << tag << " ("
-                        << max << ") is not a power of 2\n";
-              errors++;
-            }
-
-          maxSewPerLmul[group] = max;
-        }
+      if (not processMaxSewPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				   maxSewPerLmul))
+	errors++;
     }
 
   if (errors == 0)
