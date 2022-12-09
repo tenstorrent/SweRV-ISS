@@ -672,14 +672,14 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
 }
 
 
-// Maximum SEW per LMUL is allowed by the spec for m1, m2, m4, and m8.
+// Min SEW per LMUL is allowed by the spec for m1, m2, m4, and m8.
 bool
-processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
-		     std::unordered_map<GroupMultiplier, unsigned>& sewPerLmul)
+processMinByesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
+		      std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
 {
   if (not jsonMap.is_object())
     {
-      std::cerr << "Invalid min_sew_per_lmul entry in config file (expecting an object)\n";
+      std::cerr << "Invalid min_bytes_per_lmul entry in config file (expecting an object)\n";
       return false;
     }
 
@@ -690,19 +690,19 @@ processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
       const unsigned mewb = it.value();  // min element width in bytes
       if (not VecRegs::to_lmul(lmul, group))
 	{
-	  std::cerr << "Invalid lmul setting in min_sew_per_lmul: " << lmul << '\n';
+	  std::cerr << "Invalid lmul setting in min_bytes_per_lmul: " << lmul << '\n';
 	  return false;
 	}
       if (group > GroupMultiplier::Eight)
 	{
-	  std::cerr << "Invalid lmul setting in min_sew_per_lmul: " << lmul
+	  std::cerr << "Invalid lmul setting in min_bytes_per_lmul: " << lmul
 		    << " (expecting non-fractional group)\n";
 	  return false;
 	}
 
       if (mewb < minBytes or mewb > maxBytes)
 	{
-	  std::cerr << "Error: Config file min_sew_per_lmul ("
+	  std::cerr << "Error: Config file min_bytes_per_lmul ("
 		    << mewb << ") must be in the range [" << minBytes
 		    << "," << maxBytes << "]\n";
 	  return false;
@@ -710,12 +710,12 @@ processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
 
       if (not isPowerOf2(mewb))
 	{
-	  std::cerr << "Error: config file min_sew_per_lmul ("
+	  std::cerr << "Error: config file min_bytes_per_lmul ("
 		    << mewb << ") is not a power of 2\n";
 	  return false;
 	}
 
-      sewPerLmul[group] = mewb;
+      bytesPerLmul[group] = mewb;
     }
 
   return true;
@@ -723,12 +723,12 @@ processMinSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
 
 // Maximum SEW per LMUL is allowed by the spec for mf8, mf4, and mf2.
 bool
-processMaxSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
-		     std::unordered_map<GroupMultiplier, unsigned>& sewPerLmul)
+processMaxBytesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
+		     std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
 {
   if (not jsonMap.is_object())
     {
-      std::cerr << "Invalid max_sew_per_lmul tag in config file (expecting an object)\n";
+      std::cerr << "Invalid max_bytes_per_lmul tag in config file (expecting an object)\n";
       return false;
     }
 
@@ -739,19 +739,19 @@ processMaxSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
       const unsigned mewb = it.value();  // max element width in bytes
       if (not VecRegs::to_lmul(lmul, group))
 	{
-	  std::cerr << "Invalid lmul setting in max_sew_per_lmul: " << lmul << '\n';
+	  std::cerr << "Invalid lmul setting in max_bytes_per_lmul: " << lmul << '\n';
 	  return false;
 	}
       if (group < GroupMultiplier::Eighth)
 	{
-	  std::cerr << "Invalid lmul setting in max_sew_per_lmul: " << lmul
+	  std::cerr << "Invalid lmul setting in max_bytes_per_lmul: " << lmul
 		    << " (expecting fractional group)\n";
 	  return false;
 	}
 
       if (mewb < minBytes or mewb > maxBytes)
 	{
-	  std::cerr << "Error: Config file max_sew_per_lmul ("
+	  std::cerr << "Error: Config file max_bytes_per_lmul ("
 		    << mewb << ") must be in the range [" << minBytes
 		    << "," << maxBytes << "]\n";
 	  return false;
@@ -759,12 +759,12 @@ processMaxSewPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned 
 
       if (not isPowerOf2(mewb))
 	{
-	  std::cerr << "Error: config file max_sew_per_lmul  ("
+	  std::cerr << "Error: config file max_bytes_per_lmul  ("
 		    << mewb << ") is not a power of 2\n";
 	  return false;
 	}
 
-      sewPerLmul[group] = mewb;
+      bytesPerLmul[group] = mewb;
     }
   return true;
 }
@@ -844,27 +844,45 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         }
     }
 
+  std::unordered_map<GroupMultiplier, unsigned> minBytesPerLmul;
   tag = "min_sew_per_lmul";
-  std::unordered_map<GroupMultiplier, unsigned> minSewPerLmul;
   if (vconf.count(tag))
     {
-      if (not processMinSewPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
-				   minSewPerLmul))
+      std::cerr << "Tag min_sew_per_lmul is deprecated: Use min_bytes_per_lmul\n";
+      if (not processMinByesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				   minBytesPerLmul))
 	errors++;
     }
 
-  tag = "max_sew_per_lmul";
-  std::unordered_map<GroupMultiplier, unsigned> maxSewPerLmul;
+  tag = "min_bytes_per_lmul";
   if (vconf.count(tag))
     {
-      if (not processMaxSewPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
-				   maxSewPerLmul))
+      if (not processMinByesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				   minBytesPerLmul))
+	errors++;
+    }
+
+  std::unordered_map<GroupMultiplier, unsigned> maxBytesPerLmul;
+  tag = "max_sew_per_lmul";
+  if (vconf.count(tag))
+    {
+      std::cerr << "Tag max_sew_per_lmul is deprecated: Use max_bytes_per_lmul\n";
+      if (not processMaxBytesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				     maxBytesPerLmul))
+	errors++;
+    }
+
+  tag = "max_bytes_per_lmul";
+  if (vconf.count(tag))
+    {
+      if (not processMaxBytesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				     maxBytesPerLmul))
 	errors++;
     }
 
   if (errors == 0)
-    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minSewPerLmul,
-		      &maxSewPerLmul);
+    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
+		      &maxBytesPerLmul);
 
   return errors == 0;
 }
