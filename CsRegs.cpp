@@ -1040,9 +1040,9 @@ CsRegs<URV>::defineMachineRegs()
       defineCsr(name, num,  !mand, imp, 0, pmpMask, pmpMask);
     }
 
-  defineCsr("menvcfg", Csrn::MENVCFG, mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
+  defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
   if (rv32_)
-    defineCsr("menvcfgh", Csrn::MENVCFGH, mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
+    defineCsr("menvcfgh", Csrn::MENVCFGH, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
 
   // Machine Counter/Timers.
   defineCsr("mcycle",    Csrn::MCYCLE,    mand, imp, 0, wam, wam);
