@@ -1356,7 +1356,7 @@ namespace WdRiscv
       unsigned SXL      : 2;
       unsigned SBE      : 1;
       unsigned MBE      : 1;
-      unsigned GBA      : 1;
+      unsigned GVA      : 1;
       unsigned MPV      : 1;
       unsigned res2     : 23;  // Reserved
       unsigned SD       : 1;
