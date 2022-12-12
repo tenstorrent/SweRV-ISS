@@ -469,6 +469,15 @@ namespace WdRiscv
     bool isMandatory() const
     { return mandatory_; }
 
+    /// Return true if this is a virtual supervisor register.
+    bool isVirtual() const
+    { return virtual_; }
+
+    /// Return true if this is a supervisor register that maps to a
+    /// virtual supervisor register (e.g. sstatus maps to vsstatus).
+    bool mapsToVirtual() const
+    { return mapsToVirtual_; }
+
     /// Return true if this register has been marked as a debug-mode
     /// register.
     bool isDebug() const
@@ -603,6 +612,12 @@ namespace WdRiscv
     void setDefined(bool flag)
     { defined_ = flag; }
 
+    void setVirtual(bool flag)
+    { virtual_ = flag; }
+
+    void setMapsToVirtual(bool flag)
+    { mapsToVirtual_ = flag; }
+
     bool isDefined() const
     { return defined_; }
 
@@ -671,6 +686,8 @@ namespace WdRiscv
     unsigned number_ = 0;
     bool mandatory_ = false;   // True if mandated by architecture.
     bool implemented_ = false; // True if register is implemented.
+    bool virtual_ = false;     // True for virtual supervisor CSR.
+    bool mapsToVirtual_ = false; // True if CSR maps to a virtual supervisor CSR.
     bool defined_ = false;
     bool debug_ = false;       // True if this is a debug-mode register.
     bool shared_ = false;      // True if this is shared among harts.
@@ -770,6 +787,14 @@ namespace WdRiscv
       const Csr<URV>* csr = &regs_.at(ix);
       return csr->isImplemented() ? csr : nullptr;
     }
+
+    /// Similar to getImplementedCsr except that whn virtaulMode is true:
+    // 1. Supervisor CSRs are remapped to the virtual supervisor counterparts.
+    // 2. Virtual supervisor CSRs are not available.
+    Csr<URV>* getImplementedCsr(CsrNumber num, bool virtualMode);
+
+    /// Const version.
+    const Csr<URV>* getImplementedCsr(CsrNumber num, bool virtualMode) const;
 
     /// Enable/disable load-data debug triggerring (disabled by default).
     void configLoadDataTrigger(bool flag)
@@ -1201,6 +1226,11 @@ namespace WdRiscv
 
     /// Enable supervisor mode.
     void enableVectorMode(bool flag);
+
+    /// Enable/disable virtual supervisor. When enabled, the trap-related
+    /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
+    /// actually read/write vsstatus).
+    void enableVirtualSupervisor(bool flag);
 
     /// Return a legal mstatus value (chanign mpp if necessary).
     URV legalizeMstatusValue(URV value) const;
