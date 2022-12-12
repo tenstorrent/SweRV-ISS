@@ -1211,13 +1211,6 @@ CsRegs<URV>::defineUserRegs()
   defineCsr("uie",      Csrn::UIE,      !mand, !imp, 0, wam, wam);
   defineCsr("utvec",    Csrn::UTVEC,    !mand, !imp, 0, wam, wam);
 
-  // User Trap Handling
-  defineCsr("uscratch", Csrn::USCRATCH, !mand, !imp, 0, wam, wam);
-  defineCsr("uepc",     Csrn::UEPC,     !mand, !imp, 0, wam, wam);
-  defineCsr("ucause",   Csrn::UCAUSE,   !mand, !imp, 0, wam, wam);
-  defineCsr("utval",    Csrn::UTVAL,    !mand, !imp, 0, wam, wam);
-  defineCsr("uip",      Csrn::UIP,      !mand, !imp, 0, wam, wam);
-
   // User Counter/Timers
   defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
   defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);

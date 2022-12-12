@@ -2182,13 +2182,6 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       tvalNum = CsrNumber::STVAL;
       tvecNum = CsrNumber::STVEC;
     }
-  else if (nextMode == PrivilegeMode::User)
-    {
-      epcNum = CsrNumber::UEPC;
-      causeNum = CsrNumber::UCAUSE;
-      tvalNum = CsrNumber::UTVAL;
-      tvecNum = CsrNumber::UTVEC;
-    }
 
   // Save address of instruction that caused the exception or address
   // of interrupted instruction.

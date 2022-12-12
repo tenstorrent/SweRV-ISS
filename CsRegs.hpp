@@ -296,13 +296,6 @@ namespace WdRiscv
       UIE = 0x004,
       UTVEC = 0x005,
 
-      // User Trap Handling
-      USCRATCH = 0x040,
-      UEPC = 0x041,
-      UCAUSE = 0x042,
-      UTVAL = 0x043,
-      UIP = 0x044,
-
       // User Floating-Point CSRs
       FFLAGS = 0x001,
       FRM = 0x002,
