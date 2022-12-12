@@ -635,7 +635,7 @@ Hart<URV>::resetVector()
     {
       URV val = csRegs_.peekMstatus();
       MstatusFields<URV> fields(val);
-      fields.bits_.VS = unsigned(FpFs::Initial);
+      fields.bits_.VS = unsigned(VecVs::Initial);
       csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, fields.value_);
     }
 }

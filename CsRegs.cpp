@@ -310,7 +310,7 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
   PrivilegeMode mode = PrivilegeMode(fields.bits_.MPP);
 
   if (fields.bits_.FS == unsigned(FpFs::Dirty) or fields.bits_.XS == unsigned(FpFs::Dirty) or
-      fields.bits_.VS == unsigned(FpFs::Dirty))
+      fields.bits_.VS == unsigned(VecVs::Dirty))
     fields.bits_.SD = 1;
   else
     fields.bits_.SD = 0;

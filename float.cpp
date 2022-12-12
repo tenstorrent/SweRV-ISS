@@ -35,7 +35,7 @@ Hart<URV>::enableRvf(bool flag)
   rvf_ = flag;
   csRegs_.enableRvf(flag);
   if (not flag)
-    setMstatusFs(FpFs::Off);
+    setMstatusFs(VecVs::Off);
 }
 
 

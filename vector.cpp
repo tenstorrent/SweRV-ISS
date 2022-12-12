@@ -443,7 +443,7 @@ Hart<URV>::enableVectorMode(bool flag)
   csRegs_.enableVectorMode(flag);
 
   if (not flag)
-    setMstatusVs(FpFs::Off);
+    setMstatusVs(VecVs::Off);
 }
 
 

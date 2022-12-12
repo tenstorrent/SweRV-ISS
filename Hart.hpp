@@ -1507,7 +1507,7 @@ namespace WdRiscv
     { return FpFs{mstatus_.bits_.FS}; }
 
     // Retun cached value of the vs field of the mstatus CSR.
-    FpFs mstatusVs() const
+    VecVs mstatusVs() const
     { return FpFs{mstatus_.bits_.VS}; }
 
     // Retun cached value of the mprv field of the mstatus CSR.
@@ -1667,14 +1667,14 @@ namespace WdRiscv
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
-    { return mstatusVs() != FpFs::Off; }
+    { return mstatusVs() != VecVs::Off; }
 
     // Set the VS field of mstatus to the given value.
-    void setMstatusVs(FpFs value);
+    void setMstatusVs(VecVs value);
 
     // Mark VS field of mstatus as dirty.
     void markVsDirty()
-    { setMstatusVs(FpFs::Dirty); }
+    { setMstatusVs(VecVs::Dirty); }
 
     // Return true if it is legal to execute a vector instruction: V
     // extension must be enabled and VS feild of MSTATUS must not be
@@ -1687,7 +1687,7 @@ namespace WdRiscv
     bool checkVecExec()
     {
       if (not isVecLegal()) return false;
-      if (mstatusVs() != FpFs::Dirty) markVsDirty();
+      if (mstatusVs() != VecVs::Dirty) markVsDirty();
       return true;
     }
 

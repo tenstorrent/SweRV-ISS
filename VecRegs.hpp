@@ -20,9 +20,13 @@
 #include <unordered_map>
 #include <string>
 #include <cassert>
+#include "FpRegs.hpp"
 
 namespace WdRiscv
 {
+
+  /// Values of VS field in mstatus.
+  typedef FpFs VecVs;
 
   enum class GroupMultiplier : uint32_t
     {
