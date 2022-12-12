@@ -2235,9 +2235,9 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
     assert(0 and "Failed to read TVEC register");
 
   URV base = (tvec >> 2) << 2;  // Clear least sig 2 bits.
-  tvecMode_ = TrapVectorMode(tvec & 0x3);
+  auto tvecMode = TrapVectorMode(tvec & 0x3);
 
-  if (tvecMode_ == TrapVectorMode::Vectored and interrupt)
+  if (tvecMode == TrapVectorMode::Vectored and interrupt)
     base = base + 4*cause;
 
   setPc(base);
