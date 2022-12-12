@@ -646,14 +646,10 @@ void
 Hart<URV>::updateCachedMstatusFields()
 {
   URV csrVal = csRegs_.peekMstatus();
-  MstatusFields<URV> msf(csrVal);
-  mstatusMpp_ = PrivilegeMode(msf.bits_.MPP);
-  mstatusMprv_ = msf.bits_.MPRV;
-  mstatusFs_ = FpFs(msf.bits_.FS);
-  mstatusVs_ = FpFs(msf.bits_.VS);
+  mstatus_.value_ = csrVal;
 
-  virtMem_.setExecReadable(msf.bits_.MXR);
-  virtMem_.setSupervisorAccessUser(msf.bits_.SUM);
+  virtMem_.setExecReadable(mstatus_.bits_.MXR);
+  virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
 }
 
 
@@ -1317,7 +1313,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
+      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
@@ -1330,7 +1326,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(addr1);
-      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+      if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
 	  return ExceptionCause::LOAD_ACC_FAULT;
@@ -1340,7 +1336,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
 	  pmp = pmpManager_.accessPmp(next);
-	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+	  if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
 	      return ExceptionCause::LOAD_ACC_FAULT;
@@ -1964,7 +1960,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       if (pmpEnabled_)
         {
           Pmp pmp = pmpManager_.accessPmp(physAddr);
-          if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
+          if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
             {
               if (triggerTripped_)
                 return false;
@@ -1991,7 +1987,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr);
-      if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
+      if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
         {
           if (triggerTripped_)
             return false;
@@ -2031,7 +2027,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr2);
-      if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
+      if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
         {
           if (triggerTripped_)
             return false;
@@ -10022,7 +10018,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
+      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
           auto cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
@@ -10035,7 +10031,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(addr1);
-      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
+      if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
 	  return ExceptionCause::STORE_ACC_FAULT;
@@ -10045,7 +10041,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
   	  pmp = pmpManager_.accessPmp(next);
-	  if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
+	  if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
 	      return ExceptionCause::LOAD_ACC_FAULT;

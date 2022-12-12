@@ -264,7 +264,7 @@ inline
 void
 Hart<URV>::setMstatusFs(FpFs value)
 {
-  if (mstatusFs_ == value)
+  if (mstatusFs() == value)
     return;
 
   URV val = csRegs_.peekMstatus();

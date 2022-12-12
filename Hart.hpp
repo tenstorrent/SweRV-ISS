@@ -1498,6 +1498,22 @@ namespace WdRiscv
 
   protected:
 
+    // Retun cached value of the mpp field of the mstatus CSR.
+    PrivilegeMode mstatusMpp() const
+    { return PrivilegeMode{mstatus_.bits_.MPP}; }
+
+    // Retun cached value of the fs field of the mstatus CSR.
+    FpFs mstatusFs() const
+    { return FpFs{mstatus_.bits_.FS}; }
+
+    // Retun cached value of the vs field of the mstatus CSR.
+    FpFs mstatusVs() const
+    { return FpFs{mstatus_.bits_.VS}; }
+
+    // Retun cached value of the mprv field of the mstatus CSR.
+    bool mstatusMprv() const
+    { return mstatus_.bits_.MPRV; }
+
     /// Read an item that may span 2 physical pages. If pa1 is the
     /// same as pa2 then the item is in one page: do a simple read. If
     /// pa1 is different from pa2, then the item crosses a page
@@ -1617,7 +1633,7 @@ namespace WdRiscv
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
-    { return mstatusFs_ != FpFs::Off; }
+    { return mstatusFs() != FpFs::Off; }
 
     // Return true if it is legal to execute a zfh instruction: f and zfh
     // extensions must be enabled and FS feild of MSTATUS must not be
@@ -1651,7 +1667,7 @@ namespace WdRiscv
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
-    { return mstatusVs_ != FpFs::Off; }
+    { return mstatusVs() != FpFs::Off; }
 
     // Set the VS field of mstatus to the given value.
     void setMstatusVs(FpFs value);
@@ -1671,7 +1687,7 @@ namespace WdRiscv
     bool checkVecExec()
     {
       if (not isVecLegal()) return false;
-      if (mstatusVs_ != FpFs::Dirty) markVsDirty();
+      if (mstatusVs() != FpFs::Dirty) markVsDirty();
       return true;
     }
 
@@ -4194,15 +4210,11 @@ namespace WdRiscv
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
-
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
-    PrivilegeMode mstatusMpp_ = PrivilegeMode::Machine; // Cached mstatus.mpp.
-    bool mstatusMprv_ = false;                          // Cached mstatus.mprv.
-    FpFs mstatusFs_ = FpFs::Off;                        // Cahced mstatus.fs.
+
+    MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
 
     bool clearMprvOnRet_ = true;
-
-    FpFs mstatusVs_ = FpFs::Off;
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 
