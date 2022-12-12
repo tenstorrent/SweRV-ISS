@@ -443,14 +443,14 @@ Hart<URV>::enableVectorMode(bool flag)
   csRegs_.enableVectorMode(flag);
 
   if (not flag)
-    setMstatusVs(VecVs::Off);
+    setVecStatus(VecVs::Off);
 }
 
 
 template <typename URV>
 inline
 void
-Hart<URV>::setMstatusVs(FpFs value)
+Hart<URV>::setVecStatus(FpFs value)
 {
   if (mstatusVs() == value)
     return;

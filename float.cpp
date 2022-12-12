@@ -35,7 +35,7 @@ Hart<URV>::enableRvf(bool flag)
   rvf_ = flag;
   csRegs_.enableRvf(flag);
   if (not flag)
-    setMstatusFs(VecVs::Off);
+    setFpStatus(VecVs::Off);
 }
 
 
@@ -262,7 +262,7 @@ Hart<URV>::updateAccruedFpBits(double res, bool invalid)
 template <typename URV>
 inline
 void
-Hart<URV>::setMstatusFs(FpFs value)
+Hart<URV>::setFpStatus(FpFs value)
 {
   if (mstatusFs() == value)
     return;

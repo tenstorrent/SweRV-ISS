@@ -1659,22 +1659,22 @@ namespace WdRiscv
     { return isRvd() and isFpEnabled(); }
 
     // Set the FS field of mstatus to the given value.
-    void setMstatusFs(FpFs value);
+    void setFpStatus(FpFs value);
 
     // Mark FS field of mstatus as dirty.
     void markFsDirty()
-    { setMstatusFs(FpFs::Dirty); }
+    { setFpStatus(FpFs::Dirty); }
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
     { return mstatusVs() != VecVs::Off; }
 
     // Set the VS field of mstatus to the given value.
-    void setMstatusVs(VecVs value);
+    void setVecStatus(VecVs value);
 
     // Mark VS field of mstatus as dirty.
     void markVsDirty()
-    { setMstatusVs(VecVs::Dirty); }
+    { setVecStatus(VecVs::Dirty); }
 
     // Return true if it is legal to execute a vector instruction: V
     // extension must be enabled and VS feild of MSTATUS must not be
