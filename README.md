@@ -579,17 +579,19 @@ Enable support for debug triggers.
 # Memory Consistency Checks
 
 When run in server or interactive modes, Whisper will check the RISCV
-weak memory ordering rules (also known as preserved program order
-rules). This feature is enabled by setting the
+weak memory ordering rules also known as preserved program order (PPO)
+rules. This feature is enabled by setting the
 "enable_memory_consitency" to "true" in the configuration file or by
-using "--mcm" on the command line. Whisper expects to be notified
-about read and write operations and it expects such operations to be
-associated with time stamps. Each memory instruction (load/store/amo)
-is associated with one or more memory read/write operation. A memory
-operation may occur before/after the corresponding instruction is
-retired. Memory operations from two different instructions may occur
-in a global memory order that is different than the program order of
-those instructions.
+using "--mcm" on the command line. Detailed inforation about the PPO
+rules can be found in chapter 17 of the the [RISCV unprivileged specs.](https://github.com/riscv/riscv-isa-manual/releases/download/draft-20221206-b7080e0/riscv-spec.pdf)
+
+Whisper expects to be notified about read and write operations and it
+expects such operations to be associated with time stamps. Each memory
+instruction (load/store/amo) is associated with one or more memory
+read/write operation. A memory operation may occur before/after the
+corresponding instruction is retired. Memory operations from two
+different instructions may occur in a global memory order that is
+different than the program order of those instructions.
 
 A read operation has an instruction tag, an address, a size, a data
 value, and an indication of whether or not the data was forwarded from
@@ -615,10 +617,10 @@ system. The interactive command for a merge buffer write is:
 
 Similarly, we provide server mode commands that allows a client
 (typically test bench code running in a verilog simulator) to provide
-whisper information about the time, size, instruction tag and data of
-read/write operations associated with load/store/amo instructions. We use
-such information to check the preserved program order (ppo) rules of
-RISCV.
+whisper information about the time, hart-id, size, instruction tag and
+data of read/write operations associated with load/store/amo
+instructions. We use such information to check the preserved program
+order (ppo) rules of RISCV.
 
 # Limitations
 
