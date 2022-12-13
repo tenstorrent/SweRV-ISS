@@ -248,7 +248,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	    oss << ";";
 	  oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
 	  if (i < vecRegs_.stData_.size())
-	    oss << ':' << "0x" << vecRegs_.stData_.at(i);
+	    oss << '=' << "0x" << vecRegs_.stData_.at(i);
 	}
       tmp += " [" + oss.str() + "]";
     }

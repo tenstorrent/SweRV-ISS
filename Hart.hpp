@@ -1308,10 +1308,6 @@ namespace WdRiscv
     PrivilegeMode privilegeMode() const
     { return privMode_; }
 
-    /// Return current trap vector mode.
-    TrapVectorMode tvecMode() const
-    { return tvecMode_; }
-
     /// Defer interrupts received (to be taken later). This is for testbench
     /// to control when interrupts are handled without affecting architectural state.
     void setDeferredInterrupts(URV val)
@@ -1502,6 +1498,14 @@ namespace WdRiscv
 
   protected:
 
+    // Retun cached value of the mpp field of the mstatus CSR.
+    PrivilegeMode mstatusMpp() const
+    { return PrivilegeMode{mstatus_.bits_.MPP}; }
+
+    // Retun cached value of the mprv field of the mstatus CSR.
+    bool mstatusMprv() const
+    { return mstatus_.bits_.MPRV; }
+
     /// Read an item that may span 2 physical pages. If pa1 is the
     /// same as pa2 then the item is in one page: do a simple read. If
     /// pa1 is different from pa2, then the item crosses a page
@@ -1621,7 +1625,12 @@ namespace WdRiscv
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
-    { return mstatusFs_ != FpFs::Off; }
+    {
+      unsigned fpOff = unsigned(FpStatus::Off);
+      if (virtMode_)
+	return mstatus_.bits_.FS != fpOff and vsstatus_.bits_.FS != fpOff;
+      return mstatus_.bits_.FS != fpOff;
+    }
 
     // Return true if it is legal to execute a zfh instruction: f and zfh
     // extensions must be enabled and FS feild of MSTATUS must not be
@@ -1647,22 +1656,27 @@ namespace WdRiscv
     { return isRvd() and isFpEnabled(); }
 
     // Set the FS field of mstatus to the given value.
-    void setMstatusFs(FpFs value);
+    void setFpStatus(FpStatus value);
 
     // Mark FS field of mstatus as dirty.
     void markFsDirty()
-    { setMstatusFs(FpFs::Dirty); }
+    { setFpStatus(FpStatus::Dirty); }
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
-    { return mstatusVs_ != FpFs::Off; }
+    {
+      unsigned vecOff = unsigned(VecStatus::Off);
+      if (virtMode_)
+	return mstatus_.bits_.VS != vecOff and vsstatus_.bits_.VS != vecOff;
+      return mstatus_.bits_.VS != vecOff;
+    }
 
     // Set the VS field of mstatus to the given value.
-    void setMstatusVs(FpFs value);
+    void setVecStatus(VecStatus value);
 
     // Mark VS field of mstatus as dirty.
     void markVsDirty()
-    { setMstatusVs(FpFs::Dirty); }
+    { setVecStatus(VecStatus::Dirty); }
 
     // Return true if it is legal to execute a vector instruction: V
     // extension must be enabled and VS feild of MSTATUS must not be
@@ -1675,13 +1689,17 @@ namespace WdRiscv
     bool checkVecExec()
     {
       if (not isVecLegal()) return false;
-      if (mstatusVs_ != FpFs::Dirty) markVsDirty();
+      if (mstatus_.bits_.VS != unsigned(VecStatus::Dirty)) markVsDirty();
       return true;
     }
 
-    // Update cached values of mstatus.mpp and mstatus.mprv and
-    // mstatus.fs ...  This is called when mstatus is written/poked.
-    void updateCachedMstatusFields();
+    // Update cache values of mstatus. This is called when mstatus is
+    // written/poked.
+    void updateCachedMstatus();
+
+    // Update cached values of vsstatus. This is called when vsstatus
+    // is written/poked.
+    void updateCachedVsstatus();
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all
@@ -4198,16 +4216,14 @@ namespace WdRiscv
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
-    TrapVectorMode tvecMode_ = TrapVectorMode::Direct;  // Trap vector mode.
-
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
-    PrivilegeMode mstatusMpp_ = PrivilegeMode::Machine; // Cached mstatus.mpp.
-    bool mstatusMprv_ = false;                          // Cached mstatus.mprv.
-    FpFs mstatusFs_ = FpFs::Off;                        // Cahced mstatus.fs.
+
+    bool virtMode_ = false;         // True if virtual (V) mode is on.
+
+    MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
+    MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
 
     bool clearMprvOnRet_ = true;
-
-    FpFs mstatusVs_ = FpFs::Off;
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 

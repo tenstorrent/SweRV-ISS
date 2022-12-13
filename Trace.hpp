@@ -75,7 +75,12 @@ namespace WdRiscv
 
     /// Trap vector mode after last executed instruction
     TrapVectorMode nextTvecMode() const
-    { return hart_->tvecMode(); }
+    {
+      URV tvec = 0;
+      peekCsr(CsrNumber::MTVEC, tvec);
+      auto tvm = TrapVectorMode{tvec&3};
+      return tvm;
+    }
 
     /// True if last executed instruction encountered a trap.
     bool hasTrap() const

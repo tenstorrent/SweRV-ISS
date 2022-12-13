@@ -117,10 +117,47 @@ CsRegs<URV>::findCsr(CsrNumber number)
 
 
 template <typename URV>
+Csr<URV>*
+CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
+{
+  auto csr = getImplementedCsr(num);
+  if (not csr)
+    return csr;
+  if (not virtualMode)
+    return csr;
+  if (csr->isVirtual())
+    return nullptr; // Virtual mode: virtual supervisor CSRs are not available
+  if (not csr->mapsToVirtual())
+    return csr;
+  num = CsrNumber(URV(num) - 0x100);
+  return getImplementedCsr(num);
+}
+
+
+template <typename URV>
+const Csr<URV>*
+CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode) const
+{
+  auto csr = getImplementedCsr(num);
+  if (not csr)
+    return csr;
+  if (not virtualMode)
+    return csr;
+  if (csr->isVirtual())
+    return nullptr; // Virtual mode: virtual supervisor CSRs are not available
+  if (not csr->mapsToVirtual())
+    return csr;
+  num = CsrNumber(URV(num) - 0x100);
+  return getImplementedCsr(num);
+}
+
+
+template <typename URV>
 bool
 CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
 {
-  auto csr = getImplementedCsr(number);
+  bool isVirt = false;
+  auto csr = getImplementedCsr(number, isVirt);
   if (not csr)
     return false;
 
@@ -272,8 +309,8 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
   MstatusFields<URV> fields(value);
   PrivilegeMode mode = PrivilegeMode(fields.bits_.MPP);
 
-  if (fields.bits_.FS == unsigned(FpFs::Dirty) or fields.bits_.XS == unsigned(FpFs::Dirty) or
-      fields.bits_.VS == unsigned(FpFs::Dirty))
+  if (fields.bits_.FS == unsigned(FpStatus::Dirty) or fields.bits_.XS == unsigned(FpStatus::Dirty) or
+      fields.bits_.VS == unsigned(VecStatus::Dirty))
     fields.bits_.SD = 1;
   else
     fields.bits_.SD = 0;
@@ -319,9 +356,10 @@ legalizeMisa(URV v)
 
 template <typename URV>
 bool
-CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
+CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 {
-  Csr<URV>* csr = getImplementedCsr(number);
+  bool isVirt = false;
+  Csr<URV>* csr = getImplementedCsr(num, isVirt);
   if (not csr)
     return false;
 
@@ -331,46 +369,46 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
 
-  if (isPmpaddrLocked(number))
+  if (isPmpaddrLocked(num))
     {
-      recordWrite(number);
+      recordWrite(num);
       return true;  // Writing a locked PMPADDR register has no effect.
     }
 
   // fflags and frm are part of fcsr
-  if (number == CsrNumber::FFLAGS or number == CsrNumber::FRM or
-      number == CsrNumber::FCSR)
+  if (num == CsrNumber::FFLAGS or num == CsrNumber::FRM or
+      num == CsrNumber::FCSR)
     {
       csr->write(value);
-      recordWrite(number);
-      updateFcsrGroupForWrite(number, value);
+      recordWrite(num);
+      updateFcsrGroupForWrite(num, value);
       return true;
     }
 
   // vxsat and vrm are part of vcsr
-  if (number == CsrNumber::VXSAT or number == CsrNumber::VXRM or
-      number == CsrNumber::VCSR)
+  if (num == CsrNumber::VXSAT or num == CsrNumber::VXRM or
+      num == CsrNumber::VCSR)
     {
       csr->write(value);
-      recordWrite(number);
-      updateVcsrGroupForWrite(number, value);
+      recordWrite(num);
+      updateVcsrGroupForWrite(num, value);
       return true;
     }
 
-  if (number >= CsrNumber::TDATA1 and number <= CsrNumber::TDATA3)
+  if (num >= CsrNumber::TDATA1 and num <= CsrNumber::TDATA3)
     {
-      if (not writeTdata(number, mode, value))
+      if (not writeTdata(num, mode, value))
 	return false;
-      recordWrite(number);
+      recordWrite(num);
       return true;
     }
 
   // Value of SIP/SIE is that of MIP/MIE modified by SIP/SIE mask
   // and delgation register.
-  if (number == CsrNumber::SIP or number == CsrNumber::SIE)
+  if (num == CsrNumber::SIP or num == CsrNumber::SIE)
     {
       // Get MIP/MIE
-      auto mcsr = getImplementedCsr(CsrNumber(unsigned(number) + 0x200));
+      auto mcsr = getImplementedCsr(CsrNumber(unsigned(num) + 0x200));
       auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
       if (mcsr and deleg)
         {
@@ -381,41 +419,42 @@ CsRegs<URV>::write(CsrNumber number, PrivilegeMode mode, URV value)
         }
       else
         csr->write(value);
-      recordWrite(number);
+      recordWrite(num);
       return true;
     }
 
-  if (number >= CsrNumber::MHPMEVENT3 and number <= CsrNumber::MHPMEVENT31)
-    value = legalizeMhpmevent(number, value);
-  else if (number >= CsrNumber::PMPCFG0 and number <= CsrNumber::PMPCFG15)
+  if (num == CsrNumber::MSTATUS or num == CsrNumber::SSTATUS or num == CsrNumber::VSSTATUS)
+    {
+      value = legalizeMstatusValue(value);
+      csr->poke(value);       // Write cannot modify SD bit of msatus: poke it.
+      recordWrite(num);
+
+      // Cache interrupt enable from mstatus.mie.
+      if (num == CsrNumber::MSTATUS)
+	{
+	  MstatusFields<URV> fields(csr->read());
+	  interruptEnable_ = fields.bits_.MIE;
+	}
+      return true;
+    }
+
+  if (num >= CsrNumber::MHPMEVENT3 and num <= CsrNumber::MHPMEVENT31)
+    value = legalizeMhpmevent(num, value);
+  else if (num >= CsrNumber::PMPCFG0 and num <= CsrNumber::PMPCFG15)
     {
       URV prev = 0;
-      peek(number, prev);
+      peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-  else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
-    value = legalizeMstatusValue(value);
-  else if (number == CsrNumber::MISA)
+  else if (num == CsrNumber::MISA)
     value = legalizeMisa(value);
    
-  // Write cannot modify SD bit of msatus: poke it.
-  if (number == CsrNumber::MSTATUS)
-    csr->poke(value);
-  else
-    csr->write(value);
-
-  recordWrite(number);
-
-  // Cache interrupt enable.
-  if (number == CsrNumber::MSTATUS)
-    {
-      MstatusFields<URV> fields(csr->read());
-      interruptEnable_ = fields.bits_.MIE;
-    }
+  csr->write(value);
+  recordWrite(num);
 
   // Writing mcounteren/scounteren changes accessibility of the
   // counters in user/supervisor modes.
-  if (number == CsrNumber::MCOUNTEREN or number == CsrNumber::SCOUNTEREN)
+  if (num == CsrNumber::MCOUNTEREN or num == CsrNumber::SCOUNTEREN)
     updateCounterPrivilege();
 
   return true;
@@ -1001,9 +1040,9 @@ CsRegs<URV>::defineMachineRegs()
       defineCsr(name, num,  !mand, imp, 0, pmpMask, pmpMask);
     }
 
-  defineCsr("menvcfg", Csrn::MENVCFG, mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
+  defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
   if (rv32_)
-    defineCsr("menvcfgh", Csrn::MENVCFGH, mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
+    defineCsr("menvcfgh", Csrn::MENVCFGH, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
 
   // Machine Counter/Timers.
   defineCsr("mcycle",    Csrn::MCYCLE,    mand, imp, 0, wam, wam);
@@ -1154,6 +1193,7 @@ CsRegs<URV>::defineSupervisorRegs()
       sstatus->setReadMask(0x80766722L);
       if constexpr (sizeof(URV) == 8)
 	sstatus->setReadMask(0x8000000300766722L);
+      sstatus->setMapsToVirtual(true);
     }
 
   // SSTATUS shadows MSTATUS
@@ -1192,6 +1232,17 @@ CsRegs<URV>::defineSupervisorRegs()
 
   // Supervisor Protection and Translation 
   defineCsr("satp",       Csrn::SATP,       !mand, !imp, 0, wam, wam);
+
+  // Mark supervisor CSR that maps to virtual supervisor counterpart
+  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
+		     CsrNumber::SSCRATCH, CsrNumber::SEPC,
+		     CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
+		     CsrNumber::SATP })
+    {
+      auto csr = findCsr(csrn);
+      if (csr)
+	csr->setMapsToVirtual(true);
+    }
 }
 
 
@@ -1204,19 +1255,6 @@ CsRegs<URV>::defineUserRegs()
   URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
 
   using Csrn = CsrNumber;
-
-  // User trap setup.
-  URV mask = 0x11; // Only UPIE and UIE bits are writeable.
-  defineCsr("ustatus",  Csrn::USTATUS,  !mand, !imp, 0, mask, mask);
-  defineCsr("uie",      Csrn::UIE,      !mand, !imp, 0, wam, wam);
-  defineCsr("utvec",    Csrn::UTVEC,    !mand, !imp, 0, wam, wam);
-
-  // User Trap Handling
-  defineCsr("uscratch", Csrn::USCRATCH, !mand, !imp, 0, wam, wam);
-  defineCsr("uepc",     Csrn::UEPC,     !mand, !imp, 0, wam, wam);
-  defineCsr("ucause",   Csrn::UCAUSE,   !mand, !imp, 0, wam, wam);
-  defineCsr("utval",    Csrn::UTVAL,    !mand, !imp, 0, wam, wam);
-  defineCsr("uip",      Csrn::UIP,      !mand, !imp, 0, wam, wam);
 
   // User Counter/Timers
   defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
@@ -1286,15 +1324,26 @@ CsRegs<URV>::defineVirtualSupervisorRegs()
 
   using Csrn = CsrNumber;
 
-  defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, 0, wam, wam);
-  defineCsr("vsie",        Csrn::VSIE,        !mand, !imp, 0, wam, wam);
-  defineCsr("vstvec",      Csrn::VSTVEC,      !mand, !imp, 0, wam, wam);
-  defineCsr("vssratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
-  defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, wam, wam);
-  defineCsr("vscause",     Csrn::VSCAUSE,     !mand, !imp, 0, wam, wam);
-  defineCsr("vstval",      Csrn::VSTVAL,      !mand, !imp, 0, wam, wam);
-  defineCsr("vsip",        Csrn::VSIP,        !mand, !imp, 0, wam, wam);
-  defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
+  Csr<URV>* csr = nullptr;
+
+  csr = defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vsie",        Csrn::VSIE,        !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vstvec",      Csrn::VSTVEC,      !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vssratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vscause",     Csrn::VSCAUSE,     !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vstval",      Csrn::VSTVAL,      !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vsip",        Csrn::VSIP,        !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
+  csr = defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
+  csr->setVirtual(true);
 }
 
 

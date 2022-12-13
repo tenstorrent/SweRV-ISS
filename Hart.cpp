@@ -536,6 +536,7 @@ void
 Hart<URV>::reset(bool resetMemoryMappedRegs)
 {
   privMode_ = PrivilegeMode::Machine;
+  virtMode_ = false;
 
   intRegs_.reset();
   csRegs_.reset();
@@ -579,8 +580,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   resetVector();
   resetFloat();
 
-  // Update cached values of mstatus.mpp and mstatus.mprv and mstatus.fs.
-  updateCachedMstatusFields();
+  // Update cached values of MSTATUS.
+  updateCachedMstatus();
 
   updateAddressTranslation();
 
@@ -635,7 +636,7 @@ Hart<URV>::resetVector()
     {
       URV val = csRegs_.peekMstatus();
       MstatusFields<URV> fields(val);
-      fields.bits_.VS = unsigned(FpFs::Initial);
+      fields.bits_.VS = unsigned(VecStatus::Initial);
       csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, fields.value_);
     }
 }
@@ -643,17 +644,28 @@ Hart<URV>::resetVector()
 
 template <typename URV>
 void
-Hart<URV>::updateCachedMstatusFields()
+Hart<URV>::updateCachedMstatus()
 {
   URV csrVal = csRegs_.peekMstatus();
-  MstatusFields<URV> msf(csrVal);
-  mstatusMpp_ = PrivilegeMode(msf.bits_.MPP);
-  mstatusMprv_ = msf.bits_.MPRV;
-  mstatusFs_ = FpFs(msf.bits_.FS);
-  mstatusVs_ = FpFs(msf.bits_.VS);
+  mstatus_.value_ = csrVal;
 
-  virtMem_.setExecReadable(msf.bits_.MXR);
-  virtMem_.setSupervisorAccessUser(msf.bits_.SUM);
+  virtMem_.setExecReadable(mstatus_.bits_.MXR);
+  virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::updateCachedVsstatus()
+{
+  assert(not virtMode_);
+
+  URV csrVal = 0;
+  peekCsr(CsrNumber::VSSTATUS, csrVal);
+  vsstatus_.value_ = csrVal;
+
+  virtMem_.setExecReadable(vsstatus_.bits_.MXR);
+  virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
 }
 
 
@@ -1317,7 +1329,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
+      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
@@ -1330,7 +1342,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(addr1);
-      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+      if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
 	  return ExceptionCause::LOAD_ACC_FAULT;
@@ -1340,7 +1352,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
 	  pmp = pmpManager_.accessPmp(next);
-	  if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+	  if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
 	      return ExceptionCause::LOAD_ACC_FAULT;
@@ -1964,7 +1976,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       if (pmpEnabled_)
         {
           Pmp pmp = pmpManager_.accessPmp(physAddr);
-          if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
+          if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
             {
               if (triggerTripped_)
                 return false;
@@ -1991,7 +2003,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr);
-      if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
+      if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
         {
           if (triggerTripped_)
             return false;
@@ -2031,7 +2043,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr2);
-      if (not pmp.isExec(privMode_, mstatusMpp_, instMprv))
+      if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
         {
           if (triggerTripped_)
             return false;
@@ -2182,13 +2194,6 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       tvalNum = CsrNumber::STVAL;
       tvecNum = CsrNumber::STVEC;
     }
-  else if (nextMode == PrivilegeMode::User)
-    {
-      epcNum = CsrNumber::UEPC;
-      causeNum = CsrNumber::UCAUSE;
-      tvalNum = CsrNumber::UTVAL;
-      tvecNum = CsrNumber::UTVEC;
-    }
 
   // Save address of instruction that caused the exception or address
   // of interrupted instruction.
@@ -2225,16 +2230,11 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
     }
-  else if (nextMode == PrivilegeMode::User)
-    {
-      msf.bits_.UPIE = msf.bits_.UIE;
-      msf.bits_.UIE = 0;
-    }
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
     assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatusFields();
+  updateCachedMstatus();
   
   // Set program counter to trap handler address.
   URV tvec = 0;
@@ -2242,9 +2242,9 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
     assert(0 and "Failed to read TVEC register");
 
   URV base = (tvec >> 2) << 2;  // Clear least sig 2 bits.
-  tvecMode_ = TrapVectorMode(tvec & 0x3);
+  auto tvecMode = TrapVectorMode(tvec & 0x3);
 
-  if (tvecMode_ == TrapVectorMode::Vectored and interrupt)
+  if (tvecMode == TrapVectorMode::Vectored and interrupt)
     base = base + 4*cause;
 
   setPc(base);
@@ -2310,7 +2310,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
     assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatusFields();
+  updateCachedMstatus();
   
   // Clear pending nmi bit in dcsr
   URV dcsrVal = 0;
@@ -2498,9 +2498,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
   else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
-  // Update cached values of MSTATUS MPP and MPRV.
+  // Update cached values of MSTATUS,
   if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
-    updateCachedMstatusFields();
+    updateCachedMstatus();
 
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
@@ -9526,7 +9526,7 @@ Hart<URV>::execMret(const DecodedInst* di)
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
     assert(0 and "Failed to write MSTATUS register\n");
-  updateCachedMstatusFields();
+  updateCachedMstatus();
 
   // Restore program counter from MEPC.
   URV epc;
@@ -9597,7 +9597,7 @@ Hart<URV>::execSret(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  updateCachedMstatusFields();
+  updateCachedMstatus();
 
   // Restore program counter from SEPC.
   URV epc;
@@ -10029,7 +10029,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
+      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
           auto cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
@@ -10042,7 +10042,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(addr1);
-      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
+      if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
 	  return ExceptionCause::STORE_ACC_FAULT;
@@ -10052,7 +10052,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
   	  pmp = pmpManager_.accessPmp(next);
-	  if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
+	  if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
 	      return ExceptionCause::LOAD_ACC_FAULT;

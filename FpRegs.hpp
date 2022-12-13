@@ -71,7 +71,7 @@ namespace WdRiscv
     };
 
   /// Values of FS field in mstatus.
-  enum class FpFs : uint32_t
+  enum class FpStatus : uint32_t
     {
       Off = 0,
       Initial = 1,

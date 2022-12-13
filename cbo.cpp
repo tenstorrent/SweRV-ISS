@@ -35,7 +35,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv_? mstatusMpp_ : privMode_;
+      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
           uint64_t pa = 0;
@@ -57,7 +57,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
 	    {
 	      uint64_t dwa = addr + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isRead(privMode_, mstatusMpp_, mstatusMprv_))
+	      if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 		return ExceptionCause::LOAD_ACC_FAULT;
 	    }
 	}
@@ -67,7 +67,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
 	    {
 	      uint64_t dwa = addr + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isWrite(privMode_, mstatusMpp_, mstatusMprv_))
+	      if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 		return ExceptionCause::STORE_ACC_FAULT;
 	    }
 	}
