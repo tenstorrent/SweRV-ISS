@@ -1080,6 +1080,18 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for SSTATUS or VSSTATUS
+    URV peekSstatus(bool virtMode) const
+    {
+      if (virtMode)
+	{
+	  const auto& csr = regs_.at(size_t(CsrNumber::VSSTATUS));
+	  return csr.read();
+	}
+      const auto& csr = regs_.at(size_t(CsrNumber::SSTATUS));
+      return csr.read();
+    }
+
     /// Fast peek method for VSTART.
     URV peekVstart() const
     {
@@ -1238,6 +1250,12 @@ namespace WdRiscv
     void enablePerModeCounterControl(bool flag)
     { perModeCounterControl_ = flag; }
 
+    /// Turn on/off virtual mode. When virtual mode is on read/write to
+    /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
+    /// of virtual supervisor CSRs become illegal.
+    void setVirtualMode(bool flag)
+    { virtMode_ = flag; }
+
   private:
 
     bool rv32_ = sizeof(URV) == 4;
@@ -1273,6 +1291,7 @@ namespace WdRiscv
     bool perModeCounterControl_ = false;
     bool recordWrite_ = true;
     bool debugMode_ = false;
+    bool virtMode_ = false;       // True if hart virtual (V) mode is on.
   };
 
 

@@ -658,14 +658,17 @@ template <typename URV>
 void
 Hart<URV>::updateCachedVsstatus()
 {
-  assert(not virtMode_);
+  assert(virtMode_);
 
   URV csrVal = 0;
   peekCsr(CsrNumber::VSSTATUS, csrVal);
   vsstatus_.value_ = csrVal;
 
-  virtMem_.setExecReadable(vsstatus_.bits_.MXR);
-  virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
+  if (virtMode_)
+    {
+      virtMem_.setExecReadable(vsstatus_.bits_.MXR);
+      virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
+    }
 }
 
 
@@ -2212,30 +2215,29 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
     assert(0 and "Failed to write TVAL register");
 
   // Update status register saving xIE in xPIE and previous privilege
-  // mode in xPP by getting current value of mstatus ...
-  URV status = csRegs_.peekMstatus();
-
-  // ... updating its fields
-  MstatusFields<URV> msf(status);
-
+  // mode in xPP by getting current value of xstatus, updating
+  // its fields and putting it back.
   if (nextMode == PrivilegeMode::Machine)
     {
+      MstatusFields<URV> msf(csRegs_.peekMstatus());
       msf.bits_.MPP = unsigned(origMode);
       msf.bits_.MPIE = msf.bits_.MIE;
       msf.bits_.MIE = 0;
+      if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
+	assert(0 and "Failed to write MSTATUS register");
+      updateCachedMstatus();
     }
   else if (nextMode == PrivilegeMode::Supervisor)
     {
+      MstatusFields<URV> msf(csRegs_.peekSstatus(virtMode_));
       msf.bits_.SPP = unsigned(origMode);
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
+      if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
+	assert(0 and "Failed to write SSTATUS register");
+      updateCachedSstatus();
     }
 
-  // ... and putting it back
-  if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
-    assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatus();
-  
   // Set program counter to trap handler address.
   URV tvec = 0;
   if (not csRegs_.read(tvecNum, privMode_, tvec))
@@ -2297,17 +2299,14 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   if (not csRegs_.write(CsrNumber::MTVAL, privMode_, 0))
     assert(0 and "Failed to write MTVAL register");
 
-  // Update status register saving xIE in xPIE and previous privilege
-  // mode in xPP by getting current value of mstatus ...
+  // Update status register saving MIE in MPIE and previous privilege
+  // mode in MPP by getting current value of mstatus, updating
+  // its fields and putting it back.
   URV status = csRegs_.peekMstatus();
   MstatusFields<URV> msf(status);
-
-  // ... updating its fields
   msf.bits_.MPP = unsigned(origMode);
   msf.bits_.MPIE = msf.bits_.MIE;
   msf.bits_.MIE = 0;
-
-  // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
     assert(0 and "Failed to write MSTATUS register");
   updateCachedMstatus();
@@ -2499,8 +2498,12 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
   // Update cached values of MSTATUS,
-  if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
+  if (csr == CsrNumber::MSTATUS)
     updateCachedMstatus();
+  else if (csr == CsrNumber::SSTATUS)
+    updateCachedSstatus();
+  else if (csr == CsrNumber::VSSTATUS)
+    updateCachedVsstatus();
 
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
@@ -9490,52 +9493,136 @@ Hart<URV>::execSfence_inval_ir(const DecodedInst* di)
 }
 
 
-template <typename URV>
-void
-Hart<URV>::execMret(const DecodedInst* di)
+namespace WdRiscv
 {
-  if (privMode_ < PrivilegeMode::Machine)
-    {
-      illegalInst(di);
+
+  template <>
+  void
+  Hart<uint64_t>::execMret(const DecodedInst* di)
+  {
+    if (privMode_ < PrivilegeMode::Machine)
+      {
+	illegalInst(di);
+	return;
+      }
+
+    if (triggerTripped_)
       return;
-    }
 
-  if (triggerTripped_)
-    return;
+    cancelLr(); // Clear LR reservation (if any).
 
-  cancelLr(); // Clear LR reservation (if any).
+    // 1. Restore privilege mode, interrupt enable, and virtual mode.
+    uint64_t value = csRegs_.peekMstatus();
 
-  // Restore privilege mode and interrupt enable by getting
-  // current value of MSTATUS, ...
-  URV value = csRegs_.peekMstatus();
+    MstatusFields<uint64_t> fields(value);
+    PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
+    bool savedVirt = fields.bits_.MPV;
 
-  // ... updating/unpacking its fields,
-  MstatusFields<URV> fields(value);
-  PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
-  fields.bits_.MIE = fields.bits_.MPIE;
-  if (isRvu())
-    fields.bits_.MPP = unsigned(PrivilegeMode::User);
-  else if (isRvs())
-    fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
-  else
-    fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
-  fields.bits_.MPIE = 1;
-  if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
-    fields.bits_.MPRV = 0;
+    // 1.1 Restore MIE.
+    fields.bits_.MIE = fields.bits_.MPIE;
 
-  // ... and putting it back
-  if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
-    assert(0 and "Failed to write MSTATUS register\n");
-  updateCachedMstatus();
+    // 1.1. Set MPP to the least privileged mode available.
+    if (isRvu())
+      fields.bits_.MPP = unsigned(PrivilegeMode::User);
+    else if (isRvs())
+      fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
+    else
+      fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
 
-  // Restore program counter from MEPC.
-  URV epc;
-  if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
-    illegalInst(di);
-  setPc(epc);
+    // 1.2. Set MPIE.
+    fields.bits_.MPIE = 1;
+
+    // 1.3. Clear MPRV.
+    if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
+      fields.bits_.MPRV = 0;
+
+    // 1.4. Clear virtual (V) mode.
+    fields.bits_.MPV = 0;
+
+    // 1.5. Write back MSTATUS.
+    if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
+      assert(0 and "Failed to write MSTATUS register\n");
+    updateCachedMstatus();
+
+    // 2. Restore program counter from MEPC.
+    uint64_t epc;
+    if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
+      illegalInst(di);
+    setPc(epc);
       
-  // Update privilege mode.
-  privMode_ = savedMode;
+    // 3. Update virtual mode.
+    if (savedMode != PrivilegeMode::Machine)
+      setVirtualMode(savedVirt);
+
+    // 4. Update privilege mode.
+    privMode_ = savedMode;
+  }
+
+
+  // SV32 version of execMret has to contend with MSTATUSH.
+  template <>
+  void
+  Hart<uint32_t>::execMret(const DecodedInst* di)
+  {
+    if (privMode_ < PrivilegeMode::Machine)
+      {
+	illegalInst(di);
+	return;
+      }
+
+    if (triggerTripped_)
+      return;
+
+    cancelLr(); // Clear LR reservation (if any).
+
+    // 1. Restore privilege mode, interrupt enable, and virtual mode.
+    uint32_t value = csRegs_.peekMstatus();
+    uint32_t hvalue = 0;
+    peekCsr(CsrNumber::MSTATUSH, hvalue);
+    bool savedVirt = (hvalue >> 7) & 1;
+
+    MstatusFields<uint32_t> fields(value);
+    PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
+    fields.bits_.MIE = fields.bits_.MPIE;
+
+    // 1.1. Set MPP to the least privileged mode available.
+    if (isRvu())
+      fields.bits_.MPP = unsigned(PrivilegeMode::User);
+    else if (isRvs())
+      fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
+    else
+      fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
+
+    // 1.2. Enable interrupts.
+    fields.bits_.MPIE = 1;
+
+    // 1.3. Clear MPRV.
+    if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
+      fields.bits_.MPRV = 0;
+
+    // 1.4. Clear virtual (V) mode.
+    hvalue &= ~ uint32_t(1 << 7);
+
+    // 1.5. Write back MSTATUS.
+    if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
+      assert(0 and "Failed to write MSTATUS register\n");
+    if (not csRegs_.write(CsrNumber::MSTATUSH, privMode_, hvalue))
+      assert(0 and "Failed to write MSTATUSH register\n");
+    updateCachedMstatus();
+
+    // 2. Restore program counter from MEPC.
+    uint32_t epc;
+    if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
+      illegalInst(di);
+    setPc(epc);
+      
+    // 3. Update virtual mode.
+    if (savedMode != PrivilegeMode::Machine)
+      setVirtualMode(savedVirt);
+
+    // 4. Update privilege mode.
+    privMode_ = savedMode;
+  }
 }
 
 
@@ -9597,7 +9684,7 @@ Hart<URV>::execSret(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  updateCachedMstatus();
+  updateCachedSstatus();
 
   // Restore program counter from SEPC.
   URV epc;

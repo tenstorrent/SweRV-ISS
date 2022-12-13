@@ -156,8 +156,7 @@ template <typename URV>
 bool
 CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
 {
-  bool isVirt = false;
-  auto csr = getImplementedCsr(number, isVirt);
+  auto csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
@@ -358,8 +357,7 @@ template <typename URV>
 bool
 CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 {
-  bool isVirt = false;
-  Csr<URV>* csr = getImplementedCsr(num, isVirt);
+  Csr<URV>* csr = getImplementedCsr(num, virtMode_);
   if (not csr)
     return false;
 
@@ -950,6 +948,11 @@ CsRegs<URV>::defineMachineRegs()
   URV pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
 
   defineCsr("mstatus", Csrn::MSTATUS, mand, imp, val, mask, pokeMask);
+  if (rv32_)
+    {
+      mask = 0;
+      defineCsr("mstatush", Csrn::MSTATUSH, mand, imp, 0, mask, mask);
+    }
 
   val = 0x40001105;  // MISA: acim
   if constexpr (sizeof(URV) == 8)

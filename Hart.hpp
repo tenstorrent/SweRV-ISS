@@ -1678,6 +1678,15 @@ namespace WdRiscv
     void markVsDirty()
     { setVecStatus(VecStatus::Dirty); }
 
+    // Enable/disable virtual (V) mode.
+    void setVirtualMode(bool mode)
+    {
+      virtMode_ = mode;
+      csRegs_.setVirtualMode(mode);
+      if (mode)
+	updateCachedVsstatus();
+    }
+
     // Return true if it is legal to execute a vector instruction: V
     // extension must be enabled and VS feild of MSTATUS must not be
     // OFF.
@@ -1693,13 +1702,24 @@ namespace WdRiscv
       return true;
     }
 
-    // Update cache values of mstatus. This is called when mstatus is
-    // written/poked.
+    // We avoid the cost of locating MSTATUS in the CSRs register file
+    // by caching its value in this class. We do this whenever MSTATUS
+    // is written/poked.
     void updateCachedMstatus();
 
-    // Update cached values of vsstatus. This is called when vsstatus
+    // We avoid the cost of locating VSSTATUS in the CSRs register file
+    // by caching its value in this class. We do this whenever VSSTATUS
     // is written/poked.
     void updateCachedVsstatus();
+
+    // Update cached MSTATUS if non-virtual and VSSTATUS if virtual.
+    void updateCachedSstatus()
+    {
+      if (virtMode_)
+	updateCachedVsstatus();
+      else
+	updateCachedMstatus();
+    }
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all
