@@ -309,8 +309,8 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
   MstatusFields<URV> fields(value);
   PrivilegeMode mode = PrivilegeMode(fields.bits_.MPP);
 
-  if (fields.bits_.FS == unsigned(FpFs::Dirty) or fields.bits_.XS == unsigned(FpFs::Dirty) or
-      fields.bits_.VS == unsigned(VecVs::Dirty))
+  if (fields.bits_.FS == unsigned(FpStatus::Dirty) or fields.bits_.XS == unsigned(FpStatus::Dirty) or
+      fields.bits_.VS == unsigned(VecStatus::Dirty))
     fields.bits_.SD = 1;
   else
     fields.bits_.SD = 0;
@@ -1255,12 +1255,6 @@ CsRegs<URV>::defineUserRegs()
   URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
 
   using Csrn = CsrNumber;
-
-  // User trap setup.
-  URV mask = 0x11; // Only UPIE and UIE bits are writeable.
-  defineCsr("ustatus",  Csrn::USTATUS,  !mand, !imp, 0, mask, mask);
-  defineCsr("uie",      Csrn::UIE,      !mand, !imp, 0, wam, wam);
-  defineCsr("utvec",    Csrn::UTVEC,    !mand, !imp, 0, wam, wam);
 
   // User Counter/Timers
   defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);

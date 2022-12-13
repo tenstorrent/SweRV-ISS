@@ -291,11 +291,6 @@ namespace WdRiscv
 
       // User mode registers.
 
-      // User trap setup.
-      USTATUS = 0x000,
-      UIE = 0x004,
-      UTVEC = 0x005,
-
       // User Floating-Point CSRs
       FFLAGS = 0x001,
       FRM = 0x002,

@@ -1502,14 +1502,6 @@ namespace WdRiscv
     PrivilegeMode mstatusMpp() const
     { return PrivilegeMode{mstatus_.bits_.MPP}; }
 
-    // Retun cached value of the fs field of the mstatus CSR.
-    FpFs mstatusFs() const
-    { return FpFs{mstatus_.bits_.FS}; }
-
-    // Retun cached value of the vs field of the mstatus CSR.
-    VecVs mstatusVs() const
-    { return FpFs{mstatus_.bits_.VS}; }
-
     // Retun cached value of the mprv field of the mstatus CSR.
     bool mstatusMprv() const
     { return mstatus_.bits_.MPRV; }
@@ -1633,7 +1625,12 @@ namespace WdRiscv
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
-    { return mstatusFs() != FpFs::Off; }
+    {
+      unsigned fpOff = unsigned(FpStatus::Off);
+      if (virtMode_)
+	return mstatus_.bits_.FS != fpOff and vsstatus_.bits_.FS != fpOff;
+      return mstatus_.bits_.FS != fpOff;
+    }
 
     // Return true if it is legal to execute a zfh instruction: f and zfh
     // extensions must be enabled and FS feild of MSTATUS must not be
@@ -1659,22 +1656,27 @@ namespace WdRiscv
     { return isRvd() and isFpEnabled(); }
 
     // Set the FS field of mstatus to the given value.
-    void setFpStatus(FpFs value);
+    void setFpStatus(FpStatus value);
 
     // Mark FS field of mstatus as dirty.
     void markFsDirty()
-    { setFpStatus(FpFs::Dirty); }
+    { setFpStatus(FpStatus::Dirty); }
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
-    { return mstatusVs() != VecVs::Off; }
+    {
+      unsigned vecOff = unsigned(VecStatus::Off);
+      if (virtMode_)
+	return mstatus_.bits_.VS != vecOff and vsstatus_.bits_.VS != vecOff;
+      return mstatus_.bits_.VS != vecOff;
+    }
 
     // Set the VS field of mstatus to the given value.
-    void setVecStatus(VecVs value);
+    void setVecStatus(VecStatus value);
 
     // Mark VS field of mstatus as dirty.
     void markVsDirty()
-    { setVecStatus(VecVs::Dirty); }
+    { setVecStatus(VecStatus::Dirty); }
 
     // Return true if it is legal to execute a vector instruction: V
     // extension must be enabled and VS feild of MSTATUS must not be
@@ -1687,13 +1689,17 @@ namespace WdRiscv
     bool checkVecExec()
     {
       if (not isVecLegal()) return false;
-      if (mstatusVs() != VecVs::Dirty) markVsDirty();
+      if (mstatus_.bits_.VS != unsigned(VecStatus::Dirty)) markVsDirty();
       return true;
     }
 
-    // Update cached values of mstatus.mpp and mstatus.mprv and
-    // mstatus.fs ...  This is called when mstatus is written/poked.
-    void updateCachedMstatusFields();
+    // Update cache values of mstatus. This is called when mstatus is
+    // written/poked.
+    void updateCachedMstatus();
+
+    // Update cached values of vsstatus. This is called when vsstatus
+    // is written/poked.
+    void updateCachedVsstatus();
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all
@@ -4212,7 +4218,10 @@ namespace WdRiscv
     PrivilegeMode privMode_ = PrivilegeMode::Machine;   // Privilege mode.
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
 
+    bool virtMode_ = false;         // True if virtual (V) mode is on.
+
     MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
+    MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
 
     bool clearMprvOnRet_ = true;
 

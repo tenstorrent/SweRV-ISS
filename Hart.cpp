@@ -536,6 +536,7 @@ void
 Hart<URV>::reset(bool resetMemoryMappedRegs)
 {
   privMode_ = PrivilegeMode::Machine;
+  virtMode_ = false;
 
   intRegs_.reset();
   csRegs_.reset();
@@ -579,8 +580,8 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   resetVector();
   resetFloat();
 
-  // Update cached values of mstatus.mpp and mstatus.mprv and mstatus.fs.
-  updateCachedMstatusFields();
+  // Update cached values of MSTATUS.
+  updateCachedMstatus();
 
   updateAddressTranslation();
 
@@ -635,7 +636,7 @@ Hart<URV>::resetVector()
     {
       URV val = csRegs_.peekMstatus();
       MstatusFields<URV> fields(val);
-      fields.bits_.VS = unsigned(VecVs::Initial);
+      fields.bits_.VS = unsigned(VecStatus::Initial);
       csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, fields.value_);
     }
 }
@@ -643,13 +644,28 @@ Hart<URV>::resetVector()
 
 template <typename URV>
 void
-Hart<URV>::updateCachedMstatusFields()
+Hart<URV>::updateCachedMstatus()
 {
   URV csrVal = csRegs_.peekMstatus();
   mstatus_.value_ = csrVal;
 
   virtMem_.setExecReadable(mstatus_.bits_.MXR);
   virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::updateCachedVsstatus()
+{
+  assert(not virtMode_);
+
+  URV csrVal = 0;
+  peekCsr(CsrNumber::VSSTATUS, csrVal);
+  vsstatus_.value_ = csrVal;
+
+  virtMem_.setExecReadable(vsstatus_.bits_.MXR);
+  virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
 }
 
 
@@ -2214,16 +2230,11 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
     }
-  else if (nextMode == PrivilegeMode::User)
-    {
-      msf.bits_.UPIE = msf.bits_.UIE;
-      msf.bits_.UIE = 0;
-    }
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
     assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatusFields();
+  updateCachedMstatus();
   
   // Set program counter to trap handler address.
   URV tvec = 0;
@@ -2299,7 +2310,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
     assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatusFields();
+  updateCachedMstatus();
   
   // Clear pending nmi bit in dcsr
   URV dcsrVal = 0;
@@ -2487,9 +2498,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
   else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
-  // Update cached values of MSTATUS MPP and MPRV.
+  // Update cached values of MSTATUS,
   if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
-    updateCachedMstatusFields();
+    updateCachedMstatus();
 
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
@@ -9515,7 +9526,7 @@ Hart<URV>::execMret(const DecodedInst* di)
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
     assert(0 and "Failed to write MSTATUS register\n");
-  updateCachedMstatusFields();
+  updateCachedMstatus();
 
   // Restore program counter from MEPC.
   URV epc;
@@ -9586,7 +9597,7 @@ Hart<URV>::execSret(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  updateCachedMstatusFields();
+  updateCachedMstatus();
 
   // Restore program counter from SEPC.
   URV epc;

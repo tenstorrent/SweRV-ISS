@@ -26,7 +26,7 @@ namespace WdRiscv
 {
 
   /// Values of VS field in mstatus.
-  typedef FpFs VecVs;
+  typedef FpStatus VecStatus;
 
   enum class GroupMultiplier : uint32_t
     {

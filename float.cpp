@@ -35,7 +35,7 @@ Hart<URV>::enableRvf(bool flag)
   rvf_ = flag;
   csRegs_.enableRvf(flag);
   if (not flag)
-    setFpStatus(VecVs::Off);
+    setFpStatus(VecStatus::Off);
 }
 
 
@@ -49,7 +49,7 @@ Hart<URV>::resetFloat()
     {
       URV val = csRegs_.peekMstatus();
       MstatusFields<URV> fields(val);
-      fields.bits_.FS = unsigned(FpFs::Initial);
+      fields.bits_.FS = unsigned(FpStatus::Initial);
       csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, fields.value_);
     }
 
@@ -262,22 +262,39 @@ Hart<URV>::updateAccruedFpBits(double res, bool invalid)
 template <typename URV>
 inline
 void
-Hart<URV>::setFpStatus(FpFs value)
+Hart<URV>::setFpStatus(FpStatus value)
 {
-  if (mstatusFs() == value)
-    return;
+  if (mstatus_.bits_.FS != unsigned(value))
+    {
+      URV val = csRegs_.peekMstatus();
+      MstatusFields<URV> fields(val);
+      fields.bits_.FS = unsigned(value);
+      csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
 
-  URV val = csRegs_.peekMstatus();
-  MstatusFields<URV> fields(val);
-  fields.bits_.FS = unsigned(value);
-  csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
+      URV newVal = csRegs_.peekMstatus();
+      if (val != newVal)
+	recordCsrWrite(CsrNumber::MSTATUS);
 
-  URV newVal = csRegs_.peekMstatus();
-  if (val != newVal)
-    recordCsrWrite(CsrNumber::MSTATUS);
+      updateCachedMstatus();
+    }
 
-  updateCachedMstatusFields();
+  if (virtMode_ and mstatus_.bits_.FS != unsigned(value))
+    {
+      URV val = 0;
+      peekCsr(CsrNumber::VSSTATUS, val);
+      MstatusFields<URV> fields(val);
+      fields.bits_.FS = unsigned(value);
+      csRegs_.poke(CsrNumber::VSSTATUS, fields.value_);
+
+      URV newVal = 0;
+      peekCsr(CsrNumber::VSSTATUS, newVal);
+      if (val != newVal)
+	recordCsrWrite(CsrNumber::VSSTATUS);
+
+      updateCachedVsstatus();
+    }
 }
+
 
 #endif
 
