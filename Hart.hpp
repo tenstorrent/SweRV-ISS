@@ -2087,6 +2087,9 @@ namespace WdRiscv
     ///   - Write to a read-only CSR.
     void illegalInst(const DecodedInst*);
 
+    /// Initiate a virtual instruction trap.
+    void virtualInst(const DecodedInst*);
+
     /// Place holder for not-yet implemented instructions. Calls
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
@@ -4242,6 +4245,7 @@ namespace WdRiscv
 
     MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
+    HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
 
     bool clearMprvOnRet_ = true;
 

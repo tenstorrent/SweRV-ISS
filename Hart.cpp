@@ -2096,6 +2096,23 @@ Hart<URV>::illegalInst(const DecodedInst* di)
 
 template <typename URV>
 void
+Hart<URV>::virtualInst(const DecodedInst* di)
+{
+  if (triggerTripped_)
+    return;
+
+  assert(0 && "Implement Hart::virtualInst");
+
+  uint32_t inst = di->inst();
+  if (isCompressedInst(inst))
+    inst = inst & 0xffff;
+
+  initiateException(ExceptionCause::ILLEGAL_INST, currPc_, inst);
+}
+
+
+template <typename URV>
+void
 Hart<URV>::unimplemented(const DecodedInst* di)
 {
   illegalInst(di);
@@ -9419,9 +9436,13 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
 
   URV status = csRegs_.peekMstatus();
   MstatusFields<URV> fields(status);
-  if (fields.bits_.TVM and privMode_ == PrivilegeMode::Supervisor)
+  bool tvm = virtMode_ ? mstatus_.bits_.TVM : hstatus_.bits_.VTVM;
+  if (tvm and privMode_ == PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 
@@ -9643,11 +9664,15 @@ Hart<URV>::execSret(const DecodedInst* di)
     }
 
   // If MSTATUS.TSR is 1 then sret is illegal in supervisor mode.
+  bool tsr = virtMode_? mstatus_.bits_.TSR : hstatus_.bits_.VTSR;
   URV mstatus = csRegs_.peekMstatus();
   MstatusFields<URV> mfields(mstatus);
-  if (mfields.bits_.TSR and privMode_ == PrivilegeMode::Supervisor)
+  if (tsr and privMode_ == PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 

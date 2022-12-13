@@ -1376,4 +1376,67 @@ namespace WdRiscv
       unsigned SD       : 1;
     } bits_;
   };
+
+
+  /// Structure used to unpack/pack the fields of the hypervisor
+  /// status register.
+  template <typename URV>
+  union HstatusFields;
+
+  /// 32-bit version.
+  template <>
+  union HstatusFields<uint32_t>
+  {
+    HstatusFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_;   // Hypervisor status register value.
+    struct
+    {
+      unsigned res0     : 5;
+      unsigned VSBE     : 1;   // Virt supervisor big endian
+      unsigned GVA      : 1;   // Guest virtual address
+      unsigned SPV      : 1;   // Supervisor previous virtual mode
+      unsigned SPVP     : 1;   // Supervisor previous virtual privilege (nominal priv)
+      unsigned HU       : 1;   // Hypervisor instructions available in user mode
+      unsigned res1     : 2;
+      unsigned VGEIN    : 6;   // Virtual guest external interrupt number
+      unsigned res2     : 2;
+      unsigned VTVM     : 1;   // Trap on access to vsatp or SFENCE.VMA or SINVAL.VMA
+      unsigned VTW      : 1;
+      unsigned VTSR     : 1;   // Trap on sret
+      unsigned res3     : 9;
+    } bits_;
+  };
+
+  /// 64-bit version.
+  template <>
+  union HstatusFields<uint64_t>
+  {
+    HstatusFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;   // Machine status register value.
+    struct
+    {
+      unsigned res0     : 5;
+      unsigned VSBE     : 1;   // Virt supervisor big endian
+      unsigned GVA      : 1;   // Guest virtual address
+      unsigned SPV      : 1;   // Supervisor previous virtual mode
+      unsigned SPVP     : 1;   // Supervisor previous virtual privilege (nominal priv)
+      unsigned HU       : 1;   // Hypervisor instructions available in user mode
+      unsigned res1     : 2;
+      unsigned VGEIN    : 6;   // Virtual guest external interrupt number
+      unsigned res2     : 2;
+      unsigned VTVM     : 1;   // Trap on access to vsatp or SFENCE.VMA or SINVAL.VMA
+      unsigned VTW      : 1;
+      unsigned VTSR     : 1;   // Trap on sret
+      unsigned res3     : 9;
+      unsigned VSXL     : 2;
+      unsigned res4     : 29;
+    } bits_;
+  };
+
 }
