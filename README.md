@@ -579,10 +579,11 @@ Enable support for debug triggers.
 # Memory Consistency Checks
 
 When run in server or interactive modes, Whisper will check the RISCV
-weak memory ordering rules. This feature is enabled by setting the
+weak memory ordering rules (also known as preserved program order
+rules). This feature is enabled by setting the
 "enable_memory_consitency" to "true" in the configuration file or by
-using "--mcm" on the command line. Whisper expects to be notified about
-read and write operations and it expects such operations to be
+using "--mcm" on the command line. Whisper expects to be notified
+about read and write operations and it expects such operations to be
 associated with time stamps. Each memory instruction (load/store/amo)
 is associated with one or more memory read/write operation. A memory
 operation may occur before/after the corresponding instruction is
@@ -595,22 +596,29 @@ value, and an indication of whether or not the data was forwarded from
 inside the core (internal) or it came from the memory system
 (external). The interactive command for a read operation has the form:
 ```
-   time=<time-stamp>  mread <tag> <addr> <size> <data> <ie>
+   time=<time-stamp> hart=<id>  mread <tag> <addr> <size> <data> <ie>
 ```
 A merge buffer insert has an instruction tag, an address, a size, and
 data value. The operation signifies a transfer of the data to the
 store buffer. The interactive command for a merge buffer insert has
 the form:
 ```
-   time=<time-stamp> mbinsert <tag> <addr> <size> <data>
+   time=<time-stamp> hart=<id> mbinsert <tag> <addr> <size> <data>
 ```
-A merge buffer write implies the transfer of data from the merge buffer
-to the external memory. This is when the write operation becomes visible
-to the global memory system. The interactive command for a merge buffer
-write is:
+A merge buffer write implies the transfer of data from the merge
+buffer to the external memory. This is when the write operations
+accumulated in the merge buffer become visible to the global memory
+system. The interactive command for a merge buffer write is:
 ```
-   time=<time-stamp> mbwrite <addr> <data>
+   time=<time-stamp> hart=<id> mbwrite <addr> <data>
 ```
+
+Similarly, we provide server mode commands that allows a client
+(typically test bench code running in a verilog simulator) to provide
+whisper information about the time, size, instruction tag and data of
+read/write operations associated with load/store/amo instructions. We use
+such information to check the preserved program order (ppo) rules of
+RISCV.
 
 # Limitations
 
