@@ -1112,6 +1112,10 @@ namespace WdRiscv
     bool isRvs() const
     { return rvs_; }
 
+    /// Return true if rvh (hupervisor) extension is enabled in this hart.
+    bool isRvh() const
+    { return rvh_; }
+
     /// Return true if rvu (user-mode) extension is enabled in this
     /// hart.
     bool isRvu() const
@@ -1865,6 +1869,10 @@ namespace WdRiscv
     template<typename LOAD_TYPE>
     bool fastLoad(uint64_t virtAddr, uint64_t& value);
 
+    /// Helper to hypervisor load instructions.
+    template<typename LOAD_TYPE>
+    bool hyperLoad(uint64_t virtAddr, uint64_t& value);
+
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and
     /// address translation is successful, then addr1 is changed to
@@ -1894,6 +1902,10 @@ namespace WdRiscv
     /// For use by performance model. 
     template<typename STORE_TYPE>
     bool fastStore(URV addr, STORE_TYPE value);
+
+    /// Helper to hypervisor load instructions.
+    template<typename STORE_TYPE>
+    bool hyperStore(URV virtAddr, STORE_TYPE value);
 
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
@@ -4138,6 +4150,7 @@ namespace WdRiscv
     bool rvf_ = false;           // True if extension F (single fp) enabled.
     bool rvzfh_ = false;         // True if extension zfh (half fp) enabled.
     bool rvzfhmin_ = false;      // True if extension zfhmin (minimal half fp) enabled.
+    bool rvh_ = false;           // True if extension H (hupervisor) enabled.
     bool rvm_ = true;            // True if extension M (mul/div) enabled.
     bool rvs_ = false;           // True if extension S (supervisor-mode) enabled.
     bool rvu_ = false;           // True if extension U (user-mode) enabled.
