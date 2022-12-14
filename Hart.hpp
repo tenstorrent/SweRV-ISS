@@ -4044,6 +4044,24 @@ namespace WdRiscv
     void execWrs_nto(const DecodedInst*);
     void execWrs_sto(const DecodedInst*);
 
+    void execHfence_vvma(const DecodedInst*);
+    void execHfence_gvma(const DecodedInst*);
+    void execHlv_b(const DecodedInst*);
+    void execHlv_bu(const DecodedInst*);
+    void execHlv_h(const DecodedInst*);
+    void execHlv_hu(const DecodedInst*);
+    void execHlv_w(const DecodedInst*);
+    void execHlvx_hu(const DecodedInst*);
+    void execHlvx_wu(const DecodedInst*);
+    void execHsv_b(const DecodedInst*);
+    void execHsv_h(const DecodedInst*);
+    void execHsv_w(const DecodedInst*);
+    void execHlv_wu(const DecodedInst*);
+    void execHlv_d(const DecodedInst*);
+    void execHsv_d(const DecodedInst*);
+    void execHinval_vvma(const DecodedInst*);
+    void execHinval_gvma(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -4243,6 +4261,7 @@ namespace WdRiscv
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
 
+    // These are used to get fast access to the FS and VS bits.
     MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR

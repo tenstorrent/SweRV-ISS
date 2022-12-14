@@ -2620,11 +2620,10 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                       return instTable_.getEntry(InstId::sfence_vma);
                     }
 		}
-	      else if (funct7 == 0xb)
+	      else if (funct7 == 0xb and op0 == 0)
 		{
-		  if (op0 == 0 and f3 == 0)
-		    return instTable_.getEntry(InstId::sinval_vma);
-		  return instTable_.getEntry(InstId::illegal);
+		  op2 = iform.rs2();
+		  return instTable_.getEntry(InstId::sinval_vma);
 		}
 	      else if (funct7 == 0xc)
 		{
@@ -2634,6 +2633,26 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		  if (op0 == 0 and op1 == 0 and op2 == 1 and f3 == 0)
 		    return instTable_.getEntry(InstId::sfence_inval_ir);
 		  return instTable_.getEntry(InstId::illegal);
+		}
+	      else if (funct7 == 0x11 and op0 == 0)
+		{
+		  op2 = iform.rs2();
+		  return instTable_.getEntry(InstId::hfence_vvma);
+		}
+	      else if (funct7 == 0x13 and op0 == 0)
+		{
+		  op2 = iform.rs2();
+		  return instTable_.getEntry(InstId::hinval_vvma);
+		}
+	      else if (funct7 == 0x31 and op0 == 0)
+		{
+		  op2 = iform.rs2();
+		  return instTable_.getEntry(InstId::hfence_gvma);
+		}
+	      else if (funct7 == 0x33 and op0 == 0)
+		{
+		  op2 = iform.rs2();
+		  return instTable_.getEntry(InstId::hinval_vvma);
 		}
 	      else if (op2 == 0x102 and op0 == 0 and op1 == 0)
 		return instTable_.getEntry(InstId::sret);
@@ -2651,6 +2670,28 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  case 5:  return instTable_.getEntry(InstId::csrrwi);
 	  case 6:  return instTable_.getEntry(InstId::csrrsi);
 	  case 7:  return instTable_.getEntry(InstId::csrrci);
+	  case 4:
+	    {
+	      unsigned top12 = op2;
+	      if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
+	      if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
+	      if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);
+	      if (top12 == 0x641) return instTable_.getEntry(InstId::hlv_hu);
+	      if (top12 == 0x680) return instTable_.getEntry(InstId::hlv_w);
+	      if (top12 == 0x643) return instTable_.getEntry(InstId::hlvx_hu);
+	      if (top12 == 0x683) return instTable_.getEntry(InstId::hlvx_wu);
+	      if (top12 == 0x681) return instTable_.getEntry(InstId::hlv_wu);
+	      if (top12 == 0x6c0) return instTable_.getEntry(InstId::hlv_d);
+	      
+	      unsigned top7 = op2 >> 5;
+	      unsigned rd = iform.fields.rd;
+	      op0 = op2 & 0x1f;  // rs2 field
+	      if (top7 == 0x31 and rd == 0) return instTable_.getEntry(InstId::hsv_b);
+	      if (top7 == 0x33 and rd == 0) return instTable_.getEntry(InstId::hsv_h);
+	      if (top7 == 0x35 and rd == 0) return instTable_.getEntry(InstId::hsv_w);
+	      if (top7 == 0x37 and rd == 0) return instTable_.getEntry(InstId::hsv_d);
+	    }
+	    break;
 	  default: return instTable_.getEntry(InstId::illegal);
 	  }
 	return instTable_.getEntry(InstId::illegal);

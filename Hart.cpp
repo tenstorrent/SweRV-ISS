@@ -5599,6 +5599,23 @@ Hart<URV>::execute(const DecodedInst* di)
      &&wrs_nto,
      &&wrs_sto,
 
+     &&hfence_vvma,
+     &&hfence_gvma,
+     &&hlv_b,
+     &&hlv_bu,
+     &&hlv_h,
+     &&hlv_hu,
+     &&hlv_w,
+     &&hlvx_hu,
+     &&hlvx_wu,
+     &&hsv_b,
+     &&hsv_h,
+     &&hsv_w,
+     &&hlv_wu,
+     &&hlv_d,
+     &&hsv_d,
+     &&hinval_vvma,
+     &&hinval_gvma,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8900,6 +8917,74 @@ Hart<URV>::execute(const DecodedInst* di)
 
  wrs_sto:
   execWrs_sto(di);
+  return;
+
+ hfence_vvma:
+  execHfence_vvma(di);
+  return;
+
+ hfence_gvma:
+  execHfence_gvma(di);
+  return;
+
+ hlv_b:
+  execHlv_b(di);
+  return;
+
+ hlv_bu:
+  execHlv_bu(di);
+  return;
+
+ hlv_h:
+  execHlv_h(di);
+  return;
+
+ hlv_hu:
+  execHlv_hu(di);
+  return;
+
+ hlv_w:
+  execHlv_w(di);
+  return;
+
+ hlvx_hu:
+  execHlvx_hu(di);
+  return;
+
+ hlvx_wu:
+  execHlvx_wu(di);
+  return;
+
+ hsv_b:
+  execHsv_b(di);
+  return;
+
+ hsv_h:
+  execHsv_h(di);
+  return;
+
+ hsv_w:
+  execHsv_w(di);
+  return;
+
+ hlv_wu:
+  execHlv_wu(di);
+  return;
+
+ hlv_d:
+  execHlv_d(di);
+  return;
+
+ hsv_d:
+  execHsv_d(di);
+  return;
+
+ hinval_vvma:
+  execHinval_vvma(di);
+  return;
+
+ hinval_gvma:
+  execHinval_gvma(di);
   return;
 }
 

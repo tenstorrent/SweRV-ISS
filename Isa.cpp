@@ -15,6 +15,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::D)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::E)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::F)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::H)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::I)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::M)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::S)) = Info{ {{1,2}}, {1,2} };
@@ -46,6 +47,7 @@ Isa::Isa()
   stringToExt_["d"] = RvExtension::D;
   stringToExt_["e"] = RvExtension::E;
   stringToExt_["f"] = RvExtension::F;
+  stringToExt_["h"] = RvExtension::H;
   stringToExt_["i"] = RvExtension::I;
   stringToExt_["m"] = RvExtension::M;
   stringToExt_["s"] = RvExtension::S;
@@ -76,6 +78,7 @@ Isa::Isa()
   extToString_.at(extIx(RvExtension::D)) = "d";
   extToString_.at(extIx(RvExtension::E)) = "e";
   extToString_.at(extIx(RvExtension::F)) = "f";
+  extToString_.at(extIx(RvExtension::H)) = "h";
   extToString_.at(extIx(RvExtension::I)) = "i";
   extToString_.at(extIx(RvExtension::M)) = "m";
   extToString_.at(extIx(RvExtension::V)) = "v";
