@@ -1223,13 +1223,16 @@ namespace WdRiscv
 
     /// Enable user mode.
     void enableUserMode(bool flag)
-    { userModeEnabled_ = flag; }
+    { userEnabled_ = flag; }
 
     /// Enable/disable F extension.
     void enableRvf(bool flag);
 
     /// Enable supervisor mode.
     void enableSupervisorMode(bool flag);
+
+    /// Enable hypervisor mode.
+    void enableHypervisorMode(bool flag);
 
     /// Enable supervisor mode.
     void enableVectorMode(bool flag);
@@ -1285,8 +1288,9 @@ namespace WdRiscv
 
     unsigned pmpG_ = 0;  // PMP G value: ln2(pmpGrain) - 2
 
-    bool userModeEnabled_ = false;
-    bool supervisorModeEnabled_ = false;
+    bool userEnabled_ = false;    // User mode enabled
+    bool superEnabled_ = false;   // Supervisor
+    bool hyperEnabled_ = false;   // Hypervisor
 
     bool perModeCounterControl_ = false;
     bool recordWrite_ = true;

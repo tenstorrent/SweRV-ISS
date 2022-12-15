@@ -1295,6 +1295,9 @@ namespace WdRiscv
     void enableSupervisorMode(bool flag)
     { rvs_ = flag; csRegs_.enableSupervisorMode(flag); }
 
+    void enableHypervisorMode(bool flag)
+    { rvh_ = flag; csRegs_.enableHypervisorMode(flag); }
+
     /// Enable supervisor mode.
     void enableVectorMode(bool flag);
 

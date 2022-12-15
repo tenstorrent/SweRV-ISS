@@ -260,6 +260,9 @@ Hart<URV>::processExtensions(bool verbose)
   flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
   enableUserMode(flag);
 
+  flag = value & (URV(1) << ('h' - 'a'));  // Hypervisor.
+  enableHypervisorMode(flag);
+
   rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
 
   rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.

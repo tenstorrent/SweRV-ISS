@@ -209,7 +209,7 @@ template <typename URV>
 void
 CsRegs<URV>::enableSupervisorMode(bool flag)
 {
-  supervisorModeEnabled_ = flag;
+  superEnabled_ = flag;
 
   for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
 		     CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
@@ -258,6 +258,34 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
       mask = csr->getPokeMask();
       csr->setPokeMask(mask | extra);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableHypervisorMode(bool flag)
+{
+  hyperEnabled_ = flag;
+
+  typedef CsrNumber CN;
+  for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
+	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
+	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH } )
+    {
+      auto csr = findCsr(csrn);
+      if (not csr)
+        {
+          std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+        }
+      else
+        csr->setImplemented(flag);
+    }
+
+  if (not flag)
+    return;
+
+  // TBD TODO : Check if bits in MIP or MIE should be enabled.
 }
 
 
@@ -317,13 +345,13 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
   if (mode == PrivilegeMode::Machine)
     return fields.value_;
 
-  if (mode == PrivilegeMode::Supervisor and not supervisorModeEnabled_)
+  if (mode == PrivilegeMode::Supervisor and not superEnabled_)
     mode = PrivilegeMode::User;
 
   if (mode == PrivilegeMode::Reserved)
     mode = PrivilegeMode::User;
 
-  if (mode == PrivilegeMode::User and not userModeEnabled_)
+  if (mode == PrivilegeMode::User and not userEnabled_)
     mode = PrivilegeMode::Machine;
 
   fields.bits_.MPP = unsigned(mode);
@@ -1867,15 +1895,15 @@ CsRegs<URV>::updateCounterPrivilege()
 
       if (mFlag)
         {
-          if (supervisorModeEnabled_)
+          if (superEnabled_)
             {
               nextMode = PrivilegeMode::Supervisor;
 
               bool sFlag = (sMask >> i) & 1;
-              if (sFlag and userModeEnabled_)
+              if (sFlag and userEnabled_)
                 nextMode = PrivilegeMode::User;
             }
-          else if (userModeEnabled_)
+          else if (userEnabled_)
             nextMode = PrivilegeMode::User;
         }
 
