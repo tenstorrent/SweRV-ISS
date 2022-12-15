@@ -47,7 +47,6 @@ accessFaultType(bool read, bool write, bool exec)
 }
 
 
-
 ExceptionCause
 VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 {
@@ -79,7 +78,14 @@ VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, false, false, true, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, false, false, true, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
@@ -110,6 +116,56 @@ VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
     pa1 = pa2 = va2;
 
   return cause;
+}
+
+
+ExceptionCause
+VirtMem::translateForInstPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa)
+{
+  auto prevTrace = trace_; trace_ = false;
+  auto prevFile  = attFile_; attFile_ = nullptr;
+
+  auto cause = transForPeek(va, priv, pa);
+
+  trace_ = prevTrace;
+  attFile_ = prevFile;
+  return cause;
+}
+
+
+ExceptionCause
+VirtMem::transForPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa)
+{
+  if (mode_ == Bare)
+    {
+      pa = va;
+      return ExceptionCause::NONE;
+    }
+
+  // Lookup virtual page number in TLB.
+  uint64_t virPageNum = va >> pageBits_;
+  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
+  if (entry)
+    {
+      // Use TLB entry.
+      if (priv == PrivilegeMode::User and not entry->user_)
+        return pageFaultType(false, true, true);
+      if (priv == PrivilegeMode::Supervisor and entry->user_)
+        return pageFaultType(false, false, true);
+      if (not entry->exec_)
+        return pageFaultType(false, false, true);
+      if (not entry->accessed_)
+        {
+          if (faultOnFirstAccess_)
+            return pageFaultType(false, false, true);
+          entry->accessed_ = true;
+        }
+      pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+      return ExceptionCause::NONE;
+    }
+
+  TlbEntry tlbEntry;
+  return doTranslate(va, priv, false, false, true, pa, tlbEntry);
 }
 
 
@@ -145,7 +201,14 @@ VirtMem::translateForLoad(uint64_t va, PrivilegeMode priv, uint64_t& pa)
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, true, false, false, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, true, false, false, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
@@ -211,7 +274,14 @@ VirtMem::translateForStore(uint64_t va, PrivilegeMode priv, uint64_t& pa)
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, false, true, false, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, false, true, false, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
@@ -281,20 +351,26 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, read, write, exec, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, read, write, exec, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
 ExceptionCause
-VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
-                                bool write, bool exec, uint64_t& pa)
+VirtMem::doTranslate(uint64_t va, PrivilegeMode priv, bool read,
+		     bool write, bool exec, uint64_t& pa, TlbEntry& entry)
 {
   // Perform a page table walk.
   ExceptionCause cause = ExceptionCause::LOAD_PAGE_FAULT;
-  TlbEntry tmpTlbEntry;
 
   if (mode_ == Sv32)
-    cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, tmpTlbEntry);
+    cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
   else if (mode_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-39 must equal bit 38
@@ -303,7 +379,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0x1ffffff;  // Least sig 25 bits set
       if ((va >> 39) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, entry);
     }
   else if (mode_ == Sv48)
     {
@@ -313,7 +389,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0xffff;  // Least sig 16 bits set
       if ((va >> 48) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, entry);
     }
   else if (mode_ == Sv57)
     {
@@ -323,14 +399,10 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0x7f;  // Least sig 7 bits set
       if ((va >> 57) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, entry);
     }
   else
     assert(0 and "Unspupported virtual memory mode.");
-
-  // If successful, cache translation results in TLB.
-  if (cause == ExceptionCause::NONE)
-    tlb_.insertEntry(tmpTlbEntry);
 
   return cause;
 }

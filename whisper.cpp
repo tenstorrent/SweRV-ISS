@@ -1860,7 +1860,7 @@ session(const Args& args, const HartConfig& config)
       if (bblockFile)
 	hart.enableBasicBlocks(bblockFile, args.bblockInsts);
       if (attFile)
-        hart.enableAddrTransTrace(attFile);
+        hart.enableAddrTransLog(attFile);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())

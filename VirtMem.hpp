@@ -164,6 +164,13 @@ namespace WdRiscv
 
   protected:
 
+    /// Heper to translateForPeek.
+    ExceptionCause transForPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa);
+
+    /// Same as translate for fetch but TLB is not updated and no tracing/logging
+    /// is done.
+    ExceptionCause translateForInstPeek(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+
     /// Helper to translate method.
     template <typename PTE, typename VA>
     ExceptionCause pageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
@@ -174,9 +181,9 @@ namespace WdRiscv
     ExceptionCause pageTableWalk1p12(uint64_t va, PrivilegeMode pm, bool read, bool write,
 				     bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
-    /// Helper to translate method.
-    ExceptionCause pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode pm, bool read,
-                                          bool write, bool exec, uint64_t& pa);
+    /// Helper to translate methods.
+    ExceptionCause doTranslate(uint64_t va, PrivilegeMode pm, bool read,
+			       bool write, bool exec, uint64_t& pa, TlbEntry& entry);
 
     /// Set the page table root page: The root page is placed in
     /// physical memory at address root * page_size
@@ -204,9 +211,10 @@ namespace WdRiscv
     void setSupervisorAccessUser(bool flag)
     { supervisorOk_ = flag; }
 
-    /// Enable address translation trace
-    void enableAddrTransTrace(FILE* file)
-    { attFile_ = file; }
+    /// Enable/disable address translation logging (disable if file is
+    /// null). Return previous value of file.
+    FILE* enableAddrTransLog(FILE* file)
+    { FILE* prev = attFile_; attFile_ = file; return prev; }
 
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
@@ -236,8 +244,9 @@ namespace WdRiscv
     }
 
     /// Eable/disable tracing of accessed page table entries.
-    void enableTrace(bool flag)
-    { trace_ = flag; }
+    /// Return prior trace setting.
+    bool enableTrace(bool flag)
+    { bool prev = trace_; trace_ = flag; return prev; }
 
     /// Set byte to the previous PTE value if address is within
     /// the PTE entry updated by the last translation. Leave

@@ -1355,8 +1355,8 @@ namespace WdRiscv
     { virtMem_.printPageTable(out); }
 
     /// Enable address translation trace
-    void enableAddrTransTrace(FILE* file)
-    { virtMem_.enableAddrTransTrace(file); }
+    void enableAddrTransLog(FILE* file)
+    { virtMem_.enableAddrTransLog(file); }
 
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)

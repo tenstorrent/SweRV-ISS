@@ -1908,25 +1908,40 @@ Hart<URV>::execSw(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::readInst(uint64_t address, uint32_t& inst)
+Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 {
   inst = 0;
+  uint64_t pa = va;
+  bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
+
+  if (translate)
+    if (virtMem_.translateForInstPeek(va, privMode_, pa) != ExceptionCause::NONE)
+      return false;
 
   uint16_t low;  // Low 2 bytes of instruction.
-  if (not memory_.readInst(address, low))
+  if (not memory_.readInst(pa, low))
     return false;
 
   inst = low;
+  if ((inst & 0x3) != 3)
+    return true;  // Compressed instruction.
 
-  if ((inst & 0x3) == 3)  // Non-compressed instruction.
-    {
-      uint16_t high;
-      if (not memory_.readInst(address + 2, high))
+  uint16_t high;
+  uint64_t va2 = va + 2, pa2 = pa + 2;
+  if (translate and memory_.getPageIx(va) != memory_.getPageIx(va2))
+    if (virtMem_.translateForInstPeek(va2, privMode_, pa2) != ExceptionCause::NONE)
+      {
+	inst = 0;
 	return false;
+      }
+
+  if (memory_.readInst(pa2, high))
+    {
       inst |= (uint32_t(high) << 16);
+      return true;
     }
 
-  return true;
+  return false;
 }
 
 
@@ -4332,9 +4347,9 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
   if (isInterruptPossible(cause))
     {
       // Attach changes to interrupted instruction.
-      initiateInterrupt(cause, pc_);
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
+      initiateInterrupt(cause, pc_);
       printInstTrace(inst, instCounter_, instStr, traceFile);
       ++cycleCount_;
       return true;
