@@ -1666,8 +1666,7 @@ namespace WdRiscv
     void setFpStatus(FpStatus value);
 
     // Mark FS field of mstatus as dirty.
-    void markFsDirty()
-    { setFpStatus(FpStatus::Dirty); }
+    void markFsDirty();
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
