@@ -509,27 +509,16 @@ Hart<URV>::updateAddressTranslation()
 
   uint32_t prevAsid = virtMem_.addressSpace();
 
-  URV mode = 0, asid = 0, ppn = 0;
-  if constexpr (sizeof(URV) == 4)
-    {
-      mode = value >> 31;
-      asid = (value >> 22) & 0x1ff;
-      ppn = value & 0x3fffff;  // Least sig 22 bits
-    }
-  else
-    {
-      mode = value >> 60;
-      if ((mode >= 1 and mode <= 7) or mode >= 12)
-        mode = 0;  // 1-7 and 12-15 are reserved in version 1.12 of sepc.
-      asid = (value >> 44) & 0xffff;
-      ppn = value & 0xfffffffffffll;  // Least sig 44 bits
-    }
+  SatpFields<URV> satp(value);
+  if constexpr (sizeof(URV) != 4)
+    if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
+      satp.bits_.MODE = 0;
 
-  virtMem_.setMode(VirtMem::Mode(mode));
-  virtMem_.setAddressSpace(asid);
-  virtMem_.setPageTableRootPage(ppn);
+  virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
+  virtMem_.setAddressSpace(satp.bits_.ASID);
+  virtMem_.setPageTableRootPage(satp.bits_.PPN);
 
-  if (asid != prevAsid)
+  if (satp.bits_.ASID != prevAsid)
     invalidateDecodeCache();
 }
 
@@ -576,8 +565,9 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   if (peekCsr(CsrNumber::DCSR, value))
     {
-      dcsrStep_ = (value >> 2) & 1;
-      dcsrStepIe_ = (value >> 11) & 1;
+      DcsrFields<URV> dcsr(value);
+      dcsrStep_ = dcsr.bits_.STEP;
+      dcsrStepIe_ = dcsr.bits_.STEPIE;
     }
 
   resetVector();
@@ -625,11 +615,12 @@ Hart<URV>::resetVector()
   URV value = 0;
   if (peekCsr(CsrNumber::VTYPE, value))
     {
-      bool vill = (value >> (8*sizeof(URV) - 1)) & 1;
-      bool ma = (value >> 7) & 1;
-      bool ta = (value >> 6) & 1;
-      GroupMultiplier gm = GroupMultiplier(value & 7);
-      ElementWidth ew = ElementWidth((value >> 3) & 7);
+      VtypeFields<URV> vtype(value);
+      bool vill = vtype.bits_.VILL;
+      bool ma = vtype.bits_.VMA;
+      bool ta = vtype.bits_.VTA;
+      GroupMultiplier gm = GroupMultiplier(vtype.bits_.LMUL);
+      ElementWidth ew = ElementWidth(vtype.bits_.SEW);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
@@ -826,8 +817,9 @@ Hart<URV>::setPendingNmi(NmiCause cause)
   URV val = 0;  // DCSR value
   if (peekCsr(CsrNumber::DCSR, val))
     {
-      val |= URV(1) << 3;  // nmip bit
-      pokeCsr(CsrNumber::DCSR, val);
+      DcsrFields<URV> dcsr(val);
+      dcsr.bits_.NMIP = 1;
+      pokeCsr(CsrNumber::DCSR, dcsr.value_);
       recordCsrWrite(CsrNumber::DCSR);
     }
 }
@@ -843,8 +835,9 @@ Hart<URV>::clearPendingNmi()
   URV val = 0;  // DCSR value
   if (peekCsr(CsrNumber::DCSR, val))
     {
-      val &= ~(URV(1) << 3);  // nmip bit
-      pokeCsr(CsrNumber::DCSR, val);
+      DcsrFields<URV> dcsr(val);
+      dcsr.bits_.NMIP = 0;
+      pokeCsr(CsrNumber::DCSR, dcsr.value_);
       recordCsrWrite(CsrNumber::DCSR);
     }
 }
@@ -2350,8 +2343,9 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   URV dcsrVal = 0;
   if (peekCsr(CsrNumber::DCSR, dcsrVal))
     {
-      dcsrVal &= ~(URV(1) << 3);
-      pokeCsr(CsrNumber::DCSR, dcsrVal);
+      DcsrFields<URV> dcsr(dcsrVal);
+      dcsr.bits_.NMIP = 0;
+      pokeCsr(CsrNumber::DCSR, dcsr.value_);
       recordCsrWrite(CsrNumber::DCSR);
     }
 
@@ -2489,7 +2483,7 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string& name) const
-{ 
+{
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
     return false;
@@ -2499,6 +2493,18 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string& name) const
 
   name = csr->getName();
   return true;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::peekCsr(CsrNumber csrn, std::string field, URV& val) const
+{
+  const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
+  if (not csr)
+    return false;
+
+  return csr->field(field, val);
 }
 
 
@@ -2515,8 +2521,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
 
   if (csr == CsrNumber::DCSR)
     {
-      dcsrStep_ = (val >> 2) & 1;
-      dcsrStepIe_ = (val >> 11) & 1;
+      DcsrFields<URV> dcsr(val);
+      dcsrStep_ = dcsr.bits_.STEP;
+      dcsrStepIe_ = dcsr.bits_.STEPIE;
     }
   else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG15)
     updateMemoryProtection();
@@ -2543,11 +2550,12 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
     {
-      bool vill = (val >> (8*sizeof(URV) - 1)) & 1;
-      bool ma = (val >> 7) & 1;
-      bool ta = (val >> 6) & 1;
-      GroupMultiplier gm = GroupMultiplier(val & 7);
-      ElementWidth ew = ElementWidth((val >> 3) & 7);
+      VtypeFields<URV> vtype(val);
+      bool vill = vtype.bits_.VILL;
+      bool ma = vtype.bits_.VMA;
+      bool ta = vtype.bits_.VTA;
+      GroupMultiplier gm = GroupMultiplier(vtype.bits_.LMUL);
+      ElementWidth ew = ElementWidth(vtype.bits_.SEW);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
@@ -3000,9 +3008,9 @@ isDebugModeStopCount(const Hart<URV>& hart)
   if (not hart.peekCsr(CsrNumber::DCSR, dcsrVal))
     return false;
 
-  if ((dcsrVal >> 10) & 1)
-    return true;  // stop count bit is set
-  return false;
+  DcsrFields<URV> dcsr(dcsrVal);
+
+  return bool(dcsr.bits_.STOPCOUNT);
 }
 
 
@@ -9043,14 +9051,13 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
   URV value = 0;
   if (peekCsr(CsrNumber::DCSR, value))
     {
-      value &= ~(URV(7) << 6);        // Clear cause field (starts at bit 6).
-      value |= URV(cause) << 6;       // Set cause field
-      value = (value >> 2) << 2;      // Clear privilege mode bits.
-      value |= URV(privMode_) & 0x3;  // Set privelge mode bits.
+      DcsrFields<URV> dcsr(value);
+      dcsr.bits_.CAUSE = URV(cause);
+      dcsr.bits_.PRV = URV(privMode_) & 0x3;
 
       if (nmiPending_)
-	value |= URV(1) << 3;    // Set nmip bit.
-      csRegs_.poke(CsrNumber::DCSR, value);
+        dcsr.bits_.NMIP = 1;
+      csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
 
       csRegs_.poke(CsrNumber::DPC, pc);
     }
@@ -9111,7 +9118,8 @@ Hart<URV>::exitDebugMode()
   if (not peekCsr(CsrNumber::DCSR, dcsrVal))
     std::cerr << "Error: Failed to read DCSR in exit debug.\n";
 
-  if ((dcsrVal >> 3) & 1)
+  DcsrFields<URV> dcsr(dcsrVal);
+  if (dcsr.bits_.NMIP)
     setPendingNmi(nmiCause_);
 }
 

@@ -179,10 +179,18 @@ namespace WdRiscv
     VirtMem::Mode nextPageMode() const
     { return hart_->pageMode(); }
 
+    /// Return CSR value after last executed instruction.
+    bool peekCsr(CsrNumber csr, URV& val) const
+    { return hart_->peekCsr(csr, val); }
+
+    /// Return CSR field value after last executed instruction.
+    bool peekCsr(CsrNumber csr, std::string field, URV& val) const
+    { return hart_->peekCsr(csr, field, val); }
+
     /// Return the page table walk for load/store/fetch of last executed instruction.
     /// Will be empty if there was no walk.
-    void getPageTableWalkEntries(bool instruction, std::vector<uint64_t>& ptes) const
-    { hart_->getPageTableWalkEntries(instruction, ptes); }
+    void getPageTableWalkEntries(bool instr, std::vector<uint64_t>& ptes) const
+    { hart_->getPageTableWalkEntries(instr, ptes); }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
