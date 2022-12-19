@@ -2206,7 +2206,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 
   PrivilegeMode origMode = privMode_;
 
-  // Exceptions are taken in machine mode.
+  // Traps are taken in machine mode.
   privMode_ = PrivilegeMode::Machine;
   PrivilegeMode nextMode = PrivilegeMode::Machine;
 
@@ -4245,14 +4245,15 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
   URV delegVal = 0;
   peekCsr(CsrNumber::MIDELEG, delegVal);
   for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
-                              IC::M_TIMER, IC::M_INT_TIMER0,
-                              IC::M_INT_TIMER1 } )
+                              IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+			      IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
     {
       URV mask = URV(1) << unsigned(ic);
       bool delegated = (mask & delegVal) != 0;
       bool enabled = globalEnable;
       if (delegated)
-        enabled = privMode_ < PrivilegeMode::Machine;
+        enabled = ((privMode_ == PrivilegeMode::Supervisor and fields.bits_.SIE) or
+                   privMode_ < PrivilegeMode::Supervisor);
       if (enabled)
         if (mie & mask & mip)
           {
@@ -4261,6 +4262,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
           }
     }
 
+#if 0
   // Supervisor mode interrupts: SIE enabled and supervior mode, or user-mode.
   if (isRvs())
     {
@@ -4277,6 +4279,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
               }
           }
     }
+#endif
 
   return false;
 }
