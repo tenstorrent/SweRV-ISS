@@ -189,8 +189,9 @@ namespace WdRiscv
 
     /// Return the page table walk for load/store/fetch of last executed instruction.
     /// Will be empty if there was no walk.
-    void getPageTableWalkEntries(bool instr, std::vector<uint64_t>& ptes) const
-    { hart_->getPageTableWalkEntries(instr, ptes); }
+    void getPageTableWalkEntries(bool instr, unsigned ix,
+                                 std::vector<uint64_t>& ptes) const
+    { hart_->getPageTableWalkEntries(instr, ix, ptes); }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
