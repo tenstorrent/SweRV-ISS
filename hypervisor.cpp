@@ -25,16 +25,31 @@ using namespace WdRiscv;
 
 template <typename URV>
 void
-Hart<URV>::execHfence_vvma(const DecodedInst*)
+Hart<URV>::execHfence_vvma(const DecodedInst* di)
 {
+  if (not isRvs() or privMode_ < PrivilegeMode::Supervisor or virtMode_)
+    {
+      illegalInst(di);
+      return;
+    }
+
   assert(0);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execHfence_gvma(const DecodedInst*)
+Hart<URV>::execHfence_gvma(const DecodedInst* di)
 {
+  bool valid = (privMode_ == PrivilegeMode::Machine or
+		(privMode_ == PrivilegeMode::Supervisor and not virtMode_));
+  if (not valid)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  assert(0);
 }
 
 

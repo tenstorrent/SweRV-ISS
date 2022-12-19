@@ -4252,8 +4252,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
       bool delegated = (mask & delegVal) != 0;
       bool enabled = globalEnable;
       if (delegated)
-        enabled = ((privMode_ == PrivilegeMode::Supervisor and fields.bits_.SIE) or
-                   privMode_ < PrivilegeMode::Supervisor);
+        enabled = privMode_ < PrivilegeMode::Machine;
       if (enabled)
         if (mie & mask & mip)
           {
@@ -9537,8 +9536,6 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       return;
     }
 
-  URV status = csRegs_.peekMstatus();
-  MstatusFields<URV> fields(status);
   bool tvm = virtMode_ ? mstatus_.bits_.TVM : hstatus_.bits_.VTVM;
   if (tvm and privMode_ == PrivilegeMode::Supervisor)
     {
