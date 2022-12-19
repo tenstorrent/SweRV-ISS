@@ -71,6 +71,9 @@ namespace WdRiscv
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
 
+    /// Return rsw value (reserved for supervisor).
+    uint64_t rsw() const    { return bits_.rsw_; }
+
     /// Return true if this PTE is a leaf.
     bool leaf() const       { return valid() and (read() or exec()); }
 
@@ -180,6 +183,9 @@ namespace WdRiscv
 
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
+
+    /// Return rsw value (reserved for supervisor).
+    uint64_t rsw() const    { return bits_.rsw_; }
 
     /// Return true if this PTE is a leaf.
     bool leaf() const       { return valid() and (read() or exec()); }
@@ -303,6 +309,9 @@ namespace WdRiscv
 
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
+
+    /// Return rsw value (reserved for supervisor).
+    uint64_t rsw() const    { return bits_.rsw_; }
 
     /// Return true if this PTE is a leaf.
     bool leaf() const       { return valid() and (read() or exec()); }
@@ -434,6 +443,9 @@ namespace WdRiscv
 
     /// Return true if this PTE is marked dirty.
     bool dirty() const      { return bits_.dirty_; }
+
+    /// Return rsw value (reserved for supervisor).
+    uint64_t rsw() const    { return bits_.rsw_; }
 
     /// Return true if this PTE is a leaf.
     bool leaf() const       { return valid() and (read() or exec()); }
