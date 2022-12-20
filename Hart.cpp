@@ -4262,7 +4262,6 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
           }
     }
 
-#if 0
   // Supervisor mode interrupts: SIE enabled and supervior mode, or user-mode.
   if (isRvs())
     {
@@ -4279,7 +4278,6 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
               }
           }
     }
-#endif
 
   return false;
 }
