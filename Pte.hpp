@@ -89,6 +89,9 @@ namespace WdRiscv
     /// privileged spec.)
     uint32_t ppn1() const   { return bits_.ppn1_; }
 
+    /// Return reserved bits value. NA for Sv32.
+    uint64_t res() const    { return 0; }
+
     /// Number of levels of an Sv32 PTE.
     static uint32_t levels() { return 2; }
 
@@ -147,7 +150,7 @@ namespace WdRiscv
     unsigned res_      : 7;   // Reserved
     unsigned pbmt_     : 2;   // Page based memory type
     unsigned n_        : 1;
-  } __attribute((packed));
+  } __attribute__((packed));
 
 
   /// Page table entry for Sv39
@@ -205,6 +208,9 @@ namespace WdRiscv
     /// Physical page number field 2 in this PTE (see Sv39 PTE in the
     /// privileged spec.)
     uint64_t ppn2() const   { return bits_.ppn2_; }
+
+    /// Return reserved bits value
+    uint64_t res() const    { return bits_.res_; }
 
     /// Number of levels of an Sv39 PTE.
     static uint32_t levels() { return 3; }
@@ -335,6 +341,9 @@ namespace WdRiscv
     /// Physical page number field 3 in this PTE (see Sv48 PTE in the
     /// privileged spec.)
     uint64_t ppn3() const   { return bits_.ppn3_; }
+
+    /// Return reserved bits value
+    uint64_t res() const    { return bits_.res_; }
 
     /// Number of levels of an Sv48 PTE.
     static uint32_t levels() { return 4; }
@@ -473,6 +482,9 @@ namespace WdRiscv
     /// Physical page number field 4 in this PTE (see Sv57 PTE in the
     /// privileged spec.)
     uint64_t ppn4() const   { return bits_.ppn4_; }
+
+    /// Return reserved bits value
+    uint64_t res() const    { return bits_.res_; }
 
     /// Number of levels of an Sv57 PTE.
     static uint32_t levels() { return 5; }
