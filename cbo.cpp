@@ -94,11 +94,11 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   peekCsr(CsrNumber::MENVCFG, menv);
   peekCsr(CsrNumber::SENVCFG, senv);
 
-  unsigned mcbcfe = (menv >> 6) & 1;
-  unsigned scbcfe = (senv >> 6) & 1;
+  MenvcfgFields<URV> menvf(menv);
+  SenvcfgFields<URV> senvf(senv);
 
-  if ( (pm != PM::Machine and not mcbcfe) or
-       (pm == PM::User and not scbcfe) )
+  if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
+       (pm == PM::User and not senvf.bits_.CBCFE) )
     {
       illegalInst(di);
       return;
@@ -131,11 +131,11 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   peekCsr(CsrNumber::MENVCFG, menv);
   peekCsr(CsrNumber::SENVCFG, senv);
 
-  unsigned mcbcfe = (menv >> 6) & 1;
-  unsigned scbcfe = (senv >> 6) & 1;
+  MenvcfgFields<URV> menvf(menv);
+  SenvcfgFields<URV> senvf(senv);
 
-  if ( (pm != PM::Machine and not mcbcfe) or
-       (pm == PM::User and not scbcfe) )
+  if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
+       (pm == PM::User and not senvf.bits_.CBCFE) )
     {
       illegalInst(di);
       return;
@@ -168,11 +168,11 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   peekCsr(CsrNumber::MENVCFG, menv);
   peekCsr(CsrNumber::SENVCFG, senv);
 
-  unsigned mcbie = (menv >> 4) & 3;
-  unsigned scbie = (senv >> 4) & 3;
+  MenvcfgFields<URV> menvf(menv);
+  SenvcfgFields<URV> senvf(senv);
 
-  if ( (pm != PM::Machine and mcbie == 0) or
-       (pm == PM::User and scbie == 0) )
+  if ( (pm != PM::Machine and not menvf.bits_.CBIE) or
+       (pm == PM::User and not senvf.bits_.CBIE) )
     {
       illegalInst(di);
       return;
@@ -180,8 +180,8 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
 
   // If we are doing a flush then we require write access. If we are
   // doing an invalidate then we only require read access.
-  bool isFlush = ( (pm != PM::Machine and mcbie == 1) or
-		   (pm == PM::User and scbie == 1) );
+  bool isFlush = ( (pm != PM::Machine and menvf.bits_.CBIE) or
+		   (pm == PM::User and senvf.bits_.CBIE) );
   bool isRead = not isFlush;
 
   uint64_t virtAddr = intRegs_.read(di->op0());
@@ -210,11 +210,11 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   peekCsr(CsrNumber::MENVCFG, menv);
   peekCsr(CsrNumber::SENVCFG, senv);
 
-  unsigned mcbze = (menv >> 7) & 1;
-  unsigned scbze = (senv >> 7) & 1;
+  MenvcfgFields<URV> menvf(menv);
+  SenvcfgFields<URV> senvf(senv);
 
-  if ( (pm != PM::Machine and not mcbze) or
-       (pm == PM::User and not scbze) )
+  if ( (pm != PM::Machine and not menvf.bits_.CBZE) or
+       (pm == PM::User and not senvf.bits_.CBZE) )
     {
       illegalInst(di);
       return;

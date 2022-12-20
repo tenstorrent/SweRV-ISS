@@ -1107,6 +1107,9 @@ CsRegs<URV>::defineMachineRegs()
       name = "mhpmevent" + std::to_string(i);
       defineCsr(name, csrNum, mand, imp, 0, rom, rom);
     }
+
+  // add CSR fields
+  addMachineFields();
 }
 
 
@@ -1274,6 +1277,9 @@ CsRegs<URV>::defineSupervisorRegs()
       if (csr)
 	csr->setMapsToVirtual(true);
     }
+
+  // add CSR fields
+  addSupervisorFields();
 }
 
 
@@ -1488,6 +1494,9 @@ CsRegs<URV>::defineVectorRegs()
   defineCsr("vtype",  CsrNumber::VTYPE,  !mand, !imp, 0, mask, mask);
 
   defineCsr("vlenb",  CsrNumber::VLENB,  !mand, !imp, 0, 0, 0);
+
+  // add CSR fields
+  addVectorFields();
 }
 
 
@@ -1956,6 +1965,61 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
   assignEventToCounter(event, counterIx, enableUser, enableMachine);
 
   return value;
+}
+
+template <typename URV>
+void
+CsRegs<URV>::addMachineFields()
+{
+  if constexpr (sizeof(URV) == 4)
+    {
+      setCsrFields(CsrNumber::MSTATUS,
+        {{"UIE",  0}, {"SIE",    1}, {"res1", 2}, {"MIE",   3},
+         {"UPIE", 4}, {"SPIE",   5}, {"UBE",  6}, {"MPIE",  7},
+         {"SPP",  8}, {"VS",     9}, {"MPP", 11}, {"FS",   13},
+         {"XS",  15}, {"MPRV",  17}, {"SUM", 18}, {"MXR",  19},
+         {"TVM", 20}, {"TW",    21}, {"TSR", 22}, {"res0", 23},
+         {"SD",  31}});
+    }
+  else
+    {
+      setCsrFields(CsrNumber::MSTATUS,
+        {{"UIE",   0}, {"SIE",   1}, {"res2", 2}, {"MIE",   3},
+         {"UPIE",  4}, {"SPIE",  5}, {"UBE",  6}, {"MPIE",  7},
+         {"SPP",   8}, {"VS",    9}, {"MPP", 11}, {"FS",   13},
+         {"XS",   15}, {"MPRV", 17}, {"SUM", 18}, {"MXR",  19},
+         {"TVM",  20}, {"TW",   21}, {"TSR", 22}, {"res1", 23},
+         {"UXL",  32}, {"SXL",  34}, {"SBE", 36}, {"MBE",  37},
+         {"res0", 38}, {"SD",   63}});
+    }
+  setCsrFields(CsrNumber::MTVEC, {{"MODE", 0}, {"BASE", 2}});
+}
+
+template <typename URV>
+void
+CsRegs<URV>::addSupervisorFields()
+{
+  if constexpr (sizeof(URV) == 4)
+    {
+      setCsrFields(CsrNumber::SATP,
+        {{"PPN", 0}, {"ASID", 22}, {"MODE", 31}});
+    }
+  else
+    {
+      setCsrFields(CsrNumber::SATP,
+        {{"PPN", 0}, {"ASID", 44}, {"MODE", 60}});
+    }
+  setCsrFields(CsrNumber::STVEC, {{"MODE", 0}, {"BASE", 2}});
+}
+
+template <typename URV>
+void
+CsRegs<URV>::addVectorFields()
+{
+  constexpr unsigned msb = (sizeof(URV) == 4) ? 31 : 63;
+  setCsrFields(CsrNumber::VTYPE,
+    {{"LMUL", 0}, {"SEW",   3}, {"VTA", 6}, {"VMA", 7},
+     {"res",  8}, {"ILL", msb}});
 }
 
 

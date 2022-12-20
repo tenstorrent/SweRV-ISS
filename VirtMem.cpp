@@ -457,7 +457,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 
       if (attFile_)
         {
-          bool leaf = pte.valid() and (pte.write() or pte.exec());
+          bool leaf = pte.valid() and (pte.read() or pte.exec());
           fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
           fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
 		  pte.write(), pte.exec(), pte.user(), pte.global(),
@@ -470,7 +470,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
         }
 
       // 4.
-      if (not pte.valid() or (not pte.read() and pte.write()))
+      if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
         return pageFaultType(read, write, exec);
 
       // 5.
@@ -607,7 +607,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
       if (attFile_)
         {
-          bool leaf = pte.valid() and (pte.write() or pte.exec());
+          bool leaf = pte.valid() and (pte.read() or pte.exec());
           fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
           fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
 		  pte.write(), pte.exec(), pte.user(), pte.global(),
@@ -620,7 +620,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
         }
 
       // 3.
-      if (not pte.valid() or (not pte.read() and pte.write()))
+      if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
         return pageFaultType(read, write, exec);
 
       // 4.
