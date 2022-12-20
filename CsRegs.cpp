@@ -1977,20 +1977,20 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MIMPID, {{"mimpid", xlen}});
   setCsrFields(CsrNumber::MHARTID, {{"mhartid", xlen}});
   setCsrFields(CsrNumber::MCONFIGPTR, {{"mconfigptr", xlen}});
-  setCsrFields(CsrNumber::MISA, {{"EXT", 26}, {"res0", xlen - 28}, {"MXL", 2}});
+  setCsrFields(CsrNumber::MISA, {{"EXT", 26}, {"zero", xlen - 28}, {"MXL", 2}});
   // TODO: field for each trap?
   setCsrFields(CsrNumber::MEDELEG, {{"medeleg", xlen}});
   setCsrFields(CsrNumber::MIDELEG, {{"mideleg", xlen}});
   setCsrFields(CsrNumber::MIE,
-    {{"res0", 1}, {"SSIP", 1}, {"res1", 1}, {"MSIP", 1},
-     {"res2", 1}, {"STIP", 1}, {"res3", 1}, {"MTIP", 1},
-     {"res4", 1}, {"SEIP", 1}, {"res5", 1}, {"MEIP", 1},
-     {"res6", xlen - 12}});
+    {{"zero", 1}, {"SSIP", 1}, {"zero", 1}, {"MSIP", 1},
+     {"zero", 1}, {"STIP", 1}, {"zero", 1}, {"MTIP", 1},
+     {"zero", 1}, {"SEIP", 1}, {"zero", 1}, {"MEIP", 1},
+     {"zero", xlen - 12}});
   setCsrFields(CsrNumber::MIP,
-    {{"res0", 1}, {"SSIE", 1}, {"res1", 1}, {"MSIE", 1},
-     {"res2", 1}, {"STIE", 1}, {"res3", 1}, {"MTIE", 1},
-     {"res4", 1}, {"SEIE", 1}, {"res5", 1}, {"MEIE", 1},
-     {"res6", xlen - 12}});
+    {{"zero", 1}, {"SSIE", 1}, {"zero", 1}, {"MSIE", 1},
+     {"zero", 1}, {"STIE", 1}, {"zero", 1}, {"MTIE", 1},
+     {"zero", 1}, {"SEIE", 1}, {"zero", 1}, {"MEIE", 1},
+     {"zero", xlen - 12}});
   setCsrFields(CsrNumber::MTVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
 
   std::vector<class Csr<URV>::Field> mcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
@@ -1999,7 +1999,7 @@ CsRegs<URV>::addMachineFields()
     hpm.push_back({"HPM" + std::to_string(i), 1});
   mcount.insert(mcount.end(), hpm.begin(), hpm.end());
   setCsrFields(CsrNumber::MCOUNTEREN, mcount);
-  mcount.at(1) = {"res0", 1}; // TM cleared for MCOUNTINHIBIT
+  mcount.at(1) = {"zero", 1}; // TM cleared for MCOUNTINHIBIT
   setCsrFields(CsrNumber::MCOUNTINHIBIT, mcount);
 
   setCsrFields(CsrNumber::MSCRATCH, {{"mscratch", xlen}});
@@ -2075,7 +2075,7 @@ CsRegs<URV>::addMachineFields()
       if (rv32_)
         setCsrFields(csrNum, {{"addr", 32}});
       else
-        setCsrFields(csrNum, {{"addr", 54}, {"res0", 10}});
+        setCsrFields(csrNum, {{"addr", 54}, {"zero", 10}});
     }
 
   for (unsigned i = 3; i <= 31; ++i)
@@ -2098,17 +2098,50 @@ void
 CsRegs<URV>::addSupervisorFields()
 {
   constexpr unsigned xlen = sizeof(URV)*8;
+  setCsrFields(CsrNumber::STVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
+
+  std::vector<class Csr<URV>::Field> scount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
+  std::vector<class Csr<URV>::Field> hpm;
+  for (unsigned i = 3; i <= 31; ++i)
+    hpm.push_back({"HPM" + std::to_string(i), 1});
+  scount.insert(scount.end(), hpm.begin(), hpm.end());
+  setCsrFields(CsrNumber::SCOUNTEREN, scount);
+
+  setCsrFields(CsrNumber::SSCRATCH, {{"sscratch", xlen}});
+  setCsrFields(CsrNumber::SEPC, {{"sepc", xlen}});
+  setCsrFields(CsrNumber::SCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
+  setCsrFields(CsrNumber::STVAL, {{"stval", xlen}});
+  setCsrFields(CsrNumber::SIE,
+    {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
+     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
+  setCsrFields(CsrNumber::SIP,
+    {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
+     {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
+  setCsrFields(CsrNumber::SENVCFG,
+    {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1},
+     {"CBZE", 1}, {"res1", xlen - 8}});
+
   if (rv32_)
     {
+      setCsrFields(CsrNumber::SSTATUS,
+        {{"res0", 1}, {"SIE",  1}, {"res1",  3}, {"SPIE", 1},
+         {"UBE",  1}, {"res2", 1}, {"SPP",   1}, {"VS",   2},
+         {"res3", 2}, {"FS",   2}, {"XS",    2}, {"res4", 1},
+         {"SUM",  1}, {"MXR",  1}, {"res5", 11}, {"SD",   1}});
       setCsrFields(CsrNumber::SATP,
         {{"PPN", 22}, {"ASID", 9}, {"MODE", 1}});
     }
   else
     {
+      setCsrFields(CsrNumber::SSTATUS,
+        {{"res0",  1}, {"SIE",  1}, {"res1",  3}, {"SPIE",  1},
+         {"UBE",   1}, {"res2", 1}, {"SPP",   1}, {"VS",    2},
+         {"res3",  2}, {"FS",   2}, {"XS",    2}, {"res4",  1},
+         {"SUM",   1}, {"MXR",  1}, {"res5", 12}, {"UXL",   2},
+         {"res6", 29}, {"SD",   1}});
       setCsrFields(CsrNumber::SATP,
         {{"PPN", 44}, {"ASID", 16}, {"MODE", 4}});
     }
-  setCsrFields(CsrNumber::STVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
 }
 
 template <typename URV>
@@ -2116,9 +2149,19 @@ void
 CsRegs<URV>::addVectorFields()
 {
   constexpr unsigned xlen = sizeof(URV)*8;
+  setCsrFields(CsrNumber::VXSAT,
+    {{"vxsat", 1}, {"zero", xlen - 1}});
+  setCsrFields(CsrNumber::VXRM,
+    {{"vxrm", 2}, {"zero", xlen - 2}});
+  setCsrFields(CsrNumber::VCSR,
+    {{"vxsat", 1}, {"vxrm", 2}, {"zero", xlen - 3}});
+  setCsrFields(CsrNumber::VL,
+    {{"vl", xlen}});
   setCsrFields(CsrNumber::VTYPE,
     {{"LMUL",       3}, {"SEW",   3}, {"VTA", 1}, {"VMA", 1},
      {"res", xlen - 9}, {"ILL", 1}});
+  setCsrFields(CsrNumber::VLENB,
+    {{"vlenb", xlen}});
 }
 
 
