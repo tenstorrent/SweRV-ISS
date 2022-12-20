@@ -545,18 +545,11 @@ namespace WdRiscv
     /// Get field width of CSR
     unsigned width(std::string field) const
     {
-      unsigned pos = 0;
       for (auto& f : fields_)
         {
           if (f.field == field)
-            break;
-          pos++;
+            return f.width;
         }
-
-      if (pos == (fields_.size() - 1))
-        return (sizeof(URV)*8 - fields_.at(pos).bit);
-      else
-        return fields_.at(pos + 1).bit - fields_.at(pos).bit;
     }
 
   protected:
@@ -696,7 +689,7 @@ namespace WdRiscv
     struct Field
     {
       std::string field;
-      unsigned bit;
+      unsigned width;
     };
 
     void setFields(const std::vector<Field>& fields)
@@ -704,13 +697,17 @@ namespace WdRiscv
 
     bool field(std::string field, URV& val) const
     {
+      unsigned start = 0;
       for (auto& f : fields_)
-        if (f.field == field)
-          {
-            URV mask = ((1 << width(field)) - 1) << f.bit;
-            val = (value_ * mask) >> f.bit;
-            return true;
-          }
+        {
+          if (f.field == field)
+            {
+              URV mask = ((1 << f.width) - 1) << start;
+              val = (value_ * mask) >> start;
+              return true;
+            }
+          start += f.width;
+        }
       return false;
     }
 
