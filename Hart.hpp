@@ -1375,6 +1375,11 @@ namespace WdRiscv
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
 
+    /// Return the number of page table walks of the last
+    /// executed instruction
+    unsigned getNumPageTableWalks(bool isInstr) const
+    { return isInstr? virtMem_.numFetchWalks() : virtMem_.numDataWalks(); }
+
     /// Fill the addrs vector (cleared on entry) with the addresses of
     /// instruction/data the page table entries referenced by the
     /// instruction/data page table walk of the last executed

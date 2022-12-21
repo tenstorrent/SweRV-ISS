@@ -187,7 +187,18 @@ namespace WdRiscv
     bool peekCsr(CsrNumber csr, std::string field, URV& val) const
     { return hart_->peekCsr(csr, field, val); }
 
-    /// Return the page table walk for load/store/fetch of last executed instruction.
+    /// Return the number of page table walks of the last
+    /// executed instruction
+    unsigned getNumPageTableWalks(bool instr) const
+    { return hart_->getNumPageTableWalks(instr); }
+
+    /// Return the page table walk addresses for load/store/fetch of last executed instruction.
+    /// Will be empty if there was no walk.
+    void getPageTableWalkAddresses(bool instr, unsigned ix,
+                                   std::vector<uint64_t>& addrs) const
+    { hart_->getPageTableWalkAddresses(instr, ix, addrs); }
+
+    /// Return the page table walk entries for load/store/fetch of last executed instruction.
     /// Will be empty if there was no walk.
     void getPageTableWalkEntries(bool instr, unsigned ix,
                                  std::vector<uint64_t>& ptes) const

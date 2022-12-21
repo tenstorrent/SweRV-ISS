@@ -112,6 +112,13 @@ namespace WdRiscv
     template <typename PTE, typename VA>
     void printEntries(std::ostream& os, uint64_t addr, std::string path) const;
 
+    /// Return the number of walks used in the last page table walk.
+    unsigned numFetchWalks() const
+    { return fetchWalks_.size(); }
+
+    unsigned numDataWalks() const
+    { return dataWalks_.size(); }
+
     /// Return the addresses of the instruction page table entries
     /// used in the last page table walk. Return empty vector if the
     /// last executed instruction did not induce an instruction page
