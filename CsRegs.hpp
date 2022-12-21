@@ -1316,8 +1316,14 @@ namespace WdRiscv
     /// helper to add fields of supervisor CSRs
     void addSupervisorFields();
 
+    /// helper to add fields of user CSRs
+    void addUserFields();
+
     /// helper to add fields of vector CSRs
     void addVectorFields();
+
+    /// helper to add fields of fp CSRs
+    void addFpFields();
 
   private:
 

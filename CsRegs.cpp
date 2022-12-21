@@ -1315,6 +1315,9 @@ CsRegs<URV>::defineUserRegs()
       csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
       defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
     }
+
+  // add CSR fields
+  addUserFields();
 }
 
 
@@ -2093,6 +2096,7 @@ CsRegs<URV>::addMachineFields()
     }
 }
 
+
 template <typename URV>
 void
 CsRegs<URV>::addSupervisorFields()
@@ -2144,24 +2148,64 @@ CsRegs<URV>::addSupervisorFields()
     }
 }
 
+
+template <typename URV>
+void
+CsRegs<URV>::addUserFields()
+{
+  constexpr unsigned xlen = sizeof(URV)*8;
+  setCsrFields(CsrNumber::CYCLE, {{"cycle", xlen}});
+  setCsrFields(CsrNumber::TIME, {{"time", xlen}});
+  setCsrFields(CsrNumber::INSTRET, {{"instret", xlen}});
+  if (rv32_)
+    {
+      setCsrFields(CsrNumber::CYCLEH, {{"cycleh", xlen}});
+      setCsrFields(CsrNumber::TIMEH, {{"timeh", xlen}});
+      setCsrFields(CsrNumber::INSTRETH, {{"instreth", xlen}});
+    }
+
+  for (unsigned i = 3; i <= 31; ++i)
+    {
+      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3) + i - 3);
+      std::string name = "hpmcounter" + std::to_string(i);
+      setCsrFields(csrNum, {{name, xlen}});
+      if (rv32_)
+        {
+          // High register counterpart of hpmcounter.
+          csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
+          name += "h";
+          setCsrFields(csrNum, {{name, xlen}});
+        }
+    }
+}
+
+
 template <typename URV>
 void
 CsRegs<URV>::addVectorFields()
 {
   constexpr unsigned xlen = sizeof(URV)*8;
-  setCsrFields(CsrNumber::VXSAT,
-    {{"vxsat", 1}, {"zero", xlen - 1}});
-  setCsrFields(CsrNumber::VXRM,
-    {{"vxrm", 2}, {"zero", xlen - 2}});
+  setCsrFields(CsrNumber::VSTART, {{"vstart", xlen}});
+  setCsrFields(CsrNumber::VXSAT, {{"vxsat", 1}, {"zero", xlen - 1}});
+  setCsrFields(CsrNumber::VXRM, {{"vxrm", 2}, {"zero", xlen - 2}});
   setCsrFields(CsrNumber::VCSR,
     {{"vxsat", 1}, {"vxrm", 2}, {"zero", xlen - 3}});
-  setCsrFields(CsrNumber::VL,
-    {{"vl", xlen}});
+  setCsrFields(CsrNumber::VL, {{"vl", xlen}});
   setCsrFields(CsrNumber::VTYPE,
     {{"LMUL",       3}, {"SEW",   3}, {"VTA", 1}, {"VMA", 1},
      {"res", xlen - 9}, {"ILL", 1}});
-  setCsrFields(CsrNumber::VLENB,
-    {{"vlenb", xlen}});
+  setCsrFields(CsrNumber::VLENB, {{"vlenb", xlen}});
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::addFpFields()
+{
+  setCsrFields(CsrNumber::FFLAGS,
+    {{"NX", 1}, {"UF", 1}, {"OF", 1}, {"DZ", 1}, {"NV", 1}});
+  setCsrFields(CsrNumber::FRM, {{"frm", 3}});
+  setCsrFields(CsrNumber::FCSR, {{"fflags", 5}, {"frm", 3}, {"res0", 24}});
 }
 
 
