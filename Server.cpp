@@ -234,7 +234,7 @@ sendMessage(int soc, WhisperMessage& msg)
   char* p = buffer;
   while (remain > 0)
     {
-      ssize_t l = send(soc, p, remain , 0);
+      ssize_t l = send(soc, p, remain , MSG_NOSIGNAL);
       if (l < 0)
 	{
 	  if (errno == EINTR)
