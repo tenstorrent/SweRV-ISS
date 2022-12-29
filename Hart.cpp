@@ -9555,7 +9555,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       return;
     }
 
-  // Invalidate whole TLB. This is overkill. TBD FIX: Improve.
+  // Invalidate whole TLB. This is overkill. 
   if (di->op1() == 0 and di->op2() == 0)
     virtMem_.tlb_.invalidate();
   else if (di->op1() == 0 and di->op2() != 0)
