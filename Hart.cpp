@@ -2195,7 +2195,7 @@ template <typename URV>
 void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 {
-ssss  // FIX: spec no longer mandate loss of reservation on traps.
+  // FIX: spec no longer mandate loss of reservation on traps.
   if (cancelLrOnRet_)  // Temporary
     cancelLr(); // Clear LR reservation (if any).
 
