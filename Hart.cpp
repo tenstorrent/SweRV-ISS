@@ -2195,7 +2195,8 @@ template <typename URV>
 void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 {
-  cancelLr(); // Clear LR reservation (if any).
+  if (cancelLrOnRet_)  // Temporary
+    cancelLr(); // Clear LR reservation (if any).
 
   PrivilegeMode origMode = privMode_;
 
