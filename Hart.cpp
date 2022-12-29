@@ -9639,7 +9639,8 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    cancelLr(); // Clear LR reservation (if any).
+    if (cancelLrOnRet_)
+      cancelLr(); // Clear LR reservation (if any).
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint64_t value = csRegs_.peekMstatus();
@@ -9703,7 +9704,8 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    cancelLr(); // Clear LR reservation (if any).
+    if (cancelLrOnRet_)
+      cancelLr(); // Clear LR reservation (if any).
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint32_t value = csRegs_.peekMstatus();
@@ -9788,7 +9790,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
-  cancelLr(); // Clear LR reservation (if any).
+  if (cancelLrOnRet_)
+    cancelLr(); // Clear LR reservation (if any).
 
   // Restore privilege mode and interrupt enable by getting
   // current value of SSTATUS, ...

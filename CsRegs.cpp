@@ -1246,7 +1246,8 @@ CsRegs<URV>::defineSupervisorRegs()
   defineCsr("stval",      Csrn::STVAL,      !mand, !imp, 0, wam, wam);
 
   // Bits of SIE appear hardwired to zreo unless delegated.
-  defineCsr("sie",        Csrn::SIE,        !mand, !imp, 0, wam, wam);
+  mask = 0x0;
+  defineCsr("sie",        Csrn::SIE,        !mand, !imp, 0, mask, mask);
   auto sie = findCsr(Csrn::SIE);
   auto mie = findCsr(Csrn::MIE);
   if (sie and mie)
