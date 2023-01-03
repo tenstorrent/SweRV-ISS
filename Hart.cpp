@@ -4720,7 +4720,7 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
 
   for (auto csrn : csrNums)
     {
-      Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
+      Csr<URV>* csr = csRegs_.getImplementedCsr(csrn, virtMode_);
       if (not csr)
 	continue;
 

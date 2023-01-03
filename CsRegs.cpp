@@ -190,7 +190,15 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
       auto mcsr = getImplementedCsr(CsrNumber(unsigned(number) + 0x200));
       auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
       if (mcsr and deleg)
-        value = mcsr->read() & (csr->getReadMask() & deleg->read());
+	{
+	  value = mcsr->read() & (csr->getReadMask() & deleg->read());
+	  if (virtMode_)
+	    {
+	      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
+	      if (hdeleg)
+		value = value & hdeleg->read();
+	    }
+	}
       else
         value = csr->read();
       return true;
@@ -211,10 +219,11 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 {
   superEnabled_ = flag;
 
-  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
-		     CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
-		     CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
-		     CsrNumber::SATP, CsrNumber::MEDELEG, CsrNumber::MIDELEG } )
+  typedef CsrNumber CN;
+
+  for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
+		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
+		     CN::SATP, CN::MEDELEG, CN::MIDELEG } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -225,6 +234,22 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
         }
       else
         csr->setImplemented(flag);
+    }
+
+  if (hyperEnabled_)
+    {
+      for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
+			 CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP } )
+	{
+	  auto csr = findCsr(csrn);
+	  if (not csr)
+	    {
+	      std::cerr << "Error: enableSupervisorMode: CSR number 0x"
+			<< std::hex << URV(csrn) << " undefined\n";
+	    }
+	  else
+	    csr->setImplemented(flag);
+	}
     }
 
   if (not flag)
@@ -280,6 +305,22 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
         }
       else
         csr->setImplemented(flag);
+    }
+
+  if (superEnabled_)
+    {
+      for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
+			 CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP })
+	{
+	  auto csr = findCsr(csrn);
+	  if (not csr)
+	    {
+	      std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+	    }
+	  else
+	    csr->setImplemented(flag);
+	}
     }
 
   if (not flag)
@@ -439,7 +480,14 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       if (mcsr and deleg)
         {
           URV prevMask = csr->getWriteMask();
-          csr->setWriteMask((prevMask | deleg->read()) & mcsr->getWriteMask());
+	  URV tmpMask = (prevMask | deleg->read()) & mcsr->getWriteMask();
+	  if (virtMode_)
+	    {
+	      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
+	      if (hdeleg)
+		tmpMask |= hdeleg->read();
+	    }
+          csr->setWriteMask(tmpMask);
           csr->write(value);
           csr->setWriteMask(prevMask);
         }
@@ -491,7 +539,7 @@ template <typename URV>
 bool
 CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
 {
-  const Csr<URV>* csr = getImplementedCsr(number);
+  const Csr<URV>* csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
@@ -1550,7 +1598,7 @@ template <typename URV>
 bool
 CsRegs<URV>::peek(CsrNumber number, URV& value) const
 {
-  auto csr = getImplementedCsr(number);
+  auto csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
@@ -1597,7 +1645,7 @@ template <typename URV>
 bool
 CsRegs<URV>::poke(CsrNumber number, URV value)
 {
-  Csr<URV>* csr = getImplementedCsr(number);
+  Csr<URV>* csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
