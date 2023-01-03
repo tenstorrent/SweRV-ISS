@@ -920,15 +920,11 @@ namespace WdRiscv
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// either DEBUGGER or SETP depending on the step bit of DCSR.
-    void enterDebugMode(URV pc, bool force = false);
+    void enterDebugMode(URV pc);
 
     /// True if in debug mode.
     bool inDebugMode() const
     { return debugMode_; }
-
-    /// True if in debug-step mode.
-    bool inDebugStepMode() const
-    { return debugStepMode_; }
 
     /// Take this hart out of debug mode.
     void exitDebugMode();
@@ -4303,7 +4299,6 @@ namespace WdRiscv
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 
     bool debugMode_ = false;         // True on debug mode.
-    bool debugStepMode_ = false;     // True in debug step mode.
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.

@@ -558,7 +558,6 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   prevPerfControl_ = perfControl_;
 
   debugMode_ = false;
-  debugStepMode_ = false;
 
   dcsrStepIe_ = false;
   dcsrStep_ = false;
@@ -4238,7 +4237,7 @@ template <typename URV>
 bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause)
 {
-  if (debugMode_ and not debugStepMode_)
+  if (debugMode_)
     return false;
 
   URV mip = csRegs_.peekMip();
@@ -4337,7 +4336,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
     }
   mipPoked_ = false;
 
-  if (debugStepMode_ and not dcsrStepIe_)
+  if (debugMode_ and not dcsrStepIe_)
     return false;
 
   // If a non-maskable interrupt was signaled by the test-bench, take it.
@@ -9034,19 +9033,9 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
   cancelLr();  // Entering debug modes loses LR reservation.
 
   if (debugMode_)
-    {
-      if (debugStepMode_)
-	debugStepMode_ = false;
-      else
-	std::cerr << "Error: Entering debug-halt while in debug-halt\n";
-    }
+    std::cerr << "Error: Entering debug-mode while in debug-mode\n";
   else
-    {
-      debugMode_ = true;
-      if (debugStepMode_)
-	std::cerr << "Error: Entering debug-halt with debug-step true\n";
-      debugStepMode_ = false;
-    }
+    debugMode_ = true;
 
   URV value = 0;
   if (peekCsr(CsrNumber::DCSR, value))
@@ -9066,19 +9055,13 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 
 template <typename URV>
 void
-Hart<URV>::enterDebugMode(URV pc, bool /*force*/)
+Hart<URV>::enterDebugMode(URV pc)
 {
   // This method is used by the test-bench to make the simulator
-  // follow it into debug-halt or debug-stop mode. Do nothing if the
-  // simulator got into debug mode on its own.
+  // follow it into debug-mode. Do nothing if the simulator got into
+  // debug-mode on its own.
   if (debugMode_)
     return;   // Already in debug mode.
-
-  if (debugStepMode_)
-    std::cerr << "Error: Enter-debug command finds hart in debug-step mode.\n";
-
-  debugStepMode_ = false;
-  debugMode_ = false;
 
   enterDebugMode_(DebugModeCause::DEBUGGER, pc);
 }
@@ -9098,19 +9081,7 @@ Hart<URV>::exitDebugMode()
 
   peekCsr(CsrNumber::DPC, pc_);
 
-  // If in debug-step go to debug-halt. If in debug-halt go to normal
-  // or debug-step based on step-bit in DCSR.
-  if (debugStepMode_)
-    debugStepMode_ = false;
-  else
-    {
-      if (dcsrStep_)
-	debugStepMode_ = true;
-      else
-        {
-          debugMode_ = false;
-        }
-    }
+  debugMode_ = false;
 
   // If pending nmi bit is set in dcsr, set pending nmi in the hart
   // object.

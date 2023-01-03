@@ -81,27 +81,6 @@ parseCmdLineNumber(const std::string& option,
 
 static
 bool
-parseCmdLineBool(const std::string& option, const std::string& str, bool& val)
-{
-  bool good = true;
-
-  if (str == "0" or str == "false")
-    val = false;
-  else if (str == "1" or str == "true")
-    val = true;
-  else
-    good = false;
-
-  if (not good)
-    std::cerr << "Invalid command line " << option << " value: " << str
-	      << '\n';
-
-  return good;
-}
-
-
-static
-bool
 parseCmdLineVecData(const std::string& option,
 		    const std::string& valStr,
 		    std::vector<uint8_t>& val)
@@ -185,27 +164,28 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
 			      const std::vector<std::string>& tokens,
 			      FILE* traceFile)
 {
-  if (tokens.size() == 1)
+  uint64_t count = 1;
+
+  if (tokens.size() > 1)
     {
-      hart.singleStep(traceFile);
-      return true;
+      if (not parseCmdLineNumber("instruction-count", tokens.at(1), count))
+	return false;
+      if (count == 0)
+	return true;
     }
-
-  uint64_t count = 0;
-  if (not parseCmdLineNumber("instruction-count", tokens.at(1), count))
-    return false;
-
-  if (count == 0)
-    return true;
 
   uint64_t tag = 0;
   bool hasTag = false;
-  if (tokens.size() == 3)
+  if (tokens.size() > 2)
     {
       if (not parseCmdLineNumber("instruction-tag", tokens.at(2), tag))
 	return false;
       hasTag = true;
     }
+
+  bool wasInDebug = hart.inDebugMode();
+  if (wasInDebug)
+    hart.exitDebugMode();
 
   for (uint64_t i = 0; i < count; ++i)
     {
@@ -222,6 +202,9 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
       else
 	hart.singleStep(traceFile);
     }
+
+  if (wasInDebug)
+    hart.enterDebugMode(hart.peekPc());
 
   return true;
 }
@@ -1464,11 +1447,6 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "s" or command == "step")
     {
-      if (hart.inDebugMode() and not hart.inDebugStepMode())
-	{
-	  std::cerr << "Error: Single step while in debug-halt mode\n";
-	  return false;
-	}
       if (not stepCommand(hart, line, tokens, traceFile))
 	return false;
       if (commandLog)
@@ -1532,11 +1510,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "enter_debug")
     {
-      bool force = false;
-      if (tokens.size() == 2)
-        if (not parseCmdLineBool("force", tokens[1], force))
-          return false;
-      hart.enterDebugMode(hart.peekPc(), force);
+      hart.enterDebugMode(hart.peekPc());
       if (commandLog)
 	{
 	  fprintf(commandLog, "%s", line.c_str());

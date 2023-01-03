@@ -829,15 +829,6 @@ Server<URV>::stepCommand(const WhisperMessage& req,
     return false;
   auto& hart = *hartPtr;
 
-  // Step is not allowed in debug mode unless we are in debug_step as
-  // well.
-  if (hart.inDebugMode() and not hart.inDebugStepMode())
-    {
-      std::cerr << "Error: Single step while in debug-halt mode\n";
-      reply.type = Invalid;
-      return false;
-    }
-
   // Get instruction before execution (in case code is self-modifying).
   uint32_t inst = 0;
   hart.readInst(hart.peekPc(), inst);
@@ -847,6 +838,10 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
   uint64_t interruptCount = hart.getInterruptCount();
+
+  bool wasInDebug = hart.inDebugMode();
+  if (wasInDebug)
+    hart.exitDebugMode();
 
   // Memory consistency model support. No-op if mcm is off.
   if (system_.isMcmEnabled())
@@ -881,6 +876,8 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
   reply.flags = (pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) | (stop << 7);;
 
+  if (wasInDebug)
+    hart.enterDebugMode(hart.peekPc());
   return true;
 }
 
@@ -1123,12 +1120,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
         case EnterDebug:
           {
-            bool force = msg.flags;
             if (checkHart(msg, "enter_debug", reply))
-              hart.enterDebugMode(hart.peekPc(), force);
+              hart.enterDebugMode(hart.peekPc());
             if (commandLog)
-              fprintf(commandLog, "hart=%d enter_debug %s # ts=%s\n", hartId,
-                      force? "true" : "false", timeStamp.c_str());
+              fprintf(commandLog, "hart=%d enter_debug # ts=%s\n", hartId,
+                      timeStamp.c_str());
           }
           break;
 
