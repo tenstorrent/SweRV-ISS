@@ -154,7 +154,38 @@ Interactive<URV>::untilCommand(Hart<URV>& hart, const std::string& line,
   if (addr >= hart.memorySize())
     std::cerr << "Warning: Address outside memory range.\n";
 
+  if (hart.inDebugMode())
+    {
+      hart.exitDebugMode();   // Resume from halt.
+      if (hart.hasDcsrStep())
+	{
+	  hart.singleStep(traceFile);
+	  hart.enterDebugMode(hart.peekPc());
+	  return true;
+	}
+    }
+
   return hart.untilAddress(addr, traceFile);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::runCommand(Hart<URV>& hart, const std::string& /*line*/,
+			     const std::vector<std::string>& /*tokens*/,
+			     FILE* traceFile)
+{
+  if (hart.inDebugMode())
+    {
+      hart.exitDebugMode();
+      if (hart.hasDcsrStep())
+	{
+	  hart.singleStep(traceFile);
+	  hart.enterDebugMode(hart.peekPc());
+	  return true;
+	}
+    }
+  return hart.run(traceFile);
 }
 
 
@@ -1430,7 +1461,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "run")
     {
-      bool success = hart.run(traceFile);
+      bool success = runCommand(hart, line, tokens, traceFile);
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
       return success;
@@ -1438,11 +1469,10 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "u" or command == "until")
     {
-      if (not untilCommand(hart, line, tokens, traceFile))
-	return false;
+      bool success = untilCommand(hart, line, tokens, traceFile);
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
-      return true;
+      return success;
     }
 
   if (command == "s" or command == "step")

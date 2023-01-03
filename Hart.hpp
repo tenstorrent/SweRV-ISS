@@ -926,6 +926,10 @@ namespace WdRiscv
     bool inDebugMode() const
     { return debugMode_; }
 
+    /// True if DCSR.step is on.
+    bool hasDcsrStep() const
+    { return dcsrStep_; }
+
     /// Take this hart out of debug mode.
     void exitDebugMode();
 
