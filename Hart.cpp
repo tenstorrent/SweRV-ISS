@@ -9034,8 +9034,8 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 
   if (debugMode_)
     std::cerr << "Error: Entering debug-mode while in debug-mode\n";
-  else
-    debugMode_ = true;
+  debugMode_ = true;
+  csRegs_.enterDebug(true);
 
   URV value = 0;
   if (peekCsr(CsrNumber::DCSR, value))
@@ -9082,6 +9082,7 @@ Hart<URV>::exitDebugMode()
   peekCsr(CsrNumber::DPC, pc_);
 
   debugMode_ = false;
+  csRegs_.enterDebug(false);
 
   // If pending nmi bit is set in dcsr, set pending nmi in the hart
   // object.
