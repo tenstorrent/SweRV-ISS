@@ -9043,6 +9043,7 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
       DcsrFields<URV> dcsr(value);
       dcsr.bits_.CAUSE = URV(cause);
       dcsr.bits_.PRV = URV(privMode_) & 0x3;
+      dcsr.bits_.V = virtMode_;
 
       if (nmiPending_)
         dcsr.bits_.NMIP = 1;
@@ -9079,8 +9080,8 @@ Hart<URV>::exitDebugMode()
 
   cancelLr();  // Exiting debug modes loses LR reservation.
 
-  peekCsr(CsrNumber::DPC, pc_);
-
+  peekCsr(CsrNumber::DPC, pc_);  // Restore PC
+  
   debugMode_ = false;
   csRegs_.enterDebug(false);
 
@@ -9093,6 +9094,14 @@ Hart<URV>::exitDebugMode()
   DcsrFields<URV> dcsr(dcsrVal);
   if (dcsr.bits_.NMIP)
     setPendingNmi(nmiCause_);
+
+  // Restore privilege mode.
+  auto pm = PrivilegeMode{dcsr.bits_.PRV};
+  setPrivilegeMode(pm);
+
+  // Restore virtual mode.
+  bool vm = dcsr.bits_.V;
+  setVirtualMode(vm);
 }
 
 

@@ -307,7 +307,7 @@ namespace WdRiscv
       unsigned STEP : 1;
       unsigned NMIP : 1;
       unsigned MPRVEN : 1;
-      unsigned reserved0 : 1;
+      unsigned V : 1;
       unsigned CAUSE : 3;
       unsigned STOPTIME : 1;
       unsigned STOPCOUNT : 1;
@@ -316,7 +316,9 @@ namespace WdRiscv
       unsigned EBREAKS : 1;
       unsigned reserved1 : 1;
       unsigned EBREAKM : 1;
-      unsigned reserved2 : 12;
+      unsigned EBREAKVU : 1;
+      unsigned EBREAKVS : 1;
+      unsigned reserved2 : 10;
       unsigned DEBUGVER : 4;
     } bits_;
   };
@@ -335,7 +337,7 @@ namespace WdRiscv
       unsigned STEP : 1;
       unsigned NMIP : 1;
       unsigned MPRVEN : 1;
-      unsigned reserved0 : 1;
+      unsigned V : 1;
       unsigned CAUSE : 3;
       unsigned STOPTIME : 1;
       unsigned STOPCOUNT : 1;
@@ -344,7 +346,9 @@ namespace WdRiscv
       unsigned EBREAKS : 1;
       unsigned reserved1 : 1;
       unsigned EBREAKM : 1;
-      unsigned reserved2 : 12;
+      unsigned EBREAKVU : 1;
+      unsigned EBREAKVS : 1;
+      unsigned reserved2 : 10;
       unsigned DEBUGVER : 4;
     } bits_;
   };
