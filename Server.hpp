@@ -48,6 +48,10 @@ namespace WdRiscv
 		     WhisperMessage& reply,
 		     FILE* traceFile);
 
+    /// Virtual address translation command.
+    bool translateCommand(const WhisperMessage& req, 
+			  WhisperMessage& reply);
+
     /// Server mode loop: Receive command and send reply till a quit
     /// command is received. Return true on successful termination (quit
     /// received). Return false otherwise.

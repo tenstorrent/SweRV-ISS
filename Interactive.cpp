@@ -1645,6 +1645,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "translate")
+    {
+      if (not translateCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "h" or command == "?" or command == "help")
     {
       helpCommand(tokens);
@@ -1902,6 +1911,62 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
     return false;
 
   return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
+				   const std::vector<std::string>& tokens)
+{
+  // translate va [r|w|x [s|u]]. Mode defaults to r, privilege to u.
+  if (tokens.size() < 2)
+    {
+      std::cerr << "Invalid translate command: " << line << '\n';
+      std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u]]\n";
+    }
+
+  uint64_t va = 0;
+  if (not parseCmdLineNumber("virtual-address", tokens.at(1), va))
+    return false;
+
+  bool read = false, write = false, exec = false;
+  if (tokens.size() > 2)
+    {
+      if      (tokens.at(2) == "r") read  = true;
+      else if (tokens.at(2) == "w") write = true;
+      else if (tokens.at(2) == "x") exec  = true;
+      else
+	{
+	  std::cerr << "Invalid protection mode: " << tokens.at(2) << " -- expecting r, w, or x\n";
+	  return false;
+	}
+    }
+  else
+    read = true;
+
+  PrivilegeMode pm = PrivilegeMode::User;
+  if (tokens.size() > 3)
+    {
+      if      (tokens.at(3) == "u") pm = PrivilegeMode::User;
+      else if (tokens.at(3) == "s") pm = PrivilegeMode::Supervisor;
+      else
+	{
+	  std::cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting s, or u\n";
+	  return false;
+	}
+    }
+
+  uint64_t pa = 0;
+  auto ec = hart.transAddrNoUpdate(va, pm, read, write, exec, pa);
+  if (ec == ExceptionCause::NONE)
+    {
+      std::cout << "0x" << std::hex << pa << '\n';
+      return true;
+    }
+
+  std::cerr << "Translation failed -- exception code: " << unsigned(ec) << '\n';
+  return false;
 }
 
 

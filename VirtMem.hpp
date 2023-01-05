@@ -171,13 +171,16 @@ namespace WdRiscv
 
   protected:
 
-    /// Heper to translateForPeek.
-    ExceptionCause transForPeek(uint64_t va, PrivilegeMode priv, bool read,
-				bool write, bool exec, uint64_t& pa);
+    /// Heper to transAddrNoUpdate
+    ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool read,
+				 bool write, bool exec, uint64_t& pa);
 
-    /// Same as translate for fetch but TLB is not updated and no tracing/logging
-    /// is done.
-    ExceptionCause translateForInstPeek(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+    /// Translate virtual address without updating TLB or
+    /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE
+    /// on success or fault/access exception on failure. If succesful
+    /// set pa to the physical address.
+    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool r,
+				     bool w, bool x, uint64_t& pa);
 
     /// Helper to translate method.
     template <typename PTE, typename VA>

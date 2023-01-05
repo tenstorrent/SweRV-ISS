@@ -120,23 +120,26 @@ VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
 
 
 ExceptionCause
-VirtMem::translateForInstPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa)
+VirtMem::transAddrNoUpdate(uint64_t va, PrivilegeMode priv, bool read,
+			   bool write, bool exec, uint64_t& pa)
 {
   auto prevTrace = trace_; trace_ = false;
   auto prevFile  = attFile_; attFile_ = nullptr;
+  accessDirtyCheck_ = false;
 
-  bool read = false, write = false, exec = true;
-  auto cause = transForPeek(va, priv, read, write, exec, pa);
+  auto cause = transNoUpdate(va, priv, read, write, exec, pa);
 
   trace_ = prevTrace;
   attFile_ = prevFile;
+  accessDirtyCheck_ = true;
+
   return cause;
 }
 
 
 ExceptionCause
-VirtMem::transForPeek(uint64_t va, PrivilegeMode priv, bool read, bool write,
-		      bool exec, uint64_t& pa)
+VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool read, bool write,
+		       bool exec, uint64_t& pa)
 {
   if (mode_ == Bare)
     {
@@ -171,12 +174,8 @@ VirtMem::transForPeek(uint64_t va, PrivilegeMode priv, bool read, bool write,
     }
 
 
-  accessDirtyCheck_ = false;
   TlbEntry tlbEntry;
-  auto res = doTranslate(va, priv, read, write, exec, pa, tlbEntry);
-  accessDirtyCheck_ = true;
-
-  return res;
+  return doTranslate(va, priv, read, write, exec, pa, tlbEntry);
 }
 
 

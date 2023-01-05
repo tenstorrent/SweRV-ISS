@@ -882,6 +882,41 @@ Server<URV>::stepCommand(const WhisperMessage& req,
 }
 
 
+// Server mode step command.
+template <typename URV>
+bool
+Server<URV>::translateCommand(const WhisperMessage& req, 
+			      WhisperMessage& reply)
+{
+  reply = req;
+
+  // Hart id must be valid. Hart must be started.
+  if (not checkHart(req, "step", reply))
+    return false;
+
+  uint32_t hartId = req.hart;
+  auto hartPtr = system_.findHartByHartId(hartId);
+  if (not hartPtr)
+    return false;
+  auto& hart = *hartPtr;
+
+  uint64_t va = req.address;
+  bool r = req.flags & 1, w = (req.flags & 2) != 0, x = (req.flags & 4) != 0;
+  PrivilegeMode pm = (req.flags & 8) ? PrivilegeMode::Supervisor : PrivilegeMode::User;
+
+  uint64_t pa = 0;
+  auto ec = hart.transAddrNoUpdate(va, pm, r, w, x, pa);
+  if (ec != ExceptionCause::NONE)
+    {
+      reply.type = Invalid;
+      return false;
+    }
+
+  reply.address = pa;
+  return true;
+}
+
+
 /// Dump all registers contents in tracefile.
 template <typename URV>
 static void
@@ -1229,6 +1264,21 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         case PageTableWalk:
           doPageTableWalk(hart, reply);
           break;
+
+	case Translate:
+	  translateCommand(msg, reply);
+          if (commandLog)
+	    {
+	      auto flags = msg.flags;
+	      const char* rwx = "r";
+	      if (flags & 1) rwx = "r";
+	      else if (flags & 2) rwx = "w";
+	      else if (flags & 4) rwx = "x";
+	      const char* su = (flags & 8) ? "s" : "u";
+	      fprintf(commandLog, "hart=%d transate 0x%jx %s %s\n", hartId,
+		      uintmax_t(msg.address), rwx, su);
+	    }
+	  break;
 
         default:
           std::cerr << "Unknown command\n";

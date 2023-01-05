@@ -1907,7 +1907,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
   bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
 
   if (translate)
-    if (virtMem_.translateForInstPeek(va, privMode_, pa) != ExceptionCause::NONE)
+    if (virtMem_.transAddrNoUpdate(va, privMode_, false, false, true, pa) != ExceptionCause::NONE)
       return false;
 
   uint16_t low;  // Low 2 bytes of instruction.
@@ -1921,7 +1921,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
   uint16_t high;
   uint64_t va2 = va + 2, pa2 = pa + 2;
   if (translate and memory_.getPageIx(va) != memory_.getPageIx(va2))
-    if (virtMem_.translateForInstPeek(va2, privMode_, pa2) != ExceptionCause::NONE)
+    if (virtMem_.transAddrNoUpdate(va2, privMode_, false, false, true, pa2) != ExceptionCause::NONE)
       {
 	inst = 0;
 	return false;
