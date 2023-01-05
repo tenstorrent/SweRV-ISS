@@ -172,7 +172,8 @@ namespace WdRiscv
   protected:
 
     /// Heper to translateForPeek.
-    ExceptionCause transForPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa);
+    ExceptionCause transForPeek(uint64_t va, PrivilegeMode priv, bool read,
+				bool write, bool exec, uint64_t& pa);
 
     /// Same as translate for fetch but TLB is not updated and no tracing/logging
     /// is done.
@@ -297,6 +298,7 @@ namespace WdRiscv
     bool execReadable_ = false;  // MXR bit
     bool supervisorOk_ = false;  // SUM bit
     bool faultOnFirstAccess_ = true;
+    bool accessDirtyCheck_ = true;  // To be able to supress AD check
 
     FILE* attFile_ = nullptr;
 

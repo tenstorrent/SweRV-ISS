@@ -125,7 +125,8 @@ VirtMem::translateForInstPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa)
   auto prevTrace = trace_; trace_ = false;
   auto prevFile  = attFile_; attFile_ = nullptr;
 
-  auto cause = transForPeek(va, priv, pa);
+  bool read = false, write = false, exec = true;
+  auto cause = transForPeek(va, priv, read, write, exec, pa);
 
   trace_ = prevTrace;
   attFile_ = prevFile;
@@ -134,13 +135,16 @@ VirtMem::translateForInstPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 
 
 ExceptionCause
-VirtMem::transForPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa)
+VirtMem::transForPeek(uint64_t va, PrivilegeMode priv, bool read, bool write,
+		      bool exec, uint64_t& pa)
 {
   if (mode_ == Bare)
     {
       pa = va;
       return ExceptionCause::NONE;
     }
+
+  assert(read or write or exec);
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
@@ -149,23 +153,30 @@ VirtMem::transForPeek(uint64_t va, PrivilegeMode priv, uint64_t& pa)
     {
       // Use TLB entry.
       if (priv == PrivilegeMode::User and not entry->user_)
-        return pageFaultType(false, true, true);
+        return pageFaultType(read, write, exec);
       if (priv == PrivilegeMode::Supervisor and entry->user_)
+        return pageFaultType(read, write, exec);
+      if (read)
+	{
+	  bool entryRead = entry->read_ or (execReadable_ and entry->exec_);
+	  if (not entryRead)
+	    return pageFaultType(true, false, false);
+	}
+      if (write and not entry->write_)
+        return pageFaultType(false, true, false);
+      if (exec and not entry->exec_)
         return pageFaultType(false, false, true);
-      if (not entry->exec_)
-        return pageFaultType(false, false, true);
-      if (not entry->accessed_)
-        {
-          if (faultOnFirstAccess_)
-            return pageFaultType(false, false, true);
-          entry->accessed_ = true;
-        }
       pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
       return ExceptionCause::NONE;
     }
 
+
+  accessDirtyCheck_ = false;
   TlbEntry tlbEntry;
-  return doTranslate(va, priv, false, false, true, pa, tlbEntry);
+  auto res = doTranslate(va, priv, read, write, exec, pa, tlbEntry);
+  accessDirtyCheck_ = true;
+
+  return res;
 }
 
 
@@ -506,7 +517,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
       return pageFaultType(read, write, exec);
 
   // 8.
-  if (not pte.accessed() or (write and not pte.dirty()))
+  if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
     {
       // We have a choice:
       // A. Page fault
@@ -655,7 +666,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  return pageFaultType(read, write, exec);
 
       // 7.
-      if (not pte.accessed() or (write and not pte.dirty()))
+      if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
 	{
 	  // We have a choice:
 	  // A. Page fault
