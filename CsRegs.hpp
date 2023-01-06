@@ -1150,6 +1150,13 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for MIDELEG
+    URV peekMideleg() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MIDELEG));
+      return csr.read();
+    }
+
     /// Set the current integer-register/CSR width.
     void turnOn32BitMode(bool flag)
     {

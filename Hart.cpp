@@ -4246,46 +4246,28 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
     return false;  // Nothing enabled that is also pending.
 
   typedef InterruptCause IC;
+  typedef PrivilegeMode PM;
 
   // Check for machine-level interrupts if MIE enabled or if user/supervisor.
-  URV mstatus = csRegs_.peekMstatus();
-  MstatusFields<URV> fields(mstatus);
-  bool globalEnable = fields.bits_.MIE or privMode_ < PrivilegeMode::Machine;
-  URV delegVal = 0;
-  peekCsr(CsrNumber::MIDELEG, delegVal);
+  bool globalEnable = (privMode_ == PM::Machine and mstatus_.bits_.MIE) or privMode_ < PM::Machine;
+
+  URV delegVal = csRegs_.peekMideleg();
   for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
-                              IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-			      IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
+			     IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+			     IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
     {
       URV mask = URV(1) << unsigned(ic);
       bool delegated = (mask & delegVal) != 0;
       bool enabled = globalEnable;
-      if (delegated)
-        enabled = ((privMode_ == PrivilegeMode::Supervisor and fields.bits_.SIE) or
-                   privMode_ < PrivilegeMode::Supervisor);
+      if (delegated and globalEnable)
+	enabled = ((privMode_ == PrivilegeMode::Supervisor and mstatus_.bits_.SIE) or
+		   privMode_ < PrivilegeMode::Supervisor);
       if (enabled)
-        if (mie & mask & mip)
-          {
-            cause = ic;
-            return true;
-          }
-    }
-
-  // Supervisor mode interrupts: SIE enabled and supervior mode, or user-mode.
-  if (isRvs())
-    {
-      bool check = ((fields.bits_.SIE and privMode_ == PrivilegeMode::Supervisor)
-                    or privMode_ < PrivilegeMode::Supervisor);
-      if (check)
-        for (auto ic : { IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
-          {
-            URV mask = URV(1) << unsigned(ic);
-            if (mie & mask & mip)
-              {
-                cause = ic;
-                return true;
-              }
-          }
+	if (mie & mask & mip)
+	  {
+	    cause = ic;
+	    return true;
+	  }
     }
 
   return false;
