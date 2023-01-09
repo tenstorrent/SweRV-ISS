@@ -22366,10 +22366,7 @@ void
 Hart<URV>::execVfredsum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22440,10 +22437,7 @@ void
 Hart<URV>::execVfredosum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22521,10 +22515,7 @@ void
 Hart<URV>::execVfredmin_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22601,10 +22592,7 @@ void
 Hart<URV>::execVfredmax_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22680,10 +22668,7 @@ void
 Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di, true))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22760,10 +22745,7 @@ void
 Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di, true))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
