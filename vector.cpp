@@ -890,6 +890,36 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 
 
 template <typename URV>
+inline
+bool
+Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
+				   unsigned src, unsigned groupX8)
+{
+  if (not checkMaskVecOpsVsEmul(di, dest, src, groupX8))
+    return false;
+
+  typedef ElementWidth EW;
+  EW sew = vecRegs_.elemWidth();
+  bool ok = false;
+  switch (sew)
+    {
+    case EW::Half:   ok = isZfhLegal(); break;
+    case EW::Word:   ok = isFpLegal();  break;
+    case EW::Word2:  ok = isDpLegal();  break;
+    default:         ok = false;        break;
+    }
+
+  // Clear soft-float library or x86 exception flags
+  clearSimulatorFpFlags();
+
+  if (not ok)
+    illegalInst(di);
+
+  return ok;
+}
+
+
+template <typename URV>
 void
 Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 {
@@ -5538,10 +5568,7 @@ void
 Hart<URV>::execVredsum_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5607,10 +5634,7 @@ void
 Hart<URV>::execVredand_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5676,10 +5700,7 @@ void
 Hart<URV>::execVredor_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5745,10 +5766,7 @@ void
 Hart<URV>::execVredxor_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5814,10 +5832,7 @@ void
 Hart<URV>::execVredminu_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5883,10 +5898,7 @@ void
 Hart<URV>::execVredmin_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5952,10 +5964,7 @@ void
 Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -6021,10 +6030,7 @@ void
 Hart<URV>::execVredmax_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -6097,10 +6103,7 @@ void
 Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -6131,10 +6134,7 @@ void
 Hart<URV>::execVwredsum_vs(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -20003,7 +20003,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20131,7 +20131,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20253,7 +20253,7 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20375,7 +20375,7 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20436,7 +20436,7 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20497,7 +20497,7 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -22396,10 +22396,7 @@ void
 Hart<URV>::execVfredsum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22470,10 +22467,7 @@ void
 Hart<URV>::execVfredosum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22551,10 +22545,7 @@ void
 Hart<URV>::execVfredmin_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22631,10 +22622,7 @@ void
 Hart<URV>::execVfredmax_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22710,10 +22698,7 @@ void
 Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di, true))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -22790,10 +22775,7 @@ void
 Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 {
   if (not checkFpMaskableInst(di, true))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 

@@ -216,6 +216,11 @@ namespace WdRiscv
     /// val/name unmodified if csr is out of bounds.
     bool peekCsr(CsrNumber csr, URV& val, std::string& name) const;
 
+    /// Set val to the value of the control and status register csr field
+    /// returning true on success. Return false leaving val unmodified
+    /// if csr is out of bounds.
+    bool peekCsr(CsrNumber csr, std::string field, URV& val) const;
+
     /// Set the given control and status register, csr, to the given
     /// value returning true on success. Return false if csr is out of
     /// bound.
@@ -915,15 +920,15 @@ namespace WdRiscv
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// either DEBUGGER or SETP depending on the step bit of DCSR.
-    void enterDebugMode(URV pc, bool force = false);
+    void enterDebugMode(URV pc);
 
     /// True if in debug mode.
     bool inDebugMode() const
     { return debugMode_; }
 
-    /// True if in debug-step mode.
-    bool inDebugStepMode() const
-    { return debugStepMode_; }
+    /// True if DCSR.step is on.
+    bool hasDcsrStep() const
+    { return dcsrStep_; }
 
     /// Take this hart out of debug mode.
     void exitDebugMode();
@@ -1112,6 +1117,10 @@ namespace WdRiscv
     bool isRvs() const
     { return rvs_; }
 
+    /// Return true if rvh (hupervisor) extension is enabled in this hart.
+    bool isRvh() const
+    { return rvh_; }
+
     /// Return true if rvu (user-mode) extension is enabled in this
     /// hart.
     bool isRvu() const
@@ -1291,6 +1300,9 @@ namespace WdRiscv
     void enableSupervisorMode(bool flag)
     { rvs_ = flag; csRegs_.enableSupervisorMode(flag); }
 
+    void enableHypervisorMode(bool flag)
+    { rvh_ = flag; csRegs_.enableHypervisorMode(flag); }
+
     /// Enable supervisor mode.
     void enableVectorMode(bool flag);
 
@@ -1298,6 +1310,10 @@ namespace WdRiscv
     /// causes us to enter a privilege mode not Machine.
     void enableClearMprvOnRet(bool flag)
     { clearMprvOnRet_ = flag; }
+
+    /// Disable clearing of reservation set after xRET
+    void enableCancelLrOnRet(bool flag)
+    { cancelLrOnRet_ = flag; }
 
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
@@ -1348,12 +1364,20 @@ namespace WdRiscv
     { virtMem_.printPageTable(out); }
 
     /// Enable address translation trace
-    void enableAddrTransTrace(FILE* file)
-    { virtMem_.enableAddrTransTrace(file); }
+    void enableAddrTransLog(FILE* file)
+    { virtMem_.enableAddrTransLog(file); }
 
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
+
+    /// Translate virtual address without updating TLB or
+    /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE
+    /// on success or fault/access exception on failure. If succesful
+    /// set pa to the physical address.
+    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool r,
+				     bool w, bool x, uint64_t& pa)
+    { return virtMem_.transAddrNoUpdate(va, pm, r, w, x, pa); }
 
     /// Return the paging mode before last executed instruction.
     VirtMem::Mode lastPageMode() const
@@ -1362,6 +1386,11 @@ namespace WdRiscv
     /// Return the current paging mode
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
+
+    /// Return the number of page table walks of the last
+    /// executed instruction
+    unsigned getNumPageTableWalks(bool isInstr) const
+    { return isInstr? virtMem_.numFetchWalks() : virtMem_.numDataWalks(); }
 
     /// Fill the addrs vector (cleared on entry) with the addresses of
     /// instruction/data the page table entries referenced by the
@@ -1659,8 +1688,7 @@ namespace WdRiscv
     void setFpStatus(FpStatus value);
 
     // Mark FS field of mstatus as dirty.
-    void markFsDirty()
-    { setFpStatus(FpStatus::Dirty); }
+    void markFsDirty();
 
     // Return true if vS field of mstatus is not off.
     bool isVecEnabled() const
@@ -1678,6 +1706,15 @@ namespace WdRiscv
     void markVsDirty()
     { setVecStatus(VecStatus::Dirty); }
 
+    // Enable/disable virtual (V) mode.
+    void setVirtualMode(bool mode)
+    {
+      virtMode_ = mode;
+      csRegs_.setVirtualMode(mode);
+      if (mode)
+	updateCachedVsstatus();
+    }
+
     // Return true if it is legal to execute a vector instruction: V
     // extension must be enabled and VS feild of MSTATUS must not be
     // OFF.
@@ -1693,13 +1730,24 @@ namespace WdRiscv
       return true;
     }
 
-    // Update cache values of mstatus. This is called when mstatus is
-    // written/poked.
+    // We avoid the cost of locating MSTATUS in the CSRs register file
+    // by caching its value in this class. We do this whenever MSTATUS
+    // is written/poked.
     void updateCachedMstatus();
 
-    // Update cached values of vsstatus. This is called when vsstatus
+    // We avoid the cost of locating VSSTATUS in the CSRs register file
+    // by caching its value in this class. We do this whenever VSSTATUS
     // is written/poked.
     void updateCachedVsstatus();
+
+    // Update cached MSTATUS if non-virtual and VSSTATUS if virtual.
+    void updateCachedSstatus()
+    {
+      if (virtMode_)
+	updateCachedVsstatus();
+      else
+	updateCachedMstatus();
+    }
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all
@@ -1845,6 +1893,10 @@ namespace WdRiscv
     template<typename LOAD_TYPE>
     bool fastLoad(uint64_t virtAddr, uint64_t& value);
 
+    /// Helper to hypervisor load instructions.
+    template<typename LOAD_TYPE>
+    bool hyperLoad(uint64_t virtAddr, uint64_t& value);
+
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and
     /// address translation is successful, then addr1 is changed to
@@ -1874,6 +1926,10 @@ namespace WdRiscv
     /// For use by performance model. 
     template<typename STORE_TYPE>
     bool fastStore(URV addr, STORE_TYPE value);
+
+    /// Helper to hypervisor load instructions.
+    template<typename STORE_TYPE>
+    bool hyperStore(URV virtAddr, STORE_TYPE value);
 
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
@@ -2067,6 +2123,9 @@ namespace WdRiscv
     ///   - Write to a read-only CSR.
     void illegalInst(const DecodedInst*);
 
+    /// Initiate a virtual instruction trap.
+    void virtualInst(const DecodedInst*);
+
     /// Place holder for not-yet implemented instructions. Calls
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
@@ -2183,6 +2242,9 @@ namespace WdRiscv
 
     bool checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 			       unsigned groupX8);
+
+    bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+				 unsigned groupX8);
 
     // Check reduction vector operand against the group multiplier. Return true
     // if operand is a multiple of multiplier and false otherwise. Record group
@@ -4021,6 +4083,24 @@ namespace WdRiscv
     void execWrs_nto(const DecodedInst*);
     void execWrs_sto(const DecodedInst*);
 
+    void execHfence_vvma(const DecodedInst*);
+    void execHfence_gvma(const DecodedInst*);
+    void execHlv_b(const DecodedInst*);
+    void execHlv_bu(const DecodedInst*);
+    void execHlv_h(const DecodedInst*);
+    void execHlv_hu(const DecodedInst*);
+    void execHlv_w(const DecodedInst*);
+    void execHlvx_hu(const DecodedInst*);
+    void execHlvx_wu(const DecodedInst*);
+    void execHsv_b(const DecodedInst*);
+    void execHsv_h(const DecodedInst*);
+    void execHsv_w(const DecodedInst*);
+    void execHlv_wu(const DecodedInst*);
+    void execHlv_d(const DecodedInst*);
+    void execHsv_d(const DecodedInst*);
+    void execHinval_vvma(const DecodedInst*);
+    void execHinval_gvma(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -4097,6 +4177,7 @@ namespace WdRiscv
     bool rvf_ = false;           // True if extension F (single fp) enabled.
     bool rvzfh_ = false;         // True if extension zfh (half fp) enabled.
     bool rvzfhmin_ = false;      // True if extension zfhmin (minimal half fp) enabled.
+    bool rvh_ = false;           // True if extension H (hupervisor) enabled.
     bool rvm_ = true;            // True if extension M (mul/div) enabled.
     bool rvs_ = false;           // True if extension S (supervisor-mode) enabled.
     bool rvu_ = false;           // True if extension U (user-mode) enabled.
@@ -4220,15 +4301,19 @@ namespace WdRiscv
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
 
+    // These are used to get fast access to the FS and VS bits.
     MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
+    HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
 
     bool clearMprvOnRet_ = true;
+
+    // not required to clear reservation sets on xret
+    bool cancelLrOnRet_ = true;
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 
     bool debugMode_ = false;         // True on debug mode.
-    bool debugStepMode_ = false;     // True in debug step mode.
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.

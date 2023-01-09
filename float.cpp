@@ -35,7 +35,7 @@ Hart<URV>::enableRvf(bool flag)
   rvf_ = flag;
   csRegs_.enableRvf(flag);
   if (not flag)
-    setFpStatus(VecStatus::Off);
+    setFpStatus(FpStatus::Off);
 }
 
 
@@ -146,10 +146,17 @@ Hart<URV>::updateAccruedFpBits(double, bool)
 template <typename URV>
 inline
 void
-Hart<URV>::markFsDirty()
+Hart<URV>::setFpStatus(FpStatus)
 {
 }
 
+
+template <typename URV>
+inline
+void
+Hart<URV>::markFsDirty()
+{
+}
 
 #else
 
@@ -260,7 +267,6 @@ Hart<URV>::updateAccruedFpBits(double res, bool invalid)
 
 
 template <typename URV>
-inline
 void
 Hart<URV>::setFpStatus(FpStatus value)
 {
@@ -293,6 +299,15 @@ Hart<URV>::setFpStatus(FpStatus value)
 
       updateCachedVsstatus();
     }
+}
+
+
+template <typename URV>
+inline
+void
+Hart<URV>::markFsDirty()
+{
+  setFpStatus(FpStatus::Dirty);
 }
 
 

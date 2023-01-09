@@ -81,27 +81,6 @@ parseCmdLineNumber(const std::string& option,
 
 static
 bool
-parseCmdLineBool(const std::string& option, const std::string& str, bool& val)
-{
-  bool good = true;
-
-  if (str == "0" or str == "false")
-    val = false;
-  else if (str == "1" or str == "true")
-    val = true;
-  else
-    good = false;
-
-  if (not good)
-    std::cerr << "Invalid command line " << option << " value: " << str
-	      << '\n';
-
-  return good;
-}
-
-
-static
-bool
 parseCmdLineVecData(const std::string& option,
 		    const std::string& valStr,
 		    std::vector<uint8_t>& val)
@@ -175,7 +154,38 @@ Interactive<URV>::untilCommand(Hart<URV>& hart, const std::string& line,
   if (addr >= hart.memorySize())
     std::cerr << "Warning: Address outside memory range.\n";
 
+  if (hart.inDebugMode())
+    {
+      hart.exitDebugMode();   // Resume from halt.
+      if (hart.hasDcsrStep())
+	{
+	  hart.singleStep(traceFile);
+	  hart.enterDebugMode(hart.peekPc());
+	  return true;
+	}
+    }
+
   return hart.untilAddress(addr, traceFile);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::runCommand(Hart<URV>& hart, const std::string& /*line*/,
+			     const std::vector<std::string>& /*tokens*/,
+			     FILE* traceFile)
+{
+  if (hart.inDebugMode())
+    {
+      hart.exitDebugMode();
+      if (hart.hasDcsrStep())
+	{
+	  hart.singleStep(traceFile);
+	  hart.enterDebugMode(hart.peekPc());
+	  return true;
+	}
+    }
+  return hart.run(traceFile);
 }
 
 
@@ -185,27 +195,28 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
 			      const std::vector<std::string>& tokens,
 			      FILE* traceFile)
 {
-  if (tokens.size() == 1)
+  uint64_t count = 1;
+
+  if (tokens.size() > 1)
     {
-      hart.singleStep(traceFile);
-      return true;
+      if (not parseCmdLineNumber("instruction-count", tokens.at(1), count))
+	return false;
+      if (count == 0)
+	return true;
     }
-
-  uint64_t count = 0;
-  if (not parseCmdLineNumber("instruction-count", tokens.at(1), count))
-    return false;
-
-  if (count == 0)
-    return true;
 
   uint64_t tag = 0;
   bool hasTag = false;
-  if (tokens.size() == 3)
+  if (tokens.size() > 2)
     {
       if (not parseCmdLineNumber("instruction-tag", tokens.at(2), tag))
 	return false;
       hasTag = true;
     }
+
+  bool wasInDebug = hart.inDebugMode();
+  if (wasInDebug)
+    hart.exitDebugMode();
 
   for (uint64_t i = 0; i < count; ++i)
     {
@@ -222,6 +233,9 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
       else
 	hart.singleStep(traceFile);
     }
+
+  if (wasInDebug)
+    hart.enterDebugMode(hart.peekPc());
 
   return true;
 }
@@ -1447,7 +1461,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "run")
     {
-      bool success = hart.run(traceFile);
+      bool success = runCommand(hart, line, tokens, traceFile);
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
       return success;
@@ -1455,20 +1469,14 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "u" or command == "until")
     {
-      if (not untilCommand(hart, line, tokens, traceFile))
-	return false;
+      bool success = untilCommand(hart, line, tokens, traceFile);
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
-      return true;
+      return success;
     }
 
   if (command == "s" or command == "step")
     {
-      if (hart.inDebugMode() and not hart.inDebugStepMode())
-	{
-	  std::cerr << "Error: Single step while in debug-halt mode\n";
-	  return false;
-	}
       if (not stepCommand(hart, line, tokens, traceFile))
 	return false;
       if (commandLog)
@@ -1532,11 +1540,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "enter_debug")
     {
-      bool force = false;
-      if (tokens.size() == 2)
-        if (not parseCmdLineBool("force", tokens[1], force))
-          return false;
-      hart.enterDebugMode(hart.peekPc(), force);
+      hart.enterDebugMode(hart.peekPc());
       if (commandLog)
 	{
 	  fprintf(commandLog, "%s", line.c_str());
@@ -1635,6 +1639,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "mbinsert" or command == "merge_buffer_insert")
     {
       if (not mbInsertCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "translate")
+    {
+      if (not translateCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1898,6 +1911,62 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
     return false;
 
   return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
+				   const std::vector<std::string>& tokens)
+{
+  // translate va [r|w|x [s|u]]. Mode defaults to r, privilege to u.
+  if (tokens.size() < 2)
+    {
+      std::cerr << "Invalid translate command: " << line << '\n';
+      std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u]]\n";
+    }
+
+  uint64_t va = 0;
+  if (not parseCmdLineNumber("virtual-address", tokens.at(1), va))
+    return false;
+
+  bool read = false, write = false, exec = false;
+  if (tokens.size() > 2)
+    {
+      if      (tokens.at(2) == "r") read  = true;
+      else if (tokens.at(2) == "w") write = true;
+      else if (tokens.at(2) == "x") exec  = true;
+      else
+	{
+	  std::cerr << "Invalid protection mode: " << tokens.at(2) << " -- expecting r, w, or x\n";
+	  return false;
+	}
+    }
+  else
+    read = true;
+
+  PrivilegeMode pm = PrivilegeMode::User;
+  if (tokens.size() > 3)
+    {
+      if      (tokens.at(3) == "u") pm = PrivilegeMode::User;
+      else if (tokens.at(3) == "s") pm = PrivilegeMode::Supervisor;
+      else
+	{
+	  std::cerr << "Invalid privilege mode: " << tokens.at(3) << " -- expecting s, or u\n";
+	  return false;
+	}
+    }
+
+  uint64_t pa = 0;
+  auto ec = hart.transAddrNoUpdate(va, pm, read, write, exec, pa);
+  if (ec == ExceptionCause::NONE)
+    {
+      std::cout << "0x" << std::hex << pa << '\n';
+      return true;
+    }
+
+  std::cerr << "Translation failed -- exception code: " << unsigned(ec) << '\n';
+  return false;
 }
 
 

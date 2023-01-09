@@ -234,7 +234,7 @@ sendMessage(int soc, WhisperMessage& msg)
   char* p = buffer;
   while (remain > 0)
     {
-      ssize_t l = send(soc, p, remain , 0);
+      ssize_t l = send(soc, p, remain , MSG_NOSIGNAL);
       if (l < 0)
 	{
 	  if (errno == EINTR)
@@ -829,15 +829,6 @@ Server<URV>::stepCommand(const WhisperMessage& req,
     return false;
   auto& hart = *hartPtr;
 
-  // Step is not allowed in debug mode unless we are in debug_step as
-  // well.
-  if (hart.inDebugMode() and not hart.inDebugStepMode())
-    {
-      std::cerr << "Error: Single step while in debug-halt mode\n";
-      reply.type = Invalid;
-      return false;
-    }
-
   // Get instruction before execution (in case code is self-modifying).
   uint32_t inst = 0;
   hart.readInst(hart.peekPc(), inst);
@@ -847,6 +838,10 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
   uint64_t interruptCount = hart.getInterruptCount();
+
+  bool wasInDebug = hart.inDebugMode();
+  if (wasInDebug)
+    hart.exitDebugMode();
 
   // Memory consistency model support. No-op if mcm is off.
   if (system_.isMcmEnabled())
@@ -881,6 +876,43 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
   reply.flags = (pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) | (stop << 7);;
 
+  if (wasInDebug)
+    hart.enterDebugMode(hart.peekPc());
+  return true;
+}
+
+
+// Server mode step command.
+template <typename URV>
+bool
+Server<URV>::translateCommand(const WhisperMessage& req, 
+			      WhisperMessage& reply)
+{
+  reply = req;
+
+  // Hart id must be valid. Hart must be started.
+  if (not checkHart(req, "step", reply))
+    return false;
+
+  uint32_t hartId = req.hart;
+  auto hartPtr = system_.findHartByHartId(hartId);
+  if (not hartPtr)
+    return false;
+  auto& hart = *hartPtr;
+
+  uint64_t va = req.address;
+  bool r = req.flags & 1, w = (req.flags & 2) != 0, x = (req.flags & 4) != 0;
+  PrivilegeMode pm = (req.flags & 8) ? PrivilegeMode::Supervisor : PrivilegeMode::User;
+
+  uint64_t pa = 0;
+  auto ec = hart.transAddrNoUpdate(va, pm, r, w, x, pa);
+  if (ec != ExceptionCause::NONE)
+    {
+      reply.type = Invalid;
+      return false;
+    }
+
+  reply.address = pa;
   return true;
 }
 
@@ -1123,12 +1155,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
         case EnterDebug:
           {
-            bool force = msg.flags;
             if (checkHart(msg, "enter_debug", reply))
-              hart.enterDebugMode(hart.peekPc(), force);
+              hart.enterDebugMode(hart.peekPc());
             if (commandLog)
-              fprintf(commandLog, "hart=%d enter_debug %s # ts=%s\n", hartId,
-                      force? "true" : "false", timeStamp.c_str());
+              fprintf(commandLog, "hart=%d enter_debug # ts=%s\n", hartId,
+                      timeStamp.c_str());
           }
           break;
 
@@ -1233,6 +1264,21 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         case PageTableWalk:
           doPageTableWalk(hart, reply);
           break;
+
+	case Translate:
+	  translateCommand(msg, reply);
+          if (commandLog)
+	    {
+	      auto flags = msg.flags;
+	      const char* rwx = "r";
+	      if (flags & 1) rwx = "r";
+	      else if (flags & 2) rwx = "w";
+	      else if (flags & 4) rwx = "x";
+	      const char* su = (flags & 8) ? "s" : "u";
+	      fprintf(commandLog, "hart=%d transate 0x%jx %s %s\n", hartId,
+		      uintmax_t(msg.address), rwx, su);
+	    }
+	  break;
 
         default:
           std::cerr << "Unknown command\n";

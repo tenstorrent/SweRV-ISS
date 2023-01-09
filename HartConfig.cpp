@@ -1483,6 +1483,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       }
   }
 
+  tag = "cancel_lr_on_ret";
+  if (config_ -> count(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableCancelLrOnRet(flag);
+    }
+
   return errors == 0;
 }
 

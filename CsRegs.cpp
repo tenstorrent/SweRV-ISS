@@ -156,8 +156,7 @@ template <typename URV>
 bool
 CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
 {
-  bool isVirt = false;
-  auto csr = getImplementedCsr(number, isVirt);
+  auto csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
@@ -191,7 +190,15 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
       auto mcsr = getImplementedCsr(CsrNumber(unsigned(number) + 0x200));
       auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
       if (mcsr and deleg)
-        value = mcsr->read() & (csr->getReadMask() & deleg->read());
+	{
+	  value = mcsr->read() & (csr->getReadMask() & deleg->read());
+	  if (virtMode_)
+	    {
+	      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
+	      if (hdeleg)
+		value = value & hdeleg->read();
+	    }
+	}
       else
         value = csr->read();
       return true;
@@ -210,12 +217,13 @@ template <typename URV>
 void
 CsRegs<URV>::enableSupervisorMode(bool flag)
 {
-  supervisorModeEnabled_ = flag;
+  superEnabled_ = flag;
 
-  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
-		     CsrNumber::SCOUNTEREN, CsrNumber::SSCRATCH, CsrNumber::SEPC,
-		     CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
-		     CsrNumber::SATP, CsrNumber::MEDELEG, CsrNumber::MIDELEG } )
+  typedef CsrNumber CN;
+
+  for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
+		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
+		     CN::SATP, CN::MEDELEG, CN::MIDELEG } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -226,6 +234,22 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
         }
       else
         csr->setImplemented(flag);
+    }
+
+  if (hyperEnabled_)
+    {
+      for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
+			 CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP } )
+	{
+	  auto csr = findCsr(csrn);
+	  if (not csr)
+	    {
+	      std::cerr << "Error: enableSupervisorMode: CSR number 0x"
+			<< std::hex << URV(csrn) << " undefined\n";
+	    }
+	  else
+	    csr->setImplemented(flag);
+	}
     }
 
   if (not flag)
@@ -259,6 +283,50 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
       mask = csr->getPokeMask();
       csr->setPokeMask(mask | extra);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableHypervisorMode(bool flag)
+{
+  hyperEnabled_ = flag;
+
+  typedef CsrNumber CN;
+  for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
+	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
+	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH } )
+    {
+      auto csr = findCsr(csrn);
+      if (not csr)
+        {
+          std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+        }
+      else
+        csr->setImplemented(flag);
+    }
+
+  if (superEnabled_)
+    {
+      for (auto csrn : { CN::VSSTATUS, CN::VSIE, CN::VSTVEC, CN::VSSCRATCH,
+			 CN::VSEPC, CN::VSCAUSE, CN::VSTVAL, CN::VSIP, CN::VSATP })
+	{
+	  auto csr = findCsr(csrn);
+	  if (not csr)
+	    {
+	      std::cerr << "Error: enableHypervisorMode: CSR number 0x"
+                    << std::hex << URV(csrn) << " undefined\n";
+	    }
+	  else
+	    csr->setImplemented(flag);
+	}
+    }
+
+  if (not flag)
+    return;
+
+  // TBD TODO : Check if bits in MIP or MIE should be enabled.
 }
 
 
@@ -318,13 +386,13 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
   if (mode == PrivilegeMode::Machine)
     return fields.value_;
 
-  if (mode == PrivilegeMode::Supervisor and not supervisorModeEnabled_)
+  if (mode == PrivilegeMode::Supervisor and not superEnabled_)
     mode = PrivilegeMode::User;
 
   if (mode == PrivilegeMode::Reserved)
     mode = PrivilegeMode::User;
 
-  if (mode == PrivilegeMode::User and not userModeEnabled_)
+  if (mode == PrivilegeMode::User and not userEnabled_)
     mode = PrivilegeMode::Machine;
 
   fields.bits_.MPP = unsigned(mode);
@@ -358,8 +426,7 @@ template <typename URV>
 bool
 CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 {
-  bool isVirt = false;
-  Csr<URV>* csr = getImplementedCsr(num, isVirt);
+  Csr<URV>* csr = getImplementedCsr(num, virtMode_);
   if (not csr)
     return false;
 
@@ -413,7 +480,14 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       if (mcsr and deleg)
         {
           URV prevMask = csr->getWriteMask();
-          csr->setWriteMask((prevMask | deleg->read()) & mcsr->getWriteMask());
+	  URV tmpMask = (prevMask | deleg->read()) & mcsr->getWriteMask();
+	  if (virtMode_)
+	    {
+	      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
+	      if (hdeleg)
+		tmpMask |= hdeleg->read();
+	    }
+          csr->setWriteMask(tmpMask);
           csr->write(value);
           csr->setWriteMask(prevMask);
         }
@@ -465,7 +539,7 @@ template <typename URV>
 bool
 CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
 {
-  const Csr<URV>* csr = getImplementedCsr(number);
+  const Csr<URV>* csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
@@ -950,6 +1024,11 @@ CsRegs<URV>::defineMachineRegs()
   URV pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
 
   defineCsr("mstatus", Csrn::MSTATUS, mand, imp, val, mask, pokeMask);
+  if (rv32_)
+    {
+      mask = 0;
+      defineCsr("mstatush", Csrn::MSTATUSH, mand, imp, 0, mask, mask);
+    }
 
   val = 0x40001105;  // MISA: acim
   if constexpr (sizeof(URV) == 8)
@@ -1076,6 +1155,9 @@ CsRegs<URV>::defineMachineRegs()
       name = "mhpmevent" + std::to_string(i);
       defineCsr(name, csrNum, mand, imp, 0, rom, rom);
     }
+
+  // add CSR fields
+  addMachineFields();
 }
 
 
@@ -1212,7 +1294,8 @@ CsRegs<URV>::defineSupervisorRegs()
   defineCsr("stval",      Csrn::STVAL,      !mand, !imp, 0, wam, wam);
 
   // Bits of SIE appear hardwired to zreo unless delegated.
-  defineCsr("sie",        Csrn::SIE,        !mand, !imp, 0, wam, wam);
+  mask = 0x0;
+  defineCsr("sie",        Csrn::SIE,        !mand, !imp, 0, mask, mask);
   auto sie = findCsr(Csrn::SIE);
   auto mie = findCsr(Csrn::MIE);
   if (sie and mie)
@@ -1243,6 +1326,9 @@ CsRegs<URV>::defineSupervisorRegs()
       if (csr)
 	csr->setMapsToVirtual(true);
     }
+
+  // add CSR fields
+  addSupervisorFields();
 }
 
 
@@ -1278,6 +1364,9 @@ CsRegs<URV>::defineUserRegs()
       csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
       defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
     }
+
+  // add CSR fields
+  addUserFields();
 }
 
 
@@ -1457,6 +1546,9 @@ CsRegs<URV>::defineVectorRegs()
   defineCsr("vtype",  CsrNumber::VTYPE,  !mand, !imp, 0, mask, mask);
 
   defineCsr("vlenb",  CsrNumber::VLENB,  !mand, !imp, 0, 0, 0);
+
+  // add CSR fields
+  addVectorFields();
 }
 
 
@@ -1506,7 +1598,7 @@ template <typename URV>
 bool
 CsRegs<URV>::peek(CsrNumber number, URV& value) const
 {
-  auto csr = getImplementedCsr(number);
+  auto csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
@@ -1553,7 +1645,7 @@ template <typename URV>
 bool
 CsRegs<URV>::poke(CsrNumber number, URV value)
 {
-  Csr<URV>* csr = getImplementedCsr(number);
+  Csr<URV>* csr = getImplementedCsr(number, virtMode_);
   if (not csr)
     return false;
 
@@ -1864,15 +1956,15 @@ CsRegs<URV>::updateCounterPrivilege()
 
       if (mFlag)
         {
-          if (supervisorModeEnabled_)
+          if (superEnabled_)
             {
               nextMode = PrivilegeMode::Supervisor;
 
               bool sFlag = (sMask >> i) & 1;
-              if (sFlag and userModeEnabled_)
+              if (sFlag and userEnabled_)
                 nextMode = PrivilegeMode::User;
             }
-          else if (userModeEnabled_)
+          else if (userEnabled_)
             nextMode = PrivilegeMode::User;
         }
 
@@ -1925,6 +2017,244 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
   assignEventToCounter(event, counterIx, enableUser, enableMachine);
 
   return value;
+}
+
+template <typename URV>
+void
+CsRegs<URV>::addMachineFields()
+{
+  constexpr unsigned xlen = sizeof(URV)*8;
+  setCsrFields(CsrNumber::MVENDORID, {{"OFFSET", 7}, {"BANK", 25}});
+  setCsrFields(CsrNumber::MARCHID, {{"marchid", xlen}});
+  setCsrFields(CsrNumber::MIMPID, {{"mimpid", xlen}});
+  setCsrFields(CsrNumber::MHARTID, {{"mhartid", xlen}});
+  setCsrFields(CsrNumber::MCONFIGPTR, {{"mconfigptr", xlen}});
+  setCsrFields(CsrNumber::MISA, {{"EXT", 26}, {"zero", xlen - 28}, {"MXL", 2}});
+  // TODO: field for each trap?
+  setCsrFields(CsrNumber::MEDELEG, {{"medeleg", xlen}});
+  setCsrFields(CsrNumber::MIDELEG, {{"mideleg", xlen}});
+  setCsrFields(CsrNumber::MIE,
+    {{"zero", 1}, {"SSIP", 1}, {"zero", 1}, {"MSIP", 1},
+     {"zero", 1}, {"STIP", 1}, {"zero", 1}, {"MTIP", 1},
+     {"zero", 1}, {"SEIP", 1}, {"zero", 1}, {"MEIP", 1},
+     {"zero", xlen - 12}});
+  setCsrFields(CsrNumber::MIP,
+    {{"zero", 1}, {"SSIE", 1}, {"zero", 1}, {"MSIE", 1},
+     {"zero", 1}, {"STIE", 1}, {"zero", 1}, {"MTIE", 1},
+     {"zero", 1}, {"SEIE", 1}, {"zero", 1}, {"MEIE", 1},
+     {"zero", xlen - 12}});
+  setCsrFields(CsrNumber::MTVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
+
+  std::vector<class Csr<URV>::Field> mcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
+  std::vector<class Csr<URV>::Field> hpm;
+  for (unsigned i = 3; i <= 31; ++i)
+    hpm.push_back({"HPM" + std::to_string(i), 1});
+  mcount.insert(mcount.end(), hpm.begin(), hpm.end());
+  setCsrFields(CsrNumber::MCOUNTEREN, mcount);
+  mcount.at(1) = {"zero", 1}; // TM cleared for MCOUNTINHIBIT
+  setCsrFields(CsrNumber::MCOUNTINHIBIT, mcount);
+
+  setCsrFields(CsrNumber::MSCRATCH, {{"mscratch", xlen}});
+  setCsrFields(CsrNumber::MEPC, {{"mepc", xlen}});
+  setCsrFields(CsrNumber::MCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
+  setCsrFields(CsrNumber::MTVAL, {{"mtval", xlen}});
+  setCsrFields(CsrNumber::MCYCLE, {{"mcycle", xlen}});
+  setCsrFields(CsrNumber::MINSTRET, {{"minstret", xlen}});
+  if (rv32_)
+    {
+      setCsrFields(CsrNumber::MSTATUS,
+        {{"UIE",  1}, {"SIE",  1}, {"res1", 1}, {"MIE",   1},
+         {"UPIE", 1}, {"SPIE", 1}, {"UBE",  1}, {"MPIE",  1},
+         {"SPP",  1}, {"VS",   2}, {"MPP",  2}, {"FS",    2},
+         {"XS",   2}, {"MPRV", 1}, {"SUM",  1}, {"MXR",   1},
+         {"TVM",  1}, {"TW",   1}, {"TSR",  1}, {"res0",  8},
+         {"SD",   1}});
+      setCsrFields(CsrNumber::MSTATUSH,
+        {{"res1", 4}, {"SBE", 1}, {"MBE", 1}, {"res0", 26}});
+      setCsrFields(CsrNumber::MENVCFG,
+        {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
+         {"CBZE", 1}, {"res1", 24}});
+      setCsrFields(CsrNumber::MENVCFGH,
+        {{"res0", 30}, {"PBMTE", 1}, {"STCE", 1}});
+      setCsrFields(CsrNumber::MCYCLEH, {{"mcycleh", 32}});
+      setCsrFields(CsrNumber::MINSTRETH, {{"minstreth", 32}});
+    }
+  else
+    {
+      setCsrFields(CsrNumber::MSTATUS,
+        {{"UIE",  1},  {"SIE",  1}, {"res2", 1}, {"MIE",   1},
+         {"UPIE", 1},  {"SPIE", 1}, {"UBE",  1}, {"MPIE",  1},
+         {"SPP",  1},  {"VS",   2}, {"MPP",  2}, {"FS",    2},
+         {"XS",   2},  {"MPRV", 1}, {"SUM",  1}, {"MXR",   1},
+         {"TVM",  1},  {"TW",   1}, {"TSR",  1}, {"res1",  9},
+         {"UXL",  2},  {"SXL",  2}, {"SBE",  1}, {"MBE",   1},
+         {"res0", 25}, {"SD",   1}});
+      setCsrFields(CsrNumber::MENVCFG,
+        {{"FIOM", 1}, {"res0",  3}, {"CBIE",  2}, {"CBCFE", 1},
+         {"CBZE", 1}, {"res1", 54}, {"PBMTE", 1}, {"STCE",  1}});
+    }
+
+  unsigned pmpIx = 0;
+  for (unsigned i = 0; i < 16; i += 2)
+    {
+      std::vector<class Csr<URV>::Field> pmps;
+      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i);
+      unsigned end = (rv32_) ? pmpIx + 4 : pmpIx + 8;
+      for (; pmpIx < end; pmpIx++)
+        {
+          std::string name = "pmp" + std::to_string(pmpIx) + "cfg";
+          pmps.push_back({name, 8});
+        }
+
+      setCsrFields(csrNum, pmps);
+
+      if (rv32_)
+        {
+          pmps.clear();
+          csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i + 1);
+          end = pmpIx + 4;
+          for (; pmpIx < end; pmpIx++)
+            {
+              std::string name = "pmp" + std::to_string(pmpIx) + "cfg";
+              pmps.push_back({name, 8});
+            }
+          setCsrFields(csrNum, pmps);
+        }
+    }
+  for (unsigned i = 0; i < 64; ++i)
+    {
+      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPADDR0) + i);
+      if (rv32_)
+        setCsrFields(csrNum, {{"addr", 32}});
+      else
+        setCsrFields(csrNum, {{"addr", 54}, {"zero", 10}});
+    }
+
+  for (unsigned i = 3; i <= 31; ++i)
+    {
+      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3) + i - 3);
+      std::string name = "mhpmcounter" + std::to_string(i);
+      setCsrFields(csrNum, {{name, xlen}});
+      if (rv32_)
+        {
+          // High register counterpart of mhpmcounter.
+          csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3H) + i - 3);
+          name += "h";
+          setCsrFields(csrNum, {{name, xlen}});
+        }
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::addSupervisorFields()
+{
+  constexpr unsigned xlen = sizeof(URV)*8;
+  setCsrFields(CsrNumber::STVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
+
+  std::vector<class Csr<URV>::Field> scount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
+  std::vector<class Csr<URV>::Field> hpm;
+  for (unsigned i = 3; i <= 31; ++i)
+    hpm.push_back({"HPM" + std::to_string(i), 1});
+  scount.insert(scount.end(), hpm.begin(), hpm.end());
+  setCsrFields(CsrNumber::SCOUNTEREN, scount);
+
+  setCsrFields(CsrNumber::SSCRATCH, {{"sscratch", xlen}});
+  setCsrFields(CsrNumber::SEPC, {{"sepc", xlen}});
+  setCsrFields(CsrNumber::SCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
+  setCsrFields(CsrNumber::STVAL, {{"stval", xlen}});
+  setCsrFields(CsrNumber::SIE,
+    {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
+     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
+  setCsrFields(CsrNumber::SIP,
+    {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
+     {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
+  setCsrFields(CsrNumber::SENVCFG,
+    {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1},
+     {"CBZE", 1}, {"res1", xlen - 8}});
+
+  if (rv32_)
+    {
+      setCsrFields(CsrNumber::SSTATUS,
+        {{"res0", 1}, {"SIE",  1}, {"res1",  3}, {"SPIE", 1},
+         {"UBE",  1}, {"res2", 1}, {"SPP",   1}, {"VS",   2},
+         {"res3", 2}, {"FS",   2}, {"XS",    2}, {"res4", 1},
+         {"SUM",  1}, {"MXR",  1}, {"res5", 11}, {"SD",   1}});
+      setCsrFields(CsrNumber::SATP,
+        {{"PPN", 22}, {"ASID", 9}, {"MODE", 1}});
+    }
+  else
+    {
+      setCsrFields(CsrNumber::SSTATUS,
+        {{"res0",  1}, {"SIE",  1}, {"res1",  3}, {"SPIE",  1},
+         {"UBE",   1}, {"res2", 1}, {"SPP",   1}, {"VS",    2},
+         {"res3",  2}, {"FS",   2}, {"XS",    2}, {"res4",  1},
+         {"SUM",   1}, {"MXR",  1}, {"res5", 12}, {"UXL",   2},
+         {"res6", 29}, {"SD",   1}});
+      setCsrFields(CsrNumber::SATP,
+        {{"PPN", 44}, {"ASID", 16}, {"MODE", 4}});
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::addUserFields()
+{
+  constexpr unsigned xlen = sizeof(URV)*8;
+  setCsrFields(CsrNumber::CYCLE, {{"cycle", xlen}});
+  setCsrFields(CsrNumber::TIME, {{"time", xlen}});
+  setCsrFields(CsrNumber::INSTRET, {{"instret", xlen}});
+  if (rv32_)
+    {
+      setCsrFields(CsrNumber::CYCLEH, {{"cycleh", xlen}});
+      setCsrFields(CsrNumber::TIMEH, {{"timeh", xlen}});
+      setCsrFields(CsrNumber::INSTRETH, {{"instreth", xlen}});
+    }
+
+  for (unsigned i = 3; i <= 31; ++i)
+    {
+      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3) + i - 3);
+      std::string name = "hpmcounter" + std::to_string(i);
+      setCsrFields(csrNum, {{name, xlen}});
+      if (rv32_)
+        {
+          // High register counterpart of hpmcounter.
+          csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
+          name += "h";
+          setCsrFields(csrNum, {{name, xlen}});
+        }
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::addVectorFields()
+{
+  constexpr unsigned xlen = sizeof(URV)*8;
+  setCsrFields(CsrNumber::VSTART, {{"vstart", xlen}});
+  setCsrFields(CsrNumber::VXSAT, {{"vxsat", 1}, {"zero", xlen - 1}});
+  setCsrFields(CsrNumber::VXRM, {{"vxrm", 2}, {"zero", xlen - 2}});
+  setCsrFields(CsrNumber::VCSR,
+    {{"vxsat", 1}, {"vxrm", 2}, {"zero", xlen - 3}});
+  setCsrFields(CsrNumber::VL, {{"vl", xlen}});
+  setCsrFields(CsrNumber::VTYPE,
+    {{"LMUL",       3}, {"SEW",   3}, {"VTA", 1}, {"VMA", 1},
+     {"res", xlen - 9}, {"ILL", 1}});
+  setCsrFields(CsrNumber::VLENB, {{"vlenb", xlen}});
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::addFpFields()
+{
+  setCsrFields(CsrNumber::FFLAGS,
+    {{"NX", 1}, {"UF", 1}, {"OF", 1}, {"DZ", 1}, {"NV", 1}});
+  setCsrFields(CsrNumber::FRM, {{"frm", 3}});
+  setCsrFields(CsrNumber::FCSR, {{"fflags", 5}, {"frm", 3}, {"res0", 24}});
 }
 
 

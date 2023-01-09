@@ -45,12 +45,21 @@ namespace WdRiscv
     /// Return false otherwise.
     bool interact(FILE* traceFile, FILE* commandLog);
 
-    /// Helper to interact: "until" command. Run until address.
+    /// Helper to interact: "until" command. Run until address. If the hart is
+    /// in debug mode (halted), this is also a resume.
     bool untilCommand(Hart<URV>&, const std::string& line,
 		     const std::vector<std::string>& tokens,
 		     FILE* traceFile);
 
-    /// Helper to interact: "step" command. Single step.
+    /// Helper to interact: "run" command. If the hart is in debug
+    /// mode (halted), this is also a resume.
+    bool runCommand(Hart<URV>&, const std::string& line,
+		    const std::vector<std::string>& tokens,
+		    FILE* traceFile);
+
+    /// Helper to interact: "step" command. Single step. If the hart is in debug
+    /// mode it will be resumed for one instruction and will re-enter debug
+    /// mode immediately after regardless of dcsr.step.
     bool stepCommand(Hart<URV>&, const std::string& line,
 		     const std::vector<std::string>& tokens, FILE* traceFile);
 
@@ -111,6 +120,9 @@ namespace WdRiscv
 
     bool mbInsertCommand(Hart<URV>& hart, const std::string& line,
 			 const std::vector<std::string>& tokens);
+
+    bool translateCommand(Hart<URV>& hart, const std::string& line,
+			  const std::vector<std::string>& tokens);
 
     static void peekAllFpRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllIntRegs(Hart<URV>& hart, std::ostream& out);

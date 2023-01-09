@@ -309,7 +309,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       if (pending)
 	fprintf(out, "  +\n");
       formatInstTrace<URV>(out, tag, hartIx_, lastPriv_, currPc_, instBuff, 'm',
-			   URV(ldStPhysAddr1_), URV(ldStData_), tmp.c_str());
+			   URV(ldStAddr_), URV(ldStData_), tmp.c_str());
       pending = true;
     }
 
@@ -545,7 +545,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       if (not isRvd())
 	val64 = uint32_t(val64);  // Clear top 32 bits if only F extension.
       if (regCount) buffer.printChar(';');
-      buffer.print(intRegs_.regName(reg)).printChar('=').print(val64);
+      buffer.print(fpRegs_.regName(reg)).printChar('=').print(val64);
       // Print incremental flags since FRM is sticky.
       unsigned fpFlags = lastFpFlags();
       if (fpFlags != 0)

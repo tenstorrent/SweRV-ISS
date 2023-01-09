@@ -6532,5 +6532,109 @@ InstTable::setupInstVec()
       { "wrs.sto", InstId::wrs_sto, 0x01d00073, 0xffffffff,
 	RvExtension::Zawrs, RvFormat::I
       },
+
+      // Hypervisor
+      { "hfence_vvma", InstId::hfence_vvma, 0x22000073, 0xfe007fff,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask
+      },
+
+      { "hfence_gvma", InstId::hfence_gvma, 0x62000073, 0xfe007fff,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask
+      },
+
+      { "hlv_b", InstId::hlv_b, 0x60004073, 0xfff0707f,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlv_bu", InstId::hlv_bu, 0x60104073, 0xfff0707f,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlv_h", InstId::hlv_h, 0x62004073, 0xfff0707f,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlv_hu", InstId::hlv_hu, 0x62104073, 0xfff0707f,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlv_w", InstId::hlv_w, 0x68004073, 0xfff0707f,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlvx_hu", InstId::hlvx_hu, 0x64304073, 0xfff0707f,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlvx_wu", InstId::hlvx_wu, 0x68304073, 0xfff0707f,
+        RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+        OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hsv_b", InstId::hsv_b, 0x62004073, 0xfe007fff,
+	RvExtension::H, RvFormat::S,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hsv_h", InstId::hsv_h, 0x66004073, 0xfe007fff,
+	RvExtension::H, RvFormat::S,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hsv_w", InstId::hsv_w, 0x6a004073, 0xfe007fff,
+	RvExtension::H, RvFormat::S,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlv_wu", InstId::hlv_wu, 0x68104073, 0xfff0707f,
+	RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hlv_d", InstId::hlv_d, 0x6c004073, 0xfff0707f,
+	RvExtension::H, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hsv_d", InstId::hsv_d, 0x6e004073, 0xfe007fff,
+	RvExtension::H, RvFormat::S,
+	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      { "hinval.vvma", InstId::hinval_vvma, 0x26000073, 0xfe007fff,
+        RvExtension::S, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask
+      },
+
+      { "hinval.gvma", InstId::hinval_gvma, 0x66000073, 0xfe007fff,
+        RvExtension::S, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+        OperandType::IntReg, OperandMode::Read, rs2Mask
+      },
+
     };
 }

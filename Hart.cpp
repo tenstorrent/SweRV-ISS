@@ -260,6 +260,9 @@ Hart<URV>::processExtensions(bool verbose)
   flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
   enableUserMode(flag);
 
+  flag = value & (URV(1) << ('h' - 'a'));  // Hypervisor.
+  enableHypervisorMode(flag);
+
   rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
 
   rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
@@ -506,27 +509,16 @@ Hart<URV>::updateAddressTranslation()
 
   uint32_t prevAsid = virtMem_.addressSpace();
 
-  URV mode = 0, asid = 0, ppn = 0;
-  if constexpr (sizeof(URV) == 4)
-    {
-      mode = value >> 31;
-      asid = (value >> 22) & 0x1ff;
-      ppn = value & 0x3fffff;  // Least sig 22 bits
-    }
-  else
-    {
-      mode = value >> 60;
-      if ((mode >= 1 and mode <= 7) or mode >= 12)
-        mode = 0;  // 1-7 and 12-15 are reserved in version 1.12 of sepc.
-      asid = (value >> 44) & 0xffff;
-      ppn = value & 0xfffffffffffll;  // Least sig 44 bits
-    }
+  SatpFields<URV> satp(value);
+  if constexpr (sizeof(URV) != 4)
+    if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
+      satp.bits_.MODE = 0;
 
-  virtMem_.setMode(VirtMem::Mode(mode));
-  virtMem_.setAddressSpace(asid);
-  virtMem_.setPageTableRootPage(ppn);
+  virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
+  virtMem_.setAddressSpace(satp.bits_.ASID);
+  virtMem_.setPageTableRootPage(satp.bits_.PPN);
 
-  if (asid != prevAsid)
+  if (satp.bits_.ASID != prevAsid)
     invalidateDecodeCache();
 }
 
@@ -566,15 +558,15 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   prevPerfControl_ = perfControl_;
 
   debugMode_ = false;
-  debugStepMode_ = false;
 
   dcsrStepIe_ = false;
   dcsrStep_ = false;
 
   if (peekCsr(CsrNumber::DCSR, value))
     {
-      dcsrStep_ = (value >> 2) & 1;
-      dcsrStepIe_ = (value >> 11) & 1;
+      DcsrFields<URV> dcsr(value);
+      dcsrStep_ = dcsr.bits_.STEP;
+      dcsrStepIe_ = dcsr.bits_.STEPIE;
     }
 
   resetVector();
@@ -622,11 +614,12 @@ Hart<URV>::resetVector()
   URV value = 0;
   if (peekCsr(CsrNumber::VTYPE, value))
     {
-      bool vill = (value >> (8*sizeof(URV) - 1)) & 1;
-      bool ma = (value >> 7) & 1;
-      bool ta = (value >> 6) & 1;
-      GroupMultiplier gm = GroupMultiplier(value & 7);
-      ElementWidth ew = ElementWidth((value >> 3) & 7);
+      VtypeFields<URV> vtype(value);
+      bool vill = vtype.bits_.VILL;
+      bool ma = vtype.bits_.VMA;
+      bool ta = vtype.bits_.VTA;
+      GroupMultiplier gm = GroupMultiplier(vtype.bits_.LMUL);
+      ElementWidth ew = ElementWidth(vtype.bits_.SEW);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
@@ -658,14 +651,17 @@ template <typename URV>
 void
 Hart<URV>::updateCachedVsstatus()
 {
-  assert(not virtMode_);
+  assert(virtMode_);
 
   URV csrVal = 0;
   peekCsr(CsrNumber::VSSTATUS, csrVal);
   vsstatus_.value_ = csrVal;
 
-  virtMem_.setExecReadable(vsstatus_.bits_.MXR);
-  virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
+  if (virtMode_)
+    {
+      virtMem_.setExecReadable(vsstatus_.bits_.MXR);
+      virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
+    }
 }
 
 
@@ -820,8 +816,9 @@ Hart<URV>::setPendingNmi(NmiCause cause)
   URV val = 0;  // DCSR value
   if (peekCsr(CsrNumber::DCSR, val))
     {
-      val |= URV(1) << 3;  // nmip bit
-      pokeCsr(CsrNumber::DCSR, val);
+      DcsrFields<URV> dcsr(val);
+      dcsr.bits_.NMIP = 1;
+      pokeCsr(CsrNumber::DCSR, dcsr.value_);
       recordCsrWrite(CsrNumber::DCSR);
     }
 }
@@ -837,8 +834,9 @@ Hart<URV>::clearPendingNmi()
   URV val = 0;  // DCSR value
   if (peekCsr(CsrNumber::DCSR, val))
     {
-      val &= ~(URV(1) << 3);  // nmip bit
-      pokeCsr(CsrNumber::DCSR, val);
+      DcsrFields<URV> dcsr(val);
+      dcsr.bits_.NMIP = 0;
+      pokeCsr(CsrNumber::DCSR, dcsr.value_);
       recordCsrWrite(CsrNumber::DCSR);
     }
 }
@@ -1902,25 +1900,40 @@ Hart<URV>::execSw(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::readInst(uint64_t address, uint32_t& inst)
+Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 {
   inst = 0;
+  uint64_t pa = va;
+  bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
+
+  if (translate)
+    if (virtMem_.transAddrNoUpdate(va, privMode_, false, false, true, pa) != ExceptionCause::NONE)
+      return false;
 
   uint16_t low;  // Low 2 bytes of instruction.
-  if (not memory_.readInst(address, low))
+  if (not memory_.readInst(pa, low))
     return false;
 
   inst = low;
+  if ((inst & 0x3) != 3)
+    return true;  // Compressed instruction.
 
-  if ((inst & 0x3) == 3)  // Non-compressed instruction.
-    {
-      uint16_t high;
-      if (not memory_.readInst(address + 2, high))
+  uint16_t high;
+  uint64_t va2 = va + 2, pa2 = pa + 2;
+  if (translate and memory_.getPageIx(va) != memory_.getPageIx(va2))
+    if (virtMem_.transAddrNoUpdate(va2, privMode_, false, false, true, pa2) != ExceptionCause::NONE)
+      {
+	inst = 0;
 	return false;
+      }
+
+  if (memory_.readInst(pa2, high))
+    {
       inst |= (uint32_t(high) << 16);
+      return true;
     }
 
-  return true;
+  return false;
 }
 
 
@@ -2093,6 +2106,23 @@ Hart<URV>::illegalInst(const DecodedInst* di)
 
 template <typename URV>
 void
+Hart<URV>::virtualInst(const DecodedInst* di)
+{
+  if (triggerTripped_)
+    return;
+
+  assert(0 && "Implement Hart::virtualInst");
+
+  uint32_t inst = di->inst();
+  if (isCompressedInst(inst))
+    inst = inst & 0xffff;
+
+  initiateException(ExceptionCause::ILLEGAL_INST, currPc_, inst);
+}
+
+
+template <typename URV>
+void
 Hart<URV>::unimplemented(const DecodedInst* di)
 {
   illegalInst(di);
@@ -2164,11 +2194,13 @@ template <typename URV>
 void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 {
-  cancelLr(); // Clear LR reservation (if any).
+  // FIX: spec no longer mandate loss of reservation on traps.
+  if (cancelLrOnRet_)  // Temporary
+    cancelLr(); // Clear LR reservation (if any).
 
   PrivilegeMode origMode = privMode_;
 
-  // Exceptions are taken in machine mode.
+  // Traps are taken in machine mode.
   privMode_ = PrivilegeMode::Machine;
   PrivilegeMode nextMode = PrivilegeMode::Machine;
 
@@ -2212,30 +2244,29 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
     assert(0 and "Failed to write TVAL register");
 
   // Update status register saving xIE in xPIE and previous privilege
-  // mode in xPP by getting current value of mstatus ...
-  URV status = csRegs_.peekMstatus();
-
-  // ... updating its fields
-  MstatusFields<URV> msf(status);
-
+  // mode in xPP by getting current value of xstatus, updating
+  // its fields and putting it back.
   if (nextMode == PrivilegeMode::Machine)
     {
+      MstatusFields<URV> msf(csRegs_.peekMstatus());
       msf.bits_.MPP = unsigned(origMode);
       msf.bits_.MPIE = msf.bits_.MIE;
       msf.bits_.MIE = 0;
+      if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
+	assert(0 and "Failed to write MSTATUS register");
+      updateCachedMstatus();
     }
   else if (nextMode == PrivilegeMode::Supervisor)
     {
+      MstatusFields<URV> msf(csRegs_.peekSstatus(virtMode_));
       msf.bits_.SPP = unsigned(origMode);
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
+      if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
+	assert(0 and "Failed to write SSTATUS register");
+      updateCachedSstatus();
     }
 
-  // ... and putting it back
-  if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
-    assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatus();
-  
   // Set program counter to trap handler address.
   URV tvec = 0;
   if (not csRegs_.read(tvecNum, privMode_, tvec))
@@ -2297,17 +2328,14 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   if (not csRegs_.write(CsrNumber::MTVAL, privMode_, 0))
     assert(0 and "Failed to write MTVAL register");
 
-  // Update status register saving xIE in xPIE and previous privilege
-  // mode in xPP by getting current value of mstatus ...
+  // Update status register saving MIE in MPIE and previous privilege
+  // mode in MPP by getting current value of mstatus, updating
+  // its fields and putting it back.
   URV status = csRegs_.peekMstatus();
   MstatusFields<URV> msf(status);
-
-  // ... updating its fields
   msf.bits_.MPP = unsigned(origMode);
   msf.bits_.MPIE = msf.bits_.MIE;
   msf.bits_.MIE = 0;
-
-  // ... and putting it back
   if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
     assert(0 and "Failed to write MSTATUS register");
   updateCachedMstatus();
@@ -2316,8 +2344,9 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   URV dcsrVal = 0;
   if (peekCsr(CsrNumber::DCSR, dcsrVal))
     {
-      dcsrVal &= ~(URV(1) << 3);
-      pokeCsr(CsrNumber::DCSR, dcsrVal);
+      DcsrFields<URV> dcsr(dcsrVal);
+      dcsr.bits_.NMIP = 0;
+      pokeCsr(CsrNumber::DCSR, dcsr.value_);
       recordCsrWrite(CsrNumber::DCSR);
     }
 
@@ -2455,7 +2484,7 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string& name) const
-{ 
+{
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
     return false;
@@ -2465,6 +2494,18 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string& name) const
 
   name = csr->getName();
   return true;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::peekCsr(CsrNumber csrn, std::string field, URV& val) const
+{
+  const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
+  if (not csr)
+    return false;
+
+  return csr->field(field, val);
 }
 
 
@@ -2481,8 +2522,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
 
   if (csr == CsrNumber::DCSR)
     {
-      dcsrStep_ = (val >> 2) & 1;
-      dcsrStepIe_ = (val >> 11) & 1;
+      DcsrFields<URV> dcsr(val);
+      dcsrStep_ = dcsr.bits_.STEP;
+      dcsrStepIe_ = dcsr.bits_.STEPIE;
     }
   else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG15)
     updateMemoryProtection();
@@ -2499,17 +2541,22 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
   // Update cached values of MSTATUS,
-  if (csr == CsrNumber::MSTATUS or csr == CsrNumber::SSTATUS)
+  if (csr == CsrNumber::MSTATUS)
     updateCachedMstatus();
+  else if (csr == CsrNumber::SSTATUS)
+    updateCachedSstatus();
+  else if (csr == CsrNumber::VSSTATUS)
+    updateCachedVsstatus();
 
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
     {
-      bool vill = (val >> (8*sizeof(URV) - 1)) & 1;
-      bool ma = (val >> 7) & 1;
-      bool ta = (val >> 6) & 1;
-      GroupMultiplier gm = GroupMultiplier(val & 7);
-      ElementWidth ew = ElementWidth((val >> 3) & 7);
+      VtypeFields<URV> vtype(val);
+      bool vill = vtype.bits_.VILL;
+      bool ma = vtype.bits_.VMA;
+      bool ta = vtype.bits_.VTA;
+      GroupMultiplier gm = GroupMultiplier(vtype.bits_.LMUL);
+      ElementWidth ew = ElementWidth(vtype.bits_.SEW);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
@@ -2962,9 +3009,9 @@ isDebugModeStopCount(const Hart<URV>& hart)
   if (not hart.peekCsr(CsrNumber::DCSR, dcsrVal))
     return false;
 
-  if ((dcsrVal >> 10) & 1)
-    return true;  // stop count bit is set
-  return false;
+  DcsrFields<URV> dcsr(dcsrVal);
+
+  return bool(dcsr.bits_.STOPCOUNT);
 }
 
 
@@ -4190,7 +4237,7 @@ template <typename URV>
 bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause)
 {
-  if (debugMode_ and not debugStepMode_)
+  if (debugMode_)
     return false;
 
   URV mip = csRegs_.peekMip();
@@ -4199,46 +4246,28 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
     return false;  // Nothing enabled that is also pending.
 
   typedef InterruptCause IC;
+  typedef PrivilegeMode PM;
 
   // Check for machine-level interrupts if MIE enabled or if user/supervisor.
-  URV mstatus = csRegs_.peekMstatus();
-  MstatusFields<URV> fields(mstatus);
-  bool globalEnable = fields.bits_.MIE or privMode_ < PrivilegeMode::Machine;
-  URV delegVal = 0;
-  peekCsr(CsrNumber::MIDELEG, delegVal);
+  bool globalEnable = (privMode_ == PM::Machine and mstatus_.bits_.MIE) or privMode_ < PM::Machine;
+
+  URV delegVal = csRegs_.peekMideleg();
   for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
-                              IC::M_TIMER, IC::M_INT_TIMER0,
-                              IC::M_INT_TIMER1 } )
+			     IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+			     IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
     {
       URV mask = URV(1) << unsigned(ic);
       bool delegated = (mask & delegVal) != 0;
       bool enabled = globalEnable;
-      if (delegated)
-        enabled = ((privMode_ == PrivilegeMode::Supervisor and fields.bits_.SIE) or
-                   privMode_ < PrivilegeMode::Supervisor);
+      if (delegated and globalEnable)
+	enabled = ((privMode_ == PrivilegeMode::Supervisor and mstatus_.bits_.SIE) or
+		   privMode_ < PrivilegeMode::Supervisor);
       if (enabled)
-        if (mie & mask & mip)
-          {
-            cause = ic;
-            return true;
-          }
-    }
-
-  // Supervisor mode interrupts: SIE enabled and supervior mode, or user-mode.
-  if (isRvs())
-    {
-      bool check = ((fields.bits_.SIE and privMode_ == PrivilegeMode::Supervisor)
-                    or privMode_ < PrivilegeMode::Supervisor);
-      if (check)
-        for (auto ic : { IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
-          {
-            URV mask = URV(1) << unsigned(ic);
-            if (mie & mask & mip)
-              {
-                cause = ic;
-                return true;
-              }
-          }
+	if (mie & mask & mip)
+	  {
+	    cause = ic;
+	    return true;
+	  }
     }
 
   return false;
@@ -4289,7 +4318,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
     }
   mipPoked_ = false;
 
-  if (debugStepMode_ and not dcsrStepIe_)
+  if (debugMode_ and not dcsrStepIe_)
     return false;
 
   // If a non-maskable interrupt was signaled by the test-bench, take it.
@@ -4309,9 +4338,9 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
   if (isInterruptPossible(cause))
     {
       // Attach changes to interrupted instruction.
-      initiateInterrupt(cause, pc_);
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
+      initiateInterrupt(cause, pc_);
       printInstTrace(inst, instCounter_, instStr, traceFile);
       ++cycleCount_;
       return true;
@@ -4673,7 +4702,7 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
 
   for (auto csrn : csrNums)
     {
-      Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
+      Csr<URV>* csr = csRegs_.getImplementedCsr(csrn, virtMode_);
       if (not csr)
 	continue;
 
@@ -5579,6 +5608,23 @@ Hart<URV>::execute(const DecodedInst* di)
      &&wrs_nto,
      &&wrs_sto,
 
+     &&hfence_vvma,
+     &&hfence_gvma,
+     &&hlv_b,
+     &&hlv_bu,
+     &&hlv_h,
+     &&hlv_hu,
+     &&hlv_w,
+     &&hlvx_hu,
+     &&hlvx_wu,
+     &&hsv_b,
+     &&hsv_h,
+     &&hsv_w,
+     &&hlv_wu,
+     &&hlv_d,
+     &&hsv_d,
+     &&hinval_vvma,
+     &&hinval_gvma,
     };
 
   const InstEntry* entry = di->instEntry();
@@ -8881,6 +8927,74 @@ Hart<URV>::execute(const DecodedInst* di)
  wrs_sto:
   execWrs_sto(di);
   return;
+
+ hfence_vvma:
+  execHfence_vvma(di);
+  return;
+
+ hfence_gvma:
+  execHfence_gvma(di);
+  return;
+
+ hlv_b:
+  execHlv_b(di);
+  return;
+
+ hlv_bu:
+  execHlv_bu(di);
+  return;
+
+ hlv_h:
+  execHlv_h(di);
+  return;
+
+ hlv_hu:
+  execHlv_hu(di);
+  return;
+
+ hlv_w:
+  execHlv_w(di);
+  return;
+
+ hlvx_hu:
+  execHlvx_hu(di);
+  return;
+
+ hlvx_wu:
+  execHlvx_wu(di);
+  return;
+
+ hsv_b:
+  execHsv_b(di);
+  return;
+
+ hsv_h:
+  execHsv_h(di);
+  return;
+
+ hsv_w:
+  execHsv_w(di);
+  return;
+
+ hlv_wu:
+  execHlv_wu(di);
+  return;
+
+ hlv_d:
+  execHlv_d(di);
+  return;
+
+ hsv_d:
+  execHsv_d(di);
+  return;
+
+ hinval_vvma:
+  execHinval_vvma(di);
+  return;
+
+ hinval_gvma:
+  execHinval_gvma(di);
+  return;
 }
 
 
@@ -8901,31 +9015,21 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
   cancelLr();  // Entering debug modes loses LR reservation.
 
   if (debugMode_)
-    {
-      if (debugStepMode_)
-	debugStepMode_ = false;
-      else
-	std::cerr << "Error: Entering debug-halt while in debug-halt\n";
-    }
-  else
-    {
-      debugMode_ = true;
-      if (debugStepMode_)
-	std::cerr << "Error: Entering debug-halt with debug-step true\n";
-      debugStepMode_ = false;
-    }
+    std::cerr << "Error: Entering debug-mode while in debug-mode\n";
+  debugMode_ = true;
+  csRegs_.enterDebug(true);
 
   URV value = 0;
   if (peekCsr(CsrNumber::DCSR, value))
     {
-      value &= ~(URV(7) << 6);        // Clear cause field (starts at bit 6).
-      value |= URV(cause) << 6;       // Set cause field
-      value = (value >> 2) << 2;      // Clear privilege mode bits.
-      value |= URV(privMode_) & 0x3;  // Set privelge mode bits.
+      DcsrFields<URV> dcsr(value);
+      dcsr.bits_.CAUSE = URV(cause);
+      dcsr.bits_.PRV = URV(privMode_) & 0x3;
+      dcsr.bits_.V = virtMode_;
 
       if (nmiPending_)
-	value |= URV(1) << 3;    // Set nmip bit.
-      csRegs_.poke(CsrNumber::DCSR, value);
+        dcsr.bits_.NMIP = 1;
+      csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
 
       csRegs_.poke(CsrNumber::DPC, pc);
     }
@@ -8934,19 +9038,13 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 
 template <typename URV>
 void
-Hart<URV>::enterDebugMode(URV pc, bool /*force*/)
+Hart<URV>::enterDebugMode(URV pc)
 {
   // This method is used by the test-bench to make the simulator
-  // follow it into debug-halt or debug-stop mode. Do nothing if the
-  // simulator got into debug mode on its own.
+  // follow it into debug-mode. Do nothing if the simulator got into
+  // debug-mode on its own.
   if (debugMode_)
     return;   // Already in debug mode.
-
-  if (debugStepMode_)
-    std::cerr << "Error: Enter-debug command finds hart in debug-step mode.\n";
-
-  debugStepMode_ = false;
-  debugMode_ = false;
 
   enterDebugMode_(DebugModeCause::DEBUGGER, pc);
 }
@@ -8964,21 +9062,10 @@ Hart<URV>::exitDebugMode()
 
   cancelLr();  // Exiting debug modes loses LR reservation.
 
-  peekCsr(CsrNumber::DPC, pc_);
-
-  // If in debug-step go to debug-halt. If in debug-halt go to normal
-  // or debug-step based on step-bit in DCSR.
-  if (debugStepMode_)
-    debugStepMode_ = false;
-  else
-    {
-      if (dcsrStep_)
-	debugStepMode_ = true;
-      else
-        {
-          debugMode_ = false;
-        }
-    }
+  peekCsr(CsrNumber::DPC, pc_);  // Restore PC
+  
+  debugMode_ = false;
+  csRegs_.enterDebug(false);
 
   // If pending nmi bit is set in dcsr, set pending nmi in the hart
   // object.
@@ -8986,8 +9073,17 @@ Hart<URV>::exitDebugMode()
   if (not peekCsr(CsrNumber::DCSR, dcsrVal))
     std::cerr << "Error: Failed to read DCSR in exit debug.\n";
 
-  if ((dcsrVal >> 3) & 1)
+  DcsrFields<URV> dcsr(dcsrVal);
+  if (dcsr.bits_.NMIP)
     setPendingNmi(nmiCause_);
+
+  // Restore privilege mode.
+  auto pm = PrivilegeMode{dcsr.bits_.PRV};
+  setPrivilegeMode(pm);
+
+  // Restore virtual mode.
+  bool vm = dcsr.bits_.V;
+  setVirtualMode(vm);
 }
 
 
@@ -9414,15 +9510,17 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       return;
     }
 
-  URV status = csRegs_.peekMstatus();
-  MstatusFields<URV> fields(status);
-  if (fields.bits_.TVM and privMode_ == PrivilegeMode::Supervisor)
+  bool tvm = virtMode_ ? mstatus_.bits_.TVM : hstatus_.bits_.VTVM;
+  if (tvm and privMode_ == PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 
-  // Invalidate whole TLB. This is overkill. TBD FIX: Improve.
+  // Invalidate whole TLB. This is overkill. 
   if (di->op1() == 0 and di->op2() == 0)
     virtMem_.tlb_.invalidate();
   else if (di->op1() == 0 and di->op2() != 0)
@@ -9490,52 +9588,138 @@ Hart<URV>::execSfence_inval_ir(const DecodedInst* di)
 }
 
 
-template <typename URV>
-void
-Hart<URV>::execMret(const DecodedInst* di)
+namespace WdRiscv
 {
-  if (privMode_ < PrivilegeMode::Machine)
-    {
-      illegalInst(di);
+
+  template <>
+  void
+  Hart<uint64_t>::execMret(const DecodedInst* di)
+  {
+    if (privMode_ < PrivilegeMode::Machine)
+      {
+	illegalInst(di);
+	return;
+      }
+
+    if (triggerTripped_)
       return;
-    }
 
-  if (triggerTripped_)
-    return;
+    if (cancelLrOnRet_)
+      cancelLr(); // Clear LR reservation (if any).
 
-  cancelLr(); // Clear LR reservation (if any).
+    // 1. Restore privilege mode, interrupt enable, and virtual mode.
+    uint64_t value = csRegs_.peekMstatus();
 
-  // Restore privilege mode and interrupt enable by getting
-  // current value of MSTATUS, ...
-  URV value = csRegs_.peekMstatus();
+    MstatusFields<uint64_t> fields(value);
+    PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
+    bool savedVirt = fields.bits_.MPV;
 
-  // ... updating/unpacking its fields,
-  MstatusFields<URV> fields(value);
-  PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
-  fields.bits_.MIE = fields.bits_.MPIE;
-  if (isRvu())
-    fields.bits_.MPP = unsigned(PrivilegeMode::User);
-  else if (isRvs())
-    fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
-  else
-    fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
-  fields.bits_.MPIE = 1;
-  if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
-    fields.bits_.MPRV = 0;
+    // 1.1 Restore MIE.
+    fields.bits_.MIE = fields.bits_.MPIE;
 
-  // ... and putting it back
-  if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
-    assert(0 and "Failed to write MSTATUS register\n");
-  updateCachedMstatus();
+    // 1.1. Set MPP to the least privileged mode available.
+    if (isRvu())
+      fields.bits_.MPP = unsigned(PrivilegeMode::User);
+    else if (isRvs())
+      fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
+    else
+      fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
 
-  // Restore program counter from MEPC.
-  URV epc;
-  if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
-    illegalInst(di);
-  setPc(epc);
+    // 1.2. Set MPIE.
+    fields.bits_.MPIE = 1;
+
+    // 1.3. Clear MPRV.
+    if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
+      fields.bits_.MPRV = 0;
+
+    // 1.4. Clear virtual (V) mode.
+    fields.bits_.MPV = 0;
+
+    // 1.5. Write back MSTATUS.
+    if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
+      assert(0 and "Failed to write MSTATUS register\n");
+    updateCachedMstatus();
+
+    // 2. Restore program counter from MEPC.
+    uint64_t epc;
+    if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
+      illegalInst(di);
+    setPc(epc);
       
-  // Update privilege mode.
-  privMode_ = savedMode;
+    // 3. Update virtual mode.
+    if (savedMode != PrivilegeMode::Machine)
+      setVirtualMode(savedVirt);
+
+    // 4. Update privilege mode.
+    privMode_ = savedMode;
+  }
+
+
+  // SV32 version of execMret has to contend with MSTATUSH.
+  template <>
+  void
+  Hart<uint32_t>::execMret(const DecodedInst* di)
+  {
+    if (privMode_ < PrivilegeMode::Machine)
+      {
+	illegalInst(di);
+	return;
+      }
+
+    if (triggerTripped_)
+      return;
+
+    if (cancelLrOnRet_)
+      cancelLr(); // Clear LR reservation (if any).
+
+    // 1. Restore privilege mode, interrupt enable, and virtual mode.
+    uint32_t value = csRegs_.peekMstatus();
+    uint32_t hvalue = 0;
+    peekCsr(CsrNumber::MSTATUSH, hvalue);
+    bool savedVirt = (hvalue >> 7) & 1;
+
+    MstatusFields<uint32_t> fields(value);
+    PrivilegeMode savedMode = PrivilegeMode(fields.bits_.MPP);
+    fields.bits_.MIE = fields.bits_.MPIE;
+
+    // 1.1. Set MPP to the least privileged mode available.
+    if (isRvu())
+      fields.bits_.MPP = unsigned(PrivilegeMode::User);
+    else if (isRvs())
+      fields.bits_.MPP = unsigned(PrivilegeMode::Supervisor);
+    else
+      fields.bits_.MPP = unsigned(PrivilegeMode::Machine);
+
+    // 1.2. Enable interrupts.
+    fields.bits_.MPIE = 1;
+
+    // 1.3. Clear MPRV.
+    if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
+      fields.bits_.MPRV = 0;
+
+    // 1.4. Clear virtual (V) mode.
+    hvalue &= ~ uint32_t(1 << 7);
+
+    // 1.5. Write back MSTATUS.
+    if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, fields.value_))
+      assert(0 and "Failed to write MSTATUS register\n");
+    if (not csRegs_.write(CsrNumber::MSTATUSH, privMode_, hvalue))
+      assert(0 and "Failed to write MSTATUSH register\n");
+    updateCachedMstatus();
+
+    // 2. Restore program counter from MEPC.
+    uint32_t epc;
+    if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
+      illegalInst(di);
+    setPc(epc);
+      
+    // 3. Update virtual mode.
+    if (savedMode != PrivilegeMode::Machine)
+      setVirtualMode(savedVirt);
+
+    // 4. Update privilege mode.
+    privMode_ = savedMode;
+  }
 }
 
 
@@ -9556,18 +9740,23 @@ Hart<URV>::execSret(const DecodedInst* di)
     }
 
   // If MSTATUS.TSR is 1 then sret is illegal in supervisor mode.
+  bool tsr = virtMode_? mstatus_.bits_.TSR : hstatus_.bits_.VTSR;
   URV mstatus = csRegs_.peekMstatus();
   MstatusFields<URV> mfields(mstatus);
-  if (mfields.bits_.TSR and privMode_ == PrivilegeMode::Supervisor)
+  if (tsr and privMode_ == PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 
   if (triggerTripped_)
     return;
 
-  cancelLr(); // Clear LR reservation (if any).
+  if (cancelLrOnRet_)
+    cancelLr(); // Clear LR reservation (if any).
 
   // Restore privilege mode and interrupt enable by getting
   // current value of SSTATUS, ...
@@ -9597,7 +9786,7 @@ Hart<URV>::execSret(const DecodedInst* di)
       illegalInst(di);
       return;
     }
-  updateCachedMstatus();
+  updateCachedSstatus();
 
   // Restore program counter from SEPC.
   URV epc;

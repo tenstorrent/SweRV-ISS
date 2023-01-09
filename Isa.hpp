@@ -6,7 +6,7 @@
 namespace WdRiscv
 {
 
-  enum class RvExtension : unsigned { A, B, C, D, E, F, I, M, S, U, V,
+  enum class RvExtension : unsigned { A, B, C, D, E, F, H, I, M, S, U, V,
 				      Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
 				      Zbr, Zbs, Zbt, Zfh, Zfhmin, Zlsseg,
 				      Zknd, Zkne, Zknh, Zbkb, Zksed, Zksh,

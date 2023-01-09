@@ -23,6 +23,7 @@
 #include <cassert>
 #include "Triggers.hpp"
 #include "PerfRegs.hpp"
+#include "CsrFields.hpp"
 
 
 namespace WdRiscv
@@ -541,6 +542,16 @@ namespace WdRiscv
     void registerPostReset(std::function<void(Csr<URV>&)> func)
     { postReset_.push_back(func); }
 
+    /// Get field width of CSR
+    unsigned width(std::string field) const
+    {
+      for (auto& f : fields_)
+        {
+          if (f.field == field)
+            return f.width;
+        }
+    }
+
   protected:
 
     friend class CsRegs<URV>;
@@ -675,6 +686,31 @@ namespace WdRiscv
     void clearLastWritten()
     { hasPrev_ = false; }
 
+    struct Field
+    {
+      std::string field;
+      unsigned width;
+    };
+
+    void setFields(const std::vector<Field>& fields)
+    { fields_ = fields; }
+
+    bool field(std::string field, URV& val) const
+    {
+      unsigned start = 0;
+      for (auto& f : fields_)
+        {
+          if (f.field == field)
+            {
+              URV mask = ((1 << f.width) - 1) << start;
+              val = (value_ * mask) >> start;
+              return true;
+            }
+          start += f.width;
+        }
+      return false;
+    }
+
   private:
 
     std::string name_;
@@ -707,6 +743,10 @@ namespace WdRiscv
     std::vector<std::function<void(Csr<URV>&, URV&)>> preWrite_;
 
     std::vector<std::function<void(Csr<URV>&)>> postReset_;
+
+    // Optionally define fields within a CSR with 
+    // start and end bit positions.
+    std::vector<Field> fields_;
   };
 
 
@@ -1040,10 +1080,21 @@ namespace WdRiscv
     { return debugMode_; }
 
     bool readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const;
-    
+
     bool writeTdata(CsrNumber number, PrivilegeMode mode, URV value);
 
     bool pokeTdata(CsrNumber number, URV value);
+
+    bool setCsrFields(CsrNumber number,
+                      const std::vector<class Csr<URV>::Field>& fields)
+    {
+      auto csr = findCsr(number);
+      if (not csr)
+        return false;
+
+      csr->setFields(fields);
+      return true;
+    }
 
   protected:
 
@@ -1080,10 +1131,29 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for SSTATUS or VSSTATUS
+    URV peekSstatus(bool virtMode) const
+    {
+      if (virtMode)
+	{
+	  const auto& csr = regs_.at(size_t(CsrNumber::VSSTATUS));
+	  return csr.read();
+	}
+      const auto& csr = regs_.at(size_t(CsrNumber::SSTATUS));
+      return csr.read();
+    }
+
     /// Fast peek method for VSTART.
     URV peekVstart() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::VSTART));
+      return csr.read();
+    }
+
+    /// Fast peek method for MIDELEG
+    URV peekMideleg() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MIDELEG));
       return csr.read();
     }
 
@@ -1211,13 +1281,16 @@ namespace WdRiscv
 
     /// Enable user mode.
     void enableUserMode(bool flag)
-    { userModeEnabled_ = flag; }
+    { userEnabled_ = flag; }
 
     /// Enable/disable F extension.
     void enableRvf(bool flag);
 
     /// Enable supervisor mode.
     void enableSupervisorMode(bool flag);
+
+    /// Enable hypervisor mode.
+    void enableHypervisorMode(bool flag);
 
     /// Enable supervisor mode.
     void enableVectorMode(bool flag);
@@ -1237,6 +1310,27 @@ namespace WdRiscv
     /// Enable per-privilege-mode performance-counter control.
     void enablePerModeCounterControl(bool flag)
     { perModeCounterControl_ = flag; }
+
+    /// Turn on/off virtual mode. When virtual mode is on read/write to
+    /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
+    /// of virtual supervisor CSRs become illegal.
+    void setVirtualMode(bool flag)
+    { virtMode_ = flag; }
+
+    /// helper to add fields of machine CSRs
+    void addMachineFields();
+
+    /// helper to add fields of supervisor CSRs
+    void addSupervisorFields();
+
+    /// helper to add fields of user CSRs
+    void addUserFields();
+
+    /// helper to add fields of vector CSRs
+    void addVectorFields();
+
+    /// helper to add fields of fp CSRs
+    void addFpFields();
 
   private:
 
@@ -1267,94 +1361,13 @@ namespace WdRiscv
 
     unsigned pmpG_ = 0;  // PMP G value: ln2(pmpGrain) - 2
 
-    bool userModeEnabled_ = false;
-    bool supervisorModeEnabled_ = false;
+    bool userEnabled_ = false;    // User mode enabled
+    bool superEnabled_ = false;   // Supervisor
+    bool hyperEnabled_ = false;   // Hypervisor
 
     bool perModeCounterControl_ = false;
     bool recordWrite_ = true;
     bool debugMode_ = false;
-  };
-
-
-  /// Structure used to unpack/pack the fields of the machine status
-  /// register.
-  template <typename URV>
-  union MstatusFields;
-
-  /// 32-bit version.
-  template <>
-  union MstatusFields<uint32_t>
-  {
-    MstatusFields(uint32_t value = 0)
-      : value_(value)
-    { }
-
-    uint32_t value_;   // Machine status register value.
-    struct
-    {
-      unsigned UIE      : 1;
-      unsigned SIE      : 1;
-      unsigned res2     : 1;
-      unsigned MIE      : 1;
-      unsigned UPIE     : 1;
-      unsigned SPIE     : 1;
-      unsigned UBE      : 1;
-      unsigned MPIE     : 1;
-      unsigned SPP      : 1;
-      unsigned VS       : 2;
-      unsigned MPP      : 2;
-      unsigned FS       : 2;
-      unsigned XS       : 2;
-      unsigned MPRV     : 1;
-      unsigned SUM      : 1;
-      unsigned MXR      : 1;
-      unsigned TVM      : 1;
-      unsigned TW       : 1;
-      unsigned TSR      : 1;
-      unsigned res0     : 8;  // Reserved
-      unsigned SD       : 1;
-    } bits_;
-  };
-
-  /// 64-bit version.
-  template <>
-  union MstatusFields<uint64_t>
-  {
-    MstatusFields(uint64_t value = 0)
-      : value_(value)
-    { }
-
-    uint64_t value_;   // Machine status register value.
-    struct
-    {
-      unsigned UIE      : 1;
-      unsigned SIE      : 1;
-      unsigned res0     : 1;
-      unsigned MIE      : 1;
-      unsigned UPIE     : 1;
-      unsigned SPIE     : 1;
-      unsigned UBE      : 1;
-      unsigned MPIE     : 1;
-      unsigned SPP      : 1;
-      unsigned VS       : 2;
-      unsigned MPP      : 2;
-      unsigned FS       : 2;
-      unsigned XS       : 2;
-      unsigned MPRV     : 1;
-      unsigned SUM      : 1;
-      unsigned MXR      : 1;
-      unsigned TVM      : 1;
-      unsigned TW       : 1;
-      unsigned TSR      : 1;
-      unsigned res1     : 9;
-      unsigned UXL      : 2;
-      unsigned SXL      : 2;
-      unsigned SBE      : 1;
-      unsigned MBE      : 1;
-      unsigned GVA      : 1;
-      unsigned MPV      : 1;
-      unsigned res2     : 23;  // Reserved
-      unsigned SD       : 1;
-    } bits_;
+    bool virtMode_ = false;       // True if hart virtual (V) mode is on.
   };
 }

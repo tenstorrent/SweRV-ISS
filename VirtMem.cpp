@@ -47,7 +47,6 @@ accessFaultType(bool read, bool write, bool exec)
 }
 
 
-
 ExceptionCause
 VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 {
@@ -79,7 +78,14 @@ VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, false, false, true, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, false, false, true, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
@@ -110,6 +116,66 @@ VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
     pa1 = pa2 = va2;
 
   return cause;
+}
+
+
+ExceptionCause
+VirtMem::transAddrNoUpdate(uint64_t va, PrivilegeMode priv, bool read,
+			   bool write, bool exec, uint64_t& pa)
+{
+  auto prevTrace = trace_; trace_ = false;
+  auto prevFile  = attFile_; attFile_ = nullptr;
+  accessDirtyCheck_ = false;
+
+  auto cause = transNoUpdate(va, priv, read, write, exec, pa);
+
+  trace_ = prevTrace;
+  attFile_ = prevFile;
+  accessDirtyCheck_ = true;
+
+  return cause;
+}
+
+
+ExceptionCause
+VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool read, bool write,
+		       bool exec, uint64_t& pa)
+{
+  if (mode_ == Bare)
+    {
+      pa = va;
+      return ExceptionCause::NONE;
+    }
+
+  assert(read or write or exec);
+
+  // Lookup virtual page number in TLB.
+  uint64_t virPageNum = va >> pageBits_;
+  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
+  if (entry)
+    {
+      // Use TLB entry.
+      if (priv == PrivilegeMode::User and not entry->user_)
+        return pageFaultType(read, write, exec);
+      if (priv == PrivilegeMode::Supervisor and entry->user_)
+        return pageFaultType(read, write, exec);
+      if (read)
+	{
+	  bool entryRead = entry->read_ or (execReadable_ and entry->exec_);
+	  if (not entryRead)
+	    return pageFaultType(true, false, false);
+	}
+      if (write and not entry->write_)
+        return pageFaultType(false, true, false);
+      if (exec and not entry->exec_)
+        return pageFaultType(false, false, true);
+      pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+      return ExceptionCause::NONE;
+    }
+
+
+  TlbEntry tlbEntry;
+  return doTranslate(va, priv, read, write, exec, pa, tlbEntry);
 }
 
 
@@ -145,7 +211,14 @@ VirtMem::translateForLoad(uint64_t va, PrivilegeMode priv, uint64_t& pa)
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, true, false, false, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, true, false, false, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
@@ -211,7 +284,14 @@ VirtMem::translateForStore(uint64_t va, PrivilegeMode priv, uint64_t& pa)
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, false, true, false, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, false, true, false, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
@@ -281,20 +361,26 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
       return ExceptionCause::NONE;
     }
 
-  return pageTableWalkUpdateTlb(va, priv, read, write, exec, pa);
+  TlbEntry tlbEntry;
+  auto cause = doTranslate(va, priv, read, write, exec, pa, tlbEntry);
+
+  // If successful, put cache translation results in TLB.
+  if (cause == ExceptionCause::NONE)
+    tlb_.insertEntry(tlbEntry);
+
+  return cause;
 }
 
 
 ExceptionCause
-VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
-                                bool write, bool exec, uint64_t& pa)
+VirtMem::doTranslate(uint64_t va, PrivilegeMode priv, bool read,
+		     bool write, bool exec, uint64_t& pa, TlbEntry& entry)
 {
   // Perform a page table walk.
   ExceptionCause cause = ExceptionCause::LOAD_PAGE_FAULT;
-  TlbEntry tmpTlbEntry;
 
   if (mode_ == Sv32)
-    cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, tmpTlbEntry);
+    cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
   else if (mode_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-39 must equal bit 38
@@ -303,7 +389,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0x1ffffff;  // Least sig 25 bits set
       if ((va >> 39) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, entry);
     }
   else if (mode_ == Sv48)
     {
@@ -313,7 +399,7 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0xffff;  // Least sig 16 bits set
       if ((va >> 48) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, entry);
     }
   else if (mode_ == Sv57)
     {
@@ -323,14 +409,10 @@ VirtMem::pageTableWalkUpdateTlb(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0x7f;  // Least sig 7 bits set
       if ((va >> 57) != mask)
         return pageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, tmpTlbEntry);
+      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, entry);
     }
   else
     assert(0 and "Unspupported virtual memory mode.");
-
-  // If successful, cache translation results in TLB.
-  if (cause == ExceptionCause::NONE)
-    tlb_.insertEntry(tmpTlbEntry);
 
   return cause;
 }
@@ -385,7 +467,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
 
       if (attFile_)
         {
-          bool leaf = pte.valid() and (pte.write() or pte.exec());
+          bool leaf = pte.valid() and (pte.read() or pte.exec());
           fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
           fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
 		  pte.write(), pte.exec(), pte.user(), pte.global(),
@@ -398,7 +480,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
         }
 
       // 4.
-      if (not pte.valid() or (not pte.read() and pte.write()))
+      if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
         return pageFaultType(read, write, exec);
 
       // 5.
@@ -434,7 +516,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
       return pageFaultType(read, write, exec);
 
   // 8.
-  if (not pte.accessed() or (write and not pte.dirty()))
+  if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
     {
       // We have a choice:
       // A. Page fault
@@ -535,7 +617,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
       if (attFile_)
         {
-          bool leaf = pte.valid() and (pte.write() or pte.exec());
+          bool leaf = pte.valid() and (pte.read() or pte.exec());
           fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
           fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
 		  pte.write(), pte.exec(), pte.user(), pte.global(),
@@ -548,7 +630,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
         }
 
       // 3.
-      if (not pte.valid() or (not pte.read() and pte.write()))
+      if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
         return pageFaultType(read, write, exec);
 
       // 4.
@@ -583,7 +665,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  return pageFaultType(read, write, exec);
 
       // 7.
-      if (not pte.accessed() or (write and not pte.dirty()))
+      if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
 	{
 	  // We have a choice:
 	  // A. Page fault

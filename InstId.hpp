@@ -974,6 +974,25 @@ namespace WdRiscv
      wrs_nto,
      wrs_sto,
 
-     maxId = wrs_sto
+     // Hypervisor
+     hfence_vvma,
+     hfence_gvma,
+     hlv_b,
+     hlv_bu,
+     hlv_h,
+     hlv_hu,
+     hlv_w,
+     hlvx_hu,
+     hlvx_wu,
+     hsv_b,
+     hsv_h,
+     hsv_w,
+     hlv_wu,
+     hlv_d,
+     hsv_d,
+     hinval_vvma,
+     hinval_gvma,
+
+     maxId = hinval_gvma
     };
 }
