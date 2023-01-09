@@ -890,6 +890,36 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 
 
 template <typename URV>
+inline
+bool
+Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
+				   unsigned src, unsigned groupX8)
+{
+  if (not checkMaskVecOpsVsEmul(di, dest, src, groupX8))
+    return false;
+
+  typedef ElementWidth EW;
+  EW sew = vecRegs_.elemWidth();
+  bool ok = false;
+  switch (sew)
+    {
+    case EW::Half:   ok = isZfhLegal(); break;
+    case EW::Word:   ok = isFpLegal();  break;
+    case EW::Word2:  ok = isDpLegal();  break;
+    default:         ok = false;        break;
+    }
+
+  // Clear soft-float library or x86 exception flags
+  clearSimulatorFpFlags();
+
+  if (not ok)
+    illegalInst(di);
+
+  return ok;
+}
+
+
+template <typename URV>
 void
 Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 {
@@ -19973,7 +20003,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20101,7 +20131,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20223,7 +20253,7 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20345,7 +20375,7 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20406,7 +20436,7 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20467,7 +20497,7 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
