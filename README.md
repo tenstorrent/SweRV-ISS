@@ -554,6 +554,7 @@ The vector configuration is an object with the following fields:
 * bytes_per_vec: vector size in bytes
 * min_bytes_per_elem: narrowest suppoted element size in bytes (default 1).
 * max_bytes_per_elem: widest supported element size in bytes (no default).
+* min_bytes_per_lmul: map of lmul to min-element-width-in bytes (default: no min).
 
 Example:
 ```

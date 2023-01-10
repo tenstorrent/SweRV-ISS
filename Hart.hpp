@@ -2246,6 +2246,9 @@ namespace WdRiscv
     bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned groupX8);
 
+    bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+				 unsigned op2, unsigned groupX8);
+
     // Check reduction vector operand against the group multiplier. Return true
     // if operand is a multiple of multiplier and false otherwise. Record group
     // multiplier for tracing.
