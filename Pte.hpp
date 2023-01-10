@@ -698,4 +698,167 @@ namespace WdRiscv
       return 0;
     }
   };
+
+
+  /// Structure to unpack the fields of an Sv32x4 virtual address
+  /// (guest physical address).
+  struct Va32x4Bits
+  {
+    unsigned offset_ : 12;
+    unsigned vpn0_   : 10;
+    unsigned vpn1_   : 12;
+  } __attribute__((packed));
+
+
+  /// Sv32x4 virtual address (guest physical address).
+  union Va32x4
+  {
+    Va32x4Bits bits_;
+    uint64_t data_ = 0;
+
+    Va32x4(uint32_t word) : data_(word)
+    { }
+
+    uint32_t offset() const { return bits_.offset_; }
+
+    uint32_t vpn0() const   { return bits_.vpn0_; }
+
+    uint32_t vpn1() const   { return bits_.vpn1_; }
+
+    uint32_t vpn(int i) const
+    {
+      if (i == 0) return vpn0();
+      if (i == 1) return vpn1();
+      assert(0);
+      return 0;
+    }
+  };
+
+
+  /// Structure to unpack the fields of Sv39x4 virtual address.
+  struct Va39x4Bits
+  {
+    unsigned offset_ : 12;
+    unsigned vpn0_   : 9;
+    unsigned vpn1_   : 9;
+    unsigned vpn2_   : 11;
+  } __attribute__((packed));
+
+
+  /// Sv39x4 virtual address.
+  union Va39x4
+  {
+    Va39x4Bits bits_;
+    uint64_t data_ = 0;
+
+    Va39x4(uint64_t data) : data_(data)
+    { }
+
+    uint64_t offset() const { return bits_.offset_; }
+
+    uint64_t vpn0() const   { return bits_.vpn0_; }
+
+    uint64_t vpn1() const   { return bits_.vpn1_; }
+
+    uint64_t vpn2() const   { return bits_.vpn2_; }
+
+    uint64_t vpn(int i) const
+    {
+      if (i == 0) return vpn0();
+      if (i == 1) return vpn1();
+      if (i == 2) return vpn2();
+      assert(0);
+      return 0;
+    }
+  };
+
+
+  /// Structure to unpack the fields of Sv48x4 virtual address.
+  struct Va48x4Bits
+  {
+    unsigned offset_ : 12;
+    unsigned vpn0_   : 9;
+    unsigned vpn1_   : 9;
+    unsigned vpn2_   : 9;
+    unsigned vpn3_   : 11;
+  } __attribute__((packed));
+
+
+  /// Sv48x4 virtual address.
+  union Va48x4
+  {
+    Va48x4Bits bits_;
+    uint64_t data_ = 0;
+
+    Va48x4(uint64_t data) : data_(data)
+    { }
+
+    uint64_t offset() const { return bits_.offset_; }
+
+    uint64_t vpn0() const   { return bits_.vpn0_; }
+
+    uint64_t vpn1() const   { return bits_.vpn1_; }
+
+    uint64_t vpn2() const   { return bits_.vpn2_; }
+
+    uint64_t vpn3() const   { return bits_.vpn3_; }
+
+    uint64_t vpn(int i) const
+    {
+      if (i == 0) return vpn0();
+      if (i == 1) return vpn1();
+      if (i == 2) return vpn2();
+      if (i == 3) return vpn3();
+      assert(0);
+      return 0;
+    }
+  };
+
+
+  /// Structure to unpack the fields of Sv57x4 virtual address.
+  struct Va57x4Bits
+  {
+    unsigned offset_ : 12;
+    unsigned vpn0_   : 9;
+    unsigned vpn1_   : 9;
+    unsigned vpn2_   : 9;
+    unsigned vpn3_   : 9;
+    unsigned vpn4_   : 11;
+  } __attribute__((packed));
+
+
+  /// Sv57x4 virtual address.
+  union Va57x4
+  {
+    Va57x4Bits bits_;
+    uint64_t data_ = 0;
+
+    Va57x4(uint64_t data) : data_(data)
+    { }
+
+    uint64_t offset() const { return bits_.offset_; }
+
+    uint64_t vpn0() const   { return bits_.vpn0_; }
+
+    uint64_t vpn1() const   { return bits_.vpn1_; }
+
+    uint64_t vpn2() const   { return bits_.vpn2_; }
+
+    uint64_t vpn3() const   { return bits_.vpn3_; }
+
+    uint64_t vpn4() const   { return bits_.vpn4_; }
+
+    uint64_t vpn(int i) const
+    {
+      if (i == 0) return vpn0();
+      if (i == 1) return vpn1();
+      if (i == 2) return vpn2();
+      if (i == 3) return vpn3();
+      if (i == 4) return vpn4();
+      assert(0);
+      return 0;
+    }
+  };
+
+
 }
