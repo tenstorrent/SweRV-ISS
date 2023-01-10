@@ -9849,13 +9849,18 @@ bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 {
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
-    {
-      if (mstatus_.bits_.TVM)
-        {
-          illegalInst(di);
-          return false;
-        }
-    }
+    if (mstatus_.bits_.TVM)
+      {
+	illegalInst(di);
+	return false;
+      }
+
+  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+    if (mstatus_.bits_.TVM)
+      {
+	illegalInst(di);
+	return false;
+      }
 
   if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     if (not isFpLegal())
@@ -9880,10 +9885,12 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
     return false;
 
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
-    {
-      if (mstatus_.bits_.TVM)
-        return false;
-    }
+    if (mstatus_.bits_.TVM)
+      return false;
+
+  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+    if (mstatus_.bits_.TVM)
+      return false;
 
   if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     if (not isFpLegal())
