@@ -37,6 +37,18 @@ pageFaultType(bool read, bool write, bool exec)
 
 inline
 ExceptionCause
+guestPageFaultType(bool read, bool write, bool exec)
+{
+  if (exec)  return ExceptionCause::INST_GUEST_PAGE_FAULT;
+  if (read)  return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
+  if (write) return ExceptionCause::STORE_GUEST_PAGE_FAULT;
+  assert(0);
+  return ExceptionCause::STORE_PAGE_FAULT;
+}
+
+
+inline
+ExceptionCause
 accessFaultType(bool read, bool write, bool exec)
 {
   if (exec)  return ExceptionCause::INST_ACC_FAULT;
@@ -409,6 +421,48 @@ VirtMem::doTranslate(uint64_t va, PrivilegeMode priv, bool read,
         mask = 0x7f;  // Least sig 7 bits set
       if ((va >> 57) != mask)
         return pageFaultType(read, write, exec);
+      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, entry);
+    }
+  else
+    assert(0 and "Unspupported virtual memory mode.");
+
+  return cause;
+}
+
+
+ExceptionCause
+VirtMem::doStage2Translate(uint64_t va, PrivilegeMode priv, bool read,
+			   bool write, bool exec, uint64_t& pa, TlbEntry& entry)
+{
+  // Perform a page table walk.
+  ExceptionCause cause = ExceptionCause::LOAD_PAGE_FAULT;
+
+  if (mode_ == Sv32)
+    {
+      // Part 1 of address translation: Bits 63-34 must be zero
+      if ((va >> 34) != 0)
+	return guestPageFaultType(read, write, exec);
+      cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
+    }
+  else if (mode_ == Sv39)
+    {
+      // Part 1 of address translation: Bits 63-41 must be zero
+      if ((va >> 41) != 0)
+        return guestPageFaultType(read, write, exec);
+      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, entry);
+    }
+  else if (mode_ == Sv48)
+    {
+      // Part 1 of address translation: Bits 63-50 must be zero
+      if ((va >> 50) != 0)
+        return guestPageFaultType(read, write, exec);
+      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, entry);
+    }
+  else if (mode_ == Sv57)
+    {
+      // Part 1 of address translation: Bits 63-59 must be zero
+      if ((va >> 59) != 0)
+        return guestPageFaultType(read, write, exec);
       cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, entry);
     }
   else

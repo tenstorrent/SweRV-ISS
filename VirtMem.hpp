@@ -196,6 +196,11 @@ namespace WdRiscv
     ExceptionCause doTranslate(uint64_t va, PrivilegeMode pm, bool read,
 			       bool write, bool exec, uint64_t& pa, TlbEntry& entry);
 
+    /// Helper to translate methods for 2nd stage of guest address translation
+    /// (guest physical address to host physical address).
+    ExceptionCause doStage2Translate(uint64_t va, PrivilegeMode pm, bool read,
+				     bool write, bool exec, uint64_t& pa, TlbEntry& entry);
+
     /// Set the page table root page: The root page is placed in
     /// physical memory at address root * page_size
     void setPageTableRootPage(uint64_t root)
