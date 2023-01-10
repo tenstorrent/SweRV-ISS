@@ -9850,9 +9850,7 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 {
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
     {
-      URV status = csRegs_.peekMstatus();
-      MstatusFields<URV> fields(status);
-      if (fields.bits_.TVM)
+      if (mstatus_.bits_.TVM)
         {
           illegalInst(di);
           return false;
@@ -9883,9 +9881,7 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
 
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
     {
-      URV mstatus = csRegs_.peekMstatus();
-      MstatusFields<URV> fields(mstatus);
-      if (fields.bits_.TVM)
+      if (mstatus_.bits_.TVM)
         return false;
     }
 
