@@ -168,7 +168,7 @@ namespace WdRiscv
     { return entry_ and entry_->instId() == InstId::sfence_vma; }
 
     /// Return true if this a fence instruction (not fence.tso).
-    bool isfence_i() const
+    bool isFence_i() const
     { return entry_ and entry_->instId() == InstId::fence_i; }
 
     /// Return true if this a fence.tso instruction (not fence).
