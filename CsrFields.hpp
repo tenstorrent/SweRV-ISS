@@ -2,21 +2,21 @@
 
 namespace WdRiscv
 {
-  /// Structure used to unpack/pack the fields of the machine status
-  /// register.
-  template <typename URV>
-  union MstatusFields;
 
-  /// 32-bit version.
-  template <>
-  union MstatusFields<uint32_t>
+  /// Struct used to pack/unpack MSTATUSH in RV32.
+  struct Mstatush
   {
-    MstatusFields(uint32_t value = 0)
-      : value_(value)
-    { }
+    unsigned res0     : 4;
+    unsigned SBE      : 1;
+    unsigned MBE      : 1;
+    unsigned GVA      : 1;
+    unsigned MPV      : 1;
+    unsigned res1     : 24;
+  };
 
-    uint32_t value_;   // Machine status register value.
-    struct
+
+  /// Struct used to pack/unpack MSTATUS in RV32.
+  struct Mstatus32
     {
       unsigned UIE      : 1;
       unsigned SIE      : 1;
@@ -39,19 +39,11 @@ namespace WdRiscv
       unsigned TSR      : 1;
       unsigned res1     : 8;  // Reserved
       unsigned SD       : 1;
-    } bits_;
-  };
+    };
 
-  /// 64-bit version.
-  template <>
-  union MstatusFields<uint64_t>
-  {
-    MstatusFields(uint64_t value = 0)
-      : value_(value)
-    { }
 
-    uint64_t value_;   // Machine status register value.
-    struct
+  /// Struct used to pack/unpack MSTATUS in RV64.
+  struct Mstatus64
     {
       unsigned UIE      : 1;
       unsigned SIE      : 1;
@@ -81,7 +73,36 @@ namespace WdRiscv
       unsigned MPV      : 1;
       unsigned res2     : 23;  // Reserved
       unsigned SD       : 1;
-    } bits_;
+    };
+
+
+  /// Structure used to unpack/pack the fields of the machine status
+  /// register.
+  template <typename URV>
+  union MstatusFields;
+
+  /// 32-bit version.
+  template <>
+  union MstatusFields<uint32_t>
+  {
+    MstatusFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_;   // Machine status register value.
+    Mstatus32 bits_;   // Bit fields.
+  };
+
+  /// 64-bit version.
+  template <>
+  union MstatusFields<uint64_t>
+  {
+    MstatusFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;   // Machine status register value.
+    Mstatus64 bits_;   // Bit fields.
   };
 
 
