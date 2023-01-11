@@ -2248,11 +2248,12 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   // its fields and putting it back.
   if (nextMode == PrivilegeMode::Machine)
     {
-      MstatusFields<URV> msf(csRegs_.peekMstatus());
-      msf.bits_.MPP = unsigned(origMode);
-      msf.bits_.MPIE = msf.bits_.MIE;
-      msf.bits_.MIE = 0;
-      if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
+      mstatus_.bits_.MPP = unsigned(origMode);
+      mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
+      mstatus_.bits_.MIE = 0;
+      // mstatus_.bits_.MPV = virtMode_;
+      virtMode_ = false;
+      if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, mstatus_.value_))
 	assert(0 and "Failed to write MSTATUS register");
       updateCachedMstatus();
     }

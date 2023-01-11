@@ -20,7 +20,7 @@ namespace WdRiscv
     {
       unsigned UIE      : 1;
       unsigned SIE      : 1;
-      unsigned res2     : 1;
+      unsigned res0     : 1;
       unsigned MIE      : 1;
       unsigned UPIE     : 1;
       unsigned SPIE     : 1;
@@ -37,7 +37,7 @@ namespace WdRiscv
       unsigned TVM      : 1;
       unsigned TW       : 1;
       unsigned TSR      : 1;
-      unsigned res0     : 8;  // Reserved
+      unsigned res1     : 8;  // Reserved
       unsigned SD       : 1;
     } bits_;
   };
