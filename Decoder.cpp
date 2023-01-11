@@ -2033,7 +2033,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	else if (funct3 == 1)
 	  {
 	    if (rd == 0 and rs1 == 0 and imm == 0)
-	      return instTable_.getEntry(InstId::fencei);
+	      return instTable_.getEntry(InstId::fence_i);
 	  }
 	else if (funct3 == 2)
 	  {

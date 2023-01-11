@@ -3057,7 +3057,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       else if (id == InstId::fence)
 	pregs.updateCounters(EventNumber::Fence, prevPerfControl_,
                              lastPriv_);
-      else if (id == InstId::fencei)
+      else if (id == InstId::fence_i)
 	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_,
                              lastPriv_);
       else if (id == InstId::mret)
@@ -4779,7 +4779,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&and_,
      &&fence,
      &&fence_tso,
-     &&fencei,
+     &&fence_i,
      &&ecall,
      &&ebreak,
      &&csrrw,
@@ -5792,7 +5792,7 @@ Hart<URV>::execute(const DecodedInst* di)
   execFence_tso(di);
   return;
 
- fencei:
+ fence_i:
   execFencei(di);
   return;
 
