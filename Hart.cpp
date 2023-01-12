@@ -643,7 +643,10 @@ namespace WdRiscv
   Hart<uint32_t>::updateCachedMstatus()
   {
     uint32_t csrVal = csRegs_.peekMstatus();
-    mstatus_.value_ = csrVal;
+    mstatus_.value_.low_ = csrVal;
+
+    peekCsr(CsrNumber::MSTATUSH, csrVal);
+    mstatus_.value_.high_ = csrVal;
 
     virtMem_.setExecReadable(mstatus_.bits_.MXR);
     virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
@@ -666,8 +669,10 @@ namespace WdRiscv
   void
   Hart<uint32_t>::writeMstatus()
   {
-    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_))
+    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_.low_))
       assert(0 and "Failed to write MSTATUS register");
+    if (not csRegs_.write(CsrNumber::MSTATUSH, PrivilegeMode::Machine, mstatus_.value_.high_))
+      assert(0 and "Failed to write MSTATUSH register");
     updateCachedMstatus();
   }
 
@@ -2288,7 +2293,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       mstatus_.bits_.MPP = unsigned(origMode);
       mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
       mstatus_.bits_.MIE = 0;
-      // mstatus_.bits_.MPV = virtMode_;
+      mstatus_.bits_.MPV = virtMode_;
       virtMode_ = false;
       writeMstatus();
     }

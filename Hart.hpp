@@ -4308,7 +4308,7 @@ namespace WdRiscv
     bool virtMode_ = false;         // True if virtual (V) mode is on.
 
     // These are used to get fast access to the FS and VS bits.
-    MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
+    Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
 
