@@ -454,31 +454,15 @@ Hart<URV>::setVecStatus(FpStatus value)
 {
   if (mstatus_.bits_.VS != unsigned(value))
     {
-      URV val = csRegs_.peekMstatus();
-      MstatusFields<URV> fields(val);
-      fields.bits_.VS = unsigned(value);
-      csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
-
-      URV newVal = csRegs_.peekMstatus();
-      if (val != newVal)
-	recordCsrWrite(CsrNumber::MSTATUS);
-
-      updateCachedMstatus();
+      mstatus_.bits_.VS = unsigned(value);
+      writeMstatus();
     }
 
   if (virtMode_ and vsstatus_.bits_.VS != unsigned(value))
     {
-      URV val = 0;
-      peekCsr(CsrNumber::VSSTATUS, val);
-      MstatusFields<URV> fields(val);
-      fields.bits_.VS = unsigned(value);
-      csRegs_.poke(CsrNumber::VSSTATUS, fields.value_);
-
-      URV newVal = 0;
-      peekCsr(CsrNumber::VSSTATUS, newVal);
-      if (val != newVal)
-	recordCsrWrite(CsrNumber::VSSTATUS);
-
+      vsstatus_.bits_.VS = unsigned(value);
+      csRegs_.poke(CsrNumber::VSSTATUS, vsstatus_.value_);
+      recordCsrWrite(CsrNumber::VSSTATUS);
       updateCachedVsstatus();
     }
 }

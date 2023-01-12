@@ -1740,7 +1740,7 @@ namespace WdRiscv
     // is written/poked.
     void updateCachedVsstatus();
 
-    // Update cached MSTATUS if non-virtual and VSSTATUS if virtual.
+    /// Update cached MSTATUS if non-virtual and VSSTATUS if virtual.
     void updateCachedSstatus()
     {
       if (virtMode_)
@@ -1748,6 +1748,9 @@ namespace WdRiscv
       else
 	updateCachedMstatus();
     }
+
+    /// Write the cached value of mstatus (or mstatus/mstatush) into the CSR.
+    void writeMstatus();
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all

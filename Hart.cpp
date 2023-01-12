@@ -635,15 +635,52 @@ Hart<URV>::resetVector()
 }
 
 
-template <typename URV>
-void
-Hart<URV>::updateCachedMstatus()
+namespace WdRiscv
 {
-  URV csrVal = csRegs_.peekMstatus();
-  mstatus_.value_ = csrVal;
 
-  virtMem_.setExecReadable(mstatus_.bits_.MXR);
-  virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+  template <>
+  void
+  Hart<uint32_t>::updateCachedMstatus()
+  {
+    uint32_t csrVal = csRegs_.peekMstatus();
+    mstatus_.value_ = csrVal;
+
+    virtMem_.setExecReadable(mstatus_.bits_.MXR);
+    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+  }
+
+
+  template <>
+  void
+  Hart<uint64_t>::updateCachedMstatus()
+  {
+    uint64_t csrVal = csRegs_.peekMstatus();
+    mstatus_.value_ = csrVal;
+
+    virtMem_.setExecReadable(mstatus_.bits_.MXR);
+    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+  }
+
+
+  template <>
+  void
+  Hart<uint32_t>::writeMstatus()
+  {
+    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_))
+      assert(0 and "Failed to write MSTATUS register");
+    updateCachedMstatus();
+  }
+
+
+  template <>
+  void
+  Hart<uint64_t>::writeMstatus()
+  {
+    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_))
+      assert(0 and "Failed to write MSTATUS register");
+    updateCachedMstatus();
+  }
+
 }
 
 
@@ -2253,9 +2290,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       mstatus_.bits_.MIE = 0;
       // mstatus_.bits_.MPV = virtMode_;
       virtMode_ = false;
-      if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, mstatus_.value_))
-	assert(0 and "Failed to write MSTATUS register");
-      updateCachedMstatus();
+      writeMstatus();
     }
   else if (nextMode == PrivilegeMode::Supervisor)
     {
@@ -2332,14 +2367,10 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   // Update status register saving MIE in MPIE and previous privilege
   // mode in MPP by getting current value of mstatus, updating
   // its fields and putting it back.
-  URV status = csRegs_.peekMstatus();
-  MstatusFields<URV> msf(status);
-  msf.bits_.MPP = unsigned(origMode);
-  msf.bits_.MPIE = msf.bits_.MIE;
-  msf.bits_.MIE = 0;
-  if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
-    assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatus();
+  mstatus_.bits_.MPP = unsigned(origMode);
+  mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
+  mstatus_.bits_.MIE = 0;
+  writeMstatus();
   
   // Clear pending nmi bit in dcsr
   URV dcsrVal = 0;
