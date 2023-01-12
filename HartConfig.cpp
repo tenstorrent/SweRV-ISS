@@ -340,6 +340,11 @@ applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& con
       std::cerr << "Invalid CSR (" << name << ") in config file.\n";
       return false;
     }
+  if ((mask & pokeMask) != mask)
+    {
+      std::cerr << "Warning: For CSR " << name << " poke mask (0x" << std::hex << pokeMask
+		<< ") is not a superset of write mask (0x" << std::hex << mask << ")\n";
+    }
 
   if (name == "misa")
     {
@@ -349,7 +354,9 @@ applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& con
       if (writeable != writeableReset)
 	std::cerr << "Warning: Reset value of MISA should be 0x"
 		  << std::hex << (reset | writeable) << std::dec
-		  << " to be comptible with write mask.\n";
+		  << " to be compatible with write mask.\n";
+      if (writeable & (URV(1) << ('E' - 'A')))
+	std::cerr << "Warning: Bit E of MISA cannot be writebale.\n";
     }
 
   if (verbose)

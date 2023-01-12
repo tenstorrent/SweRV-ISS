@@ -402,15 +402,20 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
 
 template <typename URV>
 URV
-legalizeMisa(URV v)
+legalizeMisa(Csr<URV>* csr, URV v)
 {
-  if ((v & (1 << ('I' - 'A'))) == 0)
-    {
-      if ((v & (1 << ('E' - 'A'))) != 0)
-	return v;  // I off, E On
-      v |= (1 << ('I' - 'A'));  // I & E off, turn I on
-    }
+  URV wm = csr->getWriteMask();
+  if (wm == 0)
+    return 0;
 
+  v = (v & wm) | (csr->read() & ~wm) ;
+
+  // E must be complement of I
+  bool i = v & (1 << ('I' - 'A'));
+  bool e = v & (1 << ('E' - 'A'));
+  if (e == i)
+    v ^= v & (1 << ('E' - 'A'));  // Flip E bit.
+      
   if ((v & (1 << ('F' - 'A'))) == 0)
     v &= ~(URV(1) << ('D' - 'A'));  // D is off if F is off.
 
@@ -511,6 +516,14 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       return true;
     }
 
+  if (num == CsrNumber::MISA)
+    {
+      value = legalizeMisa(csr, value);
+      csr->pokeNoMask(value);
+      recordWrite(num);
+      return true;
+    }
+
   if (num >= CsrNumber::MHPMEVENT3 and num <= CsrNumber::MHPMEVENT31)
     value = legalizeMhpmevent(num, value);
   else if (num >= CsrNumber::PMPCFG0 and num <= CsrNumber::PMPCFG15)
@@ -519,8 +532,6 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-  else if (num == CsrNumber::MISA)
-    value = legalizeMisa(value);
    
   csr->write(value);
   recordWrite(num);
@@ -1032,7 +1043,7 @@ CsRegs<URV>::defineMachineRegs()
   val = 0x40001105;  // MISA: acim
   if constexpr (sizeof(URV) == 8)
     val = 0x8000000000001105;  // MISA: acim
-  defineCsr("misa", Csrn::MISA, mand,  imp, val, rom, rom);
+  defineCsr("misa", Csrn::MISA, mand, imp, val, rom, rom);
 
   // Bits corresponding to reserved interrupts are hardwired to zero
   // in medeleg.
@@ -1699,6 +1710,13 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
       return true;
     }
 
+  if (number == CsrNumber::MISA)
+    {
+      value = legalizeMisa(csr, value);
+      csr->pokeNoMask(value);
+      return true;
+    }
+
   if (number >= CsrNumber::MHPMEVENT3 and number <= CsrNumber::MHPMEVENT31)
     value = legalizeMhpmevent(number, value);
   else if (number >= CsrNumber::PMPCFG0 and number <= CsrNumber::PMPCFG15)
@@ -1709,8 +1727,6 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
     }
   else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
     value = legalizeMstatusValue(value);
-  else if (number == CsrNumber::MISA)
-    value = legalizeMisa(value);
 
   csr->poke(value);
 
