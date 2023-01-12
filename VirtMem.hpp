@@ -203,20 +203,29 @@ namespace WdRiscv
 
     /// Set the page table root page: The root page is placed in
     /// physical memory at address root * page_size
-    void setPageTableRootPage(uint64_t root)
-    { pageTableRootPage_ = root; }
+    void setRootPage(uint64_t root)
+    { rootPage_ = root; }
 
-    // Change the translation mode to m.  Page size is reset to 4096.
+    /// Set the page table root page for 2nd stage address translation.
+    void setStage2RootPage(uint64_t root)
+    { rootPage2_ = root; }
+
+    // Change the translation mode to m.
     void setMode(Mode m)
-    {
-      mode_ = m;
-      pageSize_ = 4096;
-      pageBits_ = 12;
-    }
+    { mode_ = m; }
+
+    // Change the translation mode to m for the 2nd stage of 2-stage
+    // (VS) translation.
+    void setStage2Mode(Mode m)
+    { mode_ = m; }
 
     /// Set the address space id (asid).
-    void setAddressSpace(uint32_t asid)
+    void setAsid(uint32_t asid)
     { asid_ = asid; }
+
+    /// Set the virtual machine id for 2-stage translation.
+    void setVmid(uint32_t vmid)
+    { vmid_ = vmid; }
 
     /// Make executable pages also readable (supports MXR bit in MSTATUS).
     void setExecReadable(bool flag)
@@ -240,8 +249,12 @@ namespace WdRiscv
     { return mode_; }
 
     /// Return current address space id.
-    uint32_t addressSpace() const
+    uint32_t asid() const
     { return asid_; }
+
+    /// Return current virtual machine id.
+    uint32_t vmid() const
+    { return vmid_; }
 
     /// Set behavior if first access to page or store and page not dirty.
     void setFaultOnFirstAccess(bool flag)
@@ -288,9 +301,12 @@ namespace WdRiscv
     };
 
     Memory& memory_;
-    uint64_t pageTableRootPage_ = 0;
+    uint64_t rootPage_ = 0;
+    uint64_t rootPage2_ = 0;  // Root page for 2nd stage translation.
     Mode mode_ = Bare;
+    Mode mode2_ = Bare;       // For 2nd stage translation.
     uint32_t asid_ = 0;
+    uint32_t vmid_ = 0;
     unsigned pageSize_ = 4096;
     unsigned pageBits_ = 12;
     uint64_t pageMask_ = 0xfff;

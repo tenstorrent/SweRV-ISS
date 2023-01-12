@@ -481,4 +481,45 @@ namespace WdRiscv
       unsigned VILL : 1;
     } bits_;
   };
+
+
+  /// Structure used to unpack/pack the fields of the HGATP register
+  template <typename URV>
+  union HgatpFields;
+
+  template <>
+  union HgatpFields<uint32_t>
+  {
+    HgatpFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_;  // HGATP register value
+    struct
+    {
+      unsigned PPN  : 22;
+      unsigned VMID : 7;
+      unsigned res  : 2;
+      unsigned MODE : 1;
+    } bits_;
+  };
+
+  template <>
+  union HgatpFields<uint64_t>
+  {
+    HgatpFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_; // HGATP register value
+    struct
+    {
+      uint64_t PPN  : 44;
+      unsigned VMID : 14;
+      unsigned res  : 2;
+      unsigned MODE : 4;
+    } bits_;
+  };
+
+
 }

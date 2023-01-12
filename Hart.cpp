@@ -500,26 +500,33 @@ template <typename URV>
 void
 Hart<URV>::updateAddressTranslation()
 {
-  if (not isRvs())
-    return;
-
   URV value = 0;
-  if (not peekCsr(CsrNumber::SATP, value))
-    return;
+  if (peekCsr(CsrNumber::SATP, value))
+    {
+      uint32_t prevAsid = virtMem_.asid();
 
-  uint32_t prevAsid = virtMem_.addressSpace();
+      SatpFields<URV> satp(value);
+      if constexpr (sizeof(URV) != 4)
+	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
+	  satp.bits_.MODE = 0;
 
-  SatpFields<URV> satp(value);
-  if constexpr (sizeof(URV) != 4)
-    if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
-      satp.bits_.MODE = 0;
+      virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
+      virtMem_.setAsid(satp.bits_.ASID);
+      virtMem_.setRootPage(satp.bits_.PPN);
 
-  virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
-  virtMem_.setAddressSpace(satp.bits_.ASID);
-  virtMem_.setPageTableRootPage(satp.bits_.PPN);
+      if (satp.bits_.ASID != prevAsid)
+	invalidateDecodeCache();
+    }
 
-  if (satp.bits_.ASID != prevAsid)
-    invalidateDecodeCache();
+  if (peekCsr(CsrNumber::HGATP, value))
+    {
+      uint32_t prevVmid = virtMem_.vmid();
+
+      HgatpFields<URV> hgatp(value);
+      virtMem_.setStage2Mode(VirtMem::Mode(hgatp.bits_.MODE));
+      virtMem_.setVmid(VirtMem::Mode(hgatp.bits_.VMID));
+      virtMem_.setStage2RootPage(hgatp.bits_.PPN);
+    }
 }
 
 

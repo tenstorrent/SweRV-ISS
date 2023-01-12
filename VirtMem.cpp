@@ -495,7 +495,7 @@ VirtMem::pageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool
     fprintf(attFile_, "VA: 0x%jx\n", uintmax_t(address));
 
   // 2. Root is "a" in section 4.3.2 of privileged spec.
-  uint64_t root = pageTableRootPage_ * pageSize_;
+  uint64_t root = rootPage_ * pageSize_;
   uint64_t pteAddr = 0;
   int ii = levels - 1;
 
@@ -633,7 +633,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 			   bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
   // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
-  uint64_t root = pageTableRootPage_ * pageSize_;
+  uint64_t root = rootPage_ * pageSize_;
 
   PTE pte(0);
   const unsigned levels = pte.levels();
@@ -844,8 +844,8 @@ VirtMem::printPageTable(std::ostream& os) const
     default:   os << "???\n";  break;
     }
 
-  os << "Root page number: 0x" << std::hex << pageTableRootPage_ << '\n';
-  uint64_t addr = pageTableRootPage_ * pageSize_;
+  os << "Root page number: 0x" << std::hex << rootPage_ << '\n';
+  uint64_t addr = rootPage_ * pageSize_;
   os << "Root page addr: 0x" << std::hex << addr << '\n';
 
   std::string path = "/";
