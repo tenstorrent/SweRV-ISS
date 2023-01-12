@@ -115,6 +115,10 @@ namespace WdRiscv
   template <>
   union Emstatus<uint32_t>
   {
+    Emstatus(uint32_t low = 0, uint32_t high = 0)
+      : value_{low, high}
+    { }
+
     struct
     {
       uint32_t low_;
@@ -159,6 +163,10 @@ namespace WdRiscv
   template <>
   union Emstatus<uint64_t>
   {
+    Emstatus(uint32_t value = 0)
+      : value_(value)
+    { }
+
     uint64_t value_;
     Mstatus64 bits_;
   };
