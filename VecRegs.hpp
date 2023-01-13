@@ -406,11 +406,12 @@ namespace WdRiscv
 
   protected:
 
-    /// Clear load/address and store data used for logging/tracing./
+    /// Clear load/address and store data used for logging/tracing.
     void clearTraceData()
     {
       ldStSize_ = 0;
       ldStAddr_.clear();
+      maskedAddr_.clear();
       stData_.clear();
       clearLastWrittenReg();
       opsEmul_.assign(opsEmul_.size(), 1);
@@ -580,6 +581,7 @@ namespace WdRiscv
     // Collected by a vector load/store instruction.
     unsigned ldStSize_ = 0;           // Vector load/store element size.
     std::vector<uint64_t> ldStAddr_;  // Addresses of vector load/store instruction.
+    std::vector<bool> maskedAddr_;    // True if address is masked off (element skipped).
     std::vector<uint64_t> stData_;    // Data of vector store instruction.
     std::vector<unsigned> opsEmul_;   // Effecive grouping of vector operands.
   };
