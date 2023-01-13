@@ -26,6 +26,7 @@ namespace WdRiscv
     uint64_t physPageNum_ = 0;
     uint64_t time_ = 0;      // Access time (we use order to approximate time).
     uint32_t asid_ = 0;      // Address space identifier.
+    uint32_t vmid_ = 0;      // Virtual machine identifier.
     bool valid_ = false;
     bool global_ = false;    // 
     bool user_ = false;      // User-mode entry if true.

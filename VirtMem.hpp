@@ -112,10 +112,13 @@ namespace WdRiscv
     template <typename PTE, typename VA>
     void printEntries(std::ostream& os, uint64_t addr, std::string path) const;
 
-    /// Return the number of walks used in the last page table walk.
+    /// Return the number of instruction page table walks used by the
+    /// last instruction address translation (this may be 0, 1, or 2
+    /// -- 0 if TLB hit, 2 if instruction crosses page boundary).
     unsigned numFetchWalks() const
     { return fetchWalks_.size(); }
 
+    /// Return the number of walks used by the last data translation.
     unsigned numDataWalks() const
     { return dataWalks_.size(); }
 
@@ -191,6 +194,11 @@ namespace WdRiscv
     template <typename PTE, typename VA>
     ExceptionCause pageTableWalk1p12(uint64_t va, PrivilegeMode pm, bool read, bool write,
 				     bool exec, uint64_t& pa, TlbEntry& tlbEntry);
+
+    /// Page table walk for the G stage of 2-stage address translation.
+    template <typename PTE, typename VA>
+    ExceptionCause pageTableWalkStage2(uint64_t va, PrivilegeMode pm, bool read, bool write,
+				       bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
     /// Helper to translate methods.
     ExceptionCause doTranslate(uint64_t va, PrivilegeMode pm, bool read,
