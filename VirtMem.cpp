@@ -442,28 +442,28 @@ VirtMem::doStage2Translate(uint64_t va, PrivilegeMode priv, bool read,
       // Part 1 of address translation: Bits 63-34 must be zero
       if ((va >> 34) != 0)
 	return guestPageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
+      cause = pageTableWalkStage2<Pte32, Va32x4>(va, priv, read, write, exec, pa, entry);
     }
   else if (mode_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-41 must be zero
       if ((va >> 41) != 0)
         return guestPageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, entry);
+      cause = pageTableWalkStage2<Pte39, Va39x4>(va, priv, read, write, exec, pa, entry);
     }
   else if (mode_ == Sv48)
     {
       // Part 1 of address translation: Bits 63-50 must be zero
       if ((va >> 50) != 0)
         return guestPageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, entry);
+      cause = pageTableWalkStage2<Pte48, Va48x4>(va, priv, read, write, exec, pa, entry);
     }
   else if (mode_ == Sv57)
     {
       // Part 1 of address translation: Bits 63-59 must be zero
       if ((va >> 59) != 0)
         return guestPageFaultType(read, write, exec);
-      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, entry);
+      cause = pageTableWalkStage2<Pte57, Va57x4>(va, priv, read, write, exec, pa, entry);
     }
   else
     assert(0 and "Unspupported virtual memory mode.");
