@@ -437,28 +437,28 @@ VirtMem::doStage2Translate(uint64_t va, PrivilegeMode priv, bool read,
   // Perform a page table walk.
   ExceptionCause cause = ExceptionCause::LOAD_PAGE_FAULT;
 
-  if (mode_ == Sv32)
+  if (modeStage2_ == Sv32)
     {
       // Part 1 of address translation: Bits 63-34 must be zero
       if ((va >> 34) != 0)
 	return guestPageFaultType(read, write, exec);
       cause = pageTableWalkStage2<Pte32, Va32x4>(va, priv, read, write, exec, pa, entry);
     }
-  else if (mode_ == Sv39)
+  else if (modeStage2_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-41 must be zero
       if ((va >> 41) != 0)
         return guestPageFaultType(read, write, exec);
       cause = pageTableWalkStage2<Pte39, Va39x4>(va, priv, read, write, exec, pa, entry);
     }
-  else if (mode_ == Sv48)
+  else if (modeStage2_ == Sv48)
     {
       // Part 1 of address translation: Bits 63-50 must be zero
       if ((va >> 50) != 0)
         return guestPageFaultType(read, write, exec);
       cause = pageTableWalkStage2<Pte48, Va48x4>(va, priv, read, write, exec, pa, entry);
     }
-  else if (mode_ == Sv57)
+  else if (modeStage2_ == Sv57)
     {
       // Part 1 of address translation: Bits 63-59 must be zero
       if ((va >> 59) != 0)
@@ -788,7 +788,7 @@ VirtMem::pageTableWalkStage2(uint64_t address, PrivilegeMode privMode, bool read
 			     bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
   // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
-  uint64_t root = rootPage2_ * pageSize_;
+  uint64_t root = rootPageStage2_ * pageSize_;
 
   PTE pte(0);
   const unsigned levels = pte.levels();

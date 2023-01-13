@@ -216,7 +216,7 @@ namespace WdRiscv
 
     /// Set the page table root page for 2nd stage address translation.
     void setStage2RootPage(uint64_t root)
-    { rootPage2_ = root; }
+    { rootPageStage2_ = root; }
 
     // Change the translation mode to m.
     void setMode(Mode m)
@@ -225,7 +225,7 @@ namespace WdRiscv
     // Change the translation mode to m for the 2nd stage of 2-stage
     // (VS) translation.
     void setStage2Mode(Mode m)
-    { mode_ = m; }
+    { modeStage2_ = m; }
 
     /// Set the address space id (asid).
     void setAsid(uint32_t asid)
@@ -310,9 +310,9 @@ namespace WdRiscv
 
     Memory& memory_;
     uint64_t rootPage_ = 0;
-    uint64_t rootPage2_ = 0;  // Root page for 2nd stage translation.
+    uint64_t rootPageStage2_ = 0;  // Root page for 2nd stage translation.
     Mode mode_ = Bare;
-    Mode mode2_ = Bare;       // For 2nd stage translation.
+    Mode modeStage2_ = Bare;       // For 2nd stage translation.
     uint32_t asid_ = 0;
     uint32_t vmid_ = 0;
     unsigned pageSize_ = 4096;
