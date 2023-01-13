@@ -2301,7 +2301,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
       mstatus_.bits_.MIE = 0;
       mstatus_.bits_.MPV = virtMode_;
-      virtMode_ = false;
+      setVirtualMode(false);
       writeMstatus();
     }
   else if (nextMode == PrivilegeMode::Supervisor)

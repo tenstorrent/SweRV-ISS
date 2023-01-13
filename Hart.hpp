@@ -1713,6 +1713,7 @@ namespace WdRiscv
       csRegs_.setVirtualMode(mode);
       if (mode)
 	updateCachedVsstatus();
+      updateAddressTranslation();
     }
 
     // Return true if it is legal to execute a vector instruction: V
