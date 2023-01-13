@@ -552,6 +552,16 @@ namespace WdRiscv
         }
     }
 
+    struct Field
+    {
+      std::string field;
+      unsigned width;
+    };
+
+    // Returns CSR fields
+    std::vector<Field> fields() const
+    { return fields_; }
+
   protected:
 
     friend class CsRegs<URV>;
@@ -688,12 +698,6 @@ namespace WdRiscv
     void clearLastWritten()
     { hasPrev_ = false; }
 
-    struct Field
-    {
-      std::string field;
-      unsigned width;
-    };
-
     void setFields(const std::vector<Field>& fields)
     { fields_ = fields; }
 
@@ -705,7 +709,7 @@ namespace WdRiscv
           if (f.field == field)
             {
               URV mask = ((1 << f.width) - 1) << start;
-              val = (value_ * mask) >> start;
+              val = (value_ & mask) >> start;
               return true;
             }
           start += f.width;
