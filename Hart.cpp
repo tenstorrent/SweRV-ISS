@@ -1393,7 +1393,8 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-	  auto cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
+	  bool load = true;
+	  auto cause = virtMem_.translateForLdSt2(va1, ldSize, mode, load, addr1, addr2);
           if (cause != ExceptionCause::NONE)
 	    return cause;
         }
@@ -10282,7 +10283,8 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
       if (mode != PrivilegeMode::Machine)
         {
-          auto cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
+	  bool load = false;
+          auto cause = virtMem_.translateForLdSt2(va1, stSize, mode, load, addr1, addr2);
           if (cause != ExceptionCause::NONE)
             return cause;
         }

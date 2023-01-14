@@ -46,8 +46,8 @@ namespace WdRiscv
     { }
 
     /// Perform virtual to physical memory address translation and
-    /// check for read access if the read flag is true (similary also
-    /// check for write access is the write flag is true ...).  Return
+    /// check for read/write/fetch access if the read/write/exec flag
+    /// is true (one and only one of the flags must be true).  Return
     /// encoutered exception on failure or ExceptionType::NONE on
     /// success. Does not check for page crossing.
     ExceptionCause translate(uint64_t va, PrivilegeMode pm, bool read,
@@ -64,27 +64,17 @@ namespace WdRiscv
     ExceptionCause translateForFetch2(uint64_t va, unsigned size, PrivilegeMode pm,
 				      uint64_t& pa1, uint64_t& pa2);
 
-    /// Same as translate but only check for read access.
-    ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+    /// Same as translate but only check for read access if load is
+    /// true and for write acess if load is false..
+    ExceptionCause translateForLdSt(uint64_t va, PrivilegeMode pm, bool load, uint64_t& pa);
 
-    /// Same as translate but only check for read access and page
-    /// crossing.  On success pa1 has the physical address and pa2 has
-    /// a copy of pa1 or the physical address of the subsequent page
-    /// if the access crosses a page boundary. On Fail pa1 has the
-    /// virtual faulting address.
-    ExceptionCause translateForLoad2(uint64_t va, unsigned size, PrivilegeMode pm,
-				     uint64_t& pa1, uint64_t& pa2);
-
-    /// Same as translate but only check for write access.
-    ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, uint64_t& pa);
-
-    /// Same as translate but only check for write access and page
-    /// crossing.  On success pa1 has the physical address and pa2 has
-    /// a copy of pa1 or the physical address of the subsequent page
-    /// if the access crosses a page boundary. On Fail pa1 has the
-    /// virtual faulting address.
-    ExceptionCause translateForStore2(uint64_t va, unsigned size, PrivilegeMode pm,
-				      uint64_t& pa1, uint64_t& pa2);
+    /// Same as translateForLdSt but translate subsequent page address
+    /// if access crosses page boundary. On success pa1 has the
+    /// physical address and pa2 has a copy of pa1 or the physical
+    /// address of the subsequent page if the access crosses a page
+    /// boundary. On Fail pa1 has the virtual faulting address.
+    ExceptionCause translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode pm,
+				     bool load, uint64_t& pa1, uint64_t& pa2);
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
@@ -209,9 +199,11 @@ namespace WdRiscv
     ExceptionCause pageTableWalkStage2(uint64_t va, PrivilegeMode pm, bool read, bool write,
 				       bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
-    /// Helper to translate methods.
-    ExceptionCause doTranslate(uint64_t va, PrivilegeMode pm, bool read,
-			       bool write, bool exec, uint64_t& pa, TlbEntry& entry);
+    /// Helper to translate methods. Similar to translate but does not use or
+    /// update TLB cache. Given TLB entry is initialized so that caller may
+    /// place it in the TLB.
+    ExceptionCause translateNoTlb(uint64_t va, PrivilegeMode pm, bool read,
+				  bool write, bool exec, uint64_t& pa, TlbEntry& entry);
 
     /// Helper to translate methods for 2nd stage of guest address translation
     /// (guest physical address to host physical address).
