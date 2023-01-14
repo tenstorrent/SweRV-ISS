@@ -53,10 +53,19 @@ namespace WdRiscv
     ExceptionCause translate(uint64_t va, PrivilegeMode pm, bool read,
                              bool write, bool exec, uint64_t& pa);
 
-    /// Same as translate but only check for execute access.
-    ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+    /// Similar to translate but targeting only execute access.
+    ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, uint64_t& pa)
+    { return translate(va, pm, false, false, true, pa); }
 
-    /// Same as translate but only check for execute access and page
+    /// Similar to translate but targeting only read access.
+    ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, uint64_t& pa)
+    { return translate(va, pm, true, false, false, pa); }
+
+    /// Similar to translate but targeting only write access.
+    ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, uint64_t& pa)
+    { return translate(va, pm, false, true, false, pa); }
+
+    /// Same as translate but check for execute access and page
     /// crossing.  On success pa1 has the physical address and pa2 has
     /// a copy of pa1 or the physical address of the subsequent page
     /// if the access crosses a page boundary. On Fail pa1 has the
@@ -64,17 +73,24 @@ namespace WdRiscv
     ExceptionCause translateForFetch2(uint64_t va, unsigned size, PrivilegeMode pm,
 				      uint64_t& pa1, uint64_t& pa2);
 
-    /// Same as translate but only check for read access if load is
-    /// true and for write acess if load is false..
-    ExceptionCause translateForLdSt(uint64_t va, PrivilegeMode pm, bool load, uint64_t& pa);
-
-    /// Same as translateForLdSt but translate subsequent page address
-    /// if access crosses page boundary. On success pa1 has the
-    /// physical address and pa2 has a copy of pa1 or the physical
-    /// address of the subsequent page if the access crosses a page
-    /// boundary. On Fail pa1 has the virtual faulting address.
+    /// Same as translate but check for load/store access (if load is
+    /// true/false) and page address if access crosses page
+    /// boundary. On success pa1 has the physical address and pa2 has
+    /// a copy of pa1 or the physical address of the subsequent page
+    /// if the access crosses a page boundary. On Fail pa1 has the
+    /// virtual faulting address.
     ExceptionCause translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode pm,
 				     bool load, uint64_t& pa1, uint64_t& pa2);
+
+    /// Load version of translateForLdSt2.
+    ExceptionCause translateForLoad2(uint64_t va, unsigned size, PrivilegeMode pm,
+				     uint64_t& pa1, uint64_t& pa2)
+    { return translateForLdSt2(va, size, pm, true, pa1, pa2); }
+    
+    /// Store version of translateForLdSt2.
+    ExceptionCause translateForStore2(uint64_t va, unsigned size, PrivilegeMode pm,
+				      uint64_t& pa1, uint64_t& pa2)
+    { return translateForLdSt2(va, size, pm, false, pa1, pa2); }
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)

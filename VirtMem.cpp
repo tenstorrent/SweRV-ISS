@@ -60,51 +60,6 @@ accessFaultType(bool read, bool write, bool exec)
 
 
 ExceptionCause
-VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
-{
-  if (twoStage_)
-    return translateForFetchVs(va, priv, pa);
-
-  if (mode_ == Bare)
-    {
-      pa = va;
-      return ExceptionCause::NONE;
-    }
-
-  // Lookup virtual page number in TLB.
-  uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
-  if (entry)
-    {
-      // Use TLB entry.
-      if (priv == PrivilegeMode::User and not entry->user_)
-        return pageFaultType(false, true, true);
-      if (priv == PrivilegeMode::Supervisor and entry->user_)
-        return pageFaultType(false, false, true);
-      if (not entry->exec_)
-        return pageFaultType(false, false, true);
-      if (not entry->accessed_)
-        {
-          if (faultOnFirstAccess_)
-            return pageFaultType(false, false, true);
-          entry->accessed_ = true;
-        }
-      pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
-      return ExceptionCause::NONE;
-    }
-
-  TlbEntry tlbEntry;
-  auto cause = translateNoTlb(va, priv, false, false, true, pa, tlbEntry);
-
-  // If successful, put cache translation results in TLB.
-  if (cause == ExceptionCause::NONE)
-    tlb_.insertEntry(tlbEntry);
-
-  return cause;
-}
-
-
-ExceptionCause
 VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
 			    uint64_t& pa1, uint64_t& pa2)
 {
@@ -195,62 +150,13 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 
 
 ExceptionCause
-VirtMem::translateForLdSt(uint64_t va, PrivilegeMode priv, bool load, uint64_t& pa)
-{
-  bool read = load;
-  bool write = not read, exec = false;
-
-  if (mode_ == Bare)
-    {
-      pa = va;
-      return ExceptionCause::NONE;
-    }
-
-  // Lookup virtual page number in TLB.
-  uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = tlb_.findEntryUpdateTime(virPageNum, asid_);
-  if (entry)
-    {
-      // Use TLB entry.
-      if (priv == PrivilegeMode::User and not entry->user_)
-        return pageFaultType(read, write, exec);
-      if (priv == PrivilegeMode::Supervisor and entry->user_ and not supervisorOk_)
-        return pageFaultType(read, write, exec);
-      bool readOk = entry->read_ or (execReadable_ and entry->exec_);
-      bool writeOk = entry->write_;
-      bool accOk = read? readOk : writeOk;
-      if (not accOk)
-        return pageFaultType(read, write, exec);
-      if (not entry->accessed_ or (write and not entry->dirty_))
-        {
-          if (faultOnFirstAccess_)
-            return pageFaultType(read, write, exec);
-          entry->accessed_ = true;
-	  if (write)
-	    entry->dirty_ = true;
-        }
-      pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
-      return ExceptionCause::NONE;
-    }
-
-  TlbEntry tlbEntry;
-  auto cause = translateNoTlb(va, priv, read, write, exec, pa, tlbEntry);
-
-  // If successful, put cache translation results in TLB.
-  if (cause == ExceptionCause::NONE)
-    tlb_.insertEntry(tlbEntry);
-
-  return cause;
-}
-
-
-ExceptionCause
 VirtMem::translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode priv,
-			   bool load, uint64_t& pa1, uint64_t& pa2)
+                           bool load, uint64_t& pa1, uint64_t& pa2)
 {
   pa1 = pa2 = va;
 
-  auto cause = translateForLdSt(va, priv, load, pa1);
+  bool read = load, write = not load, exec = false;
+  auto cause = translate(va, priv, read, write, exec, pa1);
   if (cause != ExceptionCause::NONE)
     return cause;
 
@@ -267,7 +173,7 @@ VirtMem::translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode priv,
     return ExceptionCause::NONE;  // Not page crossing
 
   uint64_t va2 = n2*pageSize_;
-  cause = translateForLdSt(va2, priv, load, pa2);
+  cause = translate(va2, priv, read, write, exec, pa2);
   if (cause != ExceptionCause::NONE)
     pa1 = pa2 = va2;
 
@@ -279,6 +185,13 @@ ExceptionCause
 VirtMem::translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
                    bool exec, uint64_t& pa)
 {
+  // Exactly one of read/write/exec must be true.
+  unsigned count = 0;
+  if (read) count++;
+  if (write) count++;
+  if (exec) count++;
+  assert(count == 1);
+
   if (mode_ == Bare)
     {
       pa = va;
@@ -293,11 +206,12 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
       // Use TLB entry.
       if (priv == PrivilegeMode::User and not entry->user_)
         return pageFaultType(read, write, exec);
-      if (priv == PrivilegeMode::Supervisor and entry->user_ and not supervisorOk_)
-        return pageFaultType(read, write, exec);
-      bool entryRead = entry->read_ or (execReadable_ and entry->exec_);
-      if ((read and not entryRead) or (write and not entry->write_) or
-          (exec and not entry->exec_))
+      if (priv == PrivilegeMode::Supervisor)
+	if (entry->user_ and (exec or not supervisorOk_))
+	  return pageFaultType(read, write, exec);
+      bool ra = entry->read_ or (execReadable_ and entry->exec_);
+      bool wa = entry->write_, xa = entry->exec_;
+      if ((read and not ra) or (write and not wa) or (exec and not xa))
         return pageFaultType(read, write, exec);
       if (not entry->accessed_ or (write and not entry->dirty_))
         {
