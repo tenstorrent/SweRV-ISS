@@ -180,15 +180,6 @@ namespace WdRiscv
 
   protected:
 
-    // Similar to translateForFetch but for VS/VU privilege modes.
-    ExceptionCause translateForFetchVs(uint64_t va, PrivilegeMode pm, uint64_t& pa);
-
-    // Similar to translateForLoad but for VS/VU privilege modes.
-    ExceptionCause translateForLoadVs(uint64_t va, PrivilegeMode pm, uint64_t& pa);
-
-    // Similar to translateForStore but for VS/VU privilege modes.
-    ExceptionCause translateForStoreVs(uint64_t va, PrivilegeMode pm, uint64_t& pa);
-
     /// Heper to transAddrNoUpdate
     ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool read,
 				 bool write, bool exec, uint64_t& pa);
@@ -212,7 +203,7 @@ namespace WdRiscv
 
     /// Page table walk for the G stage of 2-stage address translation.
     template <typename PTE, typename VA>
-    ExceptionCause pageTableWalkStage2(uint64_t va, PrivilegeMode pm, bool read, bool write,
+    ExceptionCause stage2PageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
 				       bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
     /// Helper to translate methods. Similar to translate but does not use or
@@ -223,8 +214,18 @@ namespace WdRiscv
 
     /// Helper to translate methods for 2nd stage of guest address translation
     /// (guest physical address to host physical address).
-    ExceptionCause doStage2Translate(uint64_t va, PrivilegeMode pm, bool read,
-				     bool write, bool exec, uint64_t& pa, TlbEntry& entry);
+    ExceptionCause stage2TranslateNoTlb(uint64_t va, PrivilegeMode pm, bool read,
+					bool write, bool exec, uint64_t& pa, TlbEntry& entry);
+
+    ExceptionCause stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
+				   bool exec, uint64_t& pa);
+
+    ExceptionCause stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool write,
+					bool exec, uint64_t& pa, TlbEntry& entry);
+
+    ExceptionCause twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool write,
+				     bool exec, uint64_t& pa);
+
 
     /// Set the page table root page: The root page is placed in
     /// physical memory at address root * page_size
@@ -368,6 +369,8 @@ namespace WdRiscv
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
+    Tlb stage1Tlb_;
+    Tlb stage2Tlb_;
   };
 
 }
