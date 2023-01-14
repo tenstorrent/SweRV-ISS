@@ -174,6 +174,15 @@ namespace WdRiscv
 
   protected:
 
+    // Similar to translateForFetch but for VS/VU privilege modes.
+    ExceptionCause translateForFetchVs(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+
+    // Similar to translateForLoad but for VS/VU privilege modes.
+    ExceptionCause translateForLoadVs(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+
+    // Similar to translateForStore but for VS/VU privilege modes.
+    ExceptionCause translateForStoreVs(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+
     /// Heper to transAddrNoUpdate
     ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool read,
 				 bool write, bool exec, uint64_t& pa);
@@ -235,6 +244,10 @@ namespace WdRiscv
     void setVmid(uint32_t vmid)
     { vmid_ = vmid; }
 
+    /// Set V mode (hyerpvisor VS or VU mode) if flag is true.
+    void setTwoStage(bool flag)
+    { twoStage_ = flag; }
+
     /// Make executable pages also readable (supports MXR bit in MSTATUS).
     void setExecReadable(bool flag)
     { execReadable_ = flag; }
@@ -252,9 +265,13 @@ namespace WdRiscv
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
 
-    /// Return current paging mode.
+    /// Return current address translation mode (SV32, SV39 ...)
     Mode mode() const
     { return mode_; }
+
+    /// Return true if two-stage translation is on.
+    bool isTwoStage() const
+    { return twoStage_; }
 
     /// Return current address space id.
     uint32_t asid() const
@@ -313,6 +330,7 @@ namespace WdRiscv
     uint64_t rootPageStage2_ = 0;  // Root page for 2nd stage translation.
     Mode mode_ = Bare;
     Mode modeStage2_ = Bare;       // For 2nd stage translation.
+    bool twoStage_ = false;        // True if two-stage translation is on.
     uint32_t asid_ = 0;
     uint32_t vmid_ = 0;
     unsigned pageSize_ = 4096;

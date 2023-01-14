@@ -62,6 +62,9 @@ accessFaultType(bool read, bool write, bool exec)
 ExceptionCause
 VirtMem::translateForFetch(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 {
+  if (twoStage_)
+    return translateForFetchVs(va, priv, pa);
+
   if (mode_ == Bare)
     {
       pa = va;
@@ -194,6 +197,9 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 ExceptionCause
 VirtMem::translateForLoad(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 {
+  if (twoStage_)
+    return translateForLoadVs(va, priv, pa);
+
   if (mode_ == Bare)
     {
       pa = va;
@@ -267,6 +273,9 @@ VirtMem::translateForLoad2(uint64_t va, unsigned size, PrivilegeMode priv,
 ExceptionCause
 VirtMem::translateForStore(uint64_t va, PrivilegeMode priv, uint64_t& pa)
 {
+  if (twoStage_)
+    return translateForStoreVs(va, priv, pa);
+
   if (mode_ == Bare)
     {
       pa = va;
@@ -1069,3 +1078,28 @@ VirtMem::printEntries(std::ostream& os, uint64_t addr, std::string path) const
       printEntries<PTE, VA>(os, nextAddr, nextPath);
     }
 }
+
+
+ExceptionCause
+VirtMem::translateForFetchVs(uint64_t va, PrivilegeMode pm, uint64_t& pa)
+{
+  assert(0);
+  return ExceptionCause::NONE;
+}
+
+
+ExceptionCause
+VirtMem::translateForLoadVs(uint64_t va, PrivilegeMode pm, uint64_t& pa)
+{
+  assert(0);
+  return ExceptionCause::NONE;
+}
+
+
+ExceptionCause
+VirtMem::translateForStoreVs(uint64_t va, PrivilegeMode pm, uint64_t& pa)
+{
+  assert(0);
+  return ExceptionCause::NONE;
+}
+

@@ -500,6 +500,8 @@ template <typename URV>
 void
 Hart<URV>::updateAddressTranslation()
 {
+  bool invalidate = false; // Invalidate decode cache.
+
   URV value = 0;
   if (peekCsr(CsrNumber::SATP, value))
     {
@@ -515,7 +517,7 @@ Hart<URV>::updateAddressTranslation()
       virtMem_.setRootPage(satp.bits_.PPN);
 
       if (satp.bits_.ASID != prevAsid)
-	invalidateDecodeCache();
+	invalidate = true;
     }
 
   if (peekCsr(CsrNumber::HGATP, value))
@@ -526,7 +528,19 @@ Hart<URV>::updateAddressTranslation()
       virtMem_.setStage2Mode(VirtMem::Mode(hgatp.bits_.MODE));
       virtMem_.setVmid(VirtMem::Mode(hgatp.bits_.VMID));
       virtMem_.setStage2RootPage(hgatp.bits_.PPN);
+
+      if (hgatp.bits_.VMID != prevVmid)
+	invalidate = true;
     }
+
+  if (virtMode_ != virtMem_.isTwoStage())
+    {
+      virtMem_.setTwoStage(virtMode_);
+      invalidate = true;
+    }
+
+  if (invalidate)
+    invalidateDecodeCache();
 }
 
 
@@ -2579,7 +2593,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
       if (type != Pmp::Type::Off)
         updateMemoryProtection();
     }
-  else if (csr == CsrNumber::SATP)
+  else if (csr == CsrNumber::SATP or csr == CsrNumber::HGATP)
     updateAddressTranslation();
   else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
