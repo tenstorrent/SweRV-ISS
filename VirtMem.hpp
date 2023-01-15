@@ -206,6 +206,11 @@ namespace WdRiscv
     ExceptionCause stage2PageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
 				       bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
+    /// Page table walk for the VS stage of 2-stage address translation.
+    template <typename PTE, typename VA>
+    ExceptionCause stage1PageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
+				       bool exec, uint64_t& pa, TlbEntry& tlbEntry);
+
     /// Helper to translate methods. Similar to translate but does not use or
     /// update TLB cache. Given TLB entry is initialized so that caller may
     /// place it in the TLB.
