@@ -266,6 +266,10 @@ namespace WdRiscv
     void setExecReadable(bool flag)
     { execReadable_ = flag; }
 
+    /// Make executable pages also readable (supports MXR bit in MSTATUS).
+    void setStage1ExecReadable(bool flag)
+    { s1ExecReadable_ = flag; }
+
     /// Allow supervisor-mode code to access user-mode pages (supports SUM
     /// bit in MSTATUS).
     void setSupervisorAccessUser(bool flag)
@@ -360,6 +364,7 @@ namespace WdRiscv
 
     // Cached mstatus bits
     bool execReadable_ = false;  // MXR bit
+    bool s1ExecReadable_ = false;  // MXR bit of vsstatus
     bool supervisorOk_ = false;  // SUM bit
     bool faultOnFirstAccess_ = true;
     bool accessDirtyCheck_ = true;  // To be able to supress AD check

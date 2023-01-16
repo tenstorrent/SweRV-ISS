@@ -27,13 +27,37 @@ template <typename URV>
 void
 Hart<URV>::execHfence_vvma(const DecodedInst* di)
 {
-  if (not isRvs() or privMode_ < PrivilegeMode::Supervisor or virtMode_)
+  if (not isRvh() or not isRvs() or privMode_ < PrivilegeMode::Supervisor or virtMode_)
     {
       illegalInst(di);
       return;
     }
 
-  assert(0);
+  auto tlb = virtMem_.stage1Tlb_;
+
+  // Invalidate whole VS TLB. This is overkill. 
+  if (di->op1() == 0 and di->op2() == 0)
+       tlb.invalidate();
+  else if (di->op1() == 0 and di->op2() != 0)
+    {
+      URV asid = intRegs_.read(di->op2());
+      tlb.invalidateAsid(asid);
+    }
+  else if (di->op1() != 0 and di->op2() == 0)
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      tlb.invalidateVirtualPage(vpn);
+    }
+  else
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      URV asid = intRegs_.read(di->op2());
+      tlb.invalidateVirtualPage(vpn, asid);
+    }
+
+  invalidateDecodeCache();
 }
 
 
@@ -41,15 +65,44 @@ template <typename URV>
 void
 Hart<URV>::execHfence_gvma(const DecodedInst* di)
 {
-  bool valid = (privMode_ == PrivilegeMode::Machine or
-		(privMode_ == PrivilegeMode::Supervisor and not virtMode_));
+  typedef PrivilegeMode PM;
+  bool valid = isRvh();
+  if (privMode_ == PM::User)
+    valid = false;
+  else if (privMode_ == PM::Supervisor)
+    if (mstatus_.bits_.TVM != 0 or virtMode_)
+      valid = false;
   if (not valid)
     {
       illegalInst(di);
       return;
     }
 
-  assert(0);
+  auto tlb = virtMem_.stage2Tlb_;
+
+  // Invalidate whole VS TLB. This is overkill. 
+  if (di->op1() == 0 and di->op2() == 0)
+       tlb.invalidate();
+  else if (di->op1() == 0 and di->op2() != 0)
+    {
+      URV vmid = intRegs_.read(di->op2());
+      tlb.invalidateVmid(vmid);
+    }
+  else if (di->op1() != 0 and di->op2() == 0)
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      tlb.invalidateVirtualPage(vpn);
+    }
+  else
+    {
+      URV addr = intRegs_.read(di->op1());
+      uint64_t vpn = virtMem_.pageNumber(addr);
+      URV asid = intRegs_.read(di->op2());
+      tlb.invalidateVirtualPage(vpn, asid);
+    }
+
+  invalidateDecodeCache();
 }
 
 
@@ -60,10 +113,8 @@ Hart<URV>::hyperLoad(uint64_t addr, uint64_t& data)
 {
   typedef PrivilegeMode PM;
   PM mode = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-
-  assert(addr);
-  assert(mode != PrivilegeMode::Machine);
-  data = 0;
+  bool virtMode = true;  // Instructions are executed as though V=1
+  
   return false;
 }
 
@@ -76,10 +127,17 @@ Hart<URV>::execHlv_b(const DecodedInst* di)
 
   // Must not be in virtual mode, must have H extension, must not be in User mode
   // unless hstatus.hu is on.
-  bool illegal = (virtMode_ or not isRvh() or
-		  (privMode_ == PM::User and hstatus_.bits_.HU));
-  if (illegal)
-    illegalInst(di);
+  if (virtMode_ or not isRvh())
+    {
+      virtualInst(di);
+      return;
+    }
+      
+  if (privMode_ == PM::User and hstatus_.bits_.HU)
+    {
+      illegalInst(di);
+      return;
+    }
 
   URV base = intRegs_.read(di->op1());
 

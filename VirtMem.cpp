@@ -184,6 +184,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 {
   if (twoStage_)
     return twoStageTranslate(va, priv, read, write, exec, pa);
+
   // Exactly one of read/write/exec must be true.
   unsigned count = 0;
   if (read) count++;
@@ -411,7 +412,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	  if (priv == PrivilegeMode::Supervisor)
 	    if (entry->user_ and (exec or not supervisorOk_))
 	      return pageFaultType(twoStage_, read, write, exec);
-	  bool ra = entry->read_ or (execReadable_ and entry->exec_);
+	  bool ra = entry->read_ or ((execReadable_ or s1ExecReadable_) and entry->exec_);
 	  bool wa = entry->write_, xa = entry->exec_;
 	  if ((read and not ra) or (write and not wa) or (exec and not xa))
 	    return pageFaultType(twoStage_, read, write, exec);
@@ -1040,7 +1041,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (not pte.user())
 	return pageFaultType(twoStage_, read, write, exec);  // All access as though in User mode.
 
-      bool pteRead = pte.read() or (execReadable_ and pte.exec());
+      bool pteRead = pte.read() or ((execReadable_ or s1ExecReadable_) and pte.exec());
       if ((read and not pteRead) or (write and not pte.write()) or
 	  (exec and not pte.exec()))
 	return pageFaultType(twoStage_, read, write, exec);

@@ -100,6 +100,14 @@ namespace WdRiscv
 	  entry.valid_ = false;
     }
 
+    /// Invalidate every entry matching given virtual mahine identifier.
+    void invalidateVmid(uint32_t vmid)
+    {
+      for (auto& entry : entries_)
+	if (entry.vmid_ == vmid)
+	  entry.valid_ = false;
+    }
+
     /// Invalidate every entry matching given virtual page number.
     void invalidateVirtualPage(uint64_t vpn)
     {
