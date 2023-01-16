@@ -228,7 +228,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableSupervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }
       else
@@ -244,7 +244,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	  if (not csr)
 	    {
 	      std::cerr << "Error: enableSupervisorMode: CSR number 0x"
-			<< std::hex << URV(csrn) << " undefined\n";
+			<< std::hex << URV(csrn) << std::dec << " undefined\n";
 	    }
 	  else
 	    csr->setImplemented(flag);
@@ -300,7 +300,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
         }
       else
         csr->setImplemented(flag);
@@ -315,7 +315,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	  if (not csr)
 	    {
 	      std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+			<< std::hex << URV(csrn) << std::dec << " undefined\n";
 	    }
 	  else
 	    csr->setImplemented(flag);
@@ -339,7 +339,7 @@ CsRegs<URV>::enableRvf(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableRvf: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }
       else if (not csr->isImplemented())
@@ -360,7 +360,7 @@ CsRegs<URV>::enableVectorMode(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableVectorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }
       else

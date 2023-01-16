@@ -1183,9 +1183,9 @@ VirtMem::printPageTable(std::ostream& os) const
     default:   os << "???\n";  break;
     }
 
-  os << "Root page number: 0x" << std::hex << rootPage_ << '\n';
+  os << "Root page number: 0x" << std::hex << rootPage_ << std::dec << '\n';
   uint64_t addr = rootPage_ * pageSize_;
-  os << "Root page addr: 0x" << std::hex << addr << '\n';
+  os << "Root page addr: 0x" << std::hex << addr << std::dec << '\n';
 
   std::string path = "/";
 
@@ -1210,7 +1210,7 @@ void
 VirtMem::printEntries(std::ostream& os, uint64_t addr, std::string path) const
 {
   os << "\n";
-  os << "Page table page addr: 0x" << std::hex << addr << '\n';
+  os << "Page table page addr: 0x" << std::hex << addr << std::dec << '\n';
   os << "Path: " << path << '\n';
 
   unsigned entrySize = sizeof(PTE);
@@ -1227,9 +1227,9 @@ VirtMem::printEntries(std::ostream& os, uint64_t addr, std::string path) const
 
       bool leaf = pte.valid() and (pte.read() or pte.exec());
       os << "  ix:" << std::dec << ix << " addr:0x" << std::hex << eaddr
-         << " data:0x" << std::hex << pte.data_
+         << " data:0x" << std::hex << pte.data_ 
          << " rwx:" << pte.read() << pte.write() << pte.exec()
-         << " leaf:" << leaf << " pa:0x" << (pte.ppn() * pageSize_) << '\n';
+         << " leaf:" << leaf << " pa:0x" << (pte.ppn() * pageSize_) << std::dec << '\n';
     }
 
   eaddr = addr;

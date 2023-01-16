@@ -1981,7 +1981,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
   auto ec = hart.transAddrNoUpdate(va, pm, read, write, exec, pa);
   if (ec == ExceptionCause::NONE)
     {
-      std::cout << "0x" << std::hex << pa << '\n';
+      std::cout << "0x" << std::hex << pa << std::dec << '\n';
       return true;
     }
 

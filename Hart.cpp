@@ -2892,7 +2892,7 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
     {
       std::cerr << "Memory protection grain size (0x" << std::hex
                 << size << ") is not a power of 2. Using: 0x"
-                << powerOf2 << '\n';
+                << powerOf2 << std::dec << '\n';
       size = powerOf2;
       ok = false;
     }
@@ -2901,7 +2901,7 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
     {
       std::cerr << "Memory protection grain size (0x" << std::hex
                 << size << ") is larger than 2 to the power 33. "
-                << "Using 2 to the power 33.\n";
+                << "Using 2 to the power 33.\n" << std::dec;
       size = uint64_t(1) << 33;
       powerOf2 = size;
       log2Size = 33;

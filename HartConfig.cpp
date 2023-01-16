@@ -343,7 +343,7 @@ applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& con
   if ((mask & pokeMask) != mask)
     {
       std::cerr << "Warning: For CSR " << name << " poke mask (0x" << std::hex << pokeMask
-		<< ") is not a superset of write mask (0x" << std::hex << mask << ")\n";
+		<< ") is not a superset of write mask (0x" << mask << std::dec << ")\n";
     }
 
   if (name == "misa")

@@ -101,7 +101,7 @@ Uart8250::write(uint64_t addr, uint32_t value)
 	case 6: break;
 	case 7: scr_ = value; break;
 	default:
-	  std::cerr << "Uart writing addr 0x" << std::hex << addr << '\n';
+	  std::cerr << "Uart writing addr 0x" << std::hex << addr << std::dec << '\n';
 	  assert(0);
 	}
     }
@@ -113,7 +113,7 @@ Uart8250::write(uint64_t addr, uint32_t value)
 	case 1: dlm_ = value; break;
 	case 5: psd_ = value; break;
 	default:
-	  std::cerr << "Uart writing addr 0x" << std::hex << addr << '\n';
+	  std::cerr << "Uart writing addr 0x" << std::hex << addr << std::dec << '\n';
 	  assert(0);
 	}
     }

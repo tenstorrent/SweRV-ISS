@@ -52,7 +52,7 @@ Tlb::printEntry(std::ostream& ost, const TlbEntry& te) const
 {
   if (not te.valid_)
     return;
-  ost << std::hex << std::setfill('0') << std::setw(10) << te.virtPageNum_ << ",";
+  ost << std::hex << std::setfill('0') << std::setw(10) << te.virtPageNum_ << std::dec << ",";
   if (te.global_)
     ost << "***";
   else
