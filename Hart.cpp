@@ -264,6 +264,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableHypervisorMode(flag);
 
   rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
+  rvb_ = (value & 2) and isa_.isEnabled(RvExtension::B);   // Bit-manip
 
   rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
   rvc_ = rvc_ and isa_.isEnabled(RvExtension::C);
@@ -317,7 +318,7 @@ Hart<URV>::processExtensions(bool verbose)
     epc->setReadMask(epcMask);
 
   if (verbose)
-    for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
+    for (auto ec : { 'j', 'k', 'l', 'n', 'o', 'p',
 		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )
       {
 	unsigned bit = ec - 'a';
@@ -327,13 +328,13 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  if (isa_.isEnabled(RvExtension::Zba))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zba))
     enableRvzba(true);
-  if (isa_.isEnabled(RvExtension::Zbb))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zbb))
     enableRvzbb(true);
-  if (isa_.isEnabled(RvExtension::Zbc))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zbc))
     enableRvzbc(true);
-  if (isa_.isEnabled(RvExtension::Zbs))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zbs))
     enableRvzbs(true);
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
@@ -359,6 +360,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicboz(true);
   if (isa_.isEnabled(RvExtension::Zawrs))
     enableRvzawrs(true);
+  if (rvm_ or isa_.isEnabled(RvExtension::Zmmul))
+    enableRvzmmul(true);
 }
 
 
@@ -10368,7 +10371,7 @@ template<typename URV>
 void
 Hart<URV>::execMul(const DecodedInst* di)
 {
-  if (not isRvm())
+  if (not isRvzmmul())
     {
       illegalInst(di);
       return;
@@ -10389,7 +10392,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10408,7 +10411,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10427,7 +10430,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10446,7 +10449,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10465,7 +10468,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10484,7 +10487,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;

@@ -914,6 +914,10 @@ namespace WdRiscv
     void enableRvzawrs(bool flag)
     { rvzawrs_ = flag; }
 
+    /// Enable/disable the zmmul (multiply) extension.
+    void enableRvzmmul(bool flag)
+    { rvzmmul_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1085,9 +1089,13 @@ namespace WdRiscv
     bool isRvzicboz() const
     { return rvzicboz_; }
 
-    /// Return true if the zicboz extension (wait reservation store) is enabled.
+    /// Return true if the zawrs extension (wait reservation store) is enabled.
     bool isRvzawrs() const
     { return rvzawrs_; }
+
+    /// Return true if the zmmul extension (multiply) is enabled.
+    bool isRvzmmul() const
+    { return rvzmmul_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -1111,6 +1119,10 @@ namespace WdRiscv
     /// Return true if rva (atomic) extension is enabled in this hart.
     bool isRva() const
     { return rva_; }
+
+    /// Return true if rvb (bit-manup) extension is enabled in this hart.
+    bool isRvb() const
+    { return rvb_; }
 
     /// Return true if rvs (supervisor-mode) extension is enabled in this
     /// hart.
@@ -4178,6 +4190,7 @@ namespace WdRiscv
 
     bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
     bool rva_ = false;           // True if extension A (atomic) enabled.
+    bool rvb_ = false;           // True if extension B (bit-manip) enabled.
     bool rvc_ = true;            // True if extension C (compressed) enabled.
     bool rvd_ = false;           // True if extension D (double fp) enabled.
     bool rve_ = false;           // True if extension E (embedded) enabled.
@@ -4210,6 +4223,7 @@ namespace WdRiscv
     bool rvzicbom_ = false;      // True if extension zicbom (cache block management) enabled.
     bool rvzicboz_ = false;      // True if extension zicboz (cache block zero) enabled.
     bool rvzawrs_ = false;       // True if extension zawrs (wait reservation store) enabled.
+    bool rvzmmul_ = false;       // True if extension zmmul (multply) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.

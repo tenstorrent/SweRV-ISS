@@ -38,6 +38,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zicbom)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zicboz)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zawrs)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zmmul)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 
@@ -70,6 +71,7 @@ Isa::Isa()
   stringToExt_["zicbom"] = RvExtension::Zicbom;
   stringToExt_["zicboz"] = RvExtension::Zicboz;
   stringToExt_["zawrs"] = RvExtension::Zawrs;
+  stringToExt_["zmmul"] = RvExtension::Zmmul;
 
   extToString_.resize(extIx(RvExtension::None));
   extToString_.at(extIx(RvExtension::A)) = "a";
@@ -99,6 +101,7 @@ Isa::Isa()
   extToString_.at(extIx(RvExtension::Zicbom)) = "zicbom";
   extToString_.at(extIx(RvExtension::Zicboz)) = "zicboc";
   extToString_.at(extIx(RvExtension::Zawrs)) = "zawrs";
+  extToString_.at(extIx(RvExtension::Zmmul)) = "zmmul";
 }
 
 
