@@ -11633,7 +11633,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv1r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()))
     {
       illegalInst(di);
       return;
@@ -11661,7 +11661,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv2r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()))
     {
       illegalInst(di);
       return;
@@ -11695,7 +11695,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv4r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()))
     {
       illegalInst(di);
       return;
@@ -11729,7 +11729,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv8r_v(const DecodedInst* di)
 {
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()))
+  if (di->isMasked() or (not checkVecExec()))
     {
       illegalInst(di);
       return;
