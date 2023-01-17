@@ -13687,7 +13687,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -13838,7 +13838,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14350,7 +14350,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14500,7 +14500,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14644,7 +14644,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14836,7 +14836,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15022,7 +15022,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15198,7 +15198,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15535,7 +15535,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15722,7 +15722,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
