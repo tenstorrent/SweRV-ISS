@@ -1389,7 +1389,7 @@ namespace WdRiscv
     /// set pa to the physical address.
     ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool r,
 				     bool w, bool x, uint64_t& pa)
-    { return virtMem_.transAddrNoUpdate(va, pm, r, w, x, pa); }
+    { return virtMem_.transAddrNoUpdate(va, pm, false /*twoStage*/, r, w, x, pa); }
 
     /// Return the paging mode before last executed instruction.
     VirtMem::Mode lastPageMode() const

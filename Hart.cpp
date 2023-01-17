@@ -536,12 +536,6 @@ Hart<URV>::updateAddressTranslation()
 	invalidate = true;
     }
 
-  if (virtMode_ != virtMem_.isTwoStage())
-    {
-      virtMem_.setTwoStage(virtMode_);
-      invalidate = true;
-    }
-
   if (invalidate)
     invalidateDecodeCache();
 }
@@ -1395,10 +1389,10 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (mode != PrivilegeMode::Machine)
+      PrivilegeMode priv = mstatusMprv() ? mstatusMpp() : privMode_;
+      if (priv != PrivilegeMode::Machine)
         {
-	  auto cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
+	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virtMode_, addr1, addr2);
           if (cause != ExceptionCause::NONE)
 	    return cause;
         }
@@ -1975,7 +1969,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
   bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
 
   if (translate)
-    if (virtMem_.transAddrNoUpdate(va, privMode_, false, false, true, pa) != ExceptionCause::NONE)
+    if (virtMem_.transAddrNoUpdate(va, privMode_, virtMode_, false, false, true, pa) != ExceptionCause::NONE)
       return false;
 
   uint16_t low;  // Low 2 bytes of instruction.
@@ -1989,7 +1983,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
   uint16_t high;
   uint64_t va2 = va + 2, pa2 = pa + 2;
   if (translate and memory_.getPageIx(va) != memory_.getPageIx(va2))
-    if (virtMem_.transAddrNoUpdate(va2, privMode_, false, false, true, pa2) != ExceptionCause::NONE)
+    if (virtMem_.transAddrNoUpdate(va2, privMode_, virtMode_, false, false, true, pa2) != ExceptionCause::NONE)
       {
 	inst = 0;
 	return false;
@@ -2028,7 +2022,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       if (triggerTripped_)
         return false;
 
-      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, physAddr);
+      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, physAddr);
       if (cause != ExceptionCause::NONE)
         {
           initiateException(cause, virtAddr, virtAddr);
@@ -2102,7 +2096,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   uint64_t physAddr2 = physAddr + 2;
   if (isRvs() and privMode_ != PrivilegeMode::Machine)
     {
-      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, physAddr2);
+      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, physAddr2);
       if (cause != ExceptionCause::NONE)
         {
           if (triggerTripped_)
@@ -10284,10 +10278,10 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (mode != PrivilegeMode::Machine)
+      PrivilegeMode priv = mstatusMprv() ? mstatusMpp() : privMode_;
+      if (priv != PrivilegeMode::Machine)
         {
-          auto cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
+          auto cause = virtMem_.translateForStore2(va1, stSize, priv, virtMode_, addr1, addr2);
           if (cause != ExceptionCause::NONE)
             return cause;
         }

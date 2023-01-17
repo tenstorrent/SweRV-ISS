@@ -40,7 +40,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
         {
           uint64_t pa = 0;
 	  bool read = isRead, write = not isRead, exec = false;
-          cause = virtMem_.translate(addr, mode, read, write, exec, pa);
+          cause = virtMem_.translate(addr, mode, virtMode_, read, write, exec, pa);
           if (cause != ExceptionCause::NONE)
             return cause;
           addr = pa;
