@@ -508,7 +508,9 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
         ("att", po::value(&args.attFile),
          "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
         ("tracerlib", po::value(&args.tracerLib),
-         "Path to tracer extension shared library which should provide C symbol tracerExtension.")
+         "Path to tracer extension shared library which should provide C symbol tracerExtension."
+         "Optionally include arguments after a colon to be exposed to the shared library "
+         "as C symbol tracerExtensionArgs (ex. tracer.so or tracer.so:hello42).")
 	("setreg", po::value(&args.regInits)->multitoken(),
 	 "Initialize registers. Apply to all harts unless specific prefix "
 	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
@@ -1603,6 +1605,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 
 
 void (*tracerExtension)(void*) = nullptr;
+std::string tracerExtensionArgs = "";
 
 template <typename URV>
 static
@@ -1612,7 +1615,11 @@ loadTracerLibrary(const std::string& tracerLib)
   if (tracerLib.empty())
     return true;
 
-  auto soPtr = dlopen(tracerLib.c_str(), RTLD_NOW);
+  std::vector<std::string> result;
+  boost::split(result, tracerLib, boost::is_any_of(":"));
+  assert(result.size() >= 1);
+
+  auto soPtr = dlopen(result[0].c_str(), RTLD_NOW);
   if (not soPtr)
     {
       std::cerr << "Error: Failed to load shared libarary " << dlerror() << '\n';
@@ -1628,6 +1635,8 @@ loadTracerLibrary(const std::string& tracerLib)
       std::cerr << "Error: Could not find symbol tracerExtension in " << tracerLib << '\n';
       return false;
     }
+
+  tracerExtensionArgs = result[1];
 
   return true;
 }
