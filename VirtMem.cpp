@@ -51,6 +51,18 @@ vPageFaultType(bool read, bool write, bool exec)
 }
 
 
+static
+ExceptionCause
+stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
+{
+  typedef ExceptionCause EC;
+  if (ec2 == EC::INST_GUEST_PAGE_FAULT or ec2 == EC::LOAD_GUEST_PAGE_FAULT or
+      ec2 == EC::STORE_GUEST_PAGE_FAULT)
+    return nvPageFaultType(read, write, exec);
+  return ec2;
+}
+
+
 /// Page fault type for read/write/exec access (one and only one of
 /// which must be true).
 static
@@ -855,7 +867,10 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       uint64_t pteAddr = gpteAddr;
       auto ec = stage2Translate(gpteAddr, privMode, true, false, false, pteAddr);
       if (ec != ExceptionCause::NONE)
-	return ec;
+	{
+	  stage2ExceptionToStage1(ec, read, write, exec);
+	  return ec;
+	}
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -867,7 +882,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	}
 
       if (! memory_.read(pteAddr, pte.data_))
-        return vPageFaultType(read, write, exec);
+        return nvPageFaultType(read, write, exec);
 
       if (attFile_)
         {
@@ -885,37 +900,40 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
-        return vPageFaultType(read, write, exec);
+        return nvPageFaultType(read, write, exec);
 
       // 4.
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
-	  if (pte.accessed() or pte.dirty() or pte.user() or pte.global())
-	    return vPageFaultType(read, write, exec);  // A/D/U/G bits must be zero in non-leaf entries.
+	  if (pte.accessed() or pte.dirty() or pte.user())
+	    return nvPageFaultType(read, write, exec);  // A/D/U bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)
-            return vPageFaultType(read, write, exec);
+            return nvPageFaultType(read, write, exec);
           root = pte.ppn() * pageSize_;
           continue;  // goto 2.
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (pte.pbmt() != 0 or pte.global())
-	return vPageFaultType(read, write, exec);  // Leaf page must bave pbmt=0 and G=0.
-      if (not pte.user())
-	return vPageFaultType(read, write, exec);  // All access as though in User mode.
+      if (pte.pbmt() != 0)
+	return nvPageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+      if (privMode == PrivilegeMode::User and not pte.user())
+	return nvPageFaultType(read, write, exec);
+      if (privMode == PrivilegeMode::Supervisor and pte.user() and
+	  (not supervisorOk_ or exec))
+	return nvPageFaultType(read, write, exec);
 
       bool pteRead = pte.read() or ((execReadable_ or s1ExecReadable_) and pte.exec());
       if (xForR_)
 	pteRead = pte.exec();
       if ((read and not pteRead) or (write and not pte.write()) or
 	  (exec and not pte.exec()))
-	return vPageFaultType(read, write, exec);
+	return nvPageFaultType(read, write, exec);
 
       // 6.
       for (int j = 0; j < ii; ++j)
 	if (pte.ppn(j) != 0)
-	  return vPageFaultType(read, write, exec);
+	  return nvPageFaultType(read, write, exec);
 
       // 7.
       if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
@@ -923,7 +941,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // We have a choice:
 	  // A. Page fault
 	  if (faultOnFirstAccess_)
-	    return vPageFaultType(read, write, exec);  // A
+	    return nvPageFaultType(read, write, exec);  // A
 
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
@@ -952,10 +970,13 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    uint64_t pteAddr2 = gpteAddr;
 	    auto ec = stage2Translate(gpteAddr, privMode, false, true, false, pteAddr2);
 	    if (ec != ExceptionCause::NONE)
-	      return ec;
+	      {
+		stage2ExceptionToStage1(ec, read, write, exec);
+		return ec;
+	      }
 	    assert(pteAddr == pteAddr2);
 	    if (not memory_.write(hartIx_, pteAddr2, pte.data_))
-	      return vPageFaultType(read, write, exec);
+	      return nvPageFaultType(read, write, exec);
 	  }
 	}
       break;
