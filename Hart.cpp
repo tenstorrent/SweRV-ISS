@@ -1366,7 +1366,7 @@ Hart<URV>::initiateStoreException(ExceptionCause cause, URV addr)
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldSize)
+Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldSize, bool hyper)
 {
   uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;
@@ -1387,12 +1387,20 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
     }
 
   // Address translation
-  if (isRvs())
+  if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode priv = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (priv != PrivilegeMode::Machine)
+      typedef PrivilegeMode PM;
+      PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
+      bool virt = virtMode_;
+      if (hyper)
+	{
+	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  virt = true;
+	}
+      if (priv != PM::Machine)
         {
-	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virtMode_, addr1, addr2);
+	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virt, addr1, addr2);
           if (cause != ExceptionCause::NONE)
 	    return cause;
         }
@@ -1526,7 +1534,7 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
-  auto cause = determineLoadException(addr1, addr2, ldStSize_);
+  auto cause = determineLoadException(addr1, addr2, ldStSize_, false /*hyper*/);
   if (cause != ExceptionCause::NONE)
     {
       if (triggerTripped_)

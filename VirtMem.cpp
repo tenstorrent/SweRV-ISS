@@ -378,6 +378,8 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 	if (entry->user_ and (exec or not supervisorOk_))
 	  return vPageFaultType(read, write, exec);
       bool ra = entry->read_ or (execReadable_ and entry->exec_);
+      if (xForR_)
+	ra = entry->exec_;
       bool wa = entry->write_, xa = entry->exec_;
       if ((read and not ra) or (write and not wa) or (exec and not xa))
         return vPageFaultType(read, write, exec);
@@ -432,6 +434,8 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	    if (entry->user_ and (exec or not supervisorOk_))
 	      return vPageFaultType(read, write, exec);
 	  bool ra = entry->read_ or ((execReadable_ or s1ExecReadable_) and entry->exec_);
+	  if (xForR_)
+	    ra = entry->exec_;
 	  bool wa = entry->write_, xa = entry->exec_;
 	  if ((read and not ra) or (write and not wa) or (exec and not xa))
 	    return vPageFaultType(read, write, exec);
@@ -741,6 +745,8 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	return vPageFaultType(read, write, exec);  // All access as though in User mode.
 
       bool pteRead = pte.read() or (execReadable_ and pte.exec());
+      if (xForR_)
+	pteRead = pte.exec();
       if ((read and not pteRead) or (write and not pte.write()) or
 	  (exec and not pte.exec()))
 	return vPageFaultType(read, write, exec);
@@ -900,6 +906,8 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	return vPageFaultType(read, write, exec);  // All access as though in User mode.
 
       bool pteRead = pte.read() or ((execReadable_ or s1ExecReadable_) and pte.exec());
+      if (xForR_)
+	pteRead = pte.exec();
       if ((read and not pteRead) or (write and not pte.write()) or
 	  (exec and not pte.exec()))
 	return vPageFaultType(read, write, exec);

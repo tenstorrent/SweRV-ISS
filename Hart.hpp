@@ -1920,9 +1920,11 @@ namespace WdRiscv
     /// address of the subsequent page in the case of page-crossing
     /// access. If there is an exception, the addr1 is set to the
     /// virtual address causing the trap. If no address translation or
-    /// no page crossing, then addr2 will be equal to addr1.
+    /// no page crossing, then addr2 will be equal to addr1. The hyper
+    /// flags must be true if this is called on behalf of the hypervisor
+    /// load/store instructions (e.g. hlv.b).
     ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
-					  unsigned ldSize);
+					  unsigned ldSize, bool hyper);
 
     /// Helepr to the cache block operaion (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, bool isRead);

@@ -181,7 +181,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  auto cause = determineLoadException(addr1, addr2, ldStSize_);
+  auto cause = determineLoadException(addr1, addr2, ldStSize_, false /*hyper*/);
   if (cause == ExceptionCause::LOAD_ADDR_MISAL and misalAtomicCauseAccessFault_)
     cause = ExceptionCause::LOAD_ACC_FAULT;
 

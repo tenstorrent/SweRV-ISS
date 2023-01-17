@@ -183,6 +183,10 @@ namespace WdRiscv
 
   protected:
 
+    /// Use exec access permission for read permission.
+    void useExecForRead(bool flag)
+    { xForR_ = flag; }
+
     /// Heper to transAddrNoUpdate
     ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 				 bool read, bool write, bool exec, uint64_t& pa);
@@ -359,6 +363,8 @@ namespace WdRiscv
     bool supervisorOk_ = false;  // SUM bit
     bool faultOnFirstAccess_ = true;
     bool accessDirtyCheck_ = true;  // To be able to supress AD check
+
+    bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read
 
     FILE* attFile_ = nullptr;
 

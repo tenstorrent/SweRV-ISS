@@ -13721,7 +13721,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       uint64_t pa1 = addr, pa2 = addr; // Phys addrs or faulting virtual address.
 
       ELEM_TYPE elem = 0;
-      cause = determineLoadException(pa1, pa2, sizeof(elem));
+      cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
       else
@@ -14061,7 +14061,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
 
       ELEM_TYPE elem = 0;
-      cause = determineLoadException(pa1, pa2, sizeof(elem));
+      cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
 
@@ -14380,7 +14380,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
 
       ELEM_TYPE elem = 0;
-      cause = determineLoadException(pa1, pa2, sizeof(elem));
+      cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
       else
@@ -14681,7 +14681,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
 
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
-      auto cause = determineLoadException(pa1, pa2, elemSize);
+      auto cause = determineLoadException(pa1, pa2, elemSize, false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  if (elemSize == 1)
@@ -15067,7 +15067,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 	  ELEM_TYPE elem(0);
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
-	  auto cause = determineLoadException(pa1, pa2, sizeof(elem));
+	  auto cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
 
 	  if (cause == ExceptionCause::NONE)
             memRead(pa1, pa2, elem);
@@ -15581,7 +15581,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
-          auto cause = determineLoadException(pa1, pa2, elemSize);
+          auto cause = determineLoadException(pa1, pa2, elemSize, false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      if (elemSize == 1)
