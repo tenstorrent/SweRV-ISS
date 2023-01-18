@@ -506,17 +506,17 @@ Hart<URV>::execHsv_d(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execHinval_vvma(const DecodedInst*)
+Hart<URV>::execHinval_vvma(const DecodedInst* di)
 {
-  assert(0);
+  execHfence_vvma(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execHinval_gvma(const DecodedInst*)
+Hart<URV>::execHinval_gvma(const DecodedInst* di)
 {
-  assert(0);
+  execHfence_gvma(di);
 }
 
 
