@@ -639,5 +639,5 @@ implemented unless you compile with the softfloat library:
 in which case simulation of floating point instructions slows down
 significantly.
 
-Suppprted extensions: A, B, C, D, F, I, M, S, U, V, ZFH, ZFHMIN, ZBA, ZBB,
-ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ, Zwars, Zmmul.
+Suppprted extensions: A, B, C, D, F, H, I, M, S, U, V, ZFH, ZFHMIN, ZBA, ZBB,
+ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ, ZWARS, ZMMUL.
