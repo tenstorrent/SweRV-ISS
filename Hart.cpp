@@ -2346,11 +2346,12 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       msf.bits_.SPP = unsigned(origMode);
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
-      hstatus_.bits_.SPV = origVirtMode;
+      if (not origVirtMode)
+	hstatus_.bits_.SPV = origVirtMode;
       if (origVirtMode)
 	{
 	  assert(origMode == PM::User or origMode == PM::Supervisor);
-	  hstatus_.bits_.SPVP = origMode == PM::Supervisor? 1 : 0;
+	  hstatus_.bits_.SPVP = unsigned(origMode);
 	}
       if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
 	assert(0 and "Failed to write SSTATUS register");
@@ -9871,6 +9872,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
+  if (not virtMode_)
+    virtMode_ = hstatus_.bits_.SPV;
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, fields.value_))
