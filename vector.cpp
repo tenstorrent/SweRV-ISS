@@ -13872,7 +13872,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
         }
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
-      auto cause = determineStoreException(pa1, pa2, sizeof(elem));
+      auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  memWrite(pa1, pa2, elem);
@@ -14191,7 +14191,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
         }
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
-      auto cause = determineStoreException(pa1, pa2, sizeof(elem));
+      auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  memWrite(pa1, pa2, elem);
@@ -14536,7 +14536,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
 
-      auto cause = determineStoreException(pa1, pa2, sizeof(elem));
+      auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  memWrite(pa1, pa2, elem);
@@ -14875,7 +14875,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint8_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -14884,7 +14884,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint16_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -14893,7 +14893,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint32_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -14902,7 +14902,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint64_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x));
+	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -15246,7 +15246,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  if (not vecRegs_.read(dvg, ix, groupX8, elem))
 	    assert(0);
 
-	  auto cause = determineStoreException(pa1, pa2, sizeof(elem));
+	  auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      memWrite(pa1, pa2, elem);
@@ -15774,7 +15774,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint8_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;
@@ -15783,7 +15783,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint16_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;
@@ -15792,7 +15792,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint32_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;
@@ -15801,7 +15801,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint64_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x));
+	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;

@@ -107,100 +107,6 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
 
 
 template <typename URV>
-template <typename LOAD_TYPE>
-bool
-Hart<URV>::hyperLoad(uint64_t virtAddr, uint64_t& data)
-{
-  ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
-  ldStSize_ = sizeof(LOAD_TYPE);
-
-  if (hasActiveTrigger())
-    {
-      if (ldStAddrTriggerHit(virtAddr, TriggerTiming::Before, true /*isLoad*/))
-	triggerTripped_ = true;
-    }
-
-  // Unsigned version of LOAD_TYPE
-  typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
-
-  uint64_t addr1 = virtAddr;
-  uint64_t addr2 = addr1;
-  auto cause = determineLoadException(addr1, addr2, ldStSize_, true /*hyper*/);
-  if (cause != ExceptionCause::NONE)
-    {
-      if (triggerTripped_)
-        return false;
-      initiateLoadException(cause, addr1);
-      return false;
-    }
-  ldStPhysAddr1_ = addr1;
-  ldStPhysAddr2_ = addr2;
-
-  // Loading from console-io does a standard input read.
-  if (conIoValid_ and addr1 == conIo_ and enableConIn_ and not triggerTripped_)
-    {
-      SRV val = fgetc(stdin);
-      data = val;
-      return true;
-    }
-
-  if (toHostValid_ and addr1 == toHost_)
-    {
-      data = 0;
-      return true;
-    }
-
-  ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr1 >= clintStart_ and addr1 < clintLimit_ and addr1 - clintStart_ >= 0xbff8)
-    {
-      uint64_t tm = instCounter_ >> counterToTimeShift_; // Fake time: instr count
-      tm = tm >> (addr1 - 0xbff8) * 8;
-      narrow = tm;
-    }
-  else
-    {
-      bool hasMcmVal = false;
-      if (mcm_)
-	{
-	  uint64_t mcmVal = 0;
-	  if (mcm_->getCurrentLoadValue(*this, addr1, ldStSize_, mcmVal))
-	    {
-	      narrow = mcmVal;
-	      hasMcmVal = true;
-	    }
-	}
-      if (not hasMcmVal)
-	memRead(addr1, addr2, narrow);
-    }
-
-  data = narrow;
-  if (not std::is_same<ULT, LOAD_TYPE>::value)
-    data = int64_t(LOAD_TYPE(narrow)); // Loading signed: Sign extend.
-
-  if (initStateFile_)
-    {
-      dumpInitState("load", virtAddr, addr1);
-      if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
-	dumpInitState("load", virtAddr + ldStSize_, addr2 + ldStSize_);
-    }
-
-  // Check for load-data-trigger.
-  if (hasActiveTrigger())
-    {
-      TriggerTiming timing = TriggerTiming::Before;
-      bool isLoad = true;
-      if (ldStDataTriggerHit(narrow, timing, isLoad))
-	triggerTripped_ = true;
-    }
-  if (triggerTripped_)
-    return false;
-
-  return true;  // Success.
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execHlv_b(const DecodedInst* di)
 {
@@ -225,7 +131,7 @@ Hart<URV>::execHlv_b(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<int8_t>(virtAddr, data))
+  if (load<int8_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -255,7 +161,7 @@ Hart<URV>::execHlv_bu(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<uint8_t>(virtAddr, data))
+  if (load<uint8_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -285,7 +191,7 @@ Hart<URV>::execHlv_h(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<int16_t>(virtAddr, data))
+  if (load<int16_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -315,7 +221,7 @@ Hart<URV>::execHlv_hu(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<uint16_t>(virtAddr, data))
+  if (load<uint16_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -345,7 +251,7 @@ Hart<URV>::execHlv_w(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<int32_t>(virtAddr, data))
+  if (load<int32_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -375,7 +281,7 @@ Hart<URV>::execHlv_wu(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<uint32_t>(virtAddr, data))
+  if (load<uint32_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -407,7 +313,7 @@ Hart<URV>::execHlvx_hu(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<uint16_t>(virtAddr, data))
+  if (load<uint16_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 
   virtMem_.useExecForRead(false);
@@ -441,7 +347,7 @@ Hart<URV>::execHlvx_wu(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<uint32_t>(virtAddr, data))
+  if (load<uint32_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 
   virtMem_.useExecForRead(false);
@@ -473,23 +379,8 @@ Hart<URV>::execHlv_d(const DecodedInst* di)
   URV base = intRegs_.read(di->op1());
   uint64_t virtAddr = base + di->op2As<int32_t>();
   uint64_t data = 0;
-  if (hyperLoad<int64_t>(virtAddr, data))
+  if (load<uint64_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
-}
-
-
-template <typename URV>
-template <typename STORE_TYPE>
-inline
-bool
-Hart<URV>::hyperStore(URV virtAddr, STORE_TYPE storeVal)
-{
-  typedef PrivilegeMode PM;
-  PM mode = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
-
-  assert(virtAddr);
-  assert(mode != PrivilegeMode::Machine);
-  return false;
 }
 
 
@@ -519,7 +410,7 @@ Hart<URV>::execHsv_b(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
-  hyperStore<uint8_t>(addr, value);
+  store<uint8_t>(addr, true /*hyper*/, value);
 }
 
 
@@ -549,7 +440,7 @@ Hart<URV>::execHsv_h(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint16_t value = uint8_t(intRegs_.read(di->op0()));
-  hyperStore<uint8_t>(addr, value);
+  store<uint16_t>(addr, true /*hyper*/, value);
 }
 
 
@@ -579,7 +470,7 @@ Hart<URV>::execHsv_w(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint32_t value = uint8_t(intRegs_.read(di->op0()));
-  hyperStore<uint8_t>(addr, value);
+  store<uint32_t>(addr, true /*hyper*/, value);
 }
 
 
@@ -609,7 +500,7 @@ Hart<URV>::execHsv_d(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
-  hyperStore<uint64_t>(addr, value);
+  store<uint64_t>(addr, true /*hyper*/, value);
 }
 
 

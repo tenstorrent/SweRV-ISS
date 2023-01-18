@@ -32,7 +32,7 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
   URV mask = URV(accessSize) - 1;
 
   uint64_t addr2 = addr;
-  auto cause = determineStoreException(addr, addr2, accessSize);
+  auto cause = determineStoreException(addr, addr2, accessSize, false /*hyper*/);
 
   if (cause == ExceptionCause::STORE_ADDR_MISAL)
     {
@@ -292,7 +292,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   misalignedLdSt_ = misal;
 
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  auto cause = determineStoreException(addr1, addr2, sizeof(storeVal));
+  auto cause = determineStoreException(addr1, addr2, sizeof(storeVal), false /*hyper*/);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
@@ -413,7 +413,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint32_t>(addr, uint32_t(result));
+      bool storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(result));
 
       if (storeOk and not triggerTripped_)
 	intRegs_.write(rd, rdVal);
@@ -613,7 +613,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint64_t>(addr, result);
+      bool storeOk = store<uint64_t>(addr, false /*hyper*/, result);
 
       if (storeOk and not triggerTripped_)
 	intRegs_.write(rd, rdVal);

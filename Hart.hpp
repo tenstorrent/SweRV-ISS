@@ -1901,17 +1901,15 @@ namespace WdRiscv
     /// Return true if the load is successful. Return false if an exception
     /// or a trigger is encoutered. On succes loadd value (sign extended for
     /// signed type) is placed in value. Updating the destination register is
-    /// the resposibilty of the caller.
+    /// the resposibilty of the caller. The hyper flag should be set to true
+    /// for hypervisor load/store instruction to select 2-stage address
+    /// translation.
     template<typename LOAD_TYPE>
-    bool load(uint64_t virtAddr, uint64_t& value);
+    bool load(uint64_t virtAddr, bool hyper, uint64_t& value);
 
     /// For use by performance model. 
     template<typename LOAD_TYPE>
     bool fastLoad(uint64_t virtAddr, uint64_t& value);
-
-    /// Helper to hypervisor load instructions.
-    template<typename LOAD_TYPE>
-    bool hyperLoad(uint64_t virtAddr, uint64_t& value);
 
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and
@@ -1936,24 +1934,22 @@ namespace WdRiscv
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
-    /// Return true if store is successful. Return false if an exception
-    /// or a trigger is encountered.
+    /// Return true if store is successful. Return false if an
+    /// exception or a trigger is encountered. The hyper flag should
+    /// be set to true for hypervisor load/store instruction to select
+    /// 2-stage address translation.
     template<typename STORE_TYPE>
-    bool store(URV addr, STORE_TYPE value);
+    bool store(URV addr, bool hyper, STORE_TYPE value);
 
     /// For use by performance model. 
     template<typename STORE_TYPE>
     bool fastStore(URV addr, STORE_TYPE value);
 
-    /// Helper to hypervisor load instructions.
-    template<typename STORE_TYPE>
-    bool hyperStore(URV virtAddr, STORE_TYPE value);
-
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
     ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
-					   unsigned stSize);
+					   unsigned stSize, bool hyper);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an

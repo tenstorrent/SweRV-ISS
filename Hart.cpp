@@ -1513,7 +1513,7 @@ template <typename URV>
 template <typename LOAD_TYPE>
 inline
 bool
-Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
+Hart<URV>::load(uint64_t virtAddr, bool hyper, uint64_t& data)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
@@ -1534,7 +1534,7 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
-  auto cause = determineLoadException(addr1, addr2, ldStSize_, false /*hyper*/);
+  auto cause = determineLoadException(addr1, addr2, ldStSize_, hyper);
   if (cause != ExceptionCause::NONE)
     {
       if (triggerTripped_)
@@ -1618,7 +1618,7 @@ Hart<URV>::execLw(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<int32_t>(virtAddr, data))
+  if (load<int32_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -1632,7 +1632,7 @@ Hart<URV>::execLh(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<int16_t>(virtAddr, data))
+  if (load<int16_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -1756,7 +1756,7 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
+Hart<URV>::store(URV virtAddr, bool hyper, STORE_TYPE storeVal)
 {
 #ifdef FAST_SLOPPY
   return fastStore(virtAddr, storeVal);
@@ -1765,7 +1765,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
@@ -1778,7 +1778,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
   // Determine if a store exception is possible.
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  ExceptionCause cause = determineStoreException(addr1, addr2, ldStSize_);
+  ExceptionCause cause = determineStoreException(addr1, addr2, ldStSize_, hyper);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
@@ -1964,7 +1964,7 @@ Hart<URV>::execSw(const DecodedInst* di)
   URV addr = base + di->op2As<SRV>();
   uint32_t value = uint32_t(intRegs_.read(di->op0()));
 
-  store<uint32_t>(addr, value);
+  store<uint32_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -10232,7 +10232,7 @@ Hart<URV>::execLb(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<int8_t>(virtAddr, data))
+  if (load<int8_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10245,7 +10245,7 @@ Hart<URV>::execLbu(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint8_t>(virtAddr, data))
+  if (load<uint8_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10258,14 +10258,14 @@ Hart<URV>::execLhu(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint16_t>(virtAddr, data))
+  if (load<uint16_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
 template <typename URV>
 ExceptionCause
 Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
-				   unsigned stSize)
+				   unsigned stSize, bool hyper)
 {
   uint64_t va1 = URV(addr1); // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;        // Used if crossing page boundary
@@ -10284,14 +10284,22 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     }
 
   // Address translation
-  if (isRvs())
+  if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode priv = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (priv != PrivilegeMode::Machine)
+      typedef PrivilegeMode PM;
+      PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
+      bool virt = virtMode_;
+      if (hyper)
+	{
+	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  virt = true;
+	}
+      if (priv != PM::Machine)
         {
-          auto cause = virtMem_.translateForStore2(va1, stSize, priv, virtMode_, addr1, addr2);
+	  auto cause = virtMem_.translateForStore2(va1, stSize, priv, virt, addr1, addr2);
           if (cause != ExceptionCause::NONE)
-            return cause;
+	    return cause;
         }
     }
 
@@ -10353,7 +10361,7 @@ Hart<URV>::execSb(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
-  store<uint8_t>(addr, value);
+  store<uint8_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -10365,7 +10373,7 @@ Hart<URV>::execSh(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint16_t value = uint16_t(intRegs_.read(di->op0()));
-  store<uint16_t>(addr, value);
+  store<uint16_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -10622,7 +10630,7 @@ Hart<URV>::execLwu(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint32_t>(virtAddr, data))
+  if (load<uint32_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10648,7 +10656,7 @@ Hart<uint64_t>::execLd(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint64_t>(virtAddr, data))
+  if (load<uint64_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10669,7 +10677,7 @@ Hart<URV>::execSd(const DecodedInst* di)
   URV addr = base + di->op2As<SRV>();
   URV value = intRegs_.read(di->op0());
 
-  store<uint64_t>(addr, value);
+  store<uint64_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -11005,52 +11013,92 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
 
 template
 bool
-WdRiscv::Hart<uint32_t>::load<uint16_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<uint8_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::load<uint32_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<int8_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::load<uint64_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<uint16_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::load<uint16_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<int16_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::load<uint32_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<uint32_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::load<uint64_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<int32_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::load<uint64_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint8_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<int8_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint16_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<int16_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint32_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<int32_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint64_t>(uint64_t, bool, uint64_t&);
 
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, uint16_t);
+WdRiscv::Hart<uint32_t>::store<uint8_t>(uint32_t, bool, uint8_t);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, uint32_t);
+WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, bool, uint16_t);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, uint64_t);
+WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, bool, uint32_t);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, uint16_t);
+WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, bool, uint64_t);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, uint32_t);
+WdRiscv::Hart<uint64_t>::store<uint8_t>(uint64_t, bool, uint8_t);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, uint64_t);
+WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, bool, uint16_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, bool, uint32_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, bool, uint64_t);
 
 
 template class WdRiscv::Hart<uint32_t>;
