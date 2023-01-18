@@ -27,7 +27,12 @@ template <typename URV>
 void
 Hart<URV>::execHfence_vvma(const DecodedInst* di)
 {
-  if (not isRvh() or not isRvs() or privMode_ < PrivilegeMode::Supervisor or virtMode_)
+  typedef PrivilegeMode PM;
+
+  // Valid only in M/HS modes.
+  bool valid = isRvh() and (privMode_ == PM::Machine or
+			    (privMode_ == PM::Supervisor and not virtMode_));
+  if (not valid)
     {
       illegalInst(di);
       return;
@@ -66,12 +71,11 @@ void
 Hart<URV>::execHfence_gvma(const DecodedInst* di)
 {
   typedef PrivilegeMode PM;
-  bool valid = isRvh();
-  if (privMode_ == PM::User)
-    valid = false;
-  else if (privMode_ == PM::Supervisor)
-    if (mstatus_.bits_.TVM != 0 or virtMode_)
-      valid = false;
+
+  // Valid only in HS mode when mstatus.tvm=0 or in M mode
+  bool valid = isRvh() and (privMode_ == PM::Machine or
+			    (privMode_ == PM::Supervisor and
+			     mstatus_.bits_.TVM == 0 and not virtMode_));
   if (not valid)
     {
       illegalInst(di);
