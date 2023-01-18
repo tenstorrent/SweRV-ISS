@@ -2268,20 +2268,34 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   if (cancelLrOnRet_)  // Temporary
     cancelLr(); // Clear LR reservation (if any).
 
-  PrivilegeMode origMode = privMode_;
+  bool origVirtMode = virtMode_;
+
+  typedef PrivilegeMode PM;
+  PM origMode = privMode_;
 
   // Traps are taken in machine mode.
-  privMode_ = PrivilegeMode::Machine;
-  PrivilegeMode nextMode = PrivilegeMode::Machine;
+  privMode_ = PM::Machine;
+  PM nextMode = PM::Machine;
+  virtMode_ = false;
 
-  // But they can be delegated.
-  if (isRvs() and origMode != PrivilegeMode::Machine)
+  // But they can be delegated to supervisor.
+  if (isRvs() and origMode != PM::Machine)
     {
       CsrNumber csrn = interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG;
       URV delegVal = 0;
       peekCsr(csrn, delegVal);
       if (delegVal & (URV(1) << cause))
-        nextMode = PrivilegeMode::Supervisor;
+        nextMode = PM::Supervisor;
+
+      // In hypervisor, traps can be further delegated to virtual supervisor (VS)
+      if (isRvh())
+	{
+	  csrn = interrupt? CsrNumber::HIDELEG : CsrNumber::HEDELEG;
+	  delegVal = 0;
+	  peekCsr(csrn, delegVal);
+	  if (delegVal & (URV(1) << cause))
+	    virtMode_ = true;
+	}
     }
 
   CsrNumber epcNum = CsrNumber::MEPC;
@@ -2289,7 +2303,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   CsrNumber tvalNum = CsrNumber::MTVAL;
   CsrNumber tvecNum = CsrNumber::MTVEC;
 
-  if (nextMode == PrivilegeMode::Supervisor)
+  if (nextMode == PM::Supervisor)
     {
       epcNum = CsrNumber::SEPC;
       causeNum = CsrNumber::SCAUSE;
@@ -2316,24 +2330,37 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
   // its fields and putting it back.
-  if (nextMode == PrivilegeMode::Machine)
+  if (nextMode == PM::Machine)
     {
       mstatus_.bits_.MPP = unsigned(origMode);
       mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
       mstatus_.bits_.MIE = 0;
-      mstatus_.bits_.MPV = virtMode_;
+      mstatus_.bits_.MPV = origVirtMode;
       setVirtualMode(false);
       writeMstatus();
     }
-  else if (nextMode == PrivilegeMode::Supervisor)
+  else if (nextMode == PM::Supervisor)
     {
+      // Trap taken into S/HS or, if V is 1, into VS-mode.
       MstatusFields<URV> msf(csRegs_.peekSstatus(virtMode_));
       msf.bits_.SPP = unsigned(origMode);
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
+      hstatus_.bits_.SPV = origVirtMode;
+      if (origVirtMode)
+	{
+	  assert(origMode == PM::User or origMode == PM::Supervisor);
+	  hstatus_.bits_.SPVP = origMode == PM::Supervisor? 1 : 0;
+	}
       if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
 	assert(0 and "Failed to write SSTATUS register");
       updateCachedSstatus();
+
+      if (isRvh())
+	{
+	  if (not csRegs_.write(CsrNumber::HSTATUS, PM::Machine, hstatus_.value_))
+	    assert(0 and "Failed to write HSTATUS register");
+	}
     }
 
   // Set program counter to trap handler address.
