@@ -406,7 +406,7 @@ legalizeMisa(Csr<URV>* csr, URV v)
 {
   URV wm = csr->getWriteMask();
   if (wm == 0)
-    return 0;
+    return csr->getResetValue();
 
   v = (v & wm) | (csr->read() & ~wm) ;
 
