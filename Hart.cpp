@@ -2288,7 +2288,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
         nextMode = PM::Supervisor;
 
       // In hypervisor, traps can be further delegated to virtual supervisor (VS)
-      if (isRvh())
+      if (isRvh() and origVirtMode)
 	{
 	  csrn = interrupt? CsrNumber::HIDELEG : CsrNumber::HEDELEG;
 	  delegVal = 0;
