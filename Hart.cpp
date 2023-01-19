@@ -2260,6 +2260,46 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
 }
 
 
+/// Return true if given trap number would result in a guest virtual
+/// address being written to mtval/stval if a trap was taken from
+/// VS/VU to M/HS.
+bool
+isGvaTrap(unsigned causeCode)
+{
+  typedef ExceptionCause EC;
+
+  EC cause = EC{causeCode};
+  switch (cause)
+    {
+    case EC::INST_ADDR_MISAL:        return true;
+    case EC::INST_ACC_FAULT:         return true;
+    case EC::ILLEGAL_INST:           return false;
+    case EC::BREAKP:                 return true;
+    case EC::LOAD_ADDR_MISAL:        return true;
+    case EC::LOAD_ACC_FAULT:         return true;
+    case EC::STORE_ADDR_MISAL:       return true;
+    case EC::STORE_ACC_FAULT:        return true;
+    case EC::U_ENV_CALL:             return false;
+    case EC::S_ENV_CALL:             return false;
+    case EC::VS_ENV_CALL:            return false;
+    case EC::M_ENV_CALL:             return false;
+    case EC::INST_PAGE_FAULT:        return true;
+    case EC::LOAD_PAGE_FAULT:        return true;
+    case EC::STORE_PAGE_FAULT:       return true;
+    case EC::RESERVED0:              return false;
+    case EC::RESERVED1:              return false;
+    case EC::RESERVED2:              return false;
+    case EC::RESERVED3:              return false;
+    case EC::INST_GUEST_PAGE_FAULT:  return true;
+    case EC::LOAD_GUEST_PAGE_FAULT:  return true;
+    case EC::VIRT_INST:              return false;
+    case EC::STORE_GUEST_PAGE_FAULT: return true;
+    case EC::NONE:                   return false;
+    }
+  return false;
+}
+
+
 template <typename URV>
 void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
@@ -2327,6 +2367,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   if (not csRegs_.write(tvalNum, privMode_, info))
     assert(0 and "Failed to write TVAL register");
 
+  bool gva = isRvh() and origVirtMode and isGvaTrap(cause);
+
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
   // its fields and putting it back.
@@ -2335,6 +2377,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       mstatus_.bits_.MPP = unsigned(origMode);
       mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
       mstatus_.bits_.MIE = 0;
+      mstatus_.bits_.GVA = gva;
       mstatus_.bits_.MPV = origVirtMode;
       setVirtualMode(false);
       writeMstatus();
@@ -2346,6 +2389,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       msf.bits_.SPP = unsigned(origMode);
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
+      if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
+	assert(0 and "Failed to write SSTATUS register");
       if (not origVirtMode)
 	hstatus_.bits_.SPV = origVirtMode;
       if (origVirtMode)
@@ -2353,8 +2398,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 	  assert(origMode == PM::User or origMode == PM::Supervisor);
 	  hstatus_.bits_.SPVP = unsigned(origMode);
 	}
-      if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
-	assert(0 and "Failed to write SSTATUS register");
+      if (not virtMode_)
+	hstatus_.bits_.GVA = gva;
       updateCachedSstatus();
 
       if (isRvh())
