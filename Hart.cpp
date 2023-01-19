@@ -9893,6 +9893,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  bool origVirtMode = virtMode_;
+
   if (cancelLrOnRet_)
     cancelLr(); // Clear LR reservation (if any).
 
@@ -9927,6 +9929,10 @@ Hart<URV>::execSret(const DecodedInst* di)
       return;
     }
   updateCachedSstatus();
+
+  // Clear hstatus.spv if sret executed in M/S modes.
+  if (not origVirtMode)
+    hstatus_.BITS_.SPV = 0;
 
   // Restore program counter from SEPC.
   URV epc;
