@@ -3057,7 +3057,7 @@ Hart<URV>::undoForTrigger()
 
 
 void
-addToSignedHistogram(std::vector<uint64_t>& histo, int64_t val)
+addToSignedHistogram(std::vector<uintmax_t>& histo, int64_t val)
 {
   if (histo.size() < 13)
     histo.resize(13);
@@ -3085,7 +3085,7 @@ addToSignedHistogram(std::vector<uint64_t>& histo, int64_t val)
 
 
 void
-addToUnsignedHistogram(std::vector<uint64_t>& histo, uint64_t val)
+addToUnsignedHistogram(std::vector<uintmax_t>& histo, uint64_t val)
 {
   if (histo.size() < 13)
     histo.resize(13);
@@ -3102,7 +3102,7 @@ addToUnsignedHistogram(std::vector<uint64_t>& histo, uint64_t val)
 
 template <typename FP_TYPE>
 void
-addToFpHistogram(std::vector<uint64_t>& histo, FP_TYPE val)
+addToFpHistogram(std::vector<uintmax_t>& histo, FP_TYPE val)
 {
   if (histo.size() < 13)
     histo.resize(13);
