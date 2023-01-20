@@ -1089,7 +1089,7 @@ namespace WdRiscv
     bool pokeTdata(CsrNumber number, URV value);
 
     bool setCsrFields(CsrNumber number,
-                      const std::vector<class Csr<URV>::Field>& fields)
+                      const std::vector<typename Csr<URV>::Field>& fields)
     {
       auto csr = findCsr(number);
       if (not csr)

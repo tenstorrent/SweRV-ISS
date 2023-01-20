@@ -2066,8 +2066,8 @@ CsRegs<URV>::addMachineFields()
      {"zero", xlen - 12}});
   setCsrFields(CsrNumber::MTVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
 
-  std::vector<class Csr<URV>::Field> mcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
-  std::vector<class Csr<URV>::Field> hpm;
+  std::vector<typename Csr<URV>::Field> mcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
+  std::vector<typename Csr<URV>::Field> hpm;
   for (unsigned i = 3; i <= 31; ++i)
     hpm.push_back({"HPM" + std::to_string(i), 1});
   mcount.insert(mcount.end(), hpm.begin(), hpm.end());
@@ -2118,7 +2118,7 @@ CsRegs<URV>::addMachineFields()
   unsigned pmpIx = 0;
   for (unsigned i = 0; i < 16; i += 2)
     {
-      std::vector<class Csr<URV>::Field> pmps;
+      std::vector<typename Csr<URV>::Field> pmps;
       CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i);
       unsigned end = (rv32_) ? pmpIx + 4 : pmpIx + 8;
       for (; pmpIx < end; pmpIx++)
@@ -2174,8 +2174,8 @@ CsRegs<URV>::addSupervisorFields()
   constexpr unsigned xlen = sizeof(URV)*8;
   setCsrFields(CsrNumber::STVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
 
-  std::vector<class Csr<URV>::Field> scount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
-  std::vector<class Csr<URV>::Field> hpm;
+  std::vector<typename Csr<URV>::Field> scount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
+  std::vector<typename Csr<URV>::Field> hpm;
   for (unsigned i = 3; i <= 31; ++i)
     hpm.push_back({"HPM" + std::to_string(i), 1});
   scount.insert(scount.end(), hpm.begin(), hpm.end());
