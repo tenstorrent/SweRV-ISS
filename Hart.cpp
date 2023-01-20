@@ -9932,7 +9932,7 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   // Clear hstatus.spv if sret executed in M/S modes.
   if (not origVirtMode)
-    hstatus_.BITS_.SPV = 0;
+    hstatus_.bits_.SPV = 0;
 
   // Restore program counter from SEPC.
   URV epc;
