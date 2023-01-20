@@ -264,6 +264,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableHypervisorMode(flag);
 
   rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
+  rvb_ = (value & 2) and isa_.isEnabled(RvExtension::B);   // Bit-manip
 
   rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
   rvc_ = rvc_ and isa_.isEnabled(RvExtension::C);
@@ -317,7 +318,7 @@ Hart<URV>::processExtensions(bool verbose)
     epc->setReadMask(epcMask);
 
   if (verbose)
-    for (auto ec : { 'b', 'h', 'j', 'k', 'l', 'n', 'o', 'p',
+    for (auto ec : { 'j', 'k', 'l', 'n', 'o', 'p',
 		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )
       {
 	unsigned bit = ec - 'a';
@@ -327,13 +328,13 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  if (isa_.isEnabled(RvExtension::Zba))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zba))
     enableRvzba(true);
-  if (isa_.isEnabled(RvExtension::Zbb))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zbb))
     enableRvzbb(true);
-  if (isa_.isEnabled(RvExtension::Zbc))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zbc))
     enableRvzbc(true);
-  if (isa_.isEnabled(RvExtension::Zbs))
+  if (rvb_ or isa_.isEnabled(RvExtension::Zbs))
     enableRvzbs(true);
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
@@ -359,6 +360,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicboz(true);
   if (isa_.isEnabled(RvExtension::Zawrs))
     enableRvzawrs(true);
+  if (rvm_ or isa_.isEnabled(RvExtension::Zmmul))
+    enableRvzmmul(true);
 }
 
 
@@ -500,25 +503,40 @@ template <typename URV>
 void
 Hart<URV>::updateAddressTranslation()
 {
-  if (not isRvs())
-    return;
+  bool invalidate = false; // Invalidate decode cache.
 
   URV value = 0;
-  if (not peekCsr(CsrNumber::SATP, value))
-    return;
+  if (peekCsr(CsrNumber::SATP, value))
+    {
+      uint32_t prevAsid = virtMem_.asid();
 
-  uint32_t prevAsid = virtMem_.addressSpace();
+      SatpFields<URV> satp(value);
+      if constexpr (sizeof(URV) != 4)
+	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
+	  satp.bits_.MODE = 0;
 
-  SatpFields<URV> satp(value);
-  if constexpr (sizeof(URV) != 4)
-    if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
-      satp.bits_.MODE = 0;
+      virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
+      virtMem_.setAsid(satp.bits_.ASID);
+      virtMem_.setRootPage(satp.bits_.PPN);
 
-  virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
-  virtMem_.setAddressSpace(satp.bits_.ASID);
-  virtMem_.setPageTableRootPage(satp.bits_.PPN);
+      if (satp.bits_.ASID != prevAsid)
+	invalidate = true;
+    }
 
-  if (satp.bits_.ASID != prevAsid)
+  if (peekCsr(CsrNumber::HGATP, value))
+    {
+      uint32_t prevVmid = virtMem_.vmid();
+
+      HgatpFields<URV> hgatp(value);
+      virtMem_.setStage2Mode(VirtMem::Mode(hgatp.bits_.MODE));
+      virtMem_.setVmid(VirtMem::Mode(hgatp.bits_.VMID));
+      virtMem_.setStage2RootPage(hgatp.bits_.PPN);
+
+      if (hgatp.bits_.VMID != prevVmid)
+	invalidate = true;
+    }
+
+  if (invalidate)
     invalidateDecodeCache();
 }
 
@@ -635,15 +653,59 @@ Hart<URV>::resetVector()
 }
 
 
-template <typename URV>
-void
-Hart<URV>::updateCachedMstatus()
+namespace WdRiscv
 {
-  URV csrVal = csRegs_.peekMstatus();
-  mstatus_.value_ = csrVal;
 
-  virtMem_.setExecReadable(mstatus_.bits_.MXR);
-  virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+  template <>
+  void
+  Hart<uint32_t>::updateCachedMstatus()
+  {
+    uint32_t csrVal = csRegs_.peekMstatus();
+    mstatus_.value_.low_ = csrVal;
+
+    peekCsr(CsrNumber::MSTATUSH, csrVal);
+    mstatus_.value_.high_ = csrVal;
+
+    virtMem_.setExecReadable(mstatus_.bits_.MXR);
+    virtMem_.setStage1ExecReadable(mstatus_.bits_.MXR);
+    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+  }
+
+
+  template <>
+  void
+  Hart<uint64_t>::updateCachedMstatus()
+  {
+    uint64_t csrVal = csRegs_.peekMstatus();
+    mstatus_.value_ = csrVal;
+
+    virtMem_.setExecReadable(mstatus_.bits_.MXR);
+    virtMem_.setStage1ExecReadable(mstatus_.bits_.MXR);
+    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+  }
+
+
+  template <>
+  void
+  Hart<uint32_t>::writeMstatus()
+  {
+    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_.low_))
+      assert(0 and "Failed to write MSTATUS register");
+    if (not csRegs_.write(CsrNumber::MSTATUSH, PrivilegeMode::Machine, mstatus_.value_.high_))
+      assert(0 and "Failed to write MSTATUSH register");
+    updateCachedMstatus();
+  }
+
+
+  template <>
+  void
+  Hart<uint64_t>::writeMstatus()
+  {
+    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_))
+      assert(0 and "Failed to write MSTATUS register");
+    updateCachedMstatus();
+  }
+
 }
 
 
@@ -659,7 +721,7 @@ Hart<URV>::updateCachedVsstatus()
 
   if (virtMode_)
     {
-      virtMem_.setExecReadable(vsstatus_.bits_.MXR);
+      virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
       virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
     }
 }
@@ -1304,7 +1366,7 @@ Hart<URV>::initiateStoreException(ExceptionCause cause, URV addr)
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldSize)
+Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldSize, bool hyper)
 {
   uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;
@@ -1325,12 +1387,20 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
     }
 
   // Address translation
-  if (isRvs())
+  if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (mode != PrivilegeMode::Machine)
+      typedef PrivilegeMode PM;
+      PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
+      bool virt = virtMode_;
+      if (hyper)
+	{
+	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  virt = true;
+	}
+      if (priv != PM::Machine)
         {
-	  auto cause = virtMem_.translateForLoad2(va1, ldSize, mode, addr1, addr2);
+	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virt, addr1, addr2);
           if (cause != ExceptionCause::NONE)
 	    return cause;
         }
@@ -1443,7 +1513,7 @@ template <typename URV>
 template <typename LOAD_TYPE>
 inline
 bool
-Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
+Hart<URV>::load(uint64_t virtAddr, bool hyper, uint64_t& data)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
@@ -1464,7 +1534,7 @@ Hart<URV>::load(uint64_t virtAddr, uint64_t& data)
 
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
-  auto cause = determineLoadException(addr1, addr2, ldStSize_);
+  auto cause = determineLoadException(addr1, addr2, ldStSize_, hyper);
   if (cause != ExceptionCause::NONE)
     {
       if (triggerTripped_)
@@ -1548,7 +1618,7 @@ Hart<URV>::execLw(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<int32_t>(virtAddr, data))
+  if (load<int32_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -1562,7 +1632,7 @@ Hart<URV>::execLh(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<int16_t>(virtAddr, data))
+  if (load<int16_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -1686,7 +1756,7 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
+Hart<URV>::store(URV virtAddr, bool hyper, STORE_TYPE storeVal)
 {
 #ifdef FAST_SLOPPY
   return fastStore(virtAddr, storeVal);
@@ -1695,7 +1765,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
   std::lock_guard<std::mutex> lock(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = ldStAddr_;
+  ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
   ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
@@ -1708,7 +1778,7 @@ Hart<URV>::store(URV virtAddr, STORE_TYPE storeVal)
 
   // Determine if a store exception is possible.
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  ExceptionCause cause = determineStoreException(addr1, addr2, ldStSize_);
+  ExceptionCause cause = determineStoreException(addr1, addr2, ldStSize_, hyper);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
@@ -1894,7 +1964,7 @@ Hart<URV>::execSw(const DecodedInst* di)
   URV addr = base + di->op2As<SRV>();
   uint32_t value = uint32_t(intRegs_.read(di->op0()));
 
-  store<uint32_t>(addr, value);
+  store<uint32_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -1907,7 +1977,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
   bool translate = isRvs() and privMode_ != PrivilegeMode::Machine;
 
   if (translate)
-    if (virtMem_.transAddrNoUpdate(va, privMode_, false, false, true, pa) != ExceptionCause::NONE)
+    if (virtMem_.transAddrNoUpdate(va, privMode_, virtMode_, false, false, true, pa) != ExceptionCause::NONE)
       return false;
 
   uint16_t low;  // Low 2 bytes of instruction.
@@ -1921,7 +1991,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
   uint16_t high;
   uint64_t va2 = va + 2, pa2 = pa + 2;
   if (translate and memory_.getPageIx(va) != memory_.getPageIx(va2))
-    if (virtMem_.transAddrNoUpdate(va2, privMode_, false, false, true, pa2) != ExceptionCause::NONE)
+    if (virtMem_.transAddrNoUpdate(va2, privMode_, virtMode_, false, false, true, pa2) != ExceptionCause::NONE)
       {
 	inst = 0;
 	return false;
@@ -1960,7 +2030,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       if (triggerTripped_)
         return false;
 
-      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, physAddr);
+      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, physAddr);
       if (cause != ExceptionCause::NONE)
         {
           initiateException(cause, virtAddr, virtAddr);
@@ -2034,7 +2104,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   uint64_t physAddr2 = physAddr + 2;
   if (isRvs() and privMode_ != PrivilegeMode::Machine)
     {
-      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, physAddr2);
+      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, physAddr2);
       if (cause != ExceptionCause::NONE)
         {
           if (triggerTripped_)
@@ -2190,6 +2260,46 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
 }
 
 
+/// Return true if given trap number would result in a guest virtual
+/// address being written to mtval/stval if a trap was taken from
+/// VS/VU to M/HS.
+bool
+isGvaTrap(unsigned causeCode)
+{
+  typedef ExceptionCause EC;
+
+  EC cause = EC{causeCode};
+  switch (cause)
+    {
+    case EC::INST_ADDR_MISAL:        return true;
+    case EC::INST_ACC_FAULT:         return true;
+    case EC::ILLEGAL_INST:           return false;
+    case EC::BREAKP:                 return true;
+    case EC::LOAD_ADDR_MISAL:        return true;
+    case EC::LOAD_ACC_FAULT:         return true;
+    case EC::STORE_ADDR_MISAL:       return true;
+    case EC::STORE_ACC_FAULT:        return true;
+    case EC::U_ENV_CALL:             return false;
+    case EC::S_ENV_CALL:             return false;
+    case EC::VS_ENV_CALL:            return false;
+    case EC::M_ENV_CALL:             return false;
+    case EC::INST_PAGE_FAULT:        return true;
+    case EC::LOAD_PAGE_FAULT:        return true;
+    case EC::STORE_PAGE_FAULT:       return true;
+    case EC::RESERVED0:              return false;
+    case EC::RESERVED1:              return false;
+    case EC::RESERVED2:              return false;
+    case EC::RESERVED3:              return false;
+    case EC::INST_GUEST_PAGE_FAULT:  return true;
+    case EC::LOAD_GUEST_PAGE_FAULT:  return true;
+    case EC::VIRT_INST:              return false;
+    case EC::STORE_GUEST_PAGE_FAULT: return true;
+    case EC::NONE:                   return false;
+    }
+  return false;
+}
+
+
 template <typename URV>
 void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
@@ -2198,20 +2308,34 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   if (cancelLrOnRet_)  // Temporary
     cancelLr(); // Clear LR reservation (if any).
 
-  PrivilegeMode origMode = privMode_;
+  bool origVirtMode = virtMode_;
+
+  typedef PrivilegeMode PM;
+  PM origMode = privMode_;
 
   // Traps are taken in machine mode.
-  privMode_ = PrivilegeMode::Machine;
-  PrivilegeMode nextMode = PrivilegeMode::Machine;
+  privMode_ = PM::Machine;
+  PM nextMode = PM::Machine;
+  virtMode_ = false;
 
-  // But they can be delegated.
-  if (isRvs() and origMode != PrivilegeMode::Machine)
+  // But they can be delegated to supervisor.
+  if (isRvs() and origMode != PM::Machine)
     {
       CsrNumber csrn = interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG;
       URV delegVal = 0;
       peekCsr(csrn, delegVal);
       if (delegVal & (URV(1) << cause))
-        nextMode = PrivilegeMode::Supervisor;
+        nextMode = PM::Supervisor;
+
+      // In hypervisor, traps can be further delegated to virtual supervisor (VS)
+      if (isRvh() and origVirtMode)
+	{
+	  csrn = interrupt? CsrNumber::HIDELEG : CsrNumber::HEDELEG;
+	  delegVal = 0;
+	  peekCsr(csrn, delegVal);
+	  if (delegVal & (URV(1) << cause))
+	    virtMode_ = true;
+	}
     }
 
   CsrNumber epcNum = CsrNumber::MEPC;
@@ -2219,7 +2343,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   CsrNumber tvalNum = CsrNumber::MTVAL;
   CsrNumber tvecNum = CsrNumber::MTVEC;
 
-  if (nextMode == PrivilegeMode::Supervisor)
+  if (nextMode == PM::Supervisor)
     {
       epcNum = CsrNumber::SEPC;
       causeNum = CsrNumber::SCAUSE;
@@ -2243,28 +2367,46 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
   if (not csRegs_.write(tvalNum, privMode_, info))
     assert(0 and "Failed to write TVAL register");
 
+  bool gva = isRvh() and origVirtMode and isGvaTrap(cause);
+
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
   // its fields and putting it back.
-  if (nextMode == PrivilegeMode::Machine)
+  if (nextMode == PM::Machine)
     {
-      MstatusFields<URV> msf(csRegs_.peekMstatus());
-      msf.bits_.MPP = unsigned(origMode);
-      msf.bits_.MPIE = msf.bits_.MIE;
-      msf.bits_.MIE = 0;
-      if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
-	assert(0 and "Failed to write MSTATUS register");
-      updateCachedMstatus();
+      mstatus_.bits_.MPP = unsigned(origMode);
+      mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
+      mstatus_.bits_.MIE = 0;
+      mstatus_.bits_.GVA = gva;
+      mstatus_.bits_.MPV = origVirtMode;
+      setVirtualMode(false);
+      writeMstatus();
     }
-  else if (nextMode == PrivilegeMode::Supervisor)
+  else if (nextMode == PM::Supervisor)
     {
+      // Trap taken into S/HS or, if V is 1, into VS-mode.
       MstatusFields<URV> msf(csRegs_.peekSstatus(virtMode_));
       msf.bits_.SPP = unsigned(origMode);
       msf.bits_.SPIE = msf.bits_.SIE;
       msf.bits_.SIE = 0;
       if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
 	assert(0 and "Failed to write SSTATUS register");
+      if (not origVirtMode)
+	hstatus_.bits_.SPV = origVirtMode;
+      if (origVirtMode)
+	{
+	  assert(origMode == PM::User or origMode == PM::Supervisor);
+	  hstatus_.bits_.SPVP = unsigned(origMode);
+	}
+      if (not virtMode_)
+	hstatus_.bits_.GVA = gva;
       updateCachedSstatus();
+
+      if (isRvh())
+	{
+	  if (not csRegs_.write(CsrNumber::HSTATUS, PM::Machine, hstatus_.value_))
+	    assert(0 and "Failed to write HSTATUS register");
+	}
     }
 
   // Set program counter to trap handler address.
@@ -2331,14 +2473,10 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   // Update status register saving MIE in MPIE and previous privilege
   // mode in MPP by getting current value of mstatus, updating
   // its fields and putting it back.
-  URV status = csRegs_.peekMstatus();
-  MstatusFields<URV> msf(status);
-  msf.bits_.MPP = unsigned(origMode);
-  msf.bits_.MPIE = msf.bits_.MIE;
-  msf.bits_.MIE = 0;
-  if (not csRegs_.write(CsrNumber::MSTATUS, privMode_, msf.value_))
-    assert(0 and "Failed to write MSTATUS register");
-  updateCachedMstatus();
+  mstatus_.bits_.MPP = unsigned(origMode);
+  mstatus_.bits_.MPIE = mstatus_.bits_.MIE;
+  mstatus_.bits_.MIE = 0;
+  writeMstatus();
   
   // Clear pending nmi bit in dcsr
   URV dcsrVal = 0;
@@ -2535,7 +2673,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
       if (type != Pmp::Type::Off)
         updateMemoryProtection();
     }
-  else if (csr == CsrNumber::SATP)
+  else if (csr == CsrNumber::SATP or csr == CsrNumber::HGATP)
     updateAddressTranslation();
   else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
@@ -2832,7 +2970,7 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
     {
       std::cerr << "Memory protection grain size (0x" << std::hex
                 << size << ") is not a power of 2. Using: 0x"
-                << powerOf2 << '\n';
+                << powerOf2 << std::dec << '\n';
       size = powerOf2;
       ok = false;
     }
@@ -2841,7 +2979,7 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
     {
       std::cerr << "Memory protection grain size (0x" << std::hex
                 << size << ") is larger than 2 to the power 33. "
-                << "Using 2 to the power 33.\n";
+                << "Using 2 to the power 33.\n" << std::dec;
       size = uint64_t(1) << 33;
       powerOf2 = size;
       log2Size = 33;
@@ -3057,7 +3195,7 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       else if (id == InstId::fence)
 	pregs.updateCounters(EventNumber::Fence, prevPerfControl_,
                              lastPriv_);
-      else if (id == InstId::fencei)
+      else if (id == InstId::fence_i)
 	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_,
                              lastPriv_);
       else if (id == InstId::mret)
@@ -4779,7 +4917,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&and_,
      &&fence,
      &&fence_tso,
-     &&fencei,
+     &&fence_i,
      &&ecall,
      &&ebreak,
      &&csrrw,
@@ -5792,7 +5930,7 @@ Hart<URV>::execute(const DecodedInst* di)
   execFence_tso(di);
   return;
 
- fencei:
+ fence_i:
   execFencei(di);
   return;
 
@@ -9755,6 +9893,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  bool origVirtMode = virtMode_;
+
   if (cancelLrOnRet_)
     cancelLr(); // Clear LR reservation (if any).
 
@@ -9779,6 +9919,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
+  if (not virtMode_)
+    virtMode_ = hstatus_.bits_.SPV;
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, fields.value_))
@@ -9787,6 +9929,10 @@ Hart<URV>::execSret(const DecodedInst* di)
       return;
     }
   updateCachedSstatus();
+
+  // Clear hstatus.spv if sret executed in M/S modes.
+  if (not origVirtMode)
+    hstatus_.BITS_.SPV = 0;
 
   // Restore program counter from SEPC.
   URV epc;
@@ -9849,15 +9995,18 @@ bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 {
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
-    {
-      URV status = csRegs_.peekMstatus();
-      MstatusFields<URV> fields(status);
-      if (fields.bits_.TVM)
-        {
-          illegalInst(di);
-          return false;
-        }
-    }
+    if (mstatus_.bits_.TVM)
+      {
+	illegalInst(di);
+	return false;
+      }
+
+  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+    if (mstatus_.bits_.TVM)
+      {
+	illegalInst(di);
+	return false;
+      }
 
   if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     if (not isFpLegal())
@@ -9882,12 +10031,12 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
     return false;
 
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
-    {
-      URV mstatus = csRegs_.peekMstatus();
-      MstatusFields<URV> fields(mstatus);
-      if (fields.bits_.TVM)
-        return false;
-    }
+    if (mstatus_.bits_.TVM)
+      return false;
+
+  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+    if (mstatus_.bits_.TVM)
+      return false;
 
   if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     if (not isFpLegal())
@@ -10164,7 +10313,7 @@ Hart<URV>::execLb(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<int8_t>(virtAddr, data))
+  if (load<int8_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10177,7 +10326,7 @@ Hart<URV>::execLbu(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint8_t>(virtAddr, data))
+  if (load<uint8_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10190,14 +10339,14 @@ Hart<URV>::execLhu(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint16_t>(virtAddr, data))
+  if (load<uint16_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
 template <typename URV>
 ExceptionCause
 Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
-				   unsigned stSize)
+				   unsigned stSize, bool hyper)
 {
   uint64_t va1 = URV(addr1); // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;        // Used if crossing page boundary
@@ -10216,14 +10365,22 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     }
 
   // Address translation
-  if (isRvs())
+  if (isRvs())     // Supervisor extension
     {
-      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (mode != PrivilegeMode::Machine)
+      typedef PrivilegeMode PM;
+      PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
+      bool virt = virtMode_;
+      if (hyper)
+	{
+	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  virt = true;
+	}
+      if (priv != PM::Machine)
         {
-          auto cause = virtMem_.translateForStore2(va1, stSize, mode, addr1, addr2);
+	  auto cause = virtMem_.translateForStore2(va1, stSize, priv, virt, addr1, addr2);
           if (cause != ExceptionCause::NONE)
-            return cause;
+	    return cause;
         }
     }
 
@@ -10285,7 +10442,7 @@ Hart<URV>::execSb(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
-  store<uint8_t>(addr, value);
+  store<uint8_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -10297,7 +10454,7 @@ Hart<URV>::execSh(const DecodedInst* di)
   URV base = intRegs_.read(rs1);
   URV addr = base + di->op2As<SRV>();
   uint16_t value = uint16_t(intRegs_.read(di->op0()));
-  store<uint16_t>(addr, value);
+  store<uint16_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -10305,7 +10462,7 @@ template<typename URV>
 void
 Hart<URV>::execMul(const DecodedInst* di)
 {
-  if (not isRvm())
+  if (not isRvzmmul())
     {
       illegalInst(di);
       return;
@@ -10326,7 +10483,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10345,7 +10502,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10364,7 +10521,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10383,7 +10540,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10402,7 +10559,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10421,7 +10578,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvm())
+    if (not isRvzmmul())
       {
 	illegalInst(di);
 	return;
@@ -10554,7 +10711,7 @@ Hart<URV>::execLwu(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint32_t>(virtAddr, data))
+  if (load<uint32_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10580,7 +10737,7 @@ Hart<uint64_t>::execLd(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint64_t>(virtAddr, data))
+  if (load<uint64_t>(virtAddr, false /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 }
 
@@ -10601,7 +10758,7 @@ Hart<URV>::execSd(const DecodedInst* di)
   URV addr = base + di->op2As<SRV>();
   URV value = intRegs_.read(di->op0());
 
-  store<uint64_t>(addr, value);
+  store<uint64_t>(addr, false /*hyper*/, value);
 }
 
 
@@ -10937,52 +11094,92 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
 
 template
 bool
-WdRiscv::Hart<uint32_t>::load<uint16_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<uint8_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::load<uint32_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<int8_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::load<uint64_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<uint16_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::load<uint16_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<int16_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::load<uint32_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<uint32_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::load<uint64_t>(uint64_t, uint64_t&);
+WdRiscv::Hart<uint32_t>::load<int32_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint32_t>::load<uint64_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint8_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<int8_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint16_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<int16_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint32_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<int32_t>(uint64_t, bool, uint64_t&);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::load<uint64_t>(uint64_t, bool, uint64_t&);
 
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, uint16_t);
+WdRiscv::Hart<uint32_t>::store<uint8_t>(uint32_t, bool, uint8_t);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, uint32_t);
+WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, bool, uint16_t);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, uint64_t);
+WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, bool, uint32_t);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, uint16_t);
+WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, bool, uint64_t);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, uint32_t);
+WdRiscv::Hart<uint64_t>::store<uint8_t>(uint64_t, bool, uint8_t);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, uint64_t);
+WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, bool, uint16_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, bool, uint32_t);
+
+template
+bool
+WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, bool, uint64_t);
 
 
 template class WdRiscv::Hart<uint32_t>;

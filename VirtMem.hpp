@@ -46,45 +46,54 @@ namespace WdRiscv
     { }
 
     /// Perform virtual to physical memory address translation and
-    /// check for read access if the read flag is true (similary also
-    /// check for write access is the write flag is true ...).  Return
-    /// encoutered exception on failure or ExceptionType::NONE on
-    /// success. Does not check for page crossing.
-    ExceptionCause translate(uint64_t va, PrivilegeMode pm, bool read,
-                             bool write, bool exec, uint64_t& pa);
+    /// check for read/write/fetch access (one and ly one of the
+    /// read/write/exec flags must be true). Return encoutered
+    /// exception on failure or ExceptionType::NONE on success. Does
+    /// not check for page crossing. The twoStage flag indicates
+    /// that two-stage translation (hypervisor with V=1) is on.
+    ExceptionCause translate(uint64_t va, PrivilegeMode pm, bool twoStage,
+			     bool read, bool write, bool exec, uint64_t& pa);
 
-    /// Same as translate but only check for execute access.
-    ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+    /// Similar to translate but targeting only execute access.
+    ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, bool twoStage,
+				     uint64_t& pa)
+    { return translate(va, pm, twoStage, false, false, true, pa); }
 
-    /// Same as translate but only check for execute access and page
-    /// crossing.  On success pa1 has the physical address and pa2 has
-    /// a copy of pa1 or the physical address of the subsequent page
-    /// if the access crosses a page boundary. On Fail pa1 has the
-    /// virtual faulting address.
+    /// Similar to translate but targeting only read access.
+    ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, bool twoStage,
+				    uint64_t& pa)
+    { return translate(va, pm, twoStage, true, false, false, pa); }
+
+    /// Similar to translate but targeting only write access.
+    ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, bool twoStage,
+				     uint64_t& pa)
+    { return translate(va, pm, twoStage, false, true, false, pa); }
+
+    /// Similar to translateForFetch but also check for page
+    /// crossing. On success, pa1 will have the physical address and
+    /// pa2 a copy of pa1 or the physical address of the subsequent
+    /// page if the access crosses a page boundary. On failure, pa1
+    /// will have the virtual faulting address.
     ExceptionCause translateForFetch2(uint64_t va, unsigned size, PrivilegeMode pm,
-				      uint64_t& pa1, uint64_t& pa2);
+				      bool twoStage, uint64_t& pa1, uint64_t& pa2);
 
-    /// Same as translate but only check for read access.
-    ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, uint64_t& pa);
+    /// Same as translate but targeting load or store and checking for
+    /// page crossing.  On success, pa1 will have the physical address
+    /// and pa2 a copy of pa1 or the physical address of the
+    /// subsequent page if the access crosses a page boundary. On
+    /// failuer, pa1 will have the virtual faulting address.
+    ExceptionCause translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode pm,
+				     bool twoStage, bool load, uint64_t& pa1, uint64_t& pa2);
 
-    /// Same as translate but only check for read access and page
-    /// crossing.  On success pa1 has the physical address and pa2 has
-    /// a copy of pa1 or the physical address of the subsequent page
-    /// if the access crosses a page boundary. On Fail pa1 has the
-    /// virtual faulting address.
+    /// Load version of translateForLdSt2.
     ExceptionCause translateForLoad2(uint64_t va, unsigned size, PrivilegeMode pm,
-				     uint64_t& pa1, uint64_t& pa2);
-
-    /// Same as translate but only check for write access.
-    ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, uint64_t& pa);
-
-    /// Same as translate but only check for write access and page
-    /// crossing.  On success pa1 has the physical address and pa2 has
-    /// a copy of pa1 or the physical address of the subsequent page
-    /// if the access crosses a page boundary. On Fail pa1 has the
-    /// virtual faulting address.
+				     bool twoStage, uint64_t& pa1, uint64_t& pa2)
+    { return translateForLdSt2(va, size, pm, twoStage, true, pa1, pa2); }
+    
+    /// Store version of translateForLdSt2.
     ExceptionCause translateForStore2(uint64_t va, unsigned size, PrivilegeMode pm,
-				      uint64_t& pa1, uint64_t& pa2);
+				      bool twoStage, uint64_t& pa1, uint64_t& pa2)
+    { return translateForLdSt2(va, size, pm, twoStage, false, pa1, pa2); }
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
@@ -112,10 +121,13 @@ namespace WdRiscv
     template <typename PTE, typename VA>
     void printEntries(std::ostream& os, uint64_t addr, std::string path) const;
 
-    /// Return the number of walks used in the last page table walk.
+    /// Return the number of instruction page table walks used by the
+    /// last instruction address translation (this may be 0, 1, or 2
+    /// -- 0 if TLB hit, 2 if instruction crosses page boundary).
     unsigned numFetchWalks() const
     { return fetchWalks_.size(); }
 
+    /// Return the number of walks used by the last data translation.
     unsigned numDataWalks() const
     { return dataWalks_.size(); }
 
@@ -171,51 +183,92 @@ namespace WdRiscv
 
   protected:
 
+    /// Use exec access permission for read permission.
+    void useExecForRead(bool flag)
+    { xForR_ = flag; }
+
     /// Heper to transAddrNoUpdate
-    ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool read,
-				 bool write, bool exec, uint64_t& pa);
+    ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
+				 bool read, bool write, bool exec, uint64_t& pa);
 
     /// Translate virtual address without updating TLB or
     /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE
     /// on success or fault/access exception on failure. If succesful
     /// set pa to the physical address.
-    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool r,
-				     bool w, bool x, uint64_t& pa);
+    ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool twoStage,
+				     bool r, bool w, bool x, uint64_t& pa);
 
-    /// Helper to translate method.
-    template <typename PTE, typename VA>
-    ExceptionCause pageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
-                                 bool exec, uint64_t& pa, TlbEntry& tlbEntry);
-
-    /// Same as above but for version 1.12 of spec.
+    /// Helper to translate methods: Page table walk version 1.12.
     template <typename PTE, typename VA>
     ExceptionCause pageTableWalk1p12(uint64_t va, PrivilegeMode pm, bool read, bool write,
 				     bool exec, uint64_t& pa, TlbEntry& tlbEntry);
 
-    /// Helper to translate methods.
-    ExceptionCause doTranslate(uint64_t va, PrivilegeMode pm, bool read,
-			       bool write, bool exec, uint64_t& pa, TlbEntry& entry);
+    /// Page table walk version 1.12 for the G stage of 2-stage
+    /// address translation.
+    template <typename PTE, typename VA>
+    ExceptionCause stage2PageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
+				       bool exec, uint64_t& pa, TlbEntry& tlbEntry);
+
+    /// Page table walk version 1.12 for the VS stage of 2-stage
+    /// address translation.
+    template <typename PTE, typename VA>
+    ExceptionCause stage1PageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
+				       bool exec, uint64_t& pa, TlbEntry& tlbEntry);
+
+    /// Helper to translate methods for single stage translation. Does not use or
+    /// update TLB cache. Given TLB entry is initialized so that caller may
+    /// place it in the TLB.
+    ExceptionCause translateNoTlb(uint64_t va, PrivilegeMode pm, bool twoStage,
+				  bool r, bool w, bool x, uint64_t& pa, TlbEntry& entry);
+
+    /// Helper to translate methods for 2nd stage of guest address translation
+    /// (guest physical address to host physical address).
+    ExceptionCause stage2TranslateNoTlb(uint64_t va, PrivilegeMode pm, bool r,
+					bool w, bool x, uint64_t& pa, TlbEntry& entry);
+
+    ExceptionCause stage2Translate(uint64_t va, PrivilegeMode priv, bool r, bool w,
+				   bool x, uint64_t& pa);
+
+    ExceptionCause stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool r, bool w,
+					bool x, uint64_t& pa, TlbEntry& entry);
+
+    ExceptionCause twoStageTranslate(uint64_t va, PrivilegeMode priv, bool r, bool w,
+				     bool x, uint64_t& pa);
+
 
     /// Set the page table root page: The root page is placed in
     /// physical memory at address root * page_size
-    void setPageTableRootPage(uint64_t root)
-    { pageTableRootPage_ = root; }
+    void setRootPage(uint64_t root)
+    { rootPage_ = root; }
 
-    // Change the translation mode to m.  Page size is reset to 4096.
+    /// Set the page table root page for 2nd stage address translation.
+    void setStage2RootPage(uint64_t root)
+    { rootPageStage2_ = root; }
+
+    // Change the translation mode to m.
     void setMode(Mode m)
-    {
-      mode_ = m;
-      pageSize_ = 4096;
-      pageBits_ = 12;
-    }
+    { mode_ = m; }
+
+    // Change the translation mode to m for the 2nd stage of 2-stage
+    // (VS) translation.
+    void setStage2Mode(Mode m)
+    { modeStage2_ = m; }
 
     /// Set the address space id (asid).
-    void setAddressSpace(uint32_t asid)
+    void setAsid(uint32_t asid)
     { asid_ = asid; }
+
+    /// Set the virtual machine id for 2-stage translation.
+    void setVmid(uint32_t vmid)
+    { vmid_ = vmid; }
 
     /// Make executable pages also readable (supports MXR bit in MSTATUS).
     void setExecReadable(bool flag)
     { execReadable_ = flag; }
+
+    /// Make executable pages also readable (supports MXR bit in MSTATUS).
+    void setStage1ExecReadable(bool flag)
+    { s1ExecReadable_ = flag; }
 
     /// Allow supervisor-mode code to access user-mode pages (supports SUM
     /// bit in MSTATUS).
@@ -230,13 +283,17 @@ namespace WdRiscv
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
 
-    /// Return current paging mode.
+    /// Return current address translation mode (SV32, SV39 ...)
     Mode mode() const
     { return mode_; }
 
     /// Return current address space id.
-    uint32_t addressSpace() const
+    uint32_t asid() const
     { return asid_; }
+
+    /// Return current virtual machine id.
+    uint32_t vmid() const
+    { return vmid_; }
 
     /// Set behavior if first access to page or store and page not dirty.
     void setFaultOnFirstAccess(bool flag)
@@ -283,9 +340,12 @@ namespace WdRiscv
     };
 
     Memory& memory_;
-    uint64_t pageTableRootPage_ = 0;
+    uint64_t rootPage_ = 0;
+    uint64_t rootPageStage2_ = 0;  // Root page for 2nd stage translation.
     Mode mode_ = Bare;
+    Mode modeStage2_ = Bare;       // For 2nd stage translation.
     uint32_t asid_ = 0;
+    uint32_t vmid_ = 0;
     unsigned pageSize_ = 4096;
     unsigned pageBits_ = 12;
     uint64_t pageMask_ = 0xfff;
@@ -299,9 +359,12 @@ namespace WdRiscv
 
     // Cached mstatus bits
     bool execReadable_ = false;  // MXR bit
+    bool s1ExecReadable_ = false;  // MXR bit of vsstatus
     bool supervisorOk_ = false;  // SUM bit
     bool faultOnFirstAccess_ = true;
     bool accessDirtyCheck_ = true;  // To be able to supress AD check
+
+    bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read
 
     FILE* attFile_ = nullptr;
 
@@ -313,6 +376,8 @@ namespace WdRiscv
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
+    Tlb stage1Tlb_;
+    Tlb stage2Tlb_;
   };
 
 }

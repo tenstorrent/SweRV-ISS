@@ -465,9 +465,9 @@ namespace WdRiscv
     bool isMandatory() const
     { return mandatory_; }
 
-    /// Return true if this is a virtual supervisor register.
-    bool isVirtual() const
-    { return virtual_; }
+    /// Return true if this is a hypervisor register.
+    bool isHypervisor() const
+    { return hyper_; }
 
     /// Return true if this is a supervisor register that maps to a
     /// virtual supervisor register (e.g. sstatus maps to vsstatus).
@@ -552,6 +552,16 @@ namespace WdRiscv
         }
     }
 
+    struct Field
+    {
+      std::string field;
+      unsigned width;
+    };
+
+    // Returns CSR fields
+    std::vector<Field> fields() const
+    { return fields_; }
+
   protected:
 
     friend class CsRegs<URV>;
@@ -618,8 +628,10 @@ namespace WdRiscv
     void setDefined(bool flag)
     { defined_ = flag; }
 
-    void setVirtual(bool flag)
-    { virtual_ = flag; }
+    /// True if this is a hypervisor register. Hypervisor registers
+    /// are not available in VS (virtual-supervisor) mode.
+    void setHypervisor(bool flag)
+    { hyper_ = flag; }
 
     void setMapsToVirtual(bool flag)
     { mapsToVirtual_ = flag; }
@@ -686,12 +698,6 @@ namespace WdRiscv
     void clearLastWritten()
     { hasPrev_ = false; }
 
-    struct Field
-    {
-      std::string field;
-      unsigned width;
-    };
-
     void setFields(const std::vector<Field>& fields)
     { fields_ = fields; }
 
@@ -703,7 +709,7 @@ namespace WdRiscv
           if (f.field == field)
             {
               URV mask = ((1 << f.width) - 1) << start;
-              val = (value_ * mask) >> start;
+              val = (value_ & mask) >> start;
               return true;
             }
           start += f.width;
@@ -717,7 +723,7 @@ namespace WdRiscv
     unsigned number_ = 0;
     bool mandatory_ = false;   // True if mandated by architecture.
     bool implemented_ = false; // True if register is implemented.
-    bool virtual_ = false;     // True for virtual supervisor CSR.
+    bool hyper_ = false;       // True if hypervisor CSR.
     bool mapsToVirtual_ = false; // True if CSR maps to a virtual supervisor CSR.
     bool defined_ = false;
     bool debug_ = false;       // True if this is a debug-mode register.
@@ -1040,9 +1046,6 @@ namespace WdRiscv
 
     /// Helper to constructor. Define hypervisor CSRs.
     void defineHypervisorRegs();
-
-    /// Helper to constructor. Define virtual supervisor CSRs.
-    void defineVirtualSupervisorRegs();
 
     /// Helper to construtor. Define debug-mode CSRs
     void defineDebugRegs();

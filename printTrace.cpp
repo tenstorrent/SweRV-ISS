@@ -654,6 +654,8 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	  if (i > 0)
 	    buffer.printChar(';');
 	  buffer.print(vecRegs_.ldStAddr_.at(i));
+	  if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
+	    buffer.printChar('m');
 	  if (i < vecRegs_.stData_.size())
 	    buffer.printChar('=').print(vecRegs_.stData_.at(i));
 	}

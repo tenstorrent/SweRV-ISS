@@ -543,7 +543,7 @@ InstTable::setupInstVec()
 	OperandType::Imm, OperandMode::None, 0x0f000000,
 	OperandType::Imm, OperandMode::None, 0x00f00000 },
 
-      { "fence.i", InstId::fencei, 0x100f, 0x0000707f,  // FIXME: Check mask.
+      { "fence.i", InstId::fence_i, 0x100f, 0x0000707f,  // FIXME: Check mask.
 	RvExtension::I, RvFormat::I },
 
       { "ecall", InstId::ecall, 0x00000073, 0xffffffff,

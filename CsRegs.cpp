@@ -33,7 +33,6 @@ CsRegs<URV>::CsRegs()
   defineSupervisorRegs();
   defineUserRegs();
   defineHypervisorRegs();
-  defineVirtualSupervisorRegs();
   defineDebugRegs();
   defineVectorRegs();
   defineFpRegs();
@@ -125,8 +124,8 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
     return csr;
   if (not virtualMode)
     return csr;
-  if (csr->isVirtual())
-    return nullptr; // Virtual mode: virtual supervisor CSRs are not available
+  if (csr->isHypervisor())
+    return nullptr; // Virtual mode: Hypervisor CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
   num = CsrNumber(URV(num) - 0x100);
@@ -143,7 +142,7 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode) const
     return csr;
   if (not virtualMode)
     return csr;
-  if (csr->isVirtual())
+  if (csr->isHypervisor())
     return nullptr; // Virtual mode: virtual supervisor CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
@@ -229,7 +228,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableSupervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }
       else
@@ -245,7 +244,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	  if (not csr)
 	    {
 	      std::cerr << "Error: enableSupervisorMode: CSR number 0x"
-			<< std::hex << URV(csrn) << " undefined\n";
+			<< std::hex << URV(csrn) << std::dec << " undefined\n";
 	    }
 	  else
 	    csr->setImplemented(flag);
@@ -301,7 +300,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
         }
       else
         csr->setImplemented(flag);
@@ -316,7 +315,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	  if (not csr)
 	    {
 	      std::cerr << "Error: enableHypervisorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+			<< std::hex << URV(csrn) << std::dec << " undefined\n";
 	    }
 	  else
 	    csr->setImplemented(flag);
@@ -340,7 +339,7 @@ CsRegs<URV>::enableRvf(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableRvf: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }
       else if (not csr->isImplemented())
@@ -361,7 +360,7 @@ CsRegs<URV>::enableVectorMode(bool flag)
       if (not csr)
         {
           std::cerr << "Error: enableVectorMode: CSR number 0x"
-                    << std::hex << URV(csrn) << " undefined\n";
+                    << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }
       else
@@ -403,15 +402,20 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
 
 template <typename URV>
 URV
-legalizeMisa(URV v)
+legalizeMisa(Csr<URV>* csr, URV v)
 {
-  if ((v & (1 << ('I' - 'A'))) == 0)
-    {
-      if ((v & (1 << ('E' - 'A'))) != 0)
-	return v;  // I off, E On
-      v |= (1 << ('I' - 'A'));  // I & E off, turn I on
-    }
+  URV wm = csr->getWriteMask();
+  if (wm == 0)
+    return csr->getResetValue();
 
+  v = (v & wm) | (csr->read() & ~wm) ;
+
+  // E must be complement of I
+  bool i = v & (1 << ('I' - 'A'));
+  bool e = v & (1 << ('E' - 'A'));
+  if (e == i)
+    v ^= v & (1 << ('E' - 'A'));  // Flip E bit.
+      
   if ((v & (1 << ('F' - 'A'))) == 0)
     v &= ~(URV(1) << ('D' - 'A'));  // D is off if F is off.
 
@@ -512,6 +516,14 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       return true;
     }
 
+  if (num == CsrNumber::MISA)
+    {
+      value = legalizeMisa(csr, value);
+      csr->pokeNoMask(value);
+      recordWrite(num);
+      return true;
+    }
+
   if (num >= CsrNumber::MHPMEVENT3 and num <= CsrNumber::MHPMEVENT31)
     value = legalizeMhpmevent(num, value);
   else if (num >= CsrNumber::PMPCFG0 and num <= CsrNumber::PMPCFG15)
@@ -520,8 +532,6 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-  else if (num == CsrNumber::MISA)
-    value = legalizeMisa(value);
    
   csr->write(value);
   recordWrite(num);
@@ -1033,7 +1043,7 @@ CsRegs<URV>::defineMachineRegs()
   val = 0x40001105;  // MISA: acim
   if constexpr (sizeof(URV) == 8)
     val = 0x8000000000001105;  // MISA: acim
-  defineCsr("misa", Csrn::MISA, mand,  imp, val, rom, rom);
+  defineCsr("misa", Csrn::MISA, mand, imp, val, rom, rom);
 
   // Bits corresponding to reserved interrupts are hardwired to zero
   // in medeleg.
@@ -1380,59 +1390,65 @@ CsRegs<URV>::defineHypervisorRegs()
 
   using Csrn = CsrNumber;
 
-  defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, 0, wam, wam);
-  defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, wam, wam);
-  defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, wam, wam);
-  defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, wam, wam);
-  defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
-  defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, wam, wam);
-  defineCsr("htval",       Csrn::HTVAL,       !mand, !imp, 0, wam, wam);
-  defineCsr("hip",         Csrn::HIP,         !mand, !imp, 0, wam, wam);
-  defineCsr("hvip",        Csrn::HVIP,        !mand, !imp, 0, wam, wam);
-  defineCsr("htinst",      Csrn::HTINST,      !mand, !imp, 0, wam, wam);
-  defineCsr("hgeip",       Csrn::HGEIP,       !mand, !imp, 0, wam, wam);
-  defineCsr("henvcfg",     Csrn::HENVCFG,     !mand, !imp, 0, wam, wam);
-  defineCsr("henvcfgh",    Csrn::HENVCFGH,    !mand, !imp, 0, wam, wam);
-  defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, wam, wam);
-  defineCsr("htimedelta",  Csrn::HTIMEDELTA,  !mand, !imp, 0, wam, wam);
-  defineCsr("htimedeltah", Csrn::HTIMEDELTAH, !mand, !imp, 0, wam, wam);
+  Csr<URV>* csr = nullptr;
+  csr = defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("htval",       Csrn::HTVAL,       !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hip",         Csrn::HIP,         !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hvip",        Csrn::HVIP,        !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("htinst",      Csrn::HTINST,      !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hgeip",       Csrn::HGEIP,       !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("henvcfg",     Csrn::HENVCFG,     !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("henvcfgh",    Csrn::HENVCFGH,    !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("htimedelta",  Csrn::HTIMEDELTA,  !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  csr = defineCsr("htimedeltah", Csrn::HTIMEDELTAH, !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
 
   // This may be already defined with trigger CSRs.
   if (not nameToNumber_.count("hcontext"))
-    defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
-}
-
-
-template <typename URV>
-void
-CsRegs<URV>::defineVirtualSupervisorRegs()
-{
-  bool mand = true;    // Mandatory.
-  bool imp  = true;    // Implemented.
-  URV  wam  = ~URV(0); // Write-all mask: all bits writeable.
-
-  using Csrn = CsrNumber;
-
-  Csr<URV>* csr = nullptr;
+    csr = defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
+  else
+    csr = findCsr(Csrn::HCONTEXT);
+  csr->setHypervisor(true);
 
   csr = defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vsie",        Csrn::VSIE,        !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vstvec",      Csrn::VSTVEC,      !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vssratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vscause",     Csrn::VSCAUSE,     !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vstval",      Csrn::VSTVAL,      !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vsip",        Csrn::VSIP,        !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
   csr = defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
-  csr->setVirtual(true);
+  csr->setHypervisor(true);
 }
 
 
@@ -1694,6 +1710,13 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
       return true;
     }
 
+  if (number == CsrNumber::MISA)
+    {
+      value = legalizeMisa(csr, value);
+      csr->pokeNoMask(value);
+      return true;
+    }
+
   if (number >= CsrNumber::MHPMEVENT3 and number <= CsrNumber::MHPMEVENT31)
     value = legalizeMhpmevent(number, value);
   else if (number >= CsrNumber::PMPCFG0 and number <= CsrNumber::PMPCFG15)
@@ -1704,8 +1727,6 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
     }
   else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
     value = legalizeMstatusValue(value);
-  else if (number == CsrNumber::MISA)
-    value = legalizeMisa(value);
 
   csr->poke(value);
 

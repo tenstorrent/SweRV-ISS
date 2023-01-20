@@ -469,6 +469,7 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
       std::cerr << "  example:  peek r x3\n";
       std::cerr << "  example:  peek f f4\n";
       std::cerr << "  example:  peek c mtval\n";
+      std::cerr << "  example:  peek c mtval v\n";
       std::cerr << "  example:  peek v v2\n";
       std::cerr << "  example:  peek m 0x4096\n";
       std::cerr << "  example:  peek t 0\n";
@@ -614,7 +615,26 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	}
       if (hart.peekCsr(csr->getNumber(), val))
 	{
-	  out << (boost::format(hexForm) % val) << std::endl;
+          std::string verbose;
+          if (tokens.size() > 3)
+            verbose = tokens.at(3);
+          if (verbose == "v")
+            {
+              auto fields = csr->fields();
+              if (fields.size())
+                {
+                  for (auto& field : fields)
+                    {
+                      URV mask = ((1 << field.width) - 1);
+                      std::string form = "0x%0" + std::to_string((field.width / 4) + 1) + "x";
+                      out << (boost::format("%-8s: " + form)
+                              % field.field % (val & mask)) << std::endl;
+                      val >>= field.width;
+                    }
+                }
+            }
+          else
+            out << (boost::format(hexForm) % val) << std::endl;
 	  return true;
 	}
       std::cerr << "Failed to read CSR: " << addrStr << '\n';
@@ -1961,7 +1981,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
   auto ec = hart.transAddrNoUpdate(va, pm, read, write, exec, pa);
   if (ec == ExceptionCause::NONE)
     {
-      std::cout << "0x" << std::hex << pa << '\n';
+      std::cout << "0x" << std::hex << pa << std::dec << '\n';
       return true;
     }
 

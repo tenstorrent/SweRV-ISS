@@ -39,8 +39,8 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
       if (mode != PrivilegeMode::Machine)
         {
           uint64_t pa = 0;
-          cause = isRead ? virtMem_.translateForLoad(addr, mode, pa) :
-                           virtMem_.translateForStore(addr, mode, pa);
+	  bool read = isRead, write = not isRead, exec = false;
+          cause = virtMem_.translate(addr, mode, virtMode_, read, write, exec, pa);
           if (cause != ExceptionCause::NONE)
             return cause;
           addr = pa;

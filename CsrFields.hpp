@@ -2,25 +2,25 @@
 
 namespace WdRiscv
 {
-  /// Structure used to unpack/pack the fields of the machine status
-  /// register.
-  template <typename URV>
-  union MstatusFields;
 
-  /// 32-bit version.
-  template <>
-  union MstatusFields<uint32_t>
+  /// Struct used to pack/unpack MSTATUSH in RV32.
+  struct Mstatush
   {
-    MstatusFields(uint32_t value = 0)
-      : value_(value)
-    { }
+    unsigned res0     : 4;
+    unsigned SBE      : 1;
+    unsigned MBE      : 1;
+    unsigned GVA      : 1;
+    unsigned MPV      : 1;
+    unsigned res1     : 24;
+  };
 
-    uint32_t value_;   // Machine status register value.
-    struct
+
+  /// Struct used to pack/unpack MSTATUS in RV32.
+  struct Mstatus32
     {
       unsigned UIE      : 1;
       unsigned SIE      : 1;
-      unsigned res2     : 1;
+      unsigned res0     : 1;
       unsigned MIE      : 1;
       unsigned UPIE     : 1;
       unsigned SPIE     : 1;
@@ -37,21 +37,13 @@ namespace WdRiscv
       unsigned TVM      : 1;
       unsigned TW       : 1;
       unsigned TSR      : 1;
-      unsigned res0     : 8;  // Reserved
+      unsigned res1     : 8;  // Reserved
       unsigned SD       : 1;
-    } bits_;
-  };
+    };
 
-  /// 64-bit version.
-  template <>
-  union MstatusFields<uint64_t>
-  {
-    MstatusFields(uint64_t value = 0)
-      : value_(value)
-    { }
 
-    uint64_t value_;   // Machine status register value.
-    struct
+  /// Struct used to pack/unpack MSTATUS in RV64.
+  struct Mstatus64
     {
       unsigned UIE      : 1;
       unsigned SIE      : 1;
@@ -81,7 +73,102 @@ namespace WdRiscv
       unsigned MPV      : 1;
       unsigned res2     : 23;  // Reserved
       unsigned SD       : 1;
+    };
+
+
+  /// Structure used to unpack/pack the fields of the machine status
+  /// register.
+  template <typename URV>
+  union MstatusFields;
+
+  /// 32-bit version.
+  template <>
+  union MstatusFields<uint32_t>
+  {
+    MstatusFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_;   // Machine status register value.
+    Mstatus32 bits_;   // Bit fields.
+  };
+
+  /// 64-bit version.
+  template <>
+  union MstatusFields<uint64_t>
+  {
+    MstatusFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;   // Machine status register value.
+    Mstatus64 bits_;   // Bit fields.
+  };
+
+
+  /// Effective mstatus: Cached value of mstatus for RV64 and
+  /// mstatush/mstatus for RV32.
+  template <typename URV>
+  union Emstatus;
+
+  /// RV32 version.
+  template <>
+  union Emstatus<uint32_t>
+  {
+    Emstatus(uint32_t low = 0, uint32_t high = 0)
+      : value_{low, high}
+    { }
+
+    struct
+    {
+      uint32_t low_;
+      uint32_t high_;
+    } value_;
+
+    struct
+    {
+      unsigned UIE      : 1;
+      unsigned SIE      : 1;
+      unsigned res0     : 1;
+      unsigned MIE      : 1;
+      unsigned UPIE     : 1;
+      unsigned SPIE     : 1;
+      unsigned UBE      : 1;
+      unsigned MPIE     : 1;
+      unsigned SPP      : 1;
+      unsigned VS       : 2;
+      unsigned MPP      : 2;
+      unsigned FS       : 2;
+      unsigned XS       : 2;
+      unsigned MPRV     : 1;
+      unsigned SUM      : 1;
+      unsigned MXR      : 1;
+      unsigned TVM      : 1;
+      unsigned TW       : 1;
+      unsigned TSR      : 1;
+      unsigned res1     : 8;  // Reserved
+      unsigned SD       : 1;
+
+      // mstatush
+      unsigned res2     : 4;
+      unsigned SBE      : 1;
+      unsigned MBE      : 1;
+      unsigned GVA      : 1;
+      unsigned MPV      : 1;
+      unsigned res3     : 24;
     } bits_;
+  };
+
+  /// RV64 version.
+  template <>
+  union Emstatus<uint64_t>
+  {
+    Emstatus(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;
+    Mstatus64 bits_;
   };
 
 
@@ -394,4 +481,45 @@ namespace WdRiscv
       unsigned VILL : 1;
     } bits_;
   };
+
+
+  /// Structure used to unpack/pack the fields of the HGATP register
+  template <typename URV>
+  union HgatpFields;
+
+  template <>
+  union HgatpFields<uint32_t>
+  {
+    HgatpFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_;  // HGATP register value
+    struct
+    {
+      unsigned PPN  : 22;
+      unsigned VMID : 7;
+      unsigned res  : 2;
+      unsigned MODE : 1;
+    } bits_;
+  };
+
+  template <>
+  union HgatpFields<uint64_t>
+  {
+    HgatpFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_; // HGATP register value
+    struct
+    {
+      uint64_t PPN  : 44;
+      unsigned VMID : 14;
+      unsigned res  : 2;
+      unsigned MODE : 4;
+    } bits_;
+  };
+
+
 }

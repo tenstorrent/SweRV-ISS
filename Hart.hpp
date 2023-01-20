@@ -914,6 +914,10 @@ namespace WdRiscv
     void enableRvzawrs(bool flag)
     { rvzawrs_ = flag; }
 
+    /// Enable/disable the zmmul (multiply) extension.
+    void enableRvzmmul(bool flag)
+    { rvzmmul_ = flag; }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1085,9 +1089,13 @@ namespace WdRiscv
     bool isRvzicboz() const
     { return rvzicboz_; }
 
-    /// Return true if the zicboz extension (wait reservation store) is enabled.
+    /// Return true if the zawrs extension (wait reservation store) is enabled.
     bool isRvzawrs() const
     { return rvzawrs_; }
+
+    /// Return true if the zmmul extension (multiply) is enabled.
+    bool isRvzmmul() const
+    { return rvzmmul_; }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
@@ -1111,6 +1119,10 @@ namespace WdRiscv
     /// Return true if rva (atomic) extension is enabled in this hart.
     bool isRva() const
     { return rva_; }
+
+    /// Return true if rvb (bit-manup) extension is enabled in this hart.
+    bool isRvb() const
+    { return rvb_; }
 
     /// Return true if rvs (supervisor-mode) extension is enabled in this
     /// hart.
@@ -1377,7 +1389,7 @@ namespace WdRiscv
     /// set pa to the physical address.
     ExceptionCause transAddrNoUpdate(uint64_t va, PrivilegeMode pm, bool r,
 				     bool w, bool x, uint64_t& pa)
-    { return virtMem_.transAddrNoUpdate(va, pm, r, w, x, pa); }
+    { return virtMem_.transAddrNoUpdate(va, pm, false /*twoStage*/, r, w, x, pa); }
 
     /// Return the paging mode before last executed instruction.
     VirtMem::Mode lastPageMode() const
@@ -1713,6 +1725,7 @@ namespace WdRiscv
       csRegs_.setVirtualMode(mode);
       if (mode)
 	updateCachedVsstatus();
+      updateAddressTranslation();
     }
 
     // Return true if it is legal to execute a vector instruction: V
@@ -1740,7 +1753,7 @@ namespace WdRiscv
     // is written/poked.
     void updateCachedVsstatus();
 
-    // Update cached MSTATUS if non-virtual and VSSTATUS if virtual.
+    /// Update cached MSTATUS if non-virtual and VSSTATUS if virtual.
     void updateCachedSstatus()
     {
       if (virtMode_)
@@ -1748,6 +1761,9 @@ namespace WdRiscv
       else
 	updateCachedMstatus();
     }
+
+    /// Write the cached value of mstatus (or mstatus/mstatush) into the CSR.
+    void writeMstatus();
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all
@@ -1885,17 +1901,15 @@ namespace WdRiscv
     /// Return true if the load is successful. Return false if an exception
     /// or a trigger is encoutered. On succes loadd value (sign extended for
     /// signed type) is placed in value. Updating the destination register is
-    /// the resposibilty of the caller.
+    /// the resposibilty of the caller. The hyper flag should be set to true
+    /// for hypervisor load/store instruction to select 2-stage address
+    /// translation.
     template<typename LOAD_TYPE>
-    bool load(uint64_t virtAddr, uint64_t& value);
+    bool load(uint64_t virtAddr, bool hyper, uint64_t& value);
 
     /// For use by performance model. 
     template<typename LOAD_TYPE>
     bool fastLoad(uint64_t virtAddr, uint64_t& value);
-
-    /// Helper to hypervisor load instructions.
-    template<typename LOAD_TYPE>
-    bool hyperLoad(uint64_t virtAddr, uint64_t& value);
 
     /// Helper to load method: Return possible load exception (wihtout
     /// taking any exception). If supervisor mode is enabled, and
@@ -1904,9 +1918,11 @@ namespace WdRiscv
     /// address of the subsequent page in the case of page-crossing
     /// access. If there is an exception, the addr1 is set to the
     /// virtual address causing the trap. If no address translation or
-    /// no page crossing, then addr2 will be equal to addr1.
+    /// no page crossing, then addr2 will be equal to addr1. The hyper
+    /// flags must be true if this is called on behalf of the hypervisor
+    /// load/store instructions (e.g. hlv.b).
     ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
-					  unsigned ldSize);
+					  unsigned ldSize, bool hyper);
 
     /// Helepr to the cache block operaion (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, bool isRead);
@@ -1918,24 +1934,22 @@ namespace WdRiscv
 
     /// Helper to sb, sh, sw ... Sore type should be uint8_t, uint16_t
     /// etc... for sb, sh, etc...
-    /// Return true if store is successful. Return false if an exception
-    /// or a trigger is encountered.
+    /// Return true if store is successful. Return false if an
+    /// exception or a trigger is encountered. The hyper flag should
+    /// be set to true for hypervisor load/store instruction to select
+    /// 2-stage address translation.
     template<typename STORE_TYPE>
-    bool store(URV addr, STORE_TYPE value);
+    bool store(URV addr, bool hyper, STORE_TYPE value);
 
     /// For use by performance model. 
     template<typename STORE_TYPE>
     bool fastStore(URV addr, STORE_TYPE value);
 
-    /// Helper to hypervisor load instructions.
-    template<typename STORE_TYPE>
-    bool hyperStore(URV virtAddr, STORE_TYPE value);
-
     /// Helper to store method: Return possible exception (wihtout
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
     ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
-					   unsigned stSize);
+					   unsigned stSize, bool hyper);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
     /// Return true if instruction is successful. Return false if an
@@ -2245,6 +2259,9 @@ namespace WdRiscv
 
     bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned groupX8);
+
+    bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+				 unsigned op2, unsigned groupX8);
 
     // Check reduction vector operand against the group multiplier. Return true
     // if operand is a multiple of multiplier and false otherwise. Record group
@@ -4171,6 +4188,7 @@ namespace WdRiscv
 
     bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
     bool rva_ = false;           // True if extension A (atomic) enabled.
+    bool rvb_ = false;           // True if extension B (bit-manip) enabled.
     bool rvc_ = true;            // True if extension C (compressed) enabled.
     bool rvd_ = false;           // True if extension D (double fp) enabled.
     bool rve_ = false;           // True if extension E (embedded) enabled.
@@ -4203,6 +4221,7 @@ namespace WdRiscv
     bool rvzicbom_ = false;      // True if extension zicbom (cache block management) enabled.
     bool rvzicboz_ = false;      // True if extension zicboz (cache block zero) enabled.
     bool rvzawrs_ = false;       // True if extension zawrs (wait reservation store) enabled.
+    bool rvzmmul_ = false;       // True if extension zmmul (multply) enabled.
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.
@@ -4302,7 +4321,7 @@ namespace WdRiscv
     bool virtMode_ = false;         // True if virtual (V) mode is on.
 
     // These are used to get fast access to the FS and VS bits.
-    MstatusFields<URV> mstatus_;    // Cached value of mstatus CSR
+    Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
 

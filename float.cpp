@@ -272,31 +272,15 @@ Hart<URV>::setFpStatus(FpStatus value)
 {
   if (mstatus_.bits_.FS != unsigned(value))
     {
-      URV val = csRegs_.peekMstatus();
-      MstatusFields<URV> fields(val);
-      fields.bits_.FS = unsigned(value);
-      csRegs_.poke(CsrNumber::MSTATUS, fields.value_);
-
-      URV newVal = csRegs_.peekMstatus();
-      if (val != newVal)
-	recordCsrWrite(CsrNumber::MSTATUS);
-
-      updateCachedMstatus();
+      mstatus_.bits_.FS = unsigned(value);
+      writeMstatus();
     }
 
   if (virtMode_ and mstatus_.bits_.FS != unsigned(value))
     {
-      URV val = 0;
-      peekCsr(CsrNumber::VSSTATUS, val);
-      MstatusFields<URV> fields(val);
-      fields.bits_.FS = unsigned(value);
-      csRegs_.poke(CsrNumber::VSSTATUS, fields.value_);
-
-      URV newVal = 0;
-      peekCsr(CsrNumber::VSSTATUS, newVal);
-      if (val != newVal)
-	recordCsrWrite(CsrNumber::VSSTATUS);
-
+      vsstatus_.bits_.FS = unsigned(value);
+      csRegs_.poke(CsrNumber::VSSTATUS, vsstatus_.value_);
+      recordCsrWrite(CsrNumber::VSSTATUS);
       updateCachedVsstatus();
     }
 }
@@ -486,7 +470,7 @@ Hart<URV>::execFlw(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint32_t>(virtAddr, data))
+  if (load<uint32_t>(virtAddr, false /*hyper*/, data))
     {
       Uint32FloatUnion ufu{uint32_t(data)};
       fpRegs_.writeSingle(di->op0(), ufu.f);
@@ -518,7 +502,7 @@ Hart<URV>::execFsw(const DecodedInst* di)
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint64_t val = fpRegs_.readBitsRaw(rs2);
 
-  store<uint32_t>(addr, uint32_t(val));
+  store<uint32_t>(addr, false /*hyper*/, uint32_t(val));
 }
 
 
@@ -1601,7 +1585,7 @@ Hart<URV>::execFld(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint64_t>(virtAddr, data))
+  if (load<uint64_t>(virtAddr, false /*hyper*/, data))
     {
       Uint64DoubleUnion udu{data};
       fpRegs_.writeDouble(di->op0(), udu.d);
@@ -1634,7 +1618,7 @@ Hart<URV>::execFsd(const DecodedInst* di)
 
   Uint64DoubleUnion udu{val};
 
-  store<uint64_t>(addr, udu.u);
+  store<uint64_t>(addr, false /*hyper*/, udu.u);
 }
 
 
@@ -2603,7 +2587,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
   uint64_t virtAddr = base + di->op2As<int32_t>();
 
   uint64_t data = 0;
-  if (load<uint16_t>(virtAddr, data))
+  if (load<uint16_t>(virtAddr, false /*hyper*/,  data))
     {
       Float16 f16 = Float16::fromBits(data);
       fpRegs_.writeHalf(di->op0(), f16);
@@ -2635,7 +2619,7 @@ Hart<URV>::execFsh(const DecodedInst* di)
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint16_t val = fpRegs_.readBitsRaw(rs2);
 
-  store<uint16_t>(addr, val);
+  store<uint16_t>(addr, false /*hyper*/, val);
 }
 
 

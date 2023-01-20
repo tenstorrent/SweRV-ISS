@@ -812,7 +812,7 @@ Memory::saveSnapshot(const std::string& filename,
       if (blk.first >= size_)
 	{
 	  std::cerr << "Memory::saveSnapshot: Block address (0x" << std::hex << blk.first
-		    << ") out of bounds (0x" << std::hex << size_ << ")\n" << std::dec;
+		    << ") out of bounds (0x" << size_ << ")\n" << std::dec;
 	  success = false;
 	  break;
 	}
@@ -820,7 +820,7 @@ Memory::saveSnapshot(const std::string& filename,
       if (remainingSize > size_ or size_ - remainingSize < blk.first)
 	{
 	  std::cerr << "Memory::saveSnapshot: Block at (0x" << std::hex << blk.first
-		    << ") extends beyond memory bound\n";
+		    << std::dec << ") extends beyond memory bound\n";
 	  success = false;
 	  break;
 	}
@@ -897,7 +897,7 @@ Memory::loadSnapshot(const std::string & filename,
       if (blk.first >= size_)
 	{
 	  std::cerr << "Memory::loadSnapshot: Block address (0x" << std::hex << blk.first
-		    << ") out of bounds (0x" << std::hex << size_ << ")\n" << std::dec;
+		    << ") out of bounds (0x" << size_ << ")\n" << std::dec;
 	  success = false;
 	  break;
 	}
@@ -905,7 +905,7 @@ Memory::loadSnapshot(const std::string & filename,
       if (remainingSize > size_ or size_ - remainingSize < blk.first)
 	{
 	  std::cerr << "Memory::loadSnapshot: Block at (0x" << std::hex << blk.first
-		    << ") extends beyond memory bound\n";
+		    << ") extends beyond memory bound\n" << std::dec;
 	  success = false;
 	  break;
 	}
@@ -1006,6 +1006,8 @@ Memory::saveAddressTrace(const std::string& tag,
 
   for (auto a : addrVec)
     out << a << '\n';
+
+  out << std::dec;
 
   return true;
 }
