@@ -34,7 +34,7 @@ isPowerOf2(uint64_t x)
 }
 
 
-Memory::Memory(size_t size, size_t pageSize)
+Memory::Memory(uint64_t size, uint64_t pageSize)
   : size_(size), data_(nullptr), pageSize_(pageSize), reservations_(1),
     lastWriteData_(1), pmaMgr_(size)
 { 
@@ -193,7 +193,7 @@ Memory::loadHexFile(const std::string& fileName)
 
 
 bool
-Memory::loadBinaryFile(const std::string& fileName, size_t addr)
+Memory::loadBinaryFile(const std::string& fileName, uint64_t addr)
 {
   std::ifstream input(fileName, std::ios::binary);
 
@@ -595,12 +595,12 @@ Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
     }
 
   // Copy loadable ELF segments into memory.
-  size_t maxEnd = 0;  // Largest end address of a segment.
-  size_t errors = 0;
+  uint64_t maxEnd = 0;  // Largest end address of a segment.
+  unsigned errors = 0;
 
   for (int segIx = 0; segIx < reader.segments.size(); ++segIx)
     {
-      size_t end = 0;
+      uint64_t end = 0;
       if (loadElfSegment(reader, segIx, end))
         maxEnd = std::max(end, maxEnd);
       else
@@ -658,7 +658,7 @@ Memory::findElfSection(const std::string& name, ElfSymbol& symbol) const
 
 
 bool
-Memory::findElfFunction(size_t addr, std::string& name, ElfSymbol& value) const
+Memory::findElfFunction(uint64_t addr, std::string& name, ElfSymbol& value) const
 {
   for (const auto& kv : symbols_)
     {
@@ -1032,7 +1032,7 @@ Memory::saveInstructionAddressTrace(const std::string& path) const
 
 
 bool
-Memory::specialInitializeByte(size_t addr, uint8_t value)
+Memory::specialInitializeByte(uint64_t addr, uint8_t value)
 {
   if (addr >= size_)
     return false;
@@ -1054,7 +1054,7 @@ Memory::specialInitializeByte(size_t addr, uint8_t value)
 
 
 bool
-Memory::checkCcmConfig(const std::string& tag, size_t addr, size_t size) const
+Memory::checkCcmConfig(const std::string& tag, uint64_t addr, uint64_t size) const
 {
   if (size < pageSize_)
     {
@@ -1097,7 +1097,7 @@ Memory::resetMemoryMappedRegisters()
 
 
 bool
-Memory::defineMemoryMappedRegisterWriteMask(size_t addr, uint32_t mask)
+Memory::defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask)
 {
   if ((addr & 3) != 0)
     {

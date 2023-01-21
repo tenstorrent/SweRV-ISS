@@ -1609,12 +1609,15 @@ namespace WdRiscv
 	    return;
 	  }
 
-      for (unsigned i = 0; i < size1; ++i, value >>= 8)
-	if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
-	  assert(0);
-      for (unsigned i = 0; i < size2; ++i, value >>= 8)
-	if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
-	  assert(0);
+      if constexpr (sizeof(STORE_TYPE) > 1)
+	{
+	  for (unsigned i = 0; i < size1; ++i, value >>= 8)
+	    if (not memory_.write(hartIx_, pa1 + i, uint8_t(value & 0xff)))
+	      assert(0);
+	  for (unsigned i = 0; i < size2; ++i, value >>= 8)
+	    if (not memory_.write(hartIx_, pa2 + i, uint8_t(value & 0xff)))
+	      assert(0);
+	}
     }
 
     /// Peek an item that may span 2 physical pages. See memRead.

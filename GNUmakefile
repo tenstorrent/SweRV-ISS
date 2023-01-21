@@ -58,7 +58,10 @@ else
 endif
 
 ifeq (Darwin,$(shell uname))
+  EXTRA_LIBS := -lpthread -lm -lz -ldl
   LINK_LIBS := $(BOOST_LIB_DIR)/lib$(BOOST_LIBS).a $(EXTRA_LIBS)
+else
+  LINK_LIBS += -Wl,-export-dynamic
 endif
 
 # For out of source build
@@ -72,7 +75,7 @@ OFLAGS := -O3
 IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I. -Ithird_party
 
 # Command to compile .cpp files.
-override CXXFLAGS += -MMD -MP -mfma -std=c++17 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wwrite-strings
+override CXXFLAGS += -MMD -MP -mfma -std=c++17 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
 
 # Rule to make a .o from a .cpp file.
 $(BUILD_DIR)/%.cpp.o:  %.cpp
@@ -83,7 +86,7 @@ $(BUILD_DIR)/%.cpp.o:  %.cpp
 $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
                          $(BUILD_DIR)/librvcore.a \
 			 $(soft_float_lib)
-	$(CXX) -o $@ $(OFLAGS) $^ $(LINK_DIRS) $(LINK_LIBS) -Wl,-export-dynamic
+	$(CXX) -o $@ $(OFLAGS) $^ $(LINK_DIRS) $(LINK_LIBS)
 
 # Rule to make whisper.cpp.o
 $(BUILD_DIR)/whisper.cpp.o:  .FORCE
