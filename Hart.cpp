@@ -713,8 +713,6 @@ template <typename URV>
 void
 Hart<URV>::updateCachedVsstatus()
 {
-  assert(virtMode_);
-
   URV csrVal = 0;
   peekCsr(CsrNumber::VSSTATUS, csrVal);
   vsstatus_.value_ = csrVal;
@@ -724,6 +722,16 @@ Hart<URV>::updateCachedVsstatus()
       virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
       virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
     }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::updateCachedHstatus()
+{
+  URV csrVal = 0;
+  peekCsr(CsrNumber::HSTATUS, csrVal);
+  hstatus_.value_ = csrVal;
 }
 
 
@@ -2685,6 +2693,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
     updateCachedSstatus();
   else if (csr == CsrNumber::VSSTATUS)
     updateCachedVsstatus();
+  else if (csr == CsrNumber::HSTATUS)
+    updateCachedHstatus();
 
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)

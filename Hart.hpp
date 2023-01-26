@@ -1765,6 +1765,11 @@ namespace WdRiscv
 	updateCachedMstatus();
     }
 
+    // We avoid the cost of locating HSTATUS in the CSRs register file
+    // by caching its value in this class. We do this whenever HSTATUS
+    // is written/poked.
+    void updateCachedHstatus();
+
     /// Write the cached value of mstatus (or mstatus/mstatush) into the CSR.
     void writeMstatus();
 
