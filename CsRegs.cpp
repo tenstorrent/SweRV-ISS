@@ -128,7 +128,7 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
     return nullptr; // Virtual mode: Hypervisor CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
-  num = CsrNumber(URV(num) - 0x100);
+  num = CsrNumber(URV(num) + 0x100);
   return getImplementedCsr(num);
 }
 
@@ -143,10 +143,10 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode) const
   if (not virtualMode)
     return csr;
   if (csr->isHypervisor())
-    return nullptr; // Virtual mode: virtual supervisor CSRs are not available
+    return nullptr; // Virtual mode: Hypervisors CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
-  num = CsrNumber(URV(num) - 0x100);
+  num = CsrNumber(URV(num) + 0x100);
   return getImplementedCsr(num);
 }
 
@@ -294,7 +294,8 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   typedef CsrNumber CN;
   for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
 	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
-	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH } )
+	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH,
+        CN::MTVAL2, CN::MTINST } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -1449,6 +1450,10 @@ CsRegs<URV>::defineHypervisorRegs()
   csr->setHypervisor(true);
   csr = defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
+
+  // additional machine CSRs
+  csr = defineCsr("mtval2",      Csrn::MTVAL2,      !mand, !imp, 0, wam, wam);
+  csr = defineCsr("mtinst",      Csrn::MTINST,      !mand, !imp, 0, wam, wam);
 }
 
 
