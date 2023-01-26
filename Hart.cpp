@@ -9893,8 +9893,6 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
-  bool origVirtMode = virtMode_;
-
   if (cancelLrOnRet_)
     cancelLr(); // Clear LR reservation (if any).
 
@@ -9919,8 +9917,6 @@ Hart<URV>::execSret(const DecodedInst* di)
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
-  if (not virtMode_)
-    virtMode_ = hstatus_.bits_.SPV;
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, fields.value_))
@@ -9931,7 +9927,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   updateCachedSstatus();
 
   // Clear hstatus.spv if sret executed in M/S modes.
-  if (not origVirtMode)
+  bool savedVirtMode = hstatus_.bits_.SPV;
+  if (not virtMode_)
     hstatus_.bits_.SPV = 0;
 
   // Restore program counter from SEPC.
@@ -9942,6 +9939,10 @@ Hart<URV>::execSret(const DecodedInst* di)
       return;
     }
   setPc(epc);
+
+  // Update virtual mode.
+  if (not virtMode_)
+    setVirtualMode(savedVirtMode);
 
   // Update privilege mode.
   privMode_ = savedMode;
