@@ -4164,6 +4164,7 @@ namespace WdRiscv
       ebreakInstDebug_ = false;
       ldStSize_ = 0;
       lastPriv_ = privMode_;
+      lastVirt_ = virtMode_;
       ldStWrite_ = false;
       ldStAtomic_ = false;
       lastPageMode_ = virtMem_.mode();
@@ -4322,6 +4323,7 @@ namespace WdRiscv
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
+    bool lastVirt_ = false;         // Before current inst.
 
     // These are used to get fast access to the FS and VS bits.
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
