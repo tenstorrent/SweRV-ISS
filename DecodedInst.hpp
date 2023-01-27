@@ -240,6 +240,10 @@ namespace WdRiscv
       return (inst() & 0x7f) == 0x27 and (f3 == 0 or f3 >= 5);
     }
 
+    /// Return true if this a CSR instruction.
+    bool isCsr() const
+    { return entry_ and entry_->isCsr(); }
+
     /// Return true if this a multiply instruction.
     bool isMultiply() const
     { return entry_ and entry_->isMultiply(); }
