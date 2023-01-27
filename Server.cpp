@@ -1280,6 +1280,17 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 	    }
 	  break;
 
+	case CheckInterrupt:
+	  {
+	    URV mipVal = msg.value;
+	    InterruptCause cause = InterruptCause{0};
+	    hart.isInterruptPossible(mipVal, cause);
+	    if (commandLog)
+	      fprintf(commandLog, "hart=%d check_interrupt 0x%jx\n", hartId,
+		      uintmax_t(msg.value));
+	  }
+	  break;
+
         default:
           std::cerr << "Unknown command\n";
           reply.type = Invalid;

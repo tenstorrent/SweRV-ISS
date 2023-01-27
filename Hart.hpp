@@ -1537,6 +1537,19 @@ namespace WdRiscv
     void setCounterToTimeShift(unsigned shift)
     { counterToTimeShift_ = shift; }
 
+    /// Return true if external interrupts are enabled and one or more
+    /// external interrupt that is pending is also enabled. Set cause
+    /// to the type of interrupt if one is possible; otherwise, leave
+    /// it unmodified. If more than one interrupt is possible, set
+    /// cause to the possible interrupt with the highest priority.
+    bool isInterruptPossible(InterruptCause& cause) const;
+
+    /// Return true if this hart would take an interrupt if the MIP
+    /// CSR were to have the given value. Do not change MIP, do not
+    /// change processor state. If interrupt is possible, set cause
+    /// to the interrupt cause; otherwise, leave cause unmodified.
+    bool isInterruptPossible(URV mipValue, InterruptCause& cause) const;
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -2146,11 +2159,6 @@ namespace WdRiscv
     /// Place holder for not-yet implemented instructions. Calls
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
-
-    /// Return true if an external interrupts are enabled and an external
-    /// interrupt is pending and is enabled. Set cause to the type of
-    /// interrupt.
-    bool isInterruptPossible(InterruptCause& cause);
 
     /// Return true if given address is an idempotent region of
     /// memory.

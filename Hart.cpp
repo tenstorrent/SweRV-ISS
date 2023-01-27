@@ -4373,12 +4373,11 @@ Hart<URV>::run(FILE* file)
 
 template <typename URV>
 bool
-Hart<URV>::isInterruptPossible(InterruptCause& cause)
+Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 {
   if (debugMode_)
     return false;
 
-  URV mip = csRegs_.peekMip();
   URV mie = csRegs_.peekMie();
   if ((mie & mip & ~deferredInterrupts_) == 0)
     return false;  // Nothing enabled that is also pending.
@@ -4409,6 +4408,15 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
     }
 
   return false;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::isInterruptPossible(InterruptCause& cause) const
+{
+  URV mip = csRegs_.peekMip();
+  return isInterruptPossible(mip, cause);
 }
 
 
