@@ -58,6 +58,8 @@ namespace WdRiscv
       MCAUSE = 0x342,
       MTVAL = 0x343,
       MIP = 0x344,
+      MTINST = 0x34A,
+      MTVAL2 = 0x34B,
 
       // Machine protection and translation.
       PMPCFG0 = 0x3a0,
@@ -269,7 +271,7 @@ namespace WdRiscv
       HGEIE = 0x607,
       HTVAL = 0x643,
       HIP = 0x644,
-      HVIP = 0x645,  
+      HVIP = 0x645,
       HTINST = 0x64A,
       HGEIP = 0xE12,
       HENVCFG = 0x60A,

@@ -713,8 +713,6 @@ template <typename URV>
 void
 Hart<URV>::updateCachedVsstatus()
 {
-  assert(virtMode_);
-
   URV csrVal = 0;
   peekCsr(CsrNumber::VSSTATUS, csrVal);
   vsstatus_.value_ = csrVal;
@@ -724,6 +722,16 @@ Hart<URV>::updateCachedVsstatus()
       virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
       virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
     }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::updateCachedHstatus()
+{
+  URV csrVal = 0;
+  peekCsr(CsrNumber::HSTATUS, csrVal);
+  hstatus_.value_ = csrVal;
 }
 
 
@@ -2685,6 +2693,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
     updateCachedSstatus();
   else if (csr == CsrNumber::VSSTATUS)
     updateCachedVsstatus();
+  else if (csr == CsrNumber::HSTATUS)
+    updateCachedHstatus();
 
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
@@ -9901,8 +9911,6 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
-  bool origVirtMode = virtMode_;
-
   if (cancelLrOnRet_)
     cancelLr(); // Clear LR reservation (if any).
 
@@ -9927,8 +9935,6 @@ Hart<URV>::execSret(const DecodedInst* di)
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
-  if (not virtMode_)
-    virtMode_ = hstatus_.bits_.SPV;
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, fields.value_))
@@ -9939,7 +9945,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   updateCachedSstatus();
 
   // Clear hstatus.spv if sret executed in M/S modes.
-  if (not origVirtMode)
+  bool savedVirtMode = hstatus_.bits_.SPV;
+  if (not virtMode_)
     hstatus_.bits_.SPV = 0;
 
   // Restore program counter from SEPC.
@@ -9950,6 +9957,10 @@ Hart<URV>::execSret(const DecodedInst* di)
       return;
     }
   setPc(epc);
+
+  // Update virtual mode.
+  if (not virtMode_)
+    setVirtualMode(savedVirtMode);
 
   // Update privilege mode.
   privMode_ = savedMode;

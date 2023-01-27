@@ -1778,6 +1778,11 @@ namespace WdRiscv
 	updateCachedMstatus();
     }
 
+    // We avoid the cost of locating HSTATUS in the CSRs register file
+    // by caching its value in this class. We do this whenever HSTATUS
+    // is written/poked.
+    void updateCachedHstatus();
+
     /// Write the cached value of mstatus (or mstatus/mstatush) into the CSR.
     void writeMstatus();
 
@@ -4172,6 +4177,7 @@ namespace WdRiscv
       ebreakInstDebug_ = false;
       ldStSize_ = 0;
       lastPriv_ = privMode_;
+      lastVirt_ = virtMode_;
       ldStWrite_ = false;
       ldStAtomic_ = false;
       lastPageMode_ = virtMem_.mode();
@@ -4330,6 +4336,7 @@ namespace WdRiscv
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
+    bool lastVirt_ = false;         // Before current inst.
 
     // These are used to get fast access to the FS and VS bits.
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.

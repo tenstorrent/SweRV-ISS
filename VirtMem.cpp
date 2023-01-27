@@ -121,8 +121,6 @@ ExceptionCause
 VirtMem::transAddrNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 			   bool read, bool write, bool exec, uint64_t& pa)
 {
-  assert(not twoStage);
-
   auto prevTrace = trace_; trace_ = false;
   auto prevFile  = attFile_; attFile_ = nullptr;
   accessDirtyCheck_ = false;
@@ -141,8 +139,6 @@ ExceptionCause
 VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 		       bool read, bool write, bool exec, uint64_t& pa)
 {
-  assert(not twoStage);
-
   // Exactly one of read/write/exec must be true.
   unsigned count = 0;
   if (read) count++;
