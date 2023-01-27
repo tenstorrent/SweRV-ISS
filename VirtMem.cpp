@@ -271,8 +271,6 @@ ExceptionCause
 VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool read,
 			bool write, bool exec, uint64_t& pa, TlbEntry& entry)
 {
-  assert(not twoStage);
-
   // Perform a page table walk.
   ExceptionCause cause = ExceptionCause::LOAD_PAGE_FAULT;
 
@@ -380,11 +378,10 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
   if (entry)
     {
       // Use TLB entry.
-      if (priv == PrivilegeMode::User and not entry->user_)
+      if (entry->global_)
         return vPageFaultType(read, write, exec);
-      if (priv == PrivilegeMode::Supervisor)
-	if (entry->user_ and (exec or not supervisorOk_))
-	  return vPageFaultType(read, write, exec);
+      if (not entry->user_)
+	return vPageFaultType(read, write, exec);
       bool ra = entry->read_ or (execReadable_ and entry->exec_);
       if (xForR_)
 	ra = entry->exec_;
