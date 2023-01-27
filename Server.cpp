@@ -1282,9 +1282,9 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
 	case CheckInterrupt:
 	  {
-	    URV mipVal = msg.value;
+	    URV mipVal = msg.address;
 	    InterruptCause cause = InterruptCause{0};
-	    hart.isInterruptPossible(mipVal, cause);
+	    reply.flags = hart.isInterruptPossible(mipVal, cause);
 	    if (commandLog)
 	      fprintf(commandLog, "hart=%d check_interrupt 0x%jx\n", hartId,
 		      uintmax_t(msg.value));
