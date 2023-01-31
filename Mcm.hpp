@@ -214,8 +214,8 @@ namespace WdRiscv
 
     bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const
     {
-      if (a.complete_ and not b.complete_)
-	return true;
+      // if (a.complete_ and not b.complete_)
+      // return true;
       if (not a.complete_ and b.complete_)
 	return false;
       if (not a.complete_ and not b.complete_)
