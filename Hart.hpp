@@ -1335,6 +1335,10 @@ namespace WdRiscv
       memory_.pmaMgr_.enableMisalignedData(flag);
     }
 
+    /// Make misaligned exceptions have priority over page/access fault.
+    void misalignedExceptionHasPriority(bool flag)
+    { misalHasPriority_ = flag; }
+
     /// Return current privilege mode.
     PrivilegeMode privilegeMode() const
     { return privMode_; }
