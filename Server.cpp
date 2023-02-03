@@ -1275,7 +1275,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 	      else if (flags & 2) rwx = "w";
 	      else if (flags & 4) rwx = "x";
 	      const char* su = (flags & 8) ? "s" : "u";
-	      fprintf(commandLog, "hart=%d transate 0x%jx %s %s\n", hartId,
+	      fprintf(commandLog, "hart=%d translate 0x%jx %s %s\n", hartId,
 		      uintmax_t(msg.address), rwx, su);
 	    }
 	  break;

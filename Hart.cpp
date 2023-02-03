@@ -1387,9 +1387,12 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
+  typedef PrivilegeMode PM; typedef ExceptionCause EC;
+
+  // If misaligned exception has priority take exception.
   if (misal)
     {
-      if (not misalDataOk_)
+      if (misalHasPriority_ and not misalDataOk_)
 	return ExceptionCause::LOAD_ADDR_MISAL;
       va2 = (va1 + ldSize) & ~alignMask;
     }
@@ -1397,7 +1400,6 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      typedef PrivilegeMode PM;
       PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
       bool virt = virtMode_;
       if (hyper)
@@ -1409,9 +1411,16 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (priv != PM::Machine)
         {
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virt, addr1, addr2);
-          if (cause != ExceptionCause::NONE)
+          if (cause != EC::NONE)
 	    return cause;
         }
+    }
+
+  if (misal)
+    {
+      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
@@ -1421,7 +1430,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::LOAD_ACC_FAULT;
+	  return EC::LOAD_ACC_FAULT;
 	}
       if (misal or addr1 != addr2)
 	{
@@ -1431,7 +1440,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 	  if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
-	      return ExceptionCause::LOAD_ACC_FAULT;
+	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
     }
@@ -1441,7 +1450,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (not memory_.checkRead(addr1, ldSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 	}
     }
   else
@@ -1450,17 +1459,17 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (not memory_.checkRead(aligned, ldSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 	}
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       if (not memory_.checkRead(next, ldSize))
 	{
 	  addr1 = va2;
-	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 	}
     }
 
-  return ExceptionCause::NONE;
+  return EC::NONE;
 }
 
 
@@ -10376,9 +10385,12 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
+  typedef PrivilegeMode PM; typedef ExceptionCause EC;
+
+  // If misaligned exception has priority take exception.
   if (misal)
     {
-      if (not misalDataOk_)
+      if (misalHasPriority_ and not misalDataOk_)
 	return ExceptionCause::STORE_ADDR_MISAL;
       va2 = (va1 + stSize) & ~alignMask;
     }
@@ -10386,7 +10398,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      typedef PrivilegeMode PM;
       PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
       bool virt = virtMode_;
       if (hyper)
@@ -10398,9 +10409,16 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (priv != PM::Machine)
         {
 	  auto cause = virtMem_.translateForStore2(va1, stSize, priv, virt, addr1, addr2);
-          if (cause != ExceptionCause::NONE)
+          if (cause != EC::NONE)
 	    return cause;
         }
+    }
+
+  if (misal)
+    {
+      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
@@ -10410,7 +10428,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
       if (misal or addr1 != addr2)
 	{
@@ -10420,7 +10438,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
-	      return ExceptionCause::LOAD_ACC_FAULT;
+	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
     }
@@ -10430,7 +10448,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not memory_.checkWrite(addr1, stSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
     }
   else
@@ -10439,17 +10457,17 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not memory_.checkWrite(aligned, stSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
       if (not memory_.checkWrite(next, stSize))
 	{
 	  addr1 = va2;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
     }
 
-  return ExceptionCause::NONE;
+  return EC::NONE;
 }
 
 

@@ -54,6 +54,7 @@ Pma::stringToAttrib(const std::string& str, Pma::Attrib& attrib)
 PmaManager::PmaManager(uint64_t memSize)
   : memSize_(memSize)
 {
+  noAccessPma_.enable(Pma::Attrib::MisalOk);
 }
 
 

@@ -201,6 +201,21 @@ namespace WdRiscv
     bool isAddrMemMapped(size_t addr) const
     { Pma pma = getPma(addr); return pma.isMemMappedReg(); }
 
+    /// Enable misaligned data access in default PMA.
+    void enableMisalignedData(bool flag)
+    {
+      if (flag)
+	{
+	  defaultPma_.enable(Pma::Attrib::MisalOk);
+	  noAccessPma_.enable(Pma::Attrib::MisalOk);
+	}
+      else
+	{
+	  defaultPma_.disable(Pma::Attrib::MisalOk);
+	  noAccessPma_.disable(Pma::Attrib::MisalOk);
+	}
+    }
+
   protected:
 
     /// Reset (to zero) all memory mapped registers.

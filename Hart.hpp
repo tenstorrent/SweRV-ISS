@@ -1330,7 +1330,10 @@ namespace WdRiscv
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
     void enableMisalignedData(bool flag)
-    { misalDataOk_ = flag; }
+    {
+      misalDataOk_ = flag;
+      memory_.pmaMgr_.enableMisalignedData(flag);
+    }
 
     /// Return current privilege mode.
     PrivilegeMode privilegeMode() const
@@ -4389,6 +4392,7 @@ namespace WdRiscv
     uint64_t alarmLimit_ = ~uint64_t(0); // Timer interrupt when inst counter reaches this.
 
     bool misalDataOk_ = true;
+    bool misalHasPriority_ = true;
 
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.
