@@ -1605,7 +1605,9 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 
 
 void (*tracerExtension)(void*) = nullptr;
-std::string tracerExtensionArgs = "";
+extern "C" {
+  std::string tracerExtensionArgs = "";
+}
 
 template <typename URV>
 static
