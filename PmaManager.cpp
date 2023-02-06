@@ -35,7 +35,9 @@ Pma::stringToAttrib(const std::string& str, Pma::Attrib& attrib)
     { "mem_mapped", Pma::MemMapped },
     { "rsrv", Pma::Rsrv },
     { "io", Pma::Io },
-    { "cacheable", Pma::Cacheable }
+    { "cacheable", Pma::Cacheable },
+    { "misal_ok", Pma::MisalOk },
+    { "misal_acc_fault", Pma::MisalAccFault }
   };
 
   auto iter = stringToAttrib.find(str);
@@ -52,6 +54,7 @@ Pma::stringToAttrib(const std::string& str, Pma::Attrib& attrib)
 PmaManager::PmaManager(uint64_t memSize)
   : memSize_(memSize)
 {
+  noAccessPma_.enable(Pma::Attrib::MisalOk);
 }
 
 

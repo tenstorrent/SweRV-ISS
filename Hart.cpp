@@ -713,8 +713,6 @@ template <typename URV>
 void
 Hart<URV>::updateCachedVsstatus()
 {
-  assert(virtMode_);
-
   URV csrVal = 0;
   peekCsr(CsrNumber::VSSTATUS, csrVal);
   vsstatus_.value_ = csrVal;
@@ -724,6 +722,16 @@ Hart<URV>::updateCachedVsstatus()
       virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
       virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
     }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::updateCachedHstatus()
+{
+  URV csrVal = 0;
+  peekCsr(CsrNumber::HSTATUS, csrVal);
+  hstatus_.value_ = csrVal;
 }
 
 
@@ -1379,9 +1387,12 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
+  typedef PrivilegeMode PM; typedef ExceptionCause EC;
+
+  // If misaligned exception has priority take exception.
   if (misal)
     {
-      if (not misalDataOk_)
+      if (misalHasPriority_ and not misalDataOk_)
 	return ExceptionCause::LOAD_ADDR_MISAL;
       va2 = (va1 + ldSize) & ~alignMask;
     }
@@ -1389,7 +1400,6 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      typedef PrivilegeMode PM;
       PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
       bool virt = virtMode_;
       if (hyper)
@@ -1401,9 +1411,16 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (priv != PM::Machine)
         {
 	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virt, addr1, addr2);
-          if (cause != ExceptionCause::NONE)
+          if (cause != EC::NONE)
 	    return cause;
         }
+    }
+
+  if (misal)
+    {
+      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
@@ -1413,7 +1430,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::LOAD_ACC_FAULT;
+	  return EC::LOAD_ACC_FAULT;
 	}
       if (misal or addr1 != addr2)
 	{
@@ -1423,7 +1440,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 	  if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
-	      return ExceptionCause::LOAD_ACC_FAULT;
+	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
     }
@@ -1433,7 +1450,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (not memory_.checkRead(addr1, ldSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 	}
     }
   else
@@ -1442,17 +1459,17 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
       if (not memory_.checkRead(aligned, ldSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 	}
       uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
       if (not memory_.checkRead(next, ldSize))
 	{
 	  addr1 = va2;
-	  return ExceptionCause::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
+	  return EC::LOAD_ACC_FAULT;  // Invalid physical memory attribute.
 	}
     }
 
-  return ExceptionCause::NONE;
+  return EC::NONE;
 }
 
 
@@ -2685,6 +2702,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
     updateCachedSstatus();
   else if (csr == CsrNumber::VSSTATUS)
     updateCachedVsstatus();
+  else if (csr == CsrNumber::HSTATUS)
+    updateCachedHstatus();
 
   // Update cached value of VTYPE
   if (csr == CsrNumber::VTYPE)
@@ -4373,12 +4392,11 @@ Hart<URV>::run(FILE* file)
 
 template <typename URV>
 bool
-Hart<URV>::isInterruptPossible(InterruptCause& cause)
+Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 {
   if (debugMode_)
     return false;
 
-  URV mip = csRegs_.peekMip();
   URV mie = csRegs_.peekMie();
   if ((mie & mip & ~deferredInterrupts_) == 0)
     return false;  // Nothing enabled that is also pending.
@@ -4409,6 +4427,15 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause)
     }
 
   return false;
+}
+
+
+template <typename URV>
+bool
+Hart<URV>::isInterruptPossible(InterruptCause& cause) const
+{
+  URV mip = csRegs_.peekMip();
+  return isInterruptPossible(mip, cause);
 }
 
 
@@ -9893,8 +9920,6 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
-  bool origVirtMode = virtMode_;
-
   if (cancelLrOnRet_)
     cancelLr(); // Clear LR reservation (if any).
 
@@ -9919,8 +9944,6 @@ Hart<URV>::execSret(const DecodedInst* di)
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;
-  if (not virtMode_)
-    virtMode_ = hstatus_.bits_.SPV;
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, fields.value_))
@@ -9931,7 +9954,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   updateCachedSstatus();
 
   // Clear hstatus.spv if sret executed in M/S modes.
-  if (not origVirtMode)
+  bool savedVirtMode = hstatus_.bits_.SPV;
+  if (not virtMode_)
     hstatus_.bits_.SPV = 0;
 
   // Restore program counter from SEPC.
@@ -9942,6 +9966,10 @@ Hart<URV>::execSret(const DecodedInst* di)
       return;
     }
   setPc(epc);
+
+  // Update virtual mode.
+  if (not virtMode_)
+    setVirtualMode(savedVirtMode);
 
   // Update privilege mode.
   privMode_ = savedMode;
@@ -10357,9 +10385,12 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
+  typedef PrivilegeMode PM; typedef ExceptionCause EC;
+
+  // If misaligned exception has priority take exception.
   if (misal)
     {
-      if (not misalDataOk_)
+      if (misalHasPriority_ and not misalDataOk_)
 	return ExceptionCause::STORE_ADDR_MISAL;
       va2 = (va1 + stSize) & ~alignMask;
     }
@@ -10367,7 +10398,6 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      typedef PrivilegeMode PM;
       PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
       bool virt = virtMode_;
       if (hyper)
@@ -10379,9 +10409,16 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (priv != PM::Machine)
         {
 	  auto cause = virtMem_.translateForStore2(va1, stSize, priv, virt, addr1, addr2);
-          if (cause != ExceptionCause::NONE)
+          if (cause != EC::NONE)
 	    return cause;
         }
+    }
+
+  if (misal)
+    {
+      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      if (not pma.isMisalignedOk())
+	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
@@ -10391,7 +10428,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
       if (misal or addr1 != addr2)
 	{
@@ -10401,7 +10438,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
-	      return ExceptionCause::LOAD_ACC_FAULT;
+	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
     }
@@ -10411,7 +10448,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not memory_.checkWrite(addr1, stSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
     }
   else
@@ -10420,17 +10457,17 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not memory_.checkWrite(aligned, stSize))
 	{
 	  addr1 = va1;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
       uint64_t next = addr1 == addr2? aligned + stSize : addr2;
       if (not memory_.checkWrite(next, stSize))
 	{
 	  addr1 = va2;
-	  return ExceptionCause::STORE_ACC_FAULT;
+	  return EC::STORE_ACC_FAULT;
 	}
     }
 
-  return ExceptionCause::NONE;
+  return EC::NONE;
 }
 
 

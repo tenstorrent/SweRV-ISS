@@ -124,6 +124,9 @@ namespace WdRiscv
     bool translateCommand(Hart<URV>& hart, const std::string& line,
 			  const std::vector<std::string>& tokens);
 
+    bool checkInterruptCommand(Hart<URV>& hart, const std::string& line,
+			       const std::vector<std::string>& tokens);
+
     static void peekAllFpRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllIntRegs(Hart<URV>& hart, std::ostream& out);
     static void peekAllVecRegs(Hart<URV>& hart, std::ostream& out);

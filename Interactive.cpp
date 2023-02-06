@@ -1674,6 +1674,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "check_interrupt")
+    {
+      if (not checkInterruptCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "h" or command == "?" or command == "help")
     {
       helpCommand(tokens);
@@ -1987,6 +1996,34 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
 
   std::cerr << "Translation failed -- exception code: " << unsigned(ec) << '\n';
   return false;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::checkInterruptCommand(Hart<URV>& hart, const std::string& line,
+					const std::vector<std::string>& tokens)
+{
+  // check_interrupt [<mip-value>]
+  URV mip = 0;
+  if (tokens.size() == 1)
+    hart.peekCsr(CsrNumber::MIP, mip);
+  else if (tokens.size() == 2)
+    {
+      if (not parseCmdLineNumber("MIP", tokens.at(1), mip))
+	return false;
+    }
+  else
+    {
+      std::cerr << "Invalid check_interupt command: " << line << '\n';
+      std::cerr << "Expecting: check_interrupt [<mip-value>]\n";
+    }
+
+  InterruptCause cause;
+  if (hart.isInterruptPossible(mip, cause))
+    std::cout << unsigned(cause) << '\n';
+
+  return true;
 }
 
 

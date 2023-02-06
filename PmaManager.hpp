@@ -31,12 +31,13 @@ namespace WdRiscv
 
     enum Attrib
       {
-       None = 0, Read = 1, Write = 2, Exec = 4,
-       Idempotent = 8, Amo = 16, Iccm = 32,
-       Dccm = 64, MemMapped = 128, Rsrv = 256,
-       Io = 512, Cacheable = 1024,
+       None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8, Amo = 16,
+       Iccm = 32, Dccm = 64, MemMapped = 128, Rsrv = 256, Io = 512,
+       Cacheable = 1024,
+       MisalOk = 2048, // True if misaligned access supported.
+       MisalAccFault = 4096, // Set if misaligned generates access fault.
        Mapped = Exec | Read | Write,
-       Default = Read | Write | Exec | Idempotent | Amo | Rsrv
+       Default = Read | Write | Exec | Idempotent | Amo | Rsrv | MisalOk
       };
 
     /// Default constructor: No access allowed. No-dccm, no-iccm,
@@ -90,6 +91,22 @@ namespace WdRiscv
     /// Return true if lr/sc instructions are allowed.
     bool isRsrv() const
     { return attrib_ & Rsrv; }
+
+    /// Return true if misaligned data access is supported in this region.
+    bool isMisalignedOk() const
+    { return attrib_& MisalOk; }
+
+    /// Return true if misaligned access generates a misaligned
+    /// exception in this region. Returns false if misaligned access
+    /// is supported.
+    bool misalOnMisal() const
+    { return isMisalignedOk() and not (attrib_ & MisalAccFault); }
+    
+    /// Return true if misaligned access generates an access fault
+    /// exception in this region. Returns false if misaligned access
+    /// is supported.
+    bool accessFaultOnMisal() const
+    { return isMisalignedOk() and (attrib_ & MisalAccFault); }
 
     /// Return true if this object has the same attributes as the
     /// given object.
@@ -148,7 +165,7 @@ namespace WdRiscv
 
       if (addr >= memSize_)
 	return noAccessPma_;
-      return defaultPma_;  // rwx amo rsrv idempotent
+      return defaultPma_;  // rwx amo rsrv idempotent misalok
     }
 
     /// Define a physical memory attribute region. Regions must be defined
@@ -183,6 +200,21 @@ namespace WdRiscv
     /// Return true if given address is in memory-mapped register region.
     bool isAddrMemMapped(size_t addr) const
     { Pma pma = getPma(addr); return pma.isMemMappedReg(); }
+
+    /// Enable misaligned data access in default PMA.
+    void enableMisalignedData(bool flag)
+    {
+      if (flag)
+	{
+	  defaultPma_.enable(Pma::Attrib::MisalOk);
+	  noAccessPma_.enable(Pma::Attrib::MisalOk);
+	}
+      else
+	{
+	  defaultPma_.disable(Pma::Attrib::MisalOk);
+	  noAccessPma_.disable(Pma::Attrib::MisalOk);
+	}
+    }
 
   protected:
 

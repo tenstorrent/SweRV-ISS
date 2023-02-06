@@ -1330,7 +1330,14 @@ namespace WdRiscv
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
     void enableMisalignedData(bool flag)
-    { misalDataOk_ = flag; }
+    {
+      misalDataOk_ = flag;
+      memory_.pmaMgr_.enableMisalignedData(flag);
+    }
+
+    /// Make misaligned exceptions have priority over page/access fault.
+    void misalignedExceptionHasPriority(bool flag)
+    { misalHasPriority_ = flag; }
 
     /// Return current privilege mode.
     PrivilegeMode privilegeMode() const
@@ -1536,6 +1543,19 @@ namespace WdRiscv
     // to generate a time value. This is relevant to the clint. 
     void setCounterToTimeShift(unsigned shift)
     { counterToTimeShift_ = shift; }
+
+    /// Return true if external interrupts are enabled and one or more
+    /// external interrupt that is pending is also enabled. Set cause
+    /// to the type of interrupt if one is possible; otherwise, leave
+    /// it unmodified. If more than one interrupt is possible, set
+    /// cause to the possible interrupt with the highest priority.
+    bool isInterruptPossible(InterruptCause& cause) const;
+
+    /// Return true if this hart would take an interrupt if the MIP
+    /// CSR were to have the given value. Do not change MIP, do not
+    /// change processor state. If interrupt is possible, set cause
+    /// to the interrupt cause; otherwise, leave cause unmodified.
+    bool isInterruptPossible(URV mipValue, InterruptCause& cause) const;
 
   protected:
 
@@ -1764,6 +1784,11 @@ namespace WdRiscv
       else
 	updateCachedMstatus();
     }
+
+    // We avoid the cost of locating HSTATUS in the CSRs register file
+    // by caching its value in this class. We do this whenever HSTATUS
+    // is written/poked.
+    void updateCachedHstatus();
 
     /// Write the cached value of mstatus (or mstatus/mstatush) into the CSR.
     void writeMstatus();
@@ -2146,11 +2171,6 @@ namespace WdRiscv
     /// Place holder for not-yet implemented instructions. Calls
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
-
-    /// Return true if an external interrupts are enabled and an external
-    /// interrupt is pending and is enabled. Set cause to the type of
-    /// interrupt.
-    bool isInterruptPossible(InterruptCause& cause);
 
     /// Return true if given address is an idempotent region of
     /// memory.
@@ -4164,6 +4184,7 @@ namespace WdRiscv
       ebreakInstDebug_ = false;
       ldStSize_ = 0;
       lastPriv_ = privMode_;
+      lastVirt_ = virtMode_;
       ldStWrite_ = false;
       ldStAtomic_ = false;
       lastPageMode_ = virtMem_.mode();
@@ -4322,6 +4343,7 @@ namespace WdRiscv
     PrivilegeMode lastPriv_ = PrivilegeMode::Machine;   // Before current inst.
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
+    bool lastVirt_ = false;         // Before current inst.
 
     // These are used to get fast access to the FS and VS bits.
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
@@ -4374,6 +4396,7 @@ namespace WdRiscv
     uint64_t alarmLimit_ = ~uint64_t(0); // Timer interrupt when inst counter reaches this.
 
     bool misalDataOk_ = true;
+    bool misalHasPriority_ = true;
 
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.

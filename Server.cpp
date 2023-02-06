@@ -1275,9 +1275,20 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 	      else if (flags & 2) rwx = "w";
 	      else if (flags & 4) rwx = "x";
 	      const char* su = (flags & 8) ? "s" : "u";
-	      fprintf(commandLog, "hart=%d transate 0x%jx %s %s\n", hartId,
+	      fprintf(commandLog, "hart=%d translate 0x%jx %s %s\n", hartId,
 		      uintmax_t(msg.address), rwx, su);
 	    }
+	  break;
+
+	case CheckInterrupt:
+	  {
+	    URV mipVal = msg.address;
+	    InterruptCause cause = InterruptCause{0};
+	    reply.flags = hart.isInterruptPossible(mipVal, cause);
+	    if (commandLog)
+	      fprintf(commandLog, "hart=%d check_interrupt 0x%jx\n", hartId,
+		      uintmax_t(msg.value));
+	  }
 	  break;
 
         default:

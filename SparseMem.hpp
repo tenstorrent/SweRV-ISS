@@ -18,6 +18,7 @@
 #include <cstring>
 #include <vector>
 #include <unordered_map>
+#include <mutex>
 
 
 namespace WdRiscv
@@ -98,6 +99,7 @@ namespace WdRiscv
     /// it has never been accessed before.
     uint8_t* findOrCreatePage(uint64_t pageRank)
     {
+      std::lock_guard<std::mutex> lock(mutex_);
       auto iter = pageMap_.find(pageRank);
       if (iter != pageMap_.end())
         return iter->second;
@@ -114,5 +116,6 @@ namespace WdRiscv
     unsigned pageMask_ = 0xfff;
 
     std::unordered_map<uint64_t, uint8_t*> pageMap_;  // Map address to page
+    std::mutex mutex_;
   };
 }

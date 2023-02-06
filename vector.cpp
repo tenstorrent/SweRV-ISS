@@ -13846,8 +13846,11 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), errors = 0;
-  uint64_t addr = intRegs_.read(rs1);
 
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return false;
+
+  uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
 
@@ -14358,6 +14361,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return false;
+
   uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
 
@@ -14508,6 +14515,10 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+
+  if (not checkVecOpsVsEmul(di, vd, groupX8))
+    return false;
+
   uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
 
