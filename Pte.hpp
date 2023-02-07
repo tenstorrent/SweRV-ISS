@@ -461,7 +461,7 @@ namespace WdRiscv
 
     /// Physical page number in this PTE (see Sv57 PTE in the
     /// privileged spec.)
-    uint64_t ppn() const    { return ppn0() | (ppn1() << 9) | (ppn2() << 18) | (ppn3() << 27); }
+    uint64_t ppn() const    { return ppn0() | (ppn1() << 9) | (ppn2() << 18) | (ppn3() << 27) | (ppn4() << 36); }
 
     /// Physical page number field 0 in this PTE (see Sv57 PTE in the
     /// privileged spec.)
