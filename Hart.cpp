@@ -9900,7 +9900,10 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   if (privMode_ < PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 

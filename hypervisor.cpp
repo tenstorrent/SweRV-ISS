@@ -29,10 +29,19 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
 {
   typedef PrivilegeMode PM;
 
-  // Valid only in M/HS modes.
-  bool valid = isRvh() and (privMode_ == PM::Machine or
-			    (privMode_ == PM::Supervisor and not virtMode_));
-  if (not valid)
+  if (not isRvh())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (virtMode_)
+    {
+      virtualInst(di);
+      return;
+    }
+
+  if (privMode_ == PM::User or (privMode_ == PM::Supervisor and mstatus_.bits_.TVM == 1))
     {
       illegalInst(di);
       return;
@@ -72,11 +81,19 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
 {
   typedef PrivilegeMode PM;
 
-  // Valid only in HS mode when mstatus.tvm=0 or in M mode
-  bool valid = isRvh() and (privMode_ == PM::Machine or
-			    (privMode_ == PM::Supervisor and
-			     mstatus_.bits_.TVM == 0 and not virtMode_));
-  if (not valid)
+  if (not isRvh())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (virtMode_)
+    {
+      virtualInst(di);
+      return;
+    }
+
+  if (privMode_ == PM::User or (privMode_ == PM::Supervisor and mstatus_.bits_.TVM == 1))
     {
       illegalInst(di);
       return;
