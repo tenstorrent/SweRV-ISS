@@ -9900,7 +9900,10 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   if (privMode_ < PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 
@@ -10100,6 +10103,15 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
     cycleCount_++;
 
   updatePerformanceCountersForCsr(*di);
+
+  // Avoid updating MISA if update would turn off C and next pc is not 4-byte aligned.
+  if (csr == CsrNumber::MISA and (pc_ & 3) != 0)
+    {
+      auto misa = csRegs_.getImplementedCsr(csr);
+      URV cMask = URV(1) << ('c' - 'a');
+      if (misa and (misa->getWriteMask() & cMask) and (val & cMask) == 0)
+	return;  // Cannot turn-off C-extension if PC is not word aligned.
+    }
 
   // Update CSR.
   csRegs_.write(csr, privMode_, val);
