@@ -262,11 +262,14 @@ namespace WdRiscv
     void setVmid(uint32_t vmid)
     { vmid_ = vmid; }
 
-    /// Make executable pages also readable (supports MXR bit in MSTATUS).
+    /// Make executable pages also readable (supports MXR bit in
+    /// MSTATUS/SSTATUS).  This affects both stages of translation in
+    /// virtual mode.
     void setExecReadable(bool flag)
     { execReadable_ = flag; }
 
-    /// Make executable pages also readable (supports MXR bit in MSTATUS).
+    /// Make executable pages also readable (supports MXR bit in VSTATUS).
+    /// This only affects stage1 translation.
     void setStage1ExecReadable(bool flag)
     { s1ExecReadable_ = flag; }
 
