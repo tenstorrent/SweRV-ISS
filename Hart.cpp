@@ -10025,6 +10025,12 @@ template <typename URV>
 bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 {
+  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
+    {
+      virtualInst(di);
+      return false;
+    }
+
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
     if (mstatus_.bits_.TVM)
       {
@@ -10058,6 +10064,9 @@ template <typename URV>
 bool
 Hart<URV>::isCsrWriteable(CsrNumber csr) const
 {
+  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
+    return false;
+
   if (not csRegs_.isWriteable(csr, privMode_))
     return false;
 
