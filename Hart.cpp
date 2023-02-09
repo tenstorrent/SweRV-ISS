@@ -1772,10 +1772,7 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	{
 	  char c = data;
 	  if (c)
-	    {
-	      putchar(c);
-	      fflush(stdout);
-	    }
+	    ::write(syscall_.effectiveFd(STDOUT_FILENO), &c, 1);
 	}
       else if (cmd == 0 and fromHostValid_)
 	{
