@@ -288,8 +288,13 @@ namespace WdRiscv
 
     /// Allow supervisor-mode code to access user-mode pages (supports SUM
     /// bit in MSTATUS).
-    void setSupervisorAccessUser(bool flag)
-    { supervisorOk_ = flag; }
+    void setSum(bool flag)
+    { sum_ = flag; }
+
+    /// Allow supervisor-mode code to access user-mode pages (supports SUM
+    /// bit in MSTATUS).
+    void setVsSum(bool flag)
+    { vsSum_ = flag; }
 
     /// Enable/disable address translation logging (disable if file is
     /// null). Return previous value of file.
@@ -383,7 +388,8 @@ namespace WdRiscv
     // Cached mstatus bits
     bool execReadable_ = false;  // MXR bit
     bool s1ExecReadable_ = false;  // MXR bit of vsstatus
-    bool supervisorOk_ = false;  // SUM bit
+    bool sum_ = false;  // Supervisor privilege can access user pages.
+    bool vsSum_ = false;  // Supervisor privilege can access user pages for VS mode.
     bool faultOnFirstAccess_ = true;
     bool accessDirtyCheck_ = true;  // To be able to supress AD check
 

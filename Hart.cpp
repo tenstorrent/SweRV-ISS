@@ -694,7 +694,9 @@ namespace WdRiscv
 
     virtMem_.setExecReadable(mstatus_.bits_.MXR);
     virtMem_.setStage1ExecReadable(mstatus_.bits_.MXR);
-    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+    virtMem_.setSum(mstatus_.bits_.SUM);
+    if (virtMode_)
+      updateCachedVsstatus();
   }
 
 
@@ -707,7 +709,9 @@ namespace WdRiscv
 
     virtMem_.setExecReadable(mstatus_.bits_.MXR);
     virtMem_.setStage1ExecReadable(mstatus_.bits_.MXR);
-    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+    virtMem_.setSum(mstatus_.bits_.SUM);
+    if (virtMode_)
+      updateCachedVsstatus();
   }
 
 
@@ -746,7 +750,7 @@ Hart<URV>::updateCachedVsstatus()
   if (virtMode_)
     {
       virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
-      virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
+      virtMem_.setVsSum(vsstatus_.bits_.SUM);
     }
 }
 

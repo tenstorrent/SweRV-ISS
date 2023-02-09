@@ -161,7 +161,7 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
       if (priv == PrivilegeMode::User and not entry->user_)
         return pageFaultType(twoStage, read, write, exec);
       if (priv == PrivilegeMode::Supervisor)
-	if (entry->user_ and (exec or not supervisorOk_))
+	if (entry->user_ and (exec or not sum_))
 	  return pageFaultType(twoStage, read, write, exec);
       bool ra = entry->read_ or (execReadable_ and entry->exec_);
       bool wa = entry->write_, xa = entry->exec_;
@@ -238,7 +238,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
       if (priv == PrivilegeMode::User and not entry->user_)
         return pageFaultType(twoStage, read, write, exec);
       if (priv == PrivilegeMode::Supervisor)
-	if (entry->user_ and (exec or not supervisorOk_))
+	if (entry->user_ and (exec or not sum_))
 	  return pageFaultType(twoStage, read, write, exec);
       bool ra = entry->read_ or (execReadable_ and entry->exec_);
       bool wa = entry->write_, xa = entry->exec_;
@@ -436,7 +436,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	  if (priv == PrivilegeMode::User and not entry->user_)
 	    return vPageFaultType(read, write, exec);
 	  if (priv == PrivilegeMode::Supervisor)
-	    if (entry->user_ and (exec or not supervisorOk_))
+	    if (entry->user_ and (exec or not vsSum_))
 	      return vPageFaultType(read, write, exec);
 	  bool ra = entry->read_ or ((execReadable_ or s1ExecReadable_) and entry->exec_);
 	  if (xForR_)
@@ -594,7 +594,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       if (privMode == PrivilegeMode::User and not pte.user())
 	return nvPageFaultType(read, write, exec);
       if (privMode == PrivilegeMode::Supervisor and pte.user() and
-	  (not supervisorOk_ or exec))
+	  (not sum_ or exec))
 	return nvPageFaultType(read, write, exec);
 
       bool pteRead = pte.read() or (execReadable_ and pte.exec());
@@ -913,7 +913,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (privMode == PrivilegeMode::User and not pte.user())
 	return nvPageFaultType(read, write, exec);
       if (privMode == PrivilegeMode::Supervisor and pte.user() and
-	  (not supervisorOk_ or exec))
+	  (not vsSum_ or exec))
 	return nvPageFaultType(read, write, exec);
 
       bool pteRead = pte.read() or ((execReadable_ or s1ExecReadable_) and pte.exec());
