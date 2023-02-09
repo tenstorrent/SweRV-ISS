@@ -508,16 +508,42 @@ Hart<URV>::updateAddressTranslation()
   URV value = 0;
   if (peekCsr(CsrNumber::SATP, value))
     {
-      uint32_t prevAsid = virtMem_.asid();
+      uint32_t prevAsid = virtMode_ ? virtMem_.vsAsid() : virtMem_.asid();
 
       SatpFields<URV> satp(value);
       if constexpr (sizeof(URV) != 4)
 	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
 	  satp.bits_.MODE = 0;
 
-      virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
-      virtMem_.setAsid(satp.bits_.ASID);
-      virtMem_.setRootPage(satp.bits_.PPN);
+      if (virtMode_)
+	{
+	  virtMem_.setVsMode(VirtMem::Mode(satp.bits_.MODE));
+	  virtMem_.setVsAsid(satp.bits_.ASID);
+	  virtMem_.setVsRootPage(satp.bits_.PPN);
+	}
+      else
+	{
+	  virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
+	  virtMem_.setAsid(satp.bits_.ASID);
+	  virtMem_.setRootPage(satp.bits_.PPN);
+	}
+
+      if (satp.bits_.ASID != prevAsid)
+	invalidate = true;
+    }
+
+  if (peekCsr(CsrNumber::VSATP, value))
+    {
+      uint32_t prevAsid = virtMem_.vsAsid();
+
+      SatpFields<URV> satp(value);
+      if constexpr (sizeof(URV) != 4)
+	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
+	  satp.bits_.MODE = 0;
+
+      virtMem_.setVsMode(VirtMem::Mode(satp.bits_.MODE));
+      virtMem_.setVsAsid(satp.bits_.ASID);
+      virtMem_.setVsRootPage(satp.bits_.PPN);
 
       if (satp.bits_.ASID != prevAsid)
 	invalidate = true;
@@ -9685,26 +9711,28 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       return;
     }
 
+  auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
+
   // Invalidate whole TLB. This is overkill. 
   if (di->op1() == 0 and di->op2() == 0)
-    virtMem_.tlb_.invalidate();
+    tlb.invalidate();
   else if (di->op1() == 0 and di->op2() != 0)
     {
       URV asid = intRegs_.read(di->op2());
-      virtMem_.tlb_.invalidateAsid(asid);
+      tlb.invalidateAsid(asid);
     }
   else if (di->op1() != 0 and di->op2() == 0)
     {
       URV addr = intRegs_.read(di->op1());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      virtMem_.tlb_.invalidateVirtualPage(vpn);
+      tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op1());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op2());
-      virtMem_.tlb_.invalidateVirtualPage(vpn, asid);
+      tlb.invalidateVirtualPage(vpn, asid);
     }
 
   // std::cerr << "sfence.vma " << di->op1() << ' ' << di->op2() << '\n';

@@ -10,8 +10,8 @@ using namespace WdRiscv;
 
 VirtMem::VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
                  PmpManager& pmpMgr, unsigned tlbSize)
-  : memory_(memory), mode_(Sv32), pageSize_(pageSize), hartIx_(hartIx),
-    pmpMgr_(pmpMgr), tlb_(tlbSize), stage1Tlb_(tlbSize), stage2Tlb_(tlbSize)
+  : memory_(memory), pageSize_(pageSize), hartIx_(hartIx),
+    pmpMgr_(pmpMgr), tlb_(tlbSize), vsTlb_(tlbSize), stage2Tlb_(tlbSize)
 {
   pageBits_ = static_cast<unsigned>(std::log2(pageSize_));
   unsigned p2PageSize =  unsigned(1) << pageBits_;
@@ -366,7 +366,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
   if (exec) count++;
   assert(count == 1);
 
-  if (mode_ == Bare)
+  if (modeStage2_ == Bare)
     {
       pa = va;
       return ExceptionCause::NONE;
@@ -374,7 +374,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = stage2Tlb_.findEntryUpdateTime(virPageNum, asid_);
+  TlbEntry* entry = stage2Tlb_.findEntryUpdateTime(virPageNum, vsAsid_); // FIX: vmid_ insteadm of vsAsid?
   if (entry)
     {
       // Use TLB entry.
@@ -423,13 +423,13 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
   assert(count == 1);
 
   uint64_t gpa = 0;
-  if (mode_ == Bare)
+  if (vsMode_ == Bare)
     gpa = va;
   else
     {
       // Lookup virtual page number in TLB.
       uint64_t virPageNum = va >> pageBits_;
-      TlbEntry* entry = stage1Tlb_.findEntryUpdateTime(virPageNum, asid_);
+      TlbEntry* entry = vsTlb_.findEntryUpdateTime(virPageNum, vsAsid_);
       if (entry)
 	{
 	  // Use TLB entry.
@@ -461,7 +461,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 
 	  // If successful, put stage1 translation results in TLB.
 	  if (cause == ExceptionCause::NONE)
-	    stage1Tlb_.insertEntry(tlbEntry);
+	    vsTlb_.insertEntry(tlbEntry);
 	  else
 	    return cause;
 	}
@@ -475,10 +475,10 @@ ExceptionCause
 VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool write,
 			      bool exec, uint64_t& pa, TlbEntry& entry)
 {
-  if (mode_ == Sv32)
+  if (vsMode_ == Sv32)
     return stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
-  if (mode_ == Sv39)
+  if (vsMode_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-39 must equal bit 38
       uint64_t mask = (va >> 38) & 1;
@@ -489,7 +489,7 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
       return stage1PageTableWalk<Pte39, Va39>(va, priv, read, write, exec, pa, entry);
     }
 
-  if (mode_ == Sv48)
+  if (vsMode_ == Sv48)
     {
       // Part 1 of address translation: Bits 63-47 must equal bit 47
       uint64_t mask = (va >> 47) & 1;
@@ -500,7 +500,7 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
       return stage1PageTableWalk<Pte48, Va48>(va, priv, read, write, exec, pa, entry);
     }
 
-  if (mode_ == Sv57)
+  if (vsMode_ == Sv57)
     {
       // Part 1 of address translation: Bits 63-57 muse equal bit 56
       uint64_t mask = (va >> 56) & 1;
@@ -723,7 +723,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
           fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
 		  uintmax_t(pte.ppn()) * pageSize_);
 	  if (leaf)
-            fprintf(attFile_, " s:%s", pageSize(mode_, ii));
+            fprintf(attFile_, " s:%s", pageSize(modeStage2_, ii));
 	  fprintf(attFile_, "\n\n");
         }
 
@@ -811,7 +811,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
-  tlbEntry.asid_ = asid_;
+  tlbEntry.asid_ = vsAsid_;
   tlbEntry.vmid_ = vmid_;
   tlbEntry.valid_ = true;
   tlbEntry.global_ = pte.global();
@@ -832,7 +832,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 			     bool exec, uint64_t& pa, TlbEntry& tlbEntry)
 {
   // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
-  uint64_t root = rootPage_ * pageSize_;
+  uint64_t root = vsRootPage_ * pageSize_;
 
   PTE pte(0);
   const unsigned levels = pte.levels();
@@ -887,7 +887,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
           fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
 		  uintmax_t(pte.ppn()) * pageSize_);
 	  if (leaf)
-            fprintf(attFile_, " s:%s", pageSize(mode_, ii));
+            fprintf(attFile_, " s:%s", pageSize(vsMode_, ii));
 	  fprintf(attFile_, "\n\n");
         }
 
@@ -987,7 +987,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
-  tlbEntry.asid_ = asid_;
+  tlbEntry.asid_ = vsAsid_;
   tlbEntry.vmid_ = vmid_;
   tlbEntry.valid_ = true;
   tlbEntry.global_ = pte.global();
@@ -1013,35 +1013,9 @@ VirtMem::setPageSize(uint64_t size)
   if (size != p2Size)
     return false;
   
-  if (mode_ == Sv32)
-    {
-      if (size != 4096)
-        return false;
-      pageBits_ = bits;
-      pageSize_ = size;
-      return true;
-    }
-
-  if (mode_ == Sv39)
-    {
-      if (size != 4096 and size != 2*1024*1024 and size != 1024*1024*1024)
-        return false;
-      pageBits_ = bits;
-      pageSize_ = size;
-      return true;
-    }
-
-  if (mode_ == Sv48)
-    {
-      if (size != 4096 and size != 2*1024*1024 and size != 1024*1024*1024
-          and size != 512L*1024L*1024L*1024L)
-        return false;
-      pageBits_ = bits;
-      pageSize_ = size;
-    }
-
-  assert(0 && "Translation modes Sv57 and Sv64 are not currently supported");
-  return false;
+  pageBits_ = bits;
+  pageSize_ = size;
+  return true;
 }
 
 

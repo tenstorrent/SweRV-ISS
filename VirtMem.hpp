@@ -241,6 +241,11 @@ namespace WdRiscv
     void setRootPage(uint64_t root)
     { rootPage_ = root; }
 
+    /// Set the page table root page for Vs mdoe: The root page is
+    /// placed in guest physical memory at address root * page_size
+    void setVsRootPage(uint64_t root)
+    { vsRootPage_ = root; }
+
     /// Set the page table root page for 2nd stage address translation.
     void setStage2RootPage(uint64_t root)
     { rootPageStage2_ = root; }
@@ -248,6 +253,10 @@ namespace WdRiscv
     // Change the translation mode to m.
     void setMode(Mode m)
     { mode_ = m; }
+
+    // Change the translation mode of VS (V==1) to m.
+    void setVsMode(Mode m)
+    { vsMode_ = m; }
 
     // Change the translation mode to m for the 2nd stage of 2-stage
     // (VS) translation.
@@ -257,6 +266,10 @@ namespace WdRiscv
     /// Set the address space id (asid).
     void setAsid(uint32_t asid)
     { asid_ = asid; }
+
+    /// Set the address space id (asid) for VS mode.
+    void setVsAsid(uint32_t asid)
+    { vsAsid_ = asid; }
 
     /// Set the virtual machine id for 2-stage translation.
     void setVmid(uint32_t vmid)
@@ -293,6 +306,10 @@ namespace WdRiscv
     /// Return current address space id.
     uint32_t asid() const
     { return asid_; }
+
+    /// Return current address space id for VS mode.
+    uint32_t vsAsid() const
+    { return vsAsid_; }
 
     /// Return current virtual machine id.
     uint32_t vmid() const
@@ -343,11 +360,14 @@ namespace WdRiscv
     };
 
     Memory& memory_;
-    uint64_t rootPage_ = 0;
-    uint64_t rootPageStage2_ = 0;  // Root page for 2nd stage translation.
+    uint64_t rootPage_ = 0;        // Root page for S mode (V==0).
+    uint64_t vsRootPage_ = 0;  // Root page of VS 1st stage translation (V == 1).
+    uint64_t rootPageStage2_ = 0;  // Root page of VS 2nd stage translation (V == 1).
     Mode mode_ = Bare;
+    Mode vsMode_ = Bare;
     Mode modeStage2_ = Bare;       // For 2nd stage translation.
     uint32_t asid_ = 0;
+    uint32_t vsAsid_ = 0;
     uint32_t vmid_ = 0;
     unsigned pageSize_ = 4096;
     unsigned pageBits_ = 12;
@@ -379,7 +399,7 @@ namespace WdRiscv
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
-    Tlb stage1Tlb_;
+    Tlb vsTlb_;
     Tlb stage2Tlb_;
   };
 
