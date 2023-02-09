@@ -14739,9 +14739,22 @@ Hart<URV>::execVloxei8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Byte); break;
+    case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Byte); break;
+    case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Byte); break;
+    case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Byte); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14751,9 +14764,22 @@ Hart<URV>::execVloxei16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadIndexed<uint16_t>(di, ElementWidth::Half))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Half); break;
+    case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Half); break;
+    case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Half); break;
+    case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Half); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14763,9 +14789,22 @@ Hart<URV>::execVloxei32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadIndexed<uint32_t>(di, ElementWidth::Word))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Word); break;
+    case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Word); break;
+    case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Word); break;
+    case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Word); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14775,9 +14814,22 @@ Hart<URV>::execVloxei64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Word2); break;
+    case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Word2); break;
+    case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Word2); break;
+    case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Word2); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14785,11 +14837,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxei8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadIndexed<uint8_t>(di, ElementWidth::Byte))
-    return;
-  csRegs_.clearVstart();
+  execVloxei8_v(di);
 }
 
 
@@ -14797,11 +14845,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxei16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadIndexed<uint16_t>(di, ElementWidth::Half))
-    return;
-  csRegs_.clearVstart();
+  execVloxei16_v(di);
 }
 
 
@@ -14809,11 +14853,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxei32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadIndexed<uint32_t>(di, ElementWidth::Word))
-    return;
-  csRegs_.clearVstart();
+  execVloxei32_v(di);
 }
 
 
@@ -14821,11 +14861,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxei64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadIndexed<uint64_t>(di, ElementWidth::Word2))
-    return;
-  csRegs_.clearVstart();
+  execVloxei64_v(di);
 }
 
 
@@ -14939,9 +14975,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei8_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Byte); break;
+    case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Byte); break;
+    case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Byte); break;
+    case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Byte); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14949,9 +15000,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei16_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint16_t>(di, ElementWidth::Half))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Half); break;
+    case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Half); break;
+    case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Half); break;
+    case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Half); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14959,9 +15025,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei32_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint32_t>(di, ElementWidth::Word))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Word); break;
+    case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Word); break;
+    case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Word); break;
+    case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Word); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14969,9 +15050,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei64_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Word2); break;
+    case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Word2); break;
+    case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Word2); break;
+    case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Word2); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -14979,9 +15075,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei8_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint8_t>(di, ElementWidth::Byte))
-    return;
-  csRegs_.clearVstart();
+  execVsoxei8_v(di);
 }
 
 
@@ -14989,9 +15083,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei16_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint16_t>(di, ElementWidth::Half))
-    return;
-  csRegs_.clearVstart();
+  execVsoxei16_v(di);
 }
 
 
@@ -14999,9 +15091,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei32_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint32_t>(di, ElementWidth::Word))
-    return;
-  csRegs_.clearVstart();
+  execVsoxei32_v(di);
 }
 
 
@@ -15009,9 +15099,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxei64_v(const DecodedInst* di)
 {
-  if (not vectorStoreIndexed<uint64_t>(di, ElementWidth::Word2))
-    return;
-  csRegs_.clearVstart();
+  execVsoxei64_v(di);
 }
 
 
@@ -15639,11 +15727,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte))
-    return;
-  csRegs_.clearVstart();
+  execVloxsegei8_v(di);
 }
 
 
@@ -15651,11 +15735,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half))
-    return;
-  csRegs_.clearVstart();
+  execVloxsegei16_v(di);
 }
 
 
@@ -15663,11 +15743,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word))
-    return;
-  csRegs_.clearVstart();
+  execVloxsegei32_v(di);
 }
 
 
@@ -15675,11 +15751,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
-    return;
-  if (not vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2))
-    return;
-  csRegs_.clearVstart();
+  execVloxsegei64_v(di);
 }
 
 
@@ -15839,9 +15911,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei8_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte))
-    return;
-  csRegs_.clearVstart();
+  execVsoxsegei8_v(di);
 }
 
 
@@ -15849,9 +15919,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei16_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half))
-    return;
-  csRegs_.clearVstart();
+  execVsoxsegei16_v(di);
 }
 
 
@@ -15859,9 +15927,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei32_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word))
-    return;
-  csRegs_.clearVstart();
+  execVsoxsegei32_v(di);
 }
 
 
@@ -15869,9 +15935,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei64_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2))
-    return;
-  csRegs_.clearVstart();
+  execVsoxsegei32_v(di);
 }
 
 
@@ -15913,9 +15977,22 @@ Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadSegIndexed<uint8_t>(di, ElementWidth::Byte))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Byte); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Byte); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Byte); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Byte); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -15925,9 +16002,22 @@ Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadSegIndexed<uint16_t>(di, ElementWidth::Half))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Half); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Half); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Half); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Half); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -15937,9 +16027,22 @@ Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadSegIndexed<uint32_t>(di, ElementWidth::Word))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -15949,9 +16052,22 @@ Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
     return;
-  if (not vectorLoadSegIndexed<uint64_t>(di, ElementWidth::Word2))
-    return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word2); break;
+    case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word2); break;
+    case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word2); break;
+    case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word2); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -15991,9 +16107,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint8_t>(di, ElementWidth::Byte))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Byte); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Byte); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Byte); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Byte); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -16001,9 +16132,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint16_t>(di, ElementWidth::Half))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Half); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Half); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Half); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Half); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -16011,9 +16157,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint32_t>(di, ElementWidth::Word))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
@@ -16021,9 +16182,24 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
 {
-  if (not vectorStoreSegIndexed<uint64_t>(di, ElementWidth::Word2))
+  if (not checkMaskableInst(di))
     return;
-  csRegs_.clearVstart();
+
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool ok = true;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word2); break;
+    case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word2); break;
+    case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word2); break;
+    case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word2); break;
+    default:         illegalInst(di); return;
+    }
+
+  if (ok)
+    csRegs_.clearVstart();
 }
 
 
