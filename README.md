@@ -549,6 +549,17 @@ non-standard CSR. The poke_mask should be used for the rare cases
 where poke operation may modify some bits that are not modifiable by
 CSR write instructions.
 
+For CSRs with sahred base name and different integer suffixes
+(e.g. pmpaddr0, pmpaddr1, ...), the configurations may be defined
+for each CSR or a common configuration may be defined
+with a range attribute. Example:
+```
+     "csr" : {
+         "pmpaddr0" : { "mask" : "0xffffffff" },
+         "pmpaddr" : { "exists" : "false",  "range" : [1 , 63] }
+      }
+```
+
 ###  vector
 The vector configuration is an object with the following fields:
 * bytes_per_vec: vector size in bytes
