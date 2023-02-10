@@ -278,7 +278,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (flag and not rvf_)
     {
       flag = false;
-      if (verbose)
+      if (verbose and hartIx_ == 0)
 	std::cerr << "Bit 3 (d) is set in the MISA register but f "
 		  << "extension (bit 5) is not enabled -- ignored\n";
     }
@@ -291,7 +291,7 @@ Hart<URV>::processExtensions(bool verbose)
     intRegs_.regs_.resize(16);
 
   flag = value & (URV(1) << ('i' - 'a'));
-  if (not flag and not rve_ and verbose)
+  if (not flag and not rve_ and verbose and hartIx_ == 0)
     std::cerr << "Bit 8 (i extension) is cleared in the MISA register "
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
@@ -302,7 +302,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (flag and not (rvf_ and rvd_))
     {
       flag = false;
-      if (verbose)
+      if (verbose and hartIx_ == 0)
 	std::cerr << "Bit 21 (v) is set in the MISA register but the d/f "
 		  << "extensions are not enabled -- ignored\n";
     }
@@ -317,7 +317,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (epc)
     epc->setReadMask(epcMask);
 
-  if (verbose)
+  if (verbose and hartIx_ == 0)
     for (auto ec : { 'j', 'k', 'l', 'n', 'o', 'p',
 		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )
       {
