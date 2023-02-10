@@ -133,8 +133,6 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
     return csr;
   if (not virtualMode)
     return csr;
-  if (csr->isHypervisor())
-    return nullptr; // Virtual mode: Hypervisor CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
   num = CsrNumber(URV(num) + 0x100);
@@ -151,8 +149,6 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode) const
     return csr;
   if (not virtualMode)
     return csr;
-  if (csr->isHypervisor())
-    return nullptr; // Virtual mode: Hypervisors CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
   num = CsrNumber(URV(num) + 0x100);

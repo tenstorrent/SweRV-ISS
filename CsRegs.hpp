@@ -831,9 +831,8 @@ namespace WdRiscv
       return csr->isImplemented() ? csr : nullptr;
     }
 
-    /// Similar to getImplementedCsr except that whn virtaulMode is true:
-    // 1. Supervisor CSRs are remapped to the virtual supervisor counterparts.
-    // 2. Virtual supervisor CSRs are not available.
+    /// Similar to getImplementedCsr except that when virtaulMode is true:
+    /// Supervisor CSRs are remapped to the virtual supervisor counterparts.
     Csr<URV>* getImplementedCsr(CsrNumber num, bool virtualMode);
 
     /// Const version.
