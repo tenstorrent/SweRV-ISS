@@ -47,7 +47,7 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
       return;
     }
 
-  auto tlb = virtMem_.stage1Tlb_;
+  auto& tlb = virtMem_.vsTlb_;
 
   // Invalidate whole VS TLB. This is overkill. 
   if (di->op1() == 0 and di->op2() == 0)
@@ -99,7 +99,7 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
       return;
     }
 
-  auto tlb = virtMem_.stage2Tlb_;
+  auto& tlb = virtMem_.stage2Tlb_;
 
   // Invalidate whole VS TLB. This is overkill. 
   if (di->op1() == 0 and di->op2() == 0)

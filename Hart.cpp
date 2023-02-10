@@ -508,16 +508,42 @@ Hart<URV>::updateAddressTranslation()
   URV value = 0;
   if (peekCsr(CsrNumber::SATP, value))
     {
-      uint32_t prevAsid = virtMem_.asid();
+      uint32_t prevAsid = virtMode_ ? virtMem_.vsAsid() : virtMem_.asid();
 
       SatpFields<URV> satp(value);
       if constexpr (sizeof(URV) != 4)
 	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
 	  satp.bits_.MODE = 0;
 
-      virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
-      virtMem_.setAsid(satp.bits_.ASID);
-      virtMem_.setRootPage(satp.bits_.PPN);
+      if (virtMode_)
+	{
+	  virtMem_.setVsMode(VirtMem::Mode(satp.bits_.MODE));
+	  virtMem_.setVsAsid(satp.bits_.ASID);
+	  virtMem_.setVsRootPage(satp.bits_.PPN);
+	}
+      else
+	{
+	  virtMem_.setMode(VirtMem::Mode(satp.bits_.MODE));
+	  virtMem_.setAsid(satp.bits_.ASID);
+	  virtMem_.setRootPage(satp.bits_.PPN);
+	}
+
+      if (satp.bits_.ASID != prevAsid)
+	invalidate = true;
+    }
+
+  if (peekCsr(CsrNumber::VSATP, value))
+    {
+      uint32_t prevAsid = virtMem_.vsAsid();
+
+      SatpFields<URV> satp(value);
+      if constexpr (sizeof(URV) != 4)
+	if ((satp.bits_.MODE >= 1 and satp.bits_.MODE <= 7) or satp.bits_.MODE >= 12)
+	  satp.bits_.MODE = 0;
+
+      virtMem_.setVsMode(VirtMem::Mode(satp.bits_.MODE));
+      virtMem_.setVsAsid(satp.bits_.ASID);
+      virtMem_.setVsRootPage(satp.bits_.PPN);
 
       if (satp.bits_.ASID != prevAsid)
 	invalidate = true;
@@ -668,7 +694,9 @@ namespace WdRiscv
 
     virtMem_.setExecReadable(mstatus_.bits_.MXR);
     virtMem_.setStage1ExecReadable(mstatus_.bits_.MXR);
-    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+    virtMem_.setSum(mstatus_.bits_.SUM);
+    if (virtMode_)
+      updateCachedVsstatus();
   }
 
 
@@ -681,7 +709,9 @@ namespace WdRiscv
 
     virtMem_.setExecReadable(mstatus_.bits_.MXR);
     virtMem_.setStage1ExecReadable(mstatus_.bits_.MXR);
-    virtMem_.setSupervisorAccessUser(mstatus_.bits_.SUM);
+    virtMem_.setSum(mstatus_.bits_.SUM);
+    if (virtMode_)
+      updateCachedVsstatus();
   }
 
 
@@ -720,7 +750,7 @@ Hart<URV>::updateCachedVsstatus()
   if (virtMode_)
     {
       virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
-      virtMem_.setSupervisorAccessUser(vsstatus_.bits_.SUM);
+      virtMem_.setVsSum(vsstatus_.bits_.SUM);
     }
 }
 
@@ -1401,7 +1431,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
   if (isRvs())     // Supervisor extension
     {
       PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
-      bool virt = virtMode_;
+      bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
       if (hyper)
 	{
 	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
@@ -1746,10 +1776,7 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	{
 	  char c = data;
 	  if (c)
-	    {
-	      putchar(c);
-	      fflush(stdout);
-	    }
+	    ::write(syscall_.effectiveFd(STDOUT_FILENO), &c, 1);
 	}
       else if (cmd == 0 and fromHostValid_)
 	{
@@ -9685,26 +9712,28 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       return;
     }
 
+  auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
+
   // Invalidate whole TLB. This is overkill. 
   if (di->op1() == 0 and di->op2() == 0)
-    virtMem_.tlb_.invalidate();
+    tlb.invalidate();
   else if (di->op1() == 0 and di->op2() != 0)
     {
       URV asid = intRegs_.read(di->op2());
-      virtMem_.tlb_.invalidateAsid(asid);
+      tlb.invalidateAsid(asid);
     }
   else if (di->op1() != 0 and di->op2() == 0)
     {
       URV addr = intRegs_.read(di->op1());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      virtMem_.tlb_.invalidateVirtualPage(vpn);
+      tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op1());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op2());
-      virtMem_.tlb_.invalidateVirtualPage(vpn, asid);
+      tlb.invalidateVirtualPage(vpn, asid);
     }
 
   // std::cerr << "sfence.vma " << di->op1() << ' ' << di->op2() << '\n';
@@ -10025,6 +10054,12 @@ template <typename URV>
 bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 {
+  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
+    {
+      virtualInst(di);
+      return false;
+    }
+
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
     if (mstatus_.bits_.TVM)
       {
@@ -10058,6 +10093,9 @@ template <typename URV>
 bool
 Hart<URV>::isCsrWriteable(CsrNumber csr) const
 {
+  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
+    return false;
+
   if (not csRegs_.isWriteable(csr, privMode_))
     return false;
 
@@ -10411,7 +10449,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   if (isRvs())     // Supervisor extension
     {
       PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
-      bool virt = virtMode_;
+      bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
       if (hyper)
 	{
 	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
