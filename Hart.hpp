@@ -1715,7 +1715,7 @@ namespace WdRiscv
 
     // Return trie if it is legal to execute a double precision
     // floating point instruction: D extension must be enabled and FS
-    // feild of MSTATUS must not be OFF.
+    // field of MSTATUS must not be OFF.
     bool isDpLegal() const
     { return isRvd() and isFpEnabled(); }
 
