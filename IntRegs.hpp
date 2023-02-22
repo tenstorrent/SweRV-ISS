@@ -101,17 +101,13 @@ namespace WdRiscv
     int getLastWrittenReg() const
     { return lastWrittenReg_; }
 
-    /// Set regIx and regValue to the index and previous value (before
-    /// write) of the last written register returning true on success
-    /// and false if no integer was written by the last executed
-    /// instruction (in which case regIx and regVal are left
-    /// unmodified).
-    bool getLastWrittenReg(unsigned& regIx, URV& regValue) const
+    /// Similar to getLastWrittenReg but if successful set regValue to
+    /// the prevous value of the last written register.
+    int getLastWrittenReg(uint64_t& regValue) const
     {
-      if (lastWrittenReg_ < 0) return false;
-      regIx = lastWrittenReg_;
+      if (lastWrittenReg_ < 0) return -1;
       regValue = originalValue_;
-      return true;
+      return lastWrittenReg_;
     }
 
   private:

@@ -3083,18 +3083,18 @@ template <typename URV>
 void
 Hart<URV>::undoForTrigger()
 {
-  unsigned regIx = 0;
-  URV value = 0;
-  if (intRegs_.getLastWrittenReg(regIx, value))
+  uint64_t value = 0;
+  int regIx = intRegs_.getLastWrittenReg(value);
+  if (regIx >= 0)
     {
       pokeIntReg(regIx, value);
       intRegs_.clearLastWrittenReg();
     }
 
-  uint64_t fpVal = 0;
-  if (fpRegs_.getLastWrittenReg(regIx, fpVal))
+  regIx = fpRegs_.getLastWrittenReg(value);
+  if (regIx >= 0)
     {
-      pokeFpReg(regIx, fpVal);
+      pokeFpReg(regIx, value);
       fpRegs_.clearLastWrittenReg();
     }
 
@@ -3427,10 +3427,9 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 
   unsigned opIx = 0;  // Operand index
 
-  unsigned rd = unsigned(intRegCount() + 1);
+  int rd = unsigned(intRegCount() + 1);
   OperandType rdType = OperandType::None;
-  URV rdOrigVal = 0;   // Integer destination register value.
-
+  uint64_t rdOrigVal = 0;   // Integer destination register value.
   uint64_t frdOrigVal = 0;  // Floating point destination register value.
 
   if (info.isIthOperandWrite(0))
@@ -3439,14 +3438,14 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
       if (rdType == OperandType::IntReg)
 	{
 	  prof.destRegFreq_.at(di.op0())++; opIx++;
-	  intRegs_.getLastWrittenReg(rd, rdOrigVal);
-	  assert(rd == di.op0());
+	  rd = intRegs_.getLastWrittenReg(rdOrigVal);
+	  assert(unsigned(rd) == di.op0());
 	}
       else if (rdType == OperandType::FpReg)
 	{
 	  prof.destRegFreq_.at(di.op0())++; opIx++;
-	  fpRegs_.getLastWrittenReg(rd, frdOrigVal);
-	  assert(rd == di.op0());
+	  rd = fpRegs_.getLastWrittenReg(frdOrigVal);
+	  assert(unsigned(rd) == di.op0());
 	}
       else if (rdType == OperandType::VecReg)
 	{
@@ -3475,7 +3474,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
 
           URV val = intRegs_.read(regIx);
-          if (regIx == rd and rdType == OperandType::IntReg)
+          if (regIx == unsigned(rd) and rdType == OperandType::IntReg)
             val = rdOrigVal;
           if (info.isUnsigned())
             addToUnsignedHistogram(prof.srcHisto_.at(srcIx), val);
@@ -3489,7 +3488,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
 
           uint64_t val = fpRegs_.readBitsRaw(regIx);
-          if (regIx == rd and rdType == OperandType::FpReg)
+          if (regIx == unsigned(rd) and rdType == OperandType::FpReg)
             val = frdOrigVal;
 
 	  FpRegs::FpUnion u{val};
@@ -4849,9 +4848,9 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
   record.newPc = pc_;
   setPc(prevPc);
 
-  unsigned regIx = 0;
-  URV oldValue = 0;
-  if (intRegs_.getLastWrittenReg(regIx, oldValue))
+  uint64_t oldValue = 0;
+  int regIx = intRegs_.getLastWrittenReg(oldValue);
+  if (regIx >= 0)
     {
       URV newValue = 0;
       peekIntReg(regIx, newValue);
@@ -4863,7 +4862,8 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
     }
 
   uint64_t oldFpValue = 0;
-  if (fpRegs_.getLastWrittenReg(regIx, oldFpValue))
+  regIx = fpRegs_.getLastWrittenReg(oldFpValue);
+  if (regIx >= 0)
     {
       uint64_t newFpValue = 0;
       peekFpReg(regIx, newFpValue);

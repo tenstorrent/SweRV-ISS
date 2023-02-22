@@ -599,7 +599,8 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 
   // Collect integer register change caused by execution of instruction.
   pendingChanges.clear();
-  int regIx = hart.lastIntReg();
+  uint64_t lastVal = 0;
+  int regIx = hart.lastIntReg(lastVal);
   if (regIx > 0)
     {
       URV value = 0;
@@ -611,12 +612,13 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 	  msg.address = regIx;
 	  msg.value = value;
 	  msg.size = sizeof(msg.value);
+	  msg.time = lastVal;  // Re-purpose otherwise unused time field.
 	  pendingChanges.push_back(msg);
 	}
     }
 
   // Collect floating point register change.
-  int fpRegIx = hart.lastFpReg();
+  int fpRegIx = hart.lastFpReg(lastVal);
   if (fpRegIx >= 0)
     {
       uint64_t val = 0;
@@ -628,6 +630,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
 	  msg.address = fpRegIx;
 	  msg.value = val;
 	  msg.size = sizeof(msg.value);
+	  msg.time = lastVal;  // Re-purpose otherwise unused time field.
 	  pendingChanges.push_back(msg);
 	}
     }
