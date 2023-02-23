@@ -1000,7 +1000,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 
   // Pack vtype values and update vtype
   URV vtype = 0;
-  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 6);
+  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 7);
   vtype |= (URV(vill) << (8*sizeof(URV) - 1));
   csRegs_.poke(CsrNumber::VTYPE, vtype);
   recordCsrWrite(CsrNumber::VTYPE);
@@ -1081,7 +1081,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 
   // Pack vtype values and update vtype
   URV vtype = 0;
-  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 6);
+  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 7);
   vtype |= (URV(vill) << (8*sizeof(URV) - 1));
   csRegs_.poke(CsrNumber::VTYPE, vtype);
   recordCsrWrite(CsrNumber::VTYPE);
