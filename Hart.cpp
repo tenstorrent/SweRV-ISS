@@ -328,14 +328,11 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  if (rvb_ or isa_.isEnabled(RvExtension::Zba))
-    enableRvzba(true);
-  if (rvb_ or isa_.isEnabled(RvExtension::Zbb))
-    enableRvzbb(true);
-  if (rvb_ or isa_.isEnabled(RvExtension::Zbc))
-    enableRvzbc(true);
-  if (rvb_ or isa_.isEnabled(RvExtension::Zbs))
-    enableRvzbs(true);
+  enableRvzba(isa_.isEnabled(RvExtension::Zba));
+  enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
+  enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
+  enableRvzbs(isa_.isEnabled(RvExtension::Zbs));
+
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
   if (isa_.isEnabled(RvExtension::Zfhmin))
