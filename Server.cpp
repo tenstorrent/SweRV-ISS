@@ -995,7 +995,11 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
       if (not receiveMessage(soc, msg))
 	return false;
 
-      interact(msg, reply, traceFile, commandLog);
+      if (not checkHartId(msg, reply))
+        return false;
+
+      if (interact(msg, reply, traceFile, commandLog))
+        return true;
 
       if (not sendMessage(soc, reply))
 	return false;
@@ -1015,7 +1019,11 @@ Server<URV>::interact(char* shm, FILE* traceFile, FILE* commandLog)
       if (not receiveMessage(shm, msg))
 	return false;
 
-      interact(msg, reply, traceFile, commandLog);
+      if (not checkHartId(msg, reply))
+        return false;
+
+      if (interact(msg, reply, traceFile, commandLog))
+        return true;
 
       if (not sendMessage(shm, reply))
 	return false;
@@ -1033,271 +1041,268 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
   bool resetMemoryMappedReg = false;
   reply = msg;
 
-  if (checkHartId(msg, reply))
+  std::string timeStamp = std::to_string(msg.time);
+
+  uint32_t hartId = msg.hart;
+  auto hartPtr = system_.findHartByHartId(hartId);
+  assert(hartPtr);
+  auto& hart = *hartPtr;
+
+  if (msg.type == Step or msg.type == Until)
+    resetMemoryMappedReg = true;
+
+  switch (msg.type)
     {
-      std::string timeStamp = std::to_string(msg.time);
+      case Quit:
+        if (commandLog)
+          fprintf(commandLog, "hart=%d quit\n", hartId);
+        serverPrintFinalRegisterState(hartPtr);
+        return true;
 
-      uint32_t hartId = msg.hart;
-      auto hartPtr = system_.findHartByHartId(hartId);
-      assert(hartPtr);
-      auto& hart = *hartPtr;
-
-      if (msg.type == Step or msg.type == Until)
-        resetMemoryMappedReg = true;
-
-      switch (msg.type)
-        {
-        case Quit:
-          if (commandLog)
-            fprintf(commandLog, "hart=%d quit\n", hartId);
-          serverPrintFinalRegisterState(hartPtr);
-          return true;
-
-        case Poke:
-          pokeCommand(msg, reply);
-          if (commandLog)
-            {
-              if (msg.resource == 'p')
-                fprintf(commandLog, "hart=%d poke pc 0x%jx # ts=%s tag=%s\n", hartId,
-                        uintmax_t(msg.value), timeStamp.c_str(), msg.tag);
-              else
-                fprintf(commandLog, "hart=%d poke %c 0x%jx 0x%jx # ts=%s tag=%s\n", hartId,
-                        msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),
-                        timeStamp.c_str(), msg.tag);
-            }
-          break;
-
-        case Peek:
-          peekCommand(msg, reply);
-          if (commandLog)
-            {
-              if (msg.resource == 'p')
-                fprintf(commandLog, "hart=%d peek pc # ts=%s tag=%s\n",
-                        hartId, timeStamp.c_str(), msg.tag);
-              else if (msg.resource == 's')
-                fprintf(commandLog, "hart=%d peek s %s # ts=%s tag=%s\n",
-                        hartId, specialResourceToStr(msg.address),
-                        timeStamp.c_str(), msg.tag);
-              else
-                fprintf(commandLog, "hart=%d peek %c 0x%jx # ts=%s tag=%s\n",
-                        hartId, msg.resource, uintmax_t(msg.address),
-                        timeStamp.c_str(), msg.tag);
-            }
-          break;
-
-        case Step:
-          stepCommand(msg, pendingChanges_, reply, traceFile);
-          if (commandLog)
-            {
-              if (system_.isMcmEnabled())
-                fprintf(commandLog, "hart=%d time=%s step 1 %jd\n",
-                        hartId, timeStamp.c_str(), uintmax_t(msg.instrTag));
-              else
-                fprintf(commandLog, "hart=%d step #%jd # ts=%s\n",
-                        hartId, uintmax_t(hart.getInstructionCount()),
-                        timeStamp.c_str());
-              fflush(commandLog);
-            }
-          break;
-
-        case ChangeCount:
-          reply.type = ChangeCount;
-          reply.value = pendingChanges_.size();
-          reply.address = hart.lastPc();
+      case Poke:
+        pokeCommand(msg, reply);
+        if (commandLog)
           {
-            uint32_t inst = 0;
-            hart.readInst(hart.lastPc(), inst);
-            reply.resource = inst;
-            std::string text;
-            hart.disassembleInst(inst, text);
-            uint32_t op0 = 0, op1 = 0, op2 = 0, op3 = 0;
-            const InstEntry& entry = hart.decode(inst, op0, op1, op2, op3);
-            if (entry.isBranch())
-              {
-                if (hart.lastPc() + instructionSize(inst) != hart.peekPc())
-                  text += " (T)";
-                else
-                  text += " (NT)";
-              }
-            strncpy(reply.buffer, text.c_str(), sizeof(reply.buffer) - 1);
-            reply.buffer[sizeof(reply.buffer) -1] = 0;
+            if (msg.resource == 'p')
+              fprintf(commandLog, "hart=%d poke pc 0x%jx # ts=%s tag=%s\n", hartId,
+                      uintmax_t(msg.value), timeStamp.c_str(), msg.tag);
+            else
+              fprintf(commandLog, "hart=%d poke %c 0x%jx 0x%jx # ts=%s tag=%s\n", hartId,
+                      msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),
+                      timeStamp.c_str(), msg.tag);
           }
-          break;
+        break;
 
-        case Change:
-          if (pendingChanges_.empty())
-            reply.type = Invalid;
-          else
-            {
-              reply = pendingChanges_.back();
-              pendingChanges_.pop_back();
-            }
-          break;
-
-        case Reset:
+      case Peek:
+        peekCommand(msg, reply);
+        if (commandLog)
           {
-            URV addr = static_cast<URV>(msg.address);
-            if (addr != msg.address)
-              std::cerr << "Error: Address too large (" << std::hex
-                        << msg.address << ") in reset command.\n" << std::dec;
-            pendingChanges_.clear();
-            if (msg.value != 0)
-              hart.defineResetPc(addr);
-            hart.reset(resetMemoryMappedReg);
-            if (commandLog)
-              {
-                if (msg.value != 0)
-                  fprintf(commandLog, "hart=%d reset 0x%jx # ts=%s\n", hartId,
-                          uintmax_t(addr), timeStamp.c_str());
-                else
-                  fprintf(commandLog, "hart=%d reset # ts=%s\n", hartId,
-                          timeStamp.c_str());
-              }
+            if (msg.resource == 'p')
+              fprintf(commandLog, "hart=%d peek pc # ts=%s tag=%s\n",
+                      hartId, timeStamp.c_str(), msg.tag);
+            else if (msg.resource == 's')
+              fprintf(commandLog, "hart=%d peek s %s # ts=%s tag=%s\n",
+                      hartId, specialResourceToStr(msg.address),
+                      timeStamp.c_str(), msg.tag);
+            else
+              fprintf(commandLog, "hart=%d peek %c 0x%jx # ts=%s tag=%s\n",
+                      hartId, msg.resource, uintmax_t(msg.address),
+                      timeStamp.c_str(), msg.tag);
           }
-          break;
+        break;
 
-        case EnterDebug:
+      case Step:
+        stepCommand(msg, pendingChanges_, reply, traceFile);
+        if (commandLog)
           {
-            if (checkHart(msg, "enter_debug", reply))
-              hart.enterDebugMode(hart.peekPc());
-            if (commandLog)
-              fprintf(commandLog, "hart=%d enter_debug # ts=%s\n", hartId,
+            if (system_.isMcmEnabled())
+              fprintf(commandLog, "hart=%d time=%s step 1 %jd\n",
+                      hartId, timeStamp.c_str(), uintmax_t(msg.instrTag));
+            else
+              fprintf(commandLog, "hart=%d step #%jd # ts=%s\n",
+                      hartId, uintmax_t(hart.getInstructionCount()),
                       timeStamp.c_str());
+            fflush(commandLog);
           }
-          break;
+        break;
 
-        case ExitDebug:
-          if (checkHart(msg, "exit_debug", reply))
-            hart.exitDebugMode();
-          if (commandLog)
-            fprintf(commandLog, "hart=%d exit_debug # ts=%s\n", hartId,
-                    timeStamp.c_str());
-          break;
-
-        case CancelDiv:
-          if (checkHart(msg, "cancel_div", reply))
-            if (not hart.cancelLastDiv())
-              reply.type = Invalid;
-          if (commandLog)
-            fprintf(commandLog, "hart=%d cancel_div # ts=%s\n", hartId,
-                    timeStamp.c_str());
-          break;
-
-        case CancelLr:
-          if (checkHart(msg, "cancel_lr", reply))
-            hart.cancelLr();
-          if (commandLog)
-            fprintf(commandLog, "hart=%d cancel_lr # ts=%s\n", hartId,
-                    timeStamp.c_str());
-          break;
-
-        case DumpMemory:
-          if (not system_.writeAccessedMemory(msg.buffer))
-            reply.type = Invalid;
-          if (commandLog)
-            fprintf(commandLog, "hart=%d dump_memory %s # ts=%s\n",
-                    hartId, msg.buffer, timeStamp.c_str());
-          break;
-
-        case McmRead:
-          if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
-                                  msg.size, msg.value, msg.flags))
-            reply.type = Invalid;
-          if (commandLog)
-            fprintf(commandLog, "hart=%d time=%ld mread %ld 0x%lx %d 0x%lx %s\n",
-                    hartId, msg.time, msg.instrTag, msg.address, msg.size,
-                    msg.value, msg.flags? "i" : "e");
-          break;
-
-        case McmInsert:
-          if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
-                                      msg.address, msg.size, msg.value))
-            reply.type = Invalid;
-          if (commandLog)
-            fprintf(commandLog, "hart=%d time=%ld mbinsert %ld 0x%lx %d 0x%lx\n",
-                    hartId, msg.time, msg.instrTag, msg.address, msg.size,
-                    msg.value);
-          break;
-
-        case McmWrite:
-          if (msg.size > sizeof(msg.buffer))
+      case ChangeCount:
+        reply.type = ChangeCount;
+        reply.value = pendingChanges_.size();
+        reply.address = hart.lastPc();
+        {
+          uint32_t inst = 0;
+          hart.readInst(hart.lastPc(), inst);
+          reply.resource = inst;
+          std::string text;
+          hart.disassembleInst(inst, text);
+          uint32_t op0 = 0, op1 = 0, op2 = 0, op3 = 0;
+          const InstEntry& entry = hart.decode(inst, op0, op1, op2, op3);
+          if (entry.isBranch())
             {
-              std::cerr << "Error: Server command: McmWrite data size too large: " << msg.size << '\n';
-              reply.type = Invalid;
+              if (hart.lastPc() + instructionSize(inst) != hart.peekPc())
+                text += " (T)";
+              else
+                text += " (NT)";
             }
-          else
-            {
-              std::vector<bool> mask;
-              if (msg.flags)
-                mask.resize(msg.size);
-
-              std::vector<uint8_t> data(msg.size);
-              for (size_t i = 0; i < msg.size; ++i)
-                {
-                  data.at(i) = msg.buffer[i];
-                  if (msg.flags)
-                    mask.at(i) = msg.tag[i/8] & (1 << (i%8));
-                }
-
-              if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
-                reply.type = Invalid;
-
-              if (commandLog)
-                {
-                  fprintf(commandLog, "hart=%d time=%ld mbwrite 0x%lx 0x",
-                          hartId, msg.time, msg.address);
-		  std::reverse(data.begin(), data.end()); // Print lowest address data on the right.
-                  for (uint8_t item :  data)
-                    fprintf(commandLog, "%02x", item);
-                  if (msg.flags)
-                    {
-                      fprintf(commandLog, " 0x");
-		      data.clear();
-                      for (size_t i = 0; i < msg.size / 8; ++i)
-			data.push_back(msg.tag[i]);
-		      std::reverse(data.begin(), data.end());
-		      for (uint8_t item : data)
-                        fprintf(commandLog, "%02x", item);
-                    }
-                  fprintf(commandLog, "\n");
-                }
-            }
-          break;
-
-        case PageTableWalk:
-          doPageTableWalk(hart, reply);
-          break;
-
-	case Translate:
-	  translateCommand(msg, reply);
-          if (commandLog)
-	    {
-	      auto flags = msg.flags;
-	      const char* rwx = "r";
-	      if (flags & 1) rwx = "r";
-	      else if (flags & 2) rwx = "w";
-	      else if (flags & 4) rwx = "x";
-	      const char* su = (flags & 8) ? "s" : "u";
-	      fprintf(commandLog, "hart=%d translate 0x%jx %s %s\n", hartId,
-		      uintmax_t(msg.address), rwx, su);
-	    }
-	  break;
-
-	case CheckInterrupt:
-	  {
-	    URV mipVal = msg.address;
-	    InterruptCause cause = InterruptCause{0};
-	    reply.flags = hart.isInterruptPossible(mipVal, cause);
-	    if (commandLog)
-	      fprintf(commandLog, "hart=%d check_interrupt 0x%jx\n", hartId,
-		      uintmax_t(msg.value));
-	  }
-	  break;
-
-        default:
-          std::cerr << "Unknown command\n";
-          reply.type = Invalid;
+          strncpy(reply.buffer, text.c_str(), sizeof(reply.buffer) - 1);
+          reply.buffer[sizeof(reply.buffer) -1] = 0;
         }
+        break;
+
+      case Change:
+        if (pendingChanges_.empty())
+          reply.type = Invalid;
+        else
+          {
+            reply = pendingChanges_.back();
+            pendingChanges_.pop_back();
+          }
+        break;
+
+      case Reset:
+        {
+          URV addr = static_cast<URV>(msg.address);
+          if (addr != msg.address)
+            std::cerr << "Error: Address too large (" << std::hex
+                      << msg.address << ") in reset command.\n" << std::dec;
+          pendingChanges_.clear();
+          if (msg.value != 0)
+            hart.defineResetPc(addr);
+          hart.reset(resetMemoryMappedReg);
+          if (commandLog)
+            {
+              if (msg.value != 0)
+                fprintf(commandLog, "hart=%d reset 0x%jx # ts=%s\n", hartId,
+                        uintmax_t(addr), timeStamp.c_str());
+              else
+                fprintf(commandLog, "hart=%d reset # ts=%s\n", hartId,
+                        timeStamp.c_str());
+            }
+        }
+        break;
+
+      case EnterDebug:
+        {
+          if (checkHart(msg, "enter_debug", reply))
+            hart.enterDebugMode(hart.peekPc());
+          if (commandLog)
+            fprintf(commandLog, "hart=%d enter_debug # ts=%s\n", hartId,
+                    timeStamp.c_str());
+        }
+        break;
+
+      case ExitDebug:
+        if (checkHart(msg, "exit_debug", reply))
+          hart.exitDebugMode();
+        if (commandLog)
+          fprintf(commandLog, "hart=%d exit_debug # ts=%s\n", hartId,
+                  timeStamp.c_str());
+        break;
+
+      case CancelDiv:
+        if (checkHart(msg, "cancel_div", reply))
+          if (not hart.cancelLastDiv())
+            reply.type = Invalid;
+        if (commandLog)
+          fprintf(commandLog, "hart=%d cancel_div # ts=%s\n", hartId,
+                  timeStamp.c_str());
+        break;
+
+      case CancelLr:
+        if (checkHart(msg, "cancel_lr", reply))
+          hart.cancelLr();
+        if (commandLog)
+          fprintf(commandLog, "hart=%d cancel_lr # ts=%s\n", hartId,
+                  timeStamp.c_str());
+        break;
+
+      case DumpMemory:
+        if (not system_.writeAccessedMemory(msg.buffer))
+          reply.type = Invalid;
+        if (commandLog)
+          fprintf(commandLog, "hart=%d dump_memory %s # ts=%s\n",
+                  hartId, msg.buffer, timeStamp.c_str());
+        break;
+
+      case McmRead:
+        if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
+                                msg.size, msg.value, msg.flags))
+          reply.type = Invalid;
+        if (commandLog)
+          fprintf(commandLog, "hart=%d time=%ld mread %ld 0x%lx %d 0x%lx %s\n",
+                  hartId, msg.time, msg.instrTag, msg.address, msg.size,
+                  msg.value, msg.flags? "i" : "e");
+        break;
+
+      case McmInsert:
+        if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
+                                    msg.address, msg.size, msg.value))
+          reply.type = Invalid;
+        if (commandLog)
+          fprintf(commandLog, "hart=%d time=%ld mbinsert %ld 0x%lx %d 0x%lx\n",
+                  hartId, msg.time, msg.instrTag, msg.address, msg.size,
+                  msg.value);
+        break;
+
+      case McmWrite:
+        if (msg.size > sizeof(msg.buffer))
+          {
+            std::cerr << "Error: Server command: McmWrite data size too large: " << msg.size << '\n';
+            reply.type = Invalid;
+          }
+        else
+          {
+            std::vector<bool> mask;
+            if (msg.flags)
+              mask.resize(msg.size);
+
+            std::vector<uint8_t> data(msg.size);
+            for (size_t i = 0; i < msg.size; ++i)
+              {
+                data.at(i) = msg.buffer[i];
+                if (msg.flags)
+                  mask.at(i) = msg.tag[i/8] & (1 << (i%8));
+              }
+
+            if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
+              reply.type = Invalid;
+
+            if (commandLog)
+              {
+                fprintf(commandLog, "hart=%d time=%ld mbwrite 0x%lx 0x",
+                        hartId, msg.time, msg.address);
+                std::reverse(data.begin(), data.end()); // Print lowest address data on the right.
+                for (uint8_t item :  data)
+                  fprintf(commandLog, "%02x", item);
+                if (msg.flags)
+                  {
+                    fprintf(commandLog, " 0x");
+                    data.clear();
+                    for (size_t i = 0; i < msg.size / 8; ++i)
+                      data.push_back(msg.tag[i]);
+                    std::reverse(data.begin(), data.end());
+                    for (uint8_t item : data)
+                      fprintf(commandLog, "%02x", item);
+                  }
+                fprintf(commandLog, "\n");
+              }
+          }
+        break;
+
+      case PageTableWalk:
+        doPageTableWalk(hart, reply);
+        break;
+
+      case Translate:
+        translateCommand(msg, reply);
+        if (commandLog)
+          {
+            auto flags = msg.flags;
+            const char* rwx = "r";
+            if (flags & 1) rwx = "r";
+            else if (flags & 2) rwx = "w";
+            else if (flags & 4) rwx = "x";
+            const char* su = (flags & 8) ? "s" : "u";
+            fprintf(commandLog, "hart=%d translate 0x%jx %s %s\n", hartId,
+                    uintmax_t(msg.address), rwx, su);
+          }
+        break;
+
+      case CheckInterrupt:
+        {
+          URV mipVal = msg.address;
+          InterruptCause cause = InterruptCause{0};
+          reply.flags = hart.isInterruptPossible(mipVal, cause);
+          if (commandLog)
+            fprintf(commandLog, "hart=%d check_interrupt 0x%jx\n", hartId,
+                    uintmax_t(msg.value));
+        }
+        break;
+
+      default:
+        std::cerr << "Unknown command\n";
+        reply.type = Invalid;
     }
 
   return false;

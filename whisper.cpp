@@ -1279,11 +1279,6 @@ runServerShm(System<URV>& system, const std::string& serverFile,
       perror("Failed to unmap");
       return false;
     }
-  if (shm_unlink(path.c_str()) < 0)
-    {
-      perror("Failed shm unlink");
-      return false;
-    }
   return ok;
 }
 
