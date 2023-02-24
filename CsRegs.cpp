@@ -1536,7 +1536,7 @@ CsRegs<URV>::defineDebugRegs()
   // Debug mode registers.
   URV dcsrVal = 0x40000003;
   URV dcsrMask = 0x00008e04;
-  URV dcsrPokeMask = dcsrMask | 0x1c8; // Cause field modifiable
+  URV dcsrPokeMask = dcsrMask | 0x1cf; // Cause field modifiable
   bool isDebug = true;
   defineCsr("dcsr", Csrn::DCSR, !mand, imp, dcsrVal, dcsrMask,
 	    dcsrPokeMask, isDebug);
