@@ -667,6 +667,10 @@ Hart<URV>::resetVector()
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
+  // Update cached VL
+  if (peekCsr(CsrNumber::VL, value))
+    vecRegs_.elemCount(value);
+
   // Set VS to initial in MSTATUS if linux/newlib emulation. This
   // allows linux/newlib program to run without startup code.
   if (isRvv() and (newlib_ or linux_))
@@ -2743,6 +2747,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
       ElementWidth ew = ElementWidth(vtype.bits_.SEW);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
+
+  if (csr == CsrNumber::VL)
+    vecRegs_.elemCount(val);
 
   if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
       csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or

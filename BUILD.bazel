@@ -35,6 +35,6 @@ cc_binary(
     srcs          = ["whisper.cpp"],
     deps          = [":rvcore"],
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
-    linkopts      = ["-lboost_program_options", "-lstdc++fs"],
+    linkopts      = ["-lboost_program_options", "-lstdc++fs", "-rdynamic"],
     visibility    = ["//visibility:public"],
 )
