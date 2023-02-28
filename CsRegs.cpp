@@ -81,7 +81,7 @@ CsRegs<URV>::defineCsr(const std::string& name, CsrNumber csrn, bool mandatory,
     csr.definePrivilegeMode(priv);
   else if ((ix >= size_t(CN::HSTATUS) and ix <= size_t(CN::HCONTEXT)) or
            (ix >= size_t(CN::VSSTATUS) and ix <= size_t(CN::VSATP)) or
-           (ix == size_t(CN::HGEIP)))
+           (ix == size_t(CN::HGEIP)) or (ix == size_t(CN::VSTOPI)))
     // bits 8 and 9 not sufficient for hypervisor CSRs
     csr.definePrivilegeMode(PrivilegeMode::Supervisor);
   else
