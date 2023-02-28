@@ -278,7 +278,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (flag and not rvf_)
     {
       flag = false;
-      if (verbose)
+      if (verbose and hartIx_ == 0)
 	std::cerr << "Bit 3 (d) is set in the MISA register but f "
 		  << "extension (bit 5) is not enabled -- ignored\n";
     }
@@ -291,7 +291,7 @@ Hart<URV>::processExtensions(bool verbose)
     intRegs_.regs_.resize(16);
 
   flag = value & (URV(1) << ('i' - 'a'));
-  if (not flag and not rve_ and verbose)
+  if (not flag and not rve_ and verbose and hartIx_ == 0)
     std::cerr << "Bit 8 (i extension) is cleared in the MISA register "
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
@@ -302,7 +302,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (flag and not (rvf_ and rvd_))
     {
       flag = false;
-      if (verbose)
+      if (verbose and hartIx_ == 0)
 	std::cerr << "Bit 21 (v) is set in the MISA register but the d/f "
 		  << "extensions are not enabled -- ignored\n";
     }
@@ -317,7 +317,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (epc)
     epc->setReadMask(epcMask);
 
-  if (verbose)
+  if (verbose and hartIx_ == 0)
     for (auto ec : { 'j', 'k', 'l', 'n', 'o', 'p',
 		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )
       {
@@ -328,14 +328,11 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  if (rvb_ or isa_.isEnabled(RvExtension::Zba))
-    enableRvzba(true);
-  if (rvb_ or isa_.isEnabled(RvExtension::Zbb))
-    enableRvzbb(true);
-  if (rvb_ or isa_.isEnabled(RvExtension::Zbc))
-    enableRvzbc(true);
-  if (rvb_ or isa_.isEnabled(RvExtension::Zbs))
-    enableRvzbs(true);
+  enableRvzba(isa_.isEnabled(RvExtension::Zba));
+  enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
+  enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
+  enableRvzbs(isa_.isEnabled(RvExtension::Zbs));
+
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
   if (isa_.isEnabled(RvExtension::Zfhmin))
@@ -666,6 +663,10 @@ Hart<URV>::resetVector()
       ElementWidth ew = ElementWidth(vtype.bits_.SEW);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
+
+  // Update cached VL
+  if (peekCsr(CsrNumber::VL, value))
+    vecRegs_.elemCount(value);
 
   // Set VS to initial in MSTATUS if linux/newlib emulation. This
   // allows linux/newlib program to run without startup code.
@@ -2744,6 +2745,9 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
+  if (csr == CsrNumber::VL)
+    vecRegs_.elemCount(val);
+
   if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
       csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
       csr == CsrNumber::VLENB)
@@ -3083,18 +3087,18 @@ template <typename URV>
 void
 Hart<URV>::undoForTrigger()
 {
-  unsigned regIx = 0;
-  URV value = 0;
-  if (intRegs_.getLastWrittenReg(regIx, value))
+  uint64_t value = 0;
+  int regIx = intRegs_.getLastWrittenReg(value);
+  if (regIx >= 0)
     {
       pokeIntReg(regIx, value);
       intRegs_.clearLastWrittenReg();
     }
 
-  uint64_t fpVal = 0;
-  if (fpRegs_.getLastWrittenReg(regIx, fpVal))
+  regIx = fpRegs_.getLastWrittenReg(value);
+  if (regIx >= 0)
     {
-      pokeFpReg(regIx, fpVal);
+      pokeFpReg(regIx, value);
       fpRegs_.clearLastWrittenReg();
     }
 
@@ -3427,10 +3431,9 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 
   unsigned opIx = 0;  // Operand index
 
-  unsigned rd = unsigned(intRegCount() + 1);
+  int rd = unsigned(intRegCount() + 1);
   OperandType rdType = OperandType::None;
-  URV rdOrigVal = 0;   // Integer destination register value.
-
+  uint64_t rdOrigVal = 0;   // Integer destination register value.
   uint64_t frdOrigVal = 0;  // Floating point destination register value.
 
   if (info.isIthOperandWrite(0))
@@ -3439,14 +3442,14 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
       if (rdType == OperandType::IntReg)
 	{
 	  prof.destRegFreq_.at(di.op0())++; opIx++;
-	  intRegs_.getLastWrittenReg(rd, rdOrigVal);
-	  assert(rd == di.op0());
+	  rd = intRegs_.getLastWrittenReg(rdOrigVal);
+	  assert(unsigned(rd) == di.op0());
 	}
       else if (rdType == OperandType::FpReg)
 	{
 	  prof.destRegFreq_.at(di.op0())++; opIx++;
-	  fpRegs_.getLastWrittenReg(rd, frdOrigVal);
-	  assert(rd == di.op0());
+	  rd = fpRegs_.getLastWrittenReg(frdOrigVal);
+	  assert(unsigned(rd) == di.op0());
 	}
       else if (rdType == OperandType::VecReg)
 	{
@@ -3475,7 +3478,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
 
           URV val = intRegs_.read(regIx);
-          if (regIx == rd and rdType == OperandType::IntReg)
+          if (regIx == unsigned(rd) and rdType == OperandType::IntReg)
             val = rdOrigVal;
           if (info.isUnsigned())
             addToUnsignedHistogram(prof.srcHisto_.at(srcIx), val);
@@ -3489,7 +3492,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	  prof.srcRegFreq_.at(srcIx).at(regIx)++;
 
           uint64_t val = fpRegs_.readBitsRaw(regIx);
-          if (regIx == rd and rdType == OperandType::FpReg)
+          if (regIx == unsigned(rd) and rdType == OperandType::FpReg)
             val = frdOrigVal;
 
 	  FpRegs::FpUnion u{val};
@@ -4849,9 +4852,9 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
   record.newPc = pc_;
   setPc(prevPc);
 
-  unsigned regIx = 0;
-  URV oldValue = 0;
-  if (intRegs_.getLastWrittenReg(regIx, oldValue))
+  uint64_t oldValue = 0;
+  int regIx = intRegs_.getLastWrittenReg(oldValue);
+  if (regIx >= 0)
     {
       URV newValue = 0;
       peekIntReg(regIx, newValue);
@@ -4863,7 +4866,8 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
     }
 
   uint64_t oldFpValue = 0;
-  if (fpRegs_.getLastWrittenReg(regIx, oldFpValue))
+  regIx = fpRegs_.getLastWrittenReg(oldFpValue);
+  if (regIx >= 0)
     {
       uint64_t newFpValue = 0;
       peekFpReg(regIx, newFpValue);

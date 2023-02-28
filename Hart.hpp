@@ -661,11 +661,23 @@ namespace WdRiscv
     int lastIntReg() const
     { return intRegs_.getLastWrittenReg(); }
 
+    /// Similar to lastIntReg() but if successful set val to the
+    /// previous value of the integer register written by the last
+    /// executed instruction.
+    int lastIntReg(uint64_t& val) const
+    { return intRegs_.getLastWrittenReg(val); }
+
     /// Support for tracing: Return the index of the floating point
     /// register written by the last executed instruction. Return -1
     /// it no FP register was written.
     int lastFpReg() const
     { return fpRegs_.getLastWrittenReg(); }
+
+    /// Similar to lastFpReg() but if successful set val to the
+    /// previous value of the integer register written by the last
+    /// executed instruction.
+    int lastFpReg(uint64_t& val) const
+    { return fpRegs_.getLastWrittenReg(val); }
 
     /// Support for tracing: Return the incremental change to the FRM
     /// register by the last floating point instruction. Return zer0
@@ -1715,7 +1727,7 @@ namespace WdRiscv
 
     // Return trie if it is legal to execute a double precision
     // floating point instruction: D extension must be enabled and FS
-    // feild of MSTATUS must not be OFF.
+    // field of MSTATUS must not be OFF.
     bool isDpLegal() const
     { return isRvd() and isFpEnabled(); }
 

@@ -579,7 +579,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       // 4.
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
-	  if (pte.accessed() or pte.dirty() or pte.user())
+	  if (pte.accessed() or pte.dirty() or pte.user() or pte.pbmt() != 0)
 	    return nvPageFaultType(read, write, exec);  // A/D/U bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)
@@ -734,7 +734,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // 4.
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
-	  if (pte.accessed() or pte.dirty() or pte.user() or pte.global())
+	  if (pte.accessed() or pte.dirty() or pte.user() or pte.global() or pte.pbmt() != 0)
 	    return vPageFaultType(read, write, exec);  // A/D/U/G bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)
@@ -898,7 +898,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // 4.
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
-	  if (pte.accessed() or pte.dirty() or pte.user())
+	  if (pte.accessed() or pte.dirty() or pte.user() or pte.pbmt() != 0)
 	    return nvPageFaultType(read, write, exec);  // A/D/U bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)

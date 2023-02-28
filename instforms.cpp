@@ -579,7 +579,7 @@ IFormInst::encodeSlli(unsigned rd, unsigned rs1, unsigned shamt)
   if (rd > 31 or rs1 > 31)
     return false;  // Register(s) out of bounds.
 
-  if (shamt > 31)
+  if (shamt > 63)
     return false;  // Shift amount out ofbounds.
 
   fields2.opcode = 0x13;

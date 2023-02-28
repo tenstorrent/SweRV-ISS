@@ -261,7 +261,6 @@ namespace WdRiscv
       // Supervisor Protection and Translation 
       SATP = 0x180,
 
-
       // Hypervisor registers
       HSTATUS = 0x600,
       HEDELEG = 0x602,
@@ -394,12 +393,8 @@ namespace WdRiscv
       // Advanced interrupt architecture (AIA)
       MISELECT   = 0x315,
       MIREG      = 0x351,
-      MTOPI      = 0xFB0,
-      MSETEIPNUM = 0x358,
-      MCLREIPNUM = 0x359,
-      MSETEIENUM = 0x35a,
-      MCLREIENUM = 0x35b,
       MTOPEI     = 0x35c,
+      MTOPI      = 0xFB0,
       MVIEN      = 0x308,
       MVIP       = 0x309,
       MIDELEGH   = 0x313,
@@ -407,6 +402,27 @@ namespace WdRiscv
       MVIENH     = 0x318,
       MVIPH      = 0x319,
       MIPH       = 0x354,
+      SISELECT   = 0x150,
+      SIREG      = 0x151,
+      STOPEI     = 0x15c,
+      STOPI      = 0xdb0,
+      SIEH       = 0x114,
+      SIPH       = 0x154,
+      HVIEN      = 0x608,
+      HVICTL     = 0x609,
+      HVIPRIO1   = 0x646,
+      HVIPRIO2   = 0x647,
+      VSISELECT  = 0x250,
+      VSIREG     = 0x251,
+      VSTOPEI    = 0x25c,
+      VSTOPI     = 0xeb0,
+      HIDELEGh   = 0x613,
+      NHIENH     = 0x618,
+      HVIPH      = 0x655,
+      HVIPRIO1H  = 0x656,
+      HVIPRIO3H  = 0x657,
+      VSIEH      = 0x214,
+      VSIPH      = 0x254,
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
@@ -831,9 +847,8 @@ namespace WdRiscv
       return csr->isImplemented() ? csr : nullptr;
     }
 
-    /// Similar to getImplementedCsr except that whn virtaulMode is true:
-    // 1. Supervisor CSRs are remapped to the virtual supervisor counterparts.
-    // 2. Virtual supervisor CSRs are not available.
+    /// Similar to getImplementedCsr except that when virtaulMode is true:
+    /// Supervisor CSRs are remapped to the virtual supervisor counterparts.
     Csr<URV>* getImplementedCsr(CsrNumber num, bool virtualMode);
 
     /// Const version.

@@ -81,7 +81,7 @@ CsRegs<URV>::defineCsr(const std::string& name, CsrNumber csrn, bool mandatory,
     csr.definePrivilegeMode(priv);
   else if ((ix >= size_t(CN::HSTATUS) and ix <= size_t(CN::HCONTEXT)) or
            (ix >= size_t(CN::VSSTATUS) and ix <= size_t(CN::VSATP)) or
-           (ix == size_t(CN::HGEIP)))
+           (ix == size_t(CN::HGEIP)) or (ix == size_t(CN::VSTOPI)))
     // bits 8 and 9 not sufficient for hypervisor CSRs
     csr.definePrivilegeMode(PrivilegeMode::Supervisor);
   else
@@ -133,8 +133,6 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
     return csr;
   if (not virtualMode)
     return csr;
-  if (csr->isHypervisor())
-    return nullptr; // Virtual mode: Hypervisor CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
   num = CsrNumber(URV(num) + 0x100);
@@ -151,8 +149,6 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode) const
     return csr;
   if (not virtualMode)
     return csr;
-  if (csr->isHypervisor())
-    return nullptr; // Virtual mode: Hypervisors CSRs are not available
   if (not csr->mapsToVirtual())
     return csr;
   num = CsrNumber(URV(num) + 0x100);
@@ -1540,7 +1536,7 @@ CsRegs<URV>::defineDebugRegs()
   // Debug mode registers.
   URV dcsrVal = 0x40000003;
   URV dcsrMask = 0x00008e04;
-  URV dcsrPokeMask = dcsrMask | 0x1c8; // Cause field modifiable
+  URV dcsrPokeMask = dcsrMask | 0x1cf; // Cause field modifiable
   bool isDebug = true;
   defineCsr("dcsr", Csrn::DCSR, !mand, imp, dcsrVal, dcsrMask,
 	    dcsrPokeMask, isDebug);
@@ -1608,12 +1604,8 @@ CsRegs<URV>::defineAiaRegs()
   // Advanced interrupt archtecture CSRs
   defineCsr("miselect",   CsrNumber::MISELECT,   !mand, !imp, 0, wam, wam);
   defineCsr("mireg",      CsrNumber::MIREG,      !mand, !imp, 0, wam, wam);
-  defineCsr("mtopi",      CsrNumber::MTOPI,      !mand, !imp, 0, wam, wam);
-  defineCsr("mseteipnum", CsrNumber::MSETEIPNUM, !mand, !imp, 0, wam, wam);
-  defineCsr("mclreipnum", CsrNumber::MCLREIPNUM, !mand, !imp, 0, wam, wam);
-  defineCsr("mseteienum", CsrNumber::MSETEIENUM, !mand, !imp, 0, wam, wam);
-  defineCsr("mclreienum", CsrNumber::MCLREIENUM, !mand, !imp, 0, wam, wam);
   defineCsr("mtopei",     CsrNumber::MTOPEI,     !mand, !imp, 0, wam, wam);
+  defineCsr("mtopi",      CsrNumber::MTOPI,      !mand, !imp, 0, wam, wam);
   defineCsr("mvien",      CsrNumber::MVIEN,      !mand, !imp, 0, wam, wam);
   defineCsr("mvip",       CsrNumber::MVIP,       !mand, !imp, 0, wam, wam);
   defineCsr("midelegh",   CsrNumber::MIDELEGH,   !mand, !imp, 0, wam, wam);
@@ -1621,6 +1613,27 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mvienh",     CsrNumber::MVIENH,     !mand, !imp, 0, wam, wam);
   defineCsr("mviph",      CsrNumber::MVIPH,      !mand, !imp, 0, wam, wam);
   defineCsr("miph",       CsrNumber::MIPH,       !mand, !imp, 0, wam, wam);
+  defineCsr("siselect",   CsrNumber::SISELECT,   !mand, !imp, 0, wam, wam);
+  defineCsr("sireg",      CsrNumber::SIREG,      !mand, !imp, 0, wam, wam);
+  defineCsr("stopei",     CsrNumber::STOPEI,     !mand, !imp, 0, wam, wam);
+  defineCsr("stopi",      CsrNumber::STOPI,      !mand, !imp, 0, wam, wam);
+  defineCsr("sieh",       CsrNumber::SIEH,       !mand, !imp, 0, wam, wam);
+  defineCsr("siph",       CsrNumber::SIPH,       !mand, !imp, 0, wam, wam);
+  defineCsr("hvien",      CsrNumber::HVIEN,      !mand, !imp, 0, wam, wam);
+  defineCsr("hvictl",     CsrNumber::HVICTL,     !mand, !imp, 0, wam, wam);
+  defineCsr("hviprio1",   CsrNumber::HVIPRIO1,   !mand, !imp, 0, wam, wam);
+  defineCsr("hviprio2",   CsrNumber::HVIPRIO2,   !mand, !imp, 0, wam, wam);
+  defineCsr("vsiselect",  CsrNumber::VSISELECT,  !mand, !imp, 0, wam, wam);
+  defineCsr("vsireg",     CsrNumber::VSIREG,     !mand, !imp, 0, wam, wam);
+  defineCsr("vstopei",    CsrNumber::VSTOPEI,    !mand, !imp, 0, wam, wam);
+  defineCsr("vstopi",     CsrNumber::VSTOPI,     !mand, !imp, 0, wam, wam);
+  defineCsr("hidelegh",   CsrNumber::HIDELEGh,   !mand, !imp, 0, wam, wam);
+  defineCsr("nhienh",     CsrNumber::NHIENH,     !mand, !imp, 0, wam, wam);
+  defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam);
+  defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam);
+  defineCsr("hviprio3h",  CsrNumber::HVIPRIO3H,  !mand, !imp, 0, wam, wam);
+  defineCsr("vsieh",      CsrNumber::VSIEH,      !mand, !imp, 0, wam, wam);
+  defineCsr("vsiph",      CsrNumber::VSIPH,      !mand, !imp, 0, wam, wam);
 }
 
 

@@ -1000,7 +1000,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 
   // Pack vtype values and update vtype
   URV vtype = 0;
-  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 6);
+  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 7);
   vtype |= (URV(vill) << (8*sizeof(URV) - 1));
   csRegs_.poke(CsrNumber::VTYPE, vtype);
   recordCsrWrite(CsrNumber::VTYPE);
@@ -1081,7 +1081,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 
   // Pack vtype values and update vtype
   URV vtype = 0;
-  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 6);
+  vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 7);
   vtype |= (URV(vill) << (8*sizeof(URV) - 1));
   csRegs_.poke(CsrNumber::VTYPE, vtype);
   recordCsrWrite(CsrNumber::VTYPE);
@@ -9736,7 +9736,7 @@ Hart<URV>::execVremu_vx(const DecodedInst* di)
     case EW::Byte:  vremu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Half:  vremu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vremu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vremu_vv<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vremu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
   csRegs_.clearVstart();
@@ -9877,10 +9877,10 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vremu_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vremu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vremu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vremu_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte: vrem_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half: vrem_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word: vrem_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word2: vrem_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word4:  illegalInst(di); return;
     case EW::Word8:  illegalInst(di); return;
     case EW::Word16: illegalInst(di); return;
