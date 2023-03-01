@@ -14676,7 +14676,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
       uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
 	{
 	  assert(0);
 	  return false;
@@ -14903,7 +14903,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
       uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
       uint64_t vaddr = addr + offset, data = 0;
@@ -15662,7 +15662,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
       uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
       uint64_t faddr = addr + offset;
@@ -15833,7 +15833,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
       uint64_t offset = 0;
-      if (not vecRegs_.readIndex(vi, ix, offsetEew, offsetGroupX8, offset))
+      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
 	assert(0);
 
       uint64_t faddr = addr + offset, data = 0;
