@@ -205,6 +205,7 @@ struct Args
   std::optional<uint64_t> clint;  // Core-local-interrupt (Clint) mem mapped address
   std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
   std::optional<uint64_t> syscallSlam;
+  std::optional<uint64_t> instCounter;
   std::optional<unsigned> mcmls;
 
   unsigned regWidth = 32;
@@ -395,6 +396,13 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
     {
       auto numStr = varMap["mcmls"].as<std::string>();
       if (not parseCmdLineNumber("mcmls", numStr, args.mcmls))
+        ok = false;
+    }
+
+  if (varMap.count("instcounter"))
+    {
+      auto numStr = varMap["instcounter"].as<std::string>();
+      if (not parseCmdLineNumber("instcounter", numStr, args.instCounter))
         ok = false;
     }
 
@@ -609,6 +617,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	("mcmls", po::value<std::string>(),
 	 "Memory consitency checker merge buffer line size. If set to zero then "
 	 "write operations are not buffered and will happen as soon a received.")
+	("instcounter", po::value<std::string>(),
+	 "Set instruction counter to given value.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
          "Terminate multi-threaded run when any hart finishes (default is to wait "
          "for all harts.)")
@@ -969,6 +979,14 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (not args.instFreqFile.empty())
     hart.enableInstructionFrequency(true);
 
+  if (args.clint)
+    {
+      uint64_t swAddr = *args.clint;
+      uint64_t timerAddr = swAddr + 0x4000;
+      uint64_t clintLimit = swAddr + 0xc000 - 1;
+      config.configClint(system, hart, swAddr, clintLimit, timerAddr);
+    }
+
   if (not args.loadFrom.empty())
     {
       if (not loadSnapshot(system, hart, args.loadFrom))
@@ -993,6 +1011,9 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 	  errors++;
     }
 
+  if (args.instCounter)
+    hart.setInstructionCount(*args.instCounter);
+
   // Command line to-host overrides that of ELF and config file.
   if (args.toHost)
     hart.setToHostAddress(*args.toHost);
@@ -1012,14 +1033,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     hart.setConsoleIo(URV(*args.consoleIo));
 
   hart.enableConsoleInput(! args.noConInput);
-
-  if (args.clint)
-    {
-      uint64_t swAddr = *args.clint;
-      uint64_t timerAddr = swAddr + 0x4000;
-      uint64_t clintLimit = swAddr + 0xc000 - 1;
-      config.configClint(system, hart, swAddr, clintLimit, timerAddr);
-    }
 
   if (args.interruptor)
     {
