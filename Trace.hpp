@@ -65,6 +65,10 @@ namespace WdRiscv
     uint32_t ithOperand(unsigned i) const
     { return di_.ithOperand(i); }
 
+    /// Return the rounding mode associated with a floating point instruction
+    uint32_t roundingMode() const
+    { return di_.roundingMode(); }
+
     /// Privilege mode before last executed instruction.
     PrivilegeMode privMode() const
     { return hart_->lastPrivMode(); }
