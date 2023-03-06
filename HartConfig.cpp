@@ -1507,6 +1507,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableCancelLrOnRet(flag);
     }
 
+  tag = "debug_entry_point";
+  if (config_ -> count(tag))
+    {
+      URV dep = 0;
+      if (not getJsonUnsigned(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.setDebugEntryPoint(dep);
+    }
+
   return errors == 0;
 }
 

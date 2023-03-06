@@ -184,9 +184,11 @@ namespace WdRiscv
       return true;
     }
 
-    /// Read offset for a load-indexed/sore-indexed instruction.
-    bool readIndex(uint32_t regNum, uint32_t elemIx, ElementWidth eew,
-                   uint32_t groupX8, uint64_t& offset) const
+    /// Return true if the combination regNum, elemIx, eew, and
+    /// groupX8 is valid setting stride to the value of the
+    /// element. Return false otherwise leaving stride unmodified.
+    bool readStride(uint32_t regNum, uint32_t elemIx, ElementWidth eew,
+		    uint32_t groupX8, uint64_t& stride) const
     {
       switch(eew)
         {
@@ -195,7 +197,7 @@ namespace WdRiscv
             uint8_t temp = 0;
             if (not read(regNum, elemIx, groupX8, temp))
               return false;
-            offset = temp;
+            stride = temp;
             return true;
           }
         case ElementWidth::Half:
@@ -203,7 +205,7 @@ namespace WdRiscv
             uint16_t temp = 0;
             if (not read(regNum, elemIx, groupX8, temp))
               return false;
-            offset = temp;
+            stride = temp;
             return true;
           }
         case ElementWidth::Word:
@@ -211,7 +213,7 @@ namespace WdRiscv
             uint32_t temp = 0;
             if (not read(regNum, elemIx, groupX8, temp))
               return false;
-            offset = temp;
+            stride = temp;
             return true;
           }
         case ElementWidth::Word2:
@@ -219,7 +221,7 @@ namespace WdRiscv
             uint64_t temp = 0;
             if (not read(regNum, elemIx, groupX8, temp))
               return false;
-            offset = temp;
+            stride = temp;
             return true;
           }
         default:
