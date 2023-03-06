@@ -9706,7 +9706,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       return;
     }
 
-  bool tvm = virtMode_ ? mstatus_.bits_.TVM : hstatus_.bits_.VTVM;
+  bool tvm = virtMode_ ? hstatus_.bits_.VTVM : mstatus_.bits_.TVM;
   if (tvm and privMode_ == PrivilegeMode::Supervisor)
     {
       if (virtMode_)
@@ -9941,7 +9941,7 @@ Hart<URV>::execSret(const DecodedInst* di)
     }
 
   // If MSTATUS.TSR is 1 then sret is illegal in supervisor mode.
-  bool tsr = virtMode_? mstatus_.bits_.TSR : hstatus_.bits_.VTSR;
+  bool tsr = virtMode_? hstatus_.bits_.VTSR : mstatus_.bits_.TSR;
   URV mstatus = csRegs_.peekMstatus();
   MstatusFields<URV> mfields(mstatus);
   if (tsr and privMode_ == PrivilegeMode::Supervisor)
