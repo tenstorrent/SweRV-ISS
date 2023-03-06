@@ -9227,8 +9227,14 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
         dcsr.bits_.NMIP = 1;
       csRegs_.poke(CsrNumber::DCSR, dcsr.value_);
 
-      csRegs_.poke(CsrNumber::DPC, pc);
     }
+
+  csRegs_.poke(CsrNumber::DPC, pc);
+
+  // If hart is configured to jump to a special target on enetering
+  // debug mode, then set the pc to that target.
+  if (debugEntryPoint_ != ~URV(0))
+    pc_ = debugEntryPoint_;
 }
 
 

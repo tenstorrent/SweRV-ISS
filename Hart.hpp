@@ -931,11 +931,12 @@ namespace WdRiscv
     { rvzmmul_ = flag; }
 
     /// Put this hart in debug mode setting the DCSR cause field to
-    /// the given cause.
+    /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// either DEBUGGER or SETP depending on the step bit of DCSR.
+    /// Set the debug pc (DPC) to the given pc.
     void enterDebugMode(URV pc);
 
     /// True if in debug mode.
@@ -1568,6 +1569,12 @@ namespace WdRiscv
     /// change processor state. If interrupt is possible, set cause
     /// to the interrupt cause; otherwise, leave cause unmodified.
     bool isInterruptPossible(URV mipValue, InterruptCause& cause) const;
+
+    /// Configure this hart to set its program counter to the given
+    /// addr on entering debug mode. If addr bits are all set, then
+    /// the PC is not changed on entering debug mode.
+    void setDebugEntryPoint(URV addr)
+    { debugEntryPoint_ = addr; }
 
   protected:
 
@@ -4373,6 +4380,8 @@ namespace WdRiscv
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
+    URV debugEntryPoint_ = ~URV(0);  // Jump to this address on entering debug mode.
+
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
