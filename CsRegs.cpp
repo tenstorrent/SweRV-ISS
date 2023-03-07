@@ -214,6 +214,27 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
 
 
 template <typename URV>
+bool
+CsRegs<URV>::readSignExtend(CsrNumber number, PrivilegeMode mode, URV& value) const
+{
+  if (not read(number, mode, value))
+    return false;
+  if (value == 0)
+    return true;
+
+  auto csr = getImplementedCsr(number, virtMode_);
+  URV mask = csr->getWriteMask();
+  unsigned lz = sizeof(URV) == 8 ? __builtin_clzl(mask)  : __builtin_clz(mask);
+
+  typedef typename std::make_signed_t<URV> SRV;
+  SRV svalue = value;
+  svalue = (svalue << lz) >> lz;
+  value = svalue;
+  return true;
+}
+
+
+template <typename URV>
 void
 CsRegs<URV>::enableSupervisorMode(bool flag)
 {

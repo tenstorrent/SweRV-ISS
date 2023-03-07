@@ -9230,6 +9230,7 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
     }
 
   csRegs_.poke(CsrNumber::DPC, pc);
+  setPrivilegeMode(PrivilegeMode::Machine);
 
   // If hart is configured to jump to a special target on enetering
   // debug mode, then set the pc to that target.
@@ -9846,8 +9847,8 @@ namespace WdRiscv
 
     // 2. Restore program counter from MEPC.
     uint64_t epc;
-    if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
-      illegalInst(di);
+    if (not csRegs_.readSignExtend(CsrNumber::MEPC, privMode_, epc))
+      assert(0);
     setPc(epc);
       
     // 3. Update virtual mode.
