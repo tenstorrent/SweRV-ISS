@@ -9234,8 +9234,8 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 
   // If hart is configured to jump to a special target on enetering
   // debug mode, then set the pc to that target.
-  if (debugEntryPoint_ != ~URV(0))
-    pc_ = debugEntryPoint_;
+  if (debugParkLoop_ != ~URV(0))
+    pc_ = debugParkLoop_;
 }
 
 

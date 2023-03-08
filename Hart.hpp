@@ -1573,8 +1573,15 @@ namespace WdRiscv
     /// Configure this hart to set its program counter to the given
     /// addr on entering debug mode. If addr bits are all set, then
     /// the PC is not changed on entering debug mode.
-    void setDebugEntryPoint(URV addr)
-    { debugEntryPoint_ = addr; }
+    void setDebugParkLoop(URV addr)
+    { debugParkLoop_ = addr; }
+
+    /// Configure this hart to set its program counter to the given
+    /// addr on encoutering a trap (except breakpoint) during debug
+    /// mode. If addr bits are all set, then the PC is not changed on
+    /// a trap.
+    void setDebugTrapAddress(URV addr)
+    { debugTrapAddr_ = addr; }
 
   protected:
 
@@ -4380,7 +4387,8 @@ namespace WdRiscv
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
     bool dcsrStep_ = false;          // True if step bit set in dcsr.
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
-    URV debugEntryPoint_ = ~URV(0);  // Jump to this address on entering debug mode.
+    URV debugParkLoop_ = ~URV(0);    // Jump to this address on entering debug mode.
+    URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
 
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
