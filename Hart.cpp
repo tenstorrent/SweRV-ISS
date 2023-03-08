@@ -10047,17 +10047,30 @@ Hart<URV>::execDret(const DecodedInst* di)
       return;
     }
 
+  cancelLr();  // Exiting debug modes loses LR reservation.
+
+  peekCsr(CsrNumber::DPC, pc_);  // Restore PC
+  
   debugMode_ = false;
+  csRegs_.enterDebug(false);
 
-  URV value = 0;
-  peekCsr(CsrNumber::DPC, value);
-  setPc(value);
+  // If pending nmi bit is set in dcsr, set pending nmi in the hart
+  // object.
+  URV dcsrVal = 0;
+  if (not peekCsr(CsrNumber::DCSR, dcsrVal))
+    std::cerr << "Error: Failed to read DCSR in exit debug.\n";
 
-  value = 0;
-  peekCsr(CsrNumber::DCSR, value);
-  unsigned mode = value & 3;
-  PrivilegeMode pm = PrivilegeMode{mode};
+  DcsrFields<URV> dcsrf(dcsrVal);
+  if (dcsrf.bits_.NMIP)
+    setPendingNmi(nmiCause_);
+
+  // Restore privilege mode.
+  auto pm = PrivilegeMode{dcsrf.bits_.PRV};
   setPrivilegeMode(pm);
+
+  // Restore virtual mode.
+  bool vm = dcsrf.bits_.V;
+  setVirtualMode(vm);
 }
 
 
