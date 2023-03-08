@@ -816,6 +816,10 @@ namespace WdRiscv
 
   protected:
 
+    /// Similar to read but returned value is sign extended: sign bit is bit
+    /// corresponding to most significant set bit in write mask of CSR.
+    bool readSignExtend(CsrNumber number, PrivilegeMode mode, URV& value) const;
+
     /// Define csr with given name and number. Return pointer to csr
     /// on success or nullptr if given name is already in use or if the
     /// csr number is out of bounds or if it is associated with an

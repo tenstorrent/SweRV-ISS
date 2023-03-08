@@ -10623,10 +10623,7 @@ void
 Hart<URV>::execVadc_vvm(const DecodedInst* di)
 {
   if (not checkMaskableInst(di))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;

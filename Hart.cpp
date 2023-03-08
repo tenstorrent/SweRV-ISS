@@ -9230,6 +9230,7 @@ Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
     }
 
   csRegs_.poke(CsrNumber::DPC, pc);
+  setPrivilegeMode(PrivilegeMode::Machine);
 
   // If hart is configured to jump to a special target on enetering
   // debug mode, then set the pc to that target.
@@ -9846,8 +9847,8 @@ namespace WdRiscv
 
     // 2. Restore program counter from MEPC.
     uint64_t epc;
-    if (not csRegs_.read(CsrNumber::MEPC, privMode_, epc))
-      illegalInst(di);
+    if (not csRegs_.readSignExtend(CsrNumber::MEPC, privMode_, epc))
+      assert(0);
     setPc(epc);
       
     // 3. Update virtual mode.
@@ -10046,17 +10047,30 @@ Hart<URV>::execDret(const DecodedInst* di)
       return;
     }
 
+  cancelLr();  // Exiting debug modes loses LR reservation.
+
+  peekCsr(CsrNumber::DPC, pc_);  // Restore PC
+  
   debugMode_ = false;
+  csRegs_.enterDebug(false);
 
-  URV value = 0;
-  peekCsr(CsrNumber::DPC, value);
-  setPc(value);
+  // If pending nmi bit is set in dcsr, set pending nmi in the hart
+  // object.
+  URV dcsrVal = 0;
+  if (not peekCsr(CsrNumber::DCSR, dcsrVal))
+    std::cerr << "Error: Failed to read DCSR in exit debug.\n";
 
-  value = 0;
-  peekCsr(CsrNumber::DCSR, value);
-  unsigned mode = value & 3;
-  PrivilegeMode pm = PrivilegeMode{mode};
+  DcsrFields<URV> dcsrf(dcsrVal);
+  if (dcsrf.bits_.NMIP)
+    setPendingNmi(nmiCause_);
+
+  // Restore privilege mode.
+  auto pm = PrivilegeMode{dcsrf.bits_.PRV};
   setPrivilegeMode(pm);
+
+  // Restore virtual mode.
+  bool vm = dcsrf.bits_.V;
+  setVirtualMode(vm);
 }
 
 
