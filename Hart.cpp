@@ -2215,7 +2215,8 @@ Hart<URV>::illegalInst(const DecodedInst* di)
   if (isCompressedInst(inst))
     inst = inst & 0xffff;
 
-  initiateException(ExceptionCause::ILLEGAL_INST, currPc_, inst);
+  URV info = clearMtvalOnIllInst_ ? 0 : inst;
+  initiateException(ExceptionCause::ILLEGAL_INST, currPc_, info);
 }
 
 

@@ -1336,6 +1336,11 @@ namespace WdRiscv
     void enableClearMprvOnRet(bool flag)
     { clearMprvOnRet_ = flag; }
 
+    /// Clear MTVAL on illegal instruction exception if flag is true.
+    /// Otherwise, set MTVAL to the opcode of the illegal instruction.
+    void enableClearMtvalOnIllInst(bool flag)
+    { clearMtvalOnIllInst_ = flag; }
+
     /// Disable clearing of reservation set after xRET
     void enableCancelLrOnRet(bool flag)
     { cancelLrOnRet_ = flag; }
@@ -4389,6 +4394,8 @@ namespace WdRiscv
     bool ebreakInstDebug_ = false;   // True if debug mode entered from ebreak.
     URV debugParkLoop_ = ~URV(0);    // Jump to this address on entering debug mode.
     URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
+
+    bool clearMtvalOnIllInst_ = true;
 
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
