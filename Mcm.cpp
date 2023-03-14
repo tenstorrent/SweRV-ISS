@@ -74,6 +74,14 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       assert(0 && "Mcm::readOp: Hart ix out of bound");
     }
 
+  McmInstr* instr = findOrAddInstr(hartIx, instrTag);
+  if (instr->isCanceled())
+    return true;
+  bool io = false;  // FIX  get io from PMA of address.
+  if (instr->isRetired() and not io)
+    cerr << "Warning: Read op time=" << time << " occurs after "
+	 << "instruction retires tag=" << instr->tag_ << '\n';
+
   MemoryOp op = {};
   op.time_ = time;
   op.physAddr_ = physAddr;
@@ -117,15 +125,6 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	  return false;
 	}
     }
-
-  McmInstr* instr = findOrAddInstr(hartIx, instrTag);
-
-  bool io = false;  // FIX  get io from PMA of address.
-  if (instr->isCanceled())
-    op.cancel();
-  else if (instr->isRetired() and not io)
-    cerr << "Warning: Read op time=" << op.time_ << " occurs after "
-	 << "instruction retires tag=" << instr->tag_ << '\n';
 
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
