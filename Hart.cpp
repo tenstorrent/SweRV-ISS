@@ -1728,11 +1728,14 @@ hasPendingInput(int fd)
   if (firstTime)
     {
       firstTime = false;
-      struct termios term;
-      tcgetattr(fd, &term);
-      cfmakeraw(&term);
-      term.c_lflag &= ~ECHO;
-      tcsetattr(fd, 0, &term);
+      if (isatty(fd))
+	{
+	  struct termios term;
+	  tcgetattr(fd, &term);
+	  cfmakeraw(&term);
+	  term.c_lflag &= ~ECHO;
+	  tcsetattr(fd, 0, &term);
+	}
     }
 
   struct pollfd inPollfd;
@@ -1750,10 +1753,16 @@ readCharNonBlocking(int fd)
     return 0;
 
   char c = 0;
-  if (::read(fd, &c, sizeof(c)) == 1)
+  int code = ::read(fd, &c, sizeof(c));
+  if (code == 1)
     return c;
 
-  std::cerr << "readCharNonBlocking: unexpected fail on read\n";
+  if (code == 0)
+    return 0;
+
+  if (code == -1)
+    std::cerr << "readCharNonBlocking: unexpected fail on read\n";
+
   return -1;
 }
 
@@ -1781,9 +1790,7 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	}
       else if (cmd == 0 and fromHostValid_)
 	{
-	  int ch = readCharNonBlocking(fileno(stdin));
-	  if (ch < 0)
-	    throw CoreException(CoreException::Stop, "EOF", toHost_, val);
+	  int ch = readCharNonBlocking(syscall_.effectiveFd(STDIN_FILENO));
 	  if (ch > 0)
 	    memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch));
 	}
@@ -1951,12 +1958,17 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 		hart->clintAlarm_ = storeVal;
 
 	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
-	      if (fromHostValid_ and hasPendingInput(fileno(stdin)))
+	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
+	      if (fromHostValid_ and hasPendingInput(inFd))
 		{
 		  uint64_t v = 0;
 		  peekMemory(fromHost_, v, true);
 		  if (v == 0)
-		    memory_.poke(fromHost_, (uint64_t(1) << 56) | char(readCharNonBlocking(fileno(stdin))));
+		    {
+		      int c = char(readCharNonBlocking(inFd));
+		      if (c > 0)
+			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c);
+		    }
 		}
 	    }
 
