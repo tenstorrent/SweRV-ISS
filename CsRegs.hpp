@@ -577,7 +577,7 @@ namespace WdRiscv
     };
 
     // Returns CSR fields
-    std::vector<Field> fields() const
+    const std::vector<Field>& fields() const
     { return fields_; }
 
   protected:
@@ -768,8 +768,7 @@ namespace WdRiscv
 
     std::vector<std::function<void(Csr<URV>&)>> postReset_;
 
-    // Optionally define fields within a CSR with 
-    // start and end bit positions.
+    // Optionally define fields within a CSR with name and widths
     std::vector<Field> fields_;
   };
 
@@ -786,6 +785,8 @@ namespace WdRiscv
     CsRegs();
     
     ~CsRegs();
+
+    CsRegs(const CsRegs &) = delete;
 
     /// Return pointer to the control-and-status register
     /// corresponding to the given name or nullptr if no such
@@ -813,6 +814,22 @@ namespace WdRiscv
     /// Return true if given register is writable by a CSR instruction
     /// in the given mode.
     bool isWriteable(CsrNumber number, PrivilegeMode mode) const;
+
+    /// Fill the nums vector with the numbers of the CSRs written by
+    /// the last instruction.
+    void getLastWrittenRegs(std::vector<CsrNumber>& csrNums) const
+    {
+      csrNums = lastWrittenRegs_;
+    }
+
+    /// Fill the nums vector with the numbers of the CSRs and triggers
+    /// written by the last instruction.
+    void getLastWrittenRegs(std::vector<CsrNumber>& csrNums,
+			    std::vector<unsigned>& triggerNums) const
+    {
+      csrNums = lastWrittenRegs_;
+      triggers_.getLastWrittenTriggers(triggerNums);
+    }
 
   protected:
 
@@ -1206,7 +1223,7 @@ namespace WdRiscv
     void clearLastWrittenRegs()
     {
       for (auto& csrNum : lastWrittenRegs_)
-	regs_.at(size_t(csrNum)).clearLastWritten();
+        regs_.at(size_t(csrNum)).clearLastWritten();
       lastWrittenRegs_.clear();
       triggers_.clearLastWrittenTriggers();
     }
@@ -1220,22 +1237,6 @@ namespace WdRiscv
     {
       return triggers_.config(trigger, rv1, rv2, rv3,
 			      wm1, wm2, wm3, pm1, pm2, pm3);
-    }
-
-    /// Fill the nums vector with the numbers of the CSRs written by
-    /// the last instruction.
-    void getLastWrittenRegs(std::vector<CsrNumber>& csrNums) const
-    {
-      csrNums = lastWrittenRegs_;
-    }
-
-    /// Fill the nums vector with the numbers of the CSRs and triggers
-    /// written by the last instruction.
-    void getLastWrittenRegs(std::vector<CsrNumber>& csrNums,
-			    std::vector<unsigned>& triggerNums) const
-    {
-      csrNums = lastWrittenRegs_;
-      triggers_.getLastWrittenTriggers(triggerNums);
     }
 
     bool isInterruptEnabled() const

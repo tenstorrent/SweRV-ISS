@@ -565,8 +565,7 @@ namespace WdRiscv
     { return decoder_.getInstructionEntry(name); }
 
     /// Return the CS registers associated with this hart.
-    /// TODO: make const, but copy constructor for CSRs disabled.
-    CsRegs<URV>& csRegs()
+    const CsRegs<URV>& csRegs() const
     { return csRegs_; }
 
     /// Return the vector registers associated with this hart.
