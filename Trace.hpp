@@ -96,7 +96,12 @@ namespace WdRiscv
     {
       bool trapped = hasTrap();
       if (trapped)
-        hart_->peekCsr(CsrNumber::MCAUSE, cause);
+        {
+          if (nextPrivMode() == PrivilegeMode::Machine)
+            hart_->peekCsr(CsrNumber::MCAUSE, cause);
+          else if (nextPrivMode() == PrivilegeMode::Supervisor)
+            hart_->peekCsr(CsrNumber::SCAUSE, cause);
+        }
       return trapped;
     }
 
