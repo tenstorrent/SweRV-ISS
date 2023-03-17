@@ -1613,6 +1613,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 
 
 void (*tracerExtension)(void*) = nullptr;
+void (*tracerExtensionInit)() = nullptr;
 extern "C" {
   std::string tracerExtensionArgs = "";
 }
@@ -1636,6 +1637,9 @@ loadTracerLibrary(const std::string& tracerLib)
       return false;
     }
 
+  if (result.size() == 2)
+    tracerExtensionArgs = result[1];
+
   std::string entry("tracerExtension");
   entry += sizeof(URV) == 4 ? "32" : "64";
 
@@ -1646,7 +1650,12 @@ loadTracerLibrary(const std::string& tracerLib)
       return false;
     }
 
-  tracerExtensionArgs = result[1];
+  entry = "tracerExtensionInit";
+  entry += sizeof(URV) == 4 ? "32" : "64";
+
+  tracerExtensionInit = reinterpret_cast<void (*)()>(dlsym(soPtr, entry.c_str()));
+  if (tracerExtensionInit)
+    tracerExtensionInit();
 
   return true;
 }
