@@ -1480,6 +1480,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableClearMprvOnRet(flag);
     }
 
+  tag = "clear_mtval_on_illegal_instruction";
+  if (config_ -> count(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableClearMtvalOnIllInst(flag);
+    }
+
   tag = "log2_counter_to_time";
   if (config_ ->count(tag))
   {
@@ -1507,14 +1516,24 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableCancelLrOnRet(flag);
     }
 
-  tag = "debug_entry_point";
+  tag = "debug_park_loop";
   if (config_ -> count(tag))
     {
       URV dep = 0;
-      if (not getJsonUnsigned(tag, config_ -> at(tag), flag))
+      if (not getJsonUnsigned(tag, config_ -> at(tag), dep))
         errors++;
       else
-        hart.setDebugEntryPoint(dep);
+        hart.setDebugParkLoop(dep);
+    }
+
+  tag = "debug_trap_address";
+  if (config_ -> count(tag))
+    {
+      URV addr = 0;
+      if (not getJsonUnsigned(tag, config_ -> at(tag), addr))
+        errors++;
+      else
+        hart.setDebugTrapAddress(addr);
     }
 
   return errors == 0;

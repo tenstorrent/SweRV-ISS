@@ -96,7 +96,12 @@ namespace WdRiscv
     {
       bool trapped = hasTrap();
       if (trapped)
-        hart_->peekCsr(CsrNumber::MCAUSE, cause);
+        {
+          if (nextPrivMode() == PrivilegeMode::Machine)
+            hart_->peekCsr(CsrNumber::MCAUSE, cause);
+          else if (nextPrivMode() == PrivilegeMode::Supervisor)
+            hart_->peekCsr(CsrNumber::SCAUSE, cause);
+        }
       return trapped;
     }
 
@@ -207,6 +212,62 @@ namespace WdRiscv
     void getPageTableWalkEntries(bool instr, unsigned ix,
                                  std::vector<uint64_t>& ptes) const
     { hart_->getPageTableWalkEntries(instr, ix, ptes); }
+
+    /// TODO: modified regs
+    /// Return the list of CSR address-value pairs modified after last executed instruction.
+    typedef std::pair<URV, URV> CVP;  // CSR-value pair
+    void getModifiedCsrs(std::vector<CVP>& cvps) const
+    {
+      URV value;
+      cvps.clear();
+
+      std::vector<CsrNumber> csrs;
+      std::vector<unsigned> triggers;
+      hart_->csRegs().getLastWrittenRegs(csrs, triggers);
+
+      cvps.reserve(csrs.size() + triggers.size());
+
+      // Collect non-trigger CSRs and their values.
+      for (CsrNumber csr : csrs)
+        {
+          if (not hart_->peekCsr(csr, value))
+            continue;
+          if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
+            continue; // Debug trigger values collected below.
+          cvps.push_back(CVP(URV(csr), value));
+        }
+
+      // Collect trigger CSRs and their values. A synthetic CSR number
+      // is used encoding the trigger number and the trigger component.
+      for (unsigned trigger : triggers)
+        {
+          uint64_t data1(0), data2(0), data3(0);
+          if (not hart_->peekTrigger(trigger, data1, data2, data3))
+            continue;
+
+          // Components of trigger that changed.
+          bool t1 = false, t2 = false, t3 = false;
+          hart_->getTriggerChange(trigger, t1, t2, t3);
+
+          if (t1)
+            {
+              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA1);
+              cvps.push_back(CVP(ecsr, data1));
+            }
+
+          if (t2)
+            {
+              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA2);
+              cvps.push_back(CVP(ecsr, data2));
+            }
+
+          if (t3)
+            {
+              URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA3);
+              cvps.push_back(CVP(ecsr, data3));
+            }
+        }
+    }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;

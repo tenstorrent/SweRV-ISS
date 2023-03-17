@@ -16417,6 +16417,28 @@ doFmin(FT f1, FT f2, bool& invalid)
 }
 
 
+static
+float maxfp(float a, float b)
+{
+  return std::fmaxf(a, b);
+}
+
+
+static
+double maxfp(double a, double b)
+{
+  return std::fmax(a, b);
+}
+
+
+static
+Float16 maxfp(Float16 a, Float16 b)
+{
+  float c = std::fmaxf(a.toFloat(), b.toFloat());
+  return Float16::fromFloat(c);
+}
+
+
 template <typename FT>
 static FT
 doFmax(FT f1, FT f2, bool& invalid)
@@ -16432,7 +16454,7 @@ doFmax(FT f1, FT f2, bool& invalid)
   else if (isNan2)
     res = f1;
   else
-    res = std::fmaxf(f1, f2);
+    res = maxfp(f1, f2);  // std::fmaxf or std::fmax
 
   if (isSnan(f1) or isSnan(f2))
     invalid = true;
@@ -16702,7 +16724,7 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 	  int sigMs7 = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
 	  uint32_t outExp = (2*bias - 1 - inExp);
 	  uint32_t outSigMs7 = frec7Table[sigMs7];
-	  uf.u = (outSigMs7 << 16) | (outExp << 23);
+	  uf.u = (outSigMs7 << 16) | (outExp << 23) | (signBit << 31);
 	  val = uf.f;
 	}
     }

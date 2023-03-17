@@ -658,7 +658,7 @@ IFormInst::encodeAddiw(unsigned rd, unsigned rs1, int imm)
 {
   if (not encodeAddi(rd, rs1, imm))
     return false;
-  fields.opcode = 0x033;
+  fields.opcode = 0x01b;
   fields.funct3 = 0;
   return true;
 }
