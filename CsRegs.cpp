@@ -125,6 +125,17 @@ CsRegs<URV>::findCsr(CsrNumber number)
 
 
 template <typename URV>
+const Csr<URV>*
+CsRegs<URV>::findCsr(CsrNumber number) const
+{
+  size_t ix = size_t(number);
+  if (ix >= regs_.size())
+    return nullptr;
+  return &regs_.at(ix);
+}
+
+
+template <typename URV>
 Csr<URV>*
 CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
 {
@@ -2113,7 +2124,6 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MCOUNTEREN, mcount);
   mcount.at(1) = {"zero", 1}; // TM cleared for MCOUNTINHIBIT
   setCsrFields(CsrNumber::MCOUNTINHIBIT, mcount);
-
   setCsrFields(CsrNumber::MSCRATCH, {{"mscratch", xlen}});
   setCsrFields(CsrNumber::MEPC, {{"mepc", xlen}});
   setCsrFields(CsrNumber::MCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
