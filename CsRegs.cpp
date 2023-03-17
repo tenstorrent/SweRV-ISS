@@ -125,6 +125,17 @@ CsRegs<URV>::findCsr(CsrNumber number)
 
 
 template <typename URV>
+const Csr<URV>*
+CsRegs<URV>::findCsr(CsrNumber number) const
+{
+  size_t ix = size_t(number);
+  if (ix >= regs_.size())
+    return nullptr;
+  return &regs_.at(ix);
+}
+
+
+template <typename URV>
 Csr<URV>*
 CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
 {

@@ -798,6 +798,8 @@ namespace WdRiscv
     /// register.
     Csr<URV>* findCsr(CsrNumber number);
 
+    const Csr<URV>* findCsr(CsrNumber number) const;
+
     /// Read given CSR on behalf of a CSR instruction (e.g. csrrw)
     /// into value returning true on success.  Return false leaving
     /// value unmodified if there is no CSR with the given number or
