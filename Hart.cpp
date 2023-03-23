@@ -10111,8 +10111,17 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 	return false;
       }
 
-  if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
-    if (not isFpLegal())
+  if (not isFpLegal())
+    if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
+      {
+	illegalInst(di);
+	return false;
+      }
+
+  if (not isVecLegal())
+    if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM
+	or csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE
+	or csr == CsrNumber::VLENB)
       {
         illegalInst(di);
         return false;
@@ -10144,14 +10153,14 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
     if (mstatus_.bits_.TVM)
       return false;
 
-  if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
-    if (not isFpLegal())
+  if (not isFpLegal())
+    if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
       return false;
 
-  if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
-      csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
-      csr == CsrNumber::VLENB)
-    if (not isVecLegal())
+  if (not isVecLegal())
+    if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
+	csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
+	csr == CsrNumber::VLENB)
       return false;
 
   return true;
