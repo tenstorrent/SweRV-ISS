@@ -267,7 +267,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 799;
+  unsigned subversion = 800;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -1080,9 +1080,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (not applyCmdLineRegInit(args, hart))
     errors++;
 
-  if (args.expandedTargets.empty())
-    return errors == 0;
-
   // Setup target program arguments.
   if (clib)
     {
@@ -1101,7 +1098,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
             errors++;
           }
     }
-  else if (args.expandedTargets.front().size() > 1)
+  else if (not args.expandedTargets.empty() and args.expandedTargets.front().size() > 1)
     {
       std::cerr << "Warning: Target program options present which requires\n"
 		<< "         the use of --newlib/--linux. Options ignored.\n";
@@ -1110,7 +1107,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.csv)
     hart.enableCsvLog(args.csv);
 
-  
   if (args.mcm)
     {
       unsigned mcmLineSize = 64;
@@ -1613,6 +1609,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 
 
 void (*tracerExtension)(void*) = nullptr;
+void (*tracerExtensionInit)() = nullptr;
 extern "C" {
   std::string tracerExtensionArgs = "";
 }
@@ -1636,6 +1633,9 @@ loadTracerLibrary(const std::string& tracerLib)
       return false;
     }
 
+  if (result.size() == 2)
+    tracerExtensionArgs = result[1];
+
   std::string entry("tracerExtension");
   entry += sizeof(URV) == 4 ? "32" : "64";
 
@@ -1646,7 +1646,12 @@ loadTracerLibrary(const std::string& tracerLib)
       return false;
     }
 
-  tracerExtensionArgs = result[1];
+  entry = "tracerExtensionInit";
+  entry += sizeof(URV) == 4 ? "32" : "64";
+
+  tracerExtensionInit = reinterpret_cast<void (*)()>(dlsym(soPtr, entry.c_str()));
+  if (tracerExtensionInit)
+    tracerExtensionInit();
 
   return true;
 }
