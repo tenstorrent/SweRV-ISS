@@ -1613,7 +1613,7 @@ template <typename URV>
 void
 Hart<URV>::execXperm_n(const DecodedInst* di)
 {
-  if (not isRvzbp())
+  if (not isRvzbp() and not isRvzbkx())
     {
       illegalInst(di);
       return;
@@ -1636,7 +1636,7 @@ template <typename URV>
 void
 Hart<URV>::execXperm_b(const DecodedInst* di)
 {
-  if (not isRvzbp())
+  if (not isRvzbp() and not isRvzbkx())
     {
       illegalInst(di);
       return;

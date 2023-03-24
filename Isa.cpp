@@ -32,6 +32,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zkne)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zknh)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zbkb)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zbkx)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zksed)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zksh)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Svinval)) = Info{ {{1,0}}, {1,0} };
@@ -65,6 +66,7 @@ Isa::Isa()
   stringToExt_["zkne"] = RvExtension::Zkne;
   stringToExt_["zknh"] = RvExtension::Zknh;
   stringToExt_["zbkb"] = RvExtension::Zbkb;
+  stringToExt_["zbkx"] = RvExtension::Zbkx;
   stringToExt_["zksed"] = RvExtension::Zksed;
   stringToExt_["zksh"] = RvExtension::Zksh;
   stringToExt_["svinval"] = RvExtension::Svinval;
@@ -95,6 +97,7 @@ Isa::Isa()
   extToString_.at(extIx(RvExtension::Zkne)) = "zkne";
   extToString_.at(extIx(RvExtension::Zknh)) = "zknh";
   extToString_.at(extIx(RvExtension::Zbkb)) = "zbkb";
+  extToString_.at(extIx(RvExtension::Zbkx)) = "zbkx";
   extToString_.at(extIx(RvExtension::Zksed)) = "zksed";
   extToString_.at(extIx(RvExtension::Zksh)) = "zksh";
   extToString_.at(extIx(RvExtension::Svinval)) = "svinval";
