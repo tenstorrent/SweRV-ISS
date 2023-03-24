@@ -1080,9 +1080,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (not applyCmdLineRegInit(args, hart))
     errors++;
 
-  if (args.expandedTargets.empty())
-    return errors == 0;
-
   // Setup target program arguments.
   if (clib)
     {
@@ -1101,7 +1098,7 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
             errors++;
           }
     }
-  else if (args.expandedTargets.front().size() > 1)
+  else if (not args.expandedTargets.empty() and args.expandedTargets.front().size() > 1)
     {
       std::cerr << "Warning: Target program options present which requires\n"
 		<< "         the use of --newlib/--linux. Options ignored.\n";
@@ -1110,7 +1107,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.csv)
     hart.enableCsvLog(args.csv);
 
-  
   if (args.mcm)
     {
       unsigned mcmLineSize = 64;
