@@ -1304,8 +1304,8 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enablePerModeCounterControl(flag);
     }
 
-  for (auto ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin",
-		     "zknd", "zkne", "zknh", "zbkb", "zksed", "zksh"} )
+  for (auto ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin", "zknd",
+		     "zkne", "zknh", "zbkb", "zbkx", "zksed", "zksh"} )
     {
       std::string etag = std::string("enable_") + ztag;
       if (config_ -> count(etag))

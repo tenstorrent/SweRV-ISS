@@ -901,6 +901,10 @@ namespace WdRiscv
     void enableRvzbkb(bool flag)
     { rvzbkb_ = flag; }
 
+    /// Enable/disable the crypto zbkx (crypto bit manip) extension.
+    void enableRvzbkx(bool flag)
+    { rvzbkx_ = flag; }
+
     /// Enable/disable the crypto zksed (sm4 block cipher) extension.
     void enableRvzksed(bool flag)
     { rvzksed_ = flag; }
@@ -1088,6 +1092,10 @@ namespace WdRiscv
     /// Return true if the zbkb extension (crypto bit manip) is enabled.
     bool isRvzbkb() const
     { return rvzbkb_; }
+
+    /// Return true if the zbkb extension (crypto bit manip) is enabled.
+    bool isRvzbkx() const
+    { return rvzbkx_; }
 
     /// Return true if the svinval extension (TLB invalidate) is enabled.
     bool isRvsvinval() const
@@ -4269,6 +4277,7 @@ namespace WdRiscv
     bool rvzkne_ = false;        // True if extension zkne (crypto) enabled.
     bool rvzknh_ = false;        // True if extension zknh (crypto) enabled.
     bool rvzbkb_ = false;        // True if extension zbkb (ctypto) enabled.
+    bool rvzbkx_ = false;        // True if extension zbkx (ctypto) enabled.
     bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
     bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
     bool rvsvinval_ = false;     // True if extension svinval (TLB invalidate) enabled.
