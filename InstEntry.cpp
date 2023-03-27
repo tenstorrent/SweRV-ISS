@@ -202,6 +202,15 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::fcvt_h_l)) .setHasRoundingMode(true);
   instVec_.at(size_t(InstId::fcvt_h_lu)) .setHasRoundingMode(true);
 
+  // Mark compressed instructions which are rv64 variants
+  instVec_.at(size_t(InstId::c_ld)) .setCompressedRv64(true);
+  instVec_.at(size_t(InstId::c_sd)) .setCompressedRv64(true);
+  instVec_.at(size_t(InstId::c_addiw)) .setCompressedRv64(true);
+  instVec_.at(size_t(InstId::c_subw)) .setCompressedRv64(true);
+  instVec_.at(size_t(InstId::c_addw)) .setCompressedRv64(true);
+  instVec_.at(size_t(InstId::c_ldsp)) .setCompressedRv64(true);
+  instVec_.at(size_t(InstId::c_sdsp)) .setCompressedRv64(true);
+
   // Mark floating point instruction that modify FFLAGS.
   for (unsigned i = unsigned(InstId::flw); i <= unsigned(InstId::fcvt_h_lu); ++i)
     instVec_.at(i).setModifiesFflags(true);
@@ -2614,7 +2623,7 @@ InstTable::setupInstVec()
       },
 
       { "vmsle.vx", InstId::vmsle_vx,
-        0b011101'0'00000'00000'011'00000'1010111, // Opcode
+        0b011101'0'00000'00000'100'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -2623,7 +2632,7 @@ InstTable::setupInstVec()
       },
 
       { "vmsle.vi", InstId::vmsle_vi,
-        0b011101'0'00000'00000'100'00000'1010111, // Opcode
+        0b011101'0'00000'00000'011'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -2632,7 +2641,7 @@ InstTable::setupInstVec()
       },
 
       { "vmsgtu.vx", InstId::vmsgtu_vx,
-        0b011110'0'00000'00000'011'00000'1010111, // Opcode
+        0b011110'0'00000'00000'100'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -2641,7 +2650,7 @@ InstTable::setupInstVec()
       },
 
       { "vmsgtu.vi", InstId::vmsgtu_vi,
-        0b011101'0'00000'00000'100'00000'1010111, // Opcode
+        0b011110'0'00000'00000'011'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -2650,7 +2659,7 @@ InstTable::setupInstVec()
       },
 
       { "vmsgt.vx", InstId::vmsgt_vx,
-        0b011111'0'00000'00000'011'00000'1010111, // Opcode
+        0b011111'0'00000'00000'100'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -2659,7 +2668,7 @@ InstTable::setupInstVec()
       },
 
       { "vmsgt.vi", InstId::vmsgt_vi,
-        0b011111'0'00000'00000'100'00000'1010111, // Opcode
+        0b011111'0'00000'00000'011'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -3227,7 +3236,7 @@ InstTable::setupInstVec()
       },
 
       { "vslideup.vi", InstId::vslideup_vi,
-        0b011111'0'00000'00000'011'00000'1010111,
+        0b001110'0'00000'00000'011'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -3281,7 +3290,7 @@ InstTable::setupInstVec()
       },
 
       { "vfslide1down.vf", InstId::vfslide1down_vf,
-        0b001111'0'00000'00000'110'00000'1010111,
+        0b001111'0'00000'00000'101'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -3460,7 +3469,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwmulu.vx", InstId::vwmul_vx,
+      { "vwmul.vx", InstId::vwmul_vx,
         0b111011'1'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
@@ -3542,7 +3551,7 @@ InstTable::setupInstVec()
       },
 
       { "vwmaccus.vx", InstId::vwmaccus_vx,
-        0b111111'1'00000'00000'110'00000'1010111,
+        0b111110'1'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -4002,7 +4011,7 @@ InstTable::setupInstVec()
       },
 
       { "vasubu.vv", InstId::vasubu_vv,
-        0b001001'1'00000'00000'010'00000'1010111,
+        0b001010'1'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5785,7 +5794,7 @@ InstTable::setupInstVec()
 
       { "vfmerge.vfm", InstId::vfmerge_vfm,
         0b010011'0'00000'00000'001'00000'1010111, // Opcode
-        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        0b111111'1'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::VecReg, OperandMode::Read, rs1Mask,
@@ -5793,8 +5802,8 @@ InstTable::setupInstVec()
       },
 
       { "vfmv.v.f", InstId::vfmv_v_f,
-        0b010011'0'00000'00000'001'00000'1010111, // Opcode
-        0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
+        0b010011'1'00000'00000'001'00000'1010111, // Opcode
+        0b111111'1'11111'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
         OperandType::FpReg, OperandMode::Read, rs1Mask,
@@ -5819,7 +5828,7 @@ InstTable::setupInstVec()
       },
 
       { "vmfne.vv", InstId::vmfne_vv,
-	0b011000'1'00000'00000'001'00000'1010111, // Opcode
+	0b011100'1'00000'00000'001'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
@@ -5873,7 +5882,7 @@ InstTable::setupInstVec()
       },
 
       { "vmfgt.vf", InstId::vmfgt_vf,
-	0b011111'1'00000'00000'101'00000'1010111, // Opcode
+	0b011101'1'00000'00000'101'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
         OperandType::VecReg, OperandMode::Write, rdMask,
