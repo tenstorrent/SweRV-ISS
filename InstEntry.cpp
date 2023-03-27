@@ -202,6 +202,13 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::fcvt_h_l)) .setHasRoundingMode(true);
   instVec_.at(size_t(InstId::fcvt_h_lu)) .setHasRoundingMode(true);
 
+  // Mark compressed instructions which are rv32 variants
+  instVec_.at(size_t(InstId::c_flw)) .setCompressedRv32(true);
+  instVec_.at(size_t(InstId::c_fsw)) .setCompressedRv32(true);
+  instVec_.at(size_t(InstId::c_jal)) .setCompressedRv32(true);
+  instVec_.at(size_t(InstId::c_flwsp)) .setCompressedRv32(true);
+  instVec_.at(size_t(InstId::c_fswsp)) .setCompressedRv32(true);
+
   // Mark compressed instructions which are rv64 variants
   instVec_.at(size_t(InstId::c_ld)) .setCompressedRv64(true);
   instVec_.at(size_t(InstId::c_sd)) .setCompressedRv64(true);

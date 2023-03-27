@@ -298,6 +298,10 @@ namespace WdRiscv
     bool modifiesFflags() const
     { return modifiesFflags_; }
 
+    /// Returns true if compressed instruction is an rv32 variant
+    bool isCompressedRv32() const
+    { return isCompressedRv32_; }
+
     /// Returns true if compressed instruction is an rv64 variant
     bool isCompressedRv64() const
     { return isCompressedRv64_; }
@@ -339,6 +343,10 @@ namespace WdRiscv
     /// Mark as a branch insruction.
     void setBranch(bool flag)
     { isBranch_ = flag; }
+
+    /// Mask as a compressed rv32 instruction
+    void setCompressedRv32(bool flag)
+    { isCompressedRv32_ = flag; }
 
     /// Mark as a compressed rv64 instruction
     void setCompressedRv64(bool flag)
@@ -384,7 +392,8 @@ namespace WdRiscv
     bool hasRm_ = false;       // True if instr has an explicit rounding mode .
     bool modifiesFflags_ = false; // True if instr modifed FFLAGS.
     bool isDiv_ = false;       // True for integer divide or remainder instr.
-    bool isCompressedRv64_ = false; // True if compressed and rv64 instruction variant.
+    bool isCompressedRv32_ = false; // True if compressed rv32 instruction variant.
+    bool isCompressedRv64_ = false; // True if compressed rv64 instruction variant.
   };
 
 
