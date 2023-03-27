@@ -16394,19 +16394,19 @@ doFadd(FT f1, FT f2)
 static
 float minfp(float a, float b)
 {
-  return std::fmminf(a, b);
+  return std::fminf(a, b);
 }
 
 
 static
-double maxfp(double a, double b)
+double minfp(double a, double b)
 {
   return std::fmin(a, b);
 }
 
 
 static
-Float16 maxfp(Float16 a, Float16 b)
+Float16 minfp(Float16 a, Float16 b)
 {
   float c = std::fminf(a.toFloat(), b.toFloat());
   return Float16::fromFloat(c);
