@@ -240,6 +240,8 @@ namespace WdRiscv
 
     typedef std::vector<MemoryOp> MemoryOpVec;
 
+    void cancelReplayedReads(McmInstr*);
+
     // Remove from hartPendingWrites_ the writes matching the RTL line
     // addresses and place them sorted by instr tag in coveredWrites.
     bool collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,

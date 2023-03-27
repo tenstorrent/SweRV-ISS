@@ -991,6 +991,82 @@ Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 
 
 template <typename URV>
+void
+Mcm<URV>::cancelReplayedReads(McmInstr* instr)
+{
+  size_t nops = instr->memOps_.size();
+  assert(instr->size_ > 0 and instr->size_ <= 8);
+  unsigned expectedMask = (1 << instr->size_) - 1;  // Mask of bytes covered by instruction.
+  unsigned readMask = 0;    // Mask of bytes covered by read operations.
+
+  uint64_t addr = instr->physAddr_;
+  unsigned size = instr->size_;
+  auto& ops = instr->memOps_;
+
+  // Process read ops in reverse order so that later reads take precedence.
+  for (size_t j = 0; j < nops; ++j)
+    {
+      auto opIx = ops.at(nops - 1 - j);
+      if (opIx >= sysMemOps_.size())
+	continue;
+      auto& op = sysMemOps_.at(opIx);
+      if (not op.isRead_)
+	continue;
+
+      instr->isLoad_ = true;
+
+      bool cancel = false;
+      unsigned mask = 0;
+      if (readMask == expectedMask)
+	cancel = true;
+      else if (op.physAddr_ <= addr)
+	{
+	  if (op.physAddr_ + op.size_ <= addr)
+	    cancel = true;  // Read op does not overlap instruction.
+	  else
+	    {
+	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
+	      assert(overlap > 0 and overlap <= 8);
+	      mask = (1 << overlap) - 1;
+	    }
+	}
+      else
+	{
+	  if (addr + size <= op.physAddr_)
+	    cancel = true;  // Read op does no overlap instruction.
+	  else
+	    {
+	      mask = expectedMask;
+	      mask = mask << (op.physAddr_ - addr + 1);
+	    }
+	}
+
+      mask &= expectedMask;
+      if ((mask & readMask) == mask)
+	cancel = true;  // Read op already covered by other read ops
+      else
+	readMask |= mask;
+      if (cancel)
+	op.cancel();
+    }
+
+  // Remove canceled ops.
+  size_t count = 0;
+  for (size_t i = 0; i < ops.size(); ++i)
+    {
+      auto& op = sysMemOps_.at(ops.at(i));
+      if (not op.isCanceled())
+	{
+	  if (count < i)
+	    ops.at(count) = ops.at(i);
+	  count++;
+	}
+    }
+  ops.resize(count);
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
 			      unsigned size, uint64_t& value)
@@ -1021,12 +1097,16 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
   instr->size_ = size;
   instr->physAddr_ = addr;
 
-  // Merge read operation values.
+  // Cancel early read ops that are covered by later ones.
+  cancelReplayedReads(instr);
+
   uint64_t mergeMask = 0;
   uint64_t merged = 0;
   bool ok = true;
-  for (auto opIx : instr->memOps_)
+  size_t nops = instr->memOps_.size();
+  for (size_t j = 0; j < nops; ++j)
     {
+      auto opIx = instr->memOps_.at(nops - 1 - j);
       if (opIx >= sysMemOps_.size())
 	continue;
       auto& op = sysMemOps_.at(opIx);
@@ -1328,6 +1408,8 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
       for (uint64_t ix = ix0; ix <= ix1; ++ix)
 	{
 	  const MemoryOp& op = sysMemOps_.at(ix);
+	  if (op.isCanceled())
+	    continue;
 	  if (op.hartIx_ != hartIx and not op.isRead_ and instrB.overlaps(op))
 	    {
 	      unsigned shift = 8*(8 - op.size_);
