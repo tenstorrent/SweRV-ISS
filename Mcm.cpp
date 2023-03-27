@@ -92,38 +92,35 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.isRead_ = true;
   op.internal_ = internal;
 
-  if (not internal)
+  if (size == 1)
     {
-      if (size == 1)
-	{
-	  uint8_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-	  op.data_ = val;
-	}
-      else if (size == 2)
-	{
-	  uint16_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-	  op.data_ = val;
-	}
-      else if (size == 4)
-	{
-	  uint32_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-	  op.data_ = val;
-	}
-      else if (size == 8)
-	{
-	  uint64_t val = 0;
-	  op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
-	  op.data_ = val;
-	}
-      else
-	{
-	  op.failRead_ = true;
-	  cerr << "Error: Mcm::readOp: Invalid read size: " << size << '\n';
-	  return false;
-	}
+      uint8_t val = 0;
+      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
+      op.data_ = val;
+    }
+  else if (size == 2)
+    {
+      uint16_t val = 0;
+      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
+      op.data_ = val;
+    }
+  else if (size == 4)
+    {
+      uint32_t val = 0;
+      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
+      op.data_ = val;
+    }
+  else if (size == 8)
+    {
+      uint64_t val = 0;
+      op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
+      op.data_ = val;
+    }
+  else
+    {
+      op.failRead_ = true;
+      cerr << "Error: Mcm::readOp: Invalid read size: " << size << '\n';
+      return false;
     }
 
   instr->addMemOp(sysMemOps_.size());
@@ -131,12 +128,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
   bool result = true;
   if (checkLoadComplete(*instr))
-    {
-      instr->complete_ = true;
-      if (instr->retired_)
-	if (not ppoRule3(hart, *instr))
-	  result = false;
-    }
+    instr->complete_ = true;
   
   return result;
 }
@@ -904,7 +896,9 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
   if (instr.isCanceled() or not instr.isStore_)
     return false;
 
-  uint64_t mergeMask = 0;
+  unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
+  unsigned writeMask = 0;   // Mask of bytes covered by write operations.
+  uint64_t addr = instr.physAddr_, size = instr.size_;
   for (auto opIx : instr.memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -913,29 +907,29 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
       if (op.isRead_)
 	continue;
 
-      uint64_t mask = ~uint64_t(0);
-      if (op.physAddr_ <= instr.physAddr_)
+      unsigned mask = 0;
+      if (op.physAddr_ <= addr)
 	{
-	  uint64_t offset = instr.physAddr_ - op.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  mask >>= offset*8;
+	  if (op.physAddr_ + op.size_ > addr)
+	    {
+	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
+	      assert(overlap > 0 and overlap <= 8);
+	      mask = (1 << overlap) - 1;
+	    }
 	}
       else
 	{
-	  uint64_t offset = op.physAddr_ - instr.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  mask <<= offset*8;
+	  if (addr + size > op.physAddr_)
+	    {
+	      mask = expectedMask;
+	      mask = mask << (op.physAddr_ - addr + 1);
+	    }
 	}
-      mergeMask |= mask;
+      mask &= expectedMask;
+      writeMask |= mask;
     }
 
-  unsigned unused = (8 - instr.size_)*8;  // Unused upper bits of value.
-  mergeMask = (mergeMask << unused) >> unused;
-
-  uint64_t expectedMask = (~uint64_t(0) << unused) >> unused;
-  return mergeMask == expectedMask;
+  return writeMask == expectedMask;
 }
 
 
@@ -943,10 +937,12 @@ template <typename URV>
 bool
 Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
 {
-  if (instr.isCanceled() or instr.isStore_)
+  if (instr.isCanceled() or not instr.isLoad_)
     return false;
 
-  uint64_t mergeMask = 0;
+  unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
+  unsigned readMask = 0;   // Mask of bytes covered by read operations.
+  uint64_t addr = instr.physAddr_, size = instr.size_;
   for (auto opIx : instr.memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -955,29 +951,29 @@ Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
       if (not op.isRead_)
 	continue;
 
-      uint64_t mask = ~uint64_t(0);
-      if (op.physAddr_ <= instr.physAddr_)
+      unsigned mask = 0;
+      if (op.physAddr_ <= addr)
 	{
-	  uint64_t offset = instr.physAddr_ - op.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  mask >>= offset*8;
+	  if (op.physAddr_ + op.size_ > addr)
+	    {
+	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
+	      assert(overlap > 0 and overlap <= 8);
+	      mask = (1 << overlap) - 1;
+	    }
 	}
       else
 	{
-	  uint64_t offset = op.physAddr_ - instr.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  mask <<= offset*8;
+	  if (addr + size > op.physAddr_)
+	    {
+	      mask = expectedMask;
+	      mask = mask << (op.physAddr_ - addr + 1);
+	    }
 	}
-      mergeMask |= mask;
+      mask &= expectedMask;
+      readMask |= mask;
     }
 
-  unsigned unused = (8 - instr.size_)*8;  // Unused upper bits of value.
-  mergeMask = (mergeMask << unused) >> unused;
-
-  uint64_t expectedMask = (~uint64_t(0) << unused) >> unused;
-  return mergeMask == expectedMask;
+  return readMask == expectedMask;
 }
 
 
@@ -1112,8 +1108,6 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
-
-      instr->isLoad_ = true;
 
       if (op.internal_)
 	{
