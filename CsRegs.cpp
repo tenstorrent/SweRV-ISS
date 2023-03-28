@@ -2168,26 +2168,38 @@ CsRegs<URV>::addMachineFields()
   for (unsigned i = 0; i < 16; i += 2)
     {
       std::vector<typename Csr<URV>::Field> pmps;
-      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i);
-      unsigned end = (rv32_) ? pmpIx + 4 : pmpIx + 8;
-      for (; pmpIx < end; pmpIx++)
-        {
-          std::string name = "pmp" + std::to_string(pmpIx) + "cfg";
-          pmps.push_back({name, 8});
-        }
-
-      setCsrFields(csrNum, pmps);
 
       if (rv32_)
         {
-          pmps.clear();
-          csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i + 1);
-          end = pmpIx + 4;
+          CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i + 1);
+          unsigned end = pmpIx + 4;
           for (; pmpIx < end; pmpIx++)
             {
               std::string name = "pmp" + std::to_string(pmpIx) + "cfg";
-              pmps.push_back({name, 8});
+              pmps.push_back({name + "R", 1});
+              pmps.push_back({name + "W", 1});
+              pmps.push_back({name + "X", 1});
+              pmps.push_back({name + "A", 2});
+              pmps.push_back({name + "zero", 2});
+              pmps.push_back({name + "L", 1});
             }
+          setCsrFields(csrNum, pmps);
+        }
+      else
+        {
+          CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i);
+          unsigned end = pmpIx + 8;
+          for (; pmpIx < end; pmpIx++)
+            {
+              std::string name = "pmp" + std::to_string(pmpIx) + "cfg";
+              pmps.push_back({name + "R", 1});
+              pmps.push_back({name + "W", 1});
+              pmps.push_back({name + "X", 1});
+              pmps.push_back({name + "A", 2});
+              pmps.push_back({name + "zero", 2});
+              pmps.push_back({name + "L", 1});
+            }
+
           setCsrFields(csrNum, pmps);
         }
     }
