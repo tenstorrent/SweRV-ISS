@@ -233,7 +233,7 @@ namespace WdRiscv
     static Float16 quietNan()
     { Float16 x; x.i16 = 0b0111'1110'0000'0000; return x; }
 
-    /// Return the quiet NAN Float16 number.
+    /// Return the signaling NAN Float16 number.
     static Float16 signalingNan()
     { Float16 x; x.i16 = 0b0111'1101'0000'0000; return x; }
 
