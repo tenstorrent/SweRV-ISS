@@ -16684,6 +16684,8 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	  uint64_t outSigMs7 = frec7Table[sigMs7];
 	  ud.u = (outSigMs7 << 45) | (outExp << 52);
 	  val = ud.d;
+	  if (signBit)
+	    val = -val;
 	}
     }
 
