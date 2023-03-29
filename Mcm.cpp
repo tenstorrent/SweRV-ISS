@@ -125,6 +125,7 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
+  instr->isLoad_ = true;
 
   bool result = true;
   if (checkLoadComplete(*instr))
@@ -390,6 +391,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   URV hartId = hart.hartId();
 
+  bool ok = true;
+
   // Check read operations of instruction comparing RTL values to
   // memory model (whisper) values.
   for (auto opIx : instr->memOps_)
@@ -401,10 +404,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	continue;
 
       if (not checkRtlRead(hartId, *instr, op))
-	{
-	  updateDependencies(hart, *instr);
-	  return false;
-	}
+	ok = false;
     }
 
   // Amo sanity check.
@@ -415,8 +415,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	{
 	  cerr << "Error: Amo instruction tag=" << tag
 	       << " retired before read op.\n";
-	  updateDependencies(hart, *instr);
-	  return false;
+	  ok = false;
 	}
 #if 0
       if (instrHasWrite(*instr))
@@ -429,7 +428,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->isStore_ = true;  // AMO is both load and store.
     }
 
-  bool ok = ppoRule2(hart, *instr);
+  ok = ppoRule2(hart, *instr) and ok;
   ok = ppoRule3(hart, *instr) and ok;
   ok = ppoRule4(hart, *instr) and ok;
   ok = ppoRule5(hart, *instr) and ok;
@@ -706,7 +705,7 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
 	}
       if (departed)
 	{
-	  cerr << "Internal read op forward source already drained from "
+	  cerr << "Read op forward source already drained from "
 	       << "merge buffer: read-time=" << readOp.time_ << " read-tag="
 	       << readOp.instrTag_ << " write-time=" << wopTime
 	       << " write-tag=" << instr.tag_ << '\n';
@@ -1109,13 +1108,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
       if (not op.isRead_)
 	continue;
 
-      if (op.internal_)
-	{
-	  if (not forwardToRead(hart, tag, op))
-	    ok = false;
-	}
-      else if (not checkExternalRead(hart, op))
-	ok = false;
+      if (not forwardToRead(hart, tag, op))
+	assert(0);
 
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
@@ -1161,7 +1155,7 @@ template <typename URV>
 bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
-  if (not op.internal_)
+  if (false and not op.internal_)
     return false;
 
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
@@ -1176,16 +1170,16 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       if (not di.instEntry()->isAtomic())
 	continue;
 
-      cerr << "Error: Internal read forwards from an atomic instruction"
+      cerr << "Error: Read op forwards from an atomic instruction"
 	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
 	   << " instr-tag=" << tag << " addr=0x" << std::hex
 	   << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
-      return false;
+      // return false;
     }
 
-  if (mask != 0)
+  if (false and mask != 0)
     {
-      cerr << "Error: Internal read does not forward from preceeding stores"
+      cerr << "Error: Read op does not forward from preceeding stores"
 	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
 	   << " instr-tag=" << tag << " addr=0x" << std::hex
 	   << op.physAddr_ << std::dec << '\n';

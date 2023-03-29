@@ -13696,10 +13696,9 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
-
-  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
@@ -13847,9 +13846,9 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
-  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
@@ -14048,11 +14047,12 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
     }
 
   unsigned vd = di->op0(), rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
 
-  unsigned start = 0;
+  unsigned start = csRegs_.peekVstart();
   unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
+  URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
+
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
@@ -14174,11 +14174,12 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
     }
 
   unsigned vd = di->op0(), rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
 
-  unsigned start = 0;
+  unsigned start = csRegs_.peekVstart();
   unsigned elemSize = 1;
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemSize / 8;
+  URV addr = intRegs_.read(rs1) + start*elemSize;
+
   vecRegs_.ldStSize_ = sizeof(uint8_t);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
@@ -14362,11 +14363,11 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
-
   unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
+
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
@@ -14516,11 +14517,11 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
-
   unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
+
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   // TODO check permissions, translate, ....
@@ -15130,8 +15131,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
   unsigned elemCount = vecRegs_.elemCount();
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
@@ -15306,8 +15307,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
   unsigned elemCount = vecRegs_.elemCount(), elemSize = sizeof(ELEM_TYPE);
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
@@ -16684,6 +16685,8 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	  uint64_t outSigMs7 = frec7Table[sigMs7];
 	  ud.u = (outSigMs7 << 45) | (outExp << 52);
 	  val = ud.d;
+	  if (signBit)
+	    val = -val;
 	}
     }
 
@@ -17076,6 +17079,26 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 }
 
 
+// Widen a half to a float to covering signaling NaN.
+static float
+fpWiden(Float16 x)
+{
+  if (x.isSnan())
+    return std::numeric_limits<float>::signaling_NaN();
+  return x.toFloat();
+}
+
+
+// Widen a float to a double covering signaling NaN.
+static double
+fpWiden(float x)
+{
+  if (isSnan(x))
+    return std::numeric_limits<double>::signaling_NaN();
+  return x;
+}
+
+
 template <typename URV>
 template <typename ELEM_TYPE>
 void
@@ -17100,8 +17123,8 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = ELEM_TYPE2X(e1);
-	  e2dw = ELEM_TYPE2X(e2);
+	  e1dw = fpWiden(e1);
+	  e2dw = fpWiden(e2);
 	  dest = doFadd(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17164,7 +17187,8 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{}, dest{};
+  ELEM_TYPE2X e2dw = fpWiden(e2);
 
   unsigned group2x = group*2;
 
@@ -17178,7 +17202,7 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = ELEM_TYPE2X(e1);
+	  e1dw = fpWiden(e1);
           dest = doFadd(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17253,8 +17277,8 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = ELEM_TYPE2X(e1);
-	  e2dw = ELEM_TYPE2X(e2);
+	  e1dw = fpWiden(e1);
+	  e2dw = fpWiden(e2);
 	  dest = doFadd(e1dw, -e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17317,7 +17341,8 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{}, negE2dw{-e2}, dest{};
+  ELEM_TYPE2X e1dw{}, dest{};
+  ELEM_TYPE2X negE2dw = fpWiden(-e2);
 
   unsigned group2x = group*2;
 
@@ -17331,7 +17356,7 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = ELEM_TYPE2X(e1);
+	  e1dw = fpWiden(e1);
           dest = doFadd(e1dw, negE2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17406,7 +17431,7 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e2dw = ELEM_TYPE2X(e2);
+	  e2dw = fpWiden(e2);
 	  dest = doFadd(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17468,7 +17493,8 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{}, dest{};
+  ELEM_TYPE2X e2dw = fpWiden(e2);
 
   unsigned group2x = group*2;
 
@@ -17556,7 +17582,7 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e2dw = ELEM_TYPE2X(e2);
+	  e2dw = fpWiden(e2);
 	  dest = doFadd(e1dw, -e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17617,7 +17643,8 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{}, negE2dw{-e2}, dest{};
+  ELEM_TYPE2X e1dw{}, dest{};
+  ELEM_TYPE2X negE2dw = fpWiden(-e2);
 
   unsigned group2x = group*2;
 
@@ -18017,8 +18044,8 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = ELEM_TYPE2X(e1);
-	  e2dw = ELEM_TYPE2X(e2);
+	  e1dw = fpWiden(e1);
+	  e2dw = fpWiden(e2);
 	  dest = doFmul(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18079,7 +18106,8 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{}, dest{};
+  ELEM_TYPE2X e2dw = fpWiden(e2);
 
   unsigned group2x = group*2;
 
@@ -18093,7 +18121,7 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = ELEM_TYPE2X(e1);
+	  e1dw = fpWiden(e1);
           dest = doFmul(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19277,8 +19305,8 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;  // True if fp invalid flag true for element
-	  e1dw = ELEM_TYPE2X(e1);
-	  e2dw = ELEM_TYPE2X(e2);
+	  e1dw = fpWiden(e1);
+	  e2dw = fpWiden(e2);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -19339,7 +19367,8 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
-  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
+  ELEM_TYPE2X e2dw{}, dest{};
+  ELEM_TYPE2X e1dw = fpWiden(e1);
 
   unsigned group2x = group*2;
 
@@ -19356,7 +19385,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
-	  e2dw = ELEM_TYPE2X(e2);
+	  e2dw = fpWiden(e2);
           dest = fusedMultiplyAdd(e1dw, e2dw, dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -19435,8 +19464,8 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;  // True if fp invalid flag true for element
-	  e1dw = ELEM_TYPE2X(e1);
-	  e2dw = ELEM_TYPE2X(e2);
+	  e1dw = fpWiden(e1);
+	  e2dw = fpWiden(e2);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, -dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -19497,7 +19526,8 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
-  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
+  ELEM_TYPE2X e2dw{}, dest{};
+  ELEM_TYPE2X e1dw = fpWiden(e1);
 
   unsigned group2x = group*2;
 
@@ -19514,7 +19544,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
-	  e2dw = ELEM_TYPE2X(e2);
+	  e2dw = fpWiden(e2);
           dest = fusedMultiplyAdd(-e1dw, e2dw, -dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -19593,8 +19623,8 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;  // True if fp invalid flag true for element
-	  e1dw = ELEM_TYPE2X(e1);
-	  e2dw = ELEM_TYPE2X(e2);
+	  e1dw = fpWiden(e1);
+	  e2dw = fpWiden(e2);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, -dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -19655,7 +19685,8 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
-  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
+  ELEM_TYPE2X e2dw{}, dest{};
+  ELEM_TYPE2X e1dw = fpWiden(e1);
 
   unsigned group2x = group*2;
 
@@ -19672,7 +19703,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
-	  e2dw = ELEM_TYPE2X(e2);
+	  e2dw = fpWiden(e2);
           dest = fusedMultiplyAdd(e1dw, e2dw, -dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -19751,8 +19782,8 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;  // True if fp invalid flag true for element
-	  e1dw = ELEM_TYPE2X(e1);
-	  e2dw = ELEM_TYPE2X(e2);
+	  e1dw = fpWiden(e1);
+	  e2dw = fpWiden(e2);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -19814,7 +19845,8 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
-  ELEM_TYPE2X e1dw{e1}, e2dw{}, dest{};
+  ELEM_TYPE2X e2dw{}, dest{};
+  ELEM_TYPE2X e1dw = fpWiden(e1);
 
   unsigned group2x = group*2;
 
@@ -19831,7 +19863,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  bool elemInv = false;
-	  e2dw = ELEM_TYPE2X(e2);
+	  e2dw = fpWiden(e2);
           dest = fusedMultiplyAdd(-e1dw, e2dw, dest, elemInv);
 	  invalid = invalid or elemInv;
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -22864,7 +22896,7 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
-	  ELEM_TYPE2X e1dw = ELEM_TYPE2X(e1);
+	  ELEM_TYPE2X e1dw = fpWiden(e1);
 	  result = doFadd(result, e1dw);
 	}
       else
@@ -22941,7 +22973,7 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
-	  ELEM_TYPE2X e1dw = ELEM_TYPE2X(e1);
+	  ELEM_TYPE2X e1dw = fpWiden(e1);
 	  result = doFadd(result, e1dw);
 	}
       else
