@@ -13696,10 +13696,9 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
-
-  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
@@ -13847,9 +13846,9 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
-  unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
@@ -14048,11 +14047,12 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
     }
 
   unsigned vd = di->op0(), rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
 
   unsigned start = csRegs_.peekVstart();
   unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
+  URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
+
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += sizeof(ELEM_TYPE))
@@ -14174,11 +14174,12 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
     }
 
   unsigned vd = di->op0(), rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
 
   unsigned start = csRegs_.peekVstart();
   unsigned elemSize = 1;
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemSize / 8;
+  URV addr = intRegs_.read(rs1) + start*elemSize;
+
   vecRegs_.ldStSize_ = sizeof(uint8_t);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
@@ -14362,11 +14363,11 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
-
   unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
+
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   for (unsigned ix = start; ix < elemCount; ++ix, addr += stride)
@@ -14516,11 +14517,11 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   uint64_t stride = intRegs_.read(rs2);
-
   unsigned start = csRegs_.peekVstart();
   unsigned elemCount = vecRegs_.elemCount();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
+
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
 
   // TODO check permissions, translate, ....
@@ -15130,8 +15131,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
   unsigned elemCount = vecRegs_.elemCount();
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
@@ -15306,8 +15307,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  uint64_t addr = intRegs_.read(rs1);
   unsigned start = csRegs_.peekVstart();
+  uint64_t addr = intRegs_.read(rs1) + start*stride;
   unsigned elemCount = vecRegs_.elemCount(), elemSize = sizeof(ELEM_TYPE);
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
