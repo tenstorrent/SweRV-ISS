@@ -22601,6 +22601,9 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
+
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22671,6 +22674,9 @@ Hart<URV>::vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       else
 	errors++;
     }
+
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -22749,6 +22755,9 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
+
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22825,6 +22834,9 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       else
 	errors++;
     }
+
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -22903,6 +22915,9 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE2X>();
+
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22979,6 +22994,9 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       else
 	errors++;
     }
+
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE2X>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
