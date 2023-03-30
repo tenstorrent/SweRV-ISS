@@ -21978,6 +21978,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
   ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
 
+  bool invalid = false;
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -21988,10 +21989,12 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  if constexpr(std::is_same<ELEM_TYPE, Float16>::value)
-            dest = e1.toFloat();
-	  else
-	    dest = e1;
+	  dest = fpWiden(e1);
+	  if (isSnan(dest))
+	    {
+	      dest = getQuietNan<ELEM_TYPE2X>();
+	      invalid = true;
+	    }
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -21999,7 +22002,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f, invalid);
   assert(errors == 0);
 }
 
