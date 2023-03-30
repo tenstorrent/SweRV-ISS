@@ -16660,7 +16660,8 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 
       if (inExp < -1 or inExp > 2*bias)
 	{
-	  if (mode == RoundingMode::Up or mode == RoundingMode::Zero)
+	  auto upDown = signBit? RoundingMode::Down : RoundingMode::Up;
+	  if (mode == upDown or mode == RoundingMode::Zero)
 	    {
 	      val = std::numeric_limits<double>::max();
 	      if (signBit)
@@ -16726,7 +16727,8 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 
       if (inExp < -1 or inExp > 2*bias)
 	{
-	  if (mode == RoundingMode::Up or mode == RoundingMode::Zero)
+	  auto upDown = signBit? RoundingMode::Down : RoundingMode::Up;
+	  if (mode == upDown or mode == RoundingMode::Zero)
 	    {
 	      val = std::numeric_limits<float>::max();
 	      if (signBit)
@@ -16751,6 +16753,8 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 	  uint32_t outSigMs7 = frec7Table[sigMs7];
 	  uf.u = (outSigMs7 << 16) | (outExp << 23) | (signBit << 31);
 	  val = uf.f;
+	  if (signBit)
+	    val = -val;
 	}
     }
 
