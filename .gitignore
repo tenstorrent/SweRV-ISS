@@ -4,3 +4,6 @@ whisper
 librvcore.a
 *.a
 bazel-*
+
+# VSCode
+.vscode/
