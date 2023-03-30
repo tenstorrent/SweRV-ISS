@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iomanip>
 #include <iostream>
 #include <fstream>
 #include "Filesystem.hpp"
@@ -461,6 +462,62 @@ System<URV>::mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag)
   if (not mcm_)
     return false;
   return mcm_->setCurrentInstruction(hart, tag);
+}
+
+
+template <typename URV>
+bool
+System<URV>::produceTestSignatureFile(std::string_view outPath) const
+{
+  // Find the begin_signature and end_signature section addresses
+  // from the elf file
+  WdRiscv::ElfSymbol beginSignature, endSignature;
+  for (auto&& [symbolName, pSymbol] : { std::pair{ "begin_signature", &beginSignature },
+                                        std::pair{ "end_signature",   &endSignature } })
+    {
+      if (not findElfSymbol(symbolName, *pSymbol))
+        {
+          std::cerr << "Failed to find symbol " << symbolName << " in memory.\n";
+          return false;
+        }
+    }
+
+  if (beginSignature.addr_ > endSignature.addr_)
+    {
+      std::cerr << "Ending address for signature file is before starting address.\n";
+      return false;
+    }
+
+  // Get all of the data between the two sections and store it in a vector to ensure
+  // it can all be read correctly.
+  std::vector<uint32_t> data;
+  data.reserve((endSignature.addr_ - beginSignature.addr_) / 4);
+  int count = 1;
+  for (std::size_t addr = beginSignature.addr_; addr < endSignature.addr_; addr += 4)
+    {
+      uint32_t value;
+      if (not memory_->peek(addr, value, true))
+        {
+          std::cerr << "Unable to read data at address 0x" << std::hex << addr << ".\n";
+          return false;
+        }
+
+      data.push_back(value);
+      count++;
+    }
+
+  // If all data has been read correctly, write it as 32-bit hex values with one
+  // per line.
+  std::ofstream outFile(outPath.data());
+  outFile << std::hex << std::setfill('0');
+  count = 1;
+  for (uint32_t value : data)
+    {
+      outFile << std::setw(8) << value << '\n';
+      count++;
+    }
+
+  return true;
 }
 
 

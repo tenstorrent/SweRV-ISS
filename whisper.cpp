@@ -159,33 +159,34 @@ typedef std::vector<uint64_t> Uint64Vec;
 /// Hold values provided on the command line.
 struct Args
 {
-  StringVec   hexFiles;        // Hex files to be loaded into simulator memory.
-  StringVec   binaryFiles;     // Binary files to be loaded into simulator memory.
-  std::string traceFile;       // Log of state change after each instruction.
-  std::string commandLogFile;  // Log of interactive or socket commands.
-  std::string consoleOutFile;  // Console io output file.
-  std::string serverFile;      // File in which to write server host and port.
-  std::string instFreqFile;    // Instruction frequency file.
-  std::string configFile;      // Configuration (JSON) file.
-  std::string bblockFile;      // Basci block file.
-  std::string attFile;         // Address translation file.
-  std::string tracerLib;       // Path to tracer extension shared library.
+  StringVec   hexFiles;                  // Hex files to be loaded into simulator memory.
+  StringVec   binaryFiles;               // Binary files to be loaded into simulator memory.
+  std::string traceFile;                 // Log of state change after each instruction.
+  std::string commandLogFile;            // Log of interactive or socket commands.
+  std::string consoleOutFile;            // Console io output file.
+  std::string serverFile;                // File in which to write server host and port.
+  std::string instFreqFile;              // Instruction frequency file.
+  std::string configFile;                // Configuration (JSON) file.
+  std::string bblockFile;                // Basci block file.
+  std::string attFile;                   // Address translation file.
+  std::string tracerLib;                 // Path to tracer extension shared library.
   std::string isa;
-  std::string snapshotDir = "snapshot"; // Dir prefix for saving snapshots
-  std::string loadFrom;        // Directory for loading a snapshot
-  std::string stdoutFile;      // Redirect target program stdout to this.
-  std::string stderrFile;      // Redirect target program stderr to this.
-  std::string stdinFile;       // Redirect target program stdin to this. 
-  std::string dataLines;       // Output file for data address line tracing.
-  std::string instrLines;      // Output file for instruction address line tracing.
-  std::string initStateFile;   // Output file for inital state of memory lines used in run.
-  std::string kernelFile;      // Load kernel image at address.
-  StringVec   regInits;        // Initial values of regs
-  StringVec   targets;         // Target (ELF file) programs and associated
-                               // program options to be loaded into simulator
-                               // memory. Each target plus args is one string.
-  StringVec   isaVec;          // Isa string split around _ with rv32/rv64 prefix removed.
-  std::string targetSep = " "; // Target program argument separator.
+  std::string snapshotDir = "snapshot";  // Dir prefix for saving snapshots
+  std::string loadFrom;                  // Directory for loading a snapshot
+  std::string stdoutFile;                // Redirect target program stdout to this.
+  std::string stderrFile;                // Redirect target program stderr to this.
+  std::string stdinFile;                 // Redirect target program stdin to this.
+  std::string dataLines;                 // Output file for data address line tracing.
+  std::string instrLines;                // Output file for instruction address line tracing.
+  std::string initStateFile;             // Output file for inital state of memory lines used in run.
+  std::string kernelFile;                // Load kernel image at address.
+  std::string testSignatureFile;         // Output signature file to score riscv-arch-test tests
+  StringVec   regInits;                  // Initial values of regs
+  StringVec   targets;                   // Target (ELF file) programs and associated
+                                         // program options to be loaded into simulator
+                                         // memory. Each target plus args is one string.
+  StringVec   isaVec;                    // Isa string split around _ with rv32/rv64 prefix removed.
+  std::string targetSep = " ";           // Target program argument separator.
 
   std::optional<std::string> toHostSym;
   std::optional<std::string> consoleIoSym;
@@ -454,8 +455,10 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 " Example: -b file1  -b file2:0x1040")
         ("kernel", po::value(&args.kernelFile),
          "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
-	 "rv32 or 0x200000 for rv64 unless an explicit addresss is specified after a colon suffix "
-	 "to the file path.")
+        "rv32 or 0x200000 for rv64 unless an explicit addresss is specified after a colon suffix "
+        "to the file path.")
+        ("testsignature", po::value(&args.testSignatureFile),
+         "Produce a signature file used to score tests provided by the riscv-arch-test project.")
 	("logfile,f", po::value(&args.traceFile),
 	 "Enable tracing to given file of executed instructions. Output is compressed (with /usr/bin/gzip) if file name ends with \".gz\".")
 	("csvlog", po::bool_switch(&args.csv),
@@ -1915,6 +1918,9 @@ session(const Args& args, const HartConfig& config)
   auto& hart0 = *system.ithHart(0);
   if (not args.instFreqFile.empty())
     result = reportInstructionFrequency(hart0, args.instFreqFile) and result;
+
+  if (not args.testSignatureFile.empty())
+    result = system.produceTestSignatureFile(args.testSignatureFile) and result;
 
   closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
 

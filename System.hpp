@@ -17,6 +17,7 @@
 
 #include <memory>               // For shared_ptr
 #include <functional>
+#include <string_view>
 #include "Memory.hpp"
 #include "SparseMem.hpp"
 
@@ -262,6 +263,11 @@ namespace WdRiscv
 		   const DecodedInst& di);
 
     bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
+
+    /// Produce a signature file used to score tests from the
+    /// riscv-arch-tests project.  The file is written to the
+    // path specified in the parameter.
+    bool produceTestSignatureFile(std::string_view outPath) const;
 
   private:
 
