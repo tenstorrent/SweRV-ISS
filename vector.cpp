@@ -16751,7 +16751,7 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
     }
   else if (std::isinf(val))
     {
-      val = signBit? -0 : +0;
+      val = signBit? -0.0 : +0.0;
     }
   else if (std::isnan(val))
     {
@@ -16818,7 +16818,7 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
     }
   else if (std::isinf(val))
     {
-      val = signBit? -0 : +0;
+      val = signBit? -0.0 : +0.0;
     }
   else if (std::isnan(val))
     {
