@@ -2446,12 +2446,16 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  {
 	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32esmi);
 	  }
-	else if ((funct7 & 0x1f) == 0x18)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sm4ed);
-	  }
-	else if ((funct7 & 0x1f) == 0x1a)
-	  {
+        else if ((funct7 & 0x1f) == 0x18)
+          {
+            if (funct3 == 0)
+              {
+				op3 = inst >> 30;  // Upper 2 bits.
+                return instTable_.getEntry(InstId::sm4ed);
+              }
+          }
+        else if ((funct7 & 0x1f) == 0x1a)
+          {
 	    if (funct3 == 0)
 	      {
 		op3 = inst >> 30;  // Upper 2 bits.

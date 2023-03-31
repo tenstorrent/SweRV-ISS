@@ -34,6 +34,24 @@ gfmul(uint8_t x, uint8_t y)
 }
 
 
+template <typename uint_t>
+static constexpr
+uint_t
+rol(uint_t in, unsigned amount)
+{
+  return ((in << amount) | (in >> (std::numeric_limits<uint_t>::digits - amount)));
+}
+
+
+template <typename uint_t>
+static constexpr
+uint_t
+ror(uint_t in, unsigned amount)
+{
+  return ((in >> amount) | (in << (std::numeric_limits<uint_t>::digits - amount)));
+}
+
+
 static inline
 uint32_t
 aes_mixcolumn_byte_fwd(uint8_t so)
@@ -124,7 +142,7 @@ sm4_sbox(uint8_t x)
       0xD6, 0x90, 0xE9, 0xFE, 0xCC, 0xE1, 0x3D, 0xB7, 0x16, 0xB6, 0x14, 0xC2, 0x28,
       0xFB, 0x2C, 0x05, 0x2B, 0x67, 0x9A, 0x76, 0x2A, 0xBE, 0x04, 0xC3, 0xAA, 0x44,
       0x13, 0x26, 0x49, 0x86, 0x06, 0x99, 0x9C, 0x42, 0x50, 0xF4, 0x91, 0xEF, 0x98,
-      0x33, 0x54, 0x0B, 0x43, 0xED, 0xCF, 0xAC, 0x62, 0xE4, 0xB3, 0x1C, 0xA9, 0x7A,
+      0x7A, 0x33, 0x54, 0x0B, 0x43, 0xED, 0xCF, 0xAC, 0x62, 0xE4, 0xB3, 0x1C, 0xA9,
       0xC9, 0x08, 0xE8, 0x95, 0x80, 0xDF, 0x94, 0xFA, 0x75, 0x8F, 0x3F, 0xA6, 0x47,
       0x07, 0xA7, 0xFC, 0xF3, 0x73, 0x17, 0xBA, 0x83, 0x59, 0x3C, 0x19, 0xE6, 0x85,
       0x4F, 0xA8, 0x68, 0x6B, 0x81, 0xB2, 0x71, 0x64, 0xDA, 0x8B, 0xF8, 0xEB, 0x0F,
@@ -632,7 +650,7 @@ Hart<URV>::execAes64ks1i(const DecodedInst* di)
     }
 
   uint64_t r1 = intRegs_.read(di->op1());
-  unsigned rnum = di->op3();
+  unsigned rnum = di->op2();
 
   if ( rnum > 10)
     {
@@ -643,8 +661,7 @@ Hart<URV>::execAes64ks1i(const DecodedInst* di)
   uint32_t tmp1 = r1 >> 32;
   uint32_t rc = aes_decode_rcon(rnum);
 
-  uint32_t rorTmp1 = ((tmp1 >> 8) | (tmp1 << 24));  // rotate right tmp1 by 8
-  uint32_t tmp2 = (rnum == 0xa) ? tmp1 : rorTmp1;
+  uint32_t tmp2 = (rnum == 0xa) ? tmp1 : ror(tmp1, 8);
   uint32_t tmp3 = aes_subword_fwd(tmp2);
   uint32_t tmp4 = tmp3 ^ rc;
 
@@ -665,7 +682,7 @@ Hart<URV>::execAes64ks2(const DecodedInst* di)
     }
 
   uint64_t r1 = intRegs_.read(di->op1());
-  uint64_t r2 = intRegs_.read(di->op1());
+  uint64_t r2 = intRegs_.read(di->op2());
   uint32_t w0 = uint32_t(r1 >> 32) ^ uint32_t(r2);
   uint32_t w1 = uint32_t(r1 >> 32) ^ uint32_t(r2) ^ uint32_t(r2 >> 32);
   uint64_t result = (uint64_t(w1) << 32) | uint64_t(w0);
@@ -684,10 +701,10 @@ Hart<URV>::execSha256sig0(const DecodedInst* di)
       return;
     }
 
-  uint32_t inb  = intRegs_.read(di->op1());
-  uint32_t tmp1 = (inb >> 7)  | (inb << 25);  // rotate right by 7
-  uint32_t tmp2 = (inb >> 18) | (inb << 14);  // rotate right by 18
-  uint32_t result = tmp1 ^ tmp2 ^ (inb >> 3);
+  uint32_t inb      = intRegs_.read(di->op1());
+  uint32_t result32 = ror(inb, 7) ^ ror(inb, 18) ^ (inb >> 3);
+
+  URV result = static_cast<int32_t>(result32);  // sign extend.
 
   intRegs_.write(di->op0(), result);
 }
@@ -703,10 +720,10 @@ Hart<URV>::execSha256sig1(const DecodedInst* di)
       return;
     }
 
-  uint32_t inb  = intRegs_.read(di->op1());
-  uint32_t tmp1 = (inb >> 17) | (inb << 15);  // rotate right by 17
-  uint32_t tmp2 = (inb >> 19) | (inb << 13);  // rotate right by 19
-  uint32_t result = tmp1 ^ tmp2 ^ (inb >> 10);
+  uint32_t inb      = intRegs_.read(di->op1());
+  uint32_t result32 = ror(inb, 17) ^ ror(inb, 19) ^ (inb >> 10);
+
+  URV result = static_cast<int32_t>(result32);  // sign extend.
 
   intRegs_.write(di->op0(), result);
 }
@@ -722,11 +739,10 @@ Hart<URV>::execSha256sum0(const DecodedInst* di)
       return;
     }
 
-  uint32_t inb  = intRegs_.read(di->op1());
-  uint32_t tmp1 = (inb >> 2 ) | (inb << 30);  // rotate right by 2
-  uint32_t tmp2 = (inb >> 13) | (inb << 19);  // rotate right by 13
-  uint32_t tmp3 = (inb >> 22) | (inb << 10);  // rotate right by 22
-  uint32_t result = tmp1 ^ tmp2 ^ tmp3;
+  uint32_t inb      = intRegs_.read(di->op1());
+  uint32_t result32 = ror(inb, 2) ^ ror(inb, 13) ^ ror(inb, 22);
+
+  URV result = static_cast<int32_t>(result32);  // sign extend.
 
   intRegs_.write(di->op0(), result);
 }
@@ -742,11 +758,10 @@ Hart<URV>::execSha256sum1(const DecodedInst* di)
       return;
     }
 
-  uint32_t inb  = intRegs_.read(di->op1());
-  uint32_t tmp1 = (inb >> 6 ) | (inb << 26);  // rotate right by 6
-  uint32_t tmp2 = (inb >> 11) | (inb << 21);  // rotate right by 11
-  uint32_t tmp3 = (inb >> 25) | (inb << 7);   // rotate right by 25
-  uint32_t result = tmp1 ^ tmp2 ^ tmp3;
+  uint32_t inb      = intRegs_.read(di->op1());
+  uint32_t result32 = ror(inb, 6) ^ ror(inb, 11) ^ ror(inb, 25);
+
+  URV result = static_cast<int32_t>(result32);  // sign extend.
 
   intRegs_.write(di->op0(), result);
 }
@@ -881,10 +896,8 @@ Hart<URV>::execSha512sig0(const DecodedInst* di)
       return;
     }
 
-  uint64_t r1 = intRegs_.read(di->op1());
-  uint64_t tmp1 = (r1 >> 1) | (r1 << 63);  // rotate right by 1
-  uint64_t tmp2 = (r1 >> 8) | (r1 << 58);  // rotate right by 8
-  uint64_t res = tmp1 ^ tmp2 ^ (r1 >> 7);
+  uint64_t r1  = intRegs_.read(di->op1());
+  uint64_t res = ror(r1, 1) ^ ror(r1, 8) ^ (r1 >> 7);
 
   intRegs_.write(di->op0(), res);
 }
@@ -900,10 +913,8 @@ Hart<URV>::execSha512sig1(const DecodedInst* di)
       return;
     }
 
-  uint64_t r1 = intRegs_.read(di->op1());
-  uint64_t tmp1 = (r1 >> 19) | (r1 << 45);  // rotate right by 19
-  uint64_t tmp2 = (r1 >> 61) | (r1 << 3);   // rotate right by 61
-  uint64_t res = tmp1 ^ tmp2 ^ (r1 >> 6);
+  uint64_t r1  = intRegs_.read(di->op1());
+  uint64_t res = ror(r1, 19) ^ ror(r1, 61) ^ (r1 >> 6);
 
   intRegs_.write(di->op0(), res);
 }
@@ -919,11 +930,8 @@ Hart<URV>::execSha512sum0(const DecodedInst* di)
       return;
     }
 
-  uint64_t r1 = intRegs_.read(di->op1());
-  uint64_t tmp1 = (r1 >> 28) | (r1 << 28);  // rotate right by 28
-  uint64_t tmp2 = (r1 >> 34) | (r1 << 30);  // rotate right by 34
-  uint64_t tmp3 = (r1 >> 39) | (r1 << 25);  // rotate right by 39
-  uint64_t res = tmp1 ^ tmp2 ^ tmp3;
+  uint64_t r1  = intRegs_.read(di->op1());
+  uint64_t res = ror(r1, 28) ^ ror(r1, 34) ^ ror(r1, 39);
 
   intRegs_.write(di->op0(), res);
 }
@@ -939,11 +947,8 @@ Hart<URV>::execSha512sum1(const DecodedInst* di)
       return;
     }
 
-  uint64_t r1 = intRegs_.read(di->op1());
-  uint64_t tmp1 = (r1 >> 14) | (r1 << 50);  // rotate right by 14
-  uint64_t tmp2 = (r1 >> 18) | (r1 << 46);  // rotate right by 18
-  uint64_t tmp3 = (r1 >> 41) | (r1 << 23);  // rotate right by 41
-  uint64_t res = tmp1 ^ tmp2 ^ tmp3;
+  uint64_t r1  = intRegs_.read(di->op1());
+  uint64_t res = ror(r1, 14) ^ ror(r1, 18) ^ ror(r1, 41);
 
   intRegs_.write(di->op0(), res);
 }
@@ -959,11 +964,9 @@ Hart<URV>::execSm3p0(const DecodedInst* di)
       return;
     }
 
-  uint32_t r1 = intRegs_.read(di->op1());
-  uint32_t tmp1 = (r1 << 9)  | (r1 >> 23);  // rotate left by 9
-  uint32_t tmp2 = (r1 << 17) | (r1 >> 15);  // rotate left by 15
-  int32_t sres32 = r1 ^ tmp1 ^ tmp2;
-  SRV res = sres32;  // sign extend.
+  uint32_t r1     = intRegs_.read(di->op1());
+  int32_t  sres32 = r1 ^ rol(r1, 9) ^ rol(r1, 17);
+  SRV      res    = sres32;  // sign extend.
 
   intRegs_.write(di->op0(), res);
 }
@@ -979,11 +982,9 @@ Hart<URV>::execSm3p1(const DecodedInst* di)
       return;
     }
 
-  uint32_t r1 = intRegs_.read(di->op1());
-  uint32_t tmp1 = (r1 << 15) | (r1 >> 17);  // rotate left by 15
-  uint32_t tmp2 = (r1 << 23) | (r1 >> 9);   // rotate left by 23
-  int32_t sres32 = r1 ^ tmp1 ^ tmp2;
-  SRV res = sres32;  // sign extend.
+  uint32_t r1     = intRegs_.read(di->op1());
+  int32_t  sres32 = r1 ^ rol(r1, 15) ^ rol(r1, 23);
+  SRV      res    = sres32;  // sign extend.
 
   intRegs_.write(di->op0(), res);
 }
@@ -1005,7 +1006,7 @@ Hart<URV>::execSm4ed(const DecodedInst* di)
   uint32_t y = ( x ^ (x << 8)  ^ (x << 2) ^ (x << 18) ^ ((x & 0x3f) << 26) ^
 		 ((x & 0xc0) << 10) );
 
-  uint32_t z = (y << shamt) | (y >> (32 - shamt));  // rotate left by shamt
+  uint32_t z     = rol(y, shamt);
   uint32_t res32 = z ^ uint32_t(intRegs_.read(di->op1()));
 
   SRV res = int32_t(res32);  // sign extend
@@ -1034,7 +1035,7 @@ Hart<URV>::execSm4ks(const DecodedInst* di)
   uint32_t y = ( x ^ ((x & 7) << 29)  ^ ((x & 0xfe) << 7) ^ ((x & 1) << 23) ^
 		 ((x & 0xf8) << 13) );
 
-  uint32_t z = (y << shamt) | (y >> (32 - shamt));  // rotate left by shamt
+  uint32_t z     = rol(y, shamt);
   uint32_t res32 = z ^ uint32_t(intRegs_.read(di->op1()));
 
   SRV res = int32_t(res32);  // sign extend
