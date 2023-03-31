@@ -16727,7 +16727,7 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 
       if (inExp < -1 or inExp > 2*bias)
 	{
-	  auto upDown = signBit? RoundingMode::Down : RoundingMode::Up;
+	  auto upDown = signBit? RoundingMode::Up : RoundingMode::Down;
 	  if (mode == upDown or mode == RoundingMode::Zero)
 	    {
 	      val = std::numeric_limits<float>::max();
