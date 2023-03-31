@@ -7,9 +7,9 @@ if [[ "$1" == "-f" ||  "$1" == "force" ]]; then
 fi
 
 if [ ! -d $scriptpath/ralph_venv ]; then
-  pip3 install virtualenv
-  virtualenv ralph_venv
+  python3 -m venv ralph_venv
   source ralph_venv/bin/activate
+  pip install --upgrade pip
   pip install -r requirements.txt
 else
   source ralph_venv/bin/activate

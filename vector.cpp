@@ -16660,7 +16660,8 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 
       if (inExp < -1 or inExp > 2*bias)
 	{
-	  if (mode == RoundingMode::Up or mode == RoundingMode::Zero)
+	  auto upDown = signBit? RoundingMode::Down : RoundingMode::Up;
+	  if (mode == upDown or mode == RoundingMode::Zero)
 	    {
 	      val = std::numeric_limits<double>::max();
 	      if (signBit)
@@ -16726,7 +16727,8 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 
       if (inExp < -1 or inExp > 2*bias)
 	{
-	  if (mode == RoundingMode::Up or mode == RoundingMode::Zero)
+	  auto upDown = signBit? RoundingMode::Down : RoundingMode::Up;
+	  if (mode == upDown or mode == RoundingMode::Zero)
 	    {
 	      val = std::numeric_limits<float>::max();
 	      if (signBit)
@@ -16751,6 +16753,8 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 	  uint32_t outSigMs7 = frec7Table[sigMs7];
 	  uf.u = (outSigMs7 << 16) | (outExp << 23) | (signBit << 31);
 	  val = uf.f;
+	  if (signBit)
+	    val = -val;
 	}
     }
 
@@ -21978,6 +21982,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
   ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
 
+  bool invalid = false;
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -21988,10 +21993,12 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  if constexpr(std::is_same<ELEM_TYPE, Float16>::value)
-            dest = e1.toFloat();
-	  else
-	    dest = e1;
+	  dest = fpWiden(e1);
+	  if (isSnan(dest))
+	    {
+	      dest = getQuietNan<ELEM_TYPE2X>();
+	      invalid = true;
+	    }
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -21999,7 +22006,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f, invalid);
   assert(errors == 0);
 }
 
@@ -22601,6 +22608,9 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
+
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22671,6 +22681,9 @@ Hart<URV>::vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       else
 	errors++;
     }
+
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -22749,6 +22762,9 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
+
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22825,6 +22841,9 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       else
 	errors++;
     }
+
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -22903,6 +22922,9 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE2X>();
+
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22979,6 +23001,9 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       else
 	errors++;
     }
+
+  if (std::isnan(result))
+    result = getQuietNan<ELEM_TYPE2X>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
