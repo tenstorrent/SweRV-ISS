@@ -756,6 +756,10 @@ namespace WdRiscv
     unsigned lastLdStSize() const
     { return ldStSize_; }
 
+    /// Return true if last branch instruction was taken.
+    bool lastBranchTaken() const
+    { return lastBranchTaken_; }
+
     /// Read instruction at given address. Return true on success and
     /// false if address is out of memory bounds.
     bool readInst(uint64_t address, uint32_t& instr);

@@ -140,6 +140,11 @@ namespace WdRiscv
     bool isBranchToRegister() const
     { return di_.isBranchToRegister(); }
 
+    /// Return true if last instruction was a branch and (if it was)
+    /// whether it was taken.
+    std::pair<bool, bool> lastBranchTaken() const
+    { return std::make_pair(isBranch(), hart_->lastBranchTaken()); }
+
     /// Return true if record is for a floating point instruction.
     bool isFp() const
     { return di_.isFp(); }
