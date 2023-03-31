@@ -2308,6 +2308,21 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
       counterAtLastIllegal_ = instCounter_;
     }
 
+  // In debug mode no exception is taken. If an ebreak exception and
+  // debug park loop is defined, we jump to it. If not an ebreak and
+  // debug trap entry point is defined, we jump to it.
+  if (debugMode_)
+    {
+      if (cause == ExceptionCause::BREAKP)
+	{
+	  if (debugParkLoop_ != ~URV(0))
+	    setPc(debugParkLoop_);
+	}
+      else if (debugTrapAddr_ != ~URV(0))
+	setPc(debugTrapAddr_);
+      return;
+    }
+
   bool interrupt = false;
   exceptionCount_++;
   hasException_ = true;
