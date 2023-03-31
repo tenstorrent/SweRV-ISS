@@ -17089,6 +17089,8 @@ fpWiden(Float16 x)
 {
   if (x.isSnan())
     return std::numeric_limits<float>::signaling_NaN();
+  if (std::isNan(x))
+    return getQuietNan<float>();
   return x.toFloat();
 }
 
@@ -17099,6 +17101,8 @@ fpWiden(float x)
 {
   if (isSnan(x))
     return std::numeric_limits<double>::signaling_NaN();
+  if (std::isnan(x))
+    return getQuietNan<double>();
   return x;
 }
 
