@@ -359,6 +359,12 @@ namespace WdRiscv
       return 0;
     }
 
+    /// Return the maximum element count for the current SEW and LMUL.
+    uint32_t vlmax() const
+    {
+      return groupX8_*bytesPerReg_/sewInBits_;
+    }
+
     static std::string to_string(GroupMultiplier group)
     {
       static std::vector<std::string> vec =
