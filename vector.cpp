@@ -22723,9 +22723,6 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
-  if (std::isnan(result))
-    result = getQuietNan<ELEM_TYPE>();
-
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22796,9 +22793,6 @@ Hart<URV>::vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       else
 	errors++;
     }
-
-  if (std::isnan(result))
-    result = getQuietNan<ELEM_TYPE>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -22877,9 +22871,6 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
-  if (std::isnan(result))
-    result = getQuietNan<ELEM_TYPE>();
-
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -22957,9 +22948,6 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	errors++;
     }
 
-  if (std::isnan(result))
-    result = getQuietNan<ELEM_TYPE>();
-
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
@@ -23014,12 +23002,11 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE2X e2{}, result{};
+  ELEM_TYPE2X result{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  result = e2;
   
   ELEM_TYPE e1{};
 
@@ -23036,9 +23023,6 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       else
 	errors++;
     }
-
-  if (std::isnan(result))
-    result = getQuietNan<ELEM_TYPE2X>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -23094,12 +23078,11 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
 
   unsigned errors = 0;
-  ELEM_TYPE2X e2{}, result{};
+  ELEM_TYPE2X result{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
+  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  result = e2;
   
   ELEM_TYPE e1{};
 
@@ -23116,9 +23099,6 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       else
 	errors++;
     }
-
-  if (std::isnan(result))
-    result = getQuietNan<ELEM_TYPE2X>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
