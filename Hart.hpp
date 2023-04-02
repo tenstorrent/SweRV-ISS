@@ -2290,9 +2290,14 @@ namespace WdRiscv
       return 0x1f;
     }
 
+    // Return true if maskable vector instruction is legal for current
+    // selected element width and group multiplier. Take an illegal
+    // instuction exception and return false otherwise.
+    bool checkMaskableInst(const DecodedInst* di);
+
     // Return true if maskable vector instruction is legal. Take an
     // illegal instuction exception and return false otherwise.
-    bool checkMaskableInst(const DecodedInst* di);
+    bool checkMaskableInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
