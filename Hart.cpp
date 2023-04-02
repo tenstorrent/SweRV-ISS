@@ -650,7 +650,17 @@ Hart<URV>::resetVector()
 	vecRegs_.config(16 /*bytesPerReg*/, 1 /*minBytesPerElem*/,
 			4 /*maxBytesPerElem*/, nullptr /*minSewPerLmul*/, nullptr);
       unsigned bytesPerReg = vecRegs_.bytesPerRegister();
-      csRegs_.configCsr("vlenb", true, bytesPerReg, 0, 0, false, false);
+      csRegs_.configCsr(CsrNumber::VLENB, true, bytesPerReg, 0, 0, false, false);
+      uint32_t vstartBits = static_cast<uint32_t>(std::log2(bytesPerReg*8));
+      URV vstartMask = (URV(1) << vstartBits) - 1;
+      auto csr = csRegs_.findCsr(CsrNumber::VSTART);
+      if (not csr or csr->getWriteMask() != vstartMask)
+	{
+	  std::cerr << "Warning: Write mask of CSR VSTART changed to 0x" << std::hex
+		    << vstartMask << " to be compatible with VLEN=" << std::dec
+		    << (bytesPerReg*8) << '\n';
+	  csRegs_.configCsr(CsrNumber::VSTART, true, 0, vstartMask, vstartMask, false, false);
+	}
     }
 
   // Make cached vector engine parameters match reset value of the VTYPE CSR.
