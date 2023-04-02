@@ -756,6 +756,10 @@ namespace WdRiscv
     unsigned lastLdStSize() const
     { return ldStSize_; }
 
+    /// Return true if last branch instruction was taken.
+    bool lastBranchTaken() const
+    { return lastBranchTaken_; }
+
     /// Read instruction at given address. Return true on success and
     /// false if address is out of memory bounds.
     bool readInst(uint64_t address, uint32_t& instr);
@@ -2286,9 +2290,14 @@ namespace WdRiscv
       return 0x1f;
     }
 
+    // Return true if maskable vector instruction is legal for current
+    // selected element width and group multiplier. Take an illegal
+    // instuction exception and return false otherwise.
+    bool checkMaskableInst(const DecodedInst* di);
+
     // Return true if maskable vector instruction is legal. Take an
     // illegal instuction exception and return false otherwise.
-    bool checkMaskableInst(const DecodedInst* di);
+    bool checkMaskableInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
