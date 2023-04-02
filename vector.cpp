@@ -14146,7 +14146,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   GroupMultiplier gm = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, gm);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
-  if ((not checkVecExec()) or badConfig or di->isMasked() or start > vecRegs_.vlmax())
+  if ((not checkVecExec()) or badConfig or di->isMasked())
     {
       illegalInst(di);
       return false;
@@ -14273,8 +14273,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
   unsigned start = csRegs_.peekVstart();
   unsigned groupX8 = vecRegs_.groupMultiplierX8(gm);
   ElementWidth eew = ElementWidth::Byte;
-  if (not checkVecExec()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked()  or
-      start > vecRegs_.vlmax())
+  if (not checkVecExec()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
     {
       illegalInst(di);
       return false;

@@ -365,6 +365,15 @@ namespace WdRiscv
       return groupX8_*bytesPerReg_/sewInBits_;
     }
 
+    /// Return the maximum lement count for the given group multiplier
+    /// element width.
+    uint32_t vlmax(GroupMultiplier gm, ElementWidth eew)
+    {
+      uint32_t gm8 = groupMultiplierX8(gm);
+      uint32_t eewInBits = elementWidthInBits(eew);
+      return gm8*bytesPerReg_/eewInBits;
+    }
+
     static std::string to_string(GroupMultiplier group)
     {
       static std::vector<std::string> vec =
