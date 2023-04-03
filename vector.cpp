@@ -22792,19 +22792,28 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
-  
+
   ELEM_TYPE e1{}, result{e2};
+
+  bool anyActive = false;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-	continue;
+        continue;
 
+      anyActive = true;
       if (vecRegs_.read(vs1, ix, group, e1))
-	result = doFadd(result, e1);
+        result = doFadd(result, e1);
       else
-	errors++;
+        errors++;
     }
+
+  // Note: NaN canonicalization when there are no active elements
+  // is only allowed for vfredusum.vs and NOT for vfredosum.vs,
+  // vfredmin.vs, and vfredmax.vs.
+  if (not anyActive and std::isnan(result))
+    result = getQuietNan<ELEM_TYPE>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
