@@ -157,7 +157,7 @@ namespace WdRiscv
         return false;
       if (regNum*bytesPerReg_ + elemIx*sizeof(T) > bytesInRegFile_ - sizeof(T))
         return false;
-      const T* data = reinterpret_cast<const T*>(data_ + regNum*bytesPerReg_);
+      const T* data = reinterpret_cast<const T*>(data_.data() + regNum*bytesPerReg_);
       value = data[elemIx];
       return true;
     }
@@ -177,7 +177,7 @@ namespace WdRiscv
         return false;
       if (regNum*bytesPerReg_ + (elemIx + 1)*sizeof(T) > bytesInRegFile_)
         return false;
-      T* data = reinterpret_cast<T*>(data_ + regNum*bytesPerReg_);
+      T* data = reinterpret_cast<T*>(data_.data() + regNum*bytesPerReg_);
       data[elemIx] = value;
       lastWrittenReg_ = regNum;
       lastGroupX8_ = groupX8;
@@ -472,7 +472,7 @@ namespace WdRiscv
       if (byteIx >= bytesPerReg_)
         return false;
 
-      const uint8_t* data = data_ + maskReg*bytesPerReg_;
+      const uint8_t* data = data_.data() + maskReg*bytesPerReg_;
       return (data[byteIx] >> bitIx) & 1;
     }
 
@@ -489,7 +489,7 @@ namespace WdRiscv
       if (byteIx >= bytesPerReg_)
         return false;
 
-      uint8_t* data = data_ + maskReg*bytesPerReg_;
+      uint8_t* data = data_.data() + maskReg*bytesPerReg_;
       uint8_t mask = uint8_t(1) << bitIx;
       if (value)
         data[byteIx] |= mask;
@@ -507,14 +507,14 @@ namespace WdRiscv
     {
       if (vecIx >= regCount_)
         return nullptr;
-      return data_ + vecIx*bytesPerReg_;
+      return data_.data() + vecIx*bytesPerReg_;
     }
 
     const uint8_t* getVecData(uint32_t vecIx) const
     {
       if (vecIx >= regCount_)
         return nullptr;
-      return data_ + vecIx*bytesPerReg_;
+      return data_.data() + vecIx*bytesPerReg_;
     }
 
     /// It is convenient to contruct an empty regiter file (bytesPerReg = 0)
@@ -577,7 +577,7 @@ namespace WdRiscv
     uint32_t minBytesPerElem_ = 0;
     uint32_t maxBytesPerElem_ = 0;
     uint32_t bytesInRegFile_ = 0;
-    uint8_t* data_ = nullptr;
+    std::vector<uint8_t> data_;
 
     uint32_t elems_ = 0;                           // Cached VL
     ElementWidth sew_ = ElementWidth::Byte;        // Cached VTYPE.SEW

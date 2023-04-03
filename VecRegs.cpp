@@ -48,8 +48,6 @@ VecRegs::~VecRegs()
   regCount_ = 0;
   bytesPerReg_ = 0;
   bytesInRegFile_ = 0;
-  delete [] data_;
-  data_ = nullptr;
 }
 
 
@@ -184,17 +182,15 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
     }
 
 
-  delete [] data_;
-  data_ = new uint8_t[bytesInRegFile_];
-  memset(data_, 0, bytesInRegFile_);
+  data_.resize(bytesInRegFile_);
+  std::fill(data_.begin(), data_.end(), 0);
 }
 
 
 void
 VecRegs::reset()
 {
-  if (data_)
-    memset(data_, 0, bytesInRegFile_);
+  std::fill(data_.begin(), data_.end(), 0);
   lastWrittenReg_ = -1;
   lastGroupX8_ = 8;
 }
