@@ -13773,7 +13773,9 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  unsigned start = csRegs_.peekVstart();
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
+      /*or start > vecRegs_.vlmax(lmul, eew)*/)
     {
       illegalInst(di);
       return false;
@@ -13786,7 +13788,6 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
     return false;
 
   unsigned elemCount = vecRegs_.elemCount();
-  unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
@@ -13828,8 +13829,6 @@ template <typename URV>
 void
 Hart<URV>::execVle8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    return;
   if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, false))
     return;
   csRegs_.clearVstart();
@@ -13840,8 +13839,6 @@ template <typename URV>
 void
 Hart<URV>::execVle16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    return;
   if (not vectorLoad<uint16_t>(di, ElementWidth::Half, false))
     return;
   csRegs_.clearVstart();
@@ -13852,8 +13849,6 @@ template <typename URV>
 void
 Hart<URV>::execVle32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    return;
   if (not vectorLoad<uint32_t>(di, ElementWidth::Word, false))
     return;
   csRegs_.clearVstart();
@@ -13864,8 +13859,6 @@ template <typename URV>
 void
 Hart<URV>::execVle64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    return;
   if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, false))
     return;
   csRegs_.clearVstart();
@@ -13923,7 +13916,8 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
+      /* or start > vecRegs_.vlmax(lmul, eew)*/)
     {
       illegalInst(di);
       return false;
@@ -13984,12 +13978,6 @@ template <typename URV>
 void
 Hart<URV>::execVse8_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStore<uint8_t>(di, ElementWidth::Byte))
     return;
   csRegs_.clearVstart();
@@ -14000,12 +13988,6 @@ template <typename URV>
 void
 Hart<URV>::execVse16_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Half))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStore<uint16_t>(di, ElementWidth::Half))
     return;
   csRegs_.clearVstart();
@@ -14016,12 +13998,6 @@ template <typename URV>
 void
 Hart<URV>::execVse32_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Word))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStore<uint32_t>(di, ElementWidth::Word))
     return;
   csRegs_.clearVstart();
@@ -14032,12 +14008,6 @@ template <typename URV>
 void
 Hart<URV>::execVse64_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStore<uint64_t>(di, ElementWidth::Word2))
     return;
   csRegs_.clearVstart();
@@ -14382,9 +14352,6 @@ template <typename URV>
 void
 Hart<URV>::execVle16ff_v(const DecodedInst* di)
 {
-  GroupMultiplier gm = vecRegs_.groupMultiplier();
-  if (not checkMaskableInst(di, gm, ElementWidth::Half))
-    return;
   if (not vectorLoad<uint16_t>(di, ElementWidth::Half, true))
     return;
   csRegs_.clearVstart();
@@ -14395,9 +14362,6 @@ template <typename URV>
 void
 Hart<URV>::execVle32ff_v(const DecodedInst* di)
 {
-  GroupMultiplier gm = vecRegs_.groupMultiplier();
-  if (not checkMaskableInst(di, gm, ElementWidth::Word))
-    return;
   if (not vectorLoad<uint32_t>(di, ElementWidth::Word, true))
     return;
   csRegs_.clearVstart();
@@ -14408,9 +14372,6 @@ template <typename URV>
 void
 Hart<URV>::execVle64ff_v(const DecodedInst* di)
 {
-  GroupMultiplier gm = vecRegs_.groupMultiplier();
-  if (not checkMaskableInst(di, gm, ElementWidth::Word2))
-    return;
   if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, true))
     return;
   csRegs_.clearVstart();
@@ -14468,7 +14429,8 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
+      /*or start > vecRegs_.vlmax(lmul, eew)*/)
     {
       illegalInst(di);
       return false;
@@ -14527,8 +14489,6 @@ template <typename URV>
 void
 Hart<URV>::execVlse8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    return;
   if (not vectorLoadStrided<uint8_t>(di, ElementWidth::Byte))
     return;
   csRegs_.clearVstart();
@@ -14539,8 +14499,6 @@ template <typename URV>
 void
 Hart<URV>::execVlse16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    return;
   if (not vectorLoadStrided<uint16_t>(di, ElementWidth::Half))
     return;
   csRegs_.clearVstart();
@@ -14551,8 +14509,6 @@ template <typename URV>
 void
 Hart<URV>::execVlse32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    return;
   if (not vectorLoadStrided<uint32_t>(di, ElementWidth::Word))
     return;
   csRegs_.clearVstart();
@@ -14563,8 +14519,6 @@ template <typename URV>
 void
 Hart<URV>::execVlse64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    return;
   if (not vectorLoadStrided<uint64_t>(di, ElementWidth::Word2))
     return;
   csRegs_.clearVstart();
@@ -14623,8 +14577,8 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig() or
-      start > vecRegs_.vlmax())
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
+      /* or start > vecRegs_.vlmax(lmul, eew)*/)
     {
       illegalInst(di);
       return false;
@@ -14685,12 +14639,6 @@ template <typename URV>
 void
 Hart<URV>::execVsse8_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStoreStrided<uint8_t>(di, ElementWidth::Byte))
     return;
   csRegs_.clearVstart();
@@ -14701,12 +14649,6 @@ template <typename URV>
 void
 Hart<URV>::execVsse16_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Half))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStoreStrided<uint16_t>(di, ElementWidth::Half))
     return;
   csRegs_.clearVstart();
@@ -14717,12 +14659,6 @@ template <typename URV>
 void
 Hart<URV>::execVsse32_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Word))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStoreStrided<uint32_t>(di, ElementWidth::Word))
     return;
   csRegs_.clearVstart();
@@ -14733,12 +14669,6 @@ template <typename URV>
 void
 Hart<URV>::execVsse64_v(const DecodedInst* di)
 {
-  if (csRegs_.peekVstart() > vecRegs_.vlmax(vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    {
-      illegalInst(di);
-      return;
-    }
-
   if (not vectorStoreStrided<uint64_t>(di, ElementWidth::Word2))
     return;
   csRegs_.clearVstart();
@@ -15261,7 +15191,8 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
+      /*or start > vecRegs_.vlmax(lmul, eew)*/)
     {
       illegalInst(di);
       return false;
@@ -15331,9 +15262,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
@@ -15346,9 +15274,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
@@ -15361,9 +15286,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
@@ -15376,9 +15298,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
@@ -15438,8 +15357,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig() or
-      start > vecRegs_.vlmax())
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
+      /* or start > vecRegs_.vlmax(lmul, eew)*/)
     {
       illegalInst(di);
       return false;
@@ -15509,12 +15428,6 @@ template <typename URV>
 void
 Hart<URV>::execVssege8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
@@ -15527,12 +15440,6 @@ template <typename URV>
 void
 Hart<URV>::execVssege16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
@@ -15545,12 +15452,6 @@ template <typename URV>
 void
 Hart<URV>::execVssege32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
@@ -15563,12 +15464,6 @@ template <typename URV>
 void
 Hart<URV>::execVssege64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
@@ -15613,9 +15508,6 @@ template <typename URV>
 void
 Hart<URV>::execVlssege8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
@@ -15628,9 +15520,6 @@ template <typename URV>
 void
 Hart<URV>::execVlssege16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
@@ -15643,9 +15532,6 @@ template <typename URV>
 void
 Hart<URV>::execVlssege32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
@@ -15658,9 +15544,6 @@ template <typename URV>
 void
 Hart<URV>::execVlssege64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
@@ -16428,9 +16311,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege8ff_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, true))
@@ -16443,9 +16323,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege16ff_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, true))
@@ -16458,9 +16335,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege32ff_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, true))
@@ -16473,9 +16347,6 @@ template <typename URV>
 void
 Hart<URV>::execVlsege64ff_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    return;
-
   unsigned fieldCount = di->vecFieldCount();
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, true))
