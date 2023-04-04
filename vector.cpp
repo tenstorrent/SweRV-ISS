@@ -16813,7 +16813,7 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 	  int sigMs7 = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
 	  uint32_t outExp = (2*bias - 1 - inExp);
 	  uint32_t outSigMs7 = frec7Table[sigMs7];
-	  uf.u = (outSigMs7 << 16) | (outExp << 23) | (signBit << 31);
+	  uf.u = (outSigMs7 << 16) | (outExp << 23);
 	  val = uf.f;
 	  if (signBit)
 	    val = -val;
