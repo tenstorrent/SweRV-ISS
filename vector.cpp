@@ -16815,8 +16815,6 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 	  uint32_t outSigMs7 = frec7Table[sigMs7];
 	  uf.u = (outSigMs7 << 16) | (outExp << 23) | (signBit << 31);
 	  val = uf.f;
-	  if (signBit)
-	    val = -val;
 	}
     }
 
@@ -22684,7 +22682,7 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   // is only allowed for vfredusum.vs and NOT for vfredosum.vs,
   // vfredmin.vs, and vfredmax.vs.
   if (not anyActive and std::isnan(result))
-    result = getQuietNan<ELEM_TYPE>();
+    result = getQuietNan<decltype(result)>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -22970,22 +22968,30 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
     errors++;
-  
+
   ELEM_TYPE e1{};
+
+  bool anyActive = false;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
-	continue;
+        continue;
 
+      anyActive = true;
       if (vecRegs_.read(vs1, ix, group, e1))
-	{
-	  ELEM_TYPE2X e1dw = fpWiden(e1);
-	  result = doFadd(result, e1dw);
-	}
+        {
+          ELEM_TYPE2X e1dw = fpWiden(e1);
+          result           = doFadd(result, e1dw);
+        }
       else
-	errors++;
+        errors++;
     }
+
+  // Note: NaN canonicalization when there are no active elements
+  // is only allowed for vfwredusum.vs and NOT for vfwredosum.vs.
+  if (not anyActive and std::isnan(result))
+    result = getQuietNan<decltype(result)>();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
