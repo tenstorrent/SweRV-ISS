@@ -13438,6 +13438,7 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned elemBits = integerWidth<ELEM_TYPE2X> ();
   unsigned mask = elemBits - 1;
   unsigned group2x = group*2;
+  bool saturated = false; // True if any of the elements saturate.
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -13459,6 +13460,7 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                 dest = maxVal<ELEM_TYPE>();
               else
                 dest = (e1 < 0) ? minVal<ELEM_TYPE>() : maxVal<ELEM_TYPE>();
+	      saturated = true;
             }
 
           if (not vecRegs_.write(vd, ix, group, dest))
@@ -13467,6 +13469,9 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       else
         errors++;
     }
+
+  if (saturated)
+    csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
 
   assert(errors == 0);
 }
@@ -13530,6 +13535,7 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   unsigned mask = elemBits - 1;
   unsigned amount = unsigned(e2) & mask;
   unsigned group2x = group*2;
+  bool saturated = false; // True if any of the elements saturate.
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -13550,6 +13556,7 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                 dest = maxVal<ELEM_TYPE>();
               else
                 dest = (e1 < 0) ? minVal<ELEM_TYPE>() : maxVal<ELEM_TYPE>();
+	      saturated = true;
             }
 
           if (not vecRegs_.write(vd, ix, group, dest))
@@ -13558,6 +13565,9 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
       else
         errors++;
     }
+
+  if (saturated)
+    csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
 
   assert(errors == 0);
 }
