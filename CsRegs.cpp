@@ -356,6 +356,27 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	}
     }
 
+  // enable MPV and GVA bits
+  uint64_t hyperBits;
+  Csr<URV>* mstatus;
+  if (not rv32_)
+    {
+      hyperBits = uint64_t(0x3) << 38;
+      mstatus = findCsr(CN::MSTATUS);
+    }
+  else
+    {
+      hyperBits = 0x3 << 6;
+      mstatus = findCsr(CN::MSTATUSH);
+    }
+
+  URV mask = mstatus->getWriteMask();
+  mask |= hyperBits;
+  mstatus->setWriteMask(mask);
+  mask = mstatus->getPokeMask();
+  mask |= hyperBits;
+  mstatus->setPokeMask(mask);
+
   if (not flag)
     return;
 
@@ -1085,6 +1106,7 @@ CsRegs<URV>::defineMachineRegs()
 
   // Interrupt enable: Least sig 12 bits corresponding to the 12
   // interrupt causes are writable.
+  // TODO: SGEIE (bit 12)
   URV mieMask = 0xfff; 
   defineCsr("mie", Csrn::MIE, mand, imp, 0, mieMask, mieMask);
 
@@ -2130,6 +2152,7 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MTVAL, {{"mtval", xlen}});
   setCsrFields(CsrNumber::MCYCLE, {{"mcycle", xlen}});
   setCsrFields(CsrNumber::MINSTRET, {{"minstret", xlen}});
+  // TODO: add GVA/SBE fields
   if (rv32_)
     {
       setCsrFields(CsrNumber::MSTATUS,

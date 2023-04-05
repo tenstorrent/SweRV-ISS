@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -46,58 +46,70 @@ namespace WdRiscv
     { }
 
     /// Perform virtual to physical memory address translation and
-    /// check for read/write/fetch access (one and ly one of the
+    /// check for read/write/fetch access (one and only one of the
     /// read/write/exec flags must be true). Return encoutered
     /// exception on failure or ExceptionType::NONE on success. Does
     /// not check for page crossing. The twoStage flag indicates
     /// that two-stage translation (hypervisor with V=1) is on.
     ExceptionCause translate(uint64_t va, PrivilegeMode pm, bool twoStage,
-			     bool read, bool write, bool exec, uint64_t& pa);
+			     bool read, bool write, bool exec, uint64_t& gpa,
+                             uint64_t& pa);
 
     /// Similar to translate but targeting only execute access.
     ExceptionCause translateForFetch(uint64_t va, PrivilegeMode pm, bool twoStage,
-				     uint64_t& pa)
-    { return translate(va, pm, twoStage, false, false, true, pa); }
+				     uint64_t& gpa, uint64_t& pa)
+    { return translate(va, pm, twoStage, false, false, true, gpa, pa); }
 
     /// Similar to translate but targeting only read access.
     ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, bool twoStage,
-				    uint64_t& pa)
-    { return translate(va, pm, twoStage, true, false, false, pa); }
+				    uint64_t& gpa, uint64_t& pa)
+    { return translate(va, pm, twoStage, true, false, false, gpa, pa); }
 
     /// Similar to translate but targeting only write access.
     ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, bool twoStage,
-				     uint64_t& pa)
-    { return translate(va, pm, twoStage, false, true, false, pa); }
+				     uint64_t& gpa, uint64_t& pa)
+    { return translate(va, pm, twoStage, false, true, false, gpa, pa); }
 
     /// Similar to translateForFetch but also check for page
-    /// crossing. On success, pa1 will have the physical address and
-    /// pa2 a copy of pa1 or the physical address of the subsequent
-    /// page if the access crosses a page boundary. On failure, pa1
-    /// will have the virtual faulting address.
+    /// crossing. On success, gpa1/pa1 will have the physical address and
+    /// gpa2/pa2 a copy of pa1 or the physical address of the subsequent
+    /// page if the access crosses a page boundary. On failure, either
+    /// pa1 or gpa1 will have the virtual faulting address depending on
+    /// if there was a two stage translation and which stage the fail occured.
     ExceptionCause translateForFetch2(uint64_t va, unsigned size, PrivilegeMode pm,
-				      bool twoStage, uint64_t& pa1, uint64_t& pa2);
+				      bool twoStage, uint64_t& gpa1, uint64_t& pa1,
+                                      uint64_t& gpa2, uint64_t& pa2);
 
     /// Same as translate but targeting load or store and checking for
-    /// page crossing.  On success, pa1 will have the physical address
-    /// and pa2 a copy of pa1 or the physical address of the
+    /// page crossing.  On success, gpa1/pa1 will have the physical address
+    /// and gpa2/pa2 a copy of pa1 or the physical address of the
     /// subsequent page if the access crosses a page boundary. On
-    /// failuer, pa1 will have the virtual faulting address.
+    /// failuer, either gpa1 or pa1 will have the virtual faulting address
+    /// depending on if there was a two stage translation and which stage
+    /// the fail occured.
     ExceptionCause translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode pm,
-				     bool twoStage, bool load, uint64_t& pa1, uint64_t& pa2);
+				     bool twoStage, bool load, uint64_t& gpa1,
+                                     uint64_t& pa1, uint64_t& gpa2, uint64_t& pa2);
 
     /// Load version of translateForLdSt2.
     ExceptionCause translateForLoad2(uint64_t va, unsigned size, PrivilegeMode pm,
-				     bool twoStage, uint64_t& pa1, uint64_t& pa2)
-    { return translateForLdSt2(va, size, pm, twoStage, true, pa1, pa2); }
-    
+				     bool twoStage, uint64_t& gpa1, uint64_t& pa1,
+                                     uint64_t& gpa2, uint64_t& pa2)
+    { return translateForLdSt2(va, size, pm, twoStage, true, gpa1, pa1, gpa2, pa2); }
+
     /// Store version of translateForLdSt2.
     ExceptionCause translateForStore2(uint64_t va, unsigned size, PrivilegeMode pm,
-				      bool twoStage, uint64_t& pa1, uint64_t& pa2)
-    { return translateForLdSt2(va, size, pm, twoStage, false, pa1, pa2); }
+				      bool twoStage, uint64_t& gpa1, uint64_t& pa1,
+                                      uint64_t& gpa2, uint64_t& pa2)
+    { return translateForLdSt2(va, size, pm, twoStage, false, gpa1, pa1, gpa2, pa2); }
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
-    { tlb_.setTlbSize(size); }
+    {
+      tlb_.setTlbSize(size);
+      vsTlb_.setTlbSize(size);
+      stage2Tlb_.setTlbSize(size);
+    }
 
     /// Return page size.
     unsigned pageSize() const
@@ -233,7 +245,7 @@ namespace WdRiscv
 					bool x, uint64_t& pa, TlbEntry& entry);
 
     ExceptionCause twoStageTranslate(uint64_t va, PrivilegeMode priv, bool r, bool w,
-				     bool x, uint64_t& pa);
+				     bool x, uint64_t& gpa, uint64_t& pa);
 
 
     /// Set the page table root page: The root page is placed in

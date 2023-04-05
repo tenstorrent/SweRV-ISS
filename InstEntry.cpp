@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -611,7 +611,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::Imm, OperandMode::None, immTop12 },
-	
+
       { "ld", InstId::ld, 0x3003, funct3Low7Mask,
 	RvExtension::I, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
@@ -1478,7 +1478,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0 },
 
-      { "c.lq", InstId::c_lq, 0x2000, 0xe003, 
+      { "c.lq", InstId::c_lq, 0x2000, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Write, 0,
 	OperandType::IntReg, OperandMode::Read, 0,
@@ -6241,7 +6241,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs1Mask,
         OperandType::FpReg, OperandMode::Read, rs2Mask,
       },
-      
+
       // Crypto
 
       { "aes32dsi", InstId::aes32dsi,

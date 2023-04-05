@@ -408,7 +408,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       pending = true;
     }
 
-  if (not pending) 
+  if (not pending)
     formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, 'r', 0, 0,
 			 tmp.c_str());  // No change: emit X0 as modified reg.
 
@@ -445,11 +445,11 @@ namespace Whisper
     // Append to buffer hexadecimal string representing given number.
     inline
     PrintBuffer& print(uint64_t num)
-    {                                                                                        
-      if (num == 0)                                                                          
-	buff_.at(pos_++) = '0';                                                              
-      else                                                                                   
-	{                                                                                    
+    {
+      if (num == 0)
+	buff_.at(pos_++) = '0';
+      else
+	{
 	  size_t beg = pos_;
 	  for ( ; num; num = num >> 4 )
 	    buff_.at(pos_++) = "0123456789abcdef"[num&0xf];
@@ -702,16 +702,28 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     buffer.printChar('v');
 
   // Privilege mode.
-  if      (lastPriv_ == PrivilegeMode::Machine)    buffer.print(",m,");
-  else if (lastPriv_ == PrivilegeMode::Supervisor) buffer.print(",s,");
-  else if (lastPriv_ == PrivilegeMode::User)       buffer.print(",u,");
-  else                                             buffer.print(",,");
+  if (not lastVirt_)
+    {
+      if      (lastPriv_ == PrivilegeMode::Machine)    buffer.print(",m,");
+      else if (lastPriv_ == PrivilegeMode::Supervisor) buffer.print(",s,");
+      else if (lastPriv_ == PrivilegeMode::User)       buffer.print(",u,");
+      else                                             buffer.print(",,");
+    }
+  else
+    {
+      if (lastPriv_ == PrivilegeMode::Supervisor)      buffer.print(",vs,");
+      else if (lastPriv_ == PrivilegeMode::User)       buffer.print(",vu,");
+      else                                             buffer.print(",,");
+    }
 
   // Interrupt/exception cause.
   if (hasTrap)
     {
       URV cause = 0;
-      peekCsr(CsrNumber::MCAUSE, cause);
+      if (privilegeMode() == PrivilegeMode::Machine)
+        peekCsr(CsrNumber::MCAUSE, cause);
+      else if (privilegeMode() == PrivilegeMode::Supervisor)
+        peekCsr(CsrNumber::SCAUSE, cause);
       buffer.print(uint64_t(cause));
     }
   buffer.printChar(',');

@@ -1401,28 +1401,28 @@ Hart<URV>::reportLrScStat(FILE* file) const
 
 template <typename URV>
 void
-Hart<URV>::initiateLoadException(ExceptionCause cause, URV addr)
+Hart<URV>::initiateLoadException(ExceptionCause cause, URV addr1, URV addr2)
 {
-  initiateException(cause, currPc_, addr);
+  initiateException(cause, currPc_, addr1, addr2);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::initiateStoreException(ExceptionCause cause, URV addr)
+Hart<URV>::initiateStoreException(ExceptionCause cause, URV addr1, URV addr2)
 {
-  initiateException(cause, currPc_, addr);
+  initiateException(cause, currPc_, addr1, addr2);
 }
 
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldSize, bool hyper)
+Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& gaddr1, uint64_t& gaddr2, unsigned ldSize, bool hyper)
 {
   uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;
-  addr1 = va1;
-  addr2 = va2;  // Phys addr of 2nd page when crossing page boundary.
+  addr1 = gaddr1 = va1;
+  addr2 = gaddr2 = va2;  // Phys addr of 2nd page when crossing page boundary.
 
   // Misaligned load from io section triggers an exception. Crossing
   // dccm to non-dccm causes an exception.
@@ -1453,7 +1453,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, unsigned ldS
 	}
       if (priv != PM::Machine)
         {
-	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virt, addr1, addr2);
+	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
 	    return cause;
         }
@@ -1594,12 +1594,14 @@ Hart<URV>::load(uint64_t virtAddr, bool hyper, uint64_t& data)
 
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
-  auto cause = determineLoadException(addr1, addr2, ldStSize_, hyper);
+  uint64_t gaddr1 = virtAddr;
+  uint64_t gaddr2 = virtAddr;
+  auto cause = determineLoadException(addr1, addr2, gaddr1, gaddr2, ldStSize_, hyper);
   if (cause != ExceptionCause::NONE)
     {
       if (triggerTripped_)
         return false;
-      initiateLoadException(cause, addr1);
+      initiateLoadException(cause, addr1, gaddr1);
       return false;
     }
   ldStPhysAddr1_ = addr1;
@@ -1842,7 +1844,8 @@ Hart<URV>::store(URV virtAddr, bool hyper, STORE_TYPE storeVal)
 
   // Determine if a store exception is possible.
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  ExceptionCause cause = determineStoreException(addr1, addr2, ldStSize_, hyper);
+  uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
+  ExceptionCause cause = determineStoreException(addr1, addr2, gaddr1, gaddr2, ldStSize_, hyper);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
 
@@ -1856,7 +1859,7 @@ Hart<URV>::store(URV virtAddr, bool hyper, STORE_TYPE storeVal)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateStoreException(cause, addr1);
+      initiateStoreException(cause, addr1, gaddr1);
       return false;
     }
 
@@ -2099,10 +2102,11 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       if (triggerTripped_)
         return false;
 
-      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, physAddr);
+      uint64_t gPhysAddr = virtAddr;
+      auto cause = virtMem_.translateForFetch(virtAddr, privMode_, virtMode_, gPhysAddr, physAddr);
       if (cause != ExceptionCause::NONE)
         {
-          initiateException(cause, virtAddr, virtAddr);
+          initiateException(cause, virtAddr, virtAddr, gPhysAddr);
           return false;
         }
     }
@@ -2171,14 +2175,15 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
     return true;
 
   uint64_t physAddr2 = physAddr + 2;
+  uint64_t gPhysAddr2 = physAddr2;
   if (isRvs() and privMode_ != PrivilegeMode::Machine)
     {
-      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, physAddr2);
+      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr2, physAddr2);
       if (cause != ExceptionCause::NONE)
         {
           if (triggerTripped_)
             return false;
-          initiateException(cause, virtAddr, virtAddr+2);
+          initiateException(cause, virtAddr, virtAddr+2, gPhysAddr2);
           return false;
         }
     }
@@ -2297,7 +2302,7 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
 // Start a synchronous exception.
 template <typename URV>
 void
-Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
+Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2)
 {
   // Check if stuck because of lack of exception handler. Disable if
   // you do want the stuck behavior.
@@ -2336,7 +2341,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info)
   bool interrupt = false;
   exceptionCount_++;
   hasException_ = true;
-  initiateTrap(interrupt, URV(cause), pc, info);
+  initiateTrap(interrupt, URV(cause), pc, info, info2);
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
   if (enableCounters_)
@@ -2385,9 +2390,28 @@ isGvaTrap(unsigned causeCode)
 }
 
 
+/// Return true if given trap number would result in a (guest physical
+/// address >> 2) being written to htval if a trap was taken from VS/VU to HS.
+bool
+isGpaTrap(unsigned causeCode)
+{
+  typedef ExceptionCause EC;
+
+  EC cause = EC{causeCode};
+  switch (cause)
+    {
+    case EC::INST_GUEST_PAGE_FAULT:  return true;
+    case EC::LOAD_GUEST_PAGE_FAULT:  return true;
+    case EC::STORE_GUEST_PAGE_FAULT: return true;
+    default:                         return false;
+    }
+  return false;
+}
+
+
 template <typename URV>
 void
-Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
+Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV info2)
 {
   // FIX: spec no longer mandate loss of reservation on traps.
   if (cancelLrOnRet_)  // Temporary
@@ -2413,6 +2437,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
         nextMode = PM::Supervisor;
 
       // In hypervisor, traps can be further delegated to virtual supervisor (VS)
+      // except for guest page faults
       if (isRvh() and origVirtMode)
 	{
 	  csrn = interrupt? CsrNumber::HIDELEG : CsrNumber::HEDELEG;
@@ -2422,6 +2447,10 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 	    virtMode_ = true;
 	}
     }
+
+  // Enable/disable virtual mode for CSR read/writes
+  if (virtMode_ != origVirtMode)
+    setVirtualMode(virtMode_);
 
   CsrNumber epcNum = CsrNumber::MEPC;
   CsrNumber causeNum = CsrNumber::MCAUSE;
@@ -2464,7 +2493,6 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       mstatus_.bits_.MIE = 0;
       mstatus_.bits_.GVA = gva;
       mstatus_.bits_.MPV = origVirtMode;
-      setVirtualMode(false);
       writeMstatus();
     }
   else if (nextMode == PM::Supervisor)
@@ -2476,9 +2504,9 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       msf.bits_.SIE = 0;
       if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
 	assert(0 and "Failed to write SSTATUS register");
-      if (not origVirtMode)
+      if (not virtMode_)
 	hstatus_.bits_.SPV = origVirtMode;
-      if (origVirtMode)
+      if (origVirtMode and not virtMode_)
 	{
 	  assert(origMode == PM::User or origMode == PM::Supervisor);
 	  hstatus_.bits_.SPVP = unsigned(origMode);
@@ -2491,6 +2519,11 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 	{
 	  if (not csRegs_.write(CsrNumber::HSTATUS, PM::Machine, hstatus_.value_))
 	    assert(0 and "Failed to write HSTATUS register");
+
+          // Save GPA to htval if next mode is HS and guest page fault
+          if (origVirtMode and isGpaTrap(cause))
+            if (not csRegs_.write(CsrNumber::HTVAL, privMode_, info2 >> 2))
+              assert(0 and "Failed to write HTVAL register");
 	}
     }
 
@@ -9784,7 +9817,7 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       URV addr = intRegs_.read(di->op1());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op2());
-      tlb.invalidateVirtualPage(vpn, asid);
+      tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
   // std::cerr << "sfence.vma " << di->op1() << ' ' << di->op2() << '\n';
@@ -10497,12 +10530,13 @@ Hart<URV>::execLhu(const DecodedInst* di)
 template <typename URV>
 ExceptionCause
 Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
+                                   uint64_t& gaddr1, uint64_t& gaddr2,
 				   unsigned stSize, bool hyper)
 {
   uint64_t va1 = URV(addr1); // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;        // Used if crossing page boundary
-  addr1 = va1;
-  addr2 = va2;
+  addr1 = gaddr1 = va1;
+  addr2 = gaddr2 = va2;
 
   uint64_t alignMask = stSize - 1;
   bool misal = addr1 & alignMask;
@@ -10531,7 +10565,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	}
       if (priv != PM::Machine)
         {
-	  auto cause = virtMem_.translateForStore2(va1, stSize, priv, virt, addr1, addr2);
+	  auto cause = virtMem_.translateForStore2(va1, stSize, priv, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
 	    return cause;
         }
