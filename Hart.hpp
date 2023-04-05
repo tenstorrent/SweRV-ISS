@@ -814,6 +814,11 @@ namespace WdRiscv
     /// Enable collection of instruction frequencies.
     void enableInstructionFrequency(bool b);
 
+    /// Enable/disable trapping of arithmetic vector instruction when
+    /// vstart is non-zero.
+    void enableTrapNonZeroVstart(bool flag)
+    { trapNonZeroVstart_ = flag; }
+
     /// Enable/disable the zba (bit manipulation base) extension. When
     /// disabled all the instructions in zba extension result in an
     /// illegal instruction exception.
@@ -4450,6 +4455,7 @@ namespace WdRiscv
 
     bool misalDataOk_ = true;
     bool misalHasPriority_ = true;
+    bool trapNonZeroVstart_ = true;  // Trap if vstart > 0 in arithmetic vec instructions
 
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.

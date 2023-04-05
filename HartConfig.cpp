@@ -1536,6 +1536,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.setDebugTrapAddress(addr);
     }
 
+  tag = "trap_non_zero_vstart";
+  if (config_ -> count(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableTrapNonZeroVstart(flag);
+    }
+
   return errors == 0;
 }
 
