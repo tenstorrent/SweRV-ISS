@@ -327,6 +327,22 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply)
       }
       break;
 
+    case 'v':
+      {
+        unsigned reg = static_cast<unsigned>(req.address);
+        // vector reg poke uses the buffer instead
+        if (reg == req.address and req.size <= sizeof(req.buffer))
+          {
+            std::vector<uint8_t> vecVal;
+            for (uint32_t i = 0; i < req.size; ++i)
+              vecVal.push_back(req.buffer[i]);
+            std::reverse(vecVal.begin(), vecVal.end());
+            if (hart.pokeVecReg(reg, vecVal))
+              return true;
+          }
+      }
+      break;
+
     case 'm':
       {
         bool usePma = false; // Ignore phsical memory attributes.
@@ -418,6 +434,21 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply)
 	  reply.value = value;
 	  return true;
 	}
+      break;
+    case 'v':
+      {
+        unsigned reg = static_cast<unsigned>(req.address);
+        if (reg == req.address)
+          {
+            std::vector<uint8_t> vecVal;
+            if (hart.peekVecReg(reg, vecVal) and sizeof(reply.buffer) <= vecVal.size())
+              {
+                for (unsigned i = 0; i < vecVal.size(); ++i)
+                  reply.buffer[i] = vecVal.at(i);
+                return true;
+              }
+          }
+      }
       break;
     case 'm':
       if (hart.peekMemory(req.address, value, false /*usePma*/))
