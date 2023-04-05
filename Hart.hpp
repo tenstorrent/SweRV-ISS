@@ -2304,6 +2304,11 @@ namespace WdRiscv
     // illegal instuction exception and return false otherwise.
     bool checkMaskableInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
+    // Return true if given arithmetic (non load/store) instruction is
+    // legal. Take an illegal instruction exception and return false
+    // otherwise.
+    bool checkArithmeticInst(const DecodedInst* di);
+
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
     // otherwise.

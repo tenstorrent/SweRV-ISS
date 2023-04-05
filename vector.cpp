@@ -479,23 +479,12 @@ Hart<URV>::checkMaskableInst(const DecodedInst* di)
 template <typename URV>
 bool
 Hart<URV>::checkMaskableInst(const DecodedInst* di, GroupMultiplier /*gm*/,
-			     ElementWidth eew)
+			     ElementWidth /*eew*/)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return false;
-    }
+  if (not checkArithmeticInst(di))
+    return false;
 
   if (di->isMasked() and di->op0() == 0)  // Dest register cannot overlap mask register v0
-    {
-      illegalInst(di);
-      return false;
-    }
-  
-  // Trap on use of non-zero vstart for arithmetic vector ops.
-  URV vstart = csRegs_.peekVstart();
-  if (trapNonZeroVstart_ and vstart > 0)
     {
       illegalInst(di);
       return false;
@@ -560,6 +549,30 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
 
   return ok;
 }
+
+
+template <typename URV>
+bool
+Hart<URV>::checkArithmeticInst(const DecodedInst* di)
+{
+  // vector extension must be enabled, mstatus.fs must not be off, sew/lmul must
+  // be legal, vtype.vill must not be set.
+  if (not checkVecExec() or not vecRegs_.legalConfig())
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  // Trap on use of non-zero vstart for arithmetic vector ops.
+  URV vstart = csRegs_.peekVstart();
+  if (trapNonZeroVstart_ and vstart > 0)
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  return true;
+}  
 
 
 template <typename URV>
@@ -5256,11 +5269,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vv(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5269,8 +5279,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      hasDestSourceOverlap(vd, group, vs1, group) or
+  if (hasDestSourceOverlap(vd, group, vs1, group) or
       hasDestSourceOverlap(vd, group, vs2, group))
     {
       illegalInst(di);  // Source/dest vecs cannot overlap
@@ -5336,11 +5345,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vx(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
@@ -5348,8 +5354,7 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      hasDestSourceOverlap(vd, group, vs1, group))
+  if (hasDestSourceOverlap(vd, group, vs1, group))
     {
       illegalInst(di);  // Source/dest vecs cannot overlap
       return;
@@ -5408,11 +5413,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vi(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   uint32_t vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
 
@@ -5421,8 +5423,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      hasDestSourceOverlap(vd, group, vs1, group))
+  if (hasDestSourceOverlap(vd, group, vs1, group))
     {
       illegalInst(di);  // Source/dest vecs cannot overlap
       return;
@@ -5490,11 +5491,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5507,8 +5505,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   unsigned v2Group = (2*group) / widthInBytes;
 
   GroupMultiplier v2gm = GroupMultiplier::One;
-  if ((trapNonZeroVstart_ and start > 0) or
-      not vecRegs_.groupNumberX8ToSymbol(v2Group, v2gm) or
+  if (not vecRegs_.groupNumberX8ToSymbol(v2Group, v2gm) or
       not vecRegs_.legalConfig(ElementWidth::Half, v2gm))
     {
       illegalInst(di);
@@ -5586,11 +5583,8 @@ template <typename URV>
 void
 Hart<URV>::execVcompress_vm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   // vs2 is a mask register: elmul2 is 1
 
@@ -5604,9 +5598,9 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
     return;
 
   if (hasDestSourceOverlap(vd, group, vs1, group) or
-      hasDestSourceOverlap(vd, group, vs2, 1))
+      hasDestSourceOverlap(vd, group, vs2, 1) or di->isMasked())
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      illegalInst(di);  // Source/dest vecs cannot overlap, must not be masked
       return;
     }
 
@@ -6258,19 +6252,10 @@ template <typename URV>
 void
 Hart<URV>::execVmand_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6308,19 +6293,10 @@ template <typename URV>
 void
 Hart<URV>::execVmnand_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6358,19 +6334,10 @@ template <typename URV>
 void
 Hart<URV>::execVmandnot_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6408,19 +6375,10 @@ template <typename URV>
 void
 Hart<URV>::execVmxor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6458,19 +6416,10 @@ template <typename URV>
 void
 Hart<URV>::execVmor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6508,19 +6457,10 @@ template <typename URV>
 void
 Hart<URV>::execVmnor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6558,19 +6498,10 @@ template <typename URV>
 void
 Hart<URV>::execVmornot_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6608,19 +6539,10 @@ template <typename URV>
 void
 Hart<URV>::execVmxnor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6658,14 +6580,8 @@ template <typename URV>
 void
 Hart<URV>::execVpopc_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6693,14 +6609,8 @@ template <typename URV>
 void
 Hart<URV>::execVfirst_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6732,14 +6642,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsbf_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6783,14 +6687,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsif_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6835,14 +6733,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsof_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6893,15 +6785,9 @@ template <typename URV>
 void
 Hart<URV>::execViota_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  // Spec does not explicitly state this.   FIX double check.
+  // Spec does not explicitly state that vstart > 0 is illegal.  FIX double check.
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6954,15 +6840,14 @@ template <typename URV>
 void
 Hart<URV>::execVid_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
+  // Spec does not mention vstart > 0. Got a clarification saying it
+  // is ok not to take an exception in that case.
+  uint32_t start = csRegs_.peekVstart();
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
     }
-
-  // Spec does not mention vstart > 0. Got a clarification saying it
-  // is ok not to take an exception in that case.
-  uint32_t start = csRegs_.peekVstart();
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -6970,7 +6855,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  elems = vecRegs_.elemCount();;
 
-  if ((masked and vd == 0) or start > 0)
+  if (masked and vd == 0)
     {
       illegalInst(di);
       return;
@@ -10788,17 +10673,13 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vd == vcin or not masked or   // cannot overlap vcin, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vcin or not masked)   // cannot overlap vcin, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10832,17 +10713,13 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vim(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vd == vcin or not masked or  // cannot overlap vcin, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vcin or not masked)  // cannot overlap vcin, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10876,17 +10753,13 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
-  if (vd == vbin or not masked or // cannot overlap borrow-in, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10918,17 +10791,13 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vbin = 0;
-  if (vd == vbin or not masked or // cannot overlap borrow-in, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10962,11 +10831,8 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;
@@ -10975,8 +10841,7 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vcout, 8, vs1, group) or
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group) or
       not checkDestSourceOverlap(vcout, 8, vs2, group))
     {
       illegalInst(di);
@@ -11013,11 +10878,8 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
@@ -11025,8 +10887,7 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vcout, 8, vs1, group))
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
     {
       illegalInst(di);
       return;
@@ -11063,11 +10924,8 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
@@ -11076,8 +10934,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vcout, 8, vs1, group))
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
     {
       illegalInst(di);
       return;
@@ -11114,11 +10971,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
@@ -11127,8 +10981,7 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vbout, 8, vs1, group) or
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group) or
       not checkDestSourceOverlap(vbout, 8, vs2, group))
     {
       illegalInst(di);
@@ -11165,11 +11018,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vbin = 0;
@@ -11177,8 +11027,7 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vbout, 8, vs1, group))
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group))
     {
       illegalInst(di);
       return;
@@ -11241,15 +11090,11 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  start = csRegs_.peekVstart();;
-  if (not di->isMasked() or di->op0() == 0 or // Must be masked, dest must not overlap v0.
-      (trapNonZeroVstart_ and start > 0))
+  if (not di->isMasked() or di->op0() == 0) // Must be masked, dest must not overlap v0.
     {
       illegalInst(di);
       return;
@@ -11307,15 +11152,12 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or not di->isMasked())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2(), start = csRegs_.peekVstart();
   if (not di->isMasked() or di->op0() == 0 or // Must be masked, dest must not overlap v0.
-      (trapNonZeroVstart_ and start > 0))
+      not di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11350,16 +11192,12 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vim(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(), vs1 = di->op1(), start = csRegs_.peekVstart();
   int32_t imm = di->op2As<int32_t>();
-  if (not di->isMasked() or di->op0() == 0 or // Must be masked. Dest must not overlap v0.
-      (trapNonZeroVstart_ and start > 0))
+  if (not di->isMasked() or di->op0() == 0) // Must be masked. Dest must not overlap v0.
     {
       illegalInst(di);
       return;
@@ -11392,16 +11230,13 @@ template <typename URV>
 void
 Hart<URV>::execVmv_x_s(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned rd = di->op0(), vs1 = di->op1(), groupX8 = 8;
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vs1 % eg)
+  if ((vs1 % eg) or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11456,7 +11291,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv_s_x(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11497,7 +11335,10 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11566,7 +11407,10 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11645,14 +11489,16 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_v(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()) or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0(),  vs1 = di->op1();
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -11698,14 +11544,16 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_x(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (di->isMasked() or (not checkVecExec()) or not (vecRegs_.legalConfig()) or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0();
   unsigned rs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -11737,14 +11585,16 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_i(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()) or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
@@ -11775,7 +11625,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv1r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11803,7 +11656,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv2r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11837,7 +11693,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv4r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11871,7 +11730,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv8r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -13840,8 +13702,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /*or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -13982,8 +13843,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /* or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14495,8 +14355,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /*or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14643,8 +14502,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /* or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15257,8 +15115,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /*or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15423,8 +15280,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /* or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -20140,14 +19996,16 @@ template <typename URV>
 void
 Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or not di->isMasked() or
-      di->op0() == 0 or (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (not di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
@@ -20204,14 +20062,16 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_v_f(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked() or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0(),  rs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
