@@ -1536,6 +1536,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.setDebugTrapAddress(addr);
     }
 
+  tag = "trace_pmp";
+  if (config_ -> count(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.tracePmp(flag);
+    }
+
   return errors == 0;
 }
 

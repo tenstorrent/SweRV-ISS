@@ -1555,9 +1555,13 @@ namespace WdRiscv
     void enableInstructionLineTrace()
     { instrLineTrace_ = true; }
 
-    /// Enable disable page-table-walk info in log.
+    /// Enable/disable page-table-walk info in log.
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
+
+    /// Enable/disable pmp access trace in log
+    void tracePmp(bool flag)
+    { tracePmp_ = flag; }
 
     Syscall<URV>& getSyscall()
     { return syscall_; }
@@ -4419,6 +4423,7 @@ namespace WdRiscv
 
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
+    bool tracePmp_ = false;          // Trace PMP accesses
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;

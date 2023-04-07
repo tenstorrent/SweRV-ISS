@@ -739,7 +739,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   buffer.printChar(',').print(sysHartIndex());
 
   // Page table walk.
-  if (isRvs())
+  if (isRvs() and tracePtw_)
     {
       buffer.printChar(',');
       std::vector<uint64_t> addrs, entries;
@@ -766,7 +766,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     }
 
   // PMP
-  if (pmpEnabled_)
+  if (pmpEnabled_ and tracePmp_)
     {
       buffer.printChar(',');
       std::vector<std::pair<uint32_t, Pmp>> pmps;
