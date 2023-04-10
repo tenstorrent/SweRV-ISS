@@ -16613,7 +16613,7 @@ doFrsqrt7(Float16 val, bool& divByZero, bool& invalid)
 }
 
 
-static uint32_t frec7Table[128] = {
+static constexpr uint32_t frec7Table[128] = {
   127, 125, 123, 121, 119, 117, 116, 114, 112, 110, 109, 107, 105, 104, 102, 100, 
   99,  97,  96,  94,  93,  91,  90,  88,  87,  85,  84,  83,  81,  80,  79,  77,  
   76,  75,  74,  72,  71,  70,  69,  68,  66,  65,  64,  63,  62,  61,  60,  59,  
@@ -16676,16 +16676,21 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	    }
 	}
       else
-	{
-	  Uint64DoubleUnion ud(inFrac);
-	  int sigMs7 = (ud.u >> 45) & 0x7f;  // Most sig 7 bits of significand
-	  uint64_t outExp = (2*bias - 1 - inExp);
-	  uint64_t outSigMs7 = frec7Table[sigMs7];
-	  ud.u = (outSigMs7 << 45) | (outExp << 52);
-	  val = ud.d;
-	  if (signBit)
-	    val = -val;
-	}
+        {
+          Uint64DoubleUnion ud(inFrac);
+          int               sigMs7    = (ud.u >> 45) & 0x7f;  // Most sig 7 bits of significand
+          int               outExp    = (2*bias - 1 - inExp);
+          uint64_t          outSigMs7 = static_cast<uint64_t>(frec7Table[sigMs7]) << 45;
+
+          if (outExp < 1)
+            {
+              outSigMs7 = ((UINT64_C(1) << 52) | outSigMs7) >> (1 - outExp);
+              outExp    = 0;
+            }
+
+          ud.u = outSigMs7 | (static_cast<uint64_t>(outExp) << 52) | (static_cast<uint64_t>(signBit) << 63);
+          val  = ud.d;
+        }
     }
 
   return val;
@@ -16743,14 +16748,21 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 	    }
 	}
       else
-	{
-	  Uint32FloatUnion uf(inFrac);
-	  int sigMs7 = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
-	  uint32_t outExp = (2*bias - 1 - inExp);
-	  uint32_t outSigMs7 = frec7Table[sigMs7];
-	  uf.u = (outSigMs7 << 16) | (outExp << 23) | (signBit << 31);
-	  val = uf.f;
-	}
+        {
+          Uint32FloatUnion uf(inFrac);
+          int              sigMs7    = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
+          int              outExp    = (2*bias - 1 - inExp);
+          uint32_t         outSigMs7 = frec7Table[sigMs7] << 16;
+
+          if (outExp < 1)
+            {
+              outSigMs7 = ((UINT32_C(1) << 23) | outSigMs7) >> (1 - outExp);
+              outExp    = 0;
+            }
+
+          uf.u = outSigMs7 | (static_cast<uint32_t>(outExp) << 23) | (static_cast<uint32_t>(signBit) << 31);
+          val  = uf.f;
+        }
     }
 
   return val;
