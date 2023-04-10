@@ -879,8 +879,8 @@ Hart<URV>::execSha512sum1r(const DecodedInst* di)
   uint32_t r1 = intRegs_.read(di->op1());
   uint32_t r2 = intRegs_.read(di->op2());
 
-  uint32_t res = ( (r1 << 23) ^ (r1 << 14) ^ (r1 >> 18) ^
-		   (r2 >>  9) ^ (r2 >> 18) ^ (r2 << 14) );
+  uint32_t res = ( (r1 << 23) ^ (r1 >> 14) ^ (r1 >> 18) ^
+                   (r2 >>  9) ^ (r2 << 18) ^ (r2 << 14) );
 
   intRegs_.write(di->op0(), res);
 }

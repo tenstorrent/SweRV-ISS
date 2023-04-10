@@ -1,3 +1,4 @@
+#include <cinttypes>
 #include <iostream>
 #include <sstream>
 #include "Hart.hpp"
@@ -189,7 +190,7 @@ printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
       hart.peekMemory(addr, pte, true);
       uint64_t pte64 = pte;
       fputs(sep, out);
-      fprintf(out, "0x%lx=0x%lx", addr, pte64);
+      fprintf(out, "0x%" PRIx64 "=0x%" PRIx64, addr, pte64);
       sep = ",";
     }
 }
@@ -266,9 +267,9 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 
   char instBuff[128];
   if (di.instSize() == 4)
-    sprintf(instBuff, "%08x", di.inst());
+    snprintf(instBuff, sizeof(instBuff), "%08x", di.inst());
   else
-    sprintf(instBuff, "%04x", di.inst() & 0xffff);
+    snprintf(instBuff, sizeof(instBuff), "%04x", di.inst() & 0xffff);
 
   bool pending = false;  // True if a printed line need to be terminated.
 
@@ -783,7 +784,7 @@ Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
   std::cout.flush();
 
   char secStr[20];
-  sprintf(secStr, "%.2fs", elapsed);
+  snprintf(secStr, sizeof(secStr), "%.2fs", elapsed);
 
   if (userStop)
     std::cerr << "User stop\n";

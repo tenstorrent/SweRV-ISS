@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <iostream>
+#include <cinttypes>
 #include <cstdio>
 #include <algorithm>
 #include "SparseMem.hpp"
@@ -147,7 +148,7 @@ SparseMem::writeHexFile(const std::string& path) const
     {
       uint64_t addr = kv.first * pageSize_;    // Page address
       uint8_t* data = kv.second;   // Page data
-      if (fprintf(out, "@%0lx\n", addr) < 0)
+      if (fprintf(out, "@%0" PRIx64 "\n", addr) < 0)
         {
           ok = false;
           break;

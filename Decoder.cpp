@@ -2432,19 +2432,35 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	  }
 	else if ((funct7 & 0x1f) == 0x11)
 	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32esi);
+            if (funct3 == 0)
+              {
+                op3 = inst >> 30;  // Upper 2 bits.
+                return instTable_.getEntry(InstId::aes32esi);
+              }
 	  }
 	else if ((funct7 & 0x1f) == 0x15)
 	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32dsi);
+            if (funct3 == 0)
+              {
+                op3 = inst >> 30;  // Upper 2 bits.
+                return instTable_.getEntry(InstId::aes32dsi);
+              }
 	  }
 	else if ((funct7 & 0x1f) == 0x17)
 	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32dsmi);
+            if (funct3 == 0)
+              {
+                op3 = inst >> 30;  // Upper 2 bits.
+                return instTable_.getEntry(InstId::aes32dsmi);
+              }
 	  }
 	else if ((funct7 & 0x1f) == 0x13)
 	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes32esmi);
+            if (funct3 == 0)
+              {
+                op3 = inst >> 30;  // Upper 2 bits.
+                return instTable_.getEntry(InstId::aes32esmi);
+              }
 	  }
         else if ((funct7 & 0x1f) == 0x18)
           {
