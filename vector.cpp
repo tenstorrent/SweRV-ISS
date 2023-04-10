@@ -5166,6 +5166,12 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 

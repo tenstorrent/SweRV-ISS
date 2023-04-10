@@ -264,8 +264,9 @@ namespace WdRiscv
     uint32_t groupMultiplierX8() const
     { return groupX8_; }
 
-    /// Return true if double the given element width (eew=2*sew) is
-    /// legal with the given group multiplier (prescaled by 8).
+    /// Return true if double the given element-width/group-multiplier
+    /// is legal (multipler is prescaled by 8). We check if the
+    /// combination sew*2 and groupX8*2 is legal.
     bool isDoubleWideLegal(ElementWidth sew, uint32_t groupX8) const
     {
       uint32_t wideGroup = groupX8 * 2;
