@@ -11010,9 +11010,13 @@ Hart<URV>::execAddiw(const DecodedInst* di)
       return;
     }
 
-  int32_t word = int32_t(intRegs_.read(di->op1()));
-  word += di->op2As<int32_t>();
-  SRV value = word;  // sign extend to 64-bits
+  // Signed overflow is undefined behavior, and Clang optimizes in such a way
+  // that the overflow does not occur even if intended.  As a result, do the
+  // addition as unsigned to allow the overflow and then convert to signed
+  // before sign extending.
+  uint32_t word = uint32_t(intRegs_.read(di->op1()));
+  word += di->op2As<uint32_t>();
+  SRV value = static_cast<int32_t>(word);  // sign extend to 64-bits
   intRegs_.write(di->op0(), value);
 }
 
