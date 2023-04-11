@@ -18,6 +18,7 @@
 #include <climits>
 #include <cassert>
 #include <boost/multiprecision/cpp_int.hpp>
+#include "float-convert-helpers.hpp"
 #include "wideint.hpp"
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
@@ -479,23 +480,12 @@ Hart<URV>::checkMaskableInst(const DecodedInst* di)
 template <typename URV>
 bool
 Hart<URV>::checkMaskableInst(const DecodedInst* di, GroupMultiplier /*gm*/,
-			     ElementWidth eew)
+			     ElementWidth /*eew*/)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return false;
-    }
+  if (not checkArithmeticInst(di))
+    return false;
 
   if (di->isMasked() and di->op0() == 0)  // Dest register cannot overlap mask register v0
-    {
-      illegalInst(di);
-      return false;
-    }
-  
-  // Trap on use of non-zero vstart for arithmetic vector ops.
-  URV vstart = csRegs_.peekVstart();
-  if (trapNonZeroVstart_ and vstart > 0)
     {
       illegalInst(di);
       return false;
@@ -560,6 +550,30 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
 
   return ok;
 }
+
+
+template <typename URV>
+bool
+Hart<URV>::checkArithmeticInst(const DecodedInst* di)
+{
+  // vector extension must be enabled, mstatus.fs must not be off, sew/lmul must
+  // be legal, vtype.vill must not be set.
+  if (not checkVecExec() or not vecRegs_.legalConfig())
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  // Trap on use of non-zero vstart for arithmetic vector ops.
+  URV vstart = csRegs_.peekVstart();
+  if (trapNonZeroVstart_ and vstart > 0)
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  return true;
+}  
 
 
 template <typename URV>
@@ -5152,6 +5166,12 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      illegalInst(di);
+      return;
+    }
+
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
@@ -5256,11 +5276,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vv(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5269,8 +5286,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      hasDestSourceOverlap(vd, group, vs1, group) or
+  if (hasDestSourceOverlap(vd, group, vs1, group) or
       hasDestSourceOverlap(vd, group, vs2, group))
     {
       illegalInst(di);  // Source/dest vecs cannot overlap
@@ -5336,11 +5352,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vx(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
@@ -5348,8 +5361,7 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      hasDestSourceOverlap(vd, group, vs1, group))
+  if (hasDestSourceOverlap(vd, group, vs1, group))
     {
       illegalInst(di);  // Source/dest vecs cannot overlap
       return;
@@ -5408,11 +5420,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vi(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   uint32_t vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
 
@@ -5421,8 +5430,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      hasDestSourceOverlap(vd, group, vs1, group))
+  if (hasDestSourceOverlap(vd, group, vs1, group))
     {
       illegalInst(di);  // Source/dest vecs cannot overlap
       return;
@@ -5490,11 +5498,8 @@ template <typename URV>
 void
 Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
@@ -5507,8 +5512,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   unsigned v2Group = (2*group) / widthInBytes;
 
   GroupMultiplier v2gm = GroupMultiplier::One;
-  if ((trapNonZeroVstart_ and start > 0) or
-      not vecRegs_.groupNumberX8ToSymbol(v2Group, v2gm) or
+  if (not vecRegs_.groupNumberX8ToSymbol(v2Group, v2gm) or
       not vecRegs_.legalConfig(ElementWidth::Half, v2gm))
     {
       illegalInst(di);
@@ -5586,11 +5590,8 @@ template <typename URV>
 void
 Hart<URV>::execVcompress_vm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   // vs2 is a mask register: elmul2 is 1
 
@@ -5604,9 +5605,9 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
     return;
 
   if (hasDestSourceOverlap(vd, group, vs1, group) or
-      hasDestSourceOverlap(vd, group, vs2, 1))
+      hasDestSourceOverlap(vd, group, vs2, 1) or di->isMasked())
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      illegalInst(di);  // Source/dest vecs cannot overlap, must not be masked
       return;
     }
 
@@ -6258,19 +6259,10 @@ template <typename URV>
 void
 Hart<URV>::execVmand_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6308,19 +6300,10 @@ template <typename URV>
 void
 Hart<URV>::execVmnand_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6358,19 +6341,10 @@ template <typename URV>
 void
 Hart<URV>::execVmandnot_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6408,19 +6382,10 @@ template <typename URV>
 void
 Hart<URV>::execVmxor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6458,19 +6423,10 @@ template <typename URV>
 void
 Hart<URV>::execVmor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6508,19 +6464,10 @@ template <typename URV>
 void
 Hart<URV>::execVmnor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6558,19 +6505,10 @@ template <typename URV>
 void
 Hart<URV>::execVmornot_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6608,19 +6546,10 @@ template <typename URV>
 void
 Hart<URV>::execVmxnor_mm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned start = csRegs_.peekVstart();
-  if (start > vecRegs_.bitsPerRegister())
-    {
-      illegalInst(di);
-      return;
-    }
-
   unsigned elems = vecRegs_.elemCount();
   if ((elems+7)/8 > vecRegs_.bytesPerRegister())
     assert(0);
@@ -6658,14 +6587,8 @@ template <typename URV>
 void
 Hart<URV>::execVpopc_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6693,14 +6616,8 @@ template <typename URV>
 void
 Hart<URV>::execVfirst_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6732,14 +6649,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsbf_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6783,14 +6694,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsif_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6835,14 +6740,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsof_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6893,15 +6792,9 @@ template <typename URV>
 void
 Hart<URV>::execViota_m(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
-
-  // Spec does not explicitly state this.   FIX double check.
+  // Spec does not explicitly state that vstart > 0 is illegal.  FIX double check.
   uint32_t start = csRegs_.peekVstart();
-  if (start > 0)
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
@@ -6954,15 +6847,14 @@ template <typename URV>
 void
 Hart<URV>::execVid_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
+  // Spec does not mention vstart > 0. Got a clarification saying it
+  // is ok not to take an exception in that case.
+  uint32_t start = csRegs_.peekVstart();
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
       illegalInst(di);
       return;
     }
-
-  // Spec does not mention vstart > 0. Got a clarification saying it
-  // is ok not to take an exception in that case.
-  uint32_t start = csRegs_.peekVstart();
 
   unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -6970,7 +6862,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  elems = vecRegs_.elemCount();;
 
-  if ((masked and vd == 0) or start > 0)
+  if (masked and vd == 0)
     {
       illegalInst(di);
       return;
@@ -10788,17 +10680,13 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vd == vcin or not masked or   // cannot overlap vcin, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vcin or not masked)   // cannot overlap vcin, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10832,17 +10720,13 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vim(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vd == vcin or not masked or  // cannot overlap vcin, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vcin or not masked)  // cannot overlap vcin, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10876,17 +10760,13 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
-  if (vd == vbin or not masked or // cannot overlap borrow-in, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10918,17 +10798,13 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vbin = 0;
-  if (vd == vbin or not masked or // cannot overlap borrow-in, unmasked verion reserved
-      (trapNonZeroVstart_ and start > 0))
+  if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
     {
       illegalInst(di);
       return;
@@ -10962,11 +10838,8 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;
@@ -10975,8 +10848,7 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vcout, 8, vs1, group) or
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group) or
       not checkDestSourceOverlap(vcout, 8, vs2, group))
     {
       illegalInst(di);
@@ -11013,11 +10885,8 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
@@ -11025,8 +10894,7 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vcout, 8, vs1, group))
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
     {
       illegalInst(di);
       return;
@@ -11063,11 +10931,8 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
@@ -11076,8 +10941,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vcout, 8, vs1, group))
+  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
     {
       illegalInst(di);
       return;
@@ -11114,11 +10978,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
@@ -11127,8 +10988,7 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vbout, 8, vs1, group) or
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group) or
       not checkDestSourceOverlap(vbout, 8, vs2, group))
     {
       illegalInst(di);
@@ -11165,11 +11025,8 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vbin = 0;
@@ -11177,8 +11034,7 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-  if ((trapNonZeroVstart_ and start > 0) or
-      not checkDestSourceOverlap(vbout, 8, vs1, group))
+  if (not checkDestSourceOverlap(vbout, 8, vs1, group))
     {
       illegalInst(di);
       return;
@@ -11241,15 +11097,11 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vvm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  start = csRegs_.peekVstart();;
-  if (not di->isMasked() or di->op0() == 0 or // Must be masked, dest must not overlap v0.
-      (trapNonZeroVstart_ and start > 0))
+  if (not di->isMasked() or di->op0() == 0) // Must be masked, dest must not overlap v0.
     {
       illegalInst(di);
       return;
@@ -11307,15 +11159,12 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vxm(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or not di->isMasked())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2(), start = csRegs_.peekVstart();
   if (not di->isMasked() or di->op0() == 0 or // Must be masked, dest must not overlap v0.
-      (trapNonZeroVstart_ and start > 0))
+      not di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11350,16 +11199,12 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vim(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned vd = di->op0(), vs1 = di->op1(), start = csRegs_.peekVstart();
   int32_t imm = di->op2As<int32_t>();
-  if (not di->isMasked() or di->op0() == 0 or // Must be masked. Dest must not overlap v0.
-      (trapNonZeroVstart_ and start > 0))
+  if (not di->isMasked() or di->op0() == 0) // Must be masked. Dest must not overlap v0.
     {
       illegalInst(di);
       return;
@@ -11392,16 +11237,13 @@ template <typename URV>
 void
 Hart<URV>::execVmv_x_s(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
-    {
-      illegalInst(di);
-      return;
-    }
+  if (not checkArithmeticInst(di))
+    return;
 
   unsigned rd = di->op0(), vs1 = di->op1(), groupX8 = 8;
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vs1 % eg)
+  if ((vs1 % eg) or di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11456,7 +11298,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv_s_x(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11497,7 +11342,10 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11566,7 +11414,10 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11645,14 +11496,16 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_v(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()) or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0(),  vs1 = di->op1();
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -11698,14 +11551,16 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_x(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (di->isMasked() or (not checkVecExec()) or not (vecRegs_.legalConfig()) or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0();
   unsigned rs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -11737,14 +11592,16 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_i(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (di->isMasked() or (not checkVecExec()) or (not vecRegs_.legalConfig()) or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
@@ -11775,7 +11632,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv1r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11803,7 +11663,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv2r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11837,7 +11700,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv4r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -11871,7 +11737,10 @@ template <typename URV>
 void
 Hart<URV>::execVmv8r_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
@@ -13840,8 +13709,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /*or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -13982,8 +13850,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /* or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14495,8 +14362,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /*or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -14643,8 +14509,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /* or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15257,8 +15122,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /*or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -15423,8 +15287,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig()
-      /* or start > vecRegs_.vlmax(lmul, eew)*/)
+  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
       illegalInst(di);
       return false;
@@ -16544,10 +16407,9 @@ Float16 minfp(Float16 a, Float16 b)
 
 template <typename FT>
 static FT
-doFmin(FT f1, FT f2, bool& invalid)
+doFmin(FT f1, FT f2)
 {
   FT res{};
-  invalid = false;
 
   bool isNan1 = std::isnan(f1), isNan2 = std::isnan(f2);
   if (isNan1 and isNan2)
@@ -16560,7 +16422,11 @@ doFmin(FT f1, FT f2, bool& invalid)
     res = minfp(f1, f2);  // std::fminf or std::fmin
 
   if (isSnan(f1) or isSnan(f2))
-    invalid = true;
+#ifdef SOFT_FLOAT
+    softfloat_exceptionFlags |= softfloat_flag_invalid;
+#else
+    feraiseexcept(FE_INVALID);
+#endif
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
     res = std::copysign(res, -FT{});  // Make sure min(-0, +0) is -0.
 
@@ -16592,10 +16458,9 @@ Float16 maxfp(Float16 a, Float16 b)
 
 template <typename FT>
 static FT
-doFmax(FT f1, FT f2, bool& invalid)
+doFmax(FT f1, FT f2)
 {
   FT res{};
-  invalid = false;
 
   bool isNan1 = std::isnan(f1), isNan2 = std::isnan(f2);
   if (isNan1 and isNan2)
@@ -16608,7 +16473,11 @@ doFmax(FT f1, FT f2, bool& invalid)
     res = maxfp(f1, f2);  // std::fmaxf or std::fmax
 
   if (isSnan(f1) or isSnan(f2))
-    invalid = true;
+#ifdef SOFT_FLOAT
+    softfloat_exceptionFlags |= softfloat_flag_invalid;
+#else
+    feraiseexcept(FE_INVALID);
+#endif
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
     res = std::copysign(res, FT{});  // Make sure max(-0, +0) is +0.
 
@@ -16744,7 +16613,7 @@ doFrsqrt7(Float16 val, bool& divByZero, bool& invalid)
 }
 
 
-static uint32_t frec7Table[128] = {
+static constexpr uint32_t frec7Table[128] = {
   127, 125, 123, 121, 119, 117, 116, 114, 112, 110, 109, 107, 105, 104, 102, 100, 
   99,  97,  96,  94,  93,  91,  90,  88,  87,  85,  84,  83,  81,  80,  79,  77,  
   76,  75,  74,  72,  71,  70,  69,  68,  66,  65,  64,  63,  62,  61,  60,  59,  
@@ -16807,16 +16676,21 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	    }
 	}
       else
-	{
-	  Uint64DoubleUnion ud(inFrac);
-	  int sigMs7 = (ud.u >> 45) & 0x7f;  // Most sig 7 bits of significand
-	  uint64_t outExp = (2*bias - 1 - inExp);
-	  uint64_t outSigMs7 = frec7Table[sigMs7];
-	  ud.u = (outSigMs7 << 45) | (outExp << 52);
-	  val = ud.d;
-	  if (signBit)
-	    val = -val;
-	}
+        {
+          Uint64DoubleUnion ud(inFrac);
+          int               sigMs7    = (ud.u >> 45) & 0x7f;  // Most sig 7 bits of significand
+          int               outExp    = (2*bias - 1 - inExp);
+          uint64_t          outSigMs7 = static_cast<uint64_t>(frec7Table[sigMs7]) << 45;
+
+          if (outExp < 1)
+            {
+              outSigMs7 = ((UINT64_C(1) << 52) | outSigMs7) >> (1 - outExp);
+              outExp    = 0;
+            }
+
+          ud.u = outSigMs7 | (static_cast<uint64_t>(outExp) << 52) | (static_cast<uint64_t>(signBit) << 63);
+          val  = ud.d;
+        }
     }
 
   return val;
@@ -16874,14 +16748,21 @@ doFrec7(float val, RoundingMode mode, FpFlags& flags)
 	    }
 	}
       else
-	{
-	  Uint32FloatUnion uf(inFrac);
-	  int sigMs7 = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
-	  uint32_t outExp = (2*bias - 1 - inExp);
-	  uint32_t outSigMs7 = frec7Table[sigMs7];
-	  uf.u = (outSigMs7 << 16) | (outExp << 23) | (signBit << 31);
-	  val = uf.f;
-	}
+        {
+          Uint32FloatUnion uf(inFrac);
+          int              sigMs7    = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
+          int              outExp    = (2*bias - 1 - inExp);
+          uint32_t         outSigMs7 = frec7Table[sigMs7] << 16;
+
+          if (outExp < 1)
+            {
+              outSigMs7 = ((UINT32_C(1) << 23) | outSigMs7) >> (1 - outExp);
+              outExp    = 0;
+            }
+
+          uf.u = outSigMs7 | (static_cast<uint32_t>(outExp) << 23) | (static_cast<uint32_t>(signBit) << 31);
+          val  = uf.f;
+        }
     }
 
   return val;
@@ -16952,7 +16833,7 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17015,7 +16896,7 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17077,7 +16958,7 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17140,7 +17021,7 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17203,7 +17084,7 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17304,7 +17185,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17381,7 +17262,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17458,7 +17339,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17535,7 +17416,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17611,7 +17492,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17686,7 +17567,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17761,7 +17642,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17836,7 +17717,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17898,7 +17779,7 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -17961,7 +17842,7 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -18023,7 +17904,7 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -18086,7 +17967,7 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -18149,7 +18030,7 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -18223,7 +18104,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -18299,20 +18180,20 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
 
 
 extern Float16
-fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool& invalid);
+fusedMultiplyAdd(Float16 x, Float16 y, Float16 z);
 
 extern float
-fusedMultiplyAdd(float x, float y, float z, bool& invalid);
+fusedMultiplyAdd(float x, float y, float z);
 
 extern double
-fusedMultiplyAdd(double x, double y, double z, bool& invalid);
+fusedMultiplyAdd(double x, double y, double z);
 
 
 template <typename URV>
@@ -18323,8 +18204,6 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
-
-  bool invalid = false;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -18338,9 +18217,7 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(e1, dest, e2, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(e1, dest, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18349,7 +18226,7 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18393,8 +18270,6 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18405,9 +18280,7 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
 
       if (vecRegs_.read(vf2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(e1, dest, e2, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(e1, dest, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18415,7 +18288,7 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18459,8 +18332,6 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18473,9 +18344,7 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(-e1, dest, -e2, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(-e1, dest, -e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18484,7 +18353,7 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18528,8 +18397,6 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18540,9 +18407,7 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(-e1, dest, -e2, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(-e1, dest, -e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18550,7 +18415,7 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18594,8 +18459,6 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18608,9 +18471,7 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(e1, dest, -e2, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(e1, dest, -e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18619,7 +18480,7 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18663,8 +18524,6 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18675,9 +18534,7 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(e1, dest, -e2, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(e1, dest, -e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18685,7 +18542,7 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18729,8 +18586,6 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18743,9 +18598,7 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(-e1, dest, e2, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(-e1, dest, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18754,7 +18607,7 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18798,8 +18651,6 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18810,9 +18661,7 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(-e1, dest, e2, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(-e1, dest, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18820,7 +18669,7 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18864,8 +18713,6 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18878,9 +18725,7 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(e1, e2, dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(e1, e2, dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18889,7 +18734,7 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -18933,8 +18778,6 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18945,9 +18788,7 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(e1, e2, dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(e1, e2, dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -18955,7 +18796,7 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19014,8 +18855,6 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19028,9 +18867,7 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(-e1, e2, -dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(-e1, e2, -dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -19039,7 +18876,7 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19083,8 +18920,6 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19095,9 +18930,7 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(-e1, e2, -dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(-e1, e2, -dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -19105,7 +18938,7 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19149,8 +18982,6 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19163,9 +18994,7 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(e1, e2, -dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(e1, e2, -dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -19174,7 +19003,7 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19218,8 +19047,6 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19230,9 +19057,7 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(e1, e2, -dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(e1, e2, -dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -19240,7 +19065,7 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19284,8 +19109,6 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19298,9 +19121,7 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
-	  dest = fusedMultiplyAdd(-e1, e2, dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(-e1, e2, dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -19309,7 +19130,7 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19353,8 +19174,6 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19365,9 +19184,7 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
         {
-	  bool elemInv = false;
-          dest = fusedMultiplyAdd(-e1, e2, dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(-e1, e2, dest);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -19375,7 +19192,7 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19424,8 +19241,6 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19438,11 +19253,9 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
 	  e1dw = fpWiden(e1);
 	  e2dw = fpWiden(e2);
-	  dest = fusedMultiplyAdd(e1dw, e2dw, dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19451,7 +19264,7 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19506,8 +19319,6 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19518,10 +19329,8 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;
 	  e2dw = fpWiden(e2);
-          dest = fusedMultiplyAdd(e1dw, e2dw, dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19529,7 +19338,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19583,8 +19392,6 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19597,11 +19404,9 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
 	  e1dw = fpWiden(e1);
 	  e2dw = fpWiden(e2);
-	  dest = fusedMultiplyAdd(-e1dw, e2dw, -dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19610,7 +19415,7 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19665,8 +19470,6 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19677,10 +19480,8 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;
 	  e2dw = fpWiden(e2);
-          dest = fusedMultiplyAdd(-e1dw, e2dw, -dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19688,7 +19489,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19742,8 +19543,6 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19756,11 +19555,9 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
 	  e1dw = fpWiden(e1);
 	  e2dw = fpWiden(e2);
-	  dest = fusedMultiplyAdd(e1dw, e2dw, -dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19769,7 +19566,7 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19824,8 +19621,6 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19836,10 +19631,8 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;
 	  e2dw = fpWiden(e2);
-          dest = fusedMultiplyAdd(e1dw, e2dw, -dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19847,7 +19640,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19901,8 +19694,6 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19915,11 +19706,9 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;  // True if fp invalid flag true for element
 	  e1dw = fpWiden(e1);
 	  e2dw = fpWiden(e2);
-	  dest = fusedMultiplyAdd(-e1dw, e2dw, dest, elemInv);
-	  invalid = invalid or elemInv;
+	  dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19928,7 +19717,7 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -19984,8 +19773,6 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
   unsigned group2x = group*2;
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -19996,10 +19783,8 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  bool elemInv = false;
 	  e2dw = fpWiden(e2);
-          dest = fusedMultiplyAdd(-e1dw, e2dw, dest, elemInv);
-	  invalid = invalid or elemInv;
+          dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -20007,7 +19792,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -20074,7 +19859,7 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -20140,14 +19925,16 @@ template <typename URV>
 void
 Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or not di->isMasked() or
-      di->op0() == 0 or (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (not di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
@@ -20204,14 +19991,16 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_v_f(const DecodedInst* di)
 {
-  unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked() or
-      (trapNonZeroVstart_ and start > 0))
+  if (not checkArithmeticInst(di))
+    return;
+
+  if (di->isMasked())
     {
       illegalInst(di);
       return;
     }
 
+  unsigned start = csRegs_.peekVstart();
   unsigned vd = di->op0(),  rs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
@@ -20927,466 +20716,6 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
 }
 
 
-static double
-unsignedToFp2x(uint32_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui32_to_f64(x));
-#else
-  return double(x);
-#endif
-}
-
-
-static float
-unsignedToFp2x(uint16_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui32_to_f32(x));
-#else
-  return float(x);
-#endif
-}
-
-
-static Float16
-unsignedToFp2x(uint8_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui32_to_f16(x));
-#else
-  return Float16::fromFloat(float(x));
-#endif
-}
-
-
-static double
-signedToFp2x(int32_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i32_to_f64(x));
-#else
-  return double(x);
-#endif
-}
-
-
-static float
-signedToFp2x(int16_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i32_to_f32(x));
-#else
-  return float(x);
-#endif
-}
-
-
-static Float16
-signedToFp2x(int8_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i32_to_f16(x));
-#else
-  return Float16::fromFloat(float(x));
-#endif
-}
-
-
-static uint32_t
-fpToUnsigned(float x)
-{
-#ifdef SOFT_FLOAT
-  return f32_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  return uint32_t(x);
-#endif
-}
-
-static uint64_t
-fpToUnsigned(double x)
-{
-#ifdef SOFT_FLOAT
-  return f64_to_ui64(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  return uint64_t(x);
-#endif
-}
-
-static uint16_t
-fpToUnsigned(Float16 x)
-{
-#ifdef SOFT_FLOAT
-  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
-  uint32_t i = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  if (i > 0xffff)
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_invalid;
-      return 0xffff;
-    }
-  return i;
-#else
-  // TODO: handle NAN and infinity.
-  uint32_t i = uint32_t(x.toFloat());
-  if (i > 0xffff)
-    return 0xffff;
-  return i;
-#endif
-}
-
-
-static int32_t
-fpToSigned(float x)
-{
-#ifdef SOFT_FLOAT
-  return f32_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  return int32_t(x);
-#endif
-}
-
-static int64_t
-fpToSigned(double x)
-{
-#ifdef SOFT_FLOAT
-  return f64_to_i64(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  return int64_t(x);
-#endif
-}
-
-static int16_t
-fpToSigned(Float16 x)
-{
-#ifdef SOFT_FLOAT
-  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
-  int32_t i = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  if (i > 0x7fff)
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_inexact;
-      return 0x7fff;
-    }
-  if (i < int16_t(0x8000))
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_inexact;
-      return int16_t(0x8000);
-    }
-  return i;
-#else
-  // TODO: handle NAN and infinity.
-  int32_t i = int32_t(x.toFloat());
-  if (i > 0x7fff)
-    {
-      return 0x7fff;
-    }
-    if (i < int16_t(0x8000))
-    {
-      return int16_t(0x8000);
-    }
-  return i;
-#endif
-}
-
-
-static uint64_t
-fpToUnsigned2x(float x)
-{
-#ifdef SOFT_FLOAT
-  return f32_to_ui64(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  // TODO: handle NAN and infinity.
-  return uint64_t(x);
-#endif
-}
-
-static uint32_t
-fpToUnsigned2x(Float16 x)
-{
-#ifdef SOFT_FLOAT
-  return f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-#else
-  // TODO: handle NAN and infinity.
-  return uint32_t(x.toFloat());
-#endif
-}
-
-
-static int64_t
-fpToSigned2x(float x)
-{
-#ifdef SOFT_FLOAT
-  return f32_to_i64(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  // TODO: handle NAN and infinity.
-  return int64_t(x);
-#endif
-}
-
-static uint32_t
-fpToSigned2x(Float16 x)
-{
-#ifdef SOFT_FLOAT
-  return f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-#else
-  // TODO: handle NAN and infinity.
-  return int32_t(x.toFloat());
-#endif
-}
-
-
-static uint32_t
-fpToUnsignedHalf(double x)
-{
-#ifdef SOFT_FLOAT
-  return f64_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  // TODO: handle NAN and infinity.
-  return uint32_t(x);
-#endif
-}
-
-static uint16_t
-fpToUnsignedHalf(float x)
-{
-#ifdef SOFT_FLOAT
-  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
-  uint32_t val = f32_to_ui32(nativeToSoft(x), softfloat_roundingMode, true);
-  if (val > 0xffff)
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_invalid;
-      return 0xffff;
-    }
-  return val;
-#else
-  // TODO: handle NAN and infinity.
-  return uint16_t(x);
-#endif
-}
-
-static uint8_t
-fpToUnsignedHalf(Float16 x)
-{
-#ifdef SOFT_FLOAT
-  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
-  uint32_t val = f32_to_ui32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  if (val > 0xff)
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_invalid;
-      return 0xff;
-    }
-  return val;
-#else
-  // TODO: handle NAN and infinity.
-  return uint8_t(x.toFloat());
-#endif
-}
-
-
-static int32_t
-fpToSignedHalf(double x)
-{
-#ifdef SOFT_FLOAT
-  return f64_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
-#else
-  // TODO: handle NAN and infinity.
-  return int32_t(x);
-#endif
-}
-
-static int16_t
-fpToSignedHalf(float x)
-{
-#ifdef SOFT_FLOAT
-  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
-  int32_t val = f32_to_i32(nativeToSoft(x), softfloat_roundingMode, true);
-  if (val > int16_t(0x7fff))
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_invalid;
-      return int16_t(0x7fff);
-    }
-  if (val < int16_t(0x8000))
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_invalid;
-      return int16_t(0x8000);
-    }
-  return val;
-#else
-  // TODO: handle NAN and infinity.
-  return uint16_t(x);
-#endif
-}
-
-static int8_t
-fpToSignedHalf(Float16 x)
-{
-#ifdef SOFT_FLOAT
-  auto prevInexact = softfloat_exceptionFlags & softfloat_flag_inexact;
-  int32_t val = f32_to_i32(nativeToSoft(x.toFloat()), softfloat_roundingMode, true);
-  if (val > int8_t(0x7f))
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_invalid;
-      return int8_t(0x7f);
-    }
-  if (val < int8_t(0x80))
-    {
-      if (prevInexact == 0)
-	softfloat_exceptionFlags &= ~softfloat_flag_inexact;
-      softfloat_exceptionFlags |= softfloat_flag_invalid;
-      return int8_t(0x80);
-    }
-  return val;
-#else
-  // TODO: handle NAN and infinity.
-  return int8_t(x.toFloat());
-#endif
-}
-
-
-static float
-unsignedToFp(uint32_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui32_to_f32(x));
-#else
-  return float(x);
-#endif
-}
-
-static double
-unsignedToFp(uint64_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui64_to_f64(x));
-#else
-  return double(x);
-#endif
-}
-
-
-static Float16
-unsignedToFp(uint16_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui32_to_f16(x));
-#else
-  return Float16::fromFloat(float(x));
-#endif
-}
-
-
-static float
-signedToFp(int32_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i32_to_f32(x));
-#else
-  return float(x);
-#endif
-}
-
-static double
-signedToFp(int64_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i64_to_f64(x));
-#else
-  return double(x);
-#endif
-}
-
-
-static Float16
-signedToFp(int16_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i32_to_f16(x));
-#else
-  return Float16::fromFloat(float(x));
-#endif
-}
-
-
-static Float16
-unsignedToFpHalf(uint32_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui32_to_f16(x));
-#else
-  return Float16::fromFloat(float(x));
-#endif
-}
-
-static float
-unsignedToFpHalf(uint64_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(ui64_to_f32(x));
-#else
-  return float(x);
-#endif
-}
-
-
-static Float16
-signedToFpHalf(int32_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i32_to_f16(x));
-#else
-  return Float16::fromFloat(float(x));
-#endif
-}
-
-
-static float
-signedToFpHalf(int64_t x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(i64_to_f32(x));
-#else
-  return float(x);
-#endif
-}
-
-
-static Float16
-fpToHalfFp(float x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(f32_to_f16(nativeToSoft(x)));
-#else
-  return Float16::fromFloat(x);
-#endif
-}
-
-
-static float
-fpToHalfFp(double x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(f64_to_f32(nativeToSoft(x)));
-#else
-  return x;
-#endif
-}
-
-
 template <typename URV>
 template<typename ELEM_TYPE>
 void
@@ -21407,7 +20736,7 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
-	  UINT_TYPE dest = fpToUnsigned(e1);
+	  UINT_TYPE dest = fpConvertTo<UINT_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -21415,7 +20744,7 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -21472,7 +20801,7 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
-	  INT_TYPE dest = fpToSigned(e1);
+	  INT_TYPE dest = fpConvertTo<INT_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -21480,7 +20809,7 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -21605,7 +20934,7 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  dest = unsignedToFp(e1);
+	  dest = fpConvertTo<ELEM_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -21613,7 +20942,7 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -21672,7 +21001,7 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  dest = signedToFp(e1);
+	  dest = fpConvertTo<ELEM_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -21680,7 +21009,7 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -21739,7 +21068,7 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
         {
 	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
 	  typedef typename makeDoubleWide<UINT_TYPE>::type UINT_TYPE2X;
-	  UINT_TYPE2X dest = fpToUnsigned2x(e1);
+	  UINT_TYPE2X dest = fpConvertTo<UINT_TYPE2X>(e1);
 
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -21748,7 +21077,7 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -21810,7 +21139,7 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
         {
 	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
 	  typedef typename makeDoubleWide<INT_TYPE>::type INT_TYPE2X;
-	  INT_TYPE2X dest = fpToSigned2x(e1);
+	  INT_TYPE2X dest = fpConvertTo<INT_TYPE2X>(e1);
 
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -21819,7 +21148,7 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -21954,7 +21283,7 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  dest = unsignedToFp2x(e1);
+	  dest = fpConvertTo<FP_TYPE2X>(e1);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -21962,7 +21291,7 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22040,7 +21369,7 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  dest = signedToFp2x(e1);
+	  dest = fpConvertTo<FP_TYPE2X>(e1);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -22048,7 +21377,7 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22115,7 +21444,6 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
   ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
 
-  bool invalid = false;
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -22126,12 +21454,16 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  dest = fpWiden(e1);
-	  if (isSnan(dest))
-	    {
-	      dest = getQuietNan<ELEM_TYPE2X>();
-	      invalid = true;
-	    }
+          dest = fpWiden(e1);
+          if (isSnan(dest))
+            {
+              dest = getQuietNan<ELEM_TYPE2X>();
+#ifdef SOFT_FLOAT
+              softfloat_exceptionFlags |= softfloat_flag_invalid;
+#else
+              feraiseexcept(FE_INVALID);
+#endif
+            }
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -22139,7 +21471,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22202,7 +21534,7 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1))
         {
-	  ELEM_TYPE dest = fpToUnsignedHalf(e1);
+	  ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
 
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -22211,7 +21543,7 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22220,7 +21552,7 @@ template <typename URV>
 void
 Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
 {
-  // Double-wide float to unsigned 
+  // Double-wide float to unsigned
   if (not checkMaskableInst(di))
     return;
 
@@ -22286,7 +21618,7 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1))
         {
-	  ELEM_TYPE dest = fpToSignedHalf(e1);
+	  ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
 
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -22295,7 +21627,7 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22471,7 +21803,7 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1))
         {
-	  dest = unsignedToFpHalf(e1);
+	  dest = fpConvertTo<FLOAT_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -22479,7 +21811,7 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22516,7 +21848,7 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -22546,7 +21878,7 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1))
         {
-	  dest = signedToFpHalf(e1);
+	  dest = fpConvertTo<FLOAT_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -22554,7 +21886,7 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22591,7 +21923,7 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -22620,7 +21952,7 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1))
         {
-	  dest = fpToHalfFp(e1);
+	  dest = fpConvertTo<ELEM_TYPE, false>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -22628,7 +21960,7 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   assert(errors == 0);
 }
 
@@ -22665,7 +21997,7 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
     default:         illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -22709,7 +22041,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
     default:       illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -22789,7 +22121,7 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -22860,7 +22192,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -22878,10 +22210,8 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
-  
-  ELEM_TYPE e1{}, result{e2};
 
-  bool invalid = false;
+  ELEM_TYPE e1{}, result{e2};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -22889,20 +22219,16 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	continue;
 
       if (vecRegs_.read(vs1, ix, group, e1))
-	{
-	  bool elemInvalid = false;
-	  result = doFmin(result, e1, elemInvalid);
-	  invalid |= elemInvalid;
-	}
+        result = doFmin(result, e1);
       else
-	errors++;
+        errors++;
     }
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
   assert(errors == 0);
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
 }
 
 
@@ -22955,10 +22281,8 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
     errors++;
-  
-  ELEM_TYPE e1{}, result{e2};
 
-  bool invalid = false;
+  ELEM_TYPE e1{}, result{e2};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -22966,20 +22290,16 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	continue;
 
       if (vecRegs_.read(vs1, ix, group, e1))
-	{
-	  bool elemInvalid = false;
-	  result = doFmax(result, e1, elemInvalid);
-	  invalid |= elemInvalid;
-	}
+        result = doFmax(result, e1);
       else
-	errors++;
+        errors++;
     }
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
 
   assert(errors == 0);
-  updateAccruedFpBits(0.0f, invalid);
+  updateAccruedFpBits(0.0f);
 }
 
 
@@ -23098,7 +22418,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -23174,7 +22494,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  updateAccruedFpBits(0.0f, false /*invalid*/);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
   csRegs_.clearVstart();
 }
@@ -23222,7 +22542,7 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
   if (dbz) feraiseexcept(FE_DIVBYZERO);
 #endif
 
-  updateAccruedFpBits(0.0f, false);
+  updateAccruedFpBits(0.0f);
   markFsDirty();
 
   assert(errors == 0);
@@ -23333,8 +22653,6 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{}, e2{}, dest{};
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -23345,9 +22663,7 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmin(e1, e2, einv);
-	  invalid = invalid or einv;
+          dest = doFmin(e1, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -23355,8 +22671,7 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  if (invalid)
-    orFcsrFlags(FpFlags::Invalid);
+  updateAccruedFpBits(0.0f);
 
   assert(errors == 0);
 }
@@ -23407,8 +22722,6 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -23419,9 +22732,7 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmin(e1, e2, einv);
-	  invalid = invalid or einv;
+          dest = doFmin(e1, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -23429,8 +22740,7 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
         errors++;
     }
 
-  if (invalid)
-    orFcsrFlags(FpFlags::Invalid);
+  updateAccruedFpBits(0.0f);
 
   assert(errors == 0);
 }
@@ -23475,8 +22785,6 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1{}, e2{}, dest{};
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -23487,9 +22795,7 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmax(e1, e2, einv);
-	  invalid = invalid or einv;
+          dest = doFmax(e1, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -23497,8 +22803,7 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  if (invalid)
-    orFcsrFlags(FpFlags::Invalid);
+  updateAccruedFpBits(0.0f);
 
   assert(errors == 0);
 }
@@ -23546,8 +22851,6 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
-  bool invalid = false;
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -23558,9 +22861,7 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  bool einv = false; // Invalid fp exception raised for element.
-          dest = doFmax(e1, e2, einv);
-	  invalid = invalid or einv;
+          dest = doFmax(e1, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -23568,8 +22869,7 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
         errors++;
     }
 
-  if (invalid)
-    orFcsrFlags(FpFlags::Invalid);
+  updateAccruedFpBits(0.0f);
 
   assert(errors == 0);
 }

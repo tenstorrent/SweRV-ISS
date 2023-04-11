@@ -1067,9 +1067,9 @@ CsRegs<URV>::defineMachineRegs()
       defineCsr("mstatush", Csrn::MSTATUSH, mand, imp, 0, mask, mask);
     }
 
-  val = 0x40001105;  // MISA: acim
+  val = 0x4000112d;  // MISA: acdfim
   if constexpr (sizeof(URV) == 8)
-    val = 0x8000000000001105;  // MISA: acim
+    val = 0x800000000000112d;  // MISA: acdfim
   defineCsr("misa", Csrn::MISA, mand, imp, val, rom, rom);
 
   // Bits corresponding to reserved interrupts are hardwired to zero

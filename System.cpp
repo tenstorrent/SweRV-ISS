@@ -492,7 +492,6 @@ System<URV>::produceTestSignatureFile(std::string_view outPath) const
   // it can all be read correctly.
   std::vector<uint32_t> data;
   data.reserve((endSignature.addr_ - beginSignature.addr_) / 4);
-  int count = 1;
   for (std::size_t addr = beginSignature.addr_; addr < endSignature.addr_; addr += 4)
     {
       uint32_t value;
@@ -503,18 +502,15 @@ System<URV>::produceTestSignatureFile(std::string_view outPath) const
         }
 
       data.push_back(value);
-      count++;
     }
 
   // If all data has been read correctly, write it as 32-bit hex values with one
   // per line.
   std::ofstream outFile(outPath.data());
   outFile << std::hex << std::setfill('0');
-  count = 1;
   for (uint32_t value : data)
     {
       outFile << std::setw(8) << value << '\n';
-      count++;
     }
 
   return true;

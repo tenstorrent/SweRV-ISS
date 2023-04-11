@@ -17,6 +17,7 @@
 #include <fstream>
 #include <map>
 #include <algorithm>
+#include <cinttypes>
 #include <cstring>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -1086,7 +1087,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
     {
       case Quit:
         if (commandLog)
-          fprintf(commandLog, "hart=%d quit\n", hartId);
+          fprintf(commandLog, "hart=%" PRIu32 " quit\n", hartId);
         serverPrintFinalRegisterState(hartPtr);
         return true;
 
@@ -1095,10 +1096,10 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (commandLog)
           {
             if (msg.resource == 'p')
-              fprintf(commandLog, "hart=%d poke pc 0x%jx # ts=%s tag=%s\n", hartId,
+              fprintf(commandLog, "hart=%" PRIu32 " poke pc 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
                       uintmax_t(msg.value), timeStamp.c_str(), msg.tag);
             else
-              fprintf(commandLog, "hart=%d poke %c 0x%jx 0x%jx # ts=%s tag=%s\n", hartId,
+              fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
                       msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),
                       timeStamp.c_str(), msg.tag);
           }
@@ -1109,14 +1110,14 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (commandLog)
           {
             if (msg.resource == 'p')
-              fprintf(commandLog, "hart=%d peek pc # ts=%s tag=%s\n",
+              fprintf(commandLog, "hart=%" PRIu32 " peek pc # ts=%s tag=%s\n",
                       hartId, timeStamp.c_str(), msg.tag);
             else if (msg.resource == 's')
-              fprintf(commandLog, "hart=%d peek s %s # ts=%s tag=%s\n",
+              fprintf(commandLog, "hart=%" PRIu32 " peek s %s # ts=%s tag=%s\n",
                       hartId, specialResourceToStr(msg.address),
                       timeStamp.c_str(), msg.tag);
             else
-              fprintf(commandLog, "hart=%d peek %c 0x%jx # ts=%s tag=%s\n",
+              fprintf(commandLog, "hart=%" PRIu32 " peek %c 0x%" PRIxMAX " # ts=%s tag=%s\n",
                       hartId, msg.resource, uintmax_t(msg.address),
                       timeStamp.c_str(), msg.tag);
           }
@@ -1127,10 +1128,10 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (commandLog)
           {
             if (system_.isMcmEnabled())
-              fprintf(commandLog, "hart=%d time=%s step 1 %jd\n",
+              fprintf(commandLog, "hart=%" PRIu32 " time=%s step 1 %" PRIuMAX "\n",
                       hartId, timeStamp.c_str(), uintmax_t(msg.instrTag));
             else
-              fprintf(commandLog, "hart=%d step #%jd # ts=%s\n",
+              fprintf(commandLog, "hart=%" PRIu32 " step #%" PRIuMAX " # ts=%s\n",
                       hartId, uintmax_t(hart.getInstructionCount()),
                       timeStamp.c_str());
             fflush(commandLog);
@@ -1184,10 +1185,10 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           if (commandLog)
             {
               if (msg.value != 0)
-                fprintf(commandLog, "hart=%d reset 0x%jx # ts=%s\n", hartId,
+                fprintf(commandLog, "hart=%" PRIu32 " reset 0x%" PRIxMAX " # ts=%s\n", hartId,
                         uintmax_t(addr), timeStamp.c_str());
               else
-                fprintf(commandLog, "hart=%d reset # ts=%s\n", hartId,
+                fprintf(commandLog, "hart=%" PRIu32 " reset # ts=%s\n", hartId,
                         timeStamp.c_str());
             }
         }
@@ -1198,7 +1199,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           if (checkHart(msg, "enter_debug", reply))
             hart.enterDebugMode(hart.peekPc());
           if (commandLog)
-            fprintf(commandLog, "hart=%d enter_debug # ts=%s\n", hartId,
+            fprintf(commandLog, "hart=%" PRIu32 " enter_debug # ts=%s\n", hartId,
                     timeStamp.c_str());
         }
         break;
@@ -1207,7 +1208,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (checkHart(msg, "exit_debug", reply))
           hart.exitDebugMode();
         if (commandLog)
-          fprintf(commandLog, "hart=%d exit_debug # ts=%s\n", hartId,
+          fprintf(commandLog, "hart=%" PRIu32 " exit_debug # ts=%s\n", hartId,
                   timeStamp.c_str());
         break;
 
@@ -1216,7 +1217,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           if (not hart.cancelLastDiv())
             reply.type = Invalid;
         if (commandLog)
-          fprintf(commandLog, "hart=%d cancel_div # ts=%s\n", hartId,
+          fprintf(commandLog, "hart=%" PRIu32 " cancel_div # ts=%s\n", hartId,
                   timeStamp.c_str());
         break;
 
@@ -1224,7 +1225,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (checkHart(msg, "cancel_lr", reply))
           hart.cancelLr();
         if (commandLog)
-          fprintf(commandLog, "hart=%d cancel_lr # ts=%s\n", hartId,
+          fprintf(commandLog, "hart=%" PRIu32 " cancel_lr # ts=%s\n", hartId,
                   timeStamp.c_str());
         break;
 
@@ -1232,7 +1233,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (not system_.writeAccessedMemory(msg.buffer))
           reply.type = Invalid;
         if (commandLog)
-          fprintf(commandLog, "hart=%d dump_memory %s # ts=%s\n",
+          fprintf(commandLog, "hart=%" PRIu32 " dump_memory %s # ts=%s\n",
                   hartId, msg.buffer, timeStamp.c_str());
         break;
 
@@ -1241,7 +1242,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                                 msg.size, msg.value, msg.flags))
           reply.type = Invalid;
         if (commandLog)
-          fprintf(commandLog, "hart=%d time=%ld mread %ld 0x%lx %d 0x%lx %s\n",
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 " %s\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value, msg.flags? "i" : "e");
         break;
@@ -1251,7 +1252,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                                     msg.address, msg.size, msg.value))
           reply.type = Invalid;
         if (commandLog)
-          fprintf(commandLog, "hart=%d time=%ld mbinsert %ld 0x%lx %d 0x%lx\n",
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
         break;
@@ -1281,7 +1282,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
             if (commandLog)
               {
-                fprintf(commandLog, "hart=%d time=%ld mbwrite 0x%lx 0x",
+                fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbwrite 0x%" PRIx64 " 0x",
                         hartId, msg.time, msg.address);
                 std::reverse(data.begin(), data.end()); // Print lowest address data on the right.
                 for (uint8_t item :  data)
@@ -1315,7 +1316,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
             else if (flags & 2) rwx = "w";
             else if (flags & 4) rwx = "x";
             const char* su = (flags & 8) ? "s" : "u";
-            fprintf(commandLog, "hart=%d translate 0x%jx %s %s\n", hartId,
+            fprintf(commandLog, "hart=%" PRIu32 " translate 0x%" PRIxMAX " %s %s\n", hartId,
                     uintmax_t(msg.address), rwx, su);
           }
         break;
@@ -1326,7 +1327,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           InterruptCause cause = InterruptCause{0};
           reply.flags = hart.isInterruptPossible(mipVal, cause);
           if (commandLog)
-            fprintf(commandLog, "hart=%d check_interrupt 0x%jx\n", hartId,
+            fprintf(commandLog, "hart=%" PRIu32 " check_interrupt 0x%" PRIxMAX "\n", hartId,
                     uintmax_t(msg.value));
         }
         break;

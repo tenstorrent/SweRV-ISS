@@ -1256,11 +1256,11 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
 	}
 
       if (prof.user_)
-        fprintf(file, "  +user %" PRIu64 "\n", prof.user_);
+        fprintf(file, "  +user %" PRIuMAX "\n", prof.user_);
       if (prof.supervisor_)
-        fprintf(file, "  +supervisor %" PRIu64 "\n", prof.supervisor_);
+        fprintf(file, "  +supervisor %" PRIuMAX "\n", prof.supervisor_);
       if (prof.machine_)
-        fprintf(file, "  +machine %" PRIu64 "\n", prof.machine_);
+        fprintf(file, "  +machine %" PRIuMAX "\n", prof.machine_);
     }
 }
 
@@ -4206,21 +4206,21 @@ Hart<URV>::dumpBasicBlocks()
     {
       bool first = true;
       for (const auto& kv : basicBlocks_)
-	{
-	  const BbStat& stat = kv.second;
-	  if (stat.count_)
-	    {
-	      if (first)
-		{
-		  fprintf(bbFile_, "T");
-		  first = false;
-		}
-	      fprintf(bbFile_, ":%ld:%ld:%ld:%ld ", kv.first, stat.count_,
-		      stat.access_, stat.hit_);
-	    }
-	}
+        {
+          const BbStat& stat = kv.second;
+          if (stat.count_)
+            {
+              if (first)
+                {
+                  fprintf(bbFile_, "T");
+                  first = false;
+                }
+              fprintf(bbFile_, ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 ":%" PRIu64 " ", kv.first, stat.count_,
+                stat.access_, stat.hit_);
+            }
+        }
       if (not first)
-	fprintf(bbFile_, "\n");
+        fprintf(bbFile_, "\n");
     }
   bbInsts_ = 0;
 

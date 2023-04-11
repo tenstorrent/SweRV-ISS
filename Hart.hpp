@@ -108,10 +108,14 @@ namespace WdRiscv
 
   /// Model a RISCV hart with integer registers of type URV (uint32_t
   /// for 32-bit registers and uint64_t for 64-bit registers).
-  template <typename URV>
+  template <typename URV_>
   class Hart
   {
   public:
+
+    // Alias the template parameter to allow it to be used outside this
+    // template.
+    using URV = URV_;
 
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
@@ -1895,8 +1899,9 @@ namespace WdRiscv
 
     /// Update the accrued floating point bits in the FCSR
     /// register. No-op if a trigger has tripped.
-    void updateAccruedFpBits(float res, bool invalid);
-    void updateAccruedFpBits(double res, bool invalid);
+    template <typename float_type>
+    auto updateAccruedFpBits(float_type res)
+      -> typename std::enable_if<std::is_floating_point<float_type>::value, void>::type;
 
     /// Set the flags field in FCSR to the least sig 5 bits of the
     /// given value
@@ -2303,6 +2308,11 @@ namespace WdRiscv
     // Return true if maskable vector instruction is legal. Take an
     // illegal instuction exception and return false otherwise.
     bool checkMaskableInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
+
+    // Return true if given arithmetic (non load/store) instruction is
+    // legal. Take an illegal instruction exception and return false
+    // otherwise.
+    bool checkArithmeticInst(const DecodedInst* di);
 
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false

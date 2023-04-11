@@ -64,6 +64,12 @@ else
   LINK_LIBS += -Wl,-export-dynamic
 endif
 
+ifeq (x86_64,$(shell uname -p))
+  ARCH_FLAGS := -mfma
+else
+  ARCH_FLAGS :=
+endif
+
 # For out of source build
 BUILD_DIR := build-$(shell uname -s)
 MKDIR_P ?= mkdir -p
@@ -75,7 +81,7 @@ OFLAGS := -O3
 IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I. -Ithird_party
 
 # Command to compile .cpp files.
-override CXXFLAGS += -MMD -MP -mfma -std=c++17 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
+override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=c++17 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
 
 # Rule to make a .o from a .cpp file.
 $(BUILD_DIR)/%.cpp.o:  %.cpp
