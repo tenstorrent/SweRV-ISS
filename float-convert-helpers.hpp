@@ -16,6 +16,8 @@
 // This file contains the some functions for converting floats and integers
 // to and from each other.
 
+#pragma once
+
 #include <cfenv>
 #include <cstdint>
 #include <limits>

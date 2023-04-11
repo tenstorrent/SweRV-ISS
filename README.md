@@ -652,3 +652,22 @@ significantly.
 
 Suppprted extensions: A, B, C, D, F, H, I, M, S, U, V, ZFH, ZFHMIN, ZBA, ZBB,
 ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ, ZWARS, ZMMUL.
+
+# Running riscv-arch-test Tests with RISCOF
+
+[riscv-arch-test](https://github.com/riscv-non-isa/riscv-arch-test) is a repository containing RISC-V compliance tests, and [RISCOF](https://github.com/riscv-software-src/riscof) is a tool that simplifies building and running these tests against a known reference model (Sail and/or Spike).
+
+Whisper includes the functionality necessary to run these tests and a plugin used to run and score the tests with RISCOF.  To run a test or set of tests with RISCOF:
+1. Install RISCOF via pip.  For more information, see the [RISCOF docs](https://riscof.readthedocs.io/en/stable/installation.html).
+2. Clone the [riscv-arch-test](https://github.com/riscv-non-isa/riscv-arch-test) repository.  Note that this can also be achieved using `riscof arch-test --clone` (riscof provides functionality to specify the clone directory and to update an existing checkout; use `riscof arch-test --help` for more info).
+3. Create RISCOF's config.ini file by running `riscof setup --dutname whisper`.  It defaults to using Sail as the reference model; append `--refname spike` to the command to use Spike.
+4. Update the `DUTPluginPath` in the `RISCOF` section in the config.ini file to the arch_test_target folder from this repository.  Likewise, set the `pluginpath`, `ispec`, and `pspec` paths to the appropriate locations within the arch_test_target folder.  Note that whisper_isa32.yaml is to be used when running an RV32 architecture; whisper_isa.yaml is for RV64.  RISCOF does not appear to have the ability to configure both architectures in a single file and dynamically switch based on the test.
+5. (Optional) set the `jobs` field in the `whisper` and \<Ref> sections to a number larger than 1 to allow running tests in parallel.
+6. Update sail_cSim/riscof_sail_cSim.py and/or spike/riscof_spike.py as necessary based on desired usage.  Some modifications may include:
+   - Replace the dynamic switching of 32 vs 64 based on ISA when running gcc and objdump to just 64 if your toolchain is compiled for multilib.
+   - Disable logging to file and creating disassembly files.  Some tests (particularly some floating point tests) are very large, so generating disassembly and log files for these tests is very time consuming and can consume large amounts of space.  These files are unused for scoring, so they can safely be disabled if just scoring tests.
+   - Ensure extensions for all desired tests are included in the architecture string passed to the compile command and/or executable invocations.
+7. Build Whisper and the reference model simulator.  See the Sail or Spike documentation on how to do so.
+8. Ensure the paths to the RISC-V toolchain (i.e. gcc and objdump), the reference model executable, and whisper executable are in the `PATH` environment variable.  All need to be able to be invoked without a path.
+9. Run the desired test suite using `riscof run`.  The `--suite` parameter should be provided with the riscv-arch-test/riscv-test-suite directory (or a subdirectory) from the clone from step 2 above, and the `--env` folder should be provided with the riscv-arch-test/riscv-test-suite/env folder.
+   - By default, the run command will produce an HTML report containing information about which tests passed and failed and will attempt to open this report in the browser once all tests have completed.  If this behavior is undesirable (e.g. running on a headless node or as part of CI), provide the `--no-browser` argument.

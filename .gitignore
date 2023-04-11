@@ -5,5 +5,7 @@ librvcore.a
 *.a
 bazel-*
 
+__pycache__
+
 # VSCode
 .vscode/
