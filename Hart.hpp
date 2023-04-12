@@ -645,7 +645,7 @@ namespace WdRiscv
     { if (toHostValid_) address = toHost_; return toHostValid_; }
 
     /// Program counter.
-    URV pc()
+    URV pc() const
     { return pc_; }
 
     /// Support for tracing: Return the pc of the last executed
