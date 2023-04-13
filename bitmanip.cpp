@@ -144,6 +144,40 @@ Hart<URV>::execAndn(const DecodedInst* di)
 
 template <typename URV>
 void
+Hart<URV>::execOrc_b(const DecodedInst* di)
+{
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (mxlen_ > sizeof(URV) * 8)
+    {
+      assert(0 and "mxlen is larger than xlen");
+      return;
+    }
+
+  union converter_t
+  {
+    URV     urv;
+    uint8_t bytes[sizeof(URV)];
+  } u;
+
+  // GCC 12 optimizes the following down to couple of vector instructions
+  // on Arm and x86_64.
+  u.urv = intRegs_.read(di->op1());
+  for (size_t i = 0; i < sizeof(u.bytes); i++)
+    {
+      u.bytes[i] = (u.bytes[i] == 0 ? 0 : UINT8_MAX);
+    }
+
+  intRegs_.write(di->op0(), u.urv);
+}
+
+
+template <typename URV>
+void
 Hart<URV>::execOrn(const DecodedInst* di)
 {
   if (not isRvzbb() and not isRvzbp() and not isRvzbkb())
@@ -761,13 +795,7 @@ Hart<URV>::execGorci(const DecodedInst* di)
 {
   URV shamt = di->op2();
 
-  bool orc_b = (shamt == 0x7);  // orc.b is also in zbb
-
-  bool legal = isRvzbp();
-  if (orc_b)
-    legal = legal or isRvzbb();
-
-  if (not legal)
+  if (not isRvzbp())
     {
       illegalInst(di);
       return;
@@ -823,13 +851,7 @@ Hart<URV>::execGorciw(const DecodedInst* di)
 {
   URV shamt = di->op2();
 
-  bool orc_b = (shamt == 0x7);  // orc.b is also in zbb
-
-  bool legal = isRvzbp() and isRv64();
-  if (orc_b)
-    legal = legal or isRvzbb();
-
-  if (not legal)
+  if (not isRvzbp() or not isRv64())
     {
       illegalInst(di);
       return;

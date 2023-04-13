@@ -1735,17 +1735,13 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0 },
 
+      { "andn", InstId::andn, 0x40007033, top7Funct3Low7Mask,
+	RvExtension::Zbb, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
       { "clz", InstId::clz, 0x60001013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "ctz", InstId::ctz, 0x60101013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "cpop", InstId::cpop, 0x60201013, 0xfff0707f,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
@@ -1755,7 +1751,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
-      { "ctzw", InstId::ctzw, 0x6010101b, 0xfff0707f,
+      { "cpop", InstId::cpop, 0x60201013, 0xfff0707f,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
@@ -1765,19 +1761,17 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
-      { "min", InstId::min, 0x0a004033, top7Funct3Low7Mask,
+      { "ctz", InstId::ctz, 0x60101013, 0xfff0707f,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "ctzw", InstId::ctzw, 0x6010101b, 0xfff0707f,
+	RvExtension::Zbb, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "max", InstId::max, 0x0a006033, top7Funct3Low7Mask,
-	RvExtension::Zbb, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
-
-      { "minu", InstId::minu, 0x0a005033, top7Funct3Low7Mask,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
@@ -1789,21 +1783,22 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "sext.b", InstId::sext_b, 0x60401013, 0xfff0707f,
-        RvExtension::Zbb, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "sext.h", InstId::sext_h, 0x60501013, 0xfff0707f,
-        RvExtension::Zbb, RvFormat::R,
-	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask },
-
-      { "andn", InstId::andn, 0x40007033, top7Funct3Low7Mask,
+      { "min", InstId::min, 0x0a004033, top7Funct3Low7Mask,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+      { "minu", InstId::minu, 0x0a005033, top7Funct3Low7Mask,
+	RvExtension::Zbb, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+      { "orc.b", InstId::orc_b, 0x28005013, 0xf800707f,
+	RvExtension::Zbb, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "orn", InstId::orn, 0x40006033, top7Funct3Low7Mask,
 	RvExtension::Zbb, RvFormat::R,
@@ -1811,13 +1806,18 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "xnor", InstId::xnor, 0x40004033, top7Funct3Low7Mask,
+      { "rev8", InstId::rev8, 0x69805013, 0xfff0707f,
+	RvExtension::Zbb, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "rol", InstId::rol, 0x60001033, top7Funct3Low7Mask,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "rol", InstId::rol, 0x60001033, top7Funct3Low7Mask,
+      { "rolw", InstId::rolw, 0x6000103b, top7Funct3Low7Mask,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
@@ -1835,11 +1835,11 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::Imm, OperandMode::None, shamtMask },
 
-      { "rolw", InstId::rolw, 0x6000103b, top7Funct3Low7Mask,
-	RvExtension::Zbb, RvFormat::R,
+      { "roriw", InstId::roriw, 0x6000501b, 0xfe00707f,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::IntReg, OperandMode::Read, rs2Mask },
+	OperandType::Imm, OperandMode::None, shamtMask },
 
       { "rorw", InstId::rorw, 0x6000503b, top7Funct3Low7Mask,
 	RvExtension::Zbb, RvFormat::R,
@@ -1847,16 +1847,21 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
-      { "roriw", InstId::roriw, 0x6000501b, 0xfe00707f,
-	RvExtension::Zbb, RvFormat::I,
+      { "sext.b", InstId::sext_b, 0x60401013, 0xfff0707f,
+        RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
-	OperandType::IntReg, OperandMode::Read, rs1Mask,
-	OperandType::Imm, OperandMode::None, shamtMask },
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
-      { "rev8", InstId::rev8, 0x69805013, 0xfff0707f,
+      { "sext.h", InstId::sext_h, 0x60501013, 0xfff0707f,
 	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+      { "xnor", InstId::xnor, 0x40004033, top7Funct3Low7Mask,
+	RvExtension::Zbb, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "pack", InstId::pack, 0x08004033, top7Funct3Low7Mask,
 	RvExtension::Zbe, RvFormat::R,
