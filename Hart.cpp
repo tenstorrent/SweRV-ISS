@@ -275,6 +275,7 @@ Hart<URV>::processExtensions(bool verbose)
 
   // D requires F and is enabled only if F is enabled.
   flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
+  flag = flag and isa_.isEnabled(RvExtension::D);
   if (flag and not rvf_)
     {
       flag = false;
@@ -282,7 +283,6 @@ Hart<URV>::processExtensions(bool verbose)
 	std::cerr << "Bit 3 (d) is set in the MISA register but f "
 		  << "extension (bit 5) is not enabled -- ignored\n";
     }
-  flag = flag and isa_.isEnabled(RvExtension::D);
   enableRvd(flag);
 
   rve_ = value & (URV(1) << ('e' - 'a'));
