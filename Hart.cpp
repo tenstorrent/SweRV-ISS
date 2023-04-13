@@ -2251,13 +2251,11 @@ Hart<URV>::virtualInst(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
-  assert(0 && "Implement Hart::virtualInst");
-
   uint32_t inst = di->inst();
   if (isCompressedInst(inst))
     inst = inst & 0xffff;
 
-  initiateException(ExceptionCause::ILLEGAL_INST, currPc_, inst);
+  initiateException(ExceptionCause::VIRT_INST, currPc_, inst);
 }
 
 
@@ -2422,6 +2420,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
 	    virtMode_ = true;
 	}
     }
+  csRegs_.setVirtualMode(virtMode_);
 
   CsrNumber epcNum = CsrNumber::MEPC;
   CsrNumber causeNum = CsrNumber::MCAUSE;
@@ -2476,15 +2475,17 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info)
       msf.bits_.SIE = 0;
       if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
 	assert(0 and "Failed to write SSTATUS register");
-      if (not origVirtMode)
-	hstatus_.bits_.SPV = origVirtMode;
-      if (origVirtMode)
-	{
-	  assert(origMode == PM::User or origMode == PM::Supervisor);
-	  hstatus_.bits_.SPVP = unsigned(origMode);
-	}
       if (not virtMode_)
-	hstatus_.bits_.GVA = gva;
+	{
+	  // Trap taken into HS privilege.
+	  hstatus_.bits_.SPV = origVirtMode;  // Save virt mode.
+	  if (origVirtMode)
+	    {
+	      assert(origMode == PM::User or origMode == PM::Supervisor);
+	      hstatus_.bits_.SPVP = unsigned(origMode);
+	    }
+	  hstatus_.bits_.GVA = gva;
+	}
       updateCachedSstatus();
 
       if (isRvh())
@@ -10017,13 +10018,18 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   // ... updating/unpacking its fields,
   MstatusFields<URV> fields(value);
-  PrivilegeMode savedMode = fields.bits_.SPP? PrivilegeMode::Supervisor :
-    PrivilegeMode::User;
+  PrivilegeMode savedMode = fields.bits_.SPP? PrivilegeMode::Supervisor : PrivilegeMode::User;
+
+  // Restore MIE.
   fields.bits_.SIE = fields.bits_.SPIE;
+
+  // Set SPP.
   if (isRvu())
     fields.bits_.SPP = 0; // User mode
   else
     fields.bits_.SPP = 1; // Supervisor mode
+
+  // Set SPIE
   fields.bits_.SPIE = 1;
   if (savedMode != PrivilegeMode::Machine and clearMprvOnRet_)
     fields.bits_.MPRV = 0;

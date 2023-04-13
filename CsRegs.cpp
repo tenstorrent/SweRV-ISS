@@ -662,7 +662,7 @@ CsRegs<URV>::configCsr(CsrNumber csrNum, bool implemented, URV resetValue,
   csr.setIsDebug(isDebug);
   csr.setIsShared(shared);
 
-  // Cahche interrupt enable.
+  // Cache interrupt enable.
   if (csrNum == CsrNumber::MSTATUS)
     {
       MstatusFields<URV> fields(csr.read());
