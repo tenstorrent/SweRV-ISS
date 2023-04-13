@@ -5220,28 +5220,30 @@ Hart<URV>::execute(const DecodedInst* di)
      &&c_addiw,
      &&c_sdsp,
 
-     &&clz,
-     &&ctz,
-     &&cpop,
-     &&clzw,
-     &&ctzw,
-     &&cpopw,
-     &&min,
-     &&max,
-     &&minu,
-     &&maxu,
-     &&sext_b,
-     &&sext_h,
      &&andn,
+     &&clz,
+     &&clzw,
+     &&cpop,
+     &&cpopw,
+     &&ctz,
+     &&ctzw,
+     &&max,
+     &&maxu,
+     &&min,
+     &&minu,
+     &&orc_b,
      &&orn,
-     &&xnor,
+     &&rev8,  // was bswap
      &&rol,
+     &&rolw,
      &&ror,
      &&rori,
-     &&rolw,
-     &&rorw,
      &&roriw,
-     &&rev8,
+     &&rorw,
+     &&sext_b,
+     &&sext_h,
+     &&xnor,
+
      &&pack,
      &&packh,
      &&packu,
@@ -6891,6 +6893,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
  andn:
   execAndn(di);
+  return;
+
+ orc_b:
+  execOrc_b(di);
   return;
 
  orn:
