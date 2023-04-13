@@ -1309,9 +1309,9 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sstatus)
     {
       // SSTATUS tied to MSTATUS but not all bits are readable.
-      sstatus->setReadMask(0x80766722L);
+      sstatus->setReadMask(0x800de762L);
       if constexpr (sizeof(URV) == 8)
-	sstatus->setReadMask(0x8000000300766722L);
+	sstatus->setReadMask(0x80000003000de762L);
       sstatus->setMapsToVirtual(true);
     }
 
