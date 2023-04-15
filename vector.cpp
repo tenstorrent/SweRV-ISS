@@ -11307,7 +11307,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
       return;
     }
 
-  unsigned vd = di->op0(), rs1 = di->op1(), groupX8 = 8;
+  unsigned vd = di->op0(), rs1 = di->op1(), groupX8 = 8, start = csRegs_.peekVstart();
   ElementWidth sew = vecRegs_.elemWidth();
   SRV val = intRegs_.read(rs1);
 
@@ -11315,19 +11315,19 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (vecRegs_.elemCount() > 0)
+      if (start < vecRegs_.elemCount())
 	vecRegs_.write(vd, 0, groupX8, int8_t(val));
       break;
     case EW::Half:
-      if (vecRegs_.elemCount() > 0)
+      if (start < vecRegs_.elemCount())
 	vecRegs_.write(vd, 0, groupX8, int16_t(val));
       break;
     case EW::Word:
-      if (vecRegs_.elemCount() > 0)
+      if (start < vecRegs_.elemCount())
 	vecRegs_.write(vd, 0, groupX8, int32_t(val));
       break;
     case EW::Word2:
-      if (vecRegs_.elemCount() > 0)
+      if (start < vecRegs_.elemCount())
 	vecRegs_.write(vd, 0, groupX8, int64_t(val));
       break;
     default:
@@ -11423,7 +11423,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
       return;
     }
 
-  unsigned vd = di->op0(), rs1 = di->op1(), groupX8 = 8;
+  unsigned vd = di->op0(), rs1 = di->op1(), groupX8 = 8, start = csRegs_.peekVstart();
   ElementWidth sew = vecRegs_.elemWidth();
 
   typedef ElementWidth EW;
@@ -11435,7 +11435,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
     case EW::Half:
       if (not isZfhLegal())
 	illegalInst(di);
-      else if (vecRegs_.elemCount() > 0)
+      else if (start < vecRegs_.elemCount())
 	{
 	  Float16 val = fpRegs_.readHalf(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
@@ -11444,7 +11444,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
     case EW::Word:
       if (not isFpLegal())
 	illegalInst(di);
-      else if (vecRegs_.elemCount() > 0)
+      else if (start < vecRegs_.elemCount())
 	{
 	  float val = fpRegs_.readSingle(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
@@ -11453,7 +11453,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
     case EW::Word2:
       if (not isDpLegal())
 	illegalInst(di);
-      else
+      else if (start < vecRegs_.elemCount())
 	{
 	  double val = fpRegs_.readDouble(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
