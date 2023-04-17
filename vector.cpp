@@ -16831,7 +16831,6 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -16894,7 +16893,6 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -16956,7 +16954,6 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17019,7 +17016,6 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17082,7 +17078,6 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17183,7 +17178,6 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17260,7 +17254,6 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17337,7 +17330,6 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17414,7 +17406,6 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17490,7 +17481,6 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17565,7 +17555,6 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17640,7 +17629,6 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17715,7 +17703,6 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17777,7 +17764,6 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17840,7 +17826,6 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17902,7 +17887,6 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17965,7 +17949,6 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18028,7 +18011,6 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18102,7 +18084,6 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18178,7 +18159,6 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18224,7 +18204,6 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18286,7 +18265,6 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18351,7 +18329,6 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18413,7 +18390,6 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18478,7 +18454,6 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18540,7 +18515,6 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18605,7 +18579,6 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18667,7 +18640,6 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18732,7 +18704,6 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18794,7 +18765,6 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18874,7 +18844,6 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18936,7 +18905,6 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19001,7 +18969,6 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19063,7 +19030,6 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19128,7 +19094,6 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19190,7 +19155,6 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19262,7 +19226,6 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19336,7 +19299,6 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19413,7 +19375,6 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19487,7 +19448,6 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19564,7 +19524,6 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19638,7 +19597,6 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19715,7 +19673,6 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19790,7 +19747,6 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19857,7 +19813,6 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -21846,7 +21801,6 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -21921,7 +21875,6 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -21995,7 +21948,6 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22039,7 +21991,6 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22119,7 +22070,6 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22190,7 +22140,6 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22261,7 +22210,6 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22332,7 +22280,6 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22416,7 +22363,6 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22492,7 +22438,6 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22540,7 +22485,6 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 #endif
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -22607,7 +22551,6 @@ Hart<URV>::vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
     }
 
   orFcsrFlags(flags);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -22704,7 +22647,6 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22767,8 +22709,6 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
     case EW::Word2: vfmin_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22833,7 +22773,6 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22897,7 +22836,6 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22960,7 +22898,6 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23022,7 +22959,6 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23086,7 +23022,6 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23149,7 +23084,6 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23218,7 +23152,6 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23287,7 +23220,6 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
