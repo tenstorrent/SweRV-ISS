@@ -14272,9 +14272,6 @@ template <typename URV>
 void
 Hart<URV>::execVle8ff_v(const DecodedInst* di)
 {
-  GroupMultiplier gm = vecRegs_.groupMultiplier();
-  if (not checkMaskableInst(di, gm, ElementWidth::Byte))
-    return;
   if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, true))
     return;
   csRegs_.clearVstart();
