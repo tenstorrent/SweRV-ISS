@@ -378,8 +378,6 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
   if (entry)
     {
       // Use TLB entry.
-      if (entry->global_)
-        return vPageFaultType(read, write, exec);
       if (not entry->user_)
 	return vPageFaultType(read, write, exec);
       bool ra = entry->read_ or (execReadable_ and entry->exec_);
@@ -744,8 +742,8 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (pte.pbmt() != 0 or pte.global())
-	return vPageFaultType(read, write, exec);  // Leaf page must bave pbmt=0 and G=0.
+      if (pte.pbmt() != 0)
+	return vPageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
       if (not pte.user())
 	return vPageFaultType(read, write, exec);  // All access as though in User mode.
 
