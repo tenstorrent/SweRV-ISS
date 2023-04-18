@@ -428,8 +428,7 @@ Hart<URV>::execHsv_b(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV base = intRegs_.read(rs1);
-  URV addr = base + di->op2As<SRV>();
+  URV addr = intRegs_.read(rs1);
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
   store<uint8_t>(addr, true /*hyper*/, value);
 }
@@ -458,8 +457,7 @@ Hart<URV>::execHsv_h(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV base = intRegs_.read(rs1);
-  URV addr = base + di->op2As<SRV>();
+  URV addr = intRegs_.read(rs1);
   uint16_t value = uint8_t(intRegs_.read(di->op0()));
   store<uint16_t>(addr, true /*hyper*/, value);
 }
@@ -488,8 +486,7 @@ Hart<URV>::execHsv_w(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV base = intRegs_.read(rs1);
-  URV addr = base + di->op2As<SRV>();
+  URV addr = intRegs_.read(rs1);
   uint32_t value = uint8_t(intRegs_.read(di->op0()));
   store<uint32_t>(addr, true /*hyper*/, value);
 }
@@ -518,8 +515,7 @@ Hart<URV>::execHsv_d(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV base = intRegs_.read(rs1);
-  URV addr = base + di->op2As<SRV>();
+  URV addr = intRegs_.read(rs1);
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
   store<uint64_t>(addr, true /*hyper*/, value);
 }
