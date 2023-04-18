@@ -861,8 +861,10 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
     {
       // 2.
       uint64_t gpteAddr = root + va.vpn(ii)*pteSize; // Guest pte address.
-      if (trace_)
-	walkVec.back().push_back(gpteAddr);
+
+      // TODO: this needs to be fixed, gpteAddr is not a physical address
+      /* if (trace_) */
+      /*   walkVec.back().push_back(gpteAddr); */
 
       // Translate guest pteAddr to host physical address.
       uint64_t pteAddr = gpteAddr; pa = gpteAddr;
@@ -872,6 +874,10 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  stage2ExceptionToStage1(ec, read, write, exec);
 	  return ec;
 	}
+
+      // TODO: see above
+      /* if (trace_) */
+      /*   walkVec.back().push_back(pteAddr); */
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.

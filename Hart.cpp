@@ -2262,7 +2262,7 @@ Hart<URV>::virtualInst(const DecodedInst* di)
   if (isCompressedInst(inst))
     inst = inst & 0xffff;
 
-  initiateException(ExceptionCause::ILLEGAL_INST, currPc_, inst);
+  initiateException(ExceptionCause::VIRT_INST, currPc_, inst);
 }
 
 
@@ -2505,14 +2505,15 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
       if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, msf.value_))
 	assert(0 and "Failed to write SSTATUS register");
       if (not virtMode_)
-	hstatus_.bits_.SPV = origVirtMode;
-      if (origVirtMode and not virtMode_)
-	{
-	  assert(origMode == PM::User or origMode == PM::Supervisor);
-	  hstatus_.bits_.SPVP = unsigned(origMode);
-	}
-      if (not virtMode_)
-	hstatus_.bits_.GVA = gva;
+        {
+          hstatus_.bits_.SPV = origVirtMode;
+          if (origVirtMode)
+            {
+              assert(origMode == PM::User or origMode == PM::Supervisor);
+              hstatus_.bits_.SPVP = unsigned(origMode);
+            }
+          hstatus_.bits_.GVA = gva;
+        }
       updateCachedSstatus();
 
       if (isRvh())
@@ -4081,9 +4082,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    continue;  // Next instruction in trap handler.
 
 	  // Decode unless match in decode cache.
-	  uint32_t ix = (pc_ >> 1) & decodeCacheMask_;
+	  uint32_t ix = (physPc >> 1) & decodeCacheMask_;
 	  DecodedInst* di = &decodeCache_[ix];
-	  if (not di->isValid() or di->address() != pc_)
+	  if (not di->isValid() or di->physAddress() != physPc)
 	    decode(pc_, physPc, inst, *di);
 
           // Increment pc and execute instruction
@@ -9722,7 +9723,10 @@ Hart<URV>::execEcall(const DecodedInst*)
   if (privMode_ == PrivilegeMode::Machine)
     initiateException(ExceptionCause::M_ENV_CALL, currPc_, 0);
   else if (privMode_ == PrivilegeMode::Supervisor)
-    initiateException(ExceptionCause::S_ENV_CALL, currPc_, 0);
+    {
+      auto ec = (virtMode_)? ExceptionCause::VS_ENV_CALL : ExceptionCause::S_ENV_CALL;
+      initiateException(ec, currPc_, 0);
+    }
   else if (privMode_ == PrivilegeMode::User)
     initiateException(ExceptionCause::U_ENV_CALL, currPc_, 0);
   else

@@ -702,19 +702,10 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     buffer.printChar('v');
 
   // Privilege mode.
-  if (not lastVirt_)
-    {
-      if      (lastPriv_ == PrivilegeMode::Machine)    buffer.print(",m,");
-      else if (lastPriv_ == PrivilegeMode::Supervisor) buffer.print(",s,");
-      else if (lastPriv_ == PrivilegeMode::User)       buffer.print(",u,");
-      else                                             buffer.print(",,");
-    }
-  else
-    {
-      if (lastPriv_ == PrivilegeMode::Supervisor)      buffer.print(",vs,");
-      else if (lastPriv_ == PrivilegeMode::User)       buffer.print(",vu,");
-      else                                             buffer.print(",,");
-    }
+  if      (lastPriv_ == PrivilegeMode::Machine)    buffer.print(",m,");
+  else if (lastPriv_ == PrivilegeMode::Supervisor) buffer.print((lastVirt_)? ",vs," : ",s,");
+  else if (lastPriv_ == PrivilegeMode::User)       buffer.print((lastVirt_)? ",vu," : ",u,");
+  else                                             buffer.print(",,");
 
   // Interrupt/exception cause.
   if (hasTrap)
