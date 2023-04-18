@@ -4167,7 +4167,8 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim or bbFile_ or instrLineTrace_ or isRvs() or isRvu() or hasClint())
+          if (hasLim or bbFile_ or instrLineTrace_ or branchTraceFile_ or isRvs() or
+	      isRvu() or hasClint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4292,9 +4293,12 @@ Hart<URV>::simpleRunWithLimit()
   bool checkInterrupt = isRvs() or isRvu() or hasClint();
   std::string instStr;
 
+  if (branchTraceFile_)
+    fprintf(branchTraceFile_, "0x%jx\n", uintmax_t(pc_));
+
   while (noUserStop and instCounter_ < limit) 
     {
-      hasException_ = hasInterrupt_ = false;
+      hasException_ = hasInterrupt_ = lastBranchTaken_ = false;
       currPc_ = pc_;
       ++instCounter_;
       ++cycleCount_;
@@ -4326,6 +4330,9 @@ Hart<URV>::simpleRunWithLimit()
 
       if (bbFile_)
 	countBasicBlocks(di);
+
+      if (branchTraceFile_ and di->isBranch())
+	traceBranch(di);
     }
 
   return true;
@@ -4358,6 +4365,31 @@ Hart<URV>::simpleRunNoLimit()
     }
 
   return true;
+}
+
+
+template <typename URV>
+void
+Hart<URV>::traceBranch(const DecodedInst* di)
+{
+  bool hasTrap = hasInterrupt_ or hasException_;
+  if (not hasTrap)
+    {
+      char type = lastBranchTaken_ ? 't' : 'n';  // For conditinoal branch.
+      if (not di->isConditionalBranch())
+	{
+	  if (di->op0() == 1 or di->op0() == 5)
+	    type = 'c';  // call
+	  else if (di->operandCount() >= 2 and (di->op1() == 1 or di->op1() == 5))
+	    type = 'r';  // return
+	  else if (di->isBranchToRegister())
+	    type = 'i';  // indirect
+	  else
+	    type = 'j';  // jump
+	}
+
+      fprintf(branchTraceFile_, "%c;0x%jx;0x%jx\n", type, uintmax_t(currPc_), uintmax_t(pc_));
+    }
 }
 
 

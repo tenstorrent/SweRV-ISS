@@ -1424,6 +1424,10 @@ namespace WdRiscv
     void enableAddrTransLog(FILE* file)
     { virtMem_.enableAddrTransLog(file); }
 
+    /// Enable branch address trace
+    void enableBranchTrace(FILE* file)
+    { branchTraceFile_ = file; }
+
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
@@ -2378,13 +2382,9 @@ namespace WdRiscv
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
-    // rs1: index of source register (value range: 0 to 31)
-    // rs2: index of source register (value range: 0 to 31)
-    // rd: index of destination register (value range: 0 to 31)
-    // offset: singed integer.
-    // imm: signed integer.
-    // All immediate and offset values are assumed to be already unpacked
-    // and sign extended if necessary.
+    // Emit a trace record for the given branch instruction in the
+    // branch trace file.
+    void traceBranch(const DecodedInst* di);
 
     // The program counter is adjusted (size of current instruction
     // added) before any of the following exec methods are called. To
@@ -4504,7 +4504,8 @@ namespace WdRiscv
     uint64_t bbCacheAccess_ = 0;
     uint64_t bbCacheHit_ = 0;
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
-    FILE* bbFile_ = nullptr;
+    FILE* bbFile_ = nullptr;            // Basic block file.
+    FILE* branchTraceFile_ = nullptr;   // Branch trace file.
 
     Mcm<URV>* mcm_ = nullptr;
 

@@ -169,6 +169,7 @@ struct Args
   std::string configFile;                // Configuration (JSON) file.
   std::string bblockFile;                // Basci block file.
   std::string attFile;                   // Address translation file.
+  std::string branchTraceFile;           // Branch trace file.
   std::string tracerLib;                 // Path to tracer extension shared library.
   std::string isa;
   std::string snapshotDir = "snapshot";  // Dir prefix for saving snapshots
@@ -518,6 +519,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 	 "Report instruction frequency to file.")
         ("att", po::value(&args.attFile),
          "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
+        ("tracebranch", po::value(&args.branchTraceFile),
+         "Trace branch instructions to the given file.")
         ("tracerlib", po::value(&args.tracerLib),
          "Path to tracer extension shared library which should provide C symbol tracerExtension."
          "Optionally include arguments after a colon to be exposed to the shared library "
@@ -1326,7 +1329,8 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
+	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile,
+	      FILE*& branchTraceFile)
 {
   size_t len = args.traceFile.size();
   bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
@@ -1397,6 +1401,17 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
         }
     }
 
+  if (not args.branchTraceFile.empty())
+    {
+      branchTraceFile = fopen(args.branchTraceFile.c_str(), "w");
+      if (not branchTraceFile)
+        {
+          std::cerr << "Failed to open branch trace file '"
+                    << args.attFile << "' for output\n";
+          return false;
+        }
+    }
+
   return true;
 }
 
@@ -1405,7 +1420,8 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 static
 void
 closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
+	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile,
+	       FILE*& branchTraceFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1433,6 +1449,10 @@ closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
   if (attFile and attFile != stdout)
     fclose(attFile);
   attFile = nullptr;
+
+  if (branchTraceFile and branchTraceFile != stdout)
+    fclose(branchTraceFile);
+  branchTraceFile = nullptr;
 }
 
 
@@ -1868,7 +1888,9 @@ session(const Args& args, const HartConfig& config)
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
   FILE* attFile = nullptr;
-  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile))
+  FILE* branchTraceFile = nullptr;
+  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile,
+			branchTraceFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1884,10 +1906,9 @@ session(const Args& args, const HartConfig& config)
     {
       auto& hart = *system.ithHart(i);
       hart.setConsoleOutput(consoleOut);
-      if (bblockFile)
-	hart.enableBasicBlocks(bblockFile, args.bblockInsts);
-      if (attFile)
-        hart.enableAddrTransLog(attFile);
+      hart.enableBasicBlocks(bblockFile, args.bblockInsts);
+      hart.enableAddrTransLog(attFile);
+      hart.enableBranchTrace(branchTraceFile);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())
@@ -1922,7 +1943,8 @@ session(const Args& args, const HartConfig& config)
   if (not args.testSignatureFile.empty())
     result = system.produceTestSignatureFile(args.testSignatureFile) and result;
 
-  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
+  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile,
+		 branchTraceFile);
 
   return result;
 }
