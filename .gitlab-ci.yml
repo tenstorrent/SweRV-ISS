@@ -2,7 +2,7 @@
 
 
 image:
-  name: yyz-gitlab.local.tenstorrent.com:5005/tenstorrent/infra/devel-whisper
+  name: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/risc-p-cores/risc-p-cores/dev:67bb6d2970e9174de23ecb3bf20fa9ca01b1921437a2694789a56e3c272f5793
   entrypoint: [""]
 
 
@@ -15,24 +15,67 @@ variables:
 # Commonly used YAML (anchors)
 .define-anchors:
 # refs:
-- &BRANCH_IS_MASTER /^master$/
-- &BRANCH_IS_BLACKHOLE /^black-hole.*$/
+  - &BRANCH_IS_MASTER /^master$/
+  - &BRANCH_IS_BLACKHOLE /^black-hole.*$/
 
 stages:
-- test               # Nothing too serious; one stage is all we need right now
+  - build
+  - test
 
+build-job:
+  stage: build
+  script:
+    - make SOFT_FLOAT=1 STATIC_LINK=0 -j32
+  artifacts:
+    paths:
+      - build-Linux/whisper
+    expire_in: 8 hours
 
+riscof-job:
+  stage: test
+  dependencies:
+    - "build-job"
+  script:
+    - mkdir testing/riscof
+    - cd testing/riscof
+    # Install riscof
+    - python3 -m venv virtualenv
+    - source virtualenv/bin/activate
+    - pip3 install riscof
+    - riscof arch-test --clone
+    - riscof setup --dutname whisper --refname spike
+    - rm -rf ./whisper
+    # Update riscof's config.ini file to point to the arch_test_target folder
+    - sed -i 's/testing\/riscof\/whisper/arch_test_target/g' config.ini
+    # Configure 8 parallel jobs when running whisper and spike
+    - sed -i '/target_run=1/a jobs=8' config.ini
+    - sed -i '/pluginpath=.*spike/a jobs=8' config.ini
+    # Disable runing objdump before when running spike
+    - sed -i -E 's/(\s+)(.*ref.disass.*)/\1# \2/g' spike/riscof_spike.py
+    # Add --misaligned flag, enable generating signature file, and set target file name when running spike
+    - sed -i -E "s/(execute \+= self.ref_exe \+).*/\1 ' --isa={2} --misaligned +signature={0} +signature-granularity=4 {1}'.format(sig_file, elf, self.isa)/g" spike/riscof_spike.py
+    # Get the isa population code from whisper's plugin and use it in spike's plugin
+    - sed -n -Ee '/self.isa =/,/self.compile_cmd =/ { s/( {4,})/  \1/g ; p }' ../../arch_test_target/riscof_whisper.py > isa_py.txt
+    - sed -i -e '/self.isa =/,/^$/ {' -e '/self.isa =/r isa_py.txt' -e 'd }' spike/riscof_spike.py
+    # Clone and build spike
+    - git clone https://github.com/riscv-software-src/riscv-isa-sim
+    - mkdir riscv-isa-sim/build
+    - cd riscv-isa-sim/build
+    - ../configure
+    - make -s -j32
+    - cd ../..
+    # Run riscof
+    - PATH=$PATH:$PWD/riscv-isa-sim/build:$PWD/../../build-Linux riscof run --suite riscv-arch-test/riscv-test-suite --env riscv-arch-test/riscv-test-suite/env --no-browser
+  timeout: 30 minutes
 
-
-post-commit-test:
+.post-commit-test: # Maybe re-enable this at some point in the future
   stage: test
   allow_failure: false
   script:
-    - make -j32
     - cd testing && source init_venv.sh && ralph trace -t configs.py --clean
   artifacts: &TEST_ARTIFACTS
     when: always
     expire_in: 8 hours
     paths:
-    - "test_output/*/*" 
+    - "test_output/*/*"
 
