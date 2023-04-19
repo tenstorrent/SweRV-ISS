@@ -2071,7 +2071,7 @@ namespace WdRiscv
 
     /// This is called after a csr is written/poked to update the
     /// procerssor state as a side effect to the csr change.
-    void postCsrUpdate(CsrNumber csr, URV val);
+    void postCsrUpdate(CsrNumber csr, URV val, URV lastVal);
 
     /// Return true if one or more load-address/store-address trigger
     /// has a hit on the given address and given timing
