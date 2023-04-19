@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,7 +28,7 @@ namespace WdRiscv
     uint32_t asid_ = 0;      // Address space identifier.
     uint32_t vmid_ = 0;      // Virtual machine identifier.
     bool valid_ = false;
-    bool global_ = false;    // 
+    bool global_ = false;    //
     bool user_ = false;      // User-mode entry if true.
     bool read_ = false;      // Has read access.
     bool write_ = false;     // Write access.
@@ -48,7 +48,7 @@ namespace WdRiscv
     Tlb(unsigned size);
 
     /// Return pointer to TLB entry associated with given virtual page
-    /// number and address space identifier. 
+    /// number and address space identifier.
     /// Return nullptr if no such entry.
     TlbEntry* findEntry(uint64_t pageNum, uint32_t asid)
     {
@@ -60,12 +60,36 @@ namespace WdRiscv
     }
 
     /// Return pointer to TLB entry associated with given virtual page
+    /// number, address space identifier, and virtual machine identifier.
+    /// Return nullptr if no such entry.
+    TlbEntry* findEntry(uint64_t pageNum, uint32_t asid, uint32_t vmid)
+    {
+      for (auto& entry : entries_)
+        if (entry.valid_ and entry.virtPageNum_ == pageNum)
+          if (entry.global_ or (entry.asid_ == asid and entry.vmid_ == vmid))
+              return &entry;
+      return nullptr;
+    }
+
+    /// Return pointer to TLB entry associated with given virtual page
     /// number and address space identifier. Update entry time of
     /// access and increment time if entry is found. Return nullptr if
     /// no such entry.
     TlbEntry* findEntryUpdateTime(uint64_t pageNum, uint32_t asid)
     {
       auto entry = findEntry(pageNum, asid);
+      if (entry)
+	entry->time_ = time_++;
+      return entry;
+    }
+
+    /// Return pointer to TLB entry associated with given virtual page
+    /// number and address space identifier. Update entry time of
+    /// access and increment time if entry is found. Return nullptr if
+    /// no such entry.
+    TlbEntry* findEntryUpdateTime(uint64_t pageNum, uint32_t asid, uint32_t vmid)
+    {
+      auto entry = findEntry(pageNum, asid, vmid);
       if (entry)
 	entry->time_ = time_++;
       return entry;
@@ -118,11 +142,20 @@ namespace WdRiscv
 
     /// Invalidate every entry matching given virtual page number and
     /// address space identifer except for global entries.
-    void invalidateVirtualPage(uint64_t vpn, uint32_t asid)
+    void invalidateVirtualPageAsid(uint64_t vpn, uint32_t asid)
     {
-      auto entry = findEntry(vpn, asid);
-      if (entry and not entry->global_)
-	entry->valid_ = false;
+      for (auto& entry : entries_)
+        if (entry.virtPageNum_ == vpn and entry.asid_ == asid and not entry.global_)
+          entry.valid_ = false;
+    }
+
+    /// Invalidate every entry matching given virtual page number and
+    /// virtual machine identifer except for global entries.
+    void invalidateVirtualPageVmid(uint64_t vpn, uint32_t vmid)
+    {
+      for (auto& entry : entries_)
+        if (entry.virtPageNum_ == vpn and entry.vmid_ == vmid and not entry.global_)
+          entry.valid_ = false;
     }
 
     /// Invalidate all entries.

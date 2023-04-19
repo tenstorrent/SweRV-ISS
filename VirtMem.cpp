@@ -89,13 +89,15 @@ accessFaultType(bool read, bool write, bool exec)
 
 ExceptionCause
 VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
-			    bool twoStage, uint64_t& pa1, uint64_t& pa2)
+			    bool twoStage, uint64_t& gpa1, uint64_t& pa1,
+                            uint64_t& gpa2, uint64_t& pa2)
 {
-  pa1 = pa2 = va;
-  auto cause = translateForFetch(va, priv, twoStage, pa1);
+  gpa1 = pa1 = gpa2 = pa2 = va;
+  auto cause = translateForFetch(va, priv, twoStage, gpa1, pa1);
   if (cause != ExceptionCause::NONE)
     return cause;
 
+  gpa2 = gpa1;
   pa2 = pa1;
   unsigned excess = va & (size - 1);  // va modulo size
 
@@ -109,9 +111,11 @@ VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
     return ExceptionCause::NONE;  // Not page crossing
 
   uint64_t va2 = n2*pageSize_;
-  cause = translateForFetch(va2, priv, twoStage, pa2);
-  if (cause != ExceptionCause::NONE)
+  cause = translateForFetch(va2, priv, twoStage, gpa2, pa2);
+  if (cause != ExceptionCause::NONE) {
+    gpa1 = gpa2;
     pa1 = pa2 = va2;
+  }
 
   return cause;
 }
@@ -179,15 +183,17 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 
 ExceptionCause
 VirtMem::translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode priv,
-                           bool twoStage, bool load, uint64_t& pa1, uint64_t& pa2)
+                           bool twoStage, bool load, uint64_t& gpa1, uint64_t& pa1,
+                           uint64_t& gpa2, uint64_t& pa2)
 {
-  pa1 = pa2 = va;
+  gpa1 = pa1 = gpa2 = pa2 = va;
 
   bool read = load, write = not load, exec = false;
-  auto cause = translate(va, priv, twoStage, read, write, exec, pa1);
+  auto cause = translate(va, priv, twoStage, read, write, exec, gpa1, pa1);
   if (cause != ExceptionCause::NONE)
     return cause;
 
+  gpa2 = gpa1;
   pa2 = pa1;
   unsigned excess = va & (size - 1);  // va modulo size
 
@@ -201,9 +207,11 @@ VirtMem::translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode priv,
     return ExceptionCause::NONE;  // Not page crossing
 
   uint64_t va2 = n2*pageSize_;
-  cause = translate(va2, priv, twoStage, read, write, exec, pa2);
-  if (cause != ExceptionCause::NONE)
+  cause = translate(va2, priv, twoStage, read, write, exec, gpa2, pa2);
+  if (cause != ExceptionCause::NONE) {
+    gpa1 = gpa2;
     pa1 = pa2 = va2;
+  }
 
   return cause;
 }
@@ -211,10 +219,10 @@ VirtMem::translateForLdSt2(uint64_t va, unsigned size, PrivilegeMode priv,
 
 ExceptionCause
 VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
-		   bool read, bool write, bool exec, uint64_t& pa)
+		   bool read, bool write, bool exec, uint64_t& gpa, uint64_t& pa)
 {
   if (twoStage)
-    return twoStageTranslate(va, priv, read, write, exec, pa);
+    return twoStageTranslate(va, priv, read, write, exec, gpa, pa);
 
   // Exactly one of read/write/exec must be true.
   unsigned count = 0;
@@ -374,7 +382,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 
   // Lookup virtual page number in TLB.
   uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = stage2Tlb_.findEntryUpdateTime(virPageNum, vsAsid_); // FIX: vmid_ insteadm of vsAsid?
+  TlbEntry* entry = stage2Tlb_.findEntryUpdateTime(virPageNum, asid_, vmid_);
   if (entry)
     {
       // Use TLB entry.
@@ -411,7 +419,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 
 ExceptionCause
 VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool write,
-			   bool exec, uint64_t& pa)
+			   bool exec, uint64_t& gpa, uint64_t& pa)
 {
   // Exactly one of read/write/exec must be true.
   unsigned count = 0;
@@ -420,7 +428,6 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
   if (exec) count++;
   assert(count == 1);
 
-  uint64_t gpa = 0;
   if (vsMode_ == Bare)
     gpa = va;
   else
@@ -696,6 +703,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
     {
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
+
       if (trace_)
 	walkVec.back().push_back(pteAddr);
 
@@ -809,7 +817,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   // Update tlb-entry with data found in page table entry.
   tlbEntry.virtPageNum_ = address >> pageBits_;
   tlbEntry.physPageNum_ = pa >> pageBits_;
-  tlbEntry.asid_ = vsAsid_;
+  tlbEntry.asid_ = asid_;
   tlbEntry.vmid_ = vmid_;
   tlbEntry.valid_ = true;
   tlbEntry.global_ = pte.global();
@@ -851,17 +859,23 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
     {
       // 2.
       uint64_t gpteAddr = root + va.vpn(ii)*pteSize; // Guest pte address.
-      if (trace_)
-	walkVec.back().push_back(gpteAddr);
+
+      // TODO: this needs to be fixed, gpteAddr is not a physical address
+      /* if (trace_) */
+      /*   walkVec.back().push_back(gpteAddr); */
 
       // Translate guest pteAddr to host physical address.
-      uint64_t pteAddr = gpteAddr;
+      uint64_t pteAddr = gpteAddr; pa = gpteAddr;
       auto ec = stage2Translate(gpteAddr, privMode, true, false, false, pteAddr);
       if (ec != ExceptionCause::NONE)
 	{
 	  stage2ExceptionToStage1(ec, read, write, exec);
 	  return ec;
 	}
+
+      // TODO: see above
+      /* if (trace_) */
+      /*   walkVec.back().push_back(pteAddr); */
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -958,7 +972,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	      pte.bits_.dirty_ = 1;
 
 	    // Need to make sure we have write access to page.
-	    uint64_t pteAddr2 = gpteAddr;
+	    uint64_t pteAddr2 = gpteAddr; pa = gpteAddr;
 	    auto ec = stage2Translate(gpteAddr, privMode, false, true, false, pteAddr2);
 	    if (ec != ExceptionCause::NONE)
 	      {

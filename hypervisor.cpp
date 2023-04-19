@@ -1,11 +1,11 @@
 // Copyright 2022 Tenstorretn Corporation.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 //stributed under the License isstributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -49,7 +49,7 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
 
   auto& tlb = virtMem_.vsTlb_;
 
-  // Invalidate whole VS TLB. This is overkill. 
+  // Invalidate whole VS TLB. This is overkill.
   if (di->op1() == 0 and di->op2() == 0)
        tlb.invalidate();
   else if (di->op1() == 0 and di->op2() != 0)
@@ -68,7 +68,7 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
       URV addr = intRegs_.read(di->op1());
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op2());
-      tlb.invalidateVirtualPage(vpn, asid);
+      tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
   invalidateDecodeCache();
@@ -101,7 +101,7 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
 
   auto& tlb = virtMem_.stage2Tlb_;
 
-  // Invalidate whole VS TLB. This is overkill. 
+  // Invalidate whole VS TLB. This is overkill.
   if (di->op1() == 0 and di->op2() == 0)
        tlb.invalidate();
   else if (di->op1() == 0 and di->op2() != 0)
@@ -112,15 +112,16 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
   else if (di->op1() != 0 and di->op2() == 0)
     {
       URV addr = intRegs_.read(di->op1());
-      uint64_t vpn = virtMem_.pageNumber(addr);
+      // address is shifted right by 2 bits
+      uint64_t vpn = virtMem_.pageNumber(addr << 2);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op1());
-      uint64_t vpn = virtMem_.pageNumber(addr);
-      URV asid = intRegs_.read(di->op2());
-      tlb.invalidateVirtualPage(vpn, asid);
+      uint64_t vpn = virtMem_.pageNumber(addr << 2);
+      URV vmid = intRegs_.read(di->op2());
+      tlb.invalidateVirtualPageVmid(vpn, vmid);
     }
 
   invalidateDecodeCache();
@@ -142,15 +143,14 @@ Hart<URV>::execHlv_b(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
     }
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<int8_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -172,15 +172,14 @@ Hart<URV>::execHlv_bu(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
     }
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<uint8_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -202,15 +201,14 @@ Hart<URV>::execHlv_h(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
     }
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<int16_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -232,15 +230,14 @@ Hart<URV>::execHlv_hu(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
     }
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<uint16_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -262,15 +259,14 @@ Hart<URV>::execHlv_w(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
     }
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<int32_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -292,15 +288,14 @@ Hart<URV>::execHlv_wu(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
     }
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<uint32_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -322,7 +317,7 @@ Hart<URV>::execHlvx_hu(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
@@ -331,8 +326,7 @@ Hart<URV>::execHlvx_hu(const DecodedInst* di)
 
   virtMem_.useExecForRead(true);
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<uint16_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -356,7 +350,7 @@ Hart<URV>::execHlvx_wu(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
@@ -365,8 +359,7 @@ Hart<URV>::execHlvx_wu(const DecodedInst* di)
 
   virtMem_.useExecForRead(true);
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<uint32_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -390,15 +383,14 @@ Hart<URV>::execHlv_d(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
     }
 
-  URV base = intRegs_.read(di->op1());
-  uint64_t virtAddr = base + di->op2As<int32_t>();
+  URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<uint64_t>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
@@ -420,7 +412,7 @@ Hart<URV>::execHsv_b(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
@@ -428,9 +420,9 @@ Hart<URV>::execHsv_b(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
+  URV virtAddr = intRegs_.read(rs1);
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
-  store<uint8_t>(addr, true /*hyper*/, value);
+  store<uint8_t>(virtAddr, true /*hyper*/, value);
 }
 
 
@@ -449,7 +441,7 @@ Hart<URV>::execHsv_h(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
@@ -457,9 +449,9 @@ Hart<URV>::execHsv_h(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
+  URV virtAddr = intRegs_.read(rs1);
   uint16_t value = uint8_t(intRegs_.read(di->op0()));
-  store<uint16_t>(addr, true /*hyper*/, value);
+  store<uint16_t>(virtAddr, true /*hyper*/, value);
 }
 
 
@@ -478,7 +470,7 @@ Hart<URV>::execHsv_w(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
@@ -486,9 +478,9 @@ Hart<URV>::execHsv_w(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
+  URV virtAddr = intRegs_.read(rs1);
   uint32_t value = uint8_t(intRegs_.read(di->op0()));
-  store<uint32_t>(addr, true /*hyper*/, value);
+  store<uint32_t>(virtAddr, true /*hyper*/, value);
 }
 
 
@@ -507,7 +499,7 @@ Hart<URV>::execHsv_d(const DecodedInst* di)
       virtualInst(di);    // Must not be in V mode.
       return;
     }
-      
+
   if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
@@ -515,9 +507,9 @@ Hart<URV>::execHsv_d(const DecodedInst* di)
     }
 
   uint32_t rs1 = di->op1();
-  URV addr = intRegs_.read(rs1);
+  URV virtAddr = intRegs_.read(rs1);
   uint8_t value = uint8_t(intRegs_.read(di->op0()));
-  store<uint64_t>(addr, true /*hyper*/, value);
+  store<uint64_t>(virtAddr, true /*hyper*/, value);
 }
 
 

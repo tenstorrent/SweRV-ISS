@@ -1568,9 +1568,13 @@ namespace WdRiscv
     void enableInstructionLineTrace()
     { instrLineTrace_ = true; }
 
-    /// Enable disable page-table-walk info in log.
+    /// Enable/disable page-table-walk info in log.
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
+
+    /// Enable/disable pmp access trace in log
+    void tracePmp(bool flag)
+    { tracePmp_ = flag; }
 
     Syscall<URV>& getSyscall()
     { return syscall_; }
@@ -1973,11 +1977,11 @@ namespace WdRiscv
 
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateLoadException(ExceptionCause cause, URV addr);
+    void initiateLoadException(ExceptionCause cause, URV addr1, URV addr2 = 0);
 
     /// Helper to store methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateStoreException(ExceptionCause cause, URV addr);
+    void initiateStoreException(ExceptionCause cause, URV addr1, URV addr2 = 0);
 
     /// Helper to lb, lh, lw and ld. Load type should be int_8, int16_t
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
@@ -2006,6 +2010,7 @@ namespace WdRiscv
     /// flags must be true if this is called on behalf of the hypervisor
     /// load/store instructions (e.g. hlv.b).
     ExceptionCause determineLoadException(uint64_t& addr1, uint64_t& addr2,
+                                          uint64_t& gaddr1, uint64_t& gaddr2,
 					  unsigned ldSize, bool hyper);
 
     /// Helepr to the cache block operaion (cbo) instructions.
@@ -2033,6 +2038,7 @@ namespace WdRiscv
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
     ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
+                                           uint64_t& gaddr1, uint64_t& gaddr2,
 					   unsigned stSize, bool hyper);
 
     /// Helper to execLr. Load type must be int32_t, or int64_t.
@@ -2175,7 +2181,7 @@ namespace WdRiscv
     void printInstCsvTrace(const DecodedInst& di, FILE* out);
 
     /// Start a synchronous exceptions.
-    void initiateException(ExceptionCause cause, URV pc, URV info);
+    void initiateException(ExceptionCause cause, URV pc, URV info, URV info2 = 0);
 
     /// Start an asynchronous exception (interrupt).
     void initiateInterrupt(InterruptCause cause, URV pc);
@@ -2208,9 +2214,10 @@ namespace WdRiscv
     /// exception or an interrupt. Given pc is the program counter to
     /// save (address of instruction causing the asynchronous
     /// exception or the instruction to resume after asynchronous
-    /// exception is handled). The info value holds additional
+    /// exception is handled). The info and info2 value holds additional
     /// information about an exception.
-    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info);
+    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info,
+                      URV info2 = 0);
 
     /// Illegal instruction. Initiate an illegal instruction trap.
     /// This is used for one of the following:
@@ -2239,7 +2246,7 @@ namespace WdRiscv
     /// it is out of DCCM range in DCCM-only mode. If successful, the
     /// given virtual addr is replaced by the translated physical
     /// address.
-    ExceptionCause validateAmoAddr(uint64_t& addr, unsigned accessSize);
+    ExceptionCause validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize);
 
     /// Do the load value part of a word-sized AMO instruction. Return
     /// true on success putting the loaded value in val. Return false
@@ -4432,6 +4439,7 @@ namespace WdRiscv
 
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
+    bool tracePmp_ = false;          // Trace PMP accesses
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
