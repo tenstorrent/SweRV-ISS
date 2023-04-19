@@ -2778,7 +2778,7 @@ Hart<URV>::peekCsr(CsrNumber csrn, std::string field, URV& val) const
 
 template <typename URV>
 void
-Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
+Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 {
   // This makes sure that counters stop counting after corresponding
   // event reg is written.
@@ -2837,26 +2837,24 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val)
       csr == CsrNumber::VLENB)
     markVsDirty();
 
-  if (csr == CsrNumber::MISA)
-    {
-      auto reg = csRegs_.findCsr(csr);
-      if (reg->prevValue() != val)
-	processExtensions(false);
-    }
+  if (csr == CsrNumber::MISA and lastVal != val)
+    processExtensions(false);
 }
 
 
 template <typename URV>
 bool
 Hart<URV>::pokeCsr(CsrNumber csr, URV val)
-{ 
+{
+  URV lastVal;
+
   // Some/all bits of some CSRs are read only to CSR instructions but
   // are modifiable. Use the poke method (instead of write) to make
   // sure modifiable value are changed.
-  if (not csRegs_.poke(csr, val))
+  if (not csRegs_.peek(csr, lastVal) or not csRegs_.poke(csr, val))
     return false;
 
-  postCsrUpdate(csr, val);
+  postCsrUpdate(csr, val, lastVal);
 
   return true;
 }
@@ -10366,7 +10364,7 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
   // Update integer register.
   intRegs_.write(intReg, intRegVal);
 
-  postCsrUpdate(csr, val);
+  postCsrUpdate(csr, val, intRegVal);
 
   // Csr was written. If it was minstret, compensate for
   // auto-increment that will be done by run, runUntilAddress or
