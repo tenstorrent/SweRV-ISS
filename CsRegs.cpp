@@ -356,26 +356,29 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 	}
     }
 
-  // enable MPV and GVA bits
-  uint64_t hyperBits;
-  Csr<URV>* mstatus;
-  if (not rv32_)
+  if (flag)
     {
-      hyperBits = uint64_t(0x3) << 38;
-      mstatus = findCsr(CN::MSTATUS);
-    }
-  else
-    {
-      hyperBits = 0x3 << 6;
-      mstatus = findCsr(CN::MSTATUSH);
-    }
+      // enable MPV and GVA bits
+      uint64_t hyperBits;
+      Csr<URV>* mstatus;
+      if (not rv32_)
+	{
+	  hyperBits = uint64_t(0x3) << 38;
+	  mstatus = findCsr(CN::MSTATUS);
+	}
+      else
+	{
+	  hyperBits = 0x3 << 6;
+	  mstatus = findCsr(CN::MSTATUSH);
+	}
 
-  URV mask = mstatus->getWriteMask();
-  mask |= hyperBits;
-  mstatus->setWriteMask(mask);
-  mask = mstatus->getPokeMask();
-  mask |= hyperBits;
-  mstatus->setPokeMask(mask);
+      URV mask = mstatus->getWriteMask();
+      mask |= hyperBits;
+      mstatus->setWriteMask(mask);
+      mask = mstatus->getPokeMask();
+      mask |= hyperBits;
+      mstatus->setPokeMask(mask);
+    }
 
   if (flag)
     {
