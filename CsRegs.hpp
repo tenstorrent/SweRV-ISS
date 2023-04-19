@@ -1122,6 +1122,14 @@ namespace WdRiscv
     bool inDebugMode() const
     { return debugMode_; }
 
+    /// Called after writing given csr to update aliased bits in other
+    /// hypervisor related CSRs.
+    void hyperWrite(Csr<URV>* csr);
+
+    /// Called after poking given csr to update aliased bits in other
+    /// hypervisor related CSRs.
+    void hyperPoke(Csr<URV>* csr);
+
     bool readTdata(CsrNumber number, PrivilegeMode mode, URV& value) const;
 
     bool writeTdata(CsrNumber number, PrivilegeMode mode, URV value);
@@ -1196,6 +1204,13 @@ namespace WdRiscv
     URV peekMideleg() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::MIDELEG));
+      return csr.read();
+    }
+
+    /// Fast peek method for HIDELEG
+    URV peekHideleg() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::HIDELEG));
       return csr.read();
     }
 

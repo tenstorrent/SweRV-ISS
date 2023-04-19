@@ -4508,25 +4508,71 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   typedef PrivilegeMode PM;
 
   // Check for machine-level interrupts if MIE enabled or if user/supervisor.
-  bool globalEnable = (privMode_ == PM::Machine and mstatus_.bits_.MIE) or privMode_ < PM::Machine;
 
   URV delegVal = csRegs_.peekMideleg();
+  URV hDelegVal = csRegs_.peekHideleg();
+
   for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 			     IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
 			     IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
     {
       URV mask = URV(1) << unsigned(ic);
       bool delegated = (mask & delegVal) != 0;
-      bool enabled = globalEnable;
-      if (delegated and globalEnable)
-	enabled = ((privMode_ == PrivilegeMode::Supervisor and mstatus_.bits_.SIE) or
-		   privMode_ < PrivilegeMode::Supervisor);
-      if (enabled)
-	if (mie & mask & mip)
-	  {
-	    cause = ic;
-	    return true;
-	  }
+      bool enabled = false;
+      if (privMode_ == PM::Machine)
+	{
+	  if (delegated)
+	    continue;
+	  enabled = mstatus_.bits_.MIE;
+	}
+      else if (privMode_ == PM::Supervisor)
+	{
+	  bool hDelegated = (mask & hDelegVal) != 0;
+	  if (not virtMode_)
+	    if (hDelegated)
+	      continue;
+	  enabled = virtMode_ ? vsstatus_.bits_.SIE : mstatus_.bits_.SIE;
+	}
+      else if (privMode_ == PM::User)
+	enabled = true;
+
+      if (enabled and (mie & mask & mip))
+	{
+	  cause = ic;
+	  return true;
+	}
+    }
+
+  if (isRvh())
+    {
+      for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+	{
+	  URV mask = URV(1) << unsigned(ic);
+	  bool delegated = true;
+	  bool enabled = false;
+	  if (privMode_ == PM::Machine)
+	    {
+	      if (delegated)
+		continue;
+	      enabled = mstatus_.bits_.MIE;
+	    }
+	  else if (privMode_ == PM::Supervisor)
+	    {
+	      bool hDelegated = (mask & hDelegVal) != 0;
+	      if (not virtMode_)
+		if (hDelegated)
+		  continue;
+	      enabled = virtMode_ ? vsstatus_.bits_.SIE : mstatus_.bits_.SIE;
+	    }
+	  else if (privMode_ == PM::User)
+	    enabled = true;
+
+	  if (enabled and (mie & mask & mip))
+	    {
+	      cause = ic;
+	      return true;
+	    }
+	}
     }
 
   return false;
