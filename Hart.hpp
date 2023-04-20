@@ -2042,6 +2042,10 @@ namespace WdRiscv
     template<typename LOAD_TYPE>
     void hyperLoad(const DecodedInst* di);
 
+    /// Helper to the hypervisor store instructions.
+    template<typename LOAD_TYPE>
+    void hyperStore(const DecodedInst* di);
+
     /// Helper to CSR instructions: return true if given CSR is
     /// writebale and false otherwise.
     bool isCsrWriteable(CsrNumber csr) const;
