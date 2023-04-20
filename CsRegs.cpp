@@ -1662,6 +1662,9 @@ CsRegs<URV>::defineFpRegs()
   defineCsr("fflags",   CsrNumber::FFLAGS,   !mand, !imp, 0, wam, wam);
   defineCsr("frm",      CsrNumber::FRM,      !mand, !imp, 0, wam, wam);
   defineCsr("fcsr",     CsrNumber::FCSR,     !mand, !imp, 0, 0xff, 0xff);
+
+  // add FP fields
+  addFpFields();
 }
 
 
