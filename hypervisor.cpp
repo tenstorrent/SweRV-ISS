@@ -129,8 +129,9 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
 
 
 template <typename URV>
+template <typename LOAD_TYPE>
 void
-Hart<URV>::execHlv_b(const DecodedInst* di)
+Hart<URV>::hyperLoad(const DecodedInst* di)
 {
   if (not isRvh())
     {
@@ -152,8 +153,16 @@ Hart<URV>::execHlv_b(const DecodedInst* di)
 
   URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
-  if (load<int8_t>(virtAddr, true /*hyper*/, data))
+  if (load<LOAD_TYPE>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execHlv_b(const DecodedInst* di)
+{
+  hyperLoad<int8_t>(di);
 }
 
 
@@ -161,28 +170,7 @@ template <typename URV>
 void
 Hart<URV>::execHlv_bu(const DecodedInst* di)
 {
-  if (not isRvh())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<uint8_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
+  hyperLoad<uint8_t>(di);
 }
 
 
@@ -190,28 +178,7 @@ template <typename URV>
 void
 Hart<URV>::execHlv_h(const DecodedInst* di)
 {
-  if (not isRvh())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<int16_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
+  hyperLoad<int16_t>(di);
 }
 
 
@@ -219,28 +186,7 @@ template <typename URV>
 void
 Hart<URV>::execHlv_hu(const DecodedInst* di)
 {
-  if (not isRvh())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<uint16_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
+  hyperLoad<uint16_t>(di);
 }
 
 
@@ -248,28 +194,7 @@ template <typename URV>
 void
 Hart<URV>::execHlv_w(const DecodedInst* di)
 {
-  if (not isRvh())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<int32_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
+  hyperLoad<int32_t>(di);
 }
 
 
@@ -277,28 +202,7 @@ template <typename URV>
 void
 Hart<URV>::execHlv_wu(const DecodedInst* di)
 {
-  if (not isRvh() or not isRv64())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<uint32_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
+  hyperLoad<uint32_t>(di);
 }
 
 

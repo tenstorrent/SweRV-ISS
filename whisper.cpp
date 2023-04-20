@@ -1577,7 +1577,10 @@ snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
 	}
 
       if (hart.hasTargetProgramFinished() or nextLimit >= globalLimit)
-        break;
+	{
+	  Filesystem::remove_all(path);
+	  break;
+	}
 
       if (not system.saveSnapshot(hart, pathStr))
 	{
