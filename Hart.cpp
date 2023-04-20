@@ -4087,7 +4087,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  // Decode unless match in decode cache.
 	  uint32_t ix = (physPc >> 1) & decodeCacheMask_;
 	  DecodedInst* di = &decodeCache_[ix];
-	  if (not di->isValid() or di->physAddress() != physPc)
+	  if (not di->isValid() or di->physAddress() != physPc or di->inst() != inst)
 	    decode(pc_, physPc, inst, *di);
 
           // Increment pc and execute instruction
@@ -4349,7 +4349,7 @@ Hart<URV>::simpleRunWithLimit()
 	continue;
       uint32_t ix = (physPc >> 1) & decodeCacheMask_;
       DecodedInst* di = &decodeCache_[ix];
-      if (not di->isValid() or di->address() != physPc or isRvs())
+      if (not di->isValid() or di->physAddress() != physPc or di->inst() != inst)
 	decode(pc_, physPc, inst, *di);
 
       pc_ += di->instSize();
