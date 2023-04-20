@@ -210,31 +210,8 @@ template <typename URV>
 void
 Hart<URV>::execHlvx_hu(const DecodedInst* di)
 {
-  if (not isRvh())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
   virtMem_.useExecForRead(true);
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<uint16_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
-
+  hyperLoad<uint16_t>(di);
   virtMem_.useExecForRead(false);
 }
 
@@ -243,31 +220,8 @@ template <typename URV>
 void
 Hart<URV>::execHlvx_wu(const DecodedInst* di)
 {
-  if (not isRvh())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
   virtMem_.useExecForRead(true);
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<uint32_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
-
+  hyperLoad<uint32_t>(di);
   virtMem_.useExecForRead(false);
 }
 
@@ -276,28 +230,7 @@ template <typename URV>
 void
 Hart<URV>::execHlv_d(const DecodedInst* di)
 {
-  if (not isRvh() or not isRv64())
-    {
-      illegalInst(di);    // H extension must be enabled.
-      return;
-    }
-
-  if (virtMode_)
-    {
-      virtualInst(di);    // Must not be in V mode.
-      return;
-    }
-
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
-    {
-      illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
-      return;
-    }
-
-  URV virtAddr = intRegs_.read(di->op1());
-  uint64_t data = 0;
-  if (load<uint64_t>(virtAddr, true /*hyper*/, data))
-    intRegs_.write(di->op0(), data);
+  hyperLoad<uint64_t>(di);
 }
 
 
