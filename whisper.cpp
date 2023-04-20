@@ -1405,7 +1405,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
       if (not branchTraceFile)
         {
           std::cerr << "Failed to open branch trace file '"
-                    << args.attFile << "' for output\n";
+                    << args.branchTraceFile << "' for output\n";
           return false;
         }
     }
