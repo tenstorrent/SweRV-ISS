@@ -450,7 +450,7 @@ Hart<URV>::execHsv_h(const DecodedInst* di)
 
   uint32_t rs1 = di->op1();
   URV virtAddr = intRegs_.read(rs1);
-  uint16_t value = uint8_t(intRegs_.read(di->op0()));
+  uint16_t value = uint16_t(intRegs_.read(di->op0()));
   store<uint16_t>(virtAddr, true /*hyper*/, value);
 }
 
@@ -479,7 +479,7 @@ Hart<URV>::execHsv_w(const DecodedInst* di)
 
   uint32_t rs1 = di->op1();
   URV virtAddr = intRegs_.read(rs1);
-  uint32_t value = uint8_t(intRegs_.read(di->op0()));
+  uint32_t value = uint32_t(intRegs_.read(di->op0()));
   store<uint32_t>(virtAddr, true /*hyper*/, value);
 }
 
@@ -508,7 +508,7 @@ Hart<URV>::execHsv_d(const DecodedInst* di)
 
   uint32_t rs1 = di->op1();
   URV virtAddr = intRegs_.read(rs1);
-  uint8_t value = uint8_t(intRegs_.read(di->op0()));
+  uint64_t value = uint64_t(intRegs_.read(di->op0()));
   store<uint64_t>(virtAddr, true /*hyper*/, value);
 }
 
