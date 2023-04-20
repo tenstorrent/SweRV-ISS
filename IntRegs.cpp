@@ -27,10 +27,10 @@ IntRegs<URV>::IntRegs(unsigned regCount)
 
 template <typename URV>
 bool
-IntRegs<URV>::findReg(const std::string& name, unsigned& ix) const
+IntRegs<URV>::findReg(std::string_view name, unsigned& ix) const
 {
   unsigned i = 0;
-  if (not regNames_.findReg(name, i))
+  if (not IntRegNames::findReg(name, i))
     return false;
 
   if (i >= regs_.size())

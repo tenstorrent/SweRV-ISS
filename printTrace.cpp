@@ -471,9 +471,11 @@ namespace Whisper
 
     // Append to buffer copy of given string excluding null char
     inline
-    PrintBuffer& print(const std::string& str)
+    PrintBuffer& print(std::string_view str)
     {
-      return print(str.c_str());
+      std::copy(str.begin(), str.end(), std::next(buff_.begin(), pos_));
+      pos_ += str.size();
+      return *this;
     }
 
     // Append char to buffer.

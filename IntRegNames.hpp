@@ -14,13 +14,9 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstddef>
-#include <vector>
-#include <string>
-#include <unordered_map>
-#include <type_traits>
-#include <cassert>
+#include <string_view>
+
+#include "RegNamesTemplate.hpp"
 
 namespace WdRiscv
 {
@@ -95,74 +91,35 @@ namespace WdRiscv
 	RegT6 = RegX31
       };
 
-
-  /// Manage names of interger registers.
-  class IntRegNames
+  // This array can go directly in the template declaration once using C++20
+  constexpr auto _getIntRegNumberToAbiNameArr()
   {
-  public:
+    using namespace std::string_view_literals;
 
-    /// Constructor
-    IntRegNames()
-    {
-      numberToName_.resize(32);
+    return std::array{
+      "zero"sv, "ra"sv, "sp"sv,  "gp"sv,  "tp"sv, "t0"sv, "t1"sv, "t2"sv,
+      "s0"sv,   "s1"sv, "a0"sv,  "a1"sv,  "a2"sv, "a3"sv, "a4"sv, "a5"sv,
+      "a6"sv,   "a7"sv, "s2"sv,  "s3"sv,  "s4"sv, "s5"sv, "s6"sv, "s7"sv,
+      "s8"sv,   "s9"sv, "s10"sv, "s11"sv, "t3"sv, "t4"sv, "t5"sv, "t6"sv
+    };
+  }
 
-      for (unsigned ix = 0; ix < 32; ++ix)
-	{
-	  std::string name = "x" + std::to_string(ix);
-	  nameToNumber_[name] = IntRegNumber(ix);
-	  numberToName_[ix] = name;
-	}
 
-      numberToAbiName_ = { "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
-			   "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
-			   "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",
-			   "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6" };
+  // This array can go directly in the template declaration once using C++20
+  constexpr auto _getAdditionalIntRegNameToNumberMappings()
+  {
+    using namespace std::string_view_literals;
 
-      for (unsigned ix = 0; ix < 32; ++ix)
-	{
-	  std::string abiName = numberToAbiName_.at(ix);
-	  nameToNumber_[abiName] = IntRegNumber(ix);
-	}
+    return std::array{ std::pair { "fp"sv, RegX8 } }; // Fp, s0 and x8 name the same reg.
+  }
 
-      nameToNumber_["fp"] = RegX8;   // Fp, s0 and x8 name the same reg.
-    }
 
-    /// Destructor.
-    ~IntRegNames()
-    { }
-    
-    /// Set ix to the number of the register corresponding to the
-    /// given name returning true on success and false if no such
-    /// register.  For example, if name is "x2" then ix will be set to
-    /// 2. If name is "tp" then ix will be set to 4.
-    [[nodiscard]] bool findReg(const std::string& name, unsigned& ix) const
-    {
-      const auto iter = nameToNumber_.find(name);
-      if (iter == nameToNumber_.end())
-	return false;
-      ix = iter->second;
-      return true;
-    }
+  /// Manage names of integer registers.
+  class IntRegNames : public RegNamesTemplate<IntRegNumber,
+                                              32,
+                                              'x',
+                                              _getIntRegNumberToAbiNameArr,
+                                              _getAdditionalIntRegNameToNumberMappings().size(),
+                                              _getAdditionalIntRegNameToNumberMappings> {};
 
-    /// Return the name of the given register.
-    const std::string& regName(unsigned i, bool abiNames = false) const
-    {
-      if (abiNames)
-	{
-	  if (i < numberToAbiName_.size())
-	    return numberToAbiName_[i];
-	  return unknown_;
-	}
-      if (i < numberToName_.size())
-	return numberToName_[i];
-      return unknown_;
-    }
-
-  private:
-
-    const std::string unknown_ = std::string("x?");
-    std::unordered_map<std::string, IntRegNumber> nameToNumber_;
-    std::vector<std::string> numberToAbiName_;
-    std::vector<std::string> numberToName_;
-  };
 }

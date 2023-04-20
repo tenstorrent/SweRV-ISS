@@ -136,12 +136,12 @@ namespace WdRiscv
 
     /// Return the name of the given integer register. Return an
     /// abi-name (e.g. sp) if abi names are enabled.
-    const std::string& intRegName(unsigned regIx) const
+    std::string_view intRegName(unsigned regIx) const
     { return disas_.intRegName(regIx); }
 
     /// Return the name of the given floating point register. Return an
     /// abi-name (e.g. fa0) if abi names are enabled.
-    const std::string& fpRegName(unsigned regIx) const
+    std::string_view fpRegName(unsigned regIx) const
     { return disas_.fpRegName(regIx); }
 
     /// Return count of floating point registers. Return zero if
