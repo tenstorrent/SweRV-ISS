@@ -15,15 +15,14 @@
 
 #pragma once
 
-#include <vector>
-#include <unordered_map>
-#include <string>
+#include <string_view>
 
+#include "RegNamesTemplate.hpp"
 
 namespace WdRiscv
 {
 
-  /// Symbolic names of the integer registers.
+  /// Symbolic names of the floating-point registers.
   enum FpRegNumber
     {
       RegF0   = 0,
@@ -93,72 +92,24 @@ namespace WdRiscv
     };
 
 
-  /// Manage floating point register names.
-  class FpRegNames
+  // This array can go directly in the template declaration once using C++20
+  constexpr auto _getFpRegNumberToAbiNameArr()
   {
-  public:
+    using namespace std::string_view_literals;
 
-    /// Constructor.
-    FpRegNames()
-    {
-      numberToName_.resize(32);
+    return std::array{
+      "ft0"sv, "ft1"sv, "ft2"sv,  "ft3"sv,  "ft4"sv, "ft5"sv, "ft6"sv,  "ft7"sv,
+      "fs0"sv, "fs1"sv, "fa0"sv,  "fa1"sv,  "fa2"sv, "fa3"sv, "fa4"sv,  "fa5"sv,
+      "fa6"sv, "fa7"sv, "fs2"sv,  "fs3"sv,  "fs4"sv, "fs5"sv, "fs6"sv,  "fs7"sv,
+      "fs8"sv, "fs9"sv, "fs10"sv, "fs11"sv, "ft8"sv, "ft9"sv, "ft10"sv, "ft11"sv
+    };
+  }
 
-      for (unsigned ix = 0; ix < 32; ++ix)
-	{
-	  std::string name = "f" + std::to_string(ix);
-	  nameToNumber_[name] = FpRegNumber(ix);
-	  numberToName_.at(ix) = name;
-	}
 
-      numberToAbiName_ = { "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7",
-			   "fs0", "fs1", "fa0", "fa1", "fa2", "fa3", "fa4", "fa5",
-			   "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7",
-			   "fs8", "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11" };
-
-      for (unsigned ix = 0; ix < 32; ++ix)
-	{
-	  std::string abiName = numberToAbiName_.at(ix);
-	  nameToNumber_[abiName] = FpRegNumber(ix);
-	}
-    }
-
-    /// Destructor.
-    ~FpRegNames()
-    { }
-    
-    /// Set ix to the number of the register corresponding to the
-    /// given name returning true on success and false if no such
-    /// register.  For example, if name is "f2" then ix will be set to
-    /// 2. If name is "fa0" then ix will be set to 10.
-    [[nodiscard]] bool findReg(const std::string& name, unsigned& ix) const
-    {
-      const auto iter = nameToNumber_.find(name);
-      if (iter == nameToNumber_.end())
-	return false;
-      ix = iter->second;
-      return true;
-    }
-
-    /// Return the name of the given register.
-    const std::string& regName(unsigned i, bool abiNames = false) const
-    {
-      if (abiNames)
-	{
-	  if (i < numberToAbiName_.size())
-	    return numberToAbiName_[i];
-	  return unknown_;
-	}
-      if (i < numberToName_.size())
-	return numberToName_[i];
-      return unknown_;
-    }
-
-  private:
-
-    const std::string unknown_ = std::string("f?");
-    std::unordered_map<std::string, FpRegNumber> nameToNumber_;
-    std::vector<std::string> numberToAbiName_;
-    std::vector<std::string> numberToName_;
-  };
+  /// Manage floating point register names.
+  class FpRegNames : public RegNamesTemplate<FpRegNumber,
+                                             32,
+                                             'f',
+                                             _getFpRegNumberToAbiNameArr> {};
 
 }

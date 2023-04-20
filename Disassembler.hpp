@@ -59,12 +59,12 @@ namespace WdRiscv
 			 std::string& str);
 
     /// Return the name of the integer register of the given index.
-    const std::string& intRegName(unsigned ix) const
-    { return intNames_.regName(ix, abiNames_); }
+    std::string_view intRegName(unsigned ix) const
+    { return IntRegNames::regName(ix, abiNames_); }
 
     /// Return the name of the floating point register of the given index.
-    const std::string& fpRegName(unsigned ix) const
-    { return fpNames_.regName(ix, abiNames_); }
+    std::string_view fpRegName(unsigned ix) const
+    { return FpRegNames::regName(ix, abiNames_); }
 
     /// Return the name of the CSR of the given index.
     std::string csRegName(unsigned ix) const
@@ -91,8 +91,6 @@ namespace WdRiscv
 
   private:
 
-    IntRegNames intNames_;
-    FpRegNames fpNames_;
     bool abiNames_ = false;
     std::function<std::string(unsigned ix)> csrNameCallback_ = nullptr;
 

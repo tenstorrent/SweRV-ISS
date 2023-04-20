@@ -20,6 +20,7 @@
 #include <cmath>
 #include <type_traits>
 #include <cassert>
+#include <vector>
 #include "FpRegNames.hpp"
 
 namespace WdRiscv
@@ -372,11 +373,11 @@ namespace WdRiscv
     /// given name returning true on success and false if no such
     /// register.  For example, if name is "f2" then ix will be set to
     /// 2. If name is "fa0" then ix will be set to 10.
-    bool findReg(const std::string& name, unsigned& ix) const;
+    bool findReg(std::string_view name, unsigned& ix) const;
 
     /// Return the name of the given register.
-    const std::string& regName(unsigned i, bool abiNames = false) const
-    { return regNames_.regName(i, abiNames); }
+    std::string_view regName(unsigned i, bool abiNames = false) const
+    { return FpRegNames::regName(i, abiNames); }
 
   protected:
 
@@ -472,7 +473,6 @@ namespace WdRiscv
     double originalValue_ = 0;     // Original value of last written reg.
     unsigned flen_ = 64;           // Floating point register width.
     uint64_t mask_ = ~uint64_t(0);
-    FpRegNames regNames_;
   };
 
 

@@ -361,9 +361,9 @@ getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
 
   for (unsigned ix = 0; ix < hart.intRegCount(); ++ix)
     {
-      std::string name = hart.intRegName(ix);
+      std::string_view name = hart.intRegName(ix);
       std::string num = std::to_string(ix);
-      xml += "    <reg name=\"" + name + "\" bitsize=\"" + width + "\" regnum=\"";
+      xml += "    <reg name=\"" + std::string(name) + "\" bitsize=\"" + width + "\" regnum=\"";
       xml += num + "\" save-restore=\"yes\" type=\"int\" group=\"general\"/>\n";
     }
 
@@ -380,9 +380,9 @@ getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
 
       for (unsigned ix = 0; ix < hart.fpRegCount(); ++ix)
         {
-          std::string name = hart.fpRegName(ix);
+          std::string_view name = hart.fpRegName(ix);
           std::string num = std::to_string(ix + fpRegOffset);
-          xml += "    <reg name=\"" + name + "\" bitsize=\"64\" regnum=\"";
+          xml += "    <reg name=\"" + std::string(name) + "\" bitsize=\"64\" regnum=\"";
           xml += num + "\" save-restore=\"yes\" type=\"float\" group=\"fp\"/>\n";
         }
 

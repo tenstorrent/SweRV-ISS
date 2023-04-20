@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <type_traits>
 #include <cassert>
+#include <vector>
 #include "IntRegNames.hpp"
 
 
@@ -76,11 +77,11 @@ namespace WdRiscv
     /// given name returning true on success and false if no such
     /// register.  For example, if name is "x2" then ix will be set to
     /// 2. If name is "tp" then ix will be set to 4.
-    bool findReg(const std::string& name, unsigned& ix) const;
+    bool findReg(std::string_view name, unsigned& ix) const;
 
     /// Return the name of the given register.
-    const std::string& regName(unsigned i, bool abiNames = false) const
-    { return regNames_.regName(i, abiNames); }
+    std::string_view regName(unsigned i, bool abiNames = false) const
+    { return IntRegNames::regName(i, abiNames); }
 
   protected:
 
@@ -115,7 +116,5 @@ namespace WdRiscv
     std::vector<URV> regs_;
     int lastWrittenReg_ = -1;  // Register accessed in most recent write.
     URV originalValue_ = 0;    // Original value of last written reg.
-
-    IntRegNames regNames_;
   };
 }
