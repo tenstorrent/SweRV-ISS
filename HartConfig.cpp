@@ -1456,8 +1456,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
               periods.erase(it, periods.end());
               std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
             }
-
-          hart.setSnapshotPeriods(periods);
         }
     }
 

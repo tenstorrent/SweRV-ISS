@@ -1280,23 +1280,6 @@ namespace WdRiscv
       perfControl_ = control;
     }
 
-    /// Return snapshot directory index.
-    unsigned snapshotIndex() const
-    { return snapshotIx_; }
-
-    /// Set the snapshot directory index used to generate a directory name
-    /// for the next snapshot.
-    void setSnapshotIndex(unsigned ix)
-    { snapshotIx_ = ix; }
-
-    /// Initialize the list of snapshot periods
-    void setSnapshotPeriods(const std::vector<uint64_t>& periods)
-    { snapshotPeriods_.assign(periods.begin(), periods.end()); }
-
-    /// Get list of snapshot periods
-    std::vector<uint64_t> getSnapshotPeriods() const
-    { return snapshotPeriods_; }
-
     /// Redirect the given output file descriptor (typically that of
     /// stdout or stderr) to the given file. Return true on success
     /// and false on failure.
@@ -4460,9 +4443,6 @@ namespace WdRiscv
     std::vector<DecodedInst> decodeCache_;
     uint32_t decodeCacheSize_ = 0;
     uint32_t decodeCacheMask_ = 0;  // Derived from decodeCacheSize_
-
-    uint32_t snapshotIx_ = 0;
-    std::vector<uint64_t> snapshotPeriods_;
 
     // Following is for test-bench support. It allow us to cancel div/rem
     bool hasLastDiv_ = false;

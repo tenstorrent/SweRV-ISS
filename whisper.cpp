@@ -1144,8 +1144,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
           periods.erase(it, periods.end());
           std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
         }
-
-      hart.setSnapshotPeriods(periods);
     }
 
   return errors == 0;
@@ -1530,58 +1528,62 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll)
 template <typename URV>
 static
 bool
-snapshotRun(System<URV>& system, FILE* traceFile,
-            const std::string& snapDir)
+snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
+	    const Uint64Vec& periods, const std::string& branchTrace)
 {
   assert(system.hartCount() == 1);
   Hart<URV>& hart = *(system.ithHart(0));
 
-  bool done = false;
   uint64_t globalLimit = hart.getInstructionCountLimit();
 
-  size_t period = 0;
-  const auto snapPeriods = hart.getSnapshotPeriods();
-  while (not done)
+  for (size_t ix = 0; true; ++ix)
     {
-      uint64_t nextLimit;
-      if (period < snapPeriods.size())
-        nextLimit = (snapPeriods.size() == 1) ? hart.getInstructionCount() + snapPeriods[0]
-                                                        : snapPeriods[period];
-      else
-        nextLimit = globalLimit;
-
-      if (nextLimit >= globalLimit)
-        done = true;
+      uint64_t nextLimit = globalLimit;
+      if (not periods.empty())
+	{
+	  uint64_t delta = ix < periods.size() ? periods.at(ix) : periods.back();
+	  nextLimit = hart.getInstructionCount() + delta;
+	}
       nextLimit = std::min(nextLimit, globalLimit);
       hart.setInstructionCountLimit(nextLimit);
-      hart.run(traceFile);
-      if (hart.hasTargetProgramFinished())
-        done = true;
-      if (not done)
-        {
-          std::string pathStr;
-          if (snapPeriods.size() == 1)
-            {
-              unsigned snapIndex = hart.snapshotIndex();
-              pathStr = snapDir + std::to_string(snapIndex);
-              hart.setSnapshotIndex(snapIndex + 1);
-            }
-          else
-            pathStr = snapDir + std::to_string(snapPeriods[period++]);
 
-          Filesystem::path path(pathStr);
-          if (not Filesystem::is_directory(path))
-            if (not Filesystem::create_directories(path))
-              {
-                std::cerr << "Error: Failed to create snapshot directory " << path << '\n';
-                return false;
-              }
-          if (not system.saveSnapshot(hart, path))
-            {
-              std::cerr << "Error: Failed to save a snapshot\n";
-              return false;
-            }
-        }
+      std::string pathStr = snapDir + std::to_string(ix);
+      Filesystem::path path = pathStr;
+      if (not Filesystem::is_directory(path) and not Filesystem::create_directories(path))
+	{
+	  std::cerr << "Error: Failed to create snapshot directory " << pathStr << '\n';
+	  return false;
+	}
+
+      FILE* btf = nullptr;
+      if (not branchTrace.empty())
+	{
+	  Filesystem::path path2 = path / branchTrace;
+	  btf = fopen(path2.c_str(), "w");
+	  if (not btf)
+	    {
+	      std::cerr << "Failed to open " << path2 << " for writing\n";
+	      return false;
+	    }
+	}
+      hart.enableBranchTrace(btf);
+
+      hart.run(traceFile);
+
+      if (btf)
+	{
+	  fclose(btf);
+	  hart.enableBranchTrace(nullptr);
+	}
+
+      if (hart.hasTargetProgramFinished() or nextLimit >= globalLimit)
+        break;
+
+      if (not system.saveSnapshot(hart, pathStr))
+	{
+	  std::cerr << "Error: Failed to save a snapshot\n";
+	  return false;
+	}
     }
 
 #ifdef FAST_SLOPPY
@@ -1720,11 +1722,11 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
       return interactive.interact(traceFile, cmdLog);
     }
 
-  if (not system.ithHart(0)->getSnapshotPeriods().empty())
+  if (not args.snapshotPeriods.empty())
     {
-      std::string dir = args.snapshotDir;
       if (system.hartCount() == 1)
-        return snapshotRun(system, traceFile, dir);
+        return snapshotRun(system, traceFile, args.snapshotDir, args.snapshotPeriods,
+			   args.branchTraceFile);
       std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
     }
 
@@ -1932,6 +1934,14 @@ session(const Args& args, const HartConfig& config)
       auto& hart0 = *system.ithHart(0);
       if (not hart0.setInitialStateFile(args.initStateFile))
 	return false;
+    }
+
+  if (not args.snapshotPeriods.empty() and system.hartCount() == 1 and branchTraceFile)
+    {
+      fclose(branchTraceFile);
+      branchTraceFile = nullptr;
+      auto& hart0 = *system.ithHart(0);
+      hart0.enableBranchTrace(nullptr);
     }
 
   bool result = sessionRun(system, args, traceFile, commandLog);
