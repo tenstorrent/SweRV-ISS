@@ -24,10 +24,10 @@ VirtMem::VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
 
 
 /// Page fault type for read/write/exec access (one and only one of
-/// which must be true). This is for non V (S, HS or U) translation.
-static
+/// which must be true). This is for stage 1 or single-stage translation.
+static constexpr
 ExceptionCause
-nvPageFaultType(bool read, bool write, bool exec)
+stage1PageFaultType(bool read, bool write, bool exec)
 {
   if (exec)  return ExceptionCause::INST_PAGE_FAULT;
   if (read)  return ExceptionCause::LOAD_PAGE_FAULT;
@@ -38,10 +38,10 @@ nvPageFaultType(bool read, bool write, bool exec)
 
 
 /// Page fault type for read/write/exec access (one and only one of
-/// which must be true). This is for V (VS or VU) translation.
-static
+/// which must be true). This is for stage 2 translation only.
+static constexpr
 ExceptionCause
-vPageFaultType(bool read, bool write, bool exec)
+stage2PageFaultType(bool read, bool write, bool exec)
 {
   if (exec)  return ExceptionCause::INST_GUEST_PAGE_FAULT;
   if (read)  return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
@@ -51,31 +51,31 @@ vPageFaultType(bool read, bool write, bool exec)
 }
 
 
-static
+static constexpr
 ExceptionCause
 stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
 {
   typedef ExceptionCause EC;
   if (ec2 == EC::INST_GUEST_PAGE_FAULT or ec2 == EC::LOAD_GUEST_PAGE_FAULT or
       ec2 == EC::STORE_GUEST_PAGE_FAULT)
-    return nvPageFaultType(read, write, exec);
+    return stage1PageFaultType(read, write, exec);
   return ec2;
 }
 
 
 /// Page fault type for read/write/exec access (one and only one of
 /// which must be true).
-static
+static constexpr
 ExceptionCause
 pageFaultType(bool twoStage, bool read, bool write, bool exec)
 {
   if (twoStage)
-    return vPageFaultType(read, write, exec);
-  return nvPageFaultType(read, write, exec);
+    return stage2PageFaultType(read, write, exec);
+  return stage1PageFaultType(read, write, exec);
 }
 
 
-inline
+static constexpr
 ExceptionCause
 accessFaultType(bool read, bool write, bool exec)
 {
@@ -280,44 +280,43 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
 			bool write, bool exec, uint64_t& pa, TlbEntry& entry)
 {
   // Perform a page table walk.
-  ExceptionCause cause = ExceptionCause::LOAD_PAGE_FAULT;
-
   if (mode_ == Sv32)
-    cause = pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
-  else if (mode_ == Sv39)
+    return pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
+
+  ExceptionCause (VirtMem::*pageTableWalk1p12)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
+  unsigned lowerMaskBitIndex;
+
+  if (mode_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-39 must equal bit 38
-      uint64_t mask = (va >> 38) & 1;
-      if (mask)
-        mask = 0x1ffffff;  // Least sig 25 bits set
-      if ((va >> 39) != mask)
-        return pageFaultType(twoStage, read, write, exec);
-      cause = pageTableWalk1p12<Pte39, Va39>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex = 39;
+      pageTableWalk1p12 = &VirtMem::pageTableWalk1p12<Pte39, Va39>;
     }
   else if (mode_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-47 must equal bit 47
-      uint64_t mask = (va >> 47) & 1;
-      if (mask)
-        mask = 0xffff;  // Least sig 16 bits set
-      if ((va >> 48) != mask)
-        return pageFaultType(twoStage, read, write, exec);
-      cause = pageTableWalk1p12<Pte48, Va48>(va, priv, read, write, exec, pa, entry);
+      // Part 1 of address translation: Bits 63-48 must equal bit 47
+      lowerMaskBitIndex = 48;
+      pageTableWalk1p12 = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
     }
   else if (mode_ == Sv57)
     {
       // Part 1 of address translation: Bits 63-57 muse equal bit 56
-      uint64_t mask = (va >> 56) & 1;
-      if (mask)
-        mask = 0x7f;  // Least sig 7 bits set
-      if ((va >> 57) != mask)
-        return pageFaultType(twoStage, read, write, exec);
-      cause = pageTableWalk1p12<Pte57, Va57>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex = 57;
+      pageTableWalk1p12 = &VirtMem::pageTableWalk1p12<Pte57, Va57>;
     }
   else
-    assert(0 and "Unspupported virtual memory mode.");
+    {
+      assert(0 and "Unspupported virtual memory mode.");
+      return ExceptionCause::LOAD_PAGE_FAULT;
+    }
 
-  return cause;
+  uint64_t mask = (va >> (lowerMaskBitIndex - 1)) & 1;
+  if (mask)
+    mask = (1U << (64 - lowerMaskBitIndex)) - 1;
+  if ((va >> lowerMaskBitIndex) != mask)
+    return pageFaultType(twoStage, read, write, exec);
+
+  return (this->*pageTableWalk1p12)(va, priv, read, write, exec, pa, entry);
 }
 
 
@@ -326,40 +325,42 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 			      bool write, bool exec, uint64_t& pa, TlbEntry& entry)
 {
   // Perform a page table walk.
-  ExceptionCause cause = ExceptionCause::LOAD_PAGE_FAULT;
+  ExceptionCause (VirtMem::*stage2PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
+  unsigned lowerMaskBitIndex;
 
   if (modeStage2_ == Sv32)
     {
       // Part 1 of address translation: Bits 63-34 must be zero
-      if ((va >> 34) != 0)
-	return vPageFaultType(read, write, exec);
-      cause = stage2PageTableWalk<Pte32, Va32x4>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex   = 34;
+      stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte32, Va32x4>;
     }
   else if (modeStage2_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-41 must be zero
-      if ((va >> 41) != 0)
-        return vPageFaultType(read, write, exec);
-      cause = stage2PageTableWalk<Pte39, Va39x4>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex   = 41;
+      stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte39, Va39x4>;
     }
   else if (modeStage2_ == Sv48)
     {
       // Part 1 of address translation: Bits 63-50 must be zero
-      if ((va >> 50) != 0)
-        return vPageFaultType(read, write, exec);
-      cause = stage2PageTableWalk<Pte48, Va48x4>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex   = 50;
+      stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte48, Va48x4>;
     }
   else if (modeStage2_ == Sv57)
     {
       // Part 1 of address translation: Bits 63-59 must be zero
-      if ((va >> 59) != 0)
-        return vPageFaultType(read, write, exec);
-      cause = stage2PageTableWalk<Pte57, Va57x4>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex   = 59;
+      stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte57, Va57x4>;
     }
   else
-    assert(0 and "Unspupported virtual memory mode.");
+    {
+      assert(0 and "Unspupported virtual memory mode.");
+      return ExceptionCause::LOAD_PAGE_FAULT;
+    }
 
-  return cause;
+  if ((va >> lowerMaskBitIndex) != 0)
+    return stage2PageFaultType(read, write, exec);
+  return (this->*stage2PageTableWalk)(va, priv, read, write, exec, pa, entry);
 }
 
 
@@ -387,17 +388,17 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
     {
       // Use TLB entry.
       if (not entry->user_)
-	return vPageFaultType(read, write, exec);
+        return stage2PageFaultType(read, write, exec);
       bool ra = entry->read_ or (execReadable_ and entry->exec_);
       if (xForR_)
 	ra = entry->exec_;
       bool wa = entry->write_, xa = entry->exec_;
       if ((read and not ra) or (write and not wa) or (exec and not xa))
-        return vPageFaultType(read, write, exec);
+        return stage2PageFaultType(read, write, exec);
       if (not entry->accessed_ or (write and not entry->dirty_))
         {
           if (faultOnFirstAccess_)
-            return vPageFaultType(read, write, exec);
+            return stage2PageFaultType(read, write, exec);
           entry->accessed_ = true;
           if (write)
             entry->dirty_ = true;
@@ -439,20 +440,20 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	{
 	  // Use TLB entry.
 	  if (priv == PrivilegeMode::User and not entry->user_)
-	    return vPageFaultType(read, write, exec);
+            return stage2PageFaultType(read, write, exec);
 	  if (priv == PrivilegeMode::Supervisor)
 	    if (entry->user_ and (exec or not vsSum_))
-	      return vPageFaultType(read, write, exec);
+              return stage2PageFaultType(read, write, exec);
 	  bool ra = entry->read_ or ((execReadable_ or s1ExecReadable_) and entry->exec_);
 	  if (xForR_)
 	    ra = entry->exec_;
 	  bool wa = entry->write_, xa = entry->exec_;
 	  if ((read and not ra) or (write and not wa) or (exec and not xa))
-	    return vPageFaultType(read, write, exec);
+            return stage2PageFaultType(read, write, exec);
 	  if (not entry->accessed_ or (write and not entry->dirty_))
 	    {
 	      if (faultOnFirstAccess_)
-		return vPageFaultType(read, write, exec);
+                return stage2PageFaultType(read, write, exec);
 	      entry->accessed_ = true;
 	      if (write)
 		entry->dirty_ = true;
@@ -483,41 +484,42 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   if (vsMode_ == Sv32)
     return stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
+  ExceptionCause (VirtMem::*stage1PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
+  unsigned lowerMaskBitIndex;
+
   if (vsMode_ == Sv39)
     {
       // Part 1 of address translation: Bits 63-39 must equal bit 38
-      uint64_t mask = (va >> 38) & 1;
-      if (mask)
-        mask = 0x1ffffff;  // Least sig 25 bits set
-      if ((va >> 39) != mask)
-        return vPageFaultType(read, write, exec);
-      return stage1PageTableWalk<Pte39, Va39>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex   = 39;
+      stage1PageTableWalk = &VirtMem::stage1PageTableWalk<Pte39, Va39>;
     }
 
-  if (vsMode_ == Sv48)
+  else if (vsMode_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-47 must equal bit 47
-      uint64_t mask = (va >> 47) & 1;
-      if (mask)
-        mask = 0xffff;  // Least sig 16 bits set
-      if ((va >> 48) != mask)
-        return vPageFaultType(read, write, exec);
-      return stage1PageTableWalk<Pte48, Va48>(va, priv, read, write, exec, pa, entry);
+      // Part 1 of address translation: Bits 63-48 must equal bit 47
+      lowerMaskBitIndex   = 48;
+      stage1PageTableWalk = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
     }
 
-  if (vsMode_ == Sv57)
+  else if (vsMode_ == Sv57)
     {
       // Part 1 of address translation: Bits 63-57 muse equal bit 56
-      uint64_t mask = (va >> 56) & 1;
-      if (mask)
-        mask = 0x7f;  // Least sig 7 bits set
-      if ((va >> 57) != mask)
-        return vPageFaultType(read, write, exec);
-      return stage1PageTableWalk<Pte57, Va57>(va, priv, read, write, exec, pa, entry);
+      lowerMaskBitIndex   = 57;
+      stage1PageTableWalk = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
     }
 
-  assert(0 and "Unspupported virtual memory mode.");
-  return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
+  else
+    {
+      assert(0 and "Unspupported virtual memory mode.");
+      return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
+    }
+
+  uint64_t mask = (va >> (lowerMaskBitIndex - 1)) & 1;
+  if (mask)
+    mask = (1U << (64 - lowerMaskBitIndex)) - 1;
+  if ((va >> lowerMaskBitIndex) != mask)
+    return stage1PageFaultType(read, write, exec);
+  return (this->*stage1PageTableWalk)(va, priv, read, write, exec, pa, entry);
 }
 
 
@@ -561,7 +563,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	}
 
       if (! memory_.read(pteAddr, pte.data_))
-        return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
         {
@@ -579,38 +581,38 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
-        return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       // 4.
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
 	  if (pte.accessed() or pte.dirty() or pte.user() or pte.pbmt() != 0)
-	    return nvPageFaultType(read, write, exec);  // A/D/U bits must be zero in non-leaf entries.
+            return stage1PageFaultType(read, write, exec);  // A/D/U bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)
-            return nvPageFaultType(read, write, exec);
+            return stage1PageFaultType(read, write, exec);
           root = pte.ppn() * pageSize_;
           continue;  // goto 2.
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
       if (pte.pbmt() != 0)
-	return nvPageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+        return stage1PageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
       if (privMode == PrivilegeMode::User and not pte.user())
-	return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
       if (privMode == PrivilegeMode::Supervisor and pte.user() and
 	  (not sum_ or exec))
-	return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       bool pteRead = pte.read() or (execReadable_ and pte.exec());
       if ((read and not pteRead) or (write and not pte.write()) or
 	  (exec and not pte.exec()))
-	return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       // 6.
       for (int j = 0; j < ii; ++j)
 	if (pte.ppn(j) != 0)
-	  return nvPageFaultType(read, write, exec);
+          return stage1PageFaultType(read, write, exec);
 
       // 7.
       if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
@@ -618,7 +620,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  // We have a choice:
 	  // A. Page fault
 	  if (faultOnFirstAccess_)
-	    return nvPageFaultType(read, write, exec);  // A
+	    return stage1PageFaultType(read, write, exec);  // A
 
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
@@ -644,7 +646,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	      pte.bits_.dirty_ = 1;
 
 	    if (not memory_.write(hartIx_, pteAddr, pte.data_))
-	      return nvPageFaultType(read, write, exec);
+	      return stage1PageFaultType(read, write, exec);
 	  }
 	}
       break;
@@ -717,7 +719,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	}
 
       if (! memory_.read(pteAddr, pte.data_))
-        return vPageFaultType(read, write, exec);
+        return stage2PageFaultType(read, write, exec);
 
       if (attFile_)
         {
@@ -735,37 +737,37 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
-        return vPageFaultType(read, write, exec);
+        return stage2PageFaultType(read, write, exec);
 
       // 4.
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
 	  if (pte.accessed() or pte.dirty() or pte.user() or pte.global() or pte.pbmt() != 0)
-	    return vPageFaultType(read, write, exec);  // A/D/U/G bits must be zero in non-leaf entries.
+            return stage2PageFaultType(read, write, exec);  // A/D/U/G bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)
-            return vPageFaultType(read, write, exec);
+            return stage2PageFaultType(read, write, exec);
           root = pte.ppn() * pageSize_;
           continue;  // goto 2.
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
       if (pte.pbmt() != 0)
-	return vPageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+        return stage2PageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
       if (not pte.user())
-	return vPageFaultType(read, write, exec);  // All access as though in User mode.
+        return stage2PageFaultType(read, write, exec);  // All access as though in User mode.
 
       bool pteRead = pte.read() or (execReadable_ and pte.exec());
       if (xForR_)
 	pteRead = pte.exec();
       if ((read and not pteRead) or (write and not pte.write()) or
 	  (exec and not pte.exec()))
-	return vPageFaultType(read, write, exec);
+        return stage2PageFaultType(read, write, exec);
 
       // 6.
       for (int j = 0; j < ii; ++j)
 	if (pte.ppn(j) != 0)
-	  return vPageFaultType(read, write, exec);
+          return stage2PageFaultType(read, write, exec);
 
       // 7.
       if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
@@ -773,7 +775,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // We have a choice:
 	  // A. Page fault
 	  if (faultOnFirstAccess_)
-	    return vPageFaultType(read, write, exec);  // A
+	    return stage2PageFaultType(read, write, exec);  // A
 
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
@@ -799,7 +801,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	      pte.bits_.dirty_ = 1;
 
 	    if (not memory_.write(hartIx_, pteAddr, pte.data_))
-	      return vPageFaultType(read, write, exec);
+	      return stage2PageFaultType(read, write, exec);
 	  }
 	}
       break;
@@ -887,7 +889,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	}
 
       if (! memory_.read(pteAddr, pte.data_))
-        return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
         {
@@ -905,40 +907,40 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
-        return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       // 4.
       if (not pte.read() and not pte.exec())
         {  // pte is a pointer to the next level
 	  if (pte.accessed() or pte.dirty() or pte.user() or pte.pbmt() != 0)
-	    return nvPageFaultType(read, write, exec);  // A/D/U bits must be zero in non-leaf entries.
+            return stage1PageFaultType(read, write, exec);  // A/D/U bits must be zero in non-leaf entries.
           ii = ii - 1;
           if (ii < 0)
-            return nvPageFaultType(read, write, exec);
+            return stage1PageFaultType(read, write, exec);
           root = pte.ppn() * pageSize_;
           continue;  // goto 2.
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
       if (pte.pbmt() != 0)
-	return nvPageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+        return stage1PageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
       if (privMode == PrivilegeMode::User and not pte.user())
-	return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
       if (privMode == PrivilegeMode::Supervisor and pte.user() and
 	  (not vsSum_ or exec))
-	return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       bool pteRead = pte.read() or ((execReadable_ or s1ExecReadable_) and pte.exec());
       if (xForR_)
 	pteRead = pte.exec();
       if ((read and not pteRead) or (write and not pte.write()) or
 	  (exec and not pte.exec()))
-	return nvPageFaultType(read, write, exec);
+        return stage1PageFaultType(read, write, exec);
 
       // 6.
       for (int j = 0; j < ii; ++j)
 	if (pte.ppn(j) != 0)
-	  return nvPageFaultType(read, write, exec);
+          return stage1PageFaultType(read, write, exec);
 
       // 7.
       if (accessDirtyCheck_ and (not pte.accessed() or (write and not pte.dirty())))
@@ -946,7 +948,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // We have a choice:
 	  // A. Page fault
 	  if (faultOnFirstAccess_)
-	    return nvPageFaultType(read, write, exec);  // A
+	    return stage1PageFaultType(read, write, exec);  // A
 
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
@@ -981,7 +983,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	      }
 	    assert(pteAddr == pteAddr2);
 	    if (not memory_.write(hartIx_, pteAddr2, pte.data_))
-	      return nvPageFaultType(read, write, exec);
+	      return stage1PageFaultType(read, write, exec);
 	  }
 	}
       break;
