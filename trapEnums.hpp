@@ -38,6 +38,7 @@ namespace WdRiscv
       M_SOFTWARE   = 3,  // Machine mode software interrupt
       RESERVED1    = 4,  // 
       S_TIMER      = 5,  // Supervisor timer
+      VS_TIMER     = 6,  // Virtual supervisor timer interrupt
       M_TIMER      = 7,  // Machine timer
       RESERVED2    = 8,  // 
       S_EXTERNAL   = 9,  // Supervisor external

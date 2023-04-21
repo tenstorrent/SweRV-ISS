@@ -270,6 +270,12 @@ bool
 System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
 {
   Filesystem::path dirPath = dir;
+  if (not Filesystem::is_directory(dirPath))
+    if (not Filesystem::create_directories(dirPath))
+      {
+	std::cerr << "Error: Failed to create snapshot directory " << dir << '\n';
+	return false;
+      }
 
   Filesystem::path regPath = dirPath / "registers";
   if (not hart.saveSnapshotRegs(regPath.string()))

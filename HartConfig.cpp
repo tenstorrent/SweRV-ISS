@@ -1456,8 +1456,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
               periods.erase(it, periods.end());
               std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
             }
-
-          hart.setSnapshotPeriods(periods);
         }
     }
 
@@ -1544,6 +1542,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
       else
         hart.enableTrapNonZeroVstart(flag);
+    }
+
+  tag = "trace_pmp";
+  if (config_ -> count(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.tracePmp(flag);
     }
 
   return errors == 0;

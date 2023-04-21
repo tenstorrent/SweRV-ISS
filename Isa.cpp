@@ -5,7 +5,55 @@
 
 using namespace WdRiscv;
 
+// Use this constant list to allow a compile-time check to ensure each extension has a
+// value.
+static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS[] = {
+  { "a", RvExtension::A },
+  { "b", RvExtension::B },
+  { "c", RvExtension::C },
+  { "d", RvExtension::D },
+  { "e", RvExtension::E },
+  { "f", RvExtension::F },
+  { "h", RvExtension::H },
+  { "i", RvExtension::I },
+  { "m", RvExtension::M },
+  { "n", RvExtension::N },
+  { "s", RvExtension::S },
+  { "u", RvExtension::U },
+  { "v", RvExtension::V },
+  { "zba", RvExtension::Zba },
+  { "zbb", RvExtension::Zbb },
+  { "zbc", RvExtension::Zbc },
+  { "zbe", RvExtension::Zbe },
+  { "zbf", RvExtension::Zbf },
+  { "zbm", RvExtension::Zbm },
+  { "zbp", RvExtension::Zbp },
+  { "zbr", RvExtension::Zbr },
+  { "zbs", RvExtension::Zbs },
+  { "zbt", RvExtension::Zbt },
+  { "zfh", RvExtension::Zfh },
+  { "zfhmin", RvExtension::Zfhmin },
+  { "zlssegh", RvExtension::Zlsseg },
+  { "zknd", RvExtension::Zknd },
+  { "zkne", RvExtension::Zkne },
+  { "zknh", RvExtension::Zknh },
+  { "zbkb", RvExtension::Zbkb },
+  { "zbkx", RvExtension::Zbkx },
+  { "zksed", RvExtension::Zksed },
+  { "zksh", RvExtension::Zksh },
+  { "svinval", RvExtension::Svinval },
+  { "zicbom", RvExtension::Zicbom },
+  { "zicboz", RvExtension::Zicboz },
+  { "zawrs", RvExtension::Zawrs },
+  { "zmmul", RvExtension::Zmmul },
+  { "zvfh", RvExtension::Zvfh },
+  { "zvfhmin", RvExtension::Zvfhmin },
+};
+static_assert(std::size(STRING_EXT_PAIRS) == static_cast<unsigned>(RvExtension::None));
+
+
 Isa::Isa()
+  : stringToExt_(std::begin(STRING_EXT_PAIRS), std::end(STRING_EXT_PAIRS))
 {
   infoVec_.resize(extIx(RvExtension::None) + 1);
 
@@ -40,71 +88,16 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zicboz)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zawrs)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zmmul)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zvfh)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{0,1}}, {0,1} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 
-  stringToExt_["a"] = RvExtension::A;
-  stringToExt_["b"] = RvExtension::B;
-  stringToExt_["c"] = RvExtension::C;
-  stringToExt_["d"] = RvExtension::D;
-  stringToExt_["e"] = RvExtension::E;
-  stringToExt_["f"] = RvExtension::F;
-  stringToExt_["h"] = RvExtension::H;
-  stringToExt_["i"] = RvExtension::I;
-  stringToExt_["m"] = RvExtension::M;
-  stringToExt_["s"] = RvExtension::S;
-  stringToExt_["u"] = RvExtension::U;
-  stringToExt_["v"] = RvExtension::V;
-  stringToExt_["zba"] = RvExtension::Zba;
-  stringToExt_["zbb"] = RvExtension::Zbb;
-  stringToExt_["zbc"] = RvExtension::Zbc;
-  stringToExt_["zbs"] = RvExtension::Zbs;
-  stringToExt_["zfh"] = RvExtension::Zfh;
-  stringToExt_["zfhmin"] = RvExtension::Zfhmin;
-  stringToExt_["zlssegh"] = RvExtension::Zlsseg;
-  stringToExt_["zknd"] = RvExtension::Zknd;
-  stringToExt_["zkne"] = RvExtension::Zkne;
-  stringToExt_["zknh"] = RvExtension::Zknh;
-  stringToExt_["zbkb"] = RvExtension::Zbkb;
-  stringToExt_["zbkx"] = RvExtension::Zbkx;
-  stringToExt_["zksed"] = RvExtension::Zksed;
-  stringToExt_["zksh"] = RvExtension::Zksh;
-  stringToExt_["svinval"] = RvExtension::Svinval;
-  stringToExt_["zicbom"] = RvExtension::Zicbom;
-  stringToExt_["zicboz"] = RvExtension::Zicboz;
-  stringToExt_["zawrs"] = RvExtension::Zawrs;
-  stringToExt_["zmmul"] = RvExtension::Zmmul;
-
   extToString_.resize(extIx(RvExtension::None));
-  extToString_.at(extIx(RvExtension::A)) = "a";
-  extToString_.at(extIx(RvExtension::B)) = "b";
-  extToString_.at(extIx(RvExtension::C)) = "c";
-  extToString_.at(extIx(RvExtension::D)) = "d";
-  extToString_.at(extIx(RvExtension::E)) = "e";
-  extToString_.at(extIx(RvExtension::F)) = "f";
-  extToString_.at(extIx(RvExtension::H)) = "h";
-  extToString_.at(extIx(RvExtension::I)) = "i";
-  extToString_.at(extIx(RvExtension::M)) = "m";
-  extToString_.at(extIx(RvExtension::V)) = "v";
-  extToString_.at(extIx(RvExtension::Zba)) = "zba";
-  extToString_.at(extIx(RvExtension::Zbb)) = "zbb";
-  extToString_.at(extIx(RvExtension::Zbc)) = "zbc";
-  extToString_.at(extIx(RvExtension::Zbs)) = "zbs";
-  extToString_.at(extIx(RvExtension::Zfh)) = "zfh";
-  extToString_.at(extIx(RvExtension::Zfhmin)) = "zfhmin";
-  extToString_.at(extIx(RvExtension::Zlsseg)) = "zlssegh";
-  extToString_.at(extIx(RvExtension::Zknd)) = "zknd";
-  extToString_.at(extIx(RvExtension::Zkne)) = "zkne";
-  extToString_.at(extIx(RvExtension::Zknh)) = "zknh";
-  extToString_.at(extIx(RvExtension::Zbkb)) = "zbkb";
-  extToString_.at(extIx(RvExtension::Zbkx)) = "zbkx";
-  extToString_.at(extIx(RvExtension::Zksed)) = "zksed";
-  extToString_.at(extIx(RvExtension::Zksh)) = "zksh";
-  extToString_.at(extIx(RvExtension::Svinval)) = "svinval";
-  extToString_.at(extIx(RvExtension::Zicbom)) = "zicbom";
-  extToString_.at(extIx(RvExtension::Zicboz)) = "zicboc";
-  extToString_.at(extIx(RvExtension::Zawrs)) = "zawrs";
-  extToString_.at(extIx(RvExtension::Zmmul)) = "zmmul";
+  for (auto&& [name, id] : STRING_EXT_PAIRS)
+    {
+      extToString_.at(extIx(id)) = name;
+    }
 }
 
 
@@ -215,7 +208,7 @@ Isa::getVersion(RvExtension ext, unsigned& version, unsigned& subversion) const
 
 
 RvExtension
-Isa::stringToExtension(const std::string& str) const
+Isa::stringToExtension(std::string_view str) const
 {
   const auto iter = stringToExt_.find(str);
   if (iter == stringToExt_.end())
@@ -224,7 +217,7 @@ Isa::stringToExtension(const std::string& str) const
 }
 
 
-std::string
+std::string_view
 Isa::extensionToString(RvExtension ext) const
 {
   unsigned ix = extIx(ext);
@@ -241,7 +234,7 @@ Isa::extensionToString(RvExtension ext) const
 /// The <version>/<subversion> are sequences of digits. The
 /// <version>p<subversion> suffix is optional.
 bool
-extractExtension(const std::string& isa, size_t& i, std::string& extension)
+extractExtension(std::string_view isa, size_t& i, std::string& extension)
 {
   size_t len = isa.size();
   if (i >= len)
@@ -286,7 +279,7 @@ extractExtension(const std::string& isa, size_t& i, std::string& extension)
 // 'p' followed by another sequence of decimal digits. Return true on
 // success.
 bool
-extractVersion(const std::string& isa, size_t& i, std::string& version,
+extractVersion(std::string_view isa, size_t& i, std::string& version,
 	       std::string& subversion)
 {
   size_t len = isa.size();
@@ -311,7 +304,7 @@ extractVersion(const std::string& isa, size_t& i, std::string& version,
 
 
 bool
-Isa::configIsa(const std::string& isa)
+Isa::configIsa(std::string_view isa)
 {
   if (applyIsaString(isa))
     return true;
@@ -322,9 +315,9 @@ Isa::configIsa(const std::string& isa)
   
     
 bool
-Isa::applyIsaString(const std::string& isaStr)
+Isa::applyIsaString(std::string_view isaStr)
 {
-  std::string isa = isaStr;
+  std::string_view isa = isaStr;
 
   // Check and skip rv prefix.
   if (boost::starts_with(isa, "rv32") or boost::starts_with(isa, "rv64"))

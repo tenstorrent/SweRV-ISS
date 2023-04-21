@@ -409,7 +409,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       pending = true;
     }
 
-  if (not pending) 
+  if (not pending)
     formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, 'r', 0, 0,
 			 tmp.c_str());  // No change: emit X0 as modified reg.
 
@@ -446,11 +446,11 @@ namespace Whisper
     // Append to buffer hexadecimal string representing given number.
     inline
     PrintBuffer& print(uint64_t num)
-    {                                                                                        
-      if (num == 0)                                                                          
-	buff_.at(pos_++) = '0';                                                              
-      else                                                                                   
-	{                                                                                    
+    {
+      if (num == 0)
+	buff_.at(pos_++) = '0';
+      else
+	{
 	  size_t beg = pos_;
 	  for ( ; num; num = num >> 4 )
 	    buff_.at(pos_++) = "0123456789abcdef"[num&0xf];
@@ -471,9 +471,11 @@ namespace Whisper
 
     // Append to buffer copy of given string excluding null char
     inline
-    PrintBuffer& print(const std::string& str)
+    PrintBuffer& print(std::string_view str)
     {
-      return print(str.c_str());
+      std::copy(str.begin(), str.end(), std::next(buff_.begin(), pos_));
+      pos_ += str.size();
+      return *this;
     }
 
     // Append char to buffer.
@@ -704,15 +706,18 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 
   // Privilege mode.
   if      (lastPriv_ == PrivilegeMode::Machine)    buffer.print(",m,");
-  else if (lastPriv_ == PrivilegeMode::Supervisor) buffer.print(lastVirt_? ",vs," : ",s,");
-  else if (lastPriv_ == PrivilegeMode::User)       buffer.print(lastVirt_? ",vu," : ",u,");
+  else if (lastPriv_ == PrivilegeMode::Supervisor) buffer.print((lastVirt_)? ",vs," : ",s,");
+  else if (lastPriv_ == PrivilegeMode::User)       buffer.print((lastVirt_)? ",vu," : ",u,");
   else                                             buffer.print(",,");
 
   // Interrupt/exception cause.
   if (hasTrap)
     {
       URV cause = 0;
-      peekCsr(CsrNumber::MCAUSE, cause);
+      if (privilegeMode() == PrivilegeMode::Machine)
+        peekCsr(CsrNumber::MCAUSE, cause);
+      else if (privilegeMode() == PrivilegeMode::Supervisor)
+        peekCsr(CsrNumber::SCAUSE, cause);
       buffer.print(uint64_t(cause));
     }
   buffer.printChar(',');
@@ -728,7 +733,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   buffer.printChar(',').print(sysHartIndex());
 
   // Page table walk.
-  if (isRvs())
+  if (isRvs() and tracePtw_)
     {
       buffer.printChar(',');
       std::vector<uint64_t> addrs, entries;
@@ -755,7 +760,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     }
 
   // PMP
-  if (pmpEnabled_)
+  if (pmpEnabled_ and tracePmp_)
     {
       buffer.printChar(',');
       std::vector<std::pair<uint32_t, Pmp>> pmps;

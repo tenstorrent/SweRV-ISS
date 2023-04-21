@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,12 +27,13 @@ using namespace WdRiscv;
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::validateAmoAddr(uint64_t& addr, unsigned accessSize)
+Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
 {
   URV mask = URV(accessSize) - 1;
 
   uint64_t addr2 = addr;
-  auto cause = determineStoreException(addr, addr2, accessSize, false /*hyper*/);
+  uint64_t gaddr2 = gaddr;
+  auto cause = determineStoreException(addr, addr2, gaddr, gaddr2, accessSize, false /*hyper*/);
 
   if (cause == ExceptionCause::STORE_ADDR_MISAL)
     {
@@ -76,14 +77,15 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
     }
 
   uint64_t addr = virtAddr;
-  auto cause = validateAmoAddr(addr, ldStSize_);
+  uint64_t gaddr = virtAddr;
+  auto cause = validateAmoAddr(addr, gaddr, ldStSize_);
   ldStPhysAddr1_ = addr;
   ldStPhysAddr2_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, addr);
+        initiateLoadException(cause, addr, gaddr);
       return false;
     }
 
@@ -130,14 +132,15 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
     }
 
   uint64_t addr = virtAddr;
-  auto cause = validateAmoAddr(addr, ldStSize_);
+  uint64_t gaddr = virtAddr;
+  auto cause = validateAmoAddr(addr, gaddr, ldStSize_);
   ldStPhysAddr1_ = addr;
   ldStPhysAddr2_ = addr;
 
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, addr);
+        initiateLoadException(cause, addr, gaddr);
       return false;
     }
 
@@ -181,7 +184,9 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
 
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  auto cause = determineLoadException(addr1, addr2, ldStSize_, false /*hyper*/);
+  uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
+  auto cause = determineLoadException(addr1, addr2, gaddr1, gaddr2,
+                                      ldStSize_, false /*hyper*/);
   if (cause == ExceptionCause::LOAD_ADDR_MISAL and misalAtomicCauseAccessFault_)
     cause = ExceptionCause::LOAD_ACC_FAULT;
 
@@ -203,7 +208,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateLoadException(cause, virtAddr);
+      initiateLoadException(cause, addr1, gaddr1);
       return false;
     }
 
@@ -223,7 +228,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
     {
       assert(0);
       return false;
-    }      
+    }
 
   URV value = uval;
   if (not std::is_same<ULT, LOAD_TYPE>::value)
@@ -292,7 +297,8 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   misalignedLdSt_ = misal;
 
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
-  auto cause = determineStoreException(addr1, addr2, sizeof(storeVal), false /*hyper*/);
+  uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
+  auto cause = determineStoreException(addr1, addr2, gaddr1, gaddr2, sizeof(storeVal), false /*hyper*/);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
   if (cause == ExceptionCause::STORE_ADDR_MISAL and
@@ -315,7 +321,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateStoreException(cause, virtAddr);
+      initiateStoreException(cause, addr1, gaddr1);
       return false;
     }
 
@@ -534,7 +540,7 @@ Hart<URV>::execLr_d(const DecodedInst* di)
     return;
 
   unsigned size = 8;
-  uint64_t resAddr = ldStPhysAddr1_; 
+  uint64_t resAddr = ldStPhysAddr1_;
   if (lrResSize_ > size)
     {
       // Snap reservation address to the closest smaller muliple of

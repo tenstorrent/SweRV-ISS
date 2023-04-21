@@ -36,7 +36,7 @@ template <typename URV>
 void
 Hart<URV>::enableRvf(bool flag)
 {
-  rvf_ = flag;
+  enableExtension(RvExtension::F, flag);
   csRegs_.enableRvf(flag);
   if (not flag)
     setFpStatus(FpStatus::Off);
@@ -92,6 +92,7 @@ Hart<URV>::orFcsrFlags(FpFlags flags)
     {
       setFpFlags(val);
       recordCsrWrite(CsrNumber::FCSR);
+      markFsDirty();
     }
 }
 
@@ -207,6 +208,7 @@ Hart<URV>::updateAccruedFpBits([[maybe_unused]] float_type res)
     {
       setFpFlags(val);
       recordCsrWrite(CsrNumber::FCSR);
+      markFsDirty();
     }
 }
 
@@ -916,8 +918,6 @@ Hart<URV>::execFcvt_w_s(const DecodedInst* di)
   intRegs_.write(di->op0(), result);
 
   updateAccruedFpBits(0.0);
-
-  markFsDirty();
 }
 
 
@@ -936,8 +936,6 @@ Hart<URV>::execFcvt_wu_s(const DecodedInst* di)
   intRegs_.write(di->op0(), result);
 
   updateAccruedFpBits(0.0f);
-
-  markFsDirty();
 }
 
 
@@ -985,7 +983,6 @@ Hart<URV>::execFeq_s(const DecodedInst* di)
     res = (f1 == f2)? 1 : 0;
 
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -1010,7 +1007,6 @@ Hart<URV>::execFlt_s(const DecodedInst* di)
     res = (f1 < f2)? 1 : 0;
     
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -1035,7 +1031,6 @@ Hart<URV>::execFle_s(const DecodedInst* di)
     res = (f1 <= f2)? 1 : 0;
 
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -1236,8 +1231,6 @@ Hart<uint64_t>::execFcvt_l_s(const DecodedInst* di)
   intRegs_.write(di->op0(), result);
 
   updateAccruedFpBits(0.0);
-
-  markFsDirty();
 }
 
 
@@ -1270,7 +1263,6 @@ Hart<uint64_t>::execFcvt_lu_s(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f);
 
-  markFsDirty();
 }
 
 
@@ -1800,7 +1792,6 @@ Hart<URV>::execFle_d(const DecodedInst* di)
     res = (d1 <= d2)? 1 : 0;
 
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -1825,7 +1816,6 @@ Hart<URV>::execFlt_d(const DecodedInst* di)
     res = (d1 < d2)? 1 : 0;
 
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -1853,7 +1843,6 @@ Hart<URV>::execFeq_d(const DecodedInst* di)
     res = (d1 == d2)? 1 : 0;
 
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -1872,7 +1861,6 @@ Hart<URV>::execFcvt_w_d(const DecodedInst* di)
 
   updateAccruedFpBits(0.0);
 
-  markFsDirty();
 }
 
 
@@ -1893,7 +1881,6 @@ Hart<URV>::execFcvt_wu_d(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f);
 
-  markFsDirty();
 }
 
 
@@ -1980,7 +1967,6 @@ Hart<uint64_t>::execFcvt_l_d(const DecodedInst* di)
 
   updateAccruedFpBits(0.0);
 
-  markFsDirty();
 }
 
 
@@ -2013,7 +1999,6 @@ Hart<uint64_t>::execFcvt_lu_d(const DecodedInst* di)
 
   updateAccruedFpBits(0.0f);
 
-  markFsDirty();
 }
 
 
@@ -2625,7 +2610,6 @@ Hart<URV>::execFcvt_w_h(const DecodedInst* di)
 
   updateAccruedFpBits(0.0);
 
-  markFsDirty();
 }
 
 
@@ -2644,8 +2628,6 @@ Hart<URV>::execFcvt_wu_h(const DecodedInst* di)
   intRegs_.write(di->op0(), result);
 
   updateAccruedFpBits(0.0f);
-
-  markFsDirty();
 }
 
 
@@ -2693,7 +2675,6 @@ Hart<URV>::execFeq_h(const DecodedInst* di)
     res = (f1 == f2)? 1 : 0;
 
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -2718,7 +2699,6 @@ Hart<URV>::execFlt_h(const DecodedInst* di)
     res = (f1 < f2)? 1 : 0;
     
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -2743,7 +2723,6 @@ Hart<URV>::execFle_h(const DecodedInst* di)
     res = (f1 <= f2)? 1 : 0;
     
   intRegs_.write(di->op0(), res);
-  markFsDirty();
 }
 
 
@@ -2856,8 +2835,6 @@ Hart<uint64_t>::execFcvt_l_h(const DecodedInst* di)
   intRegs_.write(di->op0(), result);
 
   updateAccruedFpBits(0.0);
-
-  markFsDirty();
 }
 
 
@@ -2889,8 +2866,6 @@ Hart<uint64_t>::execFcvt_lu_h(const DecodedInst* di)
   intRegs_.write(di->op0(), result);
 
   updateAccruedFpBits(0.0f);
-
-  markFsDirty();
 }
 
 

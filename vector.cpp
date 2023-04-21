@@ -440,7 +440,7 @@ template <typename URV>
 void
 Hart<URV>::enableVectorMode(bool flag)
 {
-  rvv_ = flag;
+  enableExtension(RvExtension::V, flag);
   csRegs_.enableVectorMode(flag);
 
   if (not flag)
@@ -511,7 +511,8 @@ extern int  setSimulatorRoundingMode(RoundingMode mode);
 
 template <typename URV>
 bool
-Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
+Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide,
+                               bool (Hart::*fp16LegalFn)() const)
 {
   if (not checkMaskableInst(di))
     return false;
@@ -523,10 +524,10 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   ok = isZfhLegal(); break;
-    case EW::Word:   ok = isFpLegal();  break;
-    case EW::Word2:  ok = isDpLegal();  break;
-    default:         ok = false;        break;
+    case EW::Half:   ok = (this->*fp16LegalFn)(); break;
+    case EW::Word:   ok = isFpLegal();            break;
+    case EW::Word2:  ok = isDpLegal();            break;
+    default:         ok = false;                  break;
     }
 
   if (wide)
@@ -977,10 +978,10 @@ Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   bool ok = false;
   switch (sew)
     {
-    case EW::Half:   ok = isZfhLegal(); break;
-    case EW::Word:   ok = isFpLegal();  break;
-    case EW::Word2:  ok = isDpLegal();  break;
-    default:         ok = false;        break;
+    case EW::Half:   ok = isZvfhLegal(); break;
+    case EW::Word:   ok = isFpLegal();   break;
+    case EW::Word2:  ok = isDpLegal();   break;
+    default:         ok = false;         break;
     }
 
   // Clear soft-float library or x86 exception flags
@@ -1007,10 +1008,10 @@ Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   bool ok = false;
   switch (sew)
     {
-    case EW::Half:   ok = isZfhLegal(); break;
-    case EW::Word:   ok = isFpLegal();  break;
-    case EW::Word2:  ok = isDpLegal();  break;
-    default:         ok = false;        break;
+    case EW::Half:   ok = isZvfhLegal(); break;
+    case EW::Word:   ok = isFpLegal();   break;
+    case EW::Word2:  ok = isDpLegal();   break;
+    default:         ok = false;         break;
     }
 
   // Clear soft-float library or x86 exception flags
@@ -11370,7 +11371,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
       return;
 
     case ElementWidth::Half:
-      if (not isZfhLegal())
+      if (not isZvfhLegal())
 	illegalInst(di);
       else
 	{
@@ -11433,7 +11434,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
       illegalInst(di);
       return;
     case EW::Half:
-      if (not isZfhLegal())
+      if (not isZvfhLegal())
 	illegalInst(di);
       else if (start < vecRegs_.elemCount())
 	{
@@ -13739,16 +13740,18 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Phys addrs or faulting virtual address.
+      uint64_t gpa1 = addr, gpa2 = addr;
 
       ELEM_TYPE elem = 0;
-      cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                     false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           if (ix == 0 or not faultFirst)
-            initiateLoadException(cause, pa1);
+            initiateLoadException(cause, pa1, gpa1);
           return false;
         }
 
@@ -13887,7 +13890,10 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
         }
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
-      auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
+      uint64_t gpa1 = addr, gpa2 = addr;
+
+      auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                           false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  memWrite(pa1, pa2, elem);
@@ -13896,7 +13902,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1);
+          initiateStoreException(cause, pa1, gpa1);
 	  assert(errors == 0);
           return false;
         }
@@ -14075,15 +14081,18 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
     {
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
+      uint64_t gpa1 = addr, gpa2 = addr;
 
       ELEM_TYPE elem = 0;
-      cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                     false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
 
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+          initiateLoadException(cause, pa1, gpa1);
           return false;
         }
 
@@ -14208,7 +14217,9 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
         }
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
-      auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
+      uint64_t gpa1 = addr, gpa2 = addr;
+      auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                           false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  memWrite(pa1, pa2, elem);
@@ -14219,7 +14230,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1);
+          initiateStoreException(cause, pa1, gpa1);
           return false;
         }
     }
@@ -14391,15 +14402,17 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
+      uint64_t gpa1 = addr, gpa2 = addr;
 
       ELEM_TYPE elem = 0;
-      cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                     false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, pa1);
+          initiateLoadException(cause, pa1, gpa1);
           return false;
         }
 
@@ -14544,8 +14557,10 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
         }
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
+      uint64_t gpa1 = addr, gpa2 = addr;
 
-      auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
+      auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                           false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  memWrite(pa1, pa2, elem);
@@ -14554,7 +14569,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1);
+          initiateStoreException(cause, pa1, gpa1);
           return false;
         }
     }
@@ -14690,7 +14705,10 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
 
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
-      auto cause = determineLoadException(pa1, pa2, elemSize, false /*hyper*/);
+      uint64_t gpa1 = vaddr, gpa2 = vaddr;
+
+      auto cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
+                                          false /*hyper*/);
       if (cause == ExceptionCause::NONE)
 	{
 	  if (elemSize == 1)
@@ -14723,7 +14741,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       else
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateLoadException(cause, pa1);
+          initiateLoadException(cause, pa1, gpa1);
           return false;
         }
     }
@@ -14915,12 +14933,15 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	}
 
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
+      uint64_t gpa1 = vaddr, gpa2 = vaddr;
+
       auto cause = ExceptionCause::NONE;
       if (elemSize == 1)
 	{
 	  uint8_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                          false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -14929,7 +14950,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint16_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                          false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -14938,7 +14960,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint32_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                          false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -14947,7 +14970,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	{
 	  uint64_t x = 0;
 	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
-	  cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                          false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    memWrite(pa1, pa2, x);
 	  data = x;
@@ -14958,7 +14982,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (cause != ExceptionCause::NONE)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          initiateStoreException(cause, pa1);
+          initiateStoreException(cause, pa1, gpa1);
           return false;
         }
 
@@ -15164,7 +15188,10 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
 	  ELEM_TYPE elem(0);
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
-	  auto cause = determineLoadException(pa1, pa2, sizeof(elem), false /*hyper*/);
+          uint64_t gpa1 = faddr, gpa2 = faddr;
+
+	  auto cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                              false /*hyper*/);
 
 	  if (cause == ExceptionCause::NONE)
             memRead(pa1, pa2, elem);
@@ -15172,7 +15199,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
 	      if (ix == 0 or not faultFirst)
-		initiateLoadException(cause, pa1);
+		initiateLoadException(cause, pa1, gpa1);
 	      return false;
 	    }
 
@@ -15316,6 +15343,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
       for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
 	{
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
+          uint64_t gpa1 = faddr, gpa2 = faddr;
 	  unsigned dvg = vd + field*eg;   // Source vector gorup.
 
 	  bool skip = masked and not vecRegs_.isActive(0, ix);
@@ -15331,7 +15359,8 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  if (not vecRegs_.read(dvg, ix, groupX8, elem))
 	    assert(0);
 
-	  auto cause = determineStoreException(pa1, pa2, sizeof(elem), false /*hyper*/);
+	  auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+                                               false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      memWrite(pa1, pa2, elem);
@@ -15340,7 +15369,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(cause, pa1);
+	      initiateStoreException(cause, pa1, gpa1);
 	      return false;
 	    }
 	}
@@ -15678,7 +15707,10 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    }
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
-          auto cause = determineLoadException(pa1, pa2, elemSize, false /*hyper*/);
+          uint64_t gpa1 = faddr, gpa2 = faddr;
+
+          auto cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
+                                              false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      if (elemSize == 1)
@@ -15711,7 +15743,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  else
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateLoadException(cause, pa1);
+	      initiateLoadException(cause, pa1, gpa1);
 	      return false;
 	    }
 	}
@@ -15850,12 +15882,14 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
 	  auto cause = ExceptionCause::NONE;
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
+          uint64_t gpa1 = faddr, gpa2 = faddr;
 
 	  if (elemSize == 1)
 	    {
 	      uint8_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                              false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;
@@ -15864,7 +15898,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint16_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                              false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;
@@ -15873,7 +15908,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint32_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                              false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;
@@ -15882,7 +15918,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint64_t x = 0;
 	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
-	      cause = determineStoreException(pa1, pa2, sizeof(x), false /*hyper*/);
+	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
+                                              false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
 		memWrite(pa1, pa2, x);
 	      data = x;
@@ -15893,7 +15930,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  if (cause != ExceptionCause::NONE)
 	    {
 	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-	      initiateStoreException(cause, pa1);
+	      initiateStoreException(cause, pa1, gpa1);
 	      return false;
 	    }
 
@@ -16831,7 +16868,6 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -16894,7 +16930,6 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -16956,7 +16991,6 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17019,7 +17053,6 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17082,7 +17115,6 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17183,7 +17215,6 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17260,7 +17291,6 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17337,7 +17367,6 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17414,7 +17443,6 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17490,7 +17518,6 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17565,7 +17592,6 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17640,7 +17666,6 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17715,7 +17740,6 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17777,7 +17801,6 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17840,7 +17863,6 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17902,7 +17924,6 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -17965,7 +17986,6 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18028,7 +18048,6 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18102,7 +18121,6 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18178,7 +18196,6 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -18224,7 +18241,6 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18286,7 +18302,6 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18351,7 +18366,6 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18413,7 +18427,6 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18478,7 +18491,6 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18540,7 +18552,6 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18605,7 +18616,6 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18667,7 +18677,6 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18732,7 +18741,6 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18794,7 +18802,6 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18823,7 +18830,7 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfmacc_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
@@ -18874,7 +18881,6 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -18936,7 +18942,6 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19001,7 +19006,6 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19063,7 +19067,6 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19128,7 +19131,6 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19190,7 +19192,6 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19262,7 +19263,6 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19336,7 +19336,6 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19413,7 +19412,6 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19487,7 +19485,6 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19564,7 +19561,6 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19638,7 +19634,6 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19715,7 +19710,6 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19790,7 +19784,6 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19857,7 +19850,6 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -19944,7 +19936,7 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfmerge<Float16>(vd, vs1, rs2, group, start, elems);
       break;
 
@@ -20010,7 +20002,7 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfmv_v_f<Float16>(vd, rs1, group, start, elems);
       break;
 
@@ -21323,7 +21315,7 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfwcvt_f_xu_v<uint8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21409,7 +21401,7 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfwcvt_f_x_v<int8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21478,7 +21470,7 @@ void
 Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
 {
   // Float to double-wide float.
-  if (not checkFpMaskableInst(di, true))
+  if (not checkFpMaskableInst(di, true, &Hart::isZvfhminLegal))
     return;
 
   bool masked = di->isMasked();
@@ -21575,7 +21567,7 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21659,7 +21651,7 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21708,7 +21700,7 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21757,7 +21749,7 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21846,7 +21838,6 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -21921,7 +21912,6 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -21967,7 +21957,7 @@ void
 Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
 {
   // Double-wide float to float.
-  if (not checkFpMaskableInst(di, true))
+  if (not checkFpMaskableInst(di, true, &Hart::isZvfhminLegal))
     return;
 
   bool masked = di->isMasked();
@@ -21995,7 +21985,6 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22039,7 +22028,6 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22119,7 +22107,6 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22190,7 +22177,6 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22261,7 +22247,6 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22332,7 +22317,6 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22416,7 +22400,6 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22492,7 +22475,6 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
     }
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22540,7 +22522,6 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 #endif
 
   updateAccruedFpBits(0.0f);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -22607,7 +22588,6 @@ Hart<URV>::vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
     }
 
   orFcsrFlags(flags);
-  markFsDirty();
 
   assert(errors == 0);
 }
@@ -22704,7 +22684,6 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
     case EW::Word32: illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22767,8 +22746,6 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
     case EW::Word2: vfmin_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
     default:        illegalInst(di); return;
     }
-
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22833,7 +22810,6 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22897,7 +22873,6 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -22960,7 +22935,6 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23022,7 +22996,6 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23086,7 +23059,6 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23149,7 +23121,6 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23218,7 +23189,6 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 
@@ -23287,7 +23257,6 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
     default:        illegalInst(di); return;
     }
 
-  markFsDirty();
   csRegs_.clearVstart();
 }
 

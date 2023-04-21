@@ -146,10 +146,10 @@ FpRegs::FpRegs(unsigned regCount)
 
 
 bool
-FpRegs::findReg(const std::string& name, unsigned& ix) const
+FpRegs::findReg(const std::string_view name, unsigned& ix) const
 {
   unsigned i = 0;
-  if (not regNames_.findReg(name, i))
+  if (not FpRegNames::findReg(name, i))
     return false;
 
   if (i >= regs_.size())

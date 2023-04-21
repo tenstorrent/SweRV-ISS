@@ -143,7 +143,8 @@ install: $(BUILD_DIR)/$(PROJECT)
          fi
 
 clean:
-	$(RM) $(BUILD_DIR)/$(PROJECT) $(OBJS_GEN) $(BUILD_DIR)/librvcore.a $(DEPS_FILES)
+	$(RM) $(BUILD_DIR)/$(PROJECT) $(OBJS_GEN) $(BUILD_DIR)/librvcore.a $(DEPS_FILES) ; \
+  $(if $(soft_float_build),$(MAKE) -C $(soft_float_build) clean,)
 
 help:
 	@echo "Possible targets: $(BUILD_DIR)/$(PROJECT) install clean"
