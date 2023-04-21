@@ -440,7 +440,7 @@ template <typename URV>
 void
 Hart<URV>::enableVectorMode(bool flag)
 {
-  rvv_ = flag;
+  enableExtension(RvExtension::V, flag);
   csRegs_.enableVectorMode(flag);
 
   if (not flag)
@@ -511,7 +511,8 @@ extern int  setSimulatorRoundingMode(RoundingMode mode);
 
 template <typename URV>
 bool
-Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
+Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide,
+                               bool (Hart::*fp16LegalFn)() const)
 {
   if (not checkMaskableInst(di))
     return false;
@@ -523,10 +524,10 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   ok = isZfhLegal(); break;
-    case EW::Word:   ok = isFpLegal();  break;
-    case EW::Word2:  ok = isDpLegal();  break;
-    default:         ok = false;        break;
+    case EW::Half:   ok = (this->*fp16LegalFn)(); break;
+    case EW::Word:   ok = isFpLegal();            break;
+    case EW::Word2:  ok = isDpLegal();            break;
+    default:         ok = false;                  break;
     }
 
   if (wide)
@@ -977,10 +978,10 @@ Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   bool ok = false;
   switch (sew)
     {
-    case EW::Half:   ok = isZfhLegal(); break;
-    case EW::Word:   ok = isFpLegal();  break;
-    case EW::Word2:  ok = isDpLegal();  break;
-    default:         ok = false;        break;
+    case EW::Half:   ok = isZvfhLegal(); break;
+    case EW::Word:   ok = isFpLegal();   break;
+    case EW::Word2:  ok = isDpLegal();   break;
+    default:         ok = false;         break;
     }
 
   // Clear soft-float library or x86 exception flags
@@ -1007,10 +1008,10 @@ Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   bool ok = false;
   switch (sew)
     {
-    case EW::Half:   ok = isZfhLegal(); break;
-    case EW::Word:   ok = isFpLegal();  break;
-    case EW::Word2:  ok = isDpLegal();  break;
-    default:         ok = false;        break;
+    case EW::Half:   ok = isZvfhLegal(); break;
+    case EW::Word:   ok = isFpLegal();   break;
+    case EW::Word2:  ok = isDpLegal();   break;
+    default:         ok = false;         break;
     }
 
   // Clear soft-float library or x86 exception flags
@@ -11370,7 +11371,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
       return;
 
     case ElementWidth::Half:
-      if (not isZfhLegal())
+      if (not isZvfhLegal())
 	illegalInst(di);
       else
 	{
@@ -11433,7 +11434,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
       illegalInst(di);
       return;
     case EW::Half:
-      if (not isZfhLegal())
+      if (not isZvfhLegal())
 	illegalInst(di);
       else if (start < vecRegs_.elemCount())
 	{
@@ -18829,7 +18830,7 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfmacc_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
@@ -19935,7 +19936,7 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfmerge<Float16>(vd, vs1, rs2, group, start, elems);
       break;
 
@@ -20001,7 +20002,7 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfmv_v_f<Float16>(vd, rs1, group, start, elems);
       break;
 
@@ -21314,7 +21315,7 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfwcvt_f_xu_v<uint8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21400,7 +21401,7 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfwcvt_f_x_v<int8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21469,7 +21470,7 @@ void
 Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
 {
   // Float to double-wide float.
-  if (not checkFpMaskableInst(di, true))
+  if (not checkFpMaskableInst(di, true, &Hart::isZvfhminLegal))
     return;
 
   bool masked = di->isMasked();
@@ -21566,7 +21567,7 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21650,7 +21651,7 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21699,7 +21700,7 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21748,7 +21749,7 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { illegalInst(di); return; }
       vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
@@ -21956,7 +21957,7 @@ void
 Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
 {
   // Double-wide float to float.
-  if (not checkFpMaskableInst(di, true))
+  if (not checkFpMaskableInst(di, true, &Hart::isZvfhminLegal))
     return;
 
   bool masked = di->isMasked();

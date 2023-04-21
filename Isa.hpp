@@ -1,16 +1,18 @@
 #pragma once
 
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 
 namespace WdRiscv
 {
 
-  enum class RvExtension : unsigned { A, B, C, D, E, F, H, I, M, S, U, V,
-				      Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
-				      Zbr, Zbs, Zbt, Zfh, Zfhmin, Zlsseg,
-				      Zknd, Zkne, Zknh, Zbkb, Zbkx, Zksed, Zksh,
-				      Svinval, Zicbom, Zicboz, Zawrs, Zmmul, None };
+  enum class RvExtension : unsigned { A, B, C, D, E, F, H, I, M, N, S, U, V,
+                                      Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
+                                      Zbr, Zbs, Zbt, Zfh, Zfhmin, Zlsseg,
+                                      Zknd, Zkne, Zknh, Zbkb, Zbkx, Zksed, Zksh,
+                                      Svinval, Zicbom, Zicboz, Zawrs, Zmmul,
+                                      Zvfh, Zvfhmin, None };
 
   /// Model supported extensions with primary/secondary version numbers.
   class Isa
@@ -66,22 +68,22 @@ namespace WdRiscv
     /// Return extension corresponding to given string. For example,
     /// return RvExtension::A for "a". Return RvExtension::None if no such
     /// extension.
-    RvExtension stringToExtension(const std::string& str) const;
+    RvExtension stringToExtension(std::string_view str) const;
 
     /// Return string correponding to given extension enum. Return empty
     /// string if given extension is out of bounds.
-    std::string extensionToString(RvExtension ext) const;
+    std::string_view extensionToString(RvExtension ext) const;
 
     /// Process extension string enabling etxesions and selecting
     /// versions. Return true on success. Return false if extension
     /// string is not valid or if an extension or extension version is
     /// not supported. Sample ISA string: rv32i2p0_m2p0
-    bool configIsa(const std::string& isa);
+    bool configIsa(std::string_view isa);
 
   protected:
 
     /// Helper to configIsa.
-    bool applyIsaString(const std::string& isa);
+    bool applyIsaString(std::string_view isa);
 
     /// Return integer value underlying extension enum.
     unsigned extIx(RvExtension ext) const
@@ -111,7 +113,7 @@ namespace WdRiscv
 
     std::vector<Info> infoVec_;
 
-    std::unordered_map<std::string, RvExtension> stringToExt_;
-    std::vector<std::string> extToString_;
+    std::unordered_map<std::string_view, RvExtension> stringToExt_;
+    std::vector<std::string_view> extToString_;
   };
 }

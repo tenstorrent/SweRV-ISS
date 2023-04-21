@@ -36,7 +36,7 @@ template <typename URV>
 void
 Hart<URV>::enableRvf(bool flag)
 {
-  rvf_ = flag;
+  enableExtension(RvExtension::F, flag);
   csRegs_.enableRvf(flag);
   if (not flag)
     setFpStatus(FpStatus::Off);
