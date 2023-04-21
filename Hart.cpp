@@ -190,31 +190,6 @@ Hart<URV>::getImplementedCsrs(std::vector<CsrNumber>& vec) const
 
 
 template <typename URV>
-bool
-Hart<URV>::configureCache(uint64_t size, unsigned lineSize,
-                          unsigned setSize)
-{
-  return memory_.configureCache(size, lineSize, setSize);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::deleteCache()
-{
-  memory_.deleteCache();
-}
-
-
-template <typename URV>
-void
-Hart<URV>::getCacheLineAddresses(std::vector<uint64_t>& addresses)
-{
-  memory_.getCacheLineAddresses(addresses);
-}
-
-
-template <typename URV>
 unsigned
 Hart<URV>::countImplementedPmpRegisters() const
 {
@@ -4303,16 +4278,6 @@ Hart<URV>::countBasicBlocks(const DecodedInst* di)
     {
       auto& blockStat = basicBlocks_[pc_];
       blockStat.count_++;
-
-      if (memory_.cache_)
-	{
-	  uint64_t access = memory_.cache_->accessCount() - bbCacheAccess_;
-	  uint64_t hit = memory_.cache_->hitCount() - bbCacheHit_;
-	  basicBlocks_[bbPc_].access_ += access;
-	  basicBlocks_[bbPc_].hit_ += hit;
-	  bbCacheAccess_ = memory_.cache_->accessCount();
-	  bbCacheHit_ = memory_.cache_->hitCount();
-	}
       bbPc_ = pc_;
     }
   else
@@ -4321,15 +4286,6 @@ Hart<URV>::countBasicBlocks(const DecodedInst* di)
       if (iter != basicBlocks_.end())
 	{
 	  iter->second.count_++;
-	  if (memory_.cache_)
-	    {
-	      uint64_t access = memory_.cache_->accessCount() - bbCacheAccess_;
-	      uint64_t hit = memory_.cache_->hitCount() - bbCacheHit_;
-	      basicBlocks_[bbPc_].access_ += access;
-	      basicBlocks_[bbPc_].hit_ += hit;
-	      bbCacheAccess_ = memory_.cache_->accessCount();
-	      bbCacheHit_ = memory_.cache_->hitCount();
-	    }
 	  bbPc_ = pc_;
 	}
       else
