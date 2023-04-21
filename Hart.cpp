@@ -4382,20 +4382,19 @@ Hart<URV>::traceBranch(const DecodedInst* di)
   bool hasTrap = hasInterrupt_ or hasException_;
   if (not hasTrap)
     {
-      char type = lastBranchTaken_ ? 't' : 'n';  // For conditinoal branch.
+      std::string_view type = lastBranchTaken_ ? "t" : "n";  // For conditinoal branch.
       if (not di->isConditionalBranch())
 	{
+	  bool indirect = di->isBranchToRegister();
 	  if (di->op0() == 1 or di->op0() == 5)
-	    type = 'c';  // call
+	    type = indirect ? "ic" : "c";  // call
 	  else if (di->operandCount() >= 2 and (di->op1() == 1 or di->op1() == 5))
-	    type = 'r';  // return
-	  else if (di->isBranchToRegister())
-	    type = 'i';  // indirect
+	    type = "r";  // return
 	  else
-	    type = 'j';  // jump
+	    type = indirect? "ij" : "j";    // indirect-jump or jump.
 	}
 
-      fprintf(branchTraceFile_, "%c;0x%jx;0x%jx\n", type, uintmax_t(currPc_), uintmax_t(pc_));
+      fprintf(branchTraceFile_, "%s 0x%jx 0x%jx\n", type.data(), uintmax_t(currPc_), uintmax_t(pc_));
     }
 }
 
