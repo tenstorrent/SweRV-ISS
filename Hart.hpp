@@ -16,6 +16,7 @@
 #pragma once
 
 #include <cstdint>
+#include <bitset>
 #include <vector>
 #include <iosfwd>
 #include <unordered_set>
@@ -827,124 +828,132 @@ namespace WdRiscv
     /// disabled all the instructions in zba extension result in an
     /// illegal instruction exception.
     void enableRvzba(bool flag)
-    { rvzba_ = flag; }
+    { enableExtension(RvExtension::Zba, flag); }
 
     /// Enable/disable the f (floating point) extension.
     void enableRvf(bool flag);
 
     /// Enable/disable the d (double-precision floating point) extension.
     void enableRvd(bool flag)
-    { rvd_ = flag; }
+    { enableExtension(RvExtension::D, flag); }
 
     /// Enable/disable the zbb (bit manipulation base) extension. When
     /// disabled all the instructions in zbb extension result in an
     /// illegal instruction exception.
     void enableRvzbb(bool flag)
-    { rvzbb_ = flag; }
+    { enableExtension(RvExtension::Zbb, flag); }
 
     /// Enable/disable the zbc (bit manipulation carryless multiply)
     /// extension. When disabled all the instructions in zbc extension
     /// result in an illegal instruction exception.
     void enableRvzbc(bool flag)
-    { rvzbc_ = flag; }
+    { enableExtension(RvExtension::Zbc, flag); }
 
     /// Enable/disable the zbe (bit manipulation) extension. When
     /// disabled all the instructions in zbe extension result in an
     /// illegal instruction exception.
     void enableRvzbe(bool flag)
-    { rvzbe_ = flag; }
+    { enableExtension(RvExtension::Zbe, flag); }
 
     /// Enable/disable the zbf (bit manipulation) extension. When
     /// disabled all the instructions in zbf extension result in an
     /// illegal instruction exception.
     void enableRvzbf(bool flag)
-    { rvzbf_ = flag; }
+    { enableExtension(RvExtension::Zbf, flag); }
 
     /// Enable/disable the zbm (bit manipulation matrix)
     /// extension. When disabled all the instructions in zbm extension
     /// result in an illegal instruction exception.
     void enableRvzbm(bool flag)
-    { rvzbm_ = flag; }
+    { enableExtension(RvExtension::Zbm, flag); }
 
     /// Enable/disable the zbp (bit manipulation permutation)
     /// extension. When disabled all the instructions in zbp extension
     /// result in an illegal instruction exception.
     void enableRvzbp(bool flag)
-    { rvzbp_ = flag; }
+    { enableExtension(RvExtension::Zbp, flag); }
 
     /// Enable/disable the zbr (bit manipulation crc)
     /// extension. When disbaled all the instructions in zbr extension
     /// result in an illegal instruction exception.
     void enableRvzbr(bool flag)
-    { rvzbr_ = flag; }
+    { enableExtension(RvExtension::Zbr, flag); }
 
     /// Enable/disable the zbs (bit manipulation single)
     /// extension. When disabled all the instructions in zbs extension
     /// result in an illegal instruction exception.
     void enableRvzbs(bool flag)
-    { rvzbs_ = flag; }
+    { enableExtension(RvExtension::Zbs, flag); }
 
     /// Enable/disable the zbt (bit manipulation ternary)
     /// extension. When disabled all the instructions in zbt extension
     /// result in an illegal instruction exception.
     void enableRvzbt(bool flag)
-    { rvzbt_ = flag; }
+    { enableExtension(RvExtension::Zbt, flag); }
 
     /// Enable/disable the half-precision floating point extension.
     void enableRvzfh(bool flag)
-    { rvzfh_ = flag; }
+    { enableExtension(RvExtension::Zfh, flag); }
 
     /// Enable/disable the minimal half-precision floating point extension.
     void enableRvzfhmin(bool flag)
-    { rvzfhmin_ = flag; }
+    { enableExtension(RvExtension::Zfhmin, flag); }
 
     /// Enable/disable the crypto zknd (nist decryption) extension.
     void enableRvzknd(bool flag)
-    { rvzknd_ = flag; }
+    { enableExtension(RvExtension::Zknd, flag); }
 
     /// Enable/disable the crypto zkne (nist encryption) extension.
     void enableRvzkne(bool flag)
-    { rvzkne_ = flag; }
+    { enableExtension(RvExtension::Zkne, flag); }
 
     /// Enable/disable the crypto zknh (nist hash) extension.
     void enableRvzknh(bool flag)
-    { rvzknh_ = flag; }
+    { enableExtension(RvExtension::Zknh, flag); }
 
     /// Enable/disable the crypto zbkb (crypto bit manip) extension.
     void enableRvzbkb(bool flag)
-    { rvzbkb_ = flag; }
+    { enableExtension(RvExtension::Zbkb, flag); }
 
     /// Enable/disable the crypto zbkx (crypto bit manip) extension.
     void enableRvzbkx(bool flag)
-    { rvzbkx_ = flag; }
+    { enableExtension(RvExtension::Zbkx, flag); }
 
     /// Enable/disable the crypto zksed (sm4 block cipher) extension.
     void enableRvzksed(bool flag)
-    { rvzksed_ = flag; }
+    { enableExtension(RvExtension::Zksed, flag); }
 
     /// Enable/disable the crypto zksed (sm3 block hash) extension.
     void enableRvzksh(bool flag)
-    { rvzksh_ = flag; }
+    { enableExtension(RvExtension::Zksh, flag); }
 
     /// Enable/disable the svinval (TLB invalidation) extension.
     void enableRvsvinval(bool flag)
-    { rvsvinval_ = flag; }
+    { enableExtension(RvExtension::Svinval, flag); }
 
     /// Enable/disable the zicbom (cache block management) extension.
     void enableRvzicbom(bool flag)
-    { rvzicbom_ = flag; }
+    { enableExtension(RvExtension::Zicbom, flag); }
 
     /// Enable/disable the zicboz (cache block zero) extension.
     void enableRvzicboz(bool flag)
-    { rvzicboz_ = flag; }
+    { enableExtension(RvExtension::Zicboz, flag); }
 
     /// Enable/disable the zawrs (wait reservation store) extension.
     void enableRvzawrs(bool flag)
-    { rvzawrs_ = flag; }
+    { enableExtension(RvExtension::Zawrs, flag); }
 
     /// Enable/disable the zmmul (multiply) extension.
     void enableRvzmmul(bool flag)
-    { rvzmmul_ = flag; }
+    { enableExtension(RvExtension::Zmmul, flag); }
+
+    /// Enable/disable the half-precision floating point vector extension.
+    void enableRvzvfh(bool flag)
+    { enableExtension(RvExtension::Zvfh, flag); }
+
+    /// Enable/disable the minimal half-precision floating point vector extension.
+    void enableRvzvfhmin(bool flag)
+    { enableExtension(RvExtension::Zvfhmin, flag); }
 
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
@@ -1065,74 +1074,74 @@ namespace WdRiscv
     /// Return true if rv32f (single precision floating point)
     /// extension is enabled in this hart.
     bool isRvf() const
-    { return rvf_; }
+    { return extensionIsEnabled(RvExtension::F); }
 
     /// Return true if the half-precision floating point extension is
     /// enabled.
     bool isRvzfh() const
-    { return rvzfh_; }
+    { return extensionIsEnabled(RvExtension::Zfh); }
 
     /// Return true if the minimal half-precision floating point
     /// extension is enabled.
     bool isRvzfhmin() const
-    { return rvzfhmin_; }
+    { return extensionIsEnabled(RvExtension::Zfhmin); }
 
     /// Return true if rv64d (double precision floating point)
     /// extension is enabled in this hart.
     bool isRvd() const
-    { return rvd_; }
+    { return extensionIsEnabled(RvExtension::D); }
 
     /// Return true if the zknd extension (crypto nist decryption) is enabled.
     bool isRvzknd() const
-    { return rvzknd_; }
+    { return extensionIsEnabled(RvExtension::Zknd); }
 
     /// Return true if the zkne extension (crypto nist encryption) is enabled.
     bool isRvzkne() const
-    { return rvzkne_; }
+    { return extensionIsEnabled(RvExtension::Zkne); }
 
     /// Return true if the zksed extension (crypto sm4 block cipher) is enabled.
     bool isRvzksed() const
-    { return rvzksed_; }
+    { return extensionIsEnabled(RvExtension::Zksed); }
 
     /// Return true if the zksh extension (crypto sm3 block hash) is enabled.
     bool isRvzksh() const
-    { return rvzksh_; }
+    { return extensionIsEnabled(RvExtension::Zksh); }
 
     /// Return true if the zknh extension (crypto nist hash) is enabled.
     bool isRvzknh() const
-    { return rvzknh_; }
+    { return extensionIsEnabled(RvExtension::Zknh); }
 
     /// Return true if the zbkb extension (crypto bit manip) is enabled.
     bool isRvzbkb() const
-    { return rvzbkb_; }
+    { return extensionIsEnabled(RvExtension::Zbkb); }
 
     /// Return true if the zbkb extension (crypto bit manip) is enabled.
     bool isRvzbkx() const
-    { return rvzbkx_; }
+    { return extensionIsEnabled(RvExtension::Zbkx); }
 
     /// Return true if the svinval extension (TLB invalidate) is enabled.
     bool isRvsvinval() const
-    { return rvsvinval_; }
+    { return extensionIsEnabled(RvExtension::Svinval); }
 
     /// Return true if the zicbom extension (cache block management) is enabled.
     bool isRvzicbom() const
-    { return rvzicbom_; }
+    { return extensionIsEnabled(RvExtension::Zicbom); }
 
     /// Return true if the zicboz extension (cache block zero) is enabled.
     bool isRvzicboz() const
-    { return rvzicboz_; }
+    { return extensionIsEnabled(RvExtension::Zicboz); }
 
     /// Return true if the zawrs extension (wait reservation store) is enabled.
     bool isRvzawrs() const
-    { return rvzawrs_; }
+    { return extensionIsEnabled(RvExtension::Zawrs); }
 
     /// Return true if the zmmul extension (multiply) is enabled.
     bool isRvzmmul() const
-    { return rvzmmul_; }
+    { return extensionIsEnabled(RvExtension::Zmmul); }
 
     /// Return true if rv64e (embedded) extension is enabled in this hart.
     bool isRve() const
-    { return rve_; }
+    { return extensionIsEnabled(RvExtension::E); }
 
     /// Return true if rv64 (64-bit option) extension is enabled in
     /// this hart.
@@ -1142,83 +1151,93 @@ namespace WdRiscv
     /// Return true if rvm (multiply/divide) extension is enabled in
     /// this hart.
     bool isRvm() const
-    { return rvm_; }
+    { return extensionIsEnabled(RvExtension::M); }
 
     /// Return true if rvc (compression) extension is enabled in this
     /// hart.
     bool isRvc() const
-    { return rvc_; }
+    { return extensionIsEnabled(RvExtension::C); }
 
     /// Return true if rva (atomic) extension is enabled in this hart.
     bool isRva() const
-    { return rva_; }
+    { return extensionIsEnabled(RvExtension::A); }
 
     /// Return true if rvb (bit-manup) extension is enabled in this hart.
     bool isRvb() const
-    { return rvb_; }
+    { return extensionIsEnabled(RvExtension::B); }
 
     /// Return true if rvs (supervisor-mode) extension is enabled in this
     /// hart.
     bool isRvs() const
-    { return rvs_; }
+    { return extensionIsEnabled(RvExtension::S); }
 
     /// Return true if rvh (hupervisor) extension is enabled in this hart.
     bool isRvh() const
-    { return rvh_; }
+    { return extensionIsEnabled(RvExtension::H); }
 
     /// Return true if rvu (user-mode) extension is enabled in this
     /// hart.
     bool isRvu() const
-    { return rvu_; }
+    { return extensionIsEnabled(RvExtension::U); }
 
     /// Return true if rvv (vector) extension is enabled in this hart.
     bool isRvv() const
-    { return rvv_; }
+    { return extensionIsEnabled(RvExtension::V); }
 
     /// Return true if rvn (user-mode-interrupt) extension is enabled
     /// in this hart.
     bool isRvn() const
-    { return rvn_; }
+    { return extensionIsEnabled(RvExtension::N); }
 
     /// Return true if zba extension is enabled in this hart.
     bool isRvzba() const
-    { return rvzba_; }
+    { return extensionIsEnabled(RvExtension::Zba); }
 
     /// Return true if zbb extension is enabled in this hart.
     bool isRvzbb() const
-    { return rvzbb_; }
+    { return extensionIsEnabled(RvExtension::Zbb); }
 
     /// Return true if zbc extension is enabled in this hart.
     bool isRvzbc() const
-    { return rvzbc_; }
+    { return extensionIsEnabled(RvExtension::Zbc); }
 
     /// Return true if zbe extension is enabled in this hart.
     bool isRvzbe() const
-    { return rvzbe_; }
+    { return extensionIsEnabled(RvExtension::Zbe); }
 
     /// Return true if zbf extension is enabled in this hart.
     bool isRvzbf() const
-    { return rvzbf_; }
+    { return extensionIsEnabled(RvExtension::Zbf); }
 
     /// Return true if zbm extension is enabled in this hart.
     bool isRvzbm() const
-    { return rvzbm_; }
+    { return extensionIsEnabled(RvExtension::Zbm); }
 
     /// Return true if zbp extension is enabled in this hart.
     bool isRvzbp() const
-    { return rvzbp_; }
+    { return extensionIsEnabled(RvExtension::Zbp); }
 
     /// Return true if zbr extension is enabled in this hart.
     bool isRvzbr() const
-    { return rvzbr_; }
+    { return extensionIsEnabled(RvExtension::Zbr); }
 
     /// Return true if zbs extension is enabled in this hart.
     bool isRvzbs() const
-    { return rvzbs_; }
+    { return extensionIsEnabled(RvExtension::Zbs); }
 
     /// Return true if zbt extension is enabled in this hart.
     bool isRvzbt() const
-    { return rvzbt_; }
+    { return extensionIsEnabled(RvExtension::Zbt); }
+
+    /// Return true if the half-precision vector floating point
+    /// extension is enabled.
+    bool isRvzvfh() const
+    { return extensionIsEnabled(RvExtension::Zvfh); }
+
+    /// Return true if the minimal half-precision vector floating
+    /// point extension is enabled.
+    bool isRvzvfhmin() const
+    { return extensionIsEnabled(RvExtension::Zvfhmin); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
@@ -1322,14 +1341,14 @@ namespace WdRiscv
 
     /// Enable user mode.
     void enableUserMode(bool flag)
-    { rvu_ = flag; csRegs_.enableUserMode(flag); }
+    { enableExtension(RvExtension::U, flag); csRegs_.enableUserMode(flag); }
 
     /// Enable supervisor mode.
     void enableSupervisorMode(bool flag)
-    { rvs_ = flag; csRegs_.enableSupervisorMode(flag); }
+    { enableExtension(RvExtension::S, flag); csRegs_.enableSupervisorMode(flag); }
 
     void enableHypervisorMode(bool flag)
-    { rvh_ = flag; csRegs_.enableHypervisorMode(flag); }
+    { enableExtension(RvExtension::H, flag); csRegs_.enableHypervisorMode(flag); }
 
     /// Enable supervisor mode.
     void enableVectorMode(bool flag);
@@ -1748,7 +1767,19 @@ namespace WdRiscv
     // extensions must be enabled and FS feild of MSTATUS must not be
     // OFF.
     bool isZfhminLegal() const
-    { return isRvf() and isRvzfhmin() and isFpEnabled(); }
+    { return isRvf() and (isRvzfhmin() or isRvzfh()) and isFpEnabled(); }
+
+    // Return true if it is legal to execute a zvfh instruction: f, v,
+    // and zvfh extensions must be enabled and FS field of MSTATUS must
+    // not be OFF.
+    bool isZvfhLegal() const
+    { return isRvf() and isRvv() and isRvzvfh() and isFpEnabled(); }
+
+    // Return true if it is legal to execute a zfhmin instruction: f,
+    // v, and zvfhmin extensions must be enabled and FS field of
+    // MSTATUS must not be OFF.
+    bool isZvfhminLegal() const
+    { return isRvf() and isRvv() and (isRvzvfhmin() or isRvzvfh()) and isFpEnabled(); }
 
     // Return true if it is legal to execute an FP instruction: F extension must
     // be enabled and FS field of MSTATUS must not be OFF.
@@ -2319,7 +2350,8 @@ namespace WdRiscv
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
     // otherwise.
-    bool checkFpMaskableInst(const DecodedInst* di, bool wide = false);
+    bool checkFpMaskableInst(const DecodedInst* di, bool wide = false,
+                             bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
     // Return true if vector operands are mutliples of the given group
     // multiplier (scaled by 8). Return false initiating an illegal instruction
@@ -4258,6 +4290,15 @@ namespace WdRiscv
 
   private:
 
+    constexpr bool extensionIsEnabled(RvExtension ext) const
+    {
+      return ext_enabled_.test(static_cast<std::size_t>(ext));
+    }
+    constexpr void enableExtension(RvExtension ext, bool isEnabled)
+    {
+      ext_enabled_.set(static_cast<std::size_t>(ext), isEnabled);
+    }
+
     unsigned hartIx_ = 0;        // Hart ix in system, see sysHartIndex method.
     Memory& memory_;
     IntRegs<URV> intRegs_;       // Integer register file.
@@ -4272,42 +4313,8 @@ namespace WdRiscv
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
 
     bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
-    bool rva_ = false;           // True if extension A (atomic) enabled.
-    bool rvb_ = false;           // True if extension B (bit-manip) enabled.
-    bool rvc_ = true;            // True if extension C (compressed) enabled.
-    bool rvd_ = false;           // True if extension D (double fp) enabled.
-    bool rve_ = false;           // True if extension E (embedded) enabled.
-    bool rvf_ = false;           // True if extension F (single fp) enabled.
-    bool rvzfh_ = false;         // True if extension zfh (half fp) enabled.
-    bool rvzfhmin_ = false;      // True if extension zfhmin (minimal half fp) enabled.
-    bool rvh_ = false;           // True if extension H (hupervisor) enabled.
-    bool rvm_ = true;            // True if extension M (mul/div) enabled.
-    bool rvs_ = false;           // True if extension S (supervisor-mode) enabled.
-    bool rvu_ = false;           // True if extension U (user-mode) enabled.
-    bool rvv_ = false;           // True if extension V (vector) enabled.
-    bool rvn_ = false;           // True if extension N (user-mode-interrupt) enabled.
-    bool rvzba_ = false;         // True if extension zba enabled.
-    bool rvzbb_ = false;         // True if extension zbb enabled.
-    bool rvzbc_ = false;         // True if extension zbc enabled.
-    bool rvzbe_ = false;         // True if extension zbe enabled.
-    bool rvzbf_ = false;         // True if extension zbf enabled.
-    bool rvzbm_ = false;         // True if extension zbm enabled.
-    bool rvzbp_ = false;         // True if extension zbp enabled.
-    bool rvzbr_ = false;         // True if extension zbr enabled.
-    bool rvzbs_ = false;         // True if extension zbs enabled.
-    bool rvzbt_ = false;         // True if extension zbt enabled.
-    bool rvzknd_ = false;        // True if extension zknd (crypto) enabled.
-    bool rvzkne_ = false;        // True if extension zkne (crypto) enabled.
-    bool rvzknh_ = false;        // True if extension zknh (crypto) enabled.
-    bool rvzbkb_ = false;        // True if extension zbkb (ctypto) enabled.
-    bool rvzbkx_ = false;        // True if extension zbkx (ctypto) enabled.
-    bool rvzksed_ = false;       // True if extension zknsed (crypto) enabled.
-    bool rvzksh_ = false;        // True if extension zknsh (crypto) enabled.
-    bool rvsvinval_ = false;     // True if extension svinval (TLB invalidate) enabled.
-    bool rvzicbom_ = false;      // True if extension zicbom (cache block management) enabled.
-    bool rvzicboz_ = false;      // True if extension zicboz (cache block zero) enabled.
-    bool rvzawrs_ = false;       // True if extension zawrs (wait reservation store) enabled.
-    bool rvzmmul_ = false;       // True if extension zmmul (multply) enabled.
+    std::bitset<static_cast<size_t>(RvExtension::None)> ext_enabled_;
+
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
     URV currPc_ = 0;             // Addr instr being executed (pc_ before fetch).
     URV resetPc_ = 0;            // Pc to use on reset.

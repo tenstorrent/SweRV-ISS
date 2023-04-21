@@ -98,6 +98,13 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
     virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16),
     isa_()
 {
+  // Enable default extensions
+  for (RvExtension ext : { RvExtension::C,
+                           RvExtension::M })
+    {
+      enableExtension(ext, true);
+    }
+
   decodeCacheSize_ = 128*1024;  // Must be a power of 2.
   decodeCacheMask_ = decodeCacheSize_ - 1;
   decodeCache_.resize(decodeCacheSize_);
@@ -263,11 +270,15 @@ Hart<URV>::processExtensions(bool verbose)
   flag = value & (URV(1) << ('h' - 'a'));  // Hypervisor.
   enableHypervisorMode(flag);
 
-  rva_ = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
-  rvb_ = (value & 2) and isa_.isEnabled(RvExtension::B);   // Bit-manip
+  flag = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
+  enableExtension(RvExtension::A, flag);
 
-  rvc_ = (value & (URV(1) << ('c' - 'a')));  // Compress option.
-  rvc_ = rvc_ and isa_.isEnabled(RvExtension::C);
+  flag = (value & 2) and isa_.isEnabled(RvExtension::B);   // Bit-manip
+  enableExtension(RvExtension::B, flag);
+
+  flag = (value & (URV(1) << ('c' - 'a')));  // Compress option.
+  flag = flag and isa_.isEnabled(RvExtension::C);
+  enableExtension(RvExtension::C, flag);
 
   flag = value & (URV(1) << ('f' - 'a'));  // Single precision FP
   flag = flag and isa_.isEnabled(RvExtension::F);
@@ -276,7 +287,7 @@ Hart<URV>::processExtensions(bool verbose)
   // D requires F and is enabled only if F is enabled.
   flag = value & (URV(1) << ('d' - 'a'));  // Double precision FP
   flag = flag and isa_.isEnabled(RvExtension::D);
-  if (flag and not rvf_)
+  if (flag and not extensionIsEnabled(RvExtension::F))
     {
       flag = false;
       if (verbose and hartIx_ == 0)
@@ -285,21 +296,23 @@ Hart<URV>::processExtensions(bool verbose)
     }
   enableRvd(flag);
 
-  rve_ = value & (URV(1) << ('e' - 'a'));
-  rve_ = rve_ and isa_.isEnabled(RvExtension::E);
-  if (rve_)
+  flag = value & (URV(1) << ('e' - 'a'));
+  flag = flag and isa_.isEnabled(RvExtension::E);
+  if (flag)
     intRegs_.regs_.resize(16);
+  enableExtension(RvExtension::E, flag);
 
   flag = value & (URV(1) << ('i' - 'a'));
-  if (not flag and not rve_ and verbose and hartIx_ == 0)
+  if (not flag and not extensionIsEnabled(RvExtension::E) and verbose and hartIx_ == 0)
     std::cerr << "Bit 8 (i extension) is cleared in the MISA register "
 	      << " but extension is mandatory -- assuming bit 8 set\n";
 
-  rvm_ = value & (URV(1) << ('m' - 'a'));
-  rvm_ = rvm_ and isa_.isEnabled(RvExtension::M);
+  flag = value & (URV(1) << ('m' - 'a'));
+  flag = flag and isa_.isEnabled(RvExtension::M);
+  enableExtension(RvExtension::M, flag);
 
   flag = value & (URV(1) << ('v' - 'a'));  // User-mode option.
-  if (flag and not (rvf_ and rvd_))
+  if (flag and not (extensionIsEnabled(RvExtension::F) and extensionIsEnabled(RvExtension::D)))
     {
       flag = false;
       if (verbose and hartIx_ == 0)
@@ -309,7 +322,7 @@ Hart<URV>::processExtensions(bool verbose)
   flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorMode(flag);
 
-  URV epcMask = rvc_? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
+  URV epcMask = extensionIsEnabled(RvExtension::C)? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
   auto epc = csRegs_.findCsr(CsrNumber::MEPC);
   if (epc)
     epc->setReadMask(epcMask);
@@ -359,8 +372,12 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicboz(true);
   if (isa_.isEnabled(RvExtension::Zawrs))
     enableRvzawrs(true);
-  if (rvm_ or isa_.isEnabled(RvExtension::Zmmul))
+  if (extensionIsEnabled(RvExtension::M) or isa_.isEnabled(RvExtension::Zmmul))
     enableRvzmmul(true);
+  if (isa_.isEnabled(RvExtension::Zvfh))
+    enableRvzvfh(true);
+  if (isa_.isEnabled(RvExtension::Zvfhmin))
+    enableRvzvfhmin(true);
 }
 
 
