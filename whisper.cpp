@@ -1539,15 +1539,16 @@ snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
   for (size_t ix = 0; true; ++ix)
     {
       uint64_t nextLimit = globalLimit;
-      if (not periods.empty())
-	{
-	  uint64_t delta = ix < periods.size() ? periods.at(ix) : periods.back();
-	  nextLimit = hart.getInstructionCount() + delta;
-	}
+      if (ix < periods.size())
+        nextLimit = (periods.size() == 1) ? hart.getInstructionCount() + periods.at(0)
+                                          : periods.at(ix);
+
       nextLimit = std::min(nextLimit, globalLimit);
       hart.setInstructionCountLimit(nextLimit);
-
-      std::string pathStr = snapDir + std::to_string(ix);
+      uint64_t tag = ix;
+      if (periods.size() > 1)
+	tag = ix < periods.size() ? periods.at(ix) : nextLimit;
+      std::string pathStr = snapDir + std::to_string(tag);
       Filesystem::path path = pathStr;
       if (not Filesystem::is_directory(path) and not Filesystem::create_directories(path))
 	{
