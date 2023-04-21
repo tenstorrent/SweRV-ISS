@@ -1286,10 +1286,17 @@ runServerShm(System<URV>& system, const std::string& serverFile,
       ok = false;
     }
 
-  close(fd);
   if (munmap(shm, 4096) < 0)
     {
       perror("Failed to unmap");
+      return false;
+    }
+
+  close(fd);
+
+  if (shm_unlink(path.c_str()) < 0)
+    {
+      perror("Failed shm unlink");
       return false;
     }
   return ok;
