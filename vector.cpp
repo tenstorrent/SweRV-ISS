@@ -15544,10 +15544,7 @@ void
 Hart<URV>::execVsssege8_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
@@ -15562,10 +15559,7 @@ void
 Hart<URV>::execVsssege16_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
@@ -15580,10 +15574,7 @@ void
 Hart<URV>::execVsssege32_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
@@ -15598,10 +15589,7 @@ void
 Hart<URV>::execVsssege64_v(const DecodedInst* di)
 {
   if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    {
-      illegalInst(di);
-      return;
-    }
+    return;
 
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
