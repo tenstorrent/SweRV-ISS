@@ -252,11 +252,13 @@ namespace WdRiscv
     bool isDivide() const
     { return entry_ and entry_->isDivide(); }
 
-    /// Return true if this is a load instruction.
+    /// Return true if this is a load instruction. This includes
+    /// floating point load and load-reserve but not AMOs.
     bool isLoad() const
     { return entry_ and entry_->isLoad(); }
 
-    /// Return true if this is a store instruction.
+    /// Return true if this is a store instruction. This includes
+    /// floating point store and store-conditional but not AMOs.
     bool isStore() const
     { return entry_ and entry_->isStore(); }
 
