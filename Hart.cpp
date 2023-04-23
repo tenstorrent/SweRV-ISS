@@ -10162,6 +10162,12 @@ template <typename URV>
 void
 Hart<URV>::execWfi(const DecodedInst* di)
 {
+  if (privilegeMode() == PrivilegeMode::User and isRvs())
+    {
+      illegalInst(di);
+      return;
+    }
+
   if (mstatus_.bits_.TW and privilegeMode() != PrivilegeMode::Machine)
     {
       illegalInst(di);
