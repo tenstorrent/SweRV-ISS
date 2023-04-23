@@ -44,6 +44,7 @@ namespace WdRiscv
       S_EXTERNAL   = 9,  // Supervisor external
       VS_EXTERNAL  = 10, // Virtual supervisor external
       M_EXTERNAL   = 11, // Machine external
+      G_EXTERNAL   = 12, // Guest external interrupt
       M_INT_TIMER1 = 28, // Internal timer 1 (WD extension) bit position.
       M_INT_TIMER0 = 29, // Internal timer 0 (WD extension) bit position.
       M_LOCAL      = 30, // Correctable error local interrupt (WD extension)

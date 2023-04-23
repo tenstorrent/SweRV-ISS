@@ -4551,7 +4551,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 
   if (isRvh())
     {
-      for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
 	  bool delegated = true;
