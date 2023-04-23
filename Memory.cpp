@@ -70,9 +70,6 @@ Memory::~Memory()
       data_ = nullptr;
     }
 
-  delete cache_;
-  cache_ = nullptr;
-
   if (not dataLineFile_.empty())
     saveDataAddressTrace(dataLineFile_);
 
@@ -958,24 +955,6 @@ Memory::loadSnapshot(const std::string & filename,
 
 
 bool
-Memory::saveCacheSnapshot(const std::string& path)
-{
-  if (not cache_)
-    return true;
-  return cache_->saveSnapshot(path);
-}
-
-
-bool
-Memory::loadCacheSnapshot(const std::string& path)
-{
-  if (not cache_)
-    return true;
-  return cache_->loadSnapshot(path);
-}
-
-
-bool
 Memory::saveAddressTrace(const std::string& tag,
 			 const std::unordered_map<uint64_t, uint64_t>& lineMap,
 			 const std::string& path) const
@@ -1118,80 +1097,3 @@ Memory::defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask)
 
   return true;
 }
-
-
-bool
-Memory::configureCache(uint64_t size, unsigned lineSize, unsigned setSize)
-{
-  delete cache_;
-  cache_ = nullptr;
-
-  if (size == 0)
-    {
-      std::cerr << "Bad cache size: " << size << '\n';
-      return false;
-    }
-  if (not isPowerOf2(size))
-    {
-      std::cerr << "Cache size not a power of 2: " << size << '\n';
-      return false;
-    }
-  if (size > 128L*1024L*1024L)
-    {
-      std::cerr << "Cache size too large: " << size << '\n';
-      return false;
-    }
-
-  if (setSize == 0)
-    {
-      std::cerr << "Bad cache associativity: " << setSize << '\n';
-      return false;
-    }
-  if (not isPowerOf2(setSize))
-    {
-      std::cerr << "Cache associtivy is not a power of 2: " << setSize << '\n';
-      return false;
-    }
-  if (setSize > 64)
-    {
-      std::cerr << "Cache associativity too large: " << setSize << '\n';
-      return false;
-    }
-
-  if (lineSize == 0)
-    {
-      std::cerr << "Bad cache line size: " << lineSize << '\n';
-      return false;
-    }
-  if (not isPowerOf2(lineSize))
-    {
-      std::cerr << "Cache line size is not a power of 2: " << lineSize << '\n';
-      return false;
-    }
-  if (lineSize > 1024)
-    {
-      std::cerr << "Cache line size too large: " << lineSize << '\n';
-      return false;
-    }
-
-  cache_ = new Cache(size, lineSize, setSize);
-  return true;
-}
-
-
-void
-Memory::deleteCache()
-{
-  delete cache_;
-  cache_ = nullptr;
-}
-
-
-void
-Memory::getCacheLineAddresses(std::vector<uint64_t>& addresses)
-{
-  addresses.clear();
-  if (cache_)
-    cache_->getLineAddresses(addresses);
-}
-

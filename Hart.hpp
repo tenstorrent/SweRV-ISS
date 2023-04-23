@@ -1409,11 +1409,6 @@ namespace WdRiscv
     /// Delete currently configured cache.
     void deleteCache();
 
-    /// Fill given vector (cleared on entry) with the addresses of the
-    /// lines currently in the cache sorted in decreasing age (oldest
-    /// one first).
-    void getCacheLineAddresses(std::vector<uint64_t>& addresses);
-
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
     { virtMem_.setTlbSize(size); }

@@ -190,31 +190,6 @@ Hart<URV>::getImplementedCsrs(std::vector<CsrNumber>& vec) const
 
 
 template <typename URV>
-bool
-Hart<URV>::configureCache(uint64_t size, unsigned lineSize,
-                          unsigned setSize)
-{
-  return memory_.configureCache(size, lineSize, setSize);
-}
-
-
-template <typename URV>
-void
-Hart<URV>::deleteCache()
-{
-  memory_.deleteCache();
-}
-
-
-template <typename URV>
-void
-Hart<URV>::getCacheLineAddresses(std::vector<uint64_t>& addresses)
-{
-  memory_.getCacheLineAddresses(addresses);
-}
-
-
-template <typename URV>
 unsigned
 Hart<URV>::countImplementedPmpRegisters() const
 {
@@ -4303,16 +4278,6 @@ Hart<URV>::countBasicBlocks(const DecodedInst* di)
     {
       auto& blockStat = basicBlocks_[pc_];
       blockStat.count_++;
-
-      if (memory_.cache_)
-	{
-	  uint64_t access = memory_.cache_->accessCount() - bbCacheAccess_;
-	  uint64_t hit = memory_.cache_->hitCount() - bbCacheHit_;
-	  basicBlocks_[bbPc_].access_ += access;
-	  basicBlocks_[bbPc_].hit_ += hit;
-	  bbCacheAccess_ = memory_.cache_->accessCount();
-	  bbCacheHit_ = memory_.cache_->hitCount();
-	}
       bbPc_ = pc_;
     }
   else
@@ -4321,15 +4286,6 @@ Hart<URV>::countBasicBlocks(const DecodedInst* di)
       if (iter != basicBlocks_.end())
 	{
 	  iter->second.count_++;
-	  if (memory_.cache_)
-	    {
-	      uint64_t access = memory_.cache_->accessCount() - bbCacheAccess_;
-	      uint64_t hit = memory_.cache_->hitCount() - bbCacheHit_;
-	      basicBlocks_[bbPc_].access_ += access;
-	      basicBlocks_[bbPc_].hit_ += hit;
-	      bbCacheAccess_ = memory_.cache_->accessCount();
-	      bbCacheHit_ = memory_.cache_->hitCount();
-	    }
 	  bbPc_ = pc_;
 	}
       else
@@ -4426,20 +4382,19 @@ Hart<URV>::traceBranch(const DecodedInst* di)
   bool hasTrap = hasInterrupt_ or hasException_;
   if (not hasTrap)
     {
-      char type = lastBranchTaken_ ? 't' : 'n';  // For conditinoal branch.
+      std::string_view type = lastBranchTaken_ ? "t" : "n";  // For conditinoal branch.
       if (not di->isConditionalBranch())
 	{
+	  bool indirect = di->isBranchToRegister();
 	  if (di->op0() == 1 or di->op0() == 5)
-	    type = 'c';  // call
+	    type = indirect ? "ic" : "c";  // call
 	  else if (di->operandCount() >= 2 and (di->op1() == 1 or di->op1() == 5))
-	    type = 'r';  // return
-	  else if (di->isBranchToRegister())
-	    type = 'i';  // indirect
+	    type = "r";  // return
 	  else
-	    type = 'j';  // jump
+	    type = indirect? "ij" : "j";    // indirect-jump or jump.
 	}
 
-      fprintf(branchTraceFile_, "%c;0x%jx;0x%jx\n", type, uintmax_t(currPc_), uintmax_t(pc_));
+      fprintf(branchTraceFile_, "%s 0x%jx 0x%jx\n", type.data(), uintmax_t(currPc_), uintmax_t(pc_));
     }
 }
 

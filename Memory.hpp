@@ -22,7 +22,6 @@
 #include <type_traits>
 #include <cassert>
 #include "PmaManager.hpp"
-#include "Cache.hpp"
 #include "IoDevice.hpp"
 
 
@@ -121,14 +120,6 @@ namespace WdRiscv
       value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
 
-      if (cache_)
-	{
-	  cache_->insert(address);
-	  if (address & (sizeof(T) - 1))  // If misaligned
-	    if (cache_->getLineNumber(address) != cache_->getLineNumber(address + sizeof(T) - 1))
-	      cache_->insert(address + sizeof(T) - 1);
-	}
-
       if (dataLineTrace_)
 	traceDataLine(address);
 
@@ -161,8 +152,6 @@ namespace WdRiscv
           value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
 
-          // if (cache_)
-          //   cache_->insert(address);
 	  return true;
 	}
       return false;
@@ -280,13 +269,6 @@ namespace WdRiscv
   #endif
 
 #endif
-      if (cache_)
-	{
-	  cache_->insert(address);
-	  if (address & (sizeof(T) - 1))  // If misaligned
-	    if (cache_->getLineNumber(address) != cache_->getLineNumber(address + sizeof(T) - 1))
-	      cache_->insert(address + sizeof(T) - 1);
-	}
 
       lwd.size_ = sizeof(T);
       return true;
@@ -476,11 +458,6 @@ namespace WdRiscv
     /// Delete currently configured cache.
     void deleteCache();
 
-    /// Fill given vector (cleared on entry) with the addresses of the
-    /// lines currently in the cache sorted in decreasing age (oldest
-    /// one first).
-    void getCacheLineAddresses(std::vector<uint64_t>& addresses);
-
     /// Define read memory callback. This (along with
     /// defineWriteMemoryCallback) allows the caller to bypass the
     /// memory model with their own.
@@ -520,15 +497,6 @@ namespace WdRiscv
     /// true on success or false on failure
     bool loadSnapshot(const std::string& filename,
                       const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
-
-    /// Save tags of cache to the given file (sorted in descending
-    /// order by age) returning true on success and false on
-    /// failure. Return true if no cache is present.
-    bool saveCacheSnapshot(const std::string& path);
-
-    /// Load tags of cache from the given file returning true on success
-    /// and false on failure. Return true if no cache is present.
-    bool loadCacheSnapshot(const std::string& path);
 
     /// If address tracing enabled, then write the accumulated data
     /// addresses into the given file.
@@ -793,7 +761,6 @@ namespace WdRiscv
     std::vector<LastWriteData> lastWriteData_;
 
     PmaManager pmaMgr_;
-    Cache* cache_ = nullptr;
 
     // Support for line address traces
     bool dataLineTrace_ = false;

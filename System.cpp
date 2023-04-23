@@ -304,10 +304,6 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
   if (not syscall.saveMmap(mmapPath.string()))
     return false;
 
-  Filesystem::path cachePath = dirPath / "cache";
-  if (not memory_->saveCacheSnapshot(cachePath))
-    return false;
-
   Filesystem::path dtracePath = dirPath / "data-lines";
   if (not memory_->saveDataAddressTrace(dtracePath))
     return false;
@@ -377,11 +373,6 @@ System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
   Filesystem::path fdPath = dirPath / "fd";
   if (not syscall.loadFileDescriptors(fdPath.string()))
     return false;
-
-  Filesystem::path cachePath = dirPath / "cache";
-  if (Filesystem::is_regular_file(cachePath))
-    if (not memory_->loadCacheSnapshot(cachePath.string()))
-      return false;
 
   return true;
 }
