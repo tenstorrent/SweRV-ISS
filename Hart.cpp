@@ -10160,9 +10160,21 @@ Hart<URV>::execSret(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execWfi(const DecodedInst*)
+Hart<URV>::execWfi(const DecodedInst* di)
 {
-  return;   // Currently implemented as a no-op.
+  if (mstatus_.bits_.TW and privilegeMode() != PrivilegeMode::Machine)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (virtMode_ and mstatus_.bits_.TW and hstatus_.bits_.VTW)
+    {
+      virtualInst(di);
+      return;
+    }
+
+  return;   // No-op.
 }
 
 
