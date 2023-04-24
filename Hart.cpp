@@ -3722,6 +3722,7 @@ Hart<URV>::clearTraceData()
   virtMem_.clearPageTableWalk();
   pmpManager_.clearPmpTrace();
   lastBranchTaken_ = false;
+  misalignedLdSt_ = false;
 }
 
 
