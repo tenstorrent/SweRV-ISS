@@ -530,7 +530,7 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide,
     default:         ok = false;                  break;
     }
 
-  if (wide)
+  if (ok and wide)
     {
       switch (sew)
 	{
