@@ -4394,7 +4394,8 @@ Hart<URV>::traceBranch(const DecodedInst* di)
 	    type = indirect? "ij" : "j";    // indirect-jump or jump.
 	}
 
-      fprintf(branchTraceFile_, "%s 0x%jx 0x%jx\n", type.data(), uintmax_t(currPc_), uintmax_t(pc_));
+      fprintf(branchTraceFile_, "%s 0x%jx 0x%jx %d\n", type.data(),
+	      uintmax_t(currPc_), uintmax_t(pc_), di->instSize());
     }
 }
 
