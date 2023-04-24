@@ -4551,7 +4551,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 
   if (isRvh())
     {
-      for (InterruptCause ic : { IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
 	  bool delegated = true;
@@ -10160,9 +10160,27 @@ Hart<URV>::execSret(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execWfi(const DecodedInst*)
+Hart<URV>::execWfi(const DecodedInst* di)
 {
-  return;   // Currently implemented as a no-op.
+  if (privilegeMode() == PrivilegeMode::User and isRvs())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (mstatus_.bits_.TW and privilegeMode() != PrivilegeMode::Machine)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (virtMode_ and mstatus_.bits_.TW and hstatus_.bits_.VTW)
+    {
+      virtualInst(di);
+      return;
+    }
+
+  return;   // No-op.
 }
 
 
