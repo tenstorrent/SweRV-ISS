@@ -283,6 +283,12 @@ namespace WdRiscv
         }
     }
 
+    bool lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
+    { return hart_->lastLdStAddress(virtAddr, physAddr); }
+
+    bool misalignedLdSt(bool& misal) const
+    { return hart_->misalignedLdSt(misal); }
+
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
   };

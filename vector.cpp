@@ -5606,9 +5606,9 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
     return;
 
   if (hasDestSourceOverlap(vd, group, vs1, group) or
-      hasDestSourceOverlap(vd, group, vs2, 1) or di->isMasked())
+      hasDestSourceOverlap(vd, group, vs2, 1) or di->isMasked() or start > 0)
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap, must not be masked
+      illegalInst(di);  // Source/dest cannot overlap, must not be masked, 0 vstart.
       return;
     }
 
@@ -7035,7 +7035,7 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
-  if (elems == 0)
+  if (start >= elems)
     return;
 
   URV amount = 1;
@@ -7194,7 +7194,7 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
-  if (elems == 0)
+  if (start >= elems)
     return;
 
   URV amount = 1;

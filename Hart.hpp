@@ -765,6 +765,16 @@ namespace WdRiscv
     bool lastBranchTaken() const
     { return lastBranchTaken_; }
 
+    /// Return true if last instruction is a ld/st instruction, setting misal
+    /// to true if the memory access was misaligned
+    bool misalignedLdSt(bool& misal) const
+    {
+      if (ldStSize_ == 0)
+        return false;
+      misal = misalignedLdSt_;
+      return true;
+    }
+
     /// Read instruction at given address. Return true on success and
     /// false if address is out of memory bounds.
     bool readInst(uint64_t address, uint32_t& instr);
