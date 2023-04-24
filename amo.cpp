@@ -85,7 +85,7 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, addr, gaddr);
+        initiateLoadException(cause, virtAddr, gaddr);
       return false;
     }
 
@@ -140,7 +140,7 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
   if (cause != ExceptionCause::NONE)
     {
       if (not triggerTripped_)
-        initiateLoadException(cause, addr, gaddr);
+        initiateLoadException(cause, virtAddr, gaddr);
       return false;
     }
 
@@ -208,7 +208,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateLoadException(cause, addr1, gaddr1);
+      initiateLoadException(cause, virtAddr, gaddr1);
       return false;
     }
 
@@ -321,7 +321,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   if (cause != ExceptionCause::NONE)
     {
-      initiateStoreException(cause, addr1, gaddr1);
+      initiateStoreException(cause, virtAddr, gaddr1);
       return false;
     }
 
