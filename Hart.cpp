@@ -1440,7 +1440,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
       if (hyper)
 	{
-	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  assert(not virtMode_);
 	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  virt = true;
 	}
@@ -2523,10 +2523,14 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 	  if (not csRegs_.write(CsrNumber::HSTATUS, PM::Machine, hstatus_.value_))
 	    assert(0 and "Failed to write HSTATUS register");
 
-          // Save GPA to htval if next mode is HS and guest page fault
-          if (origVirtMode and isGpaTrap(cause))
-            if (not csRegs_.write(CsrNumber::HTVAL, privMode_, info2 >> 2))
-              assert(0 and "Failed to write HTVAL register");
+	  if (not virtMode_) 	  // Update HTVAL if trapping to HS mode.
+	    {
+	      URV val = 0;
+	      if (isGpaTrap(cause))
+		val = info2 >> 2;
+	      if (not csRegs_.write(CsrNumber::HTVAL, privMode_, val))
+		assert(0 and "Failed to write HTVAL register");
+	    }
 	}
     }
 
@@ -5519,7 +5523,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vmnor_mm,
      &&vmornot_mm,
      &&vmxnor_mm,
-     &&vpopc_m,
+     &&vcpop_m,
      &&vfirst_m,
      &&vmsbf_m,
      &&vmsif_m,
@@ -7693,8 +7697,8 @@ Hart<URV>::execute(const DecodedInst* di)
   execVmxnor_mm(di);
   return;
 
- vpopc_m:
-  execVpopc_m(di);
+ vcpop_m:
+  execVcpop_m(di);
   return;
 
  vfirst_m:
@@ -10645,7 +10649,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
       if (hyper)
 	{
-	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  assert(not virtMode_);
 	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  virt = true;
 	}

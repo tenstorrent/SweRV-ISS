@@ -641,26 +641,17 @@ bool
 Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
 			    unsigned groupX8, unsigned vstart)
 {
-  // Trap on use of non-zero vstart for arithmetic vector ops.
-  if (trapNonZeroVstart_ and vstart > 0)
+  // Reduction ops must have zero vstart.
+  if (vstart > 0)
     {
       illegalInst(di);
       return false;
     }
-
-#if 0
-  // Use of vstart values greater than vlmax is reserved (section 3.7 of spec).
-  if (vstart > vecRegs_.vlmax())
-    {
-      illegalInst(di);
-      return false;
-    }
-#endif
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  if ((op1 & mask) == 0 and vstart == 0)
+  if ((op1 & mask) == 0)
     {
       vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for scalar operands.
       vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
@@ -6586,7 +6577,7 @@ Hart<URV>::execVmxnor_mm(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVpopc_m(const DecodedInst* di)
+Hart<URV>::execVcpop_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
@@ -6793,19 +6784,19 @@ template <typename URV>
 void
 Hart<URV>::execViota_m(const DecodedInst* di)
 {
-  // Spec does not explicitly state that vstart > 0 is illegal.  FIX double check.
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
+  unsigned group = vecRegs_.groupMultiplierX8();
+
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0 or
+      (vs1 >= vd and vs1 < vd + group/8))
     {
       illegalInst(di);
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
-
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
 
   if (masked and vd == 0)
     {
@@ -19905,14 +19896,14 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   if (not checkArithmeticInst(di))
     return;
 
-  if (not di->isMasked())
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  if (not di->isMasked() or vd == 0)
     {
       illegalInst(di);
       return;
     }
 
   unsigned start = csRegs_.peekVstart();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();

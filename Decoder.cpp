@@ -450,7 +450,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0xb:  return instTable_.getEntry(InstId::vasub_vv);
         case 0x10:
           if (op2 == 0)    return instTable_.getEntry(InstId::vmv_x_s);
-          if (op2 == 0x10) return instTable_.getEntry(InstId::vpopc_m);
+          if (op2 == 0x10) return instTable_.getEntry(InstId::vcpop_m);
           if (op2 == 0x11) return instTable_.getEntry(InstId::vfirst_m);
           return instTable_.getEntry(InstId::illegal);
         case 0x12:
@@ -802,7 +802,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           op2 = ((rform.bits.funct7 & 0xf) << 5 | op2);
 	  return instTable_.getEntry(InstId::vsetivli);
 	}
-      if (f6 == 0x20)  return instTable_.getEntry(InstId::vsetvl);
+      if (rform.bits.funct7 == 0x40)  return instTable_.getEntry(InstId::vsetvl);
     }
 
   return instTable_.getEntry(InstId::illegal);  
@@ -2101,11 +2101,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	      {
 		op2 = amt;
 		return instTable_.getEntry(InstId::bseti);
-	      }
-	    else if (top5 == 8)
-	      {
-		if (amt == 0x18)
-		  return instTable_.getEntry(InstId::rev8);
 	      }
 	    else if (top5 == 9)
 	      {

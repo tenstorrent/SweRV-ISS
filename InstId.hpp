@@ -522,7 +522,7 @@ namespace WdRiscv
      vmnor_mm,
      vmornot_mm,
      vmxnor_mm,
-     vpopc_m,
+     vcpop_m,
      vfirst_m,
      vmsbf_m,
      vmsif_m,

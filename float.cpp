@@ -92,8 +92,12 @@ Hart<URV>::orFcsrFlags(FpFlags flags)
     {
       setFpFlags(val);
       recordCsrWrite(CsrNumber::FCSR);
-      markFsDirty();
     }
+
+  // Mark FS as dirty if the instruction generated any FP flags even if they
+  // are the same as the current flags.
+  if (unsigned(flags))
+      markFsDirty();
 }
 
 
@@ -208,8 +212,12 @@ Hart<URV>::updateAccruedFpBits([[maybe_unused]] float_type res)
     {
       setFpFlags(val);
       recordCsrWrite(CsrNumber::FCSR);
-      markFsDirty();
     }
+
+  // Mark FS as dirty if the instruction generated any FP flags even if they
+  // are the same as the current flags.
+  if (incFlags)
+    markFsDirty();
 }
 
 

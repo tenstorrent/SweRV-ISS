@@ -145,7 +145,7 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
       return;
     }
 
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
+  if (privMode_ == PrivilegeMode::User and not hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;
@@ -251,7 +251,7 @@ Hart<URV>::hyperStore(const DecodedInst* di)
       return;
     }
 
-  if (privMode_ == PrivilegeMode::User and hstatus_.bits_.HU)
+  if (privMode_ == PrivilegeMode::User and not hstatus_.bits_.HU)
     {
       illegalInst(di);    // Must not be in User mode unless HSTATUS.HU
       return;

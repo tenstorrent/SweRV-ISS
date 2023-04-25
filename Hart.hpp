@@ -3100,7 +3100,7 @@ namespace WdRiscv
     void execVmnor_mm(const DecodedInst*);
     void execVmornot_mm(const DecodedInst*);
     void execVmxnor_mm(const DecodedInst*);
-    void execVpopc_m(const DecodedInst*);
+    void execVcpop_m(const DecodedInst*);
     void execVfirst_m(const DecodedInst*);
     void execVmsbf_m(const DecodedInst*);
     void execVmsif_m(const DecodedInst*);
