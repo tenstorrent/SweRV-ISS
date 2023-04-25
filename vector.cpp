@@ -6784,19 +6784,19 @@ template <typename URV>
 void
 Hart<URV>::execViota_m(const DecodedInst* di)
 {
-  // Spec does not explicitly state that vstart > 0 is illegal.  FIX double check.
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
+  unsigned group = vecRegs_.groupMultiplierX8();
+
+  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0 or
+      (vs1 >= vd and vs1 < vd + group/8))
     {
       illegalInst(di);
       return;
     }
 
-  unsigned group = vecRegs_.groupMultiplierX8();
   ElementWidth sew = vecRegs_.elemWidth();
-
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
 
   if (masked and vd == 0)
     {
