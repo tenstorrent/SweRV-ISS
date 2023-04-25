@@ -19896,14 +19896,14 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   if (not checkArithmeticInst(di))
     return;
 
-  if (not di->isMasked())
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  if (not di->isMasked() or vd == 0)
     {
       illegalInst(di);
       return;
     }
 
   unsigned start = csRegs_.peekVstart();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
