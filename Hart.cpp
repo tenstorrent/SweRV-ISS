@@ -1440,7 +1440,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
       bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
       if (hyper)
 	{
-	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  assert(not virtMode_);
 	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  virt = true;
 	}
@@ -10645,7 +10645,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
       if (hyper)
 	{
-	  assert((privMode_ == PM::Machine or privMode_ == PM::Supervisor) and not virtMode_);
+	  assert(not virtMode_);
 	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  virt = true;
 	}
