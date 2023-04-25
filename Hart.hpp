@@ -1435,6 +1435,9 @@ namespace WdRiscv
     void enableBranchTrace(FILE* file)
     { branchTraceFile_ = file; }
 
+    void branchTraceWindow(uint64_t window)
+    { branchTraceWindow_ = window; }
+
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
@@ -4517,6 +4520,7 @@ namespace WdRiscv
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;            // Basic block file.
     FILE* branchTraceFile_ = nullptr;   // Branch trace file.
+    uint64_t branchTraceWindow_ = ~uint64_t(0);
 
     Mcm<URV>* mcm_ = nullptr;
 

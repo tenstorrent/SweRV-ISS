@@ -208,6 +208,7 @@ struct Args
   std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
   std::optional<uint64_t> syscallSlam;
   std::optional<uint64_t> instCounter;
+  std::optional<uint64_t> branchWindow_;
   std::optional<unsigned> mcmls;
 
   unsigned regWidth = 32;
@@ -361,6 +362,13 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
         ok = false;
       else if (*args.alarmInterval == 0)
         std::cerr << "Warning: Zero alarm period ignored.\n";
+    }
+
+  if (varMap.count("branchwindow"))
+    {
+      auto numStr = varMap["branchwindow"].as<std::string>();
+      if (not parseCmdLineNumber("branchwindow", numStr, args.branchWindow_))
+        ok = false;
     }
 
   if (varMap.count("clint"))
@@ -992,6 +1000,9 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
       uint64_t clintLimit = swAddr + 0xc000 - 1;
       config.configClint(system, hart, swAddr, clintLimit, timerAddr);
     }
+
+  if (args.branchWindow_)
+    hart.branchTraceWindow(*args.branchWindow_);
 
   if (not args.loadFrom.empty())
     {

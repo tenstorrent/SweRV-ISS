@@ -4384,24 +4384,28 @@ template <typename URV>
 void
 Hart<URV>::traceBranch(const DecodedInst* di)
 {
-  bool hasTrap = hasInterrupt_ or hasException_;
-  if (not hasTrap)
-    {
-      std::string_view type = lastBranchTaken_ ? "t" : "n";  // For conditinoal branch.
-      if (not di->isConditionalBranch())
-	{
-	  bool indirect = di->isBranchToRegister();
-	  if (di->op0() == 1 or di->op0() == 5)
-	    type = indirect ? "ic" : "c";  // call
-	  else if (di->operandCount() >= 2 and (di->op1() == 1 or di->op1() == 5))
-	    type = "r";  // return
-	  else
-	    type = indirect? "ij" : "j";    // indirect-jump or jump.
-	}
+  uint64_t delta = instCountLim_ - instCounter_;
+  if (delta > branchTraceWindow_)
+    return;
 
-      fprintf(branchTraceFile_, "%s 0x%jx 0x%jx %d\n", type.data(),
-	      uintmax_t(currPc_), uintmax_t(pc_), di->instSize());
+  bool hasTrap = hasInterrupt_ or hasException_;
+  if (hasTrap)
+    return;
+  
+  std::string_view type = lastBranchTaken_ ? "t" : "n";  // For conditional branch.
+  if (not di->isConditionalBranch())
+    {
+      bool indirect = di->isBranchToRegister();
+      if (di->op0() == 1 or di->op0() == 5)
+	type = indirect ? "ic" : "c";  // call
+      else if (di->operandCount() >= 2 and (di->op1() == 1 or di->op1() == 5))
+	type = "r";  // return
+      else
+	type = indirect? "ij" : "j";    // indirect-jump or jump.
     }
+
+  fprintf(branchTraceFile_, "%s 0x%jx 0x%jx %d\n", type.data(),
+	  uintmax_t(currPc_), uintmax_t(pc_), di->instSize());
 }
 
 

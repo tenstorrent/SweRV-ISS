@@ -760,17 +760,20 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     }
 
   // PMP
-  if (pmpEnabled_ and tracePmp_)
+  if (pmpEnabled_)
     {
       buffer.printChar(',');
-      std::vector<std::pair<uint32_t, Pmp>> pmps;
-      getPmpsAccessed(pmps);
-      sep = "";
-      for (auto& pmp : pmps)
-        {
-          buffer.print(sep).print(pmp.first).printChar('=').print(pmp.second.val());
-          sep = ";";
-        }
+      if (tracePmp_)
+	{
+	  std::vector<std::pair<uint32_t, Pmp>> pmps;
+	  getPmpsAccessed(pmps);
+	  sep = "";
+	  for (auto& pmp : pmps)
+	    {
+	      buffer.print(sep).print(pmp.first).printChar('=').print(pmp.second.val());
+	      sep = ";";
+	    }
+	}
     }
 
   buffer.printChar('\n');
