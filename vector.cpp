@@ -641,26 +641,17 @@ bool
 Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
 			    unsigned groupX8, unsigned vstart)
 {
-  // Trap on use of non-zero vstart for arithmetic vector ops.
-  if (trapNonZeroVstart_ and vstart > 0)
+  // Reduction ops must have zero vstart.
+  if (vstart > 0)
     {
       illegalInst(di);
       return false;
     }
-
-#if 0
-  // Use of vstart values greater than vlmax is reserved (section 3.7 of spec).
-  if (vstart > vecRegs_.vlmax())
-    {
-      illegalInst(di);
-      return false;
-    }
-#endif
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  if ((op1 & mask) == 0 and vstart == 0)
+  if ((op1 & mask) == 0)
     {
       vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for scalar operands.
       vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
@@ -5663,7 +5654,7 @@ template <typename URV>
 void
 Hart<URV>::execVredsum_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5729,7 +5720,7 @@ template <typename URV>
 void
 Hart<URV>::execVredand_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5795,7 +5786,7 @@ template <typename URV>
 void
 Hart<URV>::execVredor_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5861,7 +5852,7 @@ template <typename URV>
 void
 Hart<URV>::execVredxor_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5927,7 +5918,7 @@ template <typename URV>
 void
 Hart<URV>::execVredminu_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5993,7 +5984,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmin_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6059,7 +6050,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6125,7 +6116,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmax_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkRedOpVsEmul(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6586,7 +6577,7 @@ Hart<URV>::execVmxnor_mm(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVpopc_m(const DecodedInst* di)
+Hart<URV>::execVcpop_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)

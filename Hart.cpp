@@ -5519,7 +5519,7 @@ Hart<URV>::execute(const DecodedInst* di)
      &&vmnor_mm,
      &&vmornot_mm,
      &&vmxnor_mm,
-     &&vpopc_m,
+     &&vcpop_m,
      &&vfirst_m,
      &&vmsbf_m,
      &&vmsif_m,
@@ -7693,8 +7693,8 @@ Hart<URV>::execute(const DecodedInst* di)
   execVmxnor_mm(di);
   return;
 
- vpopc_m:
-  execVpopc_m(di);
+ vcpop_m:
+  execVcpop_m(di);
   return;
 
  vfirst_m:

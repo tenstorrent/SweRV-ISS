@@ -450,7 +450,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0xb:  return instTable_.getEntry(InstId::vasub_vv);
         case 0x10:
           if (op2 == 0)    return instTable_.getEntry(InstId::vmv_x_s);
-          if (op2 == 0x10) return instTable_.getEntry(InstId::vpopc_m);
+          if (op2 == 0x10) return instTable_.getEntry(InstId::vcpop_m);
           if (op2 == 0x11) return instTable_.getEntry(InstId::vfirst_m);
           return instTable_.getEntry(InstId::illegal);
         case 0x12:

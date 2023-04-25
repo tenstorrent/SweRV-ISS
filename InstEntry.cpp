@@ -3183,7 +3183,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vpopc.m", InstId::vpopc_m,
+      { "vcpop.m", InstId::vcpop_m,
         0b010000'0'00000'10000'010'00000'1010111,
         0b111111'0'00000'11111'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
