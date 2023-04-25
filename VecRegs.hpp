@@ -451,6 +451,11 @@ namespace WdRiscv
       return -1;
     }
 
+    /// Return the number of the last written vector regsiter or -1 if no
+    /// no register has been written since the last clearLastWrittenReg.
+    int getLastWrittenReg() const
+    { return lastWrittenReg_; }
+
     /// For instructions that do not use the write method, mark the
     /// last written register and the effective element widht.
     void touchReg(uint32_t reg, uint32_t groupX8)

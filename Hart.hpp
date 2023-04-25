@@ -1835,14 +1835,9 @@ namespace WdRiscv
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
 
-    /// Return true if it is legal to execute a vector instruction and
-    /// mark MSTATUS.VS dirty if it is.
+    /// Return true if it is legal to execute a vector instruction.
     bool checkVecExec()
-    {
-      if (not isVecLegal()) return false;
-      if (mstatus_.bits_.VS != unsigned(VecStatus::Dirty)) markVsDirty();
-      return true;
-    }
+    { return isVecLegal(); }
 
     // We avoid the cost of locating MSTATUS in the CSRs register file
     // by caching its value in this class. We do this whenever MSTATUS
@@ -2420,6 +2415,14 @@ namespace WdRiscv
     // Emit a trace record for the given branch instruction in the
     // branch trace file.
     void traceBranch(const DecodedInst* di);
+
+    // Called at the end of successul vector instruction to clear the vstart
+    // register and mark VS dirty if a vector register was updated.
+    void postVecSuccess();
+
+    // Called at the end of a trapping vector instruction to mark VS
+    // dirty if a vector register was updated.
+    void postVecFail(const DecodedInst* di);
 
     // The program counter is adjusted (size of current instruction
     // added) before any of the following exec methods are called. To

@@ -462,7 +462,7 @@ Hart<URV>::setVecStatus(FpStatus value)
   if (virtMode_ and vsstatus_.bits_.VS != unsigned(value))
     {
       vsstatus_.bits_.VS = unsigned(value);
-      csRegs_.poke(CsrNumber::VSSTATUS, vsstatus_.value_);
+      pokeCsr(CsrNumber::VSSTATUS, vsstatus_.value_);
       recordCsrWrite(CsrNumber::VSSTATUS);
       updateCachedVsstatus();
     }
@@ -487,7 +487,7 @@ Hart<URV>::checkMaskableInst(const DecodedInst* di, GroupMultiplier /*gm*/,
 
   if (di->isMasked() and di->op0() == 0)  // Dest register cannot overlap mask register v0
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -495,7 +495,7 @@ Hart<URV>::checkMaskableInst(const DecodedInst* di, GroupMultiplier /*gm*/,
   // Use of vstart values greater than vlmax is reserved (section 3.7 of spec).
   if (vstart > vecRegs_.vlmax(gm, eew))
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 #endif
@@ -547,7 +547,7 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide,
   setSimulatorRoundingMode(getFpRoundingMode());
 
   if (not ok)
-    illegalInst(di);
+    postVecFail(di);
 
   return ok;
 }
@@ -561,7 +561,7 @@ Hart<URV>::checkArithmeticInst(const DecodedInst* di)
   // be legal, vtype.vill must not be set.
   if (not checkVecExec() or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -569,7 +569,7 @@ Hart<URV>::checkArithmeticInst(const DecodedInst* di)
   URV vstart = csRegs_.peekVstart();
   if (trapNonZeroVstart_ and vstart > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -593,7 +593,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
       return true;
     }
 
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -613,7 +613,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
       emul.at(0) = emul.at(1) = eg;  // Track operand group for logging
       return true;
     }
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -630,7 +630,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned group
       vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging
       return true;
     }
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -644,7 +644,7 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
   // Reduction ops must have zero vstart.
   if (vstart > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -660,7 +660,7 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
     }
 
   // Vector operand not a multiple of emul or non-zero vstart: illegal.
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -714,7 +714,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
 {
   if (not checkVecExec() or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -722,7 +722,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   URV vstart = csRegs_.peekVstart();
   if (trapNonZeroVstart_ and vstart > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -730,7 +730,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   // Use of vstart values greater than vlmax is reserved (section 3.7 of spec).
   if (vstart > vecRegs_.vlmax())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 #endif
@@ -742,7 +742,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   // if it is in the 1st source register (dest == src).
   if (hasDestSourceOverlap(dest, 8, src, groupX8) and dest != src)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -754,7 +754,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
     }
 
   // Vector operand not a multiple of emul: illegal.
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -767,7 +767,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned o
 {
   if (not checkVecExec() or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -775,7 +775,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned o
   URV vstart = csRegs_.peekVstart();
   if (trapNonZeroVstart_ and vstart > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -783,7 +783,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned o
   // Use of vstart values greater than vlmax is reserved (section 3.7 of spec).
   if (vstart > vecRegs_.vlmax())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 #endif
@@ -794,7 +794,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned o
   if (not checkDestSourceOverlap(op0, 8, op1, groupX8) or
       not checkDestSourceOverlap(op0, 8, op2, groupX8))
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -808,7 +808,7 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned o
     }
 
   // Vector operand not a multiple of emul: illegal.
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -841,7 +841,7 @@ Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
       return true;
     }
 
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -870,7 +870,7 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
       return true;
     }
 
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -894,7 +894,7 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
       return true;
     }
 
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -923,7 +923,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
       return true;
     }
 
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -950,7 +950,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
       return true;
     }
 
-  illegalInst(di);
+  postVecFail(di);
   return false;
 }
 
@@ -979,7 +979,7 @@ Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   clearSimulatorFpFlags();
 
   if (not ok)
-    illegalInst(di);
+    postVecFail(di);
 
   return ok;
 }
@@ -1009,7 +1009,7 @@ Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
   clearSimulatorFpFlags();
 
   if (not ok)
-    illegalInst(di);
+    postVecFail(di);
 
   return ok;
 }
@@ -1072,7 +1072,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   if (vill or (rd != 0 or rs1 != 0))
     {
       // VL is not writeable: Poke it.
-      csRegs_.poke(CsrNumber::VL, elems);
+      pokeCsr(CsrNumber::VL, elems);
       recordCsrWrite(CsrNumber::VL);
     }
 
@@ -1084,7 +1084,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   URV vtype = 0;
   vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 7);
   vtype |= (URV(vill) << (8*sizeof(URV) - 1));
-  csRegs_.poke(CsrNumber::VTYPE, vtype);
+  pokeCsr(CsrNumber::VTYPE, vtype);
   recordCsrWrite(CsrNumber::VTYPE);
 
   // Update cached vtype fields in vecRegs_.
@@ -1094,11 +1094,31 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 
 template <typename URV>
 void
+Hart<URV>::postVecSuccess()
+{
+  if (vecRegs_.getLastWrittenReg() >= 0)
+    markVsDirty();
+  csRegs_.clearVstart();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::postVecFail(const DecodedInst* di)
+{
+  illegalInst(di);
+  if (vecRegs_.getLastWrittenReg() >= 0)
+    markVsDirty();
+}
+
+
+template <typename URV>
+void
 Hart<URV>::execVsetvli(const DecodedInst* di)
 {
   if (not checkVecExec())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1108,7 +1128,7 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
   
   URV vtypeVal = imm;
   vsetvl(rd, rs1, vtypeVal);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1118,7 +1138,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 {
   if (not checkVecExec())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1155,7 +1175,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
     }
 
   // VL is not writeable: Poke it.
-  csRegs_.poke(CsrNumber::VL, elems);
+  pokeCsr(CsrNumber::VL, elems);
   recordCsrWrite(CsrNumber::VL);
 
   vecRegs_.elemCount(elems);  // Update cached value of VL.
@@ -1165,12 +1185,12 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
   URV vtype = 0;
   vtype |= URV(gm) | (URV(ew) << 3) | (URV(ta) << 6) | (URV(ma) << 7);
   vtype |= (URV(vill) << (8*sizeof(URV) - 1));
-  csRegs_.poke(CsrNumber::VTYPE, vtype);
+  pokeCsr(CsrNumber::VTYPE, vtype);
   recordCsrWrite(CsrNumber::VTYPE);
 
   // Update cached vtype fields in vecRegs_.
   vecRegs_.updateConfig(ew, gm, ma, ta, vill);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1180,7 +1200,7 @@ Hart<URV>::execVsetvl(const DecodedInst* di)
 {
   if (not checkVecExec())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1189,7 +1209,7 @@ Hart<URV>::execVsetvl(const DecodedInst* di)
 
   URV vtypeVal = intRegs_.read(di->op2());
   vsetvl(rd, rs1, vtypeVal);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1247,12 +1267,12 @@ Hart<URV>::execVadd_vv(const DecodedInst* di)
     case EW::Half:   vadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1312,12 +1332,12 @@ Hart<URV>::execVadd_vx(const DecodedInst* di)
     case EW::Half:   vadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1345,12 +1365,12 @@ Hart<URV>::execVadd_vi(const DecodedInst* di)
     case EW::Half:   vadd_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vadd_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vadd_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1409,12 +1429,12 @@ Hart<URV>::execVsub_vv(const DecodedInst* di)
     case EW::Half: vsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1472,12 +1492,12 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
     case EW::Half: vsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1535,12 +1555,12 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
     case EW::Half: vrsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vrsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1600,12 +1620,12 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
     case EW::Half: vrsub_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vrsub_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vrsub_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1656,7 +1676,7 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1674,12 +1694,12 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
     case EW::Half: vwadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1695,7 +1715,7 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1713,12 +1733,12 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
     case EW::Half: vwadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1769,7 +1789,7 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1789,12 +1809,12 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwadd_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1810,7 +1830,7 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1830,12 +1850,12 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
     case EW::Half: vwadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1886,7 +1906,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1905,13 +1925,13 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
     case EW::Byte: vwsub_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked); break;
     case EW::Half: vwsub_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwsub_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -1927,7 +1947,7 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -1946,13 +1966,13 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
     case EW::Byte:  vwsub_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
     case EW::Half:  vwsub_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vwsub_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2003,7 +2023,7 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2021,12 +2041,12 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
     case EW::Half: vwsub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2042,7 +2062,7 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2060,12 +2080,12 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
     case EW::Half: vwsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2116,7 +2136,7 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2134,12 +2154,12 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
     case EW::Half: vwadd_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2155,7 +2175,7 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2173,12 +2193,12 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
     case EW::Half: vwadd_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwadd_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2194,7 +2214,7 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2213,13 +2233,13 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<uint16_t>(vd, vs1, uint8_t(e2), group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<uint32_t>(vd, vs1, uint16_t(e2), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<uint64_t>(vd, vs1, uint32_t(e2), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2235,7 +2255,7 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2254,13 +2274,13 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<int16_t>(vd, vs1, int8_t(e2),  group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<int32_t>(vd, vs1, int16_t(e2), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<int64_t>(vd, vs1, int32_t(e2), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2276,7 +2296,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2295,13 +2315,13 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<uint16_t>(vd, vs1, -uint16_t(uint8_t(e2)),  group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<uint32_t>(vd, vs1, -uint32_t(uint16_t(e2)), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<uint64_t>(vd, vs1, -uint64_t(uint32_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2317,7 +2337,7 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2336,13 +2356,13 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
     case EW::Byte: vadd_vx<int16_t>(vd, vs1, -int16_t(int8_t(e2)),  group*2, start, elems, masked); break;
     case EW::Half: vadd_vx<int32_t>(vd, vs1, -int32_t(int16_t(e2)), group*2, start, elems, masked); break;
     case EW::Word: vadd_vx<int64_t>(vd, vs1, -int64_t(int32_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2393,7 +2413,7 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2411,12 +2431,12 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
     case EW::Half: vwsub_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2432,7 +2452,7 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -2450,12 +2470,12 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
     case EW::Half: vwsub_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwsub_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2510,12 +2530,12 @@ Hart<URV>::execVmseq_vv(const DecodedInst* di)
     case EW::Half:   vmseq_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmseq_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmseq_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2572,12 +2592,12 @@ Hart<URV>::execVmseq_vx(const DecodedInst* di)
     case EW::Half:   vmseq_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmseq_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmseq_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2603,12 +2623,12 @@ Hart<URV>::execVmseq_vi(const DecodedInst* di)
     case EW::Half:   vmseq_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmseq_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmseq_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2663,12 +2683,12 @@ Hart<URV>::execVmsne_vv(const DecodedInst* di)
     case EW::Half:   vmsne_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmsne_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmsne_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2725,12 +2745,12 @@ Hart<URV>::execVmsne_vx(const DecodedInst* di)
     case EW::Half:   vmsne_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsne_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsne_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2756,12 +2776,12 @@ Hart<URV>::execVmsne_vi(const DecodedInst* di)
     case EW::Half:   vmsne_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsne_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsne_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2816,12 +2836,12 @@ Hart<URV>::execVmsltu_vv(const DecodedInst* di)
     case EW::Half:   vmslt_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2878,12 +2898,12 @@ Hart<URV>::execVmsltu_vx(const DecodedInst* di)
     case EW::Half:   vmslt_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2907,12 +2927,12 @@ Hart<URV>::execVmslt_vv(const DecodedInst* di)
     case EW::Half:   vmslt_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2938,12 +2958,12 @@ Hart<URV>::execVmslt_vx(const DecodedInst* di)
     case EW::Half:   vmslt_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmslt_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmslt_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -2998,12 +3018,12 @@ Hart<URV>::execVmsleu_vv(const DecodedInst* di)
     case EW::Half:   vmsle_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3061,12 +3081,12 @@ Hart<URV>::execVmsleu_vx(const DecodedInst* di)
     case EW::Half:   vmsle_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3093,12 +3113,12 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
     case EW::Half:   vmsle_vx<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3122,12 +3142,12 @@ Hart<URV>::execVmsle_vv(const DecodedInst* di)
     case EW::Half:   vmsle_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3153,12 +3173,12 @@ Hart<URV>::execVmsle_vx(const DecodedInst* di)
     case EW::Half:   vmsle_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3184,12 +3204,12 @@ Hart<URV>::execVmsle_vi(const DecodedInst* di)
     case EW::Half:   vmsle_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsle_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsle_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3246,12 +3266,12 @@ Hart<URV>::execVmsgtu_vx(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3278,12 +3298,12 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3309,12 +3329,12 @@ Hart<URV>::execVmsgt_vx(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3340,12 +3360,12 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
     case EW::Half:   vmsgt_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:   vmsgt_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2:  vmsgt_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3404,12 +3424,12 @@ Hart<URV>::execVminu_vv(const DecodedInst* di)
     case EW::Half:   vminu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vminu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vminu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3471,12 +3491,12 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
     case EW::Half:   vminu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vminu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vminu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3535,12 +3555,12 @@ Hart<URV>::execVmin_vv(const DecodedInst* di)
     case EW::Half:   vmin_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmin_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmin_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3599,12 +3619,12 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
     case EW::Half:   vmin_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vmin_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vmin_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3663,12 +3683,12 @@ Hart<URV>::execVmaxu_vv(const DecodedInst* di)
     case EW::Half:   vmaxu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmaxu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmaxu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3730,12 +3750,12 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
     case EW::Half:   vmaxu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vmaxu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vmaxu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3794,12 +3814,12 @@ Hart<URV>::execVmax_vv(const DecodedInst* di)
     case EW::Half:   vmax_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmax_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmax_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3858,12 +3878,12 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
     case EW::Half:   vmax_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vmax_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vmax_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3922,12 +3942,12 @@ Hart<URV>::execVand_vv(const DecodedInst* di)
     case EW::Half:   vand_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vand_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vand_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -3988,12 +4008,12 @@ Hart<URV>::execVand_vx(const DecodedInst* di)
     case EW::Half:   vand_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:   vand_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2:  vand_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4055,12 +4075,12 @@ Hart<URV>::execVand_vi(const DecodedInst* di)
     case EW::Half: vand_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vand_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vand_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4119,12 +4139,12 @@ Hart<URV>::execVor_vv(const DecodedInst* di)
     case EW::Half: vor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4185,12 +4205,12 @@ Hart<URV>::execVor_vx(const DecodedInst* di)
     case EW::Half: vor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4252,12 +4272,12 @@ Hart<URV>::execVor_vi(const DecodedInst* di)
     case EW::Half: vor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4316,12 +4336,12 @@ Hart<URV>::execVxor_vv(const DecodedInst* di)
     case EW::Half: vxor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vxor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vxor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4382,12 +4402,12 @@ Hart<URV>::execVxor_vx(const DecodedInst* di)
     case EW::Half: vxor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vxor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vxor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4449,12 +4469,12 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
     case EW::Half: vxor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word: vxor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vxor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4516,12 +4536,12 @@ Hart<URV>::execVsll_vv(const DecodedInst* di)
     case EW::Half: vsll_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsll_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsll_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4588,12 +4608,12 @@ Hart<URV>::execVsll_vx(const DecodedInst* di)
     case EW::Half: vsll_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vsll_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vsll_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4622,12 +4642,12 @@ Hart<URV>::execVsll_vi(const DecodedInst* di)
     case EW::Half:  vsll_vx<int16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vsll_vx<int32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vsll_vx<int64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4689,12 +4709,12 @@ Hart<URV>::execVsrl_vv(const DecodedInst* di)
     case EW::Half: vsr_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vsr_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsr_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4761,12 +4781,12 @@ Hart<URV>::execVsrl_vx(const DecodedInst* di)
     case EW::Half:  vsr_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vsr_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vsr_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4795,12 +4815,12 @@ Hart<URV>::execVsrl_vi(const DecodedInst* di)
     case EW::Half:  vsr_vx<uint16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vsr_vx<uint32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vsr_vx<uint64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4828,12 +4848,12 @@ Hart<URV>::execVsra_vv(const DecodedInst* di)
     case EW::Half:  vsr_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vsr_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vsr_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4864,12 +4884,12 @@ Hart<URV>::execVsra_vx(const DecodedInst* di)
     case EW::Half:  vsr_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vsr_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vsr_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4898,12 +4918,12 @@ Hart<URV>::execVsra_vi(const DecodedInst* di)
     case EW::Half:  vsr_vx<int16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vsr_vx<int32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vsr_vx<int64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -4960,7 +4980,7 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -4974,12 +4994,12 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
     case EW::Half: vnsr_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vnsr_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5039,7 +5059,7 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -5056,12 +5076,12 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
     case EW::Half:  vnsr_wx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5082,7 +5102,7 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, gp))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -5096,12 +5116,12 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
     case EW::Half:  vnsr_wx<uint16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vnsr_wx<uint32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vnsr_wx<uint64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5121,7 +5141,7 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -5135,12 +5155,12 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
     case EW::Half:  vnsr_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5160,7 +5180,7 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -5177,12 +5197,12 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
     case EW::Half:  vnsr_wx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5203,7 +5223,7 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, gp))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -5217,12 +5237,12 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
     case EW::Half:  vnsr_wx<int16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vnsr_wx<int32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vnsr_wx<int64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5281,7 +5301,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
   if (hasDestSourceOverlap(vd, group, vs1, group) or
       hasDestSourceOverlap(vd, group, vs2, group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -5295,12 +5315,12 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
     case EW::Half:  vrgather_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vrgather_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrgather_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5355,7 +5375,7 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -5369,12 +5389,12 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
     case EW::Half:  vrgather_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vrgather_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrgather_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5424,7 +5444,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -5438,12 +5458,12 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
     case EW::Half:  vrgather_vi<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:  vrgather_vi<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vrgather_vi<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5507,7 +5527,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   if (not vecRegs_.groupNumberX8ToSymbol(v2Group, v2gm) or
       not vecRegs_.legalConfig(ElementWidth::Half, v2gm))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -5516,14 +5536,14 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 
   if ((vd % eg) or (vs1 % eg) or (vs2 % v2g))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   if (hasDestSourceOverlap(vd, group, vs1, group) or
       hasDestSourceOverlap(vd, group, vs2, v2Group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -5538,12 +5558,12 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
     case EW::Half: vrgatherei16_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vrgatherei16_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrgatherei16_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5599,7 +5619,7 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
   if (hasDestSourceOverlap(vd, group, vs1, group) or
       hasDestSourceOverlap(vd, group, vs2, 1) or di->isMasked() or start > 0)
     {
-      illegalInst(di);  // Source/dest cannot overlap, must not be masked, 0 vstart.
+      postVecFail(di);  // Source/dest cannot overlap, must not be masked, 0 vstart.
       return;
     }
 
@@ -5610,12 +5630,12 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
     case EW::Half: vcompress_vm<uint16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vcompress_vm<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vcompress_vm<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5676,12 +5696,12 @@ Hart<URV>::execVredsum_vs(const DecodedInst* di)
     case EW::Half:  vredsum_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredsum_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5742,12 +5762,12 @@ Hart<URV>::execVredand_vs(const DecodedInst* di)
     case EW::Half:  vredand_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredand_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredand_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5808,12 +5828,12 @@ Hart<URV>::execVredor_vs(const DecodedInst* di)
     case EW::Half:  vredor_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredor_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredor_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5874,12 +5894,12 @@ Hart<URV>::execVredxor_vs(const DecodedInst* di)
     case EW::Half:  vredxor_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredxor_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredxor_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -5940,12 +5960,12 @@ Hart<URV>::execVredminu_vs(const DecodedInst* di)
     case EW::Half:  vredminu_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredminu_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredminu_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6006,12 +6026,12 @@ Hart<URV>::execVredmin_vs(const DecodedInst* di)
     case EW::Half:  vredmin_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredmin_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredmin_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6072,12 +6092,12 @@ Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
     case EW::Half:  vredmaxu_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredmaxu_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredmaxu_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6138,12 +6158,12 @@ Hart<URV>::execVredmax_vs(const DecodedInst* di)
     case EW::Half:  vredmax_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vredmax_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vredmax_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6210,9 +6230,9 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
     case EW::Byte:  vwredsum_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Half:  vwredsum_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vwredsum_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6241,9 +6261,9 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
     case EW::Byte:  vwredsum_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Half:  vwredsum_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vwredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6284,7 +6304,7 @@ Hart<URV>::execVmand_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6325,7 +6345,7 @@ Hart<URV>::execVmnand_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6366,7 +6386,7 @@ Hart<URV>::execVmandnot_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6407,7 +6427,7 @@ Hart<URV>::execVmxor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6448,7 +6468,7 @@ Hart<URV>::execVmor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6489,7 +6509,7 @@ Hart<URV>::execVmnor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6530,7 +6550,7 @@ Hart<URV>::execVmornot_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6571,7 +6591,7 @@ Hart<URV>::execVmxnor_mm(const DecodedInst* di)
       }
 
   vecRegs_.touchMask(di->op0());
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6582,7 +6602,7 @@ Hart<URV>::execVcpop_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6600,7 +6620,7 @@ Hart<URV>::execVcpop_m(const DecodedInst* di)
     }
 
   intRegs_.write(rd, count);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6611,7 +6631,7 @@ Hart<URV>::execVfirst_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6633,7 +6653,7 @@ Hart<URV>::execVfirst_m(const DecodedInst* di)
     }
 
   intRegs_.write(rd, first);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6644,7 +6664,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6653,7 +6673,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6678,7 +6698,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6689,7 +6709,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6698,7 +6718,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6724,7 +6744,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6735,7 +6755,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6744,7 +6764,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6776,7 +6796,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
     }
 
   vecRegs_.touchMask(vd);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6791,7 +6811,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0 or
       (vs1 >= vd and vs1 < vd + group/8))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6800,7 +6820,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
 
   if (masked and vd == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6822,16 +6842,16 @@ Hart<URV>::execViota_m(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(sum)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(sum)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(sum)); break;
-        case ElementWidth::Word4:  illegalInst(di); return;
-        case ElementWidth::Word8:  illegalInst(di); return;
-        case ElementWidth::Word16: illegalInst(di); return;
-        case ElementWidth::Word32: illegalInst(di); return;
+        case ElementWidth::Word4:  postVecFail(di); return;
+        case ElementWidth::Word8:  postVecFail(di); return;
+        case ElementWidth::Word16: postVecFail(di); return;
+        case ElementWidth::Word32: postVecFail(di); return;
         }
 
       if (sourceSet)
         sum++;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6844,7 +6864,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6856,7 +6876,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
 
   if (masked and vd == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -6877,13 +6897,13 @@ Hart<URV>::execVid_v(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(ix)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(ix)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(ix)); break;
-        case ElementWidth::Word4:  illegalInst(di); return;
-        case ElementWidth::Word8:  illegalInst(di); return;
-        case ElementWidth::Word16: illegalInst(di); return;
-        case ElementWidth::Word32: illegalInst(di); return;
+        case ElementWidth::Word4:  postVecFail(di); return;
+        case ElementWidth::Word8:  postVecFail(di); return;
+        case ElementWidth::Word16: postVecFail(di); return;
+        case ElementWidth::Word32: postVecFail(di); return;
         }
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6939,7 +6959,7 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -6955,12 +6975,12 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
     case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -6980,7 +7000,7 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -6996,12 +7016,12 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
     case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7020,7 +7040,7 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -7060,12 +7080,12 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 	vecRegs_.write(vd, 0, group, int64_t(replacement));
       break;
 
-    case ElementWidth::Word4:  illegalInst(di); return;
-    case ElementWidth::Word8: illegalInst(di); return;
-    case ElementWidth::Word16: illegalInst(di); return;
-    case ElementWidth::Word32: illegalInst(di); return;
+    case ElementWidth::Word4:  postVecFail(di); return;
+    case ElementWidth::Word8: postVecFail(di); return;
+    case ElementWidth::Word16: postVecFail(di); return;
+    case ElementWidth::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7126,12 +7146,12 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
     case EW::Half:   vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word:   vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2:  vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7161,12 +7181,12 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
     case EW::Half: vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word: vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7219,12 +7239,12 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
 	vecRegs_.write(vd, elems-1, group, int64_t(replacement));
       break;
 
-    case ElementWidth::Word4: illegalInst(di); return;
-    case ElementWidth::Word8: illegalInst(di); return;
-    case ElementWidth::Word16: illegalInst(di); return;
-    case ElementWidth::Word32: illegalInst(di); return;
+    case ElementWidth::Word4: postVecFail(di); return;
+    case ElementWidth::Word8: postVecFail(di); return;
+    case ElementWidth::Word16: postVecFail(di); return;
+    case ElementWidth::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7243,7 +7263,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
     {
-      illegalInst(di);  // Source/dest vecs cannot overlap
+      postVecFail(di);  // Source/dest vecs cannot overlap
       return;
     }
 
@@ -7257,7 +7277,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
   switch (sew)
     {
     case ElementWidth::Byte:
-      illegalInst(di);
+      postVecFail(di);
       return;
 
     case ElementWidth::Half:
@@ -7293,10 +7313,10 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
       break;
 
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7323,7 +7343,7 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
   switch (sew)
     {
     case ElementWidth::Byte:
-      illegalInst(di);
+      postVecFail(di);
       return;
 
     case ElementWidth::Half:
@@ -7359,10 +7379,10 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
       break;
 
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7420,12 +7440,12 @@ Hart<URV>::execVmul_vv(const DecodedInst* di)
     case EW::Half: vmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7484,12 +7504,12 @@ Hart<URV>::execVmul_vx(const DecodedInst* di)
     case EW::Half: vmul_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmul_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmul_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7548,12 +7568,12 @@ Hart<URV>::execVmulh_vv(const DecodedInst* di)
     case EW::Half: vmulh_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7612,12 +7632,12 @@ Hart<URV>::execVmulh_vx(const DecodedInst* di)
     case EW::Half: vmulh_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7645,12 +7665,12 @@ Hart<URV>::execVmulhu_vv(const DecodedInst* di)
     case EW::Half: vmulh_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulh_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7709,12 +7729,12 @@ Hart<URV>::execVmulhu_vx(const DecodedInst* di)
     case EW::Half: vmulhu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulhu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7776,12 +7796,12 @@ Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
     case EW::Half: vmulhsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmulhsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7843,12 +7863,12 @@ Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
     case EW::Half: vmulhsu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vmulhsu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7909,12 +7929,12 @@ Hart<URV>::execVmadd_vv(const DecodedInst* di)
     case EW::Half: vmadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -7974,12 +7994,12 @@ Hart<URV>::execVmadd_vx(const DecodedInst* di)
     case EW::Half:  vmadd_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmadd_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmadd_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -8039,12 +8059,12 @@ Hart<URV>::execVnmsub_vv(const DecodedInst* di)
     case EW::Half: vnmsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vnmsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8104,12 +8124,12 @@ Hart<URV>::execVnmsub_vx(const DecodedInst* di)
     case EW::Half:  vnmsub_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnmsub_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsub_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8170,12 +8190,12 @@ Hart<URV>::execVmacc_vv(const DecodedInst* di)
     case EW::Half: vmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmacc_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8235,12 +8255,12 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
     case EW::Half:  vmacc_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmacc_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmacc_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8301,12 +8321,12 @@ Hart<URV>::execVnmsac_vv(const DecodedInst* di)
     case EW::Half: vnmsac_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vnmsac_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsac_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8366,12 +8386,12 @@ Hart<URV>::execVnmsac_vx(const DecodedInst* di)
     case EW::Half:  vnmsac_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnmsac_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsac_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8428,7 +8448,7 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
   // Double wide legal.
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8442,12 +8462,12 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
     case EW::Half: vwmulu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmulu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmulu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8502,7 +8522,7 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8518,12 +8538,12 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
     case EW::Half: vwmulu_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmulu_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulu_vx<uint64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8579,7 +8599,7 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
   // Double wide legal.
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8593,12 +8613,12 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
     case EW::Half: vwmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8655,7 +8675,7 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
   // Double wide legal.
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8671,12 +8691,12 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
     case EW::Half: vwmul_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmul_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8734,7 +8754,7 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8748,12 +8768,12 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
     case EW::Half: vwmulsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmulsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8812,7 +8832,7 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8828,12 +8848,12 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
     case EW::Half: vwmulsu_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word: vwmulsu_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8888,7 +8908,7 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8902,12 +8922,12 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
     case EW::Half: vwmacc_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmacc_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -8964,7 +8984,7 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -8980,12 +9000,12 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
     case EW::Half: vwmaccu_vx<uint16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccu_vx<uint32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccu_vx<uint64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9006,7 +9026,7 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
   // Double wide legal.
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -9020,12 +9040,12 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
     case EW::Half: vwmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9080,7 +9100,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -9096,12 +9116,12 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
     case EW::Half:  vwmacc_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word:  vwmacc_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9160,7 +9180,7 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -9174,12 +9194,12 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
     case EW::Half: vwmaccsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9238,7 +9258,7 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -9254,12 +9274,12 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
     case EW::Half: vwmaccsu_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccsu_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9318,7 +9338,7 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -9334,12 +9354,12 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
     case EW::Half: vwmaccus_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word: vwmaccus_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccus_vx<int64_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9400,12 +9420,12 @@ Hart<URV>::execVdivu_vv(const DecodedInst* di)
     case EW::Half: vdivu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vdivu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdivu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9469,9 +9489,9 @@ Hart<URV>::execVdivu_vx(const DecodedInst* di)
     case EW::Half:  vdivu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vdivu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vdivu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9540,12 +9560,12 @@ Hart<URV>::execVdiv_vv(const DecodedInst* di)
     case EW::Half: vdiv_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vdiv_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9614,12 +9634,12 @@ Hart<URV>::execVdiv_vx(const DecodedInst* di)
     case EW::Half: vdiv_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vdiv_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9680,12 +9700,12 @@ Hart<URV>::execVremu_vv(const DecodedInst* di)
     case EW::Half: vremu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vremu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9749,9 +9769,9 @@ Hart<URV>::execVremu_vx(const DecodedInst* di)
     case EW::Half:  vremu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vremu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9820,12 +9840,12 @@ Hart<URV>::execVrem_vv(const DecodedInst* di)
     case EW::Half: vrem_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vrem_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrem_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9893,12 +9913,12 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
     case EW::Half: vrem_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vrem_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrem_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -9946,13 +9966,13 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
   unsigned fromGroup = group/2;
   if (fromGroup == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
   if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -9961,12 +9981,12 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   if (eg > 2 and (vs1 % (eg/2)))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
@@ -9978,7 +9998,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: eew = EW::Byte; break;
     case EW::Word: eew = EW::Half; break;
     case EW::Word2: eew = EW::Word; break;
@@ -9989,7 +10009,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
     }
   if (not vecRegs_.legalConfig(eew, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -9998,16 +10018,16 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vsext<int16_t,int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word: vsext<int32_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10022,13 +10042,13 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
   unsigned fromGroup = group/4;
   if (fromGroup == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
   if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10038,8 +10058,8 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
     case EW::Word: eew = EW::Byte; break;
     case EW::Word2: eew = EW::Half; break;
     case EW::Word4: eew = EW::Word; break;
@@ -10049,7 +10069,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
     }
   if (not vecRegs_.legalConfig(eew, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10060,12 +10080,12 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   if (eg > 4 and (vs1 % (eg/4)))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
@@ -10073,16 +10093,16 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
     case EW::Word: vsext<int32_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10097,13 +10117,13 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
   unsigned fromGroup = group/8;
   if (fromGroup == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
   if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10113,9 +10133,9 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
-    case EW::Word: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
+    case EW::Word: postVecFail(di); return;
     case EW::Word2: eew = EW::Byte; break;
     case EW::Word4: eew = EW::Half; break;
     case EW::Word8: eew = EW::Word; break;
@@ -10124,7 +10144,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
     }
   if (not vecRegs_.legalConfig(eew, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10137,16 +10157,16 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
-    case EW::Word: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
+    case EW::Word: postVecFail(di); return;
     case EW::Word2: vsext<int64_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10193,13 +10213,13 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
   unsigned fromGroup = group/2;
   if (fromGroup == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
   if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10209,7 +10229,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: eew = EW::Byte; break;
     case EW::Word: eew = EW::Half; break;
     case EW::Word2: eew = EW::Word; break;
@@ -10220,7 +10240,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
     }
   if (not vecRegs_.legalConfig(eew, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10231,12 +10251,12 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   if (eg > 2 and (vs1 % (eg/2)))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
@@ -10244,16 +10264,16 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vzext<uint16_t,uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word: vzext<uint32_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10268,13 +10288,13 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
   unsigned fromGroup = group/4;
   if (fromGroup == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
   if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10284,8 +10304,8 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
     case EW::Word: eew = EW::Byte; break;
     case EW::Word2: eew = EW::Half; break;
     case EW::Word4: eew = EW::Word; break;
@@ -10295,7 +10315,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
     }
   if (not vecRegs_.legalConfig(eew, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10306,12 +10326,12 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   if (eg > 4 and (vs1 % (eg/4)))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
@@ -10319,16 +10339,16 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
     case EW::Word: vzext<uint32_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10343,13 +10363,13 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
   unsigned fromGroup = group/8;
   if (fromGroup == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
   if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10359,9 +10379,9 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
-    case EW::Word: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
+    case EW::Word: postVecFail(di); return;
     case EW::Word2: eew = EW::Byte; break;
     case EW::Word4: eew = EW::Half; break;
     case EW::Word8: eew = EW::Word; break;
@@ -10370,7 +10390,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
     }
   if (not vecRegs_.legalConfig(eew, emul))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10383,16 +10403,16 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
-    case EW::Half: illegalInst(di); return;
-    case EW::Word: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: postVecFail(di); return;
+    case EW::Word: postVecFail(di); return;
     case EW::Word2: vzext<uint64_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10641,7 +10661,7 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;
   if (vd == vcin or not masked)   // cannot overlap vcin, unmasked verion reserved
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10659,12 +10679,12 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
     case EW::Half: vadc_vvm<uint16_t>(vd, vs1, vs2, vcin, group, start, elems); break;
     case EW::Word: vadc_vvm<uint32_t>(vd, vs1, vs2, vcin, group, start, elems); break;
     case EW::Word2: vadc_vvm<uint64_t>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10680,7 +10700,7 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
   if (vd == vcin or not masked)   // cannot overlap vcin, unmasked verion reserved
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10699,12 +10719,12 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
     case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
     case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10720,7 +10740,7 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
   if (vd == vcin or not masked)  // cannot overlap vcin, unmasked verion reserved
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10739,12 +10759,12 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
     case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
     case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10760,7 +10780,7 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
   if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10777,12 +10797,12 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
     case EW::Half: vsbc_vvm<uint16_t>(vd, vs1, vs2, vbin, group, start, elems); break;
     case EW::Word: vsbc_vvm<uint32_t>(vd, vs1, vs2, vbin, group, start, elems); break;
     case EW::Word2: vsbc_vvm<uint64_t>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10798,7 +10818,7 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vbin = 0;
   if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -10817,12 +10837,12 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
     case EW::Half: vsbc_vxm<uint16_t>(vd, vs1, e2, vbin, group, start, elems); break;
     case EW::Word: vsbc_vxm<uint32_t>(vd, vs1, int32_t(e2), vbin, group, start, elems); break;
     case EW::Word2: vsbc_vxm<uint64_t>(vd, vs1, int64_t(e2), vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10843,14 +10863,14 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   if (not checkDestSourceOverlap(vcout, 8, vs1, group) or
       not checkDestSourceOverlap(vcout, 8, vs2, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vs1 % eg) or (vs2 % eg))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
@@ -10864,12 +10884,12 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
     case EW::Half: vmadc_vvm<uint16_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
     case EW::Word: vmadc_vvm<uint32_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vvm<uint64_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10888,14 +10908,14 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 
   if (not checkDestSourceOverlap(vcout, 8, vs1, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
@@ -10910,12 +10930,12 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
     case EW::Half: vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
     case EW::Word: vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vxm<uint64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10935,14 +10955,14 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
 
   if (not checkDestSourceOverlap(vcout, 8, vs1, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
@@ -10957,12 +10977,12 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
     case EW::Half: vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
     case EW::Word: vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vxm<uint64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -10983,14 +11003,14 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   if (not checkDestSourceOverlap(vbout, 8, vs1, group) or
       not checkDestSourceOverlap(vbout, 8, vs2, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if ((vs1 % eg) or (vs2 % eg))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
@@ -11004,12 +11024,12 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
     case EW::Half: vmsbc_vvm<uint16_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
     case EW::Word: vmsbc_vvm<uint32_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vvm<uint64_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11028,14 +11048,14 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   if (not checkDestSourceOverlap(vbout, 8, vs1, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vs1 % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
@@ -11050,12 +11070,12 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
     case EW::Half: vmsbc_vxm<uint16_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
     case EW::Word: vmsbc_vxm<uint32_t>(vbout, vs1, int32_t(e2), borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vxm<uint64_t>(vbout, vs1, int64_t(e2), borrow, vbin, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11095,7 +11115,7 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  start = csRegs_.peekVstart();;
   if (not di->isMasked() or di->op0() == 0) // Must be masked, dest must not overlap v0.
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11113,12 +11133,12 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
     case EW::Half: vmerge_vvm<int16_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word: vmerge_vvm<int32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vmerge_vvm<int64_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11158,7 +11178,7 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
   if (not di->isMasked() or di->op0() == 0 or // Must be masked, dest must not overlap v0.
       not di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11178,12 +11198,12 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
     case EW::Half: vmerge_vxm<int16_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word: vmerge_vxm<int32_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11198,7 +11218,7 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
   int32_t imm = di->op2As<int32_t>();
   if (not di->isMasked() or di->op0() == 0) // Must be masked. Dest must not overlap v0.
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11216,12 +11236,12 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
     case EW::Half: vmerge_vxm<int16_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word: vmerge_vxm<int32_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11237,7 +11257,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   if ((vs1 % eg) or di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
@@ -11279,10 +11299,10 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
       break;
 
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11295,7 +11315,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11323,10 +11343,10 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
 	vecRegs_.write(vd, 0, groupX8, int64_t(val));
       break;
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11339,7 +11359,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11348,7 +11368,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   if (vs1 % eg)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
   vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
@@ -11358,12 +11378,12 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
   switch (sew)
     {
     case ElementWidth::Byte:
-      illegalInst(di);
+      postVecFail(di);
       return;
 
     case ElementWidth::Half:
       if (not isZvfhLegal())
-	illegalInst(di);
+	postVecFail(di);
       else
 	{
 	  Float16 val{};
@@ -11374,7 +11394,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 
     case ElementWidth::Word:
       if (not isFpLegal())
-	illegalInst(di);
+	postVecFail(di);
       else
 	{
 	  float val{};
@@ -11385,7 +11405,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 
     case ElementWidth::Word2:
       if (not isDpLegal())
-	illegalInst(di);
+	postVecFail(di);
       else
 	{
 	  double val{};
@@ -11395,10 +11415,10 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
       break;
 
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11411,7 +11431,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11422,11 +11442,11 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      illegalInst(di);
+      postVecFail(di);
       return;
     case EW::Half:
       if (not isZvfhLegal())
-	illegalInst(di);
+	postVecFail(di);
       else if (start < vecRegs_.elemCount())
 	{
 	  Float16 val = fpRegs_.readHalf(rs1);
@@ -11435,7 +11455,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
       break;
     case EW::Word:
       if (not isFpLegal())
-	illegalInst(di);
+	postVecFail(di);
       else if (start < vecRegs_.elemCount())
 	{
 	  float val = fpRegs_.readSingle(rs1);
@@ -11444,7 +11464,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
       break;
     case EW::Word2:
       if (not isDpLegal())
-	illegalInst(di);
+	postVecFail(di);
       else if (start < vecRegs_.elemCount())
 	{
 	  double val = fpRegs_.readDouble(rs1);
@@ -11452,10 +11472,10 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 	}
       break;
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11493,7 +11513,7 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11514,12 +11534,12 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
     case EW::Half: vmv_v_v<int16_t>(vd, vs1, group, start, elems); break;
     case EW::Word: vmv_v_v<int32_t>(vd, vs1, group, start, elems); break;
     case EW::Word2: vmv_v_v<int64_t>(vd, vs1, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11548,7 +11568,7 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11571,12 +11591,12 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
     case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
     case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11589,7 +11609,7 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11611,12 +11631,12 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
     case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
     case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11629,7 +11649,7 @@ Hart<URV>::execVmv1r_v(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -11647,7 +11667,7 @@ Hart<URV>::execVmv1r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 1*8);  // Grouping of 1.
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11660,14 +11680,14 @@ Hart<URV>::execVmv2r_v(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned vd = di->op0(), vs1 = di->op1();
   if ((vd & 1) != 0 or (vs1 & 1) != 0)
     {
-      illegalInst(di);   // Vec indices must be even
+      postVecFail(di);   // Vec indices must be even
       return;
     }
 
@@ -11684,7 +11704,7 @@ Hart<URV>::execVmv2r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 2*8);    // Grouping of 2
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11697,14 +11717,14 @@ Hart<URV>::execVmv4r_v(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned vd = di->op0(), vs1 = di->op1();
   if ((vd & 3) != 0 or (vs1 & 3) != 0)
     {
-      illegalInst(di);   // Vec indices must be multiples of 4
+      postVecFail(di);   // Vec indices must be multiples of 4
       return;
     }
 
@@ -11721,7 +11741,7 @@ Hart<URV>::execVmv4r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 4*8);  // Grouping of 4.
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11734,14 +11754,14 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
   unsigned vd = di->op0(), vs1 = di->op1();
   if ((vd & 7) != 0 or (vs1 & 7) != 0)
     {
-      illegalInst(di);   // Vec indices must be multiples of 8
+      postVecFail(di);   // Vec indices must be multiples of 8
       return;
     }
 
@@ -11758,7 +11778,7 @@ Hart<URV>::execVmv8r_v(const DecodedInst* di)
   memcpy(dest, source, bytes);
 
   vecRegs_.touchReg(vd, 8*8);  // Grouping of 8.
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11823,12 +11843,12 @@ Hart<URV>::execVsaddu_vv(const DecodedInst* di)
     case EW::Half:   vsaddu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsaddu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11895,12 +11915,12 @@ Hart<URV>::execVsaddu_vx(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -11928,12 +11948,12 @@ Hart<URV>::execVsaddu_vi(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12004,12 +12024,12 @@ Hart<URV>::execVsadd_vv(const DecodedInst* di)
     case EW::Half:   vsadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12082,12 +12102,12 @@ Hart<URV>::execVsadd_vx(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12115,12 +12135,12 @@ Hart<URV>::execVsadd_vi(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12185,12 +12205,12 @@ Hart<URV>::execVssubu_vv(const DecodedInst* di)
     case EW::Half:   vssubu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssubu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssubu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12257,12 +12277,12 @@ Hart<URV>::execVssubu_vx(const DecodedInst* di)
     case EW::Half:   vssubu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssubu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssubu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12333,12 +12353,12 @@ Hart<URV>::execVssub_vv(const DecodedInst* di)
     case EW::Half:   vssub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12411,12 +12431,12 @@ Hart<URV>::execVssub_vx(const DecodedInst* di)
     case EW::Half:   vssub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12523,12 +12543,12 @@ Hart<URV>::execVaadd_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12555,12 +12575,12 @@ Hart<URV>::execVaaddu_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12629,12 +12649,12 @@ Hart<URV>::execVaadd_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12663,12 +12683,12 @@ Hart<URV>::execVaaddu_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12735,12 +12755,12 @@ Hart<URV>::execVasub_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12767,12 +12787,12 @@ Hart<URV>::execVasubu_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12841,12 +12861,12 @@ Hart<URV>::execVasub_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12875,12 +12895,12 @@ Hart<URV>::execVasubu_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -12961,12 +12981,12 @@ Hart<URV>::execVsmul_vv(const DecodedInst* di)
     case EW::Half:   vsmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13049,12 +13069,12 @@ Hart<URV>::execVsmul_vx(const DecodedInst* di)
     case EW::Half:   vsmul_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsmul_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsmul_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13122,12 +13142,12 @@ Hart<URV>::execVssrl_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13196,12 +13216,12 @@ Hart<URV>::execVssrl_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13228,12 +13248,12 @@ Hart<URV>::execVssrl_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13260,12 +13280,12 @@ Hart<URV>::execVssra_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13294,12 +13314,12 @@ Hart<URV>::execVssra_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13326,12 +13346,12 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13409,7 +13429,7 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -13423,12 +13443,12 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13505,7 +13525,7 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -13521,12 +13541,12 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13545,7 +13565,7 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -13559,12 +13579,12 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13583,7 +13603,7 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -13597,12 +13617,12 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13621,7 +13641,7 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -13637,12 +13657,12 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13661,7 +13681,7 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -13675,12 +13695,12 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13703,7 +13723,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   unsigned start = csRegs_.peekVstart();
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -13759,7 +13779,7 @@ Hart<URV>::execVle8_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13769,7 +13789,7 @@ Hart<URV>::execVle16_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint16_t>(di, ElementWidth::Half, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13779,7 +13799,7 @@ Hart<URV>::execVle32_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint32_t>(di, ElementWidth::Word, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13789,7 +13809,7 @@ Hart<URV>::execVle64_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13797,7 +13817,7 @@ template <typename URV>
 void
 Hart<URV>::execVle128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13805,7 +13825,7 @@ template <typename URV>
 void
 Hart<URV>::execVle256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13813,7 +13833,7 @@ template <typename URV>
 void
 Hart<URV>::execVle512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13821,7 +13841,7 @@ template <typename URV>
 void
 Hart<URV>::execVle1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13846,7 +13866,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -13910,7 +13930,7 @@ Hart<URV>::execVse8_v(const DecodedInst* di)
 {
   if (not vectorStore<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13920,7 +13940,7 @@ Hart<URV>::execVse16_v(const DecodedInst* di)
 {
   if (not vectorStore<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13930,7 +13950,7 @@ Hart<URV>::execVse32_v(const DecodedInst* di)
 {
   if (not vectorStore<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13940,7 +13960,7 @@ Hart<URV>::execVse64_v(const DecodedInst* di)
 {
   if (not vectorStore<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -13948,7 +13968,7 @@ template <typename URV>
 void
 Hart<URV>::execVse128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13956,7 +13976,7 @@ template <typename URV>
 void
 Hart<URV>::execVse256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13964,7 +13984,7 @@ template <typename URV>
 void
 Hart<URV>::execVse512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13972,7 +13992,7 @@ template <typename URV>
 void
 Hart<URV>::execVse1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -13982,7 +14002,7 @@ Hart<URV>::execVlm_v(const DecodedInst* di)
 {
   if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -14004,7 +14024,7 @@ Hart<URV>::execVlm_v(const DecodedInst* di)
 
   if (not ok)
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14014,7 +14034,7 @@ Hart<URV>::execVsm_v(const DecodedInst* di)
 {
   if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -14036,7 +14056,7 @@ Hart<URV>::execVsm_v(const DecodedInst* di)
 
   if (not ok)
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14056,7 +14076,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
   if ((not checkVecExec()) or badConfig or di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -14107,7 +14127,7 @@ Hart<URV>::execVlre8_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14117,7 +14137,7 @@ Hart<URV>::execVlre16_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14127,7 +14147,7 @@ Hart<URV>::execVlre32_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14137,7 +14157,7 @@ Hart<URV>::execVlre64_v(const DecodedInst* di)
 {
   if (not vectorLoadWholeReg<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14145,7 +14165,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14153,7 +14173,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14161,7 +14181,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14169,7 +14189,7 @@ template <typename URV>
 void
 Hart<URV>::execVlre1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14186,7 +14206,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
   ElementWidth eew = ElementWidth::Byte;
   if (not checkVecExec()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -14236,7 +14256,7 @@ Hart<URV>::execVs1r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::One))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14246,7 +14266,7 @@ Hart<URV>::execVs2r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::Two))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14256,7 +14276,7 @@ Hart<URV>::execVs4r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::Four))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14266,7 +14286,7 @@ Hart<URV>::execVs8r_v(const DecodedInst* di)
 {
   if (not vectorStoreWholeReg(di, GroupMultiplier::Eight))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14276,7 +14296,7 @@ Hart<URV>::execVle8ff_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint8_t>(di, ElementWidth::Byte, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14286,7 +14306,7 @@ Hart<URV>::execVle16ff_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint16_t>(di, ElementWidth::Half, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14296,7 +14316,7 @@ Hart<URV>::execVle32ff_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint32_t>(di, ElementWidth::Word, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14306,7 +14326,7 @@ Hart<URV>::execVle64ff_v(const DecodedInst* di)
 {
   if (not vectorLoad<uint64_t>(di, ElementWidth::Word2, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14314,7 +14334,7 @@ template <typename URV>
 void
 Hart<URV>::execVle128ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14322,7 +14342,7 @@ template <typename URV>
 void
 Hart<URV>::execVle256ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14330,7 +14350,7 @@ template <typename URV>
 void
 Hart<URV>::execVle512ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14338,7 +14358,7 @@ template <typename URV>
 void
 Hart<URV>::execVle1024ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14363,7 +14383,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -14424,7 +14444,7 @@ Hart<URV>::execVlse8_v(const DecodedInst* di)
 {
   if (not vectorLoadStrided<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14434,7 +14454,7 @@ Hart<URV>::execVlse16_v(const DecodedInst* di)
 {
   if (not vectorLoadStrided<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14444,7 +14464,7 @@ Hart<URV>::execVlse32_v(const DecodedInst* di)
 {
   if (not vectorLoadStrided<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14454,7 +14474,7 @@ Hart<URV>::execVlse64_v(const DecodedInst* di)
 {
   if (not vectorLoadStrided<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14462,7 +14482,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14470,7 +14490,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14478,7 +14498,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14486,7 +14506,7 @@ template <typename URV>
 void
 Hart<URV>::execVlse1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14512,7 +14532,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
   unsigned start = csRegs_.peekVstart();
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -14575,7 +14595,7 @@ Hart<URV>::execVsse8_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint8_t>(di, ElementWidth::Byte))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14585,7 +14605,7 @@ Hart<URV>::execVsse16_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint16_t>(di, ElementWidth::Half))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14595,7 +14615,7 @@ Hart<URV>::execVsse32_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint32_t>(di, ElementWidth::Word))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14605,7 +14625,7 @@ Hart<URV>::execVsse64_v(const DecodedInst* di)
 {
   if (not vectorStoreStrided<uint64_t>(di, ElementWidth::Word2))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -14613,7 +14633,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14621,7 +14641,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14629,7 +14649,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14637,7 +14657,7 @@ template <typename URV>
 void
 Hart<URV>::execVsse1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -14661,7 +14681,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -14757,11 +14777,11 @@ Hart<URV>::execVloxei8_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Byte); break;
     case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Byte); break;
     case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Byte); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -14782,11 +14802,11 @@ Hart<URV>::execVloxei16_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Half); break;
     case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Half); break;
     case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Half); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -14807,11 +14827,11 @@ Hart<URV>::execVloxei32_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Word); break;
     case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Word); break;
     case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Word); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -14832,11 +14852,11 @@ Hart<URV>::execVloxei64_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadIndexed<uint16_t>(di, EW::Word2); break;
     case EW::Word:   ok = vectorLoadIndexed<uint32_t>(di, EW::Word2); break;
     case EW::Word2:  ok = vectorLoadIndexed<uint64_t>(di, EW::Word2); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -14892,7 +14912,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -15001,11 +15021,11 @@ Hart<URV>::execVsoxei8_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Byte); break;
     case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Byte); break;
     case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Byte); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -15026,11 +15046,11 @@ Hart<URV>::execVsoxei16_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Half); break;
     case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Half); break;
     case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Half); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -15051,11 +15071,11 @@ Hart<URV>::execVsoxei32_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Word); break;
     case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Word); break;
     case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Word); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -15076,11 +15096,11 @@ Hart<URV>::execVsoxei64_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreIndexed<uint16_t>(di, EW::Word2); break;
     case EW::Word:   ok = vectorStoreIndexed<uint32_t>(di, EW::Word2); break;
     case EW::Word2:  ok = vectorStoreIndexed<uint64_t>(di, EW::Word2); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -15136,7 +15156,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -15154,7 +15174,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg > 32)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -15211,7 +15231,7 @@ Hart<URV>::execVlsege8_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15223,7 +15243,7 @@ Hart<URV>::execVlsege16_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15235,7 +15255,7 @@ Hart<URV>::execVlsege32_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15247,7 +15267,7 @@ Hart<URV>::execVlsege64_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15255,7 +15275,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15263,7 +15283,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15271,7 +15291,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15279,7 +15299,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15304,7 +15324,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   unsigned start = csRegs_.peekVstart();
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -15321,7 +15341,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg > 32)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -15378,7 +15398,7 @@ Hart<URV>::execVssege8_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15390,7 +15410,7 @@ Hart<URV>::execVssege16_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15402,7 +15422,7 @@ Hart<URV>::execVssege32_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15414,7 +15434,7 @@ Hart<URV>::execVssege64_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15422,7 +15442,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15430,7 +15450,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15438,7 +15458,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15446,7 +15466,7 @@ template <typename URV>
 void
 Hart<URV>::execVssege1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15458,7 +15478,7 @@ Hart<URV>::execVlssege8_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15470,7 +15490,7 @@ Hart<URV>::execVlssege16_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15482,7 +15502,7 @@ Hart<URV>::execVlssege32_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15494,7 +15514,7 @@ Hart<URV>::execVlssege64_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, false))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15502,7 +15522,7 @@ template <typename URV>
 void
 Hart<URV>::execVlssege128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15510,7 +15530,7 @@ template <typename URV>
 void
 Hart<URV>::execVlssege256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15518,7 +15538,7 @@ template <typename URV>
 void
 Hart<URV>::execVlssege512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15526,7 +15546,7 @@ template <typename URV>
 void
 Hart<URV>::execVlssege1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15541,7 +15561,7 @@ Hart<URV>::execVsssege8_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15556,7 +15576,7 @@ Hart<URV>::execVsssege16_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15571,7 +15591,7 @@ Hart<URV>::execVsssege32_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15586,7 +15606,7 @@ Hart<URV>::execVsssege64_v(const DecodedInst* di)
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -15594,7 +15614,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15602,7 +15622,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15610,7 +15630,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15618,7 +15638,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15642,7 +15662,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -15660,7 +15680,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg > 32)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
   vecRegs_.ldStSize_ = elemSize;
@@ -15768,7 +15788,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15776,7 +15796,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15784,7 +15804,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15792,7 +15812,7 @@ template <typename URV>
 void
 Hart<URV>::execVluxsegei1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15816,7 +15836,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
 
@@ -15834,7 +15854,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   // Used registers must not exceed 32.
   if (vd + fieldCount*eg > 32)
     {
-      illegalInst(di);
+      postVecFail(di);
       return false;
     }
   vecRegs_.ldStSize_ = elemSize;
@@ -15957,7 +15977,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15965,7 +15985,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15973,7 +15993,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -15981,7 +16001,7 @@ template <typename URV>
 void
 Hart<URV>::execVsuxsegei1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16002,11 +16022,11 @@ Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Byte); break;
     case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Byte); break;
     case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Byte); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16027,11 +16047,11 @@ Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Half); break;
     case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Half); break;
     case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Half); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16052,11 +16072,11 @@ Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word); break;
     case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word); break;
     case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16077,11 +16097,11 @@ Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
     case EW::Half:   ok = vectorLoadSegIndexed<uint16_t>(di, EW::Word2); break;
     case EW::Word:   ok = vectorLoadSegIndexed<uint32_t>(di, EW::Word2); break;
     case EW::Word2:  ok = vectorLoadSegIndexed<uint64_t>(di, EW::Word2); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16089,7 +16109,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16097,7 +16117,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16105,7 +16125,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16113,7 +16133,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16134,11 +16154,11 @@ Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Byte); break;
     case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Byte); break;
     case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Byte); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16159,11 +16179,11 @@ Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Half); break;
     case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Half); break;
     case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Half); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16184,11 +16204,11 @@ Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word); break;
     case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word); break;
     case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16209,11 +16229,11 @@ Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
     case EW::Half:   ok = vectorStoreSegIndexed<uint16_t>(di, EW::Word2); break;
     case EW::Word:   ok = vectorStoreSegIndexed<uint32_t>(di, EW::Word2); break;
     case EW::Word2:  ok = vectorStoreSegIndexed<uint64_t>(di, EW::Word2); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   if (ok)
-    csRegs_.clearVstart();
+    postVecSuccess();
 }
 
 
@@ -16221,7 +16241,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei128_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16229,7 +16249,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei256_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16237,7 +16257,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei512_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16245,7 +16265,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei1024_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16257,7 +16277,7 @@ Hart<URV>::execVlsege8ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint8_t);
   if (not vectorLoadSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -16269,7 +16289,7 @@ Hart<URV>::execVlsege16ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint16_t);
   if (not vectorLoadSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -16281,7 +16301,7 @@ Hart<URV>::execVlsege32ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint32_t);
   if (not vectorLoadSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -16293,7 +16313,7 @@ Hart<URV>::execVlsege64ff_v(const DecodedInst* di)
   unsigned stride = fieldCount*sizeof(uint64_t);
   if (not vectorLoadSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride, true))
     return;
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -16301,7 +16321,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege128ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16309,7 +16329,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege256ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16317,7 +16337,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege512ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16325,7 +16345,7 @@ template <typename URV>
 void
 Hart<URV>::execVlsege1024ff_v(const DecodedInst* di)
 {
-  illegalInst(di);
+  postVecFail(di);
 }
 
 
@@ -16843,11 +16863,11 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
     case EW::Half:   vfadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -16905,11 +16925,11 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
     case EW::Half:  vfadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfadd_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -16966,11 +16986,11 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
     case EW::Half:   vfsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17028,11 +17048,11 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
     case EW::Half:  vfsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17090,11 +17110,11 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
     case EW::Half:  vfrsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfrsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfrsub_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17174,7 +17194,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17189,12 +17209,12 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    default:         illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17251,7 +17271,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17266,11 +17286,11 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
     {
     case EW::Half: vfwadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vfwadd_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17326,7 +17346,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17341,12 +17361,12 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    default:         illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17403,7 +17423,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17418,11 +17438,11 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
     {
     case EW::Half: vfwsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vfwsub_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17477,7 +17497,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17492,12 +17512,12 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     {
     case EW::Half:   vfwadd_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwadd_wv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    default:         illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17552,7 +17572,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17567,11 +17587,11 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
     {
     case EW::Half: vfwadd_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vfwadd_wf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17626,7 +17646,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17641,11 +17661,11 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     {
     case EW::Half:   vfwsub_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwsub_wv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17700,7 +17720,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -17715,11 +17735,11 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
     {
     case EW::Half: vfwsub_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vfwsub_wf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17776,11 +17796,11 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
     case EW::Half:   vfmul_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmul_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmul_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17838,11 +17858,11 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
     case EW::Half:  vfmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfmul_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfmul_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17899,11 +17919,11 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
     case EW::Half:   vfdiv_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfdiv_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfdiv_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -17961,11 +17981,11 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
     case EW::Half:  vfdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfdiv_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfdiv_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18023,11 +18043,11 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
     case EW::Half:  vfrdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfrdiv_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfrdiv_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18084,7 +18104,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
   // Double wide legal. Destination register multiple of emul.
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -18096,11 +18116,11 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwmul_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwmul_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18159,7 +18179,7 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
   // Double wide legal. Destination register multiple of emul.
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -18171,11 +18191,11 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
     {
     case EW::Half: vfwmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word: vfwmul_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18247,9 +18267,9 @@ Hart<URV>::execVfmadd_vv(const DecodedInst* di)
     case EW::Half:   vfmadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -18308,9 +18328,9 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
     case EW::Half:  vfmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfmadd_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18372,9 +18392,9 @@ Hart<URV>::execVfnmadd_vv(const DecodedInst* di)
     case EW::Half:   vfnmadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfnmadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfnmadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -18433,9 +18453,9 @@ Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
     case EW::Half:  vfnmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfnmadd_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfnmadd_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18497,9 +18517,9 @@ Hart<URV>::execVfmsub_vv(const DecodedInst* di)
     case EW::Half:   vfmsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -18558,9 +18578,9 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
     case EW::Half:  vfmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfmsub_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18622,9 +18642,9 @@ Hart<URV>::execVfnmsub_vv(const DecodedInst* di)
     case EW::Half:   vfnmsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfnmsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfnmsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -18683,9 +18703,9 @@ Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
     case EW::Half:  vfnmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfnmsub_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfnmsub_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18747,9 +18767,9 @@ Hart<URV>::execVfmacc_vv(const DecodedInst* di)
     case EW::Half:   vfmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -18809,23 +18829,23 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfmacc_vf<Float16>(vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfmacc_vf<float>  (vd, f1, vs2, group, start, elems, masked);
       break;
 
     case EW::Word2:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfmacc_vf<double> (vd, f1, vs2, group, start, elems, masked);
       break;
 
-    default: illegalInst(di); return;
+    default: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -18887,9 +18907,9 @@ Hart<URV>::execVfnmacc_vv(const DecodedInst* di)
     case EW::Half:   vfnmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfnmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfnmacc_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -18948,9 +18968,9 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
     case EW::Half:  vfnmacc_vf<Float16>(vd, f1, v2, group, start, elems, masked); break;
     case EW::Word:  vfnmacc_vf<float>  (vd, f1, v2, group, start, elems, masked); break;
     case EW::Word2: vfnmacc_vf<double> (vd, f1, v2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19012,9 +19032,9 @@ Hart<URV>::execVfmsac_vv(const DecodedInst* di)
     case EW::Half:   vfmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -19073,9 +19093,9 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
     case EW::Half:  vfmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfmsac_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19137,9 +19157,9 @@ Hart<URV>::execVfnmsac_vv(const DecodedInst* di)
     case EW::Half:   vfnmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfnmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfnmsac_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -19198,9 +19218,9 @@ Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
     case EW::Half:  vfnmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfnmsac_vf<float>  (vd, f1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfnmsac_vf<double> (vd, f1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19262,7 +19282,7 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19274,9 +19294,9 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -19335,7 +19355,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19347,9 +19367,9 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
     {
     case EW::Half: vfwmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
     case EW::Word: vfwmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19411,7 +19431,7 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19423,9 +19443,9 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
     {
     case EW::Half: vfwnmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vfwnmacc_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -19484,7 +19504,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19496,9 +19516,9 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
     {
     case EW::Half: vfwnmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
     case EW::Word: vfwnmacc_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19560,7 +19580,7 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19572,9 +19592,9 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 template <typename URV>
@@ -19633,7 +19653,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19645,9 +19665,9 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
     {
     case EW::Half: vfwmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
     case EW::Word: vfwmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19709,7 +19729,7 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19721,9 +19741,9 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
     {
     case EW::Half: vfwnmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word: vfwnmsac_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19783,7 +19803,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19795,9 +19815,9 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
     {
     case EW::Half: vfwnmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
     case EW::Word: vfwnmsac_vf<float>  (vd, fs1, vs2, group, start, elems, masked); break;
-    default: illegalInst(di); return;
+    default: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19856,9 +19876,9 @@ Hart<URV>::execVfsqrt_v(const DecodedInst* di)
     case EW::Half:  vfsqrt_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfsqrt_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2: vfsqrt_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19899,7 +19919,7 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   if (not di->isMasked() or vd == 0)
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19915,23 +19935,23 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfmerge<Float16>(vd, vs1, rs2, group, start, elems);
       break;
 
     case EW::Word:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfmerge<float>  (vd, vs1, rs2, group, start, elems);
       break;
 
     case EW::Word2:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfmerge<double> (vd, vs1, rs2, group, start, elems);
       break;
 
-    default: illegalInst(di); return;
+    default: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -19964,7 +19984,7 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
 
   if (di->isMasked())
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -19981,23 +20001,23 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
   switch (sew)
     {
     case EW::Half:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfmv_v_f<Float16>(vd, rs1, group, start, elems);
       break;
 
     case EW::Word:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfmv_v_f<float>  (vd, rs1, group, start, elems);
       break;
 
     case EW::Word2:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfmv_v_f<double> (vd, rs1, group, start, elems);
       break;
 
-    default: illegalInst(di); return;
+    default: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20055,13 +20075,13 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vmfeq_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfeq_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfeq_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20123,9 +20143,9 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
     case EW::Half:  vmfeq_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfeq_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfeq_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20183,13 +20203,13 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vmfne_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfne_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfne_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20251,9 +20271,9 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
     case EW::Half:  vmfne_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfne_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfne_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20308,13 +20328,13 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vmflt_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmflt_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmflt_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20373,9 +20393,9 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
     case EW::Half:  vmflt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmflt_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmflt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20430,13 +20450,13 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vmfle_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmfle_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmfle_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20495,9 +20515,9 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
     case EW::Half:  vmfle_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfle_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfle_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20556,9 +20576,9 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
     case EW::Half:  vmfgt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfgt_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfgt_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20617,9 +20637,9 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
     case EW::Half:  vmfge_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vmfge_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmfge_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20674,13 +20694,13 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfclass_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfclass_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20736,16 +20756,16 @@ Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20801,16 +20821,16 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20834,16 +20854,16 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20867,16 +20887,16 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -20934,16 +20954,16 @@ Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_f_xu_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_xu_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_xu_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21001,16 +21021,16 @@ Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_f_x_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_x_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_x_v<double> (vd, vs1, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21066,7 +21086,7 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21076,12 +21096,12 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21137,7 +21157,7 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21147,12 +21167,12 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21173,7 +21193,7 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21183,12 +21203,12 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21208,7 +21228,7 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21218,12 +21238,12 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21283,7 +21303,7 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21294,22 +21314,22 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfwcvt_f_xu_v<uint8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfwcvt_f_xu_v<uint16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfwcvt_f_xu_v<uint32_t>(vd, vs1, group, start, elems, masked);
       break;
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21369,7 +21389,7 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21380,22 +21400,22 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfwcvt_f_x_v<int8_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfwcvt_f_x_v<int16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfwcvt_f_x_v<int32_t>(vd, vs1, group, start, elems, masked);
       break;
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21460,7 +21480,7 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21470,12 +21490,12 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfwcvt_f_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21535,7 +21555,7 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21546,20 +21566,20 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked);
       break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21619,7 +21639,7 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21630,22 +21650,22 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfncvt_x_f_w<int32_t>(vd, vs1, group, start, elems, masked);
       break;
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21668,7 +21688,7 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21679,22 +21699,22 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfncvt_xu_f_w<uint8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfncvt_xu_f_w<uint16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfncvt_xu_f_w<uint32_t>(vd, vs1, group, start, elems, masked);
       break;
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21717,7 +21737,7 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21728,22 +21748,22 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      if (not isZvfhLegal()) { illegalInst(di); return; }
+      if (not isZvfhLegal()) { postVecFail(di); return; }
       vfncvt_x_f_w<int8_t> (vd, vs1, group, start, elems, masked);
       break;
     case EW::Half:
-      if (not isFpLegal()) { illegalInst(di); return; }
+      if (not isFpLegal()) { postVecFail(di); return; }
       vfncvt_x_f_w<int16_t>(vd, vs1, group, start, elems, masked);
       break;
     case EW::Word:
-      if (not isDpLegal()) { illegalInst(di); return; }
+      if (not isDpLegal()) { postVecFail(di); return; }
       vfncvt_x_f_w<int32_t>(vd, vs1, group, start, elems, masked);
       break;
     default:
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21800,7 +21820,7 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21810,14 +21830,14 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21874,7 +21894,7 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21884,14 +21904,14 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21947,7 +21967,7 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -21957,14 +21977,14 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    default:         illegalInst(di); return;
+    default:         postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -21990,7 +22010,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 
   if (not vecRegs_.isDoubleWideLegal(sew, group))
     {
-      illegalInst(di);
+      postVecFail(di);
       return;
     }
 
@@ -22000,14 +22020,14 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: illegalInst(di); return;
+    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       illegalInst(di); return;
+    default:       postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22075,18 +22095,18 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredsum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22145,18 +22165,18 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredosum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22216,17 +22236,17 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredmin_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmin_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmin_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22286,17 +22306,17 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredmax_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmax_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmax_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22368,18 +22388,18 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfwredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22443,18 +22463,18 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfwredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  illegalInst(di); return;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word2:  postVecFail(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
 
   updateAccruedFpBits(0.0f);
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22528,9 +22548,9 @@ Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
     case EW::Half:  vfrsqrt7_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfrsqrt7_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2: vfrsqrt7_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22594,9 +22614,9 @@ Hart<URV>::execVfrec7_v(const DecodedInst* di)
     case EW::Half:  vfrec7_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:  vfrec7_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2: vfrec7_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22653,17 +22673,17 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   illegalInst(di); return;
+    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfmin_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmin_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmin_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  illegalInst(di); return;
-    case EW::Word8:  illegalInst(di); return;
-    case EW::Word16: illegalInst(di); return;
-    case EW::Word32: illegalInst(di); return;
+    case EW::Word4:  postVecFail(di); return;
+    case EW::Word8:  postVecFail(di); return;
+    case EW::Word16: postVecFail(di); return;
+    case EW::Word32: postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22723,9 +22743,9 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
     case EW::Half:  vfmin_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfmin_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfmin_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22782,14 +22802,14 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfmax_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfmax_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfmax_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22849,10 +22869,10 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
     case EW::Half:  vfmax_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfmax_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfmax_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22907,14 +22927,14 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfsgnj_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnj_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnj_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -22972,10 +22992,10 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
     case EW::Half:  vfsgnj_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnj_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnj_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -23031,14 +23051,14 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfsgnjn_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjn_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjn_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -23097,10 +23117,10 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
     case EW::Half:  vfsgnjn_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjn_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjn_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -23161,14 +23181,14 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:  illegalInst(di); return;
+    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfsgnjx_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjx_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjx_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
@@ -23233,10 +23253,10 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
     case EW::Half:  vfsgnjx_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjx_vf<float>  (vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjx_vf<double> (vd, vs1, rs2, group, start, elems, masked); break;
-    default:        illegalInst(di); return;
+    default:        postVecFail(di); return;
     }
 
-  csRegs_.clearVstart();
+  postVecSuccess();
 }
 
 
