@@ -5654,7 +5654,7 @@ template <typename URV>
 void
 Hart<URV>::execVredsum_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5720,7 +5720,7 @@ template <typename URV>
 void
 Hart<URV>::execVredand_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5786,7 +5786,7 @@ template <typename URV>
 void
 Hart<URV>::execVredor_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5852,7 +5852,7 @@ template <typename URV>
 void
 Hart<URV>::execVredxor_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5918,7 +5918,7 @@ template <typename URV>
 void
 Hart<URV>::execVredminu_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5984,7 +5984,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmin_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6050,7 +6050,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6116,7 +6116,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmax_vs(const DecodedInst* di)
 {
-  if (not checkRedOpVsEmul(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
