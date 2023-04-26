@@ -559,7 +559,7 @@ Hart<URV>::checkArithmeticInst(const DecodedInst* di)
 {
   // vector extension must be enabled, mstatus.fs must not be off, sew/lmul must
   // be legal, vtype.vill must not be set.
-  if (not checkVecExec() or not vecRegs_.legalConfig())
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -712,7 +712,7 @@ bool
 Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
 				 unsigned src, unsigned groupX8)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -765,7 +765,7 @@ bool
 Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig())
+  if (not isVecLegal() or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -1116,7 +1116,7 @@ template <typename URV>
 void
 Hart<URV>::execVsetvli(const DecodedInst* di)
 {
-  if (not checkVecExec())
+  if (not isVecLegal())
     {
       postVecFail(di);
       return;
@@ -1136,7 +1136,7 @@ template <typename URV>
 void
 Hart<URV>::execVsetivli(const DecodedInst* di)
 {
-  if (not checkVecExec())
+  if (not isVecLegal())
     {
       postVecFail(di);
       return;
@@ -1198,7 +1198,7 @@ template <typename URV>
 void
 Hart<URV>::execVsetvl(const DecodedInst* di)
 {
-  if (not checkVecExec())
+  if (not isVecLegal())
     {
       postVecFail(di);
       return;
@@ -6600,7 +6600,7 @@ void
 Hart<URV>::execVcpop_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
       postVecFail(di);
       return;
@@ -6629,7 +6629,7 @@ void
 Hart<URV>::execVfirst_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
       postVecFail(di);
       return;
@@ -6662,7 +6662,7 @@ void
 Hart<URV>::execVmsbf_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
       postVecFail(di);
       return;
@@ -6707,7 +6707,7 @@ void
 Hart<URV>::execVmsif_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
       postVecFail(di);
       return;
@@ -6753,7 +6753,7 @@ void
 Hart<URV>::execVmsof_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
       postVecFail(di);
       return;
@@ -6808,7 +6808,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
   unsigned group = vecRegs_.groupMultiplierX8();
 
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0 or
+  if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0 or
       (vs1 >= vd and vs1 < vd + group/8))
     {
       postVecFail(di);
@@ -6862,7 +6862,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   // Spec does not mention vstart > 0. Got a clarification saying it
   // is ok not to take an exception in that case.
   uint32_t start = csRegs_.peekVstart();
-  if (not checkVecExec() or not vecRegs_.legalConfig() or start > 0)
+  if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
       postVecFail(di);
       return;
@@ -13721,7 +13721,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -13864,7 +13864,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -14000,7 +14000,7 @@ template <typename URV>
 void
 Hart<URV>::execVlm_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
     {
       postVecFail(di);
       return;
@@ -14032,7 +14032,7 @@ template <typename URV>
 void
 Hart<URV>::execVsm_v(const DecodedInst* di)
 {
-  if (not checkVecExec() or not vecRegs_.legalConfig() or di->isMasked())
+  if (not isVecLegal() or not vecRegs_.legalConfig() or di->isMasked())
     {
       postVecFail(di);
       return;
@@ -14074,7 +14074,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   GroupMultiplier gm = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, gm);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
-  if ((not checkVecExec()) or badConfig or di->isMasked())
+  if ((not isVecLegal()) or badConfig or di->isMasked())
     {
       postVecFail(di);
       return false;
@@ -14204,7 +14204,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
   unsigned start = csRegs_.peekVstart();
   unsigned groupX8 = vecRegs_.groupMultiplierX8(gm);
   ElementWidth eew = ElementWidth::Byte;
-  if (not checkVecExec()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
+  if (not isVecLegal()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
     {
       postVecFail(di);
       return false;
@@ -14381,7 +14381,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -14530,7 +14530,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
     badConfig = not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -14679,7 +14679,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -14910,7 +14910,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -15154,7 +15154,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -15322,7 +15322,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
   unsigned start = csRegs_.peekVstart();
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -15660,7 +15660,7 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;
@@ -15834,7 +15834,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   GroupMultiplier offsetGroup{GroupMultiplier::One};
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
-  if (not checkVecExec() or badConfig or not vecRegs_.legalConfig())
+  if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
       postVecFail(di);
       return false;

@@ -1650,17 +1650,10 @@ namespace WdRiscv
 	    assert(0);
 	  return;
 	}
+
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
       unsigned size2 = size - size1;
-      if (size1 == 4 and size2 == 4)
-	{
-	  uint32_t val1 = 0, val2 = 0;
-	  if (not memory_.read(pa1, val1) or not memory_.read(pa2, val2))
-	    assert(0);
-	  value = (uint64_t(val2) << 32) | val1;
-	  return;
-	}
 
       value = 0;
       uint8_t byte = 0;
@@ -1675,7 +1668,6 @@ namespace WdRiscv
 	else assert(0);
     }
 
-
     /// Write an item that may span 2 physical pages. See memRead.
     template <typename STORE_TYPE>
     void memWrite(uint64_t pa1, uint64_t pa2, STORE_TYPE value)
@@ -1689,14 +1681,6 @@ namespace WdRiscv
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
       unsigned size2 = size - size1;
-      if constexpr (sizeof(STORE_TYPE) == 8)
-	if (size1 == 4 and size2 == 4)
-	  {
-	    uint32_t val1 = value, val2 = value >> 32;
-	    if (not memory_.write(hartIx_, pa1, val1) or not memory_.write(hartIx_, pa2, val2))
-	      assert(0);
-	    return;
-	  }
 
       if constexpr (sizeof(STORE_TYPE) > 1)
 	{
@@ -1721,13 +1705,6 @@ namespace WdRiscv
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
       unsigned size2 = size - size1;
-      if (size1 == 4 and size2 == 4)
-	{
-	  uint32_t val1 = 0, val2 = 0;
-	  memory_.peek(pa1, val1, usePma); memory_.peek(pa2, val2, usePma);
-	  value = (uint64_t(val2) << 32) | val1;
-	  return;
-	}
 
       value = 0;
       uint8_t byte = 0;
@@ -1837,10 +1814,6 @@ namespace WdRiscv
     // OFF.
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
-
-    /// Return true if it is legal to execute a vector instruction.
-    bool checkVecExec()
-    { return isVecLegal(); }
 
     // We avoid the cost of locating MSTATUS in the CSRs register file
     // by caching its value in this class. We do this whenever MSTATUS
