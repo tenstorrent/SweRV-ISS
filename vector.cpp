@@ -9962,7 +9962,6 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
   if (not checkMaskableInst(di))
     return;
 
-
   unsigned group = vecRegs_.groupMultiplierX8();
   unsigned fromGroup = group/2;
   if (fromGroup == 0)
@@ -9978,7 +9977,6 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
     }
 
   unsigned vd = di->op0(),  vs1 = di->op1();
-
   unsigned eg = group >= 8 ? group / 8 : 1;
   if (vd % eg)
     {
@@ -9990,6 +9988,12 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
       postVecFail(di);
       return;
     }
+  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+    {
+      postVecFail(di);
+      return;
+    }
+
   vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
   vecRegs_.opsEmul_.at(1) = eg > 2? eg/2 : 1; // Track operand group for logging.
 
@@ -10053,6 +10057,27 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
       return;
     }
 
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if (vd % eg)
+    {
+      postVecFail(di);
+      return;
+    }
+  if (eg > 4 and (vs1 % (eg/4)))
+    {
+      postVecFail(di);
+      return;
+    }
+  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging
+
   typedef ElementWidth EW;
 
   EW sew = vecRegs_.elemWidth();
@@ -10066,7 +10091,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
     case EW::Word4: eew = EW::Word; break;
     case EW::Word8: eew = EW::Word2; break;
     case EW::Word16: eew = EW::Word4; break;
-    case EW::Word32: eew = ElementWidth::Word8; break;
+    case EW::Word32: eew = EW::Word8; break;
     }
   if (not vecRegs_.legalConfig(eew, emul))
     {
@@ -10075,22 +10100,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      postVecFail(di);
-      return;
-    }
-  if (eg > 4 and (vs1 % (eg/4)))
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging
 
   switch (sew)
     {
@@ -10128,6 +10138,27 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
       return;
     }
 
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if (vd % eg)
+    {
+      postVecFail(di);
+      return;
+    }
+  if (eg > 8 and (vs1 % (eg/8)))
+    {
+      postVecFail(di);
+      return;
+    }
+  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 8? eg/8 : 1; // Track operand group for logging
+
   typedef ElementWidth EW;
 
   EW sew = vecRegs_.elemWidth();
@@ -10150,11 +10181,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
-
-  if (not checkVecOpsVsEmul(di, vd, group))
-    return;
 
   switch (sew)
     {
@@ -10224,6 +10251,27 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
       return;
     }
 
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if (vd % eg)
+    {
+      postVecFail(di);
+      return;
+    }
+  if (eg > 2 and (vs1 % (eg/2)))
+    {
+      postVecFail(di);
+      return;
+    }
+  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 2? eg/2 : 1; // Track operand group for logging.
+
   typedef ElementWidth EW;
 
   EW sew = vecRegs_.elemWidth();
@@ -10246,22 +10294,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      postVecFail(di);
-      return;
-    }
-  if (eg > 2 and (vs1 % (eg/2)))
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 2? eg/2 : 1; // Track operand group for logging.
 
   switch (sew)
     {
@@ -10299,6 +10332,27 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
       return;
     }
 
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if (vd % eg)
+    {
+      postVecFail(di);
+      return;
+    }
+  if (eg > 4 and (vs1 % (eg/4)))
+    {
+      postVecFail(di);
+      return;
+    }
+  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging
+
   typedef ElementWidth EW;
 
   EW sew = vecRegs_.elemWidth();
@@ -10321,22 +10375,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vd % eg)
-    {
-      postVecFail(di);
-      return;
-    }
-  if (eg > 4 and (vs1 % (eg/4)))
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging.
 
   switch (sew)
     {
@@ -10374,6 +10413,27 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
       return;
     }
 
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned eg = group >= 8 ? group / 8 : 1;
+  if (vd % eg)
+    {
+      postVecFail(di);
+      return;
+    }
+  if (eg > 8 and (vs1 % (eg/8)))
+    {
+      postVecFail(di);
+      return;
+    }
+  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
+  vecRegs_.opsEmul_.at(1) = eg > 8? eg/8 : 1; // Track operand group for logging
+
   typedef ElementWidth EW;
 
   EW sew = vecRegs_.elemWidth();
@@ -10396,11 +10456,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
-
-  if (not checkVecOpsVsEmul(di, vd, group))
-    return;
 
   switch (sew)
     {
