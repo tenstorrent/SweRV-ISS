@@ -2330,6 +2330,12 @@ namespace WdRiscv
     // otherwise.
     bool checkArithmeticInst(const DecodedInst* di);
 
+    // Return true if given FP arithmetic (non load/store) instruction
+    // is legal. Take an illegal instruction exception and return
+    // false otherwise.
+    bool checkFpArithmeticInst(const DecodedInst* di, bool wide = false,
+			       bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
+
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
     // otherwise.

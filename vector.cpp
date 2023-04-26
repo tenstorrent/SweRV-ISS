@@ -473,8 +473,17 @@ Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide,
   if (not checkMaskableInst(di))
     return false;
 
-  ElementWidth sew = vecRegs_.elemWidth();
+  return checkFpArithmeticInst(di, wide, fp16LegalFn);
+}
 
+
+
+template <typename URV>
+bool
+Hart<URV>::checkFpArithmeticInst(const DecodedInst* di, bool wide,
+				 bool (Hart::*fp16LegalFn)() const)
+{
+  ElementWidth sew = vecRegs_.elemWidth();
   bool ok = false;
 
   typedef ElementWidth EW;
@@ -5631,7 +5640,7 @@ template <typename URV>
 void
 Hart<URV>::execVredsum_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5697,7 +5706,7 @@ template <typename URV>
 void
 Hart<URV>::execVredand_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5763,7 +5772,7 @@ template <typename URV>
 void
 Hart<URV>::execVredor_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5829,7 +5838,7 @@ template <typename URV>
 void
 Hart<URV>::execVredxor_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5895,7 +5904,7 @@ template <typename URV>
 void
 Hart<URV>::execVredminu_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5961,7 +5970,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmin_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6027,7 +6036,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22027,7 +22036,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredsum_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22097,7 +22106,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredosum_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22168,7 +22177,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredmin_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22238,7 +22247,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredmax_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkFpArithmeticInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22320,7 +22329,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkFpArithmeticInst(di, true))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22395,7 +22404,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkFpArithmeticInst(di, true))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
