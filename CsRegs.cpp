@@ -384,9 +384,10 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
     {
       // Make VSEIP, VSTIP, and VSSIP read-only one.
       auto csr = findCsr(CN::MIDELEG);
-      auto reset = csr->getResetValue() | 0x444; // Bits VSEIP, VSTIP, and VSSIP.
-      auto mask = csr->getWriteMask() & ~URV(0x444);
-      auto pokeMask = csr->getPokeMask() & ~URV(0x444);
+      auto sgeip = geilen_ ? URV(1) << 12 : 0;  // Bit SGEIP
+      auto reset = csr->getResetValue() | sgeip | 0x444; // Bits VSEIP, VSTIP, and VSSIP.
+      auto mask = csr->getWriteMask() & ~URV(0x444) & ~sgeip;
+      auto pokeMask = csr->getPokeMask() & ~URV(0x444) & ~sgeip;
       configCsr(CN::MIDELEG, true, reset, mask, pokeMask, false, false);
     }
 }
@@ -1702,7 +1703,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("vsireg",     CsrNumber::VSIREG,     !mand, !imp, 0, wam, wam);
   defineCsr("vstopei",    CsrNumber::VSTOPEI,    !mand, !imp, 0, wam, wam);
   defineCsr("vstopi",     CsrNumber::VSTOPI,     !mand, !imp, 0, wam, wam);
-  defineCsr("hidelegh",   CsrNumber::HIDELEGh,   !mand, !imp, 0, wam, wam);
+  defineCsr("hidelegh",   CsrNumber::HIDELEGH,   !mand, !imp, 0, wam, wam);
   defineCsr("nhienh",     CsrNumber::NHIENH,     !mand, !imp, 0, wam, wam);
   defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam);
   defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam);

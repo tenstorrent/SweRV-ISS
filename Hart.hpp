@@ -1349,6 +1349,9 @@ namespace WdRiscv
     /// be a power of 2 greater than or equal to 4).
     bool configMemoryProtectionGrain(uint64_t size);
 
+    /// Set the max number of guest external interrupts.
+    bool configGuestInterruptCount(unsigned n);
+
     /// Enable user mode.
     void enableUserMode(bool flag)
     { enableExtension(RvExtension::U, flag); csRegs_.enableUserMode(flag); }

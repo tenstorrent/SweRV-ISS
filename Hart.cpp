@@ -3122,6 +3122,15 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
 
 
 template <typename URV>
+bool
+Hart<URV>::configGuestInterruptCount(unsigned n)
+{
+  csRegs_.setGuestInterruptCount(n);
+  return true;
+}
+
+
+template <typename URV>
 void
 Hart<URV>::recordDivInst(unsigned rd, URV value)
 {

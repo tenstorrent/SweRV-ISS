@@ -1320,6 +1320,16 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  tag = "guest_interrupt_count";
+  if (config_ -> count(tag))
+    {
+      uint64_t size = 0;
+      if (getJsonUnsigned<uint64_t>(tag, config_ -> at(tag), size))
+        hart.configGuestInterruptCount(size);
+      else
+        errors++;
+    }
+
   tag = "enable_misaligned_data";
   if (config_ -> count(tag))
     {

@@ -416,7 +416,7 @@ namespace WdRiscv
       VSIREG     = 0x251,
       VSTOPEI    = 0x25c,
       VSTOPI     = 0xeb0,
-      HIDELEGh   = 0x613,
+      HIDELEGH   = 0x613,
       NHIENH     = 0x618,
       HVIPH      = 0x655,
       HVIPRIO1H  = 0x656,
@@ -1320,6 +1320,11 @@ namespace WdRiscv
     unsigned getPmpG() const
     { return pmpG_; }
 
+    /// Set the max number of guest interrupt count. This should be
+    /// done before hypervisor mode is enable.
+    void setGuestInterruptCount(unsigned value)
+    { geilen_ = value; }
+
     /// Enable user mode.
     void enableUserMode(bool flag)
     { userEnabled_ = flag; }
@@ -1404,7 +1409,8 @@ namespace WdRiscv
     bool hasPerfEventSet_ = false;
     std::unordered_set<unsigned> perfEventSet_;
 
-    unsigned pmpG_ = 0;  // PMP G value: ln2(pmpGrain) - 2
+    unsigned pmpG_ = 0;     // PMP G value: ln2(pmpGrain) - 2
+    unsigned geilen_ = 0;   // Guest interrupt count.
 
     bool userEnabled_ = false;    // User mode enabled
     bool superEnabled_ = false;   // Supervisor
