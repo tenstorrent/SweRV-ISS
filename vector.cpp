@@ -186,9 +186,7 @@ namespace WdRiscv
   /// yields the type
   ///    uint32_t.
   template <typename T>
-  struct makeDoubleWide
-  {
-  };
+  struct makeDoubleWide;
 
   template <> struct makeDoubleWide<uint8_t>    { typedef uint16_t type; };
   template <> struct makeDoubleWide<uint16_t>   { typedef uint32_t type; };
@@ -216,9 +214,7 @@ namespace WdRiscv
   /// yields the type
   ///    int32_t.
   template <typename T>
-  struct getSameWidthIntType
-  {
-  };
+  struct getSameWidthIntType;
 
   template <> struct getSameWidthIntType<Float16>  { typedef int16_t  type; };
   template <> struct getSameWidthIntType<float>    { typedef int32_t  type; };
@@ -230,9 +226,7 @@ namespace WdRiscv
   /// yields the type
   ///    uint32_t.
   template <typename T>
-  struct getSameWidthUintType
-  {
-  };
+  struct getSameWidthUintType;
 
   template <> struct getSameWidthUintType<Float16>  { typedef uint16_t  type; };
   template <> struct getSameWidthUintType<float>    { typedef uint32_t  type; };
@@ -244,9 +238,7 @@ namespace WdRiscv
   /// yields the type
   ///    float.
   template <typename T>
-  struct getSameWidthFloatType
-  {
-  };
+  struct getSameWidthFloatType;
 
   template <> struct getSameWidthFloatType<int16_t>   { typedef Float16  type; };
   template <> struct getSameWidthFloatType<int32_t>   { typedef float    type; };
@@ -254,42 +246,6 @@ namespace WdRiscv
   template <> struct getSameWidthFloatType<uint16_t>  { typedef Float16  type; };
   template <> struct getSameWidthFloatType<uint32_t>  { typedef float    type; };
   template <> struct getSameWidthFloatType<uint64_t>  { typedef double   type; };
-
-
-  /// Return smallest representable value of the given integer type T.
-  template <typename T>
-  T
-  minVal()
-  {
-    typedef typename std::make_unsigned<T>::type UT;
-    if constexpr (std::is_same<T, UT>::value)
-      return T(0);
-    else
-      {
-        unsigned amount = sizeof(T)*8 - 1;
-        return T(1) << amount;
-      }
-  }
-
-
-  /// Return largest representable value of the given integer type T.
-  template <typename T>
-  T
-  maxVal()
-  {
-    typedef typename std::make_unsigned<T>::type UT;
-    if constexpr (std::is_same<T, UT>::value)
-      {
-	T x{0};
-	return ~x;
-      }
-    else
-      {
-	UT x{0};
-	x = ~x;
-	return x >> 1;
-      }
-  }
 
 
   /// Set result to the upper half of a*b computed in double width
@@ -10907,7 +10863,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   bool carry = di->isMasked();
@@ -10917,22 +10873,8 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkDestSourceOverlap(vcout, 8, vs1, group) or
-      not checkDestSourceOverlap(vcout, 8, vs2, group))
-    {
-      postVecFail(di);
-      return;
-    }
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vs1 % eg) or (vs2 % eg))
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vcout, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -10954,7 +10896,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   bool carry = di->isMasked();
@@ -10963,20 +10905,8 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
-    {
-      postVecFail(di);
-      return;
-    }
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vcout, vs1, group))
+    return;
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
@@ -11000,7 +10930,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   bool carry = di->isMasked();
@@ -11010,20 +10940,8 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkDestSourceOverlap(vcout, 8, vs1, group))
-    {
-      postVecFail(di);
-      return;
-    }
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vcout, vs1, group))
+    return;
 
   SRV e2 = di->op2As<int32_t>();
 
@@ -11047,7 +10965,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   bool borrow = di->isMasked();
@@ -11057,22 +10975,8 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkDestSourceOverlap(vbout, 8, vs1, group) or
-      not checkDestSourceOverlap(vbout, 8, vs2, group))
-    {
-      postVecFail(di);
-      return;
-    }
-
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if ((vs1 % eg) or (vs2 % eg))
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vbout, vs1, vs2, group))
+    return;
 
   typedef ElementWidth EW;
   switch (sew)
@@ -11094,7 +10998,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   bool borrow = di->isMasked();
@@ -11103,20 +11007,9 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-  if (not checkDestSourceOverlap(vbout, 8, vs1, group))
-    {
-      postVecFail(di);
-      return;
-    }
 
-  unsigned eg = group >= 8 ? group / 8 : 1;
-  if (vs1 % eg)
-    {
-      postVecFail(di);
-      return;
-    }
-  vecRegs_.opsEmul_.at(0) = 1; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  if (not checkMaskVecOpsVsEmul(di, vbout, vs1, group))
+    return;
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
@@ -13450,10 +13343,10 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
           ELEM_TYPE dest = ELEM_TYPE(e1);
           if (e1 != ELEM_TYPE2X(dest))
             {
-              if (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
-                dest = maxVal<ELEM_TYPE>();
+              if constexpr (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
+                dest = std::numeric_limits<ELEM_TYPE>::max();
               else
-                dest = (e1 < 0) ? minVal<ELEM_TYPE>() : maxVal<ELEM_TYPE>();
+                dest = (e1 < 0) ? std::numeric_limits<ELEM_TYPE>::min() : std::numeric_limits<ELEM_TYPE>::max();
 	      saturated = true;
             }
 
@@ -13546,10 +13439,10 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
           ELEM_TYPE dest = ELEM_TYPE(e1);
           if (e1 != ELEM_TYPE2X(dest))
             {
-              if (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
-                dest = maxVal<ELEM_TYPE>();
+              if constexpr (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
+                dest = std::numeric_limits<ELEM_TYPE>::max();
               else
-                dest = (e1 < 0) ? minVal<ELEM_TYPE>() : maxVal<ELEM_TYPE>();
+                dest = (e1 < 0) ? std::numeric_limits<ELEM_TYPE>::min() : std::numeric_limits<ELEM_TYPE>::max();
 	      saturated = true;
             }
 
