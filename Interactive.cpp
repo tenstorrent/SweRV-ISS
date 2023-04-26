@@ -1683,6 +1683,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "sei_pin")
+    {
+      if (not seiPinCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "h" or command == "?" or command == "help")
     {
       helpCommand(tokens);
@@ -2017,11 +2026,41 @@ Interactive<URV>::checkInterruptCommand(Hart<URV>& hart, const std::string& line
     {
       std::cerr << "Invalid check_interupt command: " << line << '\n';
       std::cerr << "Expecting: check_interrupt [<mip-value>]\n";
+      return false;
     }
 
   InterruptCause cause;
   if (hart.isInterruptPossible(mip, cause))
     std::cout << unsigned(cause) << '\n';
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::seiPinCommand(Hart<URV>& hart, const std::string& line,
+				const std::vector<std::string>& tokens)
+{
+  // sei_pin [0|1]
+  unsigned val = 0;
+  if (tokens.size() == 2)
+    {
+      if (not parseCmdLineNumber("pin-value", tokens.at(1), val))
+	return false;
+      if (val != 0 and val != 1)
+	{
+	  std::cerr << "Invalid pin-value: " << tokens.at(1) << '\n';
+	  return false;
+	}
+      hart.setSeiPin(val);
+    }
+  else
+    {
+      std::cerr << "Invalid sei_pin command: " << line << '\n';
+      std::cerr << "Expecting: sei_pin 0|1\n";
+      return false;
+    }
 
   return true;
 }

@@ -628,6 +628,10 @@ namespace WdRiscv
     /// Clear pending non-maskable-interrupt.
     void clearPendingNmi();
 
+    /// Set/clear Supervisor external interrupt pin.
+    void setSeiPin(bool flag)
+    { seiPin_ = flag; }
+
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.
@@ -4426,6 +4430,7 @@ namespace WdRiscv
     bool tracePtw_ = false;          // Trace paget table walk.
     bool tracePmp_ = false;          // Trace PMP accesses
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
+    bool seiPin_ = false;            // Supervisor external interrupt pin value.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
 

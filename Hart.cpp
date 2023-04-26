@@ -4609,6 +4609,10 @@ bool
 Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 {
   URV mip = csRegs_.peekMip();
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  mip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   return isInterruptPossible(mip, cause);
 }
 
@@ -10405,6 +10409,10 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
 
   URV next = intRegs_.read(di->op1());
 
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   doCsrWrite(di, csr, next, di->op0(), prev);
 
   if (postCsrInst_)
@@ -10441,6 +10449,10 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
         postCsrInst_(hartIx_, csr);
       return;
     }
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -10479,6 +10491,10 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
       return;
     }
 
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   doCsrWrite(di, csr, next, di->op0(), prev);
 
   if (postCsrInst_)
@@ -10506,6 +10522,10 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
           postCsrInst_(hartIx_, csr);
         return;
       }
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
 
@@ -10546,6 +10566,10 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
       return;
     }
 
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   doCsrWrite(di, csr, next, di->op0(), prev);
 
   if (postCsrInst_)
@@ -10584,6 +10608,10 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
         postCsrInst_(hartIx_, csr);
       return;
     }
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
