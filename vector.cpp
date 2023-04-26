@@ -5288,7 +5288,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vv(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5364,7 +5364,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vx(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
@@ -5432,7 +5432,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vi(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkMaskableInst(di))
     return;
 
   uint32_t vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
@@ -5525,7 +5525,8 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 
   GroupMultiplier v2gm = GroupMultiplier::One;
   if (not vecRegs_.groupNumberX8ToSymbol(v2Group, v2gm) or
-      not vecRegs_.legalConfig(ElementWidth::Half, v2gm))
+      not vecRegs_.legalConfig(ElementWidth::Half, v2gm) or
+      (masked and vd == 0))
     {
       postVecFail(di);
       return;
