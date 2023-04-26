@@ -633,10 +633,10 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
 /// Return true if destination/source overlap is allowed.
 static
 bool
-checkDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
-		       unsigned srcGroupX8)
+checkDestSourceOverlap(unsigned dest, unsigned destWidth, unsigned destGroupX8,
+		       unsigned src, unsigned srcWidth, unsigned srcGroupX8)
 {
-  if (srcGroupX8 == destGroupX8)
+  if (srcWidth == destWidth)
     return true;   // Source eew == dest eew
 
   unsigned srcGroup = srcGroupX8 >= 8 ? srcGroupX8/8 : 1;
@@ -647,7 +647,7 @@ checkDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
 
   // Destination eew > source eew: Overlap ok if source group is >=
   // 1 and overlap is at last register in dest.
-  if (destGroupX8 > srcGroupX8)
+  if (destWidth > srcWidth)
     return srcGroupX8 >= 8 and src == dest + destGroup - 1;
 
   // Destination eew < source eew: Overlap ok if overlap is at
@@ -756,8 +756,9 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned o
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  if (not checkDestSourceOverlap(op0, 8, op1, groupX8) or
-      not checkDestSourceOverlap(op0, 8, op2, groupX8))
+  unsigned destEew = 1, destGroupX8 = 8, srcEew = vecRegs_.elementWidthInBits();
+  if (not checkDestSourceOverlap(op0, destEew, destGroupX8, op1, srcEew, groupX8) or
+      not checkDestSourceOverlap(op0, destEew, destGroupX8, op2, srcEew, groupX8))
     {
       postVecFail(di);
       return false;
@@ -790,11 +791,14 @@ Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
+  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sewx2 = sew * 2;
+
   // Destination EEW > source EEW, no overlap except in highest destination
   // register and only if source EEW >= 1.
-  bool overlapOk = checkDestSourceOverlap(op0, wideGroupX8, op1, groupX8);
+  bool overlapOk = checkDestSourceOverlap(op0, sewx2, wideGroupX8, op1, sew, groupX8);
   if (op1 != op2)
-    overlapOk = overlapOk and checkDestSourceOverlap(op0, wideGroupX8, op2, groupX8);
+    overlapOk = overlapOk and checkDestSourceOverlap(op0, sewx2, wideGroupX8, op2, sew, groupX8);
 
   unsigned op = op1 | op2;
 
@@ -823,7 +827,10 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
-  bool overlapOk = checkDestSourceOverlap(op0, wideGroupX8, op2, groupX8);
+  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sewx2 = 2*sew;
+
+  bool overlapOk = checkDestSourceOverlap(op0, sewx2, wideGroupX8, op2, sew, groupX8);
 
   unsigned opw = op0 | op1;
 
@@ -876,7 +883,10 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, wideGroupX8);
+  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sewx2 = 2*sew;
+
+  bool overlapOk = checkDestSourceOverlap(op0, sew, groupX8, op1, sewx2, wideGroupX8);
 
   unsigned op = op0 | op2;
 
@@ -905,7 +915,10 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  bool overlapOk = checkDestSourceOverlap(op0, groupX8, op1, wideGroupX8);
+  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sewx2 = 2*sew;
+
+  bool overlapOk = checkDestSourceOverlap(op0, sew, groupX8, op1, sewx2, wideGroupX8);
 
   if (overlapOk and (op0 & mask) == 0 and (op1 & mask2) == 0)
     {
@@ -9953,7 +9966,9 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned sw = dw/2; // source width.
+  if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
       postVecFail(di);
       return;
@@ -10034,7 +10049,9 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned sw = dw/4; // source width.
+  if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
       postVecFail(di);
       return;
@@ -10115,7 +10132,9 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned sw = dw/8; // source width.
+  if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
       postVecFail(di);
       return;
@@ -10228,7 +10247,9 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned sw = dw/2; // source width.
+  if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
       postVecFail(di);
       return;
@@ -10309,7 +10330,9 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned sw = dw/4; // source width.
+  if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
       postVecFail(di);
       return;
@@ -10390,7 +10413,9 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  if (not checkDestSourceOverlap(vd, group, vs1, fromGroup))
+  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned sw = dw/8; // source width.
+  if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
       postVecFail(di);
       return;
