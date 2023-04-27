@@ -23,6 +23,7 @@
 #include <type_traits>
 #include <functional>
 #include <atomic>
+#include <boost/circular_buffer.hpp>
 #include "InstId.hpp"
 #include "InstEntry.hpp"
 #include "IntRegs.hpp"
@@ -1438,12 +1439,13 @@ namespace WdRiscv
     void enableAddrTransLog(FILE* file)
     { virtMem_.enableAddrTransLog(file); }
 
-    /// Enable branch address trace
-    void enableBranchTrace(FILE* file)
-    { branchTraceFile_ = file; }
+    /// Trace the last n branches to the given file. No tracing is
+    /// done if n is 0.
+    void traceBranches(const std::string& file, uint64_t n)
+    { branchTraceFile_ = file; branchBuffer_.resize(n); }
 
-    void branchTraceWindow(uint64_t window)
-    { branchTraceWindow_ = window; }
+    /// Write the collected branch traces to the file at the given path.
+    bool saveBranchTrace(const std::string& path);
 
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)
@@ -4514,8 +4516,20 @@ namespace WdRiscv
     uint64_t bbCacheHit_ = 0;
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;            // Basic block file.
-    FILE* branchTraceFile_ = nullptr;   // Branch trace file.
-    uint64_t branchTraceWindow_ = ~uint64_t(0);
+
+    std::string branchTraceFile_;       // Branch trace file.
+    struct BranchRecord
+    {
+      BranchRecord(char type = 0, uint64_t pc = 0, uint64_t nextPc = 0, uint8_t size = 0)
+	: pc_(pc), nextPc_(nextPc), type_(type), size_(size)
+      { }
+
+      uint64_t pc_ = 0;
+      uint64_t nextPc_ = 0;
+      char type_ = 0;
+      uint8_t size_ = 0;
+    };
+    boost::circular_buffer<BranchRecord> branchBuffer_;
 
     Mcm<URV>* mcm_ = nullptr;
 

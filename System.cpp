@@ -312,6 +312,10 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
   if (not memory_->saveInstructionAddressTrace(itracePath))
     return false;
 
+  Filesystem::path branchPath = dirPath / "branch-trace";
+  if (not hart.saveBranchTrace(branchPath))
+    return false;
+
   return true;
 }
 

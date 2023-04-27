@@ -171,6 +171,8 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
 template <typename URV>
 Hart<URV>::~Hart()
 {
+  if (branchBuffer_.max_size() and not branchTraceFile_.empty())
+    saveBranchTrace(branchTraceFile_);
 }
 
 
@@ -4039,6 +4041,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
   uint64_t limit = instCountLim_;
   bool doStats = instFreq_ or enableCounters_;
+  bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
 
   // Check for gdb break every 1000000 instructions.
   unsigned gdbCount = 0, gdbLimit = 1000000;
@@ -4149,6 +4152,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    if (takeTriggerAction(traceFile, pc_, pc_, instCounter_, false))
 	      return true;
           prevPerfControl_ = perfControl_;
+
+	  if (traceBranchOn and di->isBranch())
+	    traceBranch(di);
 	}
       catch (const CoreException& ce)
 	{
@@ -4213,8 +4219,8 @@ Hart<URV>::simpleRun()
       while (true)
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
-          if (hasLim or bbFile_ or instrLineTrace_ or branchTraceFile_ or isRvs() or
-	      isRvu() or hasClint())
+          if (hasLim or bbFile_ or instrLineTrace_ or not branchTraceFile_.empty() or
+	      isRvs() or isRvu() or hasClint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4320,8 +4326,7 @@ Hart<URV>::simpleRunWithLimit()
   bool checkInterrupt = isRvs() or isRvu() or hasClint();
   std::string instStr;
 
-  if (branchTraceFile_)
-    fprintf(branchTraceFile_, "0x%jx\n", uintmax_t(pc_));
+  bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
 
   while (noUserStop and instCounter_ < limit) 
     {
@@ -4356,7 +4361,7 @@ Hart<URV>::simpleRunWithLimit()
       if (bbFile_)
 	countBasicBlocks(di);
 
-      if (branchTraceFile_ and di->isBranch())
+      if (traceBranchOn and di->isBranch())
 	traceBranch(di);
     }
 
@@ -4394,31 +4399,50 @@ Hart<URV>::simpleRunNoLimit()
 
 
 template <typename URV>
+bool
+Hart<URV>::saveBranchTrace(const std::string& path)
+{
+  FILE* file = fopen(path.c_str(), "w");
+  if (not file)
+    {
+      std::cerr << "Failed to open branch-trace output file '" << path << "' for writing\n";
+      return false;
+    }
+  
+  for (auto iter = branchBuffer_.begin(); iter != branchBuffer_.end(); ++iter)
+    {
+      auto& rec = *iter;
+      if (rec.size_)
+	fprintf(file, "%c 0x%jx 0x%jx %d\n", rec.type_, uintmax_t(rec.pc_),
+		uintmax_t(rec.nextPc_), rec.size_);
+    }
+  fclose(file);
+  return true;
+}
+
+
+template <typename URV>
 void
 Hart<URV>::traceBranch(const DecodedInst* di)
 {
-  uint64_t delta = instCountLim_ - instCounter_;
-  if (delta > branchTraceWindow_)
-    return;
-
   bool hasTrap = hasInterrupt_ or hasException_;
   if (hasTrap)
     return;
   
-  std::string_view type = lastBranchTaken_ ? "t" : "n";  // For conditional branch.
+  char type = lastBranchTaken_ ? 't' : 'n';  // For conditional branch.
   if (not di->isConditionalBranch())
     {
       bool indirect = di->isBranchToRegister();
       if (di->op0() == 1 or di->op0() == 5)
-	type = indirect ? "ic" : "c";  // call
+	type = indirect ? 'k' : 'c';  // call
       else if (di->operandCount() >= 2 and (di->op1() == 1 or di->op1() == 5))
-	type = "r";  // return
+	type = 'r';  // return
       else
-	type = indirect? "ij" : "j";    // indirect-jump or jump.
+	type = indirect? 'i' : 'j';    // indirect-jump or jump.
     }
 
-  fprintf(branchTraceFile_, "%s 0x%jx 0x%jx %d\n", type.data(),
-	  uintmax_t(currPc_), uintmax_t(pc_), di->instSize());
+  if (branchBuffer_.max_size())
+    branchBuffer_.push_back(BranchRecord(type, currPc_, pc_, di->instSize()));
 }
 
 

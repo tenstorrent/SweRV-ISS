@@ -1003,8 +1003,11 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
       config.configClint(system, hart, swAddr, clintLimit, timerAddr);
     }
 
+  uint64_t window = 1000000;
   if (args.branchWindow_)
-    hart.branchTraceWindow(*args.branchWindow_);
+    window = *args.branchWindow_;
+  if (not args.branchTraceFile.empty())
+    hart.traceBranches(args.branchTraceFile, window);
 
   if (not args.loadFrom.empty())
     {
@@ -1347,8 +1350,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile,
-	      FILE*& branchTraceFile)
+	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
 {
   size_t len = args.traceFile.size();
   bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
@@ -1419,17 +1421,6 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
         }
     }
 
-  if (not args.branchTraceFile.empty())
-    {
-      branchTraceFile = fopen(args.branchTraceFile.c_str(), "w");
-      if (not branchTraceFile)
-        {
-          std::cerr << "Failed to open branch trace file '"
-                    << args.branchTraceFile << "' for output\n";
-          return false;
-        }
-    }
-
   return true;
 }
 
@@ -1438,8 +1429,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 static
 void
 closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile,
-	       FILE*& branchTraceFile)
+	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1467,10 +1457,6 @@ closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
   if (attFile and attFile != stdout)
     fclose(attFile);
   attFile = nullptr;
-
-  if (branchTraceFile and branchTraceFile != stdout)
-    fclose(branchTraceFile);
-  branchTraceFile = nullptr;
 }
 
 
@@ -1549,7 +1535,7 @@ template <typename URV>
 static
 bool
 snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
-	    const Uint64Vec& periods, const std::string& branchTrace)
+	    const Uint64Vec& periods)
 {
   assert(system.hartCount() == 1);
   Hart<URV>& hart = *(system.ithHart(0));
@@ -1559,9 +1545,13 @@ snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
   for (size_t ix = 0; true; ++ix)
     {
       uint64_t nextLimit = globalLimit;
-      if (ix < periods.size())
-        nextLimit = (periods.size() == 1) ? hart.getInstructionCount() + periods.at(0)
-                                          : periods.at(ix);
+      if (not periods.empty())
+	{
+	  if (periods.size() == 1)
+	    nextLimit = hart.getInstructionCount() + periods.at(0);
+	  else
+	    nextLimit = ix < periods.size() ? periods.at(ix) : globalLimit;
+	}
 
       nextLimit = std::min(nextLimit, globalLimit);
       hart.setInstructionCountLimit(nextLimit);
@@ -1576,26 +1566,7 @@ snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
 	  return false;
 	}
 
-      FILE* btf = nullptr;
-      if (not branchTrace.empty())
-	{
-	  Filesystem::path path2 = path / branchTrace;
-	  btf = fopen(path2.c_str(), "w");
-	  if (not btf)
-	    {
-	      std::cerr << "Failed to open " << path2 << " for writing\n";
-	      return false;
-	    }
-	}
-      hart.enableBranchTrace(btf);
-
       hart.run(traceFile);
-
-      if (btf)
-	{
-	  fclose(btf);
-	  hart.enableBranchTrace(nullptr);
-	}
 
       if (hart.hasTargetProgramFinished() or nextLimit >= globalLimit)
 	{
@@ -1609,6 +1580,8 @@ snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
 	  return false;
 	}
     }
+
+  hart.traceBranches(std::string(), 0);  // Turn off branch tracing.
 
 #ifdef FAST_SLOPPY
   hart.reportOpenedFiles(std::cout);
@@ -1749,8 +1722,7 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
   if (not args.snapshotPeriods.empty())
     {
       if (system.hartCount() == 1)
-        return snapshotRun(system, traceFile, args.snapshotDir, args.snapshotPeriods,
-			   args.branchTraceFile);
+        return snapshotRun(system, traceFile, args.snapshotDir, args.snapshotPeriods);
       std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
     }
 
@@ -1914,9 +1886,7 @@ session(const Args& args, const HartConfig& config)
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
   FILE* attFile = nullptr;
-  FILE* branchTraceFile = nullptr;
-  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile,
-			branchTraceFile))
+  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1934,7 +1904,6 @@ session(const Args& args, const HartConfig& config)
       hart.setConsoleOutput(consoleOut);
       hart.enableBasicBlocks(bblockFile, args.bblockInsts);
       hart.enableAddrTransLog(attFile);
-      hart.enableBranchTrace(branchTraceFile);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())
@@ -1960,14 +1929,6 @@ session(const Args& args, const HartConfig& config)
 	return false;
     }
 
-  if (not args.snapshotPeriods.empty() and system.hartCount() == 1 and branchTraceFile)
-    {
-      fclose(branchTraceFile);
-      branchTraceFile = nullptr;
-      auto& hart0 = *system.ithHart(0);
-      hart0.enableBranchTrace(nullptr);
-    }
-
   bool result = sessionRun(system, args, traceFile, commandLog);
 
   auto& hart0 = *system.ithHart(0);
@@ -1977,8 +1938,7 @@ session(const Args& args, const HartConfig& config)
   if (not args.testSignatureFile.empty())
     result = system.produceTestSignatureFile(args.testSignatureFile) and result;
 
-  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile,
-		 branchTraceFile);
+  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
 
   return result;
 }
