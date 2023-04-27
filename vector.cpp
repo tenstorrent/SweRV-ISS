@@ -553,8 +553,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
   unsigned op = op0 | op1 | op2;
   if ((op & mask) == 0)
     {
-      auto& emul = vecRegs_.opsEmul_;
-      emul.assign(emul.size(), eg);  // Track operand group for logging
+      vecRegs_.setOpEmul(eg, eg, eg);  // Track operand group for logging
       return true;
     }
 
@@ -574,8 +573,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
   unsigned op = op0 | op1;
   if ((op & mask) == 0)
     {
-      auto& emul = vecRegs_.opsEmul_;
-      emul.at(0) = emul.at(1) = eg;  // Track operand group for logging
+      vecRegs_.setOpEmul(eg, eg);  // Track operand group for logging
       return true;
     }
   postVecFail(di);
@@ -592,7 +590,7 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned group
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
   if ((op0 & mask) == 0)
     {
-      vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging
+      vecRegs_.setOpEmul(eg);  // Track operand group for logging
       return true;
     }
   postVecFail(di);
@@ -618,9 +616,7 @@ Hart<URV>::checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
 
   if ((op1 & mask) == 0)
     {
-      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for scalar operands.
-      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
-      vecRegs_.opsEmul_.at(2) = 1;  // Emul of 1 for scalar operands.
+      vecRegs_.setOpEmul(1, eg, 1);  // Track operand group for logging (1 for mask).
       return true;
     }
 
@@ -702,8 +698,7 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned dest,
 
   if ((src & mask) == 0)
     {
-      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
-      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
+      vecRegs_.setOpEmul(1, eg);  // Track operand group for logging. 1 for mask.
       return true;
     }
 
@@ -745,9 +740,7 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
   unsigned op = op1 | op2;
   if ((op & mask) == 0)
     {
-      vecRegs_.opsEmul_.at(0) = 1;  // Emul of 1 for mask operand.
-      vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging
-      vecRegs_.opsEmul_.at(2) = eg; // Track operand group for logging
+      vecRegs_.setOpEmul(1, eg, eg);  // Track operand group for logging. 1 for mask.
       return true;
     }
 
@@ -782,9 +775,7 @@ Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
 
   if (overlapOk and (op0 & mask2) == 0 and (op & mask) == 0)
     {
-      auto& emul =  vecRegs_.opsEmul_;
-      emul.at(0) = eg2;  // Track operand group for logging
-      emul.at(1) = emul.at(2) = eg;
+      vecRegs_.setOpEmul(eg2, eg, eg);  // Track operand group for logging
       return true;
     }
 
@@ -814,9 +805,7 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
 
   if (overlapOk and (opw & mask2) == 0 and (op2 & mask) == 0)
     {
-      auto& emul =  vecRegs_.opsEmul_;
-      emul.at(0) = emul.at(1) = eg2;
-      emul.at(2) = eg;
+      vecRegs_.setOpEmul(eg2, eg2, eg);  // Track operand group for logging
       return true;
     }
 
@@ -839,8 +828,7 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
 
   if ((op & mask) == 0)
     {
-      auto& emul =  vecRegs_.opsEmul_;
-      emul.at(0) = emul.at(1) = eg2;
+      vecRegs_.setOpEmul(eg2, eg2);  // Track operand group for logging
       return true;
     }
 
@@ -870,9 +858,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 
   if (overlapOk and (op & mask) == 0 and (op1 & mask2) == 0)
     {
-      auto& emul =  vecRegs_.opsEmul_;
-      emul.at(0) = emul.at(2) = eg;
-      emul.at(1) = eg2;
+      vecRegs_.setOpEmul(eg, eg2, eg);  // Track operand group for logging
       return true;
     }
 
@@ -900,9 +886,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 
   if (overlapOk and (op0 & mask) == 0 and (op1 & mask2) == 0)
     {
-      auto& emul =  vecRegs_.opsEmul_;
-      emul.at(0) = eg;
-      emul.at(1) = eg2;
+      vecRegs_.setOpEmul(eg, eg2);  // Track operand group for logging
       return true;
     }
 
@@ -5504,9 +5488,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
       return;
     }
 
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(2) = v2g; // Track operand group for logging.
+  vecRegs_.setOpEmul(eg, eg, v2g);  // Track operand group for logging
 
   typedef ElementWidth EW;
   switch (sew)
@@ -9952,8 +9934,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
       return;
     }
 
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 2? eg/2 : 1; // Track operand group for logging.
+  vecRegs_.setOpEmul(eg, eg > 2? eg/2 : 1);  // Track operand group for logging
 
   typedef ElementWidth EW;
 
@@ -10035,8 +10016,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
       return;
     }
 
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging
+  vecRegs_.setOpEmul(eg, eg > 4? eg/4 : 1);  // Track operand group for logging
 
   typedef ElementWidth EW;
 
@@ -10118,8 +10098,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
       return;
     }
 
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 8? eg/8 : 1; // Track operand group for logging
+  vecRegs_.setOpEmul(eg, eg > 8? eg/8 : 1);  // Track operand group for logging
 
   typedef ElementWidth EW;
 
@@ -10233,8 +10212,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
       return;
     }
 
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 2? eg/2 : 1; // Track operand group for logging.
+  vecRegs_.setOpEmul(eg, eg > 2? eg/2 : 1);  // Track operand group for logging
 
   typedef ElementWidth EW;
 
@@ -10316,8 +10294,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
       return;
     }
 
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 4? eg/4 : 1; // Track operand group for logging
+  vecRegs_.setOpEmul(eg, eg > 4? eg/4 : 1);  // Track operand group for logging
 
   typedef ElementWidth EW;
 
@@ -10399,8 +10376,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
       return;
     }
 
-  vecRegs_.opsEmul_.at(0) = eg; // Track operand group for logging.
-  vecRegs_.opsEmul_.at(1) = eg > 8? eg/8 : 1; // Track operand group for logging
+  vecRegs_.setOpEmul(eg, eg > 8? eg/8 : 1);  // Track operand group for logging
 
   typedef ElementWidth EW;
 
@@ -11222,7 +11198,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.setOpEmul(1, eg);  // Track operand group for logging
 
   ElementWidth sew = vecRegs_.elemWidth();
 
@@ -11333,7 +11309,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  vecRegs_.opsEmul_.at(1) = eg; // Track operand group for logging.
+  vecRegs_.setOpEmul(1, eg);  // Track operand group for logging
 
   ElementWidth sew = vecRegs_.elemWidth();
 

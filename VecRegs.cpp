@@ -37,7 +37,7 @@ VecRegs::VecRegs()
     groupFlags.assign(groupFlags.size(), true);
 
   // Operands effective group multiplier is used for tracing/logging.
-  // Worst case we have 3 vector operands.
+  // At most we have 3 vector operands.
   opsEmul_.resize(3);
   opsEmul_.assign(opsEmul_.size(), 1);
 }

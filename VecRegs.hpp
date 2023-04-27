@@ -456,6 +456,11 @@ namespace WdRiscv
     int getLastWrittenReg() const
     { return lastWrittenReg_; }
 
+    /// Set effective group multipliers of the operands of a vector
+    /// instruction (this is used to record logging information).
+    void setOpEmul(unsigned emul0, unsigned emul1 = 1, unsigned emul2 = 1)
+    { opsEmul_.at(0) = emul0; opsEmul_.at(1) = emul1; opsEmul_.at(2) = emul2; }
+
     /// For instructions that do not use the write method, mark the
     /// last written register and the effective element widht.
     void touchReg(uint32_t reg, uint32_t groupX8)
