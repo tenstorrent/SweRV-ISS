@@ -529,6 +529,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
         ("tracebranch", po::value(&args.branchTraceFile),
          "Trace branch instructions to the given file.")
+        ("branchwindow", po::value<std::string>(),
+         "Trace branches in the last n instructions.")
         ("tracerlib", po::value(&args.tracerLib),
          "Path to tracer extension shared library which should provide C symbol tracerExtension."
          "Optionally include arguments after a colon to be exposed to the shared library "
