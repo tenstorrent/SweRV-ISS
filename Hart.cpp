@@ -1795,7 +1795,10 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	{
 	  char c = data;
 	  if (c)
-	    ::write(syscall_.effectiveFd(STDOUT_FILENO), &c, 1);
+	    {
+	      ::write(syscall_.effectiveFd(STDOUT_FILENO), &c, 1);
+	      std::cerr << "Hart::handleStoreToHost: write failed\n";
+	    }
 	}
       else if (cmd == 0 and fromHostValid_)
 	{
