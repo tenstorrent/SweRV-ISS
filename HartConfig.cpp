@@ -58,7 +58,8 @@ HartConfig::loadConfigFile(const std::string& filePath)
 
   try
     {
-      ifs >> *config_;
+      // Use json::parse rather than operator>> to allow comments to be ignored
+      *config_ = nlohmann::json::parse(ifs, nullptr /* callback */, true /* allow_exceptions */, true /* ignore_comments */);
     }
   catch (std::exception& e)
     {
