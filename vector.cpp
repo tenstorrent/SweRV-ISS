@@ -427,18 +427,18 @@ Hart<URV>::setVecStatus(FpStatus value)
 
 template <typename URV>
 bool
-Hart<URV>::checkMaskableInst(const DecodedInst* di)
+Hart<URV>::checkVecIntInst(const DecodedInst* di)
 {
-  return checkMaskableInst(di, vecRegs_.groupMultiplier(), vecRegs_.elemWidth());
+  return checkVecIntInst(di, vecRegs_.groupMultiplier(), vecRegs_.elemWidth());
 }
 
 
 template <typename URV>
 bool
-Hart<URV>::checkMaskableInst(const DecodedInst* di, GroupMultiplier /*gm*/,
+Hart<URV>::checkVecIntInst(const DecodedInst* di, GroupMultiplier /*gm*/,
 			     ElementWidth /*eew*/)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return false;
 
   if (di->isMasked() and di->op0() == 0)  // Dest register cannot overlap mask register v0
@@ -467,20 +467,20 @@ extern int  setSimulatorRoundingMode(RoundingMode mode);
 
 template <typename URV>
 bool
-Hart<URV>::checkFpMaskableInst(const DecodedInst* di, bool wide,
+Hart<URV>::checkVecFpInst(const DecodedInst* di, bool wide,
                                bool (Hart::*fp16LegalFn)() const)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return false;
 
-  return checkFpArithmeticInst(di, wide, fp16LegalFn);
+  return checkFpSewLmulVstart(di, wide, fp16LegalFn);
 }
 
 
 
 template <typename URV>
 bool
-Hart<URV>::checkFpArithmeticInst(const DecodedInst* di, bool wide,
+Hart<URV>::checkFpSewLmulVstart(const DecodedInst* di, bool wide,
 				 bool (Hart::*fp16LegalFn)() const)
 {
   ElementWidth sew = vecRegs_.elemWidth();
@@ -520,7 +520,7 @@ Hart<URV>::checkFpArithmeticInst(const DecodedInst* di, bool wide,
 
 template <typename URV>
 bool
-Hart<URV>::checkArithmeticInst(const DecodedInst* di)
+Hart<URV>::checkSewLmulVstart(const DecodedInst* di)
 {
   // vector extension must be enabled, mstatus.fs must not be off, sew/lmul must
   // be legal, vtype.vill must not be set.
@@ -674,22 +674,11 @@ hasDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
+Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned dest,
 				 unsigned src, unsigned groupX8)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
-    {
-      postVecFail(di);
-      return false;
-    }
-
-  // Trap on use of non-zero vstart for arithmetic vector ops.
-  URV vstart = csRegs_.peekVstart();
-  if (trapNonZeroVstart_ and vstart > 0)
-    {
-      postVecFail(di);
-      return false;
-    }
+  if (not checkSewLmulVstart(di))
+    return false;
 
 #if 0
   // Use of vstart values greater than vlmax is reserved (section 3.7 of spec).
@@ -727,22 +716,11 @@ Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8)
 {
-  if (not isVecLegal() or not vecRegs_.legalConfig())
-    {
-      postVecFail(di);
-      return false;
-    }
-
-  // Trap on use of non-zero vstart for arithmetic vector ops.
-  URV vstart = csRegs_.peekVstart();
-  if (trapNonZeroVstart_ and vstart > 0)
-    {
-      postVecFail(di);
-      return false;
-    }
+  if (not checkSewLmulVstart(di))
+    return false;
 
 #if 0
   // Use of vstart values greater than vlmax is reserved (section 3.7 of spec).
@@ -936,10 +914,10 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
+Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
 				   unsigned src, unsigned groupX8)
 {
-  if (not checkMaskVecOpsVsEmul(di, dest, src, groupX8))
+  if (not checkVecMaskInst(di, dest, src, groupX8))
     return false;
 
   typedef ElementWidth EW;
@@ -966,10 +944,10 @@ Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
 template <typename URV>
 inline
 bool
-Hart<URV>::checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned dest,
+Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
 				   unsigned src1, unsigned src2, unsigned groupX8)
 {
-  if (not checkMaskVecOpsVsEmul(di, dest, src1, src2, groupX8))
+  if (not checkVecMaskInst(di, dest, src1, src2, groupX8))
     return false;
 
   typedef ElementWidth EW;
@@ -1226,7 +1204,7 @@ template <typename URV>
 void
 Hart<URV>::execVadd_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -1289,7 +1267,7 @@ template <typename URV>
 void
 Hart<URV>::execVadd_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -1323,7 +1301,7 @@ template <typename URV>
 void
 Hart<URV>::execVadd_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -1388,7 +1366,7 @@ template <typename URV>
 void
 Hart<URV>::execVsub_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -1451,7 +1429,7 @@ template <typename URV>
 void
 Hart<URV>::execVsub_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -1514,7 +1492,7 @@ template <typename URV>
 void
 Hart<URV>::execVrsub_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -1577,7 +1555,7 @@ template <typename URV>
 void
 Hart<URV>::execVrsub_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -1646,7 +1624,7 @@ template <typename URV>
 void
 Hart<URV>::execVwaddu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -1685,7 +1663,7 @@ template <typename URV>
 void
 Hart<URV>::execVwadd_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -1759,7 +1737,7 @@ template <typename URV>
 void
 Hart<URV>::execVwaddu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -1800,7 +1778,7 @@ template <typename URV>
 void
 Hart<URV>::execVwadd_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -1876,7 +1854,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsubu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -1917,7 +1895,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsub_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -1993,7 +1971,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsubu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2032,7 +2010,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsub_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2106,7 +2084,7 @@ template <typename URV>
 void
 Hart<URV>::execVwaddu_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2145,7 +2123,7 @@ template <typename URV>
 void
 Hart<URV>::execVwadd_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2184,7 +2162,7 @@ template <typename URV>
 void
 Hart<URV>::execVwaddu_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2225,7 +2203,7 @@ template <typename URV>
 void
 Hart<URV>::execVwadd_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2266,7 +2244,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsubu_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2307,7 +2285,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsub_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2383,7 +2361,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsubu_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2422,7 +2400,7 @@ template <typename URV>
 void
 Hart<URV>::execVwsub_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -2498,7 +2476,7 @@ Hart<URV>::execVmseq_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -2558,7 +2536,7 @@ Hart<URV>::execVmseq_vx(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(rs2));
@@ -2589,7 +2567,7 @@ Hart<URV>::execVmseq_vi(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   int32_t imm = di->op2As<int32_t>();
@@ -2651,7 +2629,7 @@ Hart<URV>::execVmsne_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -2711,7 +2689,7 @@ Hart<URV>::execVmsne_vx(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(rs2));
@@ -2742,7 +2720,7 @@ Hart<URV>::execVmsne_vi(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   int32_t imm = di->op2As<int32_t>();
@@ -2804,7 +2782,7 @@ Hart<URV>::execVmsltu_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -2864,7 +2842,7 @@ Hart<URV>::execVmsltu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(rs2);
@@ -2895,7 +2873,7 @@ Hart<URV>::execVmslt_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -2924,7 +2902,7 @@ Hart<URV>::execVmslt_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(rs2));
@@ -2986,7 +2964,7 @@ Hart<URV>::execVmsleu_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -3047,7 +3025,7 @@ Hart<URV>::execVmsleu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(rs2);
@@ -3078,7 +3056,7 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   // Immediate is sign exended and then treated as unsigned.
@@ -3110,7 +3088,7 @@ Hart<URV>::execVmsle_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -3139,7 +3117,7 @@ Hart<URV>::execVmsle_vx(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(rs2));
@@ -3170,7 +3148,7 @@ Hart<URV>::execVmsle_vi(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   int32_t imm = di->op2As<int32_t>();
@@ -3232,7 +3210,7 @@ Hart<URV>::execVmsgtu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(rs2);
@@ -3263,7 +3241,7 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   // Immediate is sign exended and then treated as unsigned.
@@ -3295,7 +3273,7 @@ Hart<URV>::execVmsgt_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   URV e2 = intRegs_.read(rs2);
@@ -3326,7 +3304,7 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecMaskInst(di, vd, vs1, group))
     return;
 
   int32_t imm = di->op2As<int32_t>();
@@ -3382,7 +3360,7 @@ template <typename URV>
 void
 Hart<URV>::execVminu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3449,7 +3427,7 @@ template <typename URV>
 void
 Hart<URV>::execVminu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3513,7 +3491,7 @@ template <typename URV>
 void
 Hart<URV>::execVmin_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3577,7 +3555,7 @@ template <typename URV>
 void
 Hart<URV>::execVmin_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3641,7 +3619,7 @@ template <typename URV>
 void
 Hart<URV>::execVmaxu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3708,7 +3686,7 @@ template <typename URV>
 void
 Hart<URV>::execVmaxu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3772,7 +3750,7 @@ template <typename URV>
 void
 Hart<URV>::execVmax_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3836,7 +3814,7 @@ template <typename URV>
 void
 Hart<URV>::execVmax_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3900,7 +3878,7 @@ template <typename URV>
 void
 Hart<URV>::execVand_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -3966,7 +3944,7 @@ template <typename URV>
 void
 Hart<URV>::execVand_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4032,7 +4010,7 @@ template <typename URV>
 void
 Hart<URV>::execVand_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4097,7 +4075,7 @@ template <typename URV>
 void
 Hart<URV>::execVor_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4163,7 +4141,7 @@ template <typename URV>
 void
 Hart<URV>::execVor_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4229,7 +4207,7 @@ template <typename URV>
 void
 Hart<URV>::execVor_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4294,7 +4272,7 @@ template <typename URV>
 void
 Hart<URV>::execVxor_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4360,7 +4338,7 @@ template <typename URV>
 void
 Hart<URV>::execVxor_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4426,7 +4404,7 @@ template <typename URV>
 void
 Hart<URV>::execVxor_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4494,7 +4472,7 @@ template <typename URV>
 void
 Hart<URV>::execVsll_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4563,7 +4541,7 @@ template <typename URV>
 void
 Hart<URV>::execVsll_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4599,7 +4577,7 @@ template <typename URV>
 void
 Hart<URV>::execVsll_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool msk = di->isMasked();
@@ -4667,7 +4645,7 @@ template <typename URV>
 void
 Hart<URV>::execVsrl_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4736,7 +4714,7 @@ template <typename URV>
 void
 Hart<URV>::execVsrl_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4772,7 +4750,7 @@ template <typename URV>
 void
 Hart<URV>::execVsrl_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool msk = di->isMasked();
@@ -4806,7 +4784,7 @@ template <typename URV>
 void
 Hart<URV>::execVsra_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4839,7 +4817,7 @@ template <typename URV>
 void
 Hart<URV>::execVsra_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -4875,7 +4853,7 @@ template <typename URV>
 void
 Hart<URV>::execVsra_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool msk = di->isMasked();
@@ -4947,7 +4925,7 @@ template <typename URV>
 void
 Hart<URV>::execVnsrl_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -5025,7 +5003,7 @@ template <typename URV>
 void
 Hart<URV>::execVnsrl_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -5067,7 +5045,7 @@ template <typename URV>
 void
 Hart<URV>::execVnsrl_wi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool msk = di->isMasked();
@@ -5107,7 +5085,7 @@ template <typename URV>
 void
 Hart<URV>::execVnsra_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -5146,7 +5124,7 @@ template <typename URV>
 void
 Hart<URV>::execVnsra_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -5188,7 +5166,7 @@ template <typename URV>
 void
 Hart<URV>::execVnsra_wi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool msk = di->isMasked();
@@ -5266,7 +5244,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5342,7 +5320,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
@@ -5410,7 +5388,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgather_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   uint32_t vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
@@ -5488,7 +5466,7 @@ template <typename URV>
 void
 Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5581,7 +5559,7 @@ template <typename URV>
 void
 Hart<URV>::execVcompress_vm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   // vs2 is a mask register: elmul2 is 1
@@ -5653,7 +5631,7 @@ template <typename URV>
 void
 Hart<URV>::execVredsum_vs(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5719,7 +5697,7 @@ template <typename URV>
 void
 Hart<URV>::execVredand_vs(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5785,7 +5763,7 @@ template <typename URV>
 void
 Hart<URV>::execVredor_vs(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5851,7 +5829,7 @@ template <typename URV>
 void
 Hart<URV>::execVredxor_vs(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5917,7 +5895,7 @@ template <typename URV>
 void
 Hart<URV>::execVredminu_vs(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -5983,7 +5961,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmin_vs(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6049,7 +6027,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6115,7 +6093,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmax_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6188,7 +6166,7 @@ template <typename URV>
 void
 Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6219,7 +6197,7 @@ template <typename URV>
 void
 Hart<URV>::execVwredsum_vs(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -6250,7 +6228,7 @@ template <typename URV>
 void
 Hart<URV>::execVmand_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6291,7 +6269,7 @@ template <typename URV>
 void
 Hart<URV>::execVmnand_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6332,7 +6310,7 @@ template <typename URV>
 void
 Hart<URV>::execVmandnot_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6373,7 +6351,7 @@ template <typename URV>
 void
 Hart<URV>::execVmxor_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6414,7 +6392,7 @@ template <typename URV>
 void
 Hart<URV>::execVmor_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6455,7 +6433,7 @@ template <typename URV>
 void
 Hart<URV>::execVmnor_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6496,7 +6474,7 @@ template <typename URV>
 void
 Hart<URV>::execVmornot_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6537,7 +6515,7 @@ template <typename URV>
 void
 Hart<URV>::execVmxnor_mm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned start = csRegs_.peekVstart();
@@ -6926,7 +6904,7 @@ template <typename URV>
 void
 Hart<URV>::execVslideup_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -6967,7 +6945,7 @@ template <typename URV>
 void
 Hart<URV>::execVslideup_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7008,7 +6986,7 @@ template <typename URV>
 void
 Hart<URV>::execVslide1up_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7104,7 +7082,7 @@ template <typename URV>
 void
 Hart<URV>::execVslidedown_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7138,7 +7116,7 @@ template <typename URV>
 void
 Hart<URV>::execVslidedown_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7173,7 +7151,7 @@ template <typename URV>
 void
 Hart<URV>::execVslide1down_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7231,7 +7209,7 @@ template <typename URV>
 void
 Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7303,7 +7281,7 @@ template <typename URV>
 void
 Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7400,7 +7378,7 @@ template <typename URV>
 void
 Hart<URV>::execVmul_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7463,7 +7441,7 @@ template <typename URV>
 void
 Hart<URV>::execVmul_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7527,7 +7505,7 @@ template <typename URV>
 void
 Hart<URV>::execVmulh_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7591,7 +7569,7 @@ template <typename URV>
 void
 Hart<URV>::execVmulh_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7624,7 +7602,7 @@ template <typename URV>
 void
 Hart<URV>::execVmulhu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7688,7 +7666,7 @@ template <typename URV>
 void
 Hart<URV>::execVmulhu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7755,7 +7733,7 @@ template <typename URV>
 void
 Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7822,7 +7800,7 @@ template <typename URV>
 void
 Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7888,7 +7866,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadd_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -7953,7 +7931,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadd_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8018,7 +7996,7 @@ template <typename URV>
 void
 Hart<URV>::execVnmsub_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8083,7 +8061,7 @@ template <typename URV>
 void
 Hart<URV>::execVnmsub_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8149,7 +8127,7 @@ template <typename URV>
 void
 Hart<URV>::execVmacc_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8214,7 +8192,7 @@ template <typename URV>
 void
 Hart<URV>::execVmacc_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8280,7 +8258,7 @@ template <typename URV>
 void
 Hart<URV>::execVnmsac_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8345,7 +8323,7 @@ template <typename URV>
 void
 Hart<URV>::execVnmsac_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8414,7 +8392,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmulu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8489,7 +8467,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmulu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8565,7 +8543,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmul_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8641,7 +8619,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmul_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8721,7 +8699,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8799,7 +8777,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8875,7 +8853,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -8951,7 +8929,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -8992,7 +8970,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmacc_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -9067,7 +9045,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmacc_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9147,7 +9125,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -9225,7 +9203,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9305,7 +9283,7 @@ template <typename URV>
 void
 Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9379,7 +9357,7 @@ template <typename URV>
 void
 Hart<URV>::execVdivu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9448,7 +9426,7 @@ template <typename URV>
 void
 Hart<URV>::execVdivu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9519,7 +9497,7 @@ template <typename URV>
 void
 Hart<URV>::execVdiv_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9593,7 +9571,7 @@ template <typename URV>
 void
 Hart<URV>::execVdiv_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9659,7 +9637,7 @@ template <typename URV>
 void
 Hart<URV>::execVremu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9728,7 +9706,7 @@ template <typename URV>
 void
 Hart<URV>::execVremu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9799,7 +9777,7 @@ template <typename URV>
 void
 Hart<URV>::execVrem_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9872,7 +9850,7 @@ template <typename URV>
 void
 Hart<URV>::execVrem_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -9937,7 +9915,7 @@ template <typename URV>
 void
 Hart<URV>::execVsext_vf2(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -10020,7 +9998,7 @@ template <typename URV>
 void
 Hart<URV>::execVsext_vf4(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -10103,7 +10081,7 @@ template <typename URV>
 void
 Hart<URV>::execVsext_vf8(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -10218,7 +10196,7 @@ template <typename URV>
 void
 Hart<URV>::execVzext_vf2(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -10301,7 +10279,7 @@ template <typename URV>
 void
 Hart<URV>::execVzext_vf4(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -10384,7 +10362,7 @@ template <typename URV>
 void
 Hart<URV>::execVzext_vf8(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -10701,7 +10679,7 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vvm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -10739,7 +10717,7 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vxm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
@@ -10779,7 +10757,7 @@ template <typename URV>
 void
 Hart<URV>::execVadc_vim(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
@@ -10819,7 +10797,7 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vvm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
@@ -10857,7 +10835,7 @@ template <typename URV>
 void
 Hart<URV>::execVsbc_vxm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
@@ -10897,7 +10875,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool carry = di->isMasked();
@@ -10907,7 +10885,7 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vcout, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vcout, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -10930,7 +10908,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool carry = di->isMasked();
@@ -10939,7 +10917,7 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vcout, vs1, group))
+  if (not checkVecMaskInst(di, vcout, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
@@ -10964,7 +10942,7 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool carry = di->isMasked();
@@ -10974,7 +10952,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vcout, vs1, group))
+  if (not checkVecMaskInst(di, vcout, vs1, group))
     return;
 
   SRV e2 = di->op2As<int32_t>();
@@ -10999,7 +10977,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool borrow = di->isMasked();
@@ -11009,7 +10987,7 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vbout, vs1, vs2, group))
+  if (not checkVecMaskInst(di, vbout, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -11032,7 +11010,7 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool borrow = di->isMasked();
@@ -11042,7 +11020,7 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkMaskVecOpsVsEmul(di, vbout, vs1, group))
+  if (not checkVecMaskInst(di, vbout, vs1, group))
     return;
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
@@ -11093,7 +11071,7 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vvm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  start = csRegs_.peekVstart();;
@@ -11155,7 +11133,7 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vxm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2(), start = csRegs_.peekVstart();
@@ -11195,7 +11173,7 @@ template <typename URV>
 void
 Hart<URV>::execVmerge_vim(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(), vs1 = di->op1(), start = csRegs_.peekVstart();
@@ -11233,7 +11211,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_x_s(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned rd = di->op0(), vs1 = di->op1(), groupX8 = 8;
@@ -11294,7 +11272,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_s_x(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11338,7 +11316,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_f_s(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11410,7 +11388,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11492,7 +11470,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_v(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11547,7 +11525,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_x(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11588,7 +11566,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv_v_i(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11628,7 +11606,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv1r_v(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11659,7 +11637,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv2r_v(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11696,7 +11674,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv4r_v(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11733,7 +11711,7 @@ template <typename URV>
 void
 Hart<URV>::execVmv8r_v(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -11808,7 +11786,7 @@ template <typename URV>
 void
 Hart<URV>::execVsaddu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -11878,7 +11856,7 @@ template <typename URV>
 void
 Hart<URV>::execVsaddu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -11912,7 +11890,7 @@ template <typename URV>
 void
 Hart<URV>::execVsaddu_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -11989,7 +11967,7 @@ template <typename URV>
 void
 Hart<URV>::execVsadd_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12065,7 +12043,7 @@ template <typename URV>
 void
 Hart<URV>::execVsadd_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12099,7 +12077,7 @@ template <typename URV>
 void
 Hart<URV>::execVsadd_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12170,7 +12148,7 @@ template <typename URV>
 void
 Hart<URV>::execVssubu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12240,7 +12218,7 @@ template <typename URV>
 void
 Hart<URV>::execVssubu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12318,7 +12296,7 @@ template <typename URV>
 void
 Hart<URV>::execVssub_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12394,7 +12372,7 @@ template <typename URV>
 void
 Hart<URV>::execVssub_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12508,7 +12486,7 @@ template <typename URV>
 void
 Hart<URV>::execVaadd_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12540,7 +12518,7 @@ template <typename URV>
 void
 Hart<URV>::execVaaddu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12612,7 +12590,7 @@ template <typename URV>
 void
 Hart<URV>::execVaadd_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12646,7 +12624,7 @@ template <typename URV>
 void
 Hart<URV>::execVaaddu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12720,7 +12698,7 @@ template <typename URV>
 void
 Hart<URV>::execVasub_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12752,7 +12730,7 @@ template <typename URV>
 void
 Hart<URV>::execVasubu_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12824,7 +12802,7 @@ template <typename URV>
 void
 Hart<URV>::execVasub_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12858,7 +12836,7 @@ template <typename URV>
 void
 Hart<URV>::execVasubu_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -12946,7 +12924,7 @@ template <typename URV>
 void
 Hart<URV>::execVsmul_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13032,7 +13010,7 @@ template <typename URV>
 void
 Hart<URV>::execVsmul_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13107,7 +13085,7 @@ template <typename URV>
 void
 Hart<URV>::execVssrl_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13179,7 +13157,7 @@ template <typename URV>
 void
 Hart<URV>::execVssrl_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13213,7 +13191,7 @@ template <typename URV>
 void
 Hart<URV>::execVssrl_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13245,7 +13223,7 @@ template <typename URV>
 void
 Hart<URV>::execVssra_vv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13277,7 +13255,7 @@ template <typename URV>
 void
 Hart<URV>::execVssra_vx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13311,7 +13289,7 @@ template <typename URV>
 void
 Hart<URV>::execVssra_vi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13402,7 +13380,7 @@ template <typename URV>
 void
 Hart<URV>::execVnclipu_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13498,7 +13476,7 @@ template <typename URV>
 void
 Hart<URV>::execVnclipu_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13538,7 +13516,7 @@ template <typename URV>
 void
 Hart<URV>::execVnclipu_wi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13576,7 +13554,7 @@ template <typename URV>
 void
 Hart<URV>::execVnclip_wv(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13614,7 +13592,7 @@ template <typename URV>
 void
 Hart<URV>::execVnclip_wx(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -13654,7 +13632,7 @@ template <typename URV>
 void
 Hart<URV>::execVnclip_wi(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -14748,7 +14726,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxei8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -14773,7 +14751,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxei16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -14798,7 +14776,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxei32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -14823,7 +14801,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxei64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -14992,7 +14970,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -15017,7 +14995,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -15042,7 +15020,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -15067,7 +15045,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -15538,7 +15516,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
+  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
     return;
 
   uint64_t stride = intRegs_.read(di->op2());
@@ -15553,7 +15531,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
+  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
     return;
 
   uint64_t stride = intRegs_.read(di->op2());
@@ -15568,7 +15546,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
+  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
     return;
 
   uint64_t stride = intRegs_.read(di->op2());
@@ -15583,7 +15561,7 @@ template <typename URV>
 void
 Hart<URV>::execVsssege64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
+  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
     return;
 
   uint64_t stride = intRegs_.read(di->op2());
@@ -15993,7 +15971,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16018,7 +15996,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16043,7 +16021,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16068,7 +16046,7 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16125,7 +16103,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16150,7 +16128,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16175,7 +16153,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16200,7 +16178,7 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
 {
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   ElementWidth sew = vecRegs_.elemWidth();
@@ -16829,7 +16807,7 @@ template <typename URV>
 void
 Hart<URV>::execVfadd_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -16891,7 +16869,7 @@ template <typename URV>
 void
 Hart<URV>::execVfadd_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -16952,7 +16930,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsub_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17014,7 +16992,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsub_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17076,7 +17054,7 @@ template <typename URV>
 void
 Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17168,7 +17146,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true /*widen*/))
+  if (not checkVecFpInst(di, true /*widen*/))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17245,7 +17223,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17320,7 +17298,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17397,7 +17375,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17471,7 +17449,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_wv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17546,7 +17524,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwadd_wf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17620,7 +17598,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_wv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17694,7 +17672,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
@@ -17762,7 +17740,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmul_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17824,7 +17802,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmul_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17885,7 +17863,7 @@ template <typename URV>
 void
 Hart<URV>::execVfdiv_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -17947,7 +17925,7 @@ template <typename URV>
 void
 Hart<URV>::execVfdiv_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18009,7 +17987,7 @@ template <typename URV>
 void
 Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18076,7 +18054,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmul_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18151,7 +18129,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmul_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -18233,7 +18211,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmadd_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18294,7 +18272,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmadd_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18358,7 +18336,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmadd_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18419,7 +18397,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18483,7 +18461,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmsub_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18544,7 +18522,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmsub_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18608,7 +18586,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmsub_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18669,7 +18647,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18733,7 +18711,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmacc_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18794,7 +18772,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmacc_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   clearSimulatorFpFlags();
@@ -18873,7 +18851,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmacc_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18934,7 +18912,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -18998,7 +18976,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmsac_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19059,7 +19037,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmsac_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19123,7 +19101,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmsac_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19184,7 +19162,7 @@ template <typename URV>
 void
 Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19255,7 +19233,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19328,7 +19306,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19404,7 +19382,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19477,7 +19455,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19553,7 +19531,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19626,7 +19604,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19702,7 +19680,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19776,7 +19754,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di, true))
+  if (not checkVecFpInst(di, true))
     return;
 
   bool masked = di->isMasked();
@@ -19842,7 +19820,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsqrt_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -19897,7 +19875,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
@@ -19963,7 +19941,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmv_v_f(const DecodedInst* di)
 {
-  if (not checkArithmeticInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   if (di->isMasked())
@@ -20053,7 +20031,7 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -20118,7 +20096,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20181,7 +20159,7 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -20246,7 +20224,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20306,7 +20284,7 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -20368,7 +20346,7 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20428,7 +20406,7 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, vs2, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
   typedef ElementWidth EW;
@@ -20490,7 +20468,7 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20551,7 +20529,7 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20612,7 +20590,7 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  if (not checkFpMaskVecOpsVsEmul(di, vd, vs1, group))
+  if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
   typedef ElementWidth EW;
@@ -20663,7 +20641,7 @@ template <typename URV>
 void
 Hart<URV>::execVfclass_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -20725,7 +20703,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -20790,7 +20768,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -20822,7 +20800,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
   setSimulatorRoundingMode(RoundingMode::Zero);
 
@@ -20855,7 +20833,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
   setSimulatorRoundingMode(RoundingMode::Zero);
 
@@ -20923,7 +20901,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -20990,7 +20968,7 @@ template <typename URV>
 void
 Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21059,7 +21037,7 @@ void
 Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
 {
   // Float to double-wide integer.
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21130,7 +21108,7 @@ void
 Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
 {
   // Float to double-wide integer
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21164,7 +21142,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   setSimulatorRoundingMode(RoundingMode::Zero);
@@ -21200,7 +21178,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
   setSimulatorRoundingMode(RoundingMode::Zero);
 
@@ -21273,7 +21251,7 @@ void
 Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
 {
   // Unsigned to double-wide fp.
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   clearSimulatorFpFlags();
@@ -21359,7 +21337,7 @@ void
 Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
 {
   // signed to double-wide fp.
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   clearSimulatorFpFlags();
@@ -21453,7 +21431,7 @@ void
 Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
 {
   // Float to double-wide float.
-  if (not checkFpMaskableInst(di, true, &Hart::isZvfhminLegal))
+  if (not checkVecFpInst(di, true, &Hart::isZvfhminLegal))
     return;
 
   bool masked = di->isMasked();
@@ -21525,7 +21503,7 @@ void
 Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
 {
   // Double-wide float to unsigned
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   clearSimulatorFpFlags();
@@ -21609,7 +21587,7 @@ void
 Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
 {
   // Double-wide float to int.
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   clearSimulatorFpFlags();
@@ -21658,7 +21636,7 @@ void
 Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
 {
   // Double-wide float to unsigned
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   clearSimulatorFpFlags();
@@ -21707,7 +21685,7 @@ void
 Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
 {
   // double-wide float to int
-  if (not checkMaskableInst(di))
+  if (not checkVecIntInst(di))
     return;
 
   clearSimulatorFpFlags();
@@ -21793,7 +21771,7 @@ void
 Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
 {
   // Double-wide unsigned to float
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21867,7 +21845,7 @@ void
 Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
 {
   // Double-wide int to float
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -21940,7 +21918,7 @@ void
 Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
 {
   // Double-wide float to float.
-  if (not checkFpMaskableInst(di, true, &Hart::isZvfhminLegal))
+  if (not checkVecFpInst(di, true, &Hart::isZvfhminLegal))
     return;
 
   bool masked = di->isMasked();
@@ -21978,7 +21956,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 {
   // Double-wide float to float.
 
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
 #ifdef SOFT_FLOAT
@@ -22061,7 +22039,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredsum_vs(const DecodedInst* di)
 {
-  if (not checkFpArithmeticInst(di))
+  if (not checkFpSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22131,7 +22109,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredosum_vs(const DecodedInst* di)
 {
-  if (not checkFpArithmeticInst(di))
+  if (not checkFpSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22202,7 +22180,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredmin_vs(const DecodedInst* di)
 {
-  if (not checkFpArithmeticInst(di))
+  if (not checkFpSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22272,7 +22250,7 @@ template <typename URV>
 void
 Hart<URV>::execVfredmax_vs(const DecodedInst* di)
 {
-  if (not checkFpArithmeticInst(di))
+  if (not checkFpSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22354,7 +22332,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
 {
-  if (not checkFpArithmeticInst(di, true))
+  if (not checkFpSewLmulVstart(di, true))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22429,7 +22407,7 @@ template <typename URV>
 void
 Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 {
-  if (not checkFpArithmeticInst(di, true))
+  if (not checkFpSewLmulVstart(di, true))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -22514,7 +22492,7 @@ template <typename URV>
 void
 Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -22580,7 +22558,7 @@ template <typename URV>
 void
 Hart<URV>::execVfrec7_v(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -22641,7 +22619,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmin_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -22709,7 +22687,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmin_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -22770,7 +22748,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmax_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -22835,7 +22813,7 @@ template <typename URV>
 void
 Hart<URV>::execVfmax_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -22895,7 +22873,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -22958,7 +22936,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -23019,7 +22997,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -23083,7 +23061,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -23149,7 +23127,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();
@@ -23219,7 +23197,7 @@ template <typename URV>
 void
 Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
 {
-  if (not checkFpMaskableInst(di))
+  if (not checkVecFpInst(di))
     return;
 
   bool masked = di->isMasked();

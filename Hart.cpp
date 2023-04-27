@@ -3618,44 +3618,48 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
            {
              case ElementWidth::Byte:
                {
-                 int8_t val;
+                 int8_t val = 0;
                  size_t numElem = ((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+		       assert(0);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
                }
              case ElementWidth::Half:
                {
-                 int16_t val;
+                 int16_t val = 0;
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 1);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+		       assert(0);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
                }
              case ElementWidth::Word:
                {
-                 int32_t val;
+                 int32_t val = 0;
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 2);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+		       assert(0);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
                }
              case ElementWidth::Word2:
                {
-                 int64_t val;
+                 int64_t val = 0;
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 3);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     assert(vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val));
+                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
+		       assert(0);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;

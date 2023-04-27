@@ -2316,31 +2316,34 @@ namespace WdRiscv
       return 0x1f;
     }
 
-    // Return true if maskable vector instruction is legal for current
-    // selected element width and group multiplier. Take an illegal
-    // instuction exception and return false otherwise.
-    bool checkMaskableInst(const DecodedInst* di);
+    // Return true if maskable integer vector instruction is legal for
+    // current sew and lmul, current vstart, and mask-register
+    // destination register overlap. Check if vector extension is
+    // enabled. Take an illegal instuction exception and return false
+    // otherwise. This is for non-load, non-mask destination,
+    // non-reduction instructions.
+    bool checkVecIntInst(const DecodedInst* di);
 
-    // Return true if maskable vector instruction is legal. Take an
-    // illegal instuction exception and return false otherwise.
-    bool checkMaskableInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
+    // Same as above but with explicit group multiplier and element width.
+    bool checkVecIntInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
     // Return true if given arithmetic (non load/store) instruction is
-    // legal. Take an illegal instruction exception and return false
-    // otherwise.
-    bool checkArithmeticInst(const DecodedInst* di);
+    // legal. Check if vector extension is enabled. Check if the
+    // currnet sew/lmul is legal. Return true if legal. Take an
+    // illegal instruction exception and return false otherwise. This
+    // is for integer instructions.
+    bool checkSewLmulVstart(const DecodedInst* di);
 
-    // Return true if given FP arithmetic (non load/store) instruction
-    // is legal. Take an illegal instruction exception and return
-    // false otherwise.
-    bool checkFpArithmeticInst(const DecodedInst* di, bool wide = false,
-			       bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
+    // Similar to above but includes check for floating point operations (is F/D/ZFH
+    // enabled ...).
+    bool checkFpSewLmulVstart(const DecodedInst* di, bool wide = false,
+			      bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
     // otherwise.
-    bool checkFpMaskableInst(const DecodedInst* di, bool wide = false,
-                             bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
+    bool checkVecFpInst(const DecodedInst* di, bool wide = false,
+			bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
     // Return true if vector operands are mutliples of the given group
     // multiplier (scaled by 8). Return false initiating an illegal instruction
@@ -2355,20 +2358,25 @@ namespace WdRiscv
     // Similar to above but for 1 vector operand instructions.
     bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned groupX8);
 
-    // Return true if vector operands are mutliples of the given group
-    // multiplier (scaled by 8) for mask instructions (such as
-    // vmseq). Return false initiating an illegal instruction trap
-    // otherwise.
-    bool checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
-			       unsigned op2, unsigned groupX8);
+    // Return if mask producing instruction (e.g. vmseq) is
+    // legal. Check if vector operands are mutliples of the given
+    // group multiplier (scaled by 8). Return true if legal.  Return
+    // false initiating an illegal instruction trap otherwise.
+    bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
+			  unsigned groupX8);
 
-    bool checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
-			       unsigned groupX8);
+    // Similar to the above but for 3 vector operand instructions.
+    bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
+			  unsigned op2, unsigned groupX8);
 
-    bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+
+    // Similar to the above but for floating point instructions.
+    bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned groupX8);
 
-    bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+    // Similar to the above but for floating point instructions with 3
+    // vector operands.
+    bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8);
 
     // Check reduction vector operand against the group multiplier. Return true
