@@ -642,9 +642,9 @@ checkDestSourceOverlap(unsigned dest, unsigned destWidth, unsigned destGroupX8,
     return true;  // No overlap.
 
   // Destination eew > source eew: Overlap ok if source group is >=
-  // 1 and overlap is at last register in dest.
+  // 1 and overlap is at last # of <srcGroup> registers in dest.
   if (destWidth > srcWidth)
-    return srcGroupX8 >= 8 and src == dest + destGroup - 1;
+    return srcGroupX8 >= 8 and src == dest + destGroup - srcGroup;
 
   // Destination eew < source eew: Overlap ok if overlap is at
   // first register in source.
