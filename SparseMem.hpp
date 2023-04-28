@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <vector>
 #include <unordered_map>
 #include <mutex>
@@ -64,11 +65,11 @@ namespace WdRiscv
     read(uint64_t addr, uint64_t& value)
     {
       uint64_t pageRank = getPageRank(addr);
-      uint8_t* page = findOrCreatePage(pageRank);
+      std::shared_ptr<uint8_t[]> page = findOrCreatePage(pageRank);
       if (not page)
         return false;
       unsigned offset = addr & pageMask_;
-      value = *( reinterpret_cast<U*>(page + offset) );
+      value = *( reinterpret_cast<U*>(page.get() + offset) );
       return true;
     }
 
@@ -81,11 +82,11 @@ namespace WdRiscv
     write(uint64_t addr, uint64_t value)
     {
       uint64_t pageRank = getPageRank(addr);
-      uint8_t* page = findOrCreatePage(pageRank);
+      std::shared_ptr<uint8_t[]> page = findOrCreatePage(pageRank);
       if (not page)
         return false;
       unsigned offset = addr & pageMask_;
-      *( reinterpret_cast<U*>(page + offset) ) = value;
+      *( reinterpret_cast<U*>(page.get() + offset) ) = value;
       return true;
     }
 
@@ -97,14 +98,14 @@ namespace WdRiscv
     /// Return host-machine address of the target-machine page with
     /// the given page number creating such a page (and zeroing it) if
     /// it has never been accessed before.
-    uint8_t* findOrCreatePage(uint64_t pageRank)
+    std::shared_ptr<uint8_t[]> findOrCreatePage(uint64_t pageRank)
     {
       std::lock_guard<std::mutex> lock(mutex_);
       auto iter = pageMap_.find(pageRank);
       if (iter != pageMap_.end())
         return iter->second;
-      uint8_t* page = new uint8_t[pageSize_];
-      memset(page, 0, pageSize_);
+      std::shared_ptr<uint8_t[]> page = std::make_unique<uint8_t[]>(pageSize_);
+      memset(page.get(), 0, pageSize_);
       pageMap_[pageRank] = page;
       return page;
     }
@@ -115,7 +116,7 @@ namespace WdRiscv
     unsigned pageShift_ = 12;
     unsigned pageMask_ = 0xfff;
 
-    std::unordered_map<uint64_t, uint8_t*> pageMap_;  // Map address to page
+    std::unordered_map<uint64_t, std::shared_ptr<uint8_t[]>> pageMap_;  // Map address to page
     std::mutex mutex_;
   };
 }

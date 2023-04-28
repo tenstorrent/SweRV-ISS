@@ -1580,8 +1580,8 @@ namespace WdRiscv
     { bbFile_ = file; bbLimit_ = instCount; }
 
     /// Enable memory consistency model.
-    void setMcm(Mcm<URV>* mcm)
-    { mcm_ = mcm; }
+    void setMcm(std::shared_ptr<Mcm<URV>> mcm)
+    { mcm_ = std::move(mcm); }
 
     /// Enable instruction line address tracing.
     void enableInstructionLineTrace()
@@ -4531,7 +4531,7 @@ namespace WdRiscv
     };
     boost::circular_buffer<BranchRecord> branchBuffer_;
 
-    Mcm<URV>* mcm_ = nullptr;
+    std::shared_ptr<Mcm<URV>> mcm_;
 
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;

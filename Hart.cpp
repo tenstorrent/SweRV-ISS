@@ -74,10 +74,10 @@ parseNumber(const std::string& numberStr, TYPE& number)
   if (good)
     {
       char* end = nullptr;
-      if (sizeof(TYPE) == 4)
-	number = strtoul(numberStr.c_str(), &end, 0);
-      else if (sizeof(TYPE) == 8)
-	number = strtoull(numberStr.c_str(), &end, 0);
+      if constexpr (sizeof(TYPE) == 4)
+        number = strtoul(numberStr.c_str(), &end, 0);
+      else if constexpr (sizeof(TYPE) == 8)
+        number = strtoull(numberStr.c_str(), &end, 0);
       else
 	{
 	  std::cerr << "parseNumber: Only 32/64-bit RISCV harts supported\n";
@@ -1568,7 +1568,7 @@ template <typename URV>
 template <typename LOAD_TYPE>
 inline
 bool
-Hart<URV>::load(uint64_t virtAddr, bool hyper, uint64_t& data)
+Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
 {
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = virtAddr;
@@ -1820,7 +1820,7 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(URV virtAddr, bool hyper, STORE_TYPE storeVal)
+Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
 {
 #ifdef FAST_SLOPPY
   return fastStore(virtAddr, storeVal);

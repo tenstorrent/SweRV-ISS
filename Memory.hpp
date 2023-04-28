@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -217,7 +218,7 @@ namespace WdRiscv
     /// inaccessible regions or if the write crosses memory region of
     /// different attributes.
     template <typename T>
-    bool write(unsigned sysHartIx, uint64_t address, T value)
+    bool write([[maybe_unused]] unsigned sysHartIx, uint64_t address, T value)
     {
       auto& lwd = lastWriteData_.at(sysHartIx);
       lwd.size_ = 0;
@@ -235,7 +236,6 @@ namespace WdRiscv
         return false;
       if (dataLineTrace_)
 	traceDataLine(address);
-      sysHartIx = sysHartIx; // Avoid unused var warning.
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
@@ -279,7 +279,7 @@ namespace WdRiscv
     template<typename T>
     bool readIo(uint64_t addr, T& val) const
     {
-      for (auto dev : ioDevs_)
+      for (auto& dev : ioDevs_)
 	if (dev->isAddressInRange(addr))
 	  {
 	    val = dev->read(addr);
@@ -293,7 +293,7 @@ namespace WdRiscv
     template<typename T>
     bool writeIo(uint64_t addr, T val)
     {
-      for (auto dev : ioDevs_)
+      for (auto& dev : ioDevs_)
 	if (dev->isAddressInRange(addr))
 	  {
 	    dev->write(addr, val);
@@ -485,8 +485,8 @@ namespace WdRiscv
     void enableInstructionLineTrace(const std::string& path)
     { instrLineTrace_ = true;  instrLineFile_ = path; }
 
-    void registerIoDevice(IoDevice* dev)
-    { assert(dev); ioDevs_.push_back(dev); }
+    void registerIoDevice(std::shared_ptr<IoDevice> dev)
+    { assert(dev); ioDevs_.push_back(std::move(dev)); }
 
     /// Take a snapshot of the entire simulated memory into binary
     /// file. Return true on success or false on failure
@@ -772,7 +772,7 @@ namespace WdRiscv
     mutable std::unordered_map<uint64_t, uint64_t> dataLineMap_;  // Map line addr to order
     mutable std::unordered_map<uint64_t, uint64_t> instrLineMap_;  // Map line addr to order
 
-    std::vector<IoDevice*> ioDevs_;
+    std::vector<std::shared_ptr<IoDevice>> ioDevs_;
 
     /// Callback for read: bool func(uint64_t addr, unsigned size, uint64_t& val);
     std::function<bool(uint64_t, unsigned, uint64_t&)> readCallback_ = nullptr;

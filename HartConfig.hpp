@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <nlohmann/json_fwd.hpp>
 
@@ -153,7 +154,7 @@ namespace WdRiscv
     HartConfig(const HartConfig&) = delete;
     void operator= (const HartConfig&) = delete;
 
-    nlohmann::json* config_;
+    std::unique_ptr<nlohmann::json> config_;
   };
 
 }

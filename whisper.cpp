@@ -51,15 +51,15 @@ using namespace WdRiscv;
 /// Return format string suitable for printing an integer of type URV
 /// in hexadecimal form.
 template <typename URV>
-static
+static constexpr
 const char*
 getHexForm()
 {
-  if (sizeof(URV) == 4)
+  if constexpr (sizeof(URV) == 4)
     return "0x%08x";
-  if (sizeof(URV) == 8)
+  if constexpr (sizeof(URV) == 8)
     return "0x%016x";
-  if (sizeof(URV) == 16)
+  if constexpr (sizeof(URV) == 16)
     return "0x%032x";
   return "0x%x";
 }

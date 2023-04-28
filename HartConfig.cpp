@@ -25,7 +25,7 @@
 using namespace WdRiscv;
 
 
-inline bool
+constexpr bool
 isPowerOf2(uint64_t x)
 {
   return x != 0 and (x & (x-1)) == 0;
@@ -33,16 +33,12 @@ isPowerOf2(uint64_t x)
 
 
 HartConfig::HartConfig()
+  : config_(std::make_unique<nlohmann::json>())
 {
-  config_ = new nlohmann::json();
 }
 
 
-HartConfig::~HartConfig()
-{
-  delete config_;
-  config_ = nullptr;
-}
+HartConfig::~HartConfig() = default;
 
 
 bool
@@ -987,7 +983,7 @@ processMemMappedMasks(Hart<URV>& hart, const std::string& path, const nlohmann::
 	if (not hart.setMemMappedMask(addr, mask))
 	  {
 	    std::cerr << "Error: Failed to configure mask for config item "
-		      << entryPath << " at addres 0x" << std::hex << addr
+		      << entryPath << " at address 0x" << std::hex << addr
 		      << std::dec << '\n';
 	    errors++;
 	  }
