@@ -10851,9 +10851,6 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vvm(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;
 
@@ -10884,9 +10881,6 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
@@ -10953,9 +10947,6 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
 
@@ -10986,9 +10977,6 @@ template <typename URV>
 void
 Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   bool borrow = di->isMasked();
   unsigned vbout = di->op0(),  vs1 = di->op1(),  vbin = 0;
 
