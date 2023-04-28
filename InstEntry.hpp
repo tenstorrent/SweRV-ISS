@@ -431,7 +431,7 @@ namespace WdRiscv
     void perfCountFpLoadStore(bool flag);
 
     /// Return the instruction vector table.
-    std::vector<InstEntry> getInstVec()
+    const std::vector<InstEntry>& getInstVec()
     { return instVec_; }
 
   private:

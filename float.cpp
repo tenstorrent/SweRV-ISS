@@ -140,7 +140,7 @@ template <typename URV>
 template <typename float_type>
 inline
 auto
-Hart<URV>::updateAccruedFpBits(float_type res)
+Hart<URV>::updateAccruedFpBits(float_type)
   -> typename std::enable_if<std::is_floating_point<float_type>::value>::type
 {
 }

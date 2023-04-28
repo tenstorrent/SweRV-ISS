@@ -27,11 +27,7 @@ SparseMem::SparseMem()
 }
 
 
-SparseMem::~SparseMem()
-{
-  for (auto kv : pageMap_)
-    delete [] kv.second;
-}
+SparseMem::~SparseMem() = default;
 
 
 bool
@@ -146,8 +142,9 @@ SparseMem::writeHexFile(const std::string& path) const
 
   for (const auto& kv : pageMap_)
     {
-      uint64_t addr = kv.first * pageSize_;    // Page address
-      uint8_t* data = kv.second;   // Page data
+      uint64_t addr = kv.first * pageSize_;             // Page address
+      std::shared_ptr<uint8_t[]> data_sp = kv.second;   // Page data
+      uint8_t* data = data_sp.get();
       if (fprintf(out, "@%0" PRIx64 "\n", addr) < 0)
         {
           ok = false;

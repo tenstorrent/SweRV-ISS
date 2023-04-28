@@ -15,7 +15,6 @@
 #pragma once
 
 #include <iosfwd>
-#include <boost/variant.hpp>
 #include "trapEnums.hpp"
 #include "Memory.hpp"
 #include "Tlb.hpp"
