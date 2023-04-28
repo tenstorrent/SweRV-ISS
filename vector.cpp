@@ -6075,7 +6075,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmax_vs(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
