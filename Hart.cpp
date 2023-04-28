@@ -2528,13 +2528,15 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 	  if (not csRegs_.write(CsrNumber::HSTATUS, PM::Machine, hstatus_.value_))
 	    assert(0 and "Failed to write HSTATUS register");
 
-	  if (not virtMode_) 	  // Update HTVAL if trapping to HS mode.
+	  if (not virtMode_) 	  // Update HTVAL/HTINST if trapping to HS mode.
 	    {
 	      URV val = 0;
 	      if (isGpaTrap(cause))
 		val = info2 >> 2;
 	      if (not csRegs_.write(CsrNumber::HTVAL, privMode_, val))
 		assert(0 and "Failed to write HTVAL register");
+	      if (not csRegs_.write(CsrNumber::HTINST, privMode_, 0))
+		assert(0 and "Failed to write HTINST register");
 	    }
 	}
     }
