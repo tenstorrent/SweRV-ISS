@@ -1451,11 +1451,22 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "cancel_lr_on_ret";
   if (config_ -> count(tag))
     {
+      std::cerr << "Config tag cancel_lr_on_ret is deprecated. Use cancel_lr_on_trap.\n";
       if (not getJsonBoolean(tag, config_ -> at(tag), flag))
         errors++;
       else
-        hart.enableCancelLrOnRet(flag);
+        hart.enableCancelLrOnTrap(flag);
     }
+
+  tag = "cancel_lr_on_trap";
+  if (config_ -> count(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableCancelLrOnTrap(flag);
+    }
+
 
   tag = "debug_park_loop";
   if (config_ -> count(tag))

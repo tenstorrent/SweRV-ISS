@@ -1382,8 +1382,8 @@ namespace WdRiscv
     { clearMtvalOnIllInst_ = flag; }
 
     /// Disable clearing of reservation set after xRET
-    void enableCancelLrOnRet(bool flag)
-    { cancelLrOnRet_ = flag; }
+    void enableCancelLrOnTrap(bool flag)
+    { cancelLrOnTrap_ = flag; }
 
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
@@ -4427,9 +4427,7 @@ namespace WdRiscv
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
 
     bool clearMprvOnRet_ = true;
-
-    // not required to clear reservation sets on xret
-    bool cancelLrOnRet_ = true;
+    bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 

@@ -2409,9 +2409,8 @@ template <typename URV>
 void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV info2)
 {
-  // FIX: spec no longer mandate loss of reservation on traps.
-  if (cancelLrOnRet_)  // Temporary
-    cancelLr(); // Clear LR reservation (if any).
+  if (cancelLrOnTrap_)
+    cancelLr();
 
   bool origVirtMode = virtMode_;
 
@@ -9999,8 +9998,8 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    if (cancelLrOnRet_)
-      cancelLr(); // Clear LR reservation (if any).
+    if (cancelLrOnTrap_)
+      cancelLr();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint64_t value = csRegs_.peekMstatus();
@@ -10064,8 +10063,8 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    if (cancelLrOnRet_)
-      cancelLr(); // Clear LR reservation (if any).
+    if (cancelLrOnTrap_)
+      cancelLr();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint32_t value = csRegs_.peekMstatus();
@@ -10153,8 +10152,8 @@ Hart<URV>::execSret(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
-  if (cancelLrOnRet_)
-    cancelLr(); // Clear LR reservation (if any).
+  if (cancelLrOnTrap_)
+    cancelLr();
 
   // Restore privilege mode and interrupt enable by getting
   // current value of SSTATUS, ...
