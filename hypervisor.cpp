@@ -41,7 +41,7 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
       return;
     }
 
-  if (privMode_ == PM::User or (privMode_ == PM::Supervisor and mstatus_.bits_.TVM == 1))
+  if (privMode_ == PM::User)
     {
       illegalInst(di);
       return;
