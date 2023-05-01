@@ -1781,6 +1781,7 @@ template <typename STORE_TYPE>
 void
 Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 {
+  // We assume that the HTIF device is little endian.
   ldStWrite_ = true;
   ldStData_ = storeVal;
   memory_.write(hartIx_, physAddr, storeVal);
@@ -1804,7 +1805,7 @@ Hart<URV>::handleStoreToHost(URV physAddr, STORE_TYPE storeVal)
 	{
 	  int ch = readCharNonBlocking(syscall_.effectiveFd(STDIN_FILENO));
 	  if (ch > 0)
-	    memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch));
+	    memory_.poke(fromHost_, ((val >> 48) << 48) | uint64_t(ch), true);
 	}
     }
   else if (dev == 0 and cmd == 0)
@@ -1928,6 +1929,7 @@ template <typename URV>
 void
 Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 {
+  // We assume that the CLINT device is little endian.
   if (addr >= clintStart_ and addr < clintStart_ + 0x4000)
     {
       unsigned hartIx = (addr - clintStart_) / 4;
@@ -1980,14 +1982,10 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 		    {
 		      int c = char(readCharNonBlocking(inFd));
 		      if (c > 0)
-			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c);
+			memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
 		    }
 		}
 	    }
-
-	  // URV mipVal = hart->csRegs_.peekMip();
-	  // mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
-	  // hart->pokeCsr(CsrNumber::MIP, mipVal);
 	  return;
 	}
     }
@@ -3815,7 +3813,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
 
   // Push on stack null for aux vector.
   sp -= sizeof(URV);
-  if (not memory_.poke(sp, URV(0)))
+  if (not pokeMemory(sp, URV(0), true))
     return false;
 
   // Push argv/envp entries on the stack.
@@ -3828,22 +3826,22 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
 
   // Push argv entries on the stack.
   for (const auto addr : argvAddrs)
-    if (not memory_.poke(sp + ix++*sizeof(URV), addr))
+    if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
       return false;
 
   // Set environ for newlib. This is superfluous for Linux.
   URV ea = sp + ix*sizeof(URV);  // Address of envp array
   ElfSymbol sym;
   if (memory_.findElfSymbol("environ", sym))
-    memory_.poke(URV(sym.addr_), ea);
+    pokeMemory(URV(sym.addr_), ea, true);
 
   // Push envp entries on the stack.
   for (const auto addr : envpAddrs)
-    if (not memory_.poke(sp + ix++*sizeof(URV), addr))
+    if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
       return false;
 
   // Put argc on the stack.
-  if (not memory_.poke(sp, URV(args.size())))
+  if (not pokeMemory(sp, URV(args.size()), true))
     return false;
 
   if (not pokeIntReg(RegSp, sp))
@@ -5067,7 +5065,7 @@ Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
       uint64_t value = ldStPrevData_;
       for (size_t i = 0; i < ldStSize_; ++i, ++addr)
 	{
-	  memory_.poke(addr, uint8_t(value));
+	  pokeMemory(addr, uint8_t(value), true);
 	  value = value >> 8;
 	}
     }
