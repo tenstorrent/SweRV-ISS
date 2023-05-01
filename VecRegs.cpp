@@ -197,17 +197,17 @@ VecRegs::reset()
 
 
 bool
-VecRegs::findReg(const std::string& name, unsigned& ix) const
+VecRegs::findReg(std::string_view name, unsigned& ix) const
 {
   if (name.empty())
     return false;
 
-  std::string numStr = name;
+  std::string_view numStr = name;
   if (numStr.at(0) == 'v')
     numStr = numStr.substr(1);
 
   char* end = nullptr;
-  unsigned n = strtoul(numStr.c_str(), &end, 10);
+  unsigned n = strtoul(numStr.data(), &end, 10);
   if (end and *end)
     return false;
 

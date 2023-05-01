@@ -90,7 +90,7 @@ namespace WdRiscv
 
 
     /// Return the name of the instruction.
-    const std::string& name() const { return name_; }
+    std::string_view name() const { return name_; }
 
     /// Return the id of the instruction (an integer between 0 and n
     /// where n is the number of defined instructions). Note that it is
@@ -410,13 +410,13 @@ namespace WdRiscv
 
     // Return the info corresponding to the given name or the info of
     // the illegal instruction if no such instruction.
-    const InstEntry& getEntry(const std::string& name) const;
+    const InstEntry& getEntry(std::string_view name) const;
 
     // Return true if given id is present in the table.
     bool hasInfo(InstId) const;
 
     // Return true if given instance name is present in the table.
-    bool hasInfo(const std::string& name) const;
+    bool hasInfo(std::string_view name) const;
 
     /// Mark lr as a load instruction and sc as a store for the
     /// purpose of performance counters if flag is true; otherwise,
@@ -442,6 +442,6 @@ namespace WdRiscv
   private:
 
     std::vector<InstEntry> instVec_;
-    std::unordered_map<std::string, InstId> instMap_;
+    std::unordered_map<std::string_view, InstId> instMap_;
   };
 }

@@ -66,7 +66,7 @@ PerfRegs::reset()
 
 
 // Map a performance event name (string) to the corresponding internal id (enum).
-std::unordered_map<std::string, EventNumber>
+const std::unordered_map<std::string_view, EventNumber>
 PerfRegs::eventNameToId_ = {
   { "None", EventNumber::None },
   { "InstCommited", EventNumber::InstCommited },

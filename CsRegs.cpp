@@ -50,7 +50,7 @@ CsRegs<URV>::~CsRegs()
 
 template <typename URV>
 Csr<URV>*
-CsRegs<URV>::defineCsr(const std::string& name, CsrNumber csrn, bool mandatory,
+CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
 		       bool implemented, URV resetValue, URV writeMask,
 		       URV pokeMask, bool isDebug, bool quiet)
 {
@@ -92,16 +92,16 @@ CsRegs<URV>::defineCsr(const std::string& name, CsrNumber csrn, bool mandatory,
   csr.config(name, csrn, mandatory, implemented, resetValue, writeMask,
 	     pokeMask, isDebug);
 
-  nameToNumber_[name] = csrn;
+  nameToNumber_.insert_or_assign(std::move(name), csrn);
   return &csr;
 }
 
 
 template <typename URV>
 Csr<URV>*
-CsRegs<URV>::findCsr(const std::string& name)
+CsRegs<URV>::findCsr(std::string_view name)
 {
-  const auto iter = nameToNumber_.find(name);
+  const auto iter = nameToNumber_.find(std::string(name)); // The string constructor can be avoided in C++20
   if (iter == nameToNumber_.end())
     return nullptr;
 
@@ -652,10 +652,10 @@ CsRegs<URV>::reset()
 
 template <typename URV>
 bool
-CsRegs<URV>::configCsr(const std::string& name, bool implemented, URV resetValue,
+CsRegs<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
                        URV mask, URV pokeMask, bool isDebug, bool shared)
 {
-  auto iter = nameToNumber_.find(name);
+  auto iter = nameToNumber_.find(std::string(name)); // The string constructor can be avoided in C++20
   if (iter == nameToNumber_.end())
     return false;
 
@@ -1188,7 +1188,7 @@ CsRegs<URV>::defineMachineRegs()
     {
       std::string name = std::string("pmpaddr") + std::to_string(i);
       Csrn num = Csrn{unsigned(Csrn::PMPADDR0) + i};
-      defineCsr(name, num,  !mand, imp, 0, pmpMask, pmpMask);
+      defineCsr(std::move(name), num,  !mand, imp, 0, pmpMask, pmpMask);
     }
 
   defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
@@ -1220,12 +1220,12 @@ CsRegs<URV>::defineMachineRegs()
           name += "h";
           csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3H) + i - 3);
           bool hmand = rv32_;  // high counters mandatory only in rv32
-          defineCsr(name, csrNum, hmand, imp, 0, rom, rom);
+          defineCsr(std::move(name), csrNum, hmand, imp, 0, rom, rom);
         }
 
       csrNum = CsrNumber(unsigned(CsrNumber::MHPMEVENT3) + i - 3);
       name = "mhpmevent" + std::to_string(i);
-      defineCsr(name, csrNum, mand, imp, 0, rom, rom);
+      defineCsr(std::move(name), csrNum, mand, imp, 0, rom, rom);
     }
 
   // add CSR fields
@@ -1435,7 +1435,7 @@ CsRegs<URV>::defineUserRegs()
       // High register counterpart of mhpmcounter.
       name += "h";
       csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
-      defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
+      defineCsr(std::move(name), csrNum, !mand, !imp, 0, wam, wam);
     }
 
   // add CSR fields

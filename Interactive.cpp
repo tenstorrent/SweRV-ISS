@@ -284,11 +284,11 @@ Interactive<URV>::peekAllIntRegs(Hart<URV>& hart, std::ostream& out)
 
   for (unsigned i = 0; i < hart.intRegCount(); ++i)
     {
-      std::string name;
+      std::string_view name;
       URV val = 0;
       if (hart.peekIntReg(i, val, name))
 	{
-	  std::string tag = name;
+	  std::string tag = std::string(name);
 	  if (abiNames)
 	    tag += "(" + std::to_string(i) + ")";
 	  tag += ":";
@@ -317,7 +317,7 @@ Interactive<URV>::peekAllCsrs(Hart<URV>& hart, std::ostream& out)
   for (size_t i = 0; i <= size_t(CsrNumber::MAX_CSR_); ++i)
     {
       CsrNumber csr = CsrNumber(i);
-      std::string name;
+      std::string_view name;
       URV val = 0;
       if (hart.peekCsr(csr, val, name))
 	{

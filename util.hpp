@@ -68,4 +68,28 @@ namespace util
   using _helpers::value_to_string;
 
   using _helpers::make_reg_name_array;
+
+  /// Combines all of the arguments into a single string using one allocation
+  template <typename Arg, typename... Args>
+  static std::string join(std::string_view separator, Arg arg, Args&&... args)
+  {
+    constexpr auto getLen = [](auto&& stringOrStringWiew) -> std::size_t {
+      if constexpr (std::is_convertible<decltype(stringOrStringWiew), const char*>::value)
+        {
+          return std::strlen(stringOrStringWiew);
+        }
+      else
+        {
+          return stringOrStringWiew.size();
+        }
+    };
+
+    std::string result;
+    result.reserve((getLen(arg) + ... + getLen(args)) + (separator.size() * sizeof...(Args)));
+
+    result += arg;
+    (result.append(separator).append(args), ...);
+
+    return result;
+  }
 }
