@@ -14,6 +14,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <nlohmann/json.hpp>
+#include <charconv>
 #include <fstream>
 #include <iostream>
 #include "HartConfig.hpp"
@@ -81,7 +82,7 @@ namespace WdRiscv
   /// if given entry does not represent an integer.
   template <typename URV>
   bool
-  getJsonUnsigned(const std::string& tag, const nlohmann::json& js, URV& value)
+  getJsonUnsigned(std::string_view tag, const nlohmann::json& js, URV& value)
   {
     value = 0;
 
@@ -93,24 +94,24 @@ namespace WdRiscv
 
     if (js.is_string())
       {
-	char *end = nullptr;
-	std::string str = js.get<std::string>();
-	uint64_t u64 = strtoull(str.c_str(), &end, 0);
-	if (end and *end)
+        char*            end = nullptr;
+        std::string_view str = js.get<std::string_view>();
+        uint64_t         u64 = strtoull(str.data(), &end, 0);
+        if (end and *end)
           {
             std::cerr << "Invalid config file value for '" << tag << "': "
                       << str << '\n';
             return false;
           }
-	value = static_cast<URV>(u64);
-	if (value != u64)
+        value = static_cast<URV>(u64);
+        if (value != u64)
           {
             std::cerr << "Overflow in config file value for '" << tag << "': "
                       << str << '\n';
             return false;
           }
 
-	return true;
+        return true;
       }
 
     std::cerr << "Config file entry '" << tag << "' must contain a number\n";
@@ -123,7 +124,7 @@ namespace WdRiscv
   /// sucess an false on failure.
   template <typename URV>
   bool
-  getJsonUnsignedVec(const std::string& tag, const nlohmann::json& js,
+  getJsonUnsignedVec(std::string_view tag, const nlohmann::json& js,
                      std::vector<URV>& vec)
   {
     vec.clear();
@@ -143,9 +144,9 @@ namespace WdRiscv
 	  vec.push_back(item.get<unsigned>());
 	else if (item.is_string())
 	  {
-	    char *end = nullptr;
-	    std::string str = item.get<std::string>();
-	    uint64_t u64 = strtoull(str.c_str(), &end, 0);
+            char*            end = nullptr;
+            std::string_view str = item.get<std::string_view>();
+            uint64_t         u64 = strtoull(str.data(), &end, 0);
 	    if (end and *end)
 	      {
 		std::cerr << "Invalid config file value for '" << tag << "': "
@@ -154,11 +155,11 @@ namespace WdRiscv
 		continue;
 	      }
 
-	    URV val = static_cast<URV>(u64);
-	    if (val != u64)
+            URV val = static_cast<URV>(u64);
+            if (val != u64)
               {
-                std::cerr << "Overflow in config file value for '" << tag
-                          << "': " << str << '\n';
+                std::cerr << "Overflow in config file value for '" << tag << "': "
+                          << str << '\n';
                 errors++;
                 continue;
               }
@@ -180,7 +181,7 @@ namespace WdRiscv
   /// Convert given json entry to a boolean value. Return ture on
   /// success and false on failure.
   bool
-  getJsonBoolean(const std::string& tag, const nlohmann::json& js, bool& value)
+  getJsonBoolean(std::string_view tag, const nlohmann::json& js, bool& value)
   {
     value = false;
 
@@ -198,10 +199,10 @@ namespace WdRiscv
 
     if (js.is_string())
       {
-	std::string str = js.get<std::string>();
-	if (str == "0" or str == "false" or str == "False")
+        std::string_view str = js.get<std::string_view>();
+        if (str == "0" or str == "false" or str == "False")
           value = false;
-	else if (str == "1" or str == "true" or str == "True")
+        else if (str == "1" or str == "true" or str == "True")
           value = true;
         else
           {
@@ -222,13 +223,13 @@ namespace WdRiscv
 template <typename URV>
 static
 bool
-applyCsrConfig(Hart<URV>& hart, const std::string& nm, const nlohmann::json& conf, bool verbose)
+applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf, bool verbose)
 {
   unsigned errors = 0;
   URV reset = 0, mask = 0, pokeMask = 0;
   bool isDebug = false, exists = true, shared = false;
 
-  std::string name = nm;
+  std::string name(nm);
   if (name == "dscratch")
     name +=  "0";
 
@@ -412,10 +413,10 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
   unsigned errors = 0;
   for (auto it = csrs.begin(); it != csrs.end(); ++it)
     {
-      const std::string csrName = it.key();
+      std::string_view csrName = it.key();
       const auto& conf = it.value();
 
-      std::string tag = "range";
+      std::string_view tag = "range";
       if (not conf.count(tag))
 	{
 	  applyCsrConfig(hart, csrName, conf, verbose) or errors++;
@@ -423,7 +424,7 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 	}
 
       std::vector<unsigned> range;
-      if (not getJsonUnsignedVec("csr." + tag + ".range", conf.at(tag), range)
+      if (not getJsonUnsignedVec(util::join("", "csr.", tag, ".range"), conf.at(tag), range)
 	  or range.size() != 2 or range.at(0) > range.at(1))
 	{
 	  std::cerr << "Invalid range in CSR '" << csrName << "': " << conf.at(tag) << '\n';
@@ -441,7 +442,7 @@ applyCsrConfig(Hart<URV>& hart, const nlohmann::json& config, bool verbose)
 
       for (unsigned n = range.at(0); n <= range.at(1); ++n)
 	{
-	  std::string strand = csrName + std::to_string(n);
+	  std::string strand = util::join("", csrName, std::to_string(n));
 	  if (not applyCsrConfig(hart, strand, conf, verbose))
 	    {
 	      errors++;
@@ -551,7 +552,7 @@ static
 bool
 applyPerfEventMap(Hart<URV>& hart, const nlohmann::json& config)
 {
-  const char* tag = "mmode_perf_event_map";
+  constexpr std::string_view tag = "mmode_perf_event_map";
   if (not config.count(tag))
     return true;
 
@@ -567,9 +568,9 @@ applyPerfEventMap(Hart<URV>& hart, const nlohmann::json& config)
   unsigned errors = 0;
   for (auto it = perfMap.begin(); it != perfMap.end(); ++it)
     {
-      const std::string& eventName = it.key();
+      std::string_view eventName = it.key();
       const auto& valObj = it.value();
-      std::string path = std::string(tag) + "." + eventName;
+      std::string path = util::join(".", tag, eventName);
       URV value = 0;
       if (not getJsonUnsigned(path, valObj,  value))
 	{
@@ -606,7 +607,7 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
 {
   unsigned errors = 0;
 
-  std::string tag = "num_mmode_perf_regs";
+  std::string_view tag = "num_mmode_perf_regs";
   if (config.count(tag))
     {
       unsigned count = 0;
@@ -658,7 +659,7 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
           for (auto it = events.begin(); it != events.end(); ++it, ++ix)
             {
               const auto& event = *it;
-              std::string elemTag = tag + "element " + std::to_string(ix);
+              std::string elemTag = util::join("", tag, "element ", std::to_string(ix));
               unsigned eventId = 0;
               if (not getJsonUnsigned<unsigned>(elemTag, event, eventId))
                 errors++;
@@ -690,7 +691,7 @@ processMinByesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned
   for (auto it = jsonMap.begin(); it != jsonMap.end(); it++)
     {
       GroupMultiplier group;
-      const std::string& lmul = it.key();
+      std::string_view lmul = it.key();
       const unsigned mewb = it.value();  // min element width in bytes
       if (not VecRegs::to_lmul(lmul, group))
 	{
@@ -739,7 +740,7 @@ processMaxBytesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigne
   for (auto it = jsonMap.begin(); it != jsonMap.end(); it++)
     {
       GroupMultiplier group;
-      const std::string& lmul = it.key();
+      std::string_view lmul = it.key();
       const unsigned mewb = it.value();  // max element width in bytes
       if (not VecRegs::to_lmul(lmul, group))
 	{
@@ -779,6 +780,8 @@ static
 bool
 applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 {
+  using namespace std::string_view_literals;
+
   if (not config.count("vector"))
     return true;  // Nothing to apply
 
@@ -786,7 +789,7 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
   const auto& vconf = config.at("vector");
 
   unsigned bytesPerVec = 0;
-  std::string tag = "bytes_per_vec";
+  std::string_view tag = "bytes_per_vec";
   if (not vconf.count(tag))
     {
       std::cerr << "Error: Missing " << tag << " tag in vector section of config file\n";
@@ -811,7 +814,7 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
     }
 
   std::vector<unsigned> bytesPerElem = { 1, 1 };
-  std::vector<const char*>  tags = { "min_bytes_per_elem", "max_bytes_per_elem" };
+  static constexpr auto tags = std::array{ "min_bytes_per_elem"sv, "max_bytes_per_elem"sv };
   for (size_t ix = 0; ix < tags.size(); ++ix)
     {
       unsigned bytes = 0;
@@ -900,7 +903,7 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 ///     "attribs" : [ "read", "write", "exec", "amo", "rsrv" ]
 static
 bool
-getConfigPma(const std::string& path, const nlohmann::json& attribs, Pma& pma)
+getConfigPma(std::string_view path, const nlohmann::json& attribs, Pma& pma)
 {
   using std::cerr;
 
@@ -917,18 +920,18 @@ getConfigPma(const std::string& path, const nlohmann::json& attribs, Pma& pma)
     {
       if (not attrib.is_string())
 	{
-	  cerr << "Error: Invalid item value in config item " << (path + ".attribs")
+	  cerr << "Error: Invalid item value in config item " << path << ".attribs"
 	       << " -- expecting a string\n";
 	  errors++;
 	  continue;
 	}
 
       Pma::Attrib attr = Pma::Attrib::None;
-      std::string valueStr = attrib.get<std::string>();
+      std::string_view valueStr = attrib.get<std::string_view>();
       if (not Pma::stringToAttrib(valueStr, attr))
 	{
 	  cerr << "Error: Invalid value in config item (" << valueStr << ") "
-	       << (path + ".attribs") << '\n';
+               << path << ".attribs" << '\n';
 	  errors++;
 	}
       else
@@ -942,7 +945,7 @@ getConfigPma(const std::string& path, const nlohmann::json& attribs, Pma& pma)
 template <typename URV>
 static
 bool
-processMemMappedMasks(Hart<URV>& hart, const std::string& path, const nlohmann::json& masks,
+processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::json& masks,
 		      uint64_t low, uint64_t high)
 {
   // Parse an array of entries, each entry is an array containing low
@@ -952,7 +955,7 @@ processMemMappedMasks(Hart<URV>& hart, const std::string& path, const nlohmann::
   for (auto maskIter = masks.begin(); maskIter != masks.end(); ++maskIter, ++ix)
     {
       const auto& entry = *maskIter;
-      std::string entryPath = path + ".masks[" + std::to_string(ix) + "]";
+      std::string entryPath = util::join("", path, ".masks[", std::to_string(ix), "]");
       std::vector<uint64_t> vec;
       if (not getJsonUnsignedVec(entryPath, entry, vec))
 	{
@@ -1022,14 +1025,14 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 
       unsigned itemErrors = 0;
 
-      std::string tag = "low";
+      std::string_view tag = "low";
       uint64_t low = 0;
       if (not item.count(tag))
 	{
 	  cerr << "Error: Missing entry \"low\" in configuration item " << path << "\n";
 	  itemErrors++;
 	}
-      else if (not getJsonUnsigned(path + "." + tag, item.at(tag), low))
+      else if (not getJsonUnsigned(util::join(".", path, tag), item.at(tag), low))
 	itemErrors++;
 
       tag = "high";
@@ -1039,7 +1042,7 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 	  cerr << "Error: Missing entry \"high\" in configuration item " << path << "\n";
 	  itemErrors++;
 	}
-      else if (not getJsonUnsigned(path + "." + tag, item.at(tag), high))
+      else if (not getJsonUnsigned(util::join(".", path, tag), item.at(tag), high))
 	itemErrors++;
 
       tag = "attribs";
@@ -1084,7 +1087,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
     {
       // Apply memory protection windows.
       const auto& memMap = config_ -> at("memmap");
-      std::string tag = "pma";
+      std::string_view tag = "pma";
       if (memMap.count(tag))
 	if (not applyPmaConfig(hart, memMap.at(tag)))
 	  errors++;
@@ -1137,7 +1140,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   unsigned errors = 0;
 
   // Define PC value after reset.
-  std::string tag = "reset_vec";
+  std::string_view tag = "reset_vec";
   if (config_ -> count(tag))
     {
       URV resetPc = 0;
@@ -1237,18 +1240,18 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enablePerModeCounterControl(flag);
     }
 
-  for (auto ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin", "zknd",
+  for (std::string_view ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin", "zknd",
 		     "zkne", "zknh", "zbkb", "zbkx", "zksed", "zksh"} )
     {
-      std::string etag = std::string("enable_") + ztag;
+      std::string etag = util::join("", "enable_", ztag);
       if (config_ -> count(etag))
 	std::cerr << "Config file tag \"" << etag << "\" deprecated: "
 		  << "Add extension string \"" << ztag << "\" to \"isa\" tag instead.\n";
     }
 
-  for (auto ztag : { "zbe", "zbf", "zbm", "zbp", "zbr", "zbt" } )
+  for (std::string_view ztag : { "zbe", "zbf", "zbm", "zbp", "zbr", "zbt" } )
     {
-      std::string etag = std::string("enable_") + ztag;
+      std::string etag = util::join("", "enable_", ztag);
       if (config_ -> count(etag))
 	std::cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
@@ -1345,7 +1348,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "force_rounding_mode";
   if (config_ -> count(tag))
     {
-      std::string str = config_->at(tag).get<std::string>();
+      std::string_view str = config_->at(tag).get<std::string_view>();
       if (str == "rne")
 	hart.forceRoundingMode(RoundingMode::NearestEven);
       else if (str == "rtz")
@@ -1517,7 +1520,7 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
   userMode = userMode or this->userModeEnabled();
 
   bool siOnReset = false;
-  std::string siTag = "clint_software_interrupt_on_reset";
+  constexpr std::string_view siTag = "clint_software_interrupt_on_reset";
   if (config_ -> count(siTag))
     if (not getJsonBoolean(siTag, config_ -> at(siTag), siOnReset))
       return false;
@@ -1529,7 +1532,7 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
       if (not applyConfig(hart, userMode, verbose))
 	return false;
 
-      std::string tag = "clint";
+      constexpr std::string_view tag = "clint";
       if (config_ -> count(tag))
 	{
 	  uint64_t addr = 0;
@@ -1554,7 +1557,7 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
     }
 
   unsigned mbLineSize = 64;
-  std::string tag = "merge_buffer_line_size";
+  std::string_view tag = "merge_buffer_line_size";
   if (config_ -> count(tag))
     if (not getJsonUnsigned(tag, config_ -> at(tag), mbLineSize))
       return false;
@@ -1584,8 +1587,8 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 	  return false;
 	}
       uint64_t addr = 0, size = 0;
-      if (not getJsonUnsigned(tag + ".address", uart.at("address"), addr) or
-	  not getJsonUnsigned(tag + ".size", uart.at("size"), size))
+      if (not getJsonUnsigned(util::join("", tag, ".address"), uart.at("address"), addr) or
+          not getJsonUnsigned(util::join("", tag, ".size"), uart.at("size"), size))
 	return false;
       system.defineUart(addr, size);
     }
@@ -1618,14 +1621,17 @@ HartConfig::getXlen(unsigned& xlen) const
     return false;
   if (isa.size() >= 4 and isa.at(0) == 'r' and isa.at(1) == 'v')
     {
-      int len = atoi(isa.c_str() + 2);
-      if (len == 32 or len == 64)
-	{
-	  xlen = len;
-	  return true;
-	}
-      std::cerr << "Invalid register width in isa string ("
-		<< isa << ") in config file -- ignored\n";
+      unsigned len;
+      if (auto convResult = std::from_chars(isa.c_str() + 2, isa.c_str() + isa.size(), len);
+          convResult.ec == std::errc{})
+        {
+          if (len == 32 or len == 64)
+            {
+              xlen = len;
+              return true;
+            }
+        }
+      std::cerr << "Invalid register width in isa string (" << isa << ") in config file -- ignored\n";
     }
   return false;
 }
@@ -1666,7 +1672,7 @@ HartConfig::getPageSize(size_t& pageSize) const
 bool
 HartConfig::getHartIdOffset(unsigned& offset) const
 {
-  std::string tag = "core_hart_id_offset";
+  constexpr std::string_view tag = "core_hart_id_offset";
   if (not config_ -> count(tag))
     return false;
 
@@ -1677,7 +1683,7 @@ HartConfig::getHartIdOffset(unsigned& offset) const
 bool
 HartConfig::getIsa(std::string& isa) const
 {
-  std::string tag = "isa";
+  constexpr std::string_view tag = "isa";
   if (not config_ -> count(tag))
     return false;
 
@@ -1708,7 +1714,7 @@ HartConfig::getMemorySize(size_t& memSize) const
 bool
 HartConfig::getMcmLineSize(unsigned& ls) const
 {
-  std::string tag = "merge_buffer_line_size";
+  constexpr std::string_view tag = "merge_buffer_line_size";
   if (not config_ -> count(tag))
     return false;
   return getJsonUnsigned(tag, config_ -> at(tag), ls);
@@ -1718,7 +1724,7 @@ HartConfig::getMcmLineSize(unsigned& ls) const
 bool
 HartConfig::getMcmCheckAll(bool& ca) const
 {
-  std::string tag = "merge_buffer_check_all";
+  constexpr std::string_view tag = "merge_buffer_check_all";
   if (not config_ -> count(tag))
     return false;
   return getJsonUnsigned(tag, config_ -> at(tag), ca);
@@ -1861,7 +1867,7 @@ HartConfig::getMisaReset(uint64_t& val) const
 
 
 bool
-HartConfig::hasCsrConfig(const std::string& csrName) const
+HartConfig::hasCsrConfig(std::string_view csrName) const
 {
   if (not config_ -> count("csr"))
     return false;  // No csr section

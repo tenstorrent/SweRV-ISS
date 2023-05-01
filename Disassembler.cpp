@@ -349,9 +349,9 @@ printSc(const Disassembler& disas, std::ostream& stream, const char* inst,
 
 static
 std::string
-insertFieldCountInName(const std::string& name, unsigned count, unsigned n)
+insertFieldCountInName(std::string_view name, unsigned count, unsigned n)
 {
-  std::string res = name.substr(0, n) + std::to_string(count) + name.substr(n);
+  std::string res = util::join("", name.substr(0, n), std::to_string(count), name.substr(n));
   return res;
 }
 
@@ -365,7 +365,7 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
 
   if (opcode7 == 0x7 or opcode7 == 0x27)
     {  // Vector load store
-      std::string name = di.name();
+      std::string_view name = di.name();
       if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
 	name = insertFieldCountInName(name, di.vecFieldCount(), 2);
       else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or
@@ -412,12 +412,12 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
       return;
     }
 
-  std::string name = di.name();
+  std::string_view name = di.name();
   if (id >= InstId::vmadc_vvm and id <= InstId::vmsbc_vxm and not di.isMasked())
     name = name.substr(0, name.size() - 1);
   out << name;
 
-  const char* sep = " ";
+  std::string_view sep = " ";
 
   for (unsigned i = 0; i < di.operandCount(); ++i)
     {

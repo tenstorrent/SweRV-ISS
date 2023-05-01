@@ -24,7 +24,7 @@ InstEntry::InstEntry(std::string name, InstId id,
 		     OperandType op1Type, OperandMode op1Mode, uint32_t op1Mask,
 		     OperandType op2Type, OperandMode op2Mode, uint32_t op2Mask,
 		     OperandType op3Type, OperandMode op3Mode, uint32_t op3Mask)
-  : name_(name), id_(id), code_(code), codeMask_(mask), ext_(ext), fmt_(fmt),
+  : name_(std::move(name)), id_(id), code_(code), codeMask_(mask), ext_(ext), fmt_(fmt),
     op0Mask_(op0Mask), op1Mask_(op1Mask), op2Mask_(op2Mask), op3Mask_(op3Mask),
     op0Type_(op0Type), op1Type_(op1Type), op2Type_(op2Type), op3Type_(op3Type),
     op0Mode_(op0Mode), op1Mode_(op1Mode), op2Mode_(op2Mode), op3Mode_(op3Mode),
@@ -263,7 +263,7 @@ InstTable::getEntry(InstId id) const
 
 
 const InstEntry&
-InstTable::getEntry(const std::string& name) const
+InstTable::getEntry(std::string_view name) const
 {
   const auto iter = instMap_.find(name);
   if (iter == instMap_.end())

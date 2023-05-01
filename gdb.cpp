@@ -397,13 +397,13 @@ getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
   for (auto csrn : csrNumbers)
     {
       URV val = 0;
-      std::string name;
+      std::string_view name;
       if (not hart.peekCsr(csrn, val, name))
         continue;
 
       std::string num = std::to_string(unsigned(csrn) + csrOffset);
 
-      xml += "    <reg name=\"" + name + "\" bitsize=\"" + width + "\" regnum=\"";
+      xml += "    <reg name=\"" + std::string(name) + "\" bitsize=\"" + width + "\" regnum=\"";
       xml += num + "\" save-restore=\"no\" type=\"int\" group=\"csr\"/>\n";
     }
   xml += "  </feature>\n";

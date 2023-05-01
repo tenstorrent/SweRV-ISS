@@ -78,7 +78,7 @@ namespace WdRiscv
     }
 
     /// Set a callback to obtain the abi CSR name.
-    void setCsrNameCallback(std::function<std::string(unsigned)> callback)
+    void setCsrNameCallback(std::function<std::string_view(unsigned)> callback)
     { csrNameCallback_ = callback; }
 
   protected:
@@ -92,7 +92,7 @@ namespace WdRiscv
   private:
 
     bool abiNames_ = false;
-    std::function<std::string(unsigned ix)> csrNameCallback_ = nullptr;
+    std::function<std::string_view(unsigned ix)> csrNameCallback_ = nullptr;
 
     std::unordered_map<uint32_t, std::string> disasMap_;
   };

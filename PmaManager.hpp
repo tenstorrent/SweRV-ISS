@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 
@@ -130,7 +131,7 @@ namespace WdRiscv
     /// return false if string does not contain a valid attribute names.
     /// Valid names: none, read, write, execute, idempotent, amo, iccm,
     /// dccm, mem_mapped, rsrv, io.
-    static bool stringToAttrib(const std::string& str, Attrib& attrib);
+    static bool stringToAttrib(std::string_view str, Attrib& attrib);
 
   private:
 
