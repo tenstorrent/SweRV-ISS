@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string_view>
 #include <vector>
 #include <unordered_map>
@@ -21,8 +22,7 @@ namespace WdRiscv
 
     Isa();
 
-    ~Isa()
-    { }
+    ~Isa() = default;
 
     /// Select given given version of extension. Return true if
     /// successful. Return false if given extension or associated
@@ -68,11 +68,11 @@ namespace WdRiscv
     /// Return extension corresponding to given string. For example,
     /// return RvExtension::A for "a". Return RvExtension::None if no such
     /// extension.
-    RvExtension stringToExtension(std::string_view str) const;
+    static RvExtension stringToExtension(std::string_view str);
 
     /// Return string correponding to given extension enum. Return empty
     /// string if given extension is out of bounds.
-    std::string_view extensionToString(RvExtension ext) const;
+    static std::string_view extensionToString(RvExtension ext);
 
     /// Process extension string enabling etxesions and selecting
     /// versions. Return true on success. Return false if extension
@@ -85,8 +85,13 @@ namespace WdRiscv
     /// Helper to configIsa.
     bool applyIsaString(std::string_view isa);
 
+    // Exists to be used below in the std::array size
+    // declarations
+    template <RvExtension ext>
+    using ext_ix = std::integral_constant<unsigned, static_cast<unsigned>(ext)>; // Use std::to_underlying
+
     /// Return integer value underlying extension enum.
-    unsigned extIx(RvExtension ext) const
+    static constexpr unsigned extIx(RvExtension ext)
     { return static_cast<unsigned>(ext); } // Use std::to_underlying
 
   private:
@@ -111,9 +116,9 @@ namespace WdRiscv
       std::vector<VersionPair> versions;
     };
 
-    std::vector<Info> infoVec_;
+    std::array<Info, ext_ix<RvExtension::None>::value> infoVec_;
 
-    std::unordered_map<std::string_view, RvExtension> stringToExt_;
-    std::vector<std::string_view> extToString_;
+    static const std::unordered_map<std::string_view, RvExtension> stringToExt_;
+    static const std::array<std::string_view, ext_ix<RvExtension::None>::value> extToString_;
   };
 }
