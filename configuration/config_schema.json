@@ -1,0 +1,603 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "definitions": {
+        "bool_or_bool_string": {
+            "oneOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                {
+                    "type": "string",
+                    "enum": [
+                        "0",
+                        "1",
+                        "false",
+                        "true",
+                        "False",
+                        "True"
+                    ]
+                }
+            ]
+        },
+        "int_or_hex_string": {
+            "oneOf": [
+                {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                },
+                {
+                    "type": "string",
+                    "pattern": "^0x[\\da-fA-F]+$"
+                }
+            ]
+        },
+        "pow_of_2_int_or_hex_string": {
+            "$ref": "#/definitions/int_or_hex_string",
+            "enum": [
+                1,
+                2,
+                4,
+                8,
+                16,
+                32,
+                64,
+                128,
+                256,
+                512,
+                1024,
+                2048,
+                4096,
+                "0x1",
+                "0x2",
+                "0x4",
+                "0x8",
+                "0x10",
+                "0x20",
+                "0x40",
+                "0x80",
+                "0x100",
+                "0x200",
+                "0x400",
+                "0x800",
+                "0x1000"
+            ]
+        }
+    },
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "abi_names": {
+            "$ref": "#/definitions/bool_or_bool_string",
+            "description": "Use ABI register names (e.g. sp instead of x2)."
+        },
+        "cancel_lr_on_ret": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "clear_mprv_on_ret": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "clear_mtval_on_illegal_instruction": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "clint": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "clint_software_interrupt_on_reset": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "Comment": {
+            "type": "string",
+            "deprecated": true
+        },
+        "cores": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "csr": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-z][a-z-0-9]*$": {
+                    "properties": {
+                        "debug": {
+                            "$ref": "#/definitions/bool_or_bool_string"
+                        },
+                        "exists": {
+                            "$ref": "#/definitions/bool_or_bool_string"
+                        },
+                        "mask": {
+                            "$ref": "#/definitions/int_or_hex_string"
+                        },
+                        "number": {
+                            "$ref": "#/definitions/int_or_hex_string"
+                        },
+                        "poke_mask": {
+                            "$ref": "#/definitions/int_or_hex_string"
+                        },
+                        "range": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": {
+                                "$ref": "#/definitions/int_or_hex_string"
+                            }
+                        },
+                        "reset": {
+                            "$ref": "#/definitions/int_or_hex_string"
+                        },
+                        "shared": {
+                            "$ref": "#/definitions/bool_or_bool_string"
+                        }
+                    },
+                    "patternProperties": {
+                        "[Cc]omment": {
+                            "deprecated": true
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "additionalProperties": false
+            }
+        },
+        "debug_park_loop": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "debug_trap_address": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "enable_csv_log": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_memory_consistency": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_misaligned_data": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_per_mode_counter_control": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_performance_counters": {
+            "$ref": "#/definitions/bool_or_bool_string",
+            "description": "Enable performance counters."
+        },
+        "enable_triggers": {
+            "$ref": "#/definitions/bool_or_bool_string",
+            "description": "Enable debug triggers."
+        },
+        "even_odd_trigger_chains": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "exec_opcode_trigger": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "force_rounding_mode": {
+            "type": "string",
+            "enum": [
+                "rne",
+                "rtz",
+                "rdn",
+                "rup",
+                "rmm"
+            ]
+        },
+        "guest_interrupt_count": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "harts": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "isa": {
+            "type": "string",
+            "pattern": "^rv(\\d{2,3})[a-z]+(_z[a-z]+)*$"
+        },
+        "load_data_trigger": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "log2_counter_to_time": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "max_mmode_perf_event": {
+            "$ref": "#/definitions/int_or_hex_string",
+            "maximum": 16384
+        },
+        "memmap": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "Comment": {
+                    "deprecated": true
+                },
+                "consoleio": {
+                    "$ref": "#/definitions/bool_or_bool_string"
+                },
+                "pma": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "attribs": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "read",
+                                        "write",
+                                        "exec",
+                                        "idempotent",
+                                        "amo",
+                                        "iccm",
+                                        "dccm",
+                                        "mem_mapped",
+                                        "rsrv",
+                                        "io",
+                                        "cacheable",
+                                        "misal_ok",
+                                        "misal_acc_fault"
+                                    ]
+                                }
+                            },
+                            "high": {
+                                "$ref": "#/definitions/int_or_hex_string"
+                            },
+                            "masks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/int_or_hex_string"
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3
+                                }
+                            },
+                            "low": {
+                                "$ref": "#/definitions/int_or_hex_string"
+                            }
+                        },
+                        "required": [
+                            "attribs",
+                            "high",
+                            "low"
+                        ]
+                    }
+                },
+                "size": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                }
+            }
+        },
+        "merge_buffer_check_all": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "merge_buffer_line_size": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "mmode_perf_event_map": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "None": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "InstCommited": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Inst16Commited": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Inst32Commited": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "InstAligned": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Mult": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Div": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Load": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Store": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "MisalignLoad": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "MisalignStore": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Alu": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "CsrRead": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "CsrReadWrite": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "CsrWrite": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Ebreak": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Ecall": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Fence": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Fencei": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Mret": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Branch": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "BranchTaken": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Exception": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "TimerInterrupt": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "ExternalInterrupt": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "BusFetch": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "BusTransactions": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "BusMisalign": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "IbusError": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "DbusError": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Atomic": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Lr": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Sc": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Bitmanip": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "BusLoad": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "BusStore": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "MultDiv": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "FpHalf": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "FpSingle": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "FpDouble": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Vector": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "Csr": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                }
+            }
+        },
+        "mmode_perf_events": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/int_or_hex_string",
+                "minimum": 1,
+                "not": {
+                    "type": "string",
+                    "pattern": "^(0x)?0+$"
+                }
+            }
+        },
+        "misaligned_has_priority": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "nmi_vec": {
+            "$ref": "#/definitions/int_or_hex_string",
+            "description": "Non-maskable-interrupt pc"
+        },
+        "num_mmode_perf_regs": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "page_fault_on_first_access": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "perf_count_atomic_load_store": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "perf_count_fp_load_store": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "physical_memory_protection_grain": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "print_load_store_address": {
+            "deprecated": true
+        },
+        "reservation_bytes": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "reset_vec": {
+            "$ref": "#/definitions/int_or_hex_string",
+            "description": "PC value after reset."
+        },
+        "snapshot_periods": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/int_or_hex_string",
+                "minimum": 1,
+                "not": {
+                    "type": "string",
+                    "pattern": "^(0x)?0+$"
+                }
+            }
+        },
+        "syscall_slam_area": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "tlb_entries": {
+            "$ref": "#/definitions/int_or_hex_string"
+        },
+        "trace_pmp": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "trace_ptw": {
+            "$ref": "#/definitions/bool_or_bool_string",
+            "description": "Trace page table walk in log."
+        },
+        "trap_non_zero_vstart": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "triggers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "mask": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/int_or_hex_string"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
+                    },
+                    "poke_mask": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/int_or_hex_string"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
+                    },
+                    "reset": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/int_or_hex_string"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3
+                    }
+                },
+                "required": [
+                    "mask",
+                    "poke_mask",
+                    "reset"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "uart": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                },
+                "size": {
+                    "$ref": "#/definitions/int_or_hex_string"
+                }
+            },
+            "required": [
+                "address",
+                "size"
+            ]
+        },
+        "vector": {
+            "type": "object",
+            "properties": {
+                "bytes_per_vec": {
+                    "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                },
+                "Comment": {
+                    "deprecated": true
+                },
+                "max_bytes_per_elem": {
+                    "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                },
+                "min_bytes_per_elem": {
+                    "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                },
+                "max_bytes_per_lmul": {
+                    "type": "object",
+                    "properties": {
+                        "mf2": {
+                            "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                        },
+                        "mf4": {
+                            "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                        },
+                        "mf8": {
+                            "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                        }
+                    }
+                },
+                "min_bytes_per_lmul": {
+                    "type": "object",
+                    "properties": {
+                        "m1": {
+                            "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                        },
+                        "m2": {
+                            "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                        },
+                        "m4": {
+                            "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                        },
+                        "m8": {
+                            "$ref": "#/definitions/pow_of_2_int_or_hex_string"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "bytes_per_vec",
+                "max_bytes_per_elem",
+                "min_bytes_per_elem"
+            ]
+        },
+        "xlen": {
+            "$id": "xlen",
+            "type": "integer",
+            "enum": [32, 64, 128]
+        }
+    },
+    "required": [
+        "isa",
+        "xlen"
+    ]
+}
