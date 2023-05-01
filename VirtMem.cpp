@@ -562,7 +562,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	    return accessFaultType(read, write, exec);
 	}
 
-      if (! memory_.read(pteAddr, pte.data_))
+      if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
@@ -638,14 +638,14 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
-	    memory_.read(pteAddr, pte2.data_);
+	    memRead(pteAddr, bigEnd_, pte2.data_);
 	    if (pte.data_ != pte2.data_)
 	      continue;  // Comparison fails: return to step 2.
 	    pte.bits_.accessed_ = 1;
 	    if (write)
 	      pte.bits_.dirty_ = 1;
 
-	    if (not memory_.write(hartIx_, pteAddr, pte.data_))
+	    if (not memWrite(pteAddr, bigEnd_, pte.data_))
 	      return stage1PageFaultType(read, write, exec);
 	  }
 	}
@@ -718,7 +718,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    return accessFaultType(read, write, exec);
 	}
 
-      if (! memory_.read(pteAddr, pte.data_))
+      if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage2PageFaultType(read, write, exec);
 
       if (attFile_)
@@ -793,14 +793,14 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
-	    memory_.read(pteAddr, pte2.data_);
+	    memRead(pteAddr, bigEnd_, pte2.data_);
 	    if (pte.data_ != pte2.data_)
 	      continue;  // Comparison fails: return to step 2.
 	    pte.bits_.accessed_ = 1;
 	    if (write)
 	      pte.bits_.dirty_ = 1;
 
-	    if (not memory_.write(hartIx_, pteAddr, pte.data_))
+	    if (not memWrite(pteAddr, bigEnd_, pte.data_))
 	      return stage2PageFaultType(read, write, exec);
 	  }
 	}
@@ -888,7 +888,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    return accessFaultType(read, write, exec);
 	}
 
-      if (! memory_.read(pteAddr, pte.data_))
+      if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
@@ -966,7 +966,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    // TODO FIX : this has to be atomic
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
-	    memory_.read(pteAddr, pte2.data_);
+	    memRead(pteAddr, bigEnd_, pte2.data_);
 	    if (pte.data_ != pte2.data_)
 	      continue;  // Comparison fails: return to step 2.
 	    pte.bits_.accessed_ = 1;
@@ -982,7 +982,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 		return ec;
 	      }
 	    assert(pteAddr == pteAddr2);
-	    if (not memory_.write(hartIx_, pteAddr2, pte.data_))
+	    if (not memWrite(pteAddr2, bigEnd_, pte.data_))
 	      return stage1PageFaultType(read, write, exec);
 	  }
 	}

@@ -15,6 +15,7 @@
 #pragma once
 
 #include <iosfwd>
+#include <byteswap.h>
 #include "trapEnums.hpp"
 #include "Memory.hpp"
 #include "Tlb.hpp"
@@ -203,6 +204,46 @@ namespace WdRiscv
     /// by translation.
     void setBigEndian(bool be)
     { bigEnd_ = be; }
+
+    /// Read a memory word honoring the big-endian flag. Return true
+    /// on success and false on failure.
+    bool memRead(uint64_t addr, bool bigEnd, uint32_t& data)
+    {
+      if (not memory_.read(addr, data))
+	return false;
+      if (bigEnd)
+	data = bswap_32(data);
+      return true;
+    }
+
+    /// Read a memory double-word honoring the big-endian flag. Return
+    /// true on success and false on failure.
+    bool memRead(uint64_t addr, bool bigEnd, uint64_t& data)
+    {
+      if (not memory_.read(addr, data))
+	return false;
+      if (bigEnd)
+	data = bswap_64(data);
+      return true;
+    }
+
+    /// Write a memory word honoring the big-endian flag. Return true
+    /// on success and false on failure.
+    bool memWrite(uint64_t addr, bool bigEnd, uint32_t data)
+    {
+      if (bigEnd)
+	data = bswap_32(data);
+      return memory_.write(hartIx_, addr, data);
+    }
+
+    /// Write a memory double-word honoring the big-endian flag. Return
+    /// true on success and false on failure.
+    bool memWrite(uint64_t addr, bool bigEnd, uint64_t data)
+    {
+      if (bigEnd)
+	data = bswap_64(data);
+      return memory_.write(hartIx_, addr, data);
+    }
 
     /// Use exec access permission for read permission.
     void useExecForRead(bool flag)
