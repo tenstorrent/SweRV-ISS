@@ -1675,6 +1675,8 @@ namespace WdRiscv
 	{
 	  if (not memory_.read(pa1, value))
 	    assert(0);
+	  if (bigEnd_)
+	    value = byteswap(value);
 	  return;
 	}
 
@@ -1693,12 +1695,18 @@ namespace WdRiscv
 	if (memory_.read(pa2 + i, byte))
 	  value |= LOAD_TYPE(byte) << 8*destIx;
 	else assert(0);
+
+      if (bigEnd_)
+	value = byteswap(value);
     }
 
     /// Write an item that may span 2 physical pages. See memRead.
     template <typename STORE_TYPE>
     void memWrite(uint64_t pa1, uint64_t pa2, STORE_TYPE value)
     {
+      if (bigEnd_)
+	value = byteswap(value);
+
       if (pa1 == pa2)
 	{
 	  if (not memory_.write(hartIx_, pa1, value))
