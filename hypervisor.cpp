@@ -151,10 +151,16 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
       return;
     }
 
+  // Use VS mode big-endian for translation.
+  bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
+  virtMem_.setBigEndian(hstatus_.bits_.VSBE);
+
   URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
   if (load<LOAD_TYPE>(virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
+
+  virtMem_.setBigEndian(prevTbe);
 }
 
 
@@ -257,10 +263,16 @@ Hart<URV>::hyperStore(const DecodedInst* di)
       return;
     }
 
+  // Use VS mode big-endian for translation.
+  bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
+  virtMem_.setBigEndian(hstatus_.bits_.VSBE);
+
   uint32_t rs1 = di->op1();
   URV virtAddr = intRegs_.read(rs1);
   STORE_TYPE value = STORE_TYPE(intRegs_.read(di->op0()));
   store<STORE_TYPE>(virtAddr, true /*hyper*/, value);
+
+  virtMem_.setBigEndian(prevTbe);
 }
 
 

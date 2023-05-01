@@ -194,6 +194,16 @@ namespace WdRiscv
 
   protected:
 
+    /// Return current big-endian mode of implicit memory read/write
+    /// used by translation.
+    bool bigEndian() const
+    { return bigEnd_; }
+
+    /// Set the big-endian mode of implicit memory read/write ops used
+    /// by translation.
+    void setBigEndian(bool be)
+    { bigEnd_ = be; }
+
     /// Use exec access permission for read permission.
     void useExecForRead(bool flag)
     { xForR_ = flag; }
@@ -393,6 +403,7 @@ namespace WdRiscv
     uint64_t time_ = 0;  //  Access order
 
     bool trace_ = true;
+    bool bigEnd_ = false;
 
     std::vector<UpdatedPte> updatedPtes_;
 

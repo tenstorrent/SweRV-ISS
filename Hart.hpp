@@ -23,6 +23,7 @@
 #include <type_traits>
 #include <functional>
 #include <atomic>
+#include <byteswap.h>
 #include <boost/circular_buffer.hpp>
 #include "InstId.hpp"
 #include "InstEntry.hpp"
@@ -79,6 +80,23 @@ namespace WdRiscv
     uint64_t val_ = 0;
   };
     
+
+  /// Until we have C++23 and std::byteswap
+  template <typename T,
+              std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  inline T byteswap(T x)
+  {
+    if constexpr (sizeof(x) == 1)
+      return x;
+    if constexpr (sizeof(x) == 2)
+      return bswap_16(x);
+    if constexpr (sizeof(x) == 4)
+      return bswap_32(x);
+    if constexpr (sizeof(x) == 8)
+      return bswap_64(x);
+    assert(0);
+    return 0;
+  }
 
   /// Changes made by the execution of one instruction. Useful for
   /// test pattern generation.
@@ -1850,6 +1868,9 @@ namespace WdRiscv
 
     /// Write the cached value of mstatus (or mstatus/mstatush) into the CSR.
     void writeMstatus();
+
+    /// Update big endian mode.
+    void updateBigEndian();
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all
@@ -4480,6 +4501,8 @@ namespace WdRiscv
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.
     PmpManager pmpManager_;
+
+    bool bigEnd_ = false;   // True if big endian
 
     VirtMem virtMem_;
     Isa isa_;

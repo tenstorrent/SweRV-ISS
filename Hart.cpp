@@ -705,6 +705,7 @@ namespace WdRiscv
     virtMem_.setSum(mstatus_.bits_.SUM);
     if (virtMode_)
       updateCachedVsstatus();
+    updateBigEndian();
   }
 
 
@@ -720,6 +721,7 @@ namespace WdRiscv
     virtMem_.setSum(mstatus_.bits_.SUM);
     if (virtMode_)
       updateCachedVsstatus();
+    updateBigEndian();
   }
 
 
@@ -760,6 +762,7 @@ Hart<URV>::updateCachedVsstatus()
       virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
       virtMem_.setVsSum(vsstatus_.bits_.SUM);
     }
+  updateBigEndian();
 }
 
 
@@ -770,6 +773,28 @@ Hart<URV>::updateCachedHstatus()
   URV csrVal = 0;
   peekCsr(CsrNumber::HSTATUS, csrVal);
   hstatus_.value_ = csrVal;
+  updateBigEndian();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::updateBigEndian()
+{
+  PrivilegeMode pm = mstatusMprv() ? mstatusMpp() : privMode_;
+  bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
+  if (pm == PrivilegeMode::Machine)
+    bigEnd_ = mstatus_.bits_.MBE;
+  else if (pm == PrivilegeMode::Supervisor)
+    bigEnd_ = virt? hstatus_.bits_.VSBE : mstatus_.bits_.SBE;
+  else if (pm == PrivilegeMode::User)
+    bigEnd_ = virt? vsstatus_.bits_.UBE : mstatus_.bits_.UBE;
+
+  if (pm != PrivilegeMode::Machine)
+    {
+      bool tbe = virt? hstatus_.bits_.VSBE : mstatus_.bits_.SBE; // translatiom big end
+      virtMem_.setBigEndian(tbe);
+    }
 }
 
 
@@ -1412,7 +1437,8 @@ Hart<URV>::initiateStoreException(ExceptionCause cause, URV addr1, URV addr2)
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& gaddr1, uint64_t& gaddr2, unsigned ldSize, bool hyper)
+Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& gaddr1,
+				  uint64_t& gaddr2, unsigned ldSize, bool hyper)
 {
   uint64_t va1 = URV(addr1);   // Virtual address. Truncate to 32-bits in 32-bit mode.
   uint64_t va2 = va1;
@@ -3825,23 +3851,38 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   size_t ix = 1;  // Index 0 is for argc
 
   // Push argv entries on the stack.
-  for (const auto addr : argvAddrs)
-    if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
-      return false;
+  for (auto addr : argvAddrs)
+    {
+      if (bigEnd_)
+	addr = byteswap(addr);
+      if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
+	return false;
+    }
 
   // Set environ for newlib. This is superfluous for Linux.
   URV ea = sp + ix*sizeof(URV);  // Address of envp array
   ElfSymbol sym;
   if (memory_.findElfSymbol("environ", sym))
-    pokeMemory(URV(sym.addr_), ea, true);
+    {
+      if (bigEnd_)
+	ea = byteswap(ea);
+      pokeMemory(URV(sym.addr_), ea, true);
+    }
 
   // Push envp entries on the stack.
-  for (const auto addr : envpAddrs)
-    if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
-      return false;
+  for (auto addr : envpAddrs)
+    {
+      if (bigEnd_)
+	addr = byteswap(addr);
+      if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
+	return false;
+    }
 
   // Put argc on the stack.
-  if (not pokeMemory(sp, URV(args.size()), true))
+  URV argc = args.size();
+  if (bigEnd_)
+    argc = byteswap(argc);
+  if (not pokeMemory(sp, argc, true))
     return false;
 
   if (not pokeIntReg(RegSp, sp))

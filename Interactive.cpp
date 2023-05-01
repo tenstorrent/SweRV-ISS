@@ -860,7 +860,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       size_t addr = 0;
       if (not parseCmdLineNumber("address", addrStr, addr))
 	return false;
-      bool usePma = false; // Ignore physicla memory attributes.
+      bool usePma = false; // Ignore physical memory attributes.
       uint32_t word = value; // Memory peek/poke in words.
       if (hart.pokeMemory(addr, word, usePma))
 	return true;
