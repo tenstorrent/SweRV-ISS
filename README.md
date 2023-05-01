@@ -448,6 +448,8 @@ be specified using the strings "false", "False", "true", or "True".
 
 Command line options override settings in the configuration file.
 
+C++ style comments are ignored when the file is parsed.
+
 Here is a sample configuration file:
 ```
     {
@@ -471,6 +473,13 @@ Here is a sample configuration file:
         }
     }
 ```
+
+A schema for the JSON config file is located in the configuration folder.
+It can be used for code completion and validation by adding the following to a config file:
+```
+"$schema": "<path to this repository>/configuration/config_schema.json",
+```
+
 ## Configuration parameters
 
 ### cores
