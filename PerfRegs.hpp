@@ -199,7 +199,7 @@ namespace WdRiscv
     /// Set id to event-id (tag from enum EventNumber) coresponding to the
     /// given event name returning true. Return false leaving id unmodified
     /// if given string is not an event name.
-    static bool findEvent(const std::string& name, EventNumber& id)
+    static bool findEvent(std::string_view name, EventNumber& id)
     {
       auto iter = eventNameToId_.find(name);
       if (iter == eventNameToId_.end())
@@ -229,7 +229,7 @@ namespace WdRiscv
     std::vector<uint64_t> counters_;
 
     // Map an event name to an event id.
-    static std::unordered_map<std::string, EventNumber> eventNameToId_;
+    static const std::unordered_map<std::string_view, EventNumber> eventNameToId_;
 
     // Map a user event number to an internal event id.
     std::unordered_map<uint64_t, EventNumber> userNumberToId_;

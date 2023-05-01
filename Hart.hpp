@@ -195,7 +195,7 @@ namespace WdRiscv
     /// Set val to the value of integer register reg returning true on
     /// success. Return false leaving val unmodified if reg is out of
     /// bounds. If successful, set name to the register name.
-    bool peekIntReg(unsigned reg, URV& val, std::string& name) const;
+    bool peekIntReg(unsigned reg, URV& val, std::string_view& name) const;
 
     /// Return to the value of integer register reg which must not be 
     /// out of bounds (otherwise we trigger an assert).
@@ -238,12 +238,12 @@ namespace WdRiscv
     /// Set val/name to the value/name of the control and status
     /// register csr returning true on success. Return false leaving
     /// val/name unmodified if csr is out of bounds.
-    bool peekCsr(CsrNumber csr, URV& val, std::string& name) const;
+    bool peekCsr(CsrNumber csr, URV& val, std::string_view& name) const;
 
     /// Set val to the value of the control and status register csr field
     /// returning true on success. Return false leaving val unmodified
     /// if csr is out of bounds.
-    bool peekCsr(CsrNumber csr, std::string field, URV& val) const;
+    bool peekCsr(CsrNumber csr, std::string_view field, URV& val) const;
 
     /// Set the given control and status register, csr, to the given
     /// value returning true on success. Return false if csr is out of
@@ -271,20 +271,20 @@ namespace WdRiscv
     /// represent an integer or a symbolic name). Set num to the
     /// number of the corresponding register if found. Return true on
     /// success and false if no such register.
-    bool findIntReg(const std::string& name, unsigned& num) const;
+    bool findIntReg(std::string_view name, unsigned& num) const;
 
     /// Find the floating point with the given name.  Set num to the
     /// number of the corresponding register if found. Return true on
     /// success and false if no such register.
-    bool findFpReg(const std::string& name, unsigned& num) const;
+    bool findFpReg(std::string_view name, unsigned& num) const;
 
     /// Find vector register by name. See findFpReg.
-    bool findVecReg(const std::string& name, unsigned& num) const;
+    bool findVecReg(std::string_view name, unsigned& num) const;
 
     /// Find the control and status register with the given name
     /// (which may represent an integer or a symbolic name). Return
     /// pointer to CSR on success and nullptr if no such register.
-    Csr<URV>* findCsr(const std::string& name);
+    Csr<URV>* findCsr(std::string_view name);
 
     /// Find the control and status register with the given number.
     /// Return pointer to CSR on success and nullptr if no such
@@ -294,14 +294,14 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if
     /// no such CSR.
-    bool configCsr(const std::string& name, bool implemented,
+    bool configCsr(std::string_view name, bool implemented,
 		   URV resetValue, URV mask, URV pokeMask,
 		   bool isDebug, bool shared);
 
     /// Define a new CSR (beyond the standard CSRs defined by the
     /// RISCV spec). Return true on success and false if name/number
     /// already in use.
-    bool defineCsr(const std::string& name, CsrNumber number,
+    bool defineCsr(std::string name, CsrNumber number,
 		   bool implemented, URV resetValue, URV mask,
 		   URV pokeMask, bool isDebug);
 
@@ -320,7 +320,7 @@ namespace WdRiscv
     /// updateMisa is true then the MISA CSR reset value is updated to
     /// enable the extensions defined by the given string (this is done
     /// for linux/newlib emulation).
-    bool configIsa(const std::string& string, bool updateMisa);
+    bool configIsa(std::string_view string, bool updateMisa);
 
     /// Enable/disable load-data debug triggerring (disabled by default).
     void configLoadDataTrigger(bool flag)

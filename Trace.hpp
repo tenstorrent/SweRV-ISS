@@ -174,7 +174,7 @@ namespace WdRiscv
     { return di_.instId(); }
 
     /// Return the instruction name of the instruction of this record.
-    std::string name() const
+    std::string_view name() const
     { return di_.name(); }
 
     /// Return currently configured element width.
@@ -198,7 +198,7 @@ namespace WdRiscv
     { return hart_->peekCsr(csr, val); }
 
     /// Return CSR field value after last executed instruction.
-    bool peekCsr(CsrNumber csr, std::string field, URV& val) const
+    bool peekCsr(CsrNumber csr, std::string_view field, URV& val) const
     { return hart_->peekCsr(csr, field, val); }
 
     /// Return the number of page table walks of the last

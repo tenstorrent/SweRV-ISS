@@ -14,55 +14,11 @@
 
 #pragma once
 
-#include <array>
-#include <cstddef>
 #include <cstdint>
-#include <string_view>
 #include <tuple>
-#include <type_traits>
 #include <unordered_map>
 
-// This namespace should just be used within this file.  It is needed to allow
-// template specializations which are not allowed directly in a struct/class.
-// It is used to build register name constant strings at compile time.
-namespace _helper
-{
-  // Splits an unsigned value into its digits.  The contained type
-  // is an integer_sequence containing the digits in printed order.
-  template <size_t V, size_t... Vs> struct _digit_sequence_helper
-  {
-    using type = typename _digit_sequence_helper<V / 10, V % 10, Vs...>::type;
-  };
-  template <> struct _digit_sequence_helper<0>
-  {
-    using type = std::index_sequence<0>;
-  };
-  template <std::size_t V, std::size_t... Vs> struct _digit_sequence_helper<0, V, Vs...>
-  {
-    using type = std::index_sequence<V, Vs...>;
-  };
-  template <std::size_t V> using digit_sequence = typename _digit_sequence_helper<V>::type;
-
-  // Creates a compile-time string using an integer_sequence of the digits.
-  // the template is only defined for integer_sequence<size_t>.
-  template <typename, char...> struct _value_to_string_helper;
-  template <std::size_t... Digits, char... PREFIX_CHARS>
-  struct _value_to_string_helper<std::index_sequence<Digits...>, PREFIX_CHARS...>
-  {
-    static constexpr const char value[] = {PREFIX_CHARS..., ('0' + Digits)..., 0};
-  };
-  template <std::size_t V, char... PREFIX_CHARS> using value_to_string = _value_to_string_helper<digit_sequence<V>, PREFIX_CHARS...>;
-
-  // Creates an array of compile-time register strings.  Specify the number
-  // of register names to create and provide the prefix characters at the end
-  template <typename, char...> struct _reg_name_array_helper;
-  template <std::size_t... Vs, char... PREFIX_CHARS>
-  struct _reg_name_array_helper<std::index_sequence<Vs...>, PREFIX_CHARS...>
-  {
-    static constexpr auto value = std::array{std::string_view(value_to_string<Vs, PREFIX_CHARS...>::value)...};
-  };
-  template <std::size_t V, char... PREFIX_CHARS> using make_reg_name_array = _reg_name_array_helper<std::make_index_sequence<V>, PREFIX_CHARS...>;
-}
+#include "util.hpp"
 
 namespace WdRiscv
 {
@@ -132,7 +88,7 @@ namespace WdRiscv
     RegNamesTemplate() = delete;
 
     static inline constexpr const char unknown_[]       = {PREFIX_CHAR, '?', 0};
-    static inline constexpr auto       numberToName_    = _helper::make_reg_name_array<NUM_REGS, PREFIX_CHAR>::value;
+    static inline constexpr auto       numberToName_    = util::make_reg_name_array<NUM_REGS, PREFIX_CHAR>::value;
     static inline const     auto       nameToNumber_    = buildNameToNumberMap();
     static inline constexpr auto       numberToAbiName_ = GET_NUMBER_TO_ABI_NAME();
   };

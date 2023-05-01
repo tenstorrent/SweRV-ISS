@@ -67,7 +67,7 @@ using namespace WdRiscv;
 template <typename TYPE>
 static
 bool
-parseNumber(const std::string& numberStr, TYPE& number)
+parseNumber(std::string_view numberStr, TYPE& number)
 {
   bool good = not numberStr.empty();
 
@@ -75,9 +75,9 @@ parseNumber(const std::string& numberStr, TYPE& number)
     {
       char* end = nullptr;
       if constexpr (sizeof(TYPE) == 4)
-        number = strtoul(numberStr.c_str(), &end, 0);
+        number = strtoul(numberStr.data(), &end, 0);
       else if constexpr (sizeof(TYPE) == 8)
-        number = strtoull(numberStr.c_str(), &end, 0);
+        number = strtoull(numberStr.data(), &end, 0);
       else
 	{
 	  std::cerr << "parseNumber: Only 32/64-bit RISCV harts supported\n";
@@ -162,7 +162,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   // Give disassembler a way to get abi-names of CSRs.
   auto callback = [this](unsigned ix) {
     auto csr = this->findCsr(CsrNumber(ix));
-    return csr? csr->getName() : std::string();
+    return csr? csr->getName() : std::string_view{};
   };
   disas_.setCsrNameCallback(callback);
 }
@@ -1213,7 +1213,7 @@ Hart<URV>::reportInstructionFrequency(FILE* file) const
       std::string instr;
       // Don't collect non-vector repeats
       if (entry.isVector())
-        instr = entry.name() + "." + VecRegs::to_string(prof.elemWidth_);
+        instr = util::join(".", entry.name(), VecRegs::to_string(prof.elemWidth_));
       else if (prof.elemWidth_ == ElementWidth::Byte)
         instr = entry.name();
       else
@@ -2671,7 +2671,7 @@ Hart<URV>::peekIntReg(unsigned ix) const
 
 template <typename URV>
 bool
-Hart<URV>::peekIntReg(unsigned ix, URV& val, std::string& name) const
+Hart<URV>::peekIntReg(unsigned ix, URV& val, std::string_view& name) const
 { 
   if (ix < intRegs_.size())
     {
@@ -2776,7 +2776,7 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 
 template <typename URV>
 bool
-Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string& name) const
+Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string_view& name) const
 {
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
@@ -2792,7 +2792,7 @@ Hart<URV>::peekCsr(CsrNumber csrn, URV& val, std::string& name) const
 
 template <typename URV>
 bool
-Hart<URV>::peekCsr(CsrNumber csrn, std::string field, URV& val) const
+Hart<URV>::peekCsr(CsrNumber csrn, std::string_view field, URV& val) const
 {
   const Csr<URV>* csr = csRegs_.getImplementedCsr(csrn);
   if (not csr)
@@ -2952,7 +2952,7 @@ Hart<URV>::pokePc(URV address)
 
 template <typename URV>
 bool
-Hart<URV>::findIntReg(const std::string& name, unsigned& num) const
+Hart<URV>::findIntReg(std::string_view name, unsigned& num) const
 {
   if (intRegs_.findReg(name, num))
     return true;
@@ -2970,7 +2970,7 @@ Hart<URV>::findIntReg(const std::string& name, unsigned& num) const
 
 template <typename URV>
 bool
-Hart<URV>::findFpReg(const std::string& name, unsigned& num) const
+Hart<URV>::findFpReg(std::string_view name, unsigned& num) const
 {
   if (not isRvf())
     return false;   // Floating point extension not enabled.
@@ -2983,7 +2983,7 @@ Hart<URV>::findFpReg(const std::string& name, unsigned& num) const
 
   if (name.at(0) == 'f')
     {
-      std::string numStr = name.substr(1);
+      std::string_view numStr = name.substr(1);
       unsigned n = 0;
       if (parseNumber<unsigned>(numStr, num) and n < fpRegCount())
 	return true;
@@ -3002,7 +3002,7 @@ Hart<URV>::findFpReg(const std::string& name, unsigned& num) const
 
 template <typename URV>
 bool
-Hart<URV>::findVecReg(const std::string& name, unsigned& num) const
+Hart<URV>::findVecReg(std::string_view name, unsigned& num) const
 {
   if (not isRvv())
     return false;
@@ -3013,7 +3013,7 @@ Hart<URV>::findVecReg(const std::string& name, unsigned& num) const
 
 template <typename URV>
 Csr<URV>*
-Hart<URV>::findCsr(const std::string& name)
+Hart<URV>::findCsr(std::string_view name)
 {
   Csr<URV>* csr = csRegs_.findCsr(name);
 
@@ -3030,7 +3030,7 @@ Hart<URV>::findCsr(const std::string& name)
 
 template <typename URV>
 bool
-Hart<URV>::configCsr(const std::string& name, bool implemented, URV resetValue,
+Hart<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
                      URV mask, URV pokeMask, bool debug, bool shared)
 {
   return csRegs_.configCsr(name, implemented, resetValue, mask, pokeMask,
@@ -3040,12 +3040,12 @@ Hart<URV>::configCsr(const std::string& name, bool implemented, URV resetValue,
 
 template <typename URV>
 bool
-Hart<URV>::defineCsr(const std::string& name, CsrNumber num,
+Hart<URV>::defineCsr(std::string name, CsrNumber num,
 		     bool implemented, URV resetVal, URV mask,
 		     URV pokeMask, bool isDebug)
 {
   bool mandatory = false, quiet = true;
-  auto c = csRegs_.defineCsr(name, num, mandatory, implemented, resetVal,
+  auto c = csRegs_.defineCsr(std::move(name), num, mandatory, implemented, resetVal,
 			     mask, pokeMask, isDebug, quiet);
   return c != nullptr;
 }
@@ -3053,7 +3053,7 @@ Hart<URV>::defineCsr(const std::string& name, CsrNumber num,
 
 template <typename URV>
 bool
-Hart<URV>::configIsa(const std::string& isa, bool updateMisa)
+Hart<URV>::configIsa(std::string_view isa, bool updateMisa)
 {
   if (not isa_.configIsa(isa))
     return false;
@@ -3791,7 +3791,7 @@ Hart<URV>::setTargetProgramBreak(URV addr)
 template <typename URV>
 inline
 bool
-pokeString(Hart<URV>& hart, uint64_t addr, const std::string& str)
+pokeString(Hart<URV>& hart, uint64_t addr, std::string_view str)
 {
   for (uint8_t c : str)
     if (not hart.pokeMemory(addr++, c, true))
@@ -3826,7 +3826,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   argvAddrs.push_back(0);  // Null pointer at end of argv.
 
   // Setup envp on the stack (LANG is needed for clang compiled code).
-  std::vector<std::string> envs = { "LANG=C", "LC_ALL=C" };
+  static constexpr std::string_view envs[] = { "LANG=C", "LC_ALL=C" };
   std::vector<URV> envpAddrs;  // Addresses of the envp strings.
   for (const auto& env : envs)
     {
