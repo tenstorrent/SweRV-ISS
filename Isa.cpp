@@ -395,7 +395,7 @@ Isa::applyIsaString(std::string_view isaStr)
       if (version.empty())
 	continue;
 
-      unsigned v;
+      unsigned v = 0;
       std::from_chars(version.begin(), version.end(), v);
 
       unsigned s = 0;
