@@ -20,6 +20,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <cassert>
 #include <utility>
 
 namespace util
