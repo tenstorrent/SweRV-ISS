@@ -703,8 +703,6 @@ order (ppo) rules of RISCV.
 It is not possible to change XLEN at run time by writing to the MISA
 register.
 
-Big endian mode is not supported.
-
 The "round to nearest break tie to max magnitude" rounding mode is not
 implemented unless you compile with the softfloat library:
 ```
