@@ -235,7 +235,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
     }
 
   for (unsigned i = 0; i < cacheLineSize_; i+= 8)
-    memory_.poke(physAddr + i, uint64_t(0), true /*usePma*/);
+    pokeMemory(physAddr + i, uint64_t(0), true /*usePma*/);
 }
 
 template class WdRiscv::Hart<uint32_t>;

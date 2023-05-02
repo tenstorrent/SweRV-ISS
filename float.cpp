@@ -140,7 +140,7 @@ template <typename URV>
 template <typename float_type>
 inline
 auto
-Hart<URV>::updateAccruedFpBits(float_type res)
+Hart<URV>::updateAccruedFpBits(float_type)
   -> typename std::enable_if<std::is_floating_point<float_type>::value>::type
 {
 }
@@ -334,9 +334,11 @@ clearSimulatorFpFlags()
   uint32_t val = _mm_getcsr();
   val &= ~uint32_t(0x3f);
   _mm_setcsr(val);
-#endif
-#ifndef SOFT_FLOAT
-  std::feclearexcept(FE_ALL_EXCEPT);
+#else
+  std::fexcept_t fe;
+  std::fegetexceptflag(&fe, FE_ALL_EXCEPT);
+  if (unsigned(fe) != 0)
+    std::feclearexcept(FE_ALL_EXCEPT);
 #endif
 }
 

@@ -21,9 +21,9 @@ using namespace WdRiscv;
 
 
 bool
-Pma::stringToAttrib(const std::string& str, Pma::Attrib& attrib)
+Pma::stringToAttrib(std::string_view str, Pma::Attrib& attrib)
 {
-  static std::unordered_map<std::string, Attrib> stringToAttrib = {
+  static const std::unordered_map<std::string_view, Attrib> stringToAttrib = {
     { "none", Pma::None },
     { "read", Pma::Read },
     { "write", Pma::Write },

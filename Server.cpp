@@ -1332,6 +1332,16 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         }
         break;
 
+      case SeiPin:
+        {
+          bool val = msg.value;
+          hart.setSeiPin(val);
+          if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " sei_pin %d\n", hartId, unsigned(val));
+        }
+        break;
+
+
       default:
         std::cerr << "Unknown command\n";
         reply.type = Invalid;

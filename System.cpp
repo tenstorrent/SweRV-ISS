@@ -15,6 +15,7 @@
 #include <iomanip>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include "Filesystem.hpp"
 #include "Hart.hpp"
 #include "Core.hpp"
@@ -42,10 +43,10 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
 {
   cores_.resize(coreCount);
 
-  memory_ = std::make_shared<Memory>(memSize, pageSize);
+  memory_ = std::make_unique<Memory>(memSize, pageSize);
   sparseMem_ = nullptr;
 
-  Memory& mem = *(memory_.get());
+  Memory& mem = *memory_;
   mem.setHartCount(hartCount_);
 
   for (unsigned ix = 0; ix < coreCount; ++ix)
@@ -67,7 +68,7 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
     }
 
 #ifdef MEM_CALLBACKS
-  sparseMem_ = new SparseMem();
+  sparseMem_ = std::make_unique<SparseMem>();
   auto readf = [this](uint64_t addr, unsigned size, uint64_t& value) -> bool {
                  return sparseMem_->read(addr, size, value); };
   auto writef = [this](uint64_t addr, unsigned size, uint64_t value) -> bool {
@@ -84,24 +85,14 @@ template <typename URV>
 void
 System<URV>::defineUart(uint64_t addr, uint64_t size)
 {
-  auto uart = new Uartsf(addr, size);
-  ioDevs_.push_back(uart);
+  auto uart = std::make_shared<Uartsf>(addr, size);
   memory_->registerIoDevice(uart);
+  ioDevs_.push_back(std::move(uart));
 }
 
 
 template <typename URV>
-System<URV>::~System()
-{
-  delete sparseMem_;
-  sparseMem_ = nullptr;
-
-  delete mcm_;
-  mcm_ = nullptr;
-
-  for (auto dev : ioDevs_)
-    delete dev;
-}
+System<URV>::~System() = default;
 
 
 template <typename URV>
@@ -312,6 +303,10 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
   if (not memory_->saveInstructionAddressTrace(itracePath))
     return false;
 
+  Filesystem::path branchPath = dirPath / "branch-trace";
+  if (not hart.saveBranchTrace(branchPath))
+    return false;
+
   return true;
 }
 
@@ -382,12 +377,6 @@ template <typename URV>
 bool
 System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 {
-  if (mcm_)
-    {
-      delete mcm_;
-      mcm_ = nullptr;
-    }
-
   if (mbLineSize != 0)
     if (not isPowerOf2(mbLineSize) or mbLineSize > 512)
       {
@@ -396,11 +385,11 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 	return false;
       }
 
-  mcm_ = new Mcm<URV>(this->hartCount(), mbLineSize);
+  mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), mbLineSize);
   mbSize_ = mbLineSize;
   mcm_->setCheckWholeMbLine(mbLineCheckAll);
 
-  for (auto hart :  sysHarts_)
+  for (auto& hart :  sysHarts_)
     hart->setMcm(mcm_);
 
   return true;

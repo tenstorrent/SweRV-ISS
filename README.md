@@ -448,6 +448,8 @@ be specified using the strings "false", "False", "true", or "True".
 
 Command line options override settings in the configuration file.
 
+C++ style comments are ignored when the file is parsed.
+
 Here is a sample configuration file:
 ```
     {
@@ -471,6 +473,13 @@ Here is a sample configuration file:
         }
     }
 ```
+
+A schema for the JSON config file is located in the configuration folder.
+It can be used for code completion and validation by adding the following to a config file:
+```
+"$schema": "<path to this repository>/configuration/config_schema.json",
+```
+
 ## Configuration parameters
 
 ### cores
@@ -526,14 +535,61 @@ count retired load insructions) are supported.
 If set to true then registers are identified by their ABI names in the
 log file (e.g. ra instead of x1).
 
+###  trace_ptw
+If set to true then page table walk information is emitted to the log file.
+
+###  reservation_bytes
+Defines the size of a lr.w/lr.d reservation (default is 4 for RV32 and 8 for RV64).
+
 ###  enable_misaligned_data
 If set to false then a misaligend data access by a load/store
 instructions will trigger an exception.
 
+###  misaligned_has_priority
+When true, makes misalgined data exceptions have priority over page and access
+fault exceptions. Default is true.
+
+###  page_fault_on_first_access
+When true, makes first access to a page table entry trigger a page fault.
+Default is true.
+
+###  tlb_entries
+Defines the number of translation lookaside buffer entries. Default is 32.
+
+### clear_mprv_on_ret
+When true (default), makes the mret/sret instruction clear the mprv bit in
+the mstatus/status CSR.
+
+### clear_mtval_on_illegal_instruction
+When true, causes the illegal instruction exception to clear the mtval CSR.
+Default is false.
+
+### cancel_lr_on_trap
+When true (default), causes reservations to be canceled on traps.
+
+### debug_park_loop
+Defines the address of the entry point of the debug mode park
+look. Whisper will jump to this address upon entering debug mode if
+this address is not an all ones bit pattern. Default: all ones bit pattern.
+
+### debug_trap_address
+Defines the address of the debug mode exception handler.  Whisper will
+jump to this address upon ecountering an exception in debug mode if
+this address is not an all ones bit pattern. Default: all ones bit
+pattern.
+
+### trap_non_zero_vstart
+Causes vector instruction to trap on non-zero vstart. Default is true.
+
 ###  physical_memory_protection_grain
-Define the G value of the physical memory protection grain. This is
+Defines the G value of the physical memory protection grain. This is
 the log base 2 of the grain minus 2.  The default is G=0 (implying a
 grain of 4).
+
+###  guest_interrupt_count
+Defines the maximum number of guest external interrupt count (GEILEN).
+Default is zero.
+
 
 ###  csr
 The CSR configuration is a map wher each key is a CSR name and the
@@ -586,7 +642,15 @@ command will change the program counter to the value of reset_vec.
 Defines the PC address after a non-maskable-interrupt.
 
 ###  enable_triggers
-Enable support for debug triggers.
+Enable support for debug triggers when set to true.
+
+###  perf_count_atomic_load_store
+When true, the lr/sc instructions will be counted as load/store 
+by the performance counters.
+
+### perf_count_fp_load_store
+When true, the floating point load/store instructions will be counted
+as load/store by the performance counters.
 
 # Memory Consistency Checks
 
@@ -638,8 +702,6 @@ order (ppo) rules of RISCV.
 
 It is not possible to change XLEN at run time by writing to the MISA
 register.
-
-Big endian mode is not supported.
 
 The "round to nearest break tie to max magnitude" rounding mode is not
 implemented unless you compile with the softfloat library:

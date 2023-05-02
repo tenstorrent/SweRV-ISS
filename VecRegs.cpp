@@ -37,7 +37,7 @@ VecRegs::VecRegs()
     groupFlags.assign(groupFlags.size(), true);
 
   // Operands effective group multiplier is used for tracing/logging.
-  // Worst case we have 3 vector operands.
+  // At most we have 3 vector operands.
   opsEmul_.resize(3);
   opsEmul_.assign(opsEmul_.size(), 1);
 }
@@ -197,17 +197,17 @@ VecRegs::reset()
 
 
 bool
-VecRegs::findReg(const std::string& name, unsigned& ix) const
+VecRegs::findReg(std::string_view name, unsigned& ix) const
 {
   if (name.empty())
     return false;
 
-  std::string numStr = name;
+  std::string_view numStr = name;
   if (numStr.at(0) == 'v')
     numStr = numStr.substr(1);
 
   char* end = nullptr;
-  unsigned n = strtoul(numStr.c_str(), &end, 10);
+  unsigned n = strtoul(numStr.data(), &end, 10);
   if (end and *end)
     return false;
 

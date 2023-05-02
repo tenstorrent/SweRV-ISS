@@ -1,4 +1,5 @@
 #include <boost/algorithm/string.hpp>
+#include <charconv>
 #include <iostream>
 #include "Isa.hpp"
 
@@ -51,12 +52,27 @@ static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS
 };
 static_assert(std::size(STRING_EXT_PAIRS) == static_cast<unsigned>(RvExtension::None));
 
+const std::unordered_map<std::string_view, RvExtension> Isa::stringToExt_(std::begin(STRING_EXT_PAIRS),
+                                                                          std::end(STRING_EXT_PAIRS));
+
+// Use this function to do the constant initialization to allow use of indices
+template <size_t N, unsigned (*TO_INDEX)(RvExtension)>
+static constexpr std::array<std::string_view, N>
+buildExtToStr()
+{
+  std::array<std::string_view, N> extToString;
+  for (auto&& [name, id] : STRING_EXT_PAIRS)
+    {
+      extToString.at(TO_INDEX(id)) = name;
+    }
+  return extToString;
+}
+
+const std::array<std::string_view, Isa::extIx(RvExtension::None)> Isa::extToString_ =
+  buildExtToStr<Isa::extIx(RvExtension::None), Isa::extIx>();
 
 Isa::Isa()
-  : stringToExt_(std::begin(STRING_EXT_PAIRS), std::end(STRING_EXT_PAIRS))
 {
-  infoVec_.resize(extIx(RvExtension::None) + 1);
-
   infoVec_.at(extIx(RvExtension::A)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::B)) = Info{ {{0,93}}, {0,93} };
   infoVec_.at(extIx(RvExtension::C)) = Info{ {{1,0}, {2,0}}, {1,0} };
@@ -92,12 +108,6 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{0,1}}, {0,1} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
-
-  extToString_.resize(extIx(RvExtension::None));
-  for (auto&& [name, id] : STRING_EXT_PAIRS)
-    {
-      extToString_.at(extIx(id)) = name;
-    }
 }
 
 
@@ -208,7 +218,7 @@ Isa::getVersion(RvExtension ext, unsigned& version, unsigned& subversion) const
 
 
 RvExtension
-Isa::stringToExtension(std::string_view str) const
+Isa::stringToExtension(std::string_view str)
 {
   const auto iter = stringToExt_.find(str);
   if (iter == stringToExt_.end())
@@ -218,7 +228,7 @@ Isa::stringToExtension(std::string_view str) const
 
 
 std::string_view
-Isa::extensionToString(RvExtension ext) const
+Isa::extensionToString(RvExtension ext)
 {
   unsigned ix = extIx(ext);
   return ix < extToString_.size()? extToString_.at(ix) : "";
@@ -234,7 +244,7 @@ Isa::extensionToString(RvExtension ext) const
 /// The <version>/<subversion> are sequences of digits. The
 /// <version>p<subversion> suffix is optional.
 bool
-extractExtension(std::string_view isa, size_t& i, std::string& extension)
+extractExtension(std::string_view isa, size_t& i, std::string_view& extension)
 {
   size_t len = isa.size();
   if (i >= len)
@@ -243,31 +253,36 @@ extractExtension(std::string_view isa, size_t& i, std::string& extension)
     {
       // A sequence of letters following 'z', is part of the extension
       // name.
-      while (i < len and isa.at(i) >= 'a' and isa.at(i) <= 'z')
-	extension.push_back(isa.at(i++));
+      size_t init = i;
+      for ( ; i < len and isa.at(i) >= 'a' and isa.at(i) <= 'z'; i++)
+        ;
+
+      extension = isa.substr(init, i - init);
 
       // A sequence of digits followed by an letter other than 'p' is also
       // part of the extension name.
       size_t j = i;
       for ( ; j < len and std::isdigit(isa.at(j)); ++j)
-	;
+        ;
+
       if (j < len and j > i)
-	{
-	  auto c = isa.at(j);
-	  if (c >= 'a' and c < 'z' and c != 'p')
-	    {
-	      extension += isa.substr(i, j - i + 1);
-	      i = j + 1;
-	    }
-	}
+        {
+          auto c = isa.at(j);
+          if (c >= 'a' and c < 'z' and c != 'p')
+            {
+              extension = isa.substr(init, j - init);
+              i         = j + 1;
+            }
+        }
 
       return true;
     }
+
   if (isa.at(i) >= 'a' and isa.at(i) < 'z')
     {
-      extension.push_back(isa.at(i));
-      if (i+1 < len and std::isdigit(isa.at(i+1)))
-	++i;
+      extension = isa.substr(i, 1);
+      if (i + 1 < len and std::isdigit(isa.at(i + 1)))
+        ++i;
       return true;
     }
   return false;
@@ -279,8 +294,8 @@ extractExtension(std::string_view isa, size_t& i, std::string& extension)
 // 'p' followed by another sequence of decimal digits. Return true on
 // success.
 bool
-extractVersion(std::string_view isa, size_t& i, std::string& version,
-	       std::string& subversion)
+extractVersion(std::string_view isa, size_t& i, std::string_view& version,
+	       std::string_view& subversion)
 {
   size_t len = isa.size();
   if (i >= len)
@@ -289,16 +304,20 @@ extractVersion(std::string_view isa, size_t& i, std::string& version,
   if (not std::isdigit(isa.at(i)))
     return true;
 
-  while (i < len and  std::isdigit(isa.at(i)))
-    version.push_back(isa.at(i++));
+  size_t j = i;
+  for ( ; i < len and  std::isdigit(isa.at(i)); i++)
+    ;
+  version = isa.substr(j, i - j);
 
   if (i >= len or isa.at(i) != 'p')
     return false;
   i++;
   
-  size_t j = i;
-  while (i < len and  std::isdigit(isa.at(i)))
-    subversion.push_back(isa.at(i++));
+  j = i;
+  for ( ; i < len and  std::isdigit(isa.at(i)); i++)
+    ;
+  subversion = isa.substr(j, i - j);
+
   return i > j;
 }
 
@@ -332,7 +351,7 @@ Isa::applyIsaString(std::string_view isaStr)
   
   for (size_t i = 0; i < isa.size(); ++i)
     {
-      std::string extension, version, subversion;
+      std::string_view extension, version, subversion;
 
       char c = isa.at(i);
       if (c == '_')
@@ -376,10 +395,12 @@ Isa::applyIsaString(std::string_view isaStr)
       if (version.empty())
 	continue;
 
-      unsigned v = atoi(version.c_str());
+      unsigned v;
+      std::from_chars(version.begin(), version.end(), v);
+
       unsigned s = 0;
       if (not subversion.empty())
-	s = atoi(subversion.c_str());
+        std::from_chars(subversion.begin(), subversion.end(), s);
       if (not selectVersion(ext, v, s))
 	{
 	  getDefaultVersion(ext, v, s);

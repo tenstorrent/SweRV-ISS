@@ -277,13 +277,13 @@ namespace WdRiscv
     std::vector< std::shared_ptr<CoreClass> > cores_;
     std::vector< std::shared_ptr<HartClass> > sysHarts_; // All harts in system.
     std::unordered_map<URV, unsigned> hartIdToIndex_;
-    std::shared_ptr<Memory> memory_ = nullptr;
-    SparseMem* sparseMem_ = nullptr;
-    Mcm<URV>* mcm_ = nullptr;
+    std::unique_ptr<Memory> memory_;
+    std::unique_ptr<SparseMem> sparseMem_;
+    std::shared_ptr<Mcm<URV>> mcm_;
     unsigned mbSize_ = 64;  // Merge buffer size.
     std::string toHostSym_ = "tohost";   // ELF symbol to use as "tohost" addr.
     std::string fromHostSym_ = "fromhost";
     std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
-    std::vector<IoDevice*> ioDevs_;
+    std::vector<std::shared_ptr<IoDevice>> ioDevs_;
   };
 }

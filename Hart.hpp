@@ -23,6 +23,8 @@
 #include <type_traits>
 #include <functional>
 #include <atomic>
+#include <byteswap.h>
+#include <boost/circular_buffer.hpp>
 #include "InstId.hpp"
 #include "InstEntry.hpp"
 #include "IntRegs.hpp"
@@ -78,6 +80,23 @@ namespace WdRiscv
     uint64_t val_ = 0;
   };
     
+
+  /// Until we have C++23 and std::byteswap
+  template <typename T,
+              std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  inline T byteswap(T x)
+  {
+    if constexpr (sizeof(x) == 1)
+      return x;
+    if constexpr (sizeof(x) == 2)
+      return bswap_16(x);
+    if constexpr (sizeof(x) == 4)
+      return bswap_32(x);
+    if constexpr (sizeof(x) == 8)
+      return bswap_64(x);
+    assert(0);
+    return 0;
+  }
 
   /// Changes made by the execution of one instruction. Useful for
   /// test pattern generation.
@@ -176,7 +195,7 @@ namespace WdRiscv
     /// Set val to the value of integer register reg returning true on
     /// success. Return false leaving val unmodified if reg is out of
     /// bounds. If successful, set name to the register name.
-    bool peekIntReg(unsigned reg, URV& val, std::string& name) const;
+    bool peekIntReg(unsigned reg, URV& val, std::string_view& name) const;
 
     /// Return to the value of integer register reg which must not be 
     /// out of bounds (otherwise we trigger an assert).
@@ -219,12 +238,12 @@ namespace WdRiscv
     /// Set val/name to the value/name of the control and status
     /// register csr returning true on success. Return false leaving
     /// val/name unmodified if csr is out of bounds.
-    bool peekCsr(CsrNumber csr, URV& val, std::string& name) const;
+    bool peekCsr(CsrNumber csr, URV& val, std::string_view& name) const;
 
     /// Set val to the value of the control and status register csr field
     /// returning true on success. Return false leaving val unmodified
     /// if csr is out of bounds.
-    bool peekCsr(CsrNumber csr, std::string field, URV& val) const;
+    bool peekCsr(CsrNumber csr, std::string_view field, URV& val) const;
 
     /// Set the given control and status register, csr, to the given
     /// value returning true on success. Return false if csr is out of
@@ -252,20 +271,20 @@ namespace WdRiscv
     /// represent an integer or a symbolic name). Set num to the
     /// number of the corresponding register if found. Return true on
     /// success and false if no such register.
-    bool findIntReg(const std::string& name, unsigned& num) const;
+    bool findIntReg(std::string_view name, unsigned& num) const;
 
     /// Find the floating point with the given name.  Set num to the
     /// number of the corresponding register if found. Return true on
     /// success and false if no such register.
-    bool findFpReg(const std::string& name, unsigned& num) const;
+    bool findFpReg(std::string_view name, unsigned& num) const;
 
     /// Find vector register by name. See findFpReg.
-    bool findVecReg(const std::string& name, unsigned& num) const;
+    bool findVecReg(std::string_view name, unsigned& num) const;
 
     /// Find the control and status register with the given name
     /// (which may represent an integer or a symbolic name). Return
     /// pointer to CSR on success and nullptr if no such register.
-    Csr<URV>* findCsr(const std::string& name);
+    Csr<URV>* findCsr(std::string_view name);
 
     /// Find the control and status register with the given number.
     /// Return pointer to CSR on success and nullptr if no such
@@ -275,14 +294,14 @@ namespace WdRiscv
 
     /// Configure given CSR. Return true on success and false if
     /// no such CSR.
-    bool configCsr(const std::string& name, bool implemented,
+    bool configCsr(std::string_view name, bool implemented,
 		   URV resetValue, URV mask, URV pokeMask,
 		   bool isDebug, bool shared);
 
     /// Define a new CSR (beyond the standard CSRs defined by the
     /// RISCV spec). Return true on success and false if name/number
     /// already in use.
-    bool defineCsr(const std::string& name, CsrNumber number,
+    bool defineCsr(std::string name, CsrNumber number,
 		   bool implemented, URV resetValue, URV mask,
 		   URV pokeMask, bool isDebug);
 
@@ -301,7 +320,7 @@ namespace WdRiscv
     /// updateMisa is true then the MISA CSR reset value is updated to
     /// enable the extensions defined by the given string (this is done
     /// for linux/newlib emulation).
-    bool configIsa(const std::string& string, bool updateMisa);
+    bool configIsa(std::string_view string, bool updateMisa);
 
     /// Enable/disable load-data debug triggerring (disabled by default).
     void configLoadDataTrigger(bool flag)
@@ -627,6 +646,10 @@ namespace WdRiscv
 
     /// Clear pending non-maskable-interrupt.
     void clearPendingNmi();
+
+    /// Set/clear Supervisor external interrupt pin.
+    void setSeiPin(bool flag)
+    { seiPin_ = flag; }
 
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
@@ -1349,6 +1372,9 @@ namespace WdRiscv
     /// be a power of 2 greater than or equal to 4).
     bool configMemoryProtectionGrain(uint64_t size);
 
+    /// Set the max number of guest external interrupts.
+    bool configGuestInterruptCount(unsigned n);
+
     /// Enable user mode.
     void enableUserMode(bool flag)
     { enableExtension(RvExtension::U, flag); csRegs_.enableUserMode(flag); }
@@ -1374,8 +1400,8 @@ namespace WdRiscv
     { clearMtvalOnIllInst_ = flag; }
 
     /// Disable clearing of reservation set after xRET
-    void enableCancelLrOnRet(bool flag)
-    { cancelLrOnRet_ = flag; }
+    void enableCancelLrOnTrap(bool flag)
+    { cancelLrOnTrap_ = flag; }
 
     /// Enable/diable misaligned access. If disabled then misaligned
     /// ld/st will trigger an exception.
@@ -1431,9 +1457,13 @@ namespace WdRiscv
     void enableAddrTransLog(FILE* file)
     { virtMem_.enableAddrTransLog(file); }
 
-    /// Enable branch address trace
-    void enableBranchTrace(FILE* file)
-    { branchTraceFile_ = file; }
+    /// Trace the last n branches to the given file. No tracing is
+    /// done if n is 0.
+    void traceBranches(const std::string& file, uint64_t n)
+    { branchTraceFile_ = file; branchBuffer_.resize(n); }
+
+    /// Write the collected branch traces to the file at the given path.
+    bool saveBranchTrace(const std::string& path);
 
     /// Set behavior if first access to page
     void setFaultOnFirstAccess(bool flag)
@@ -1568,8 +1598,8 @@ namespace WdRiscv
     { bbFile_ = file; bbLimit_ = instCount; }
 
     /// Enable memory consistency model.
-    void setMcm(Mcm<URV>* mcm)
-    { mcm_ = mcm; }
+    void setMcm(std::shared_ptr<Mcm<URV>> mcm)
+    { mcm_ = std::move(mcm); }
 
     /// Enable instruction line address tracing.
     void enableInstructionLineTrace()
@@ -1645,19 +1675,14 @@ namespace WdRiscv
 	{
 	  if (not memory_.read(pa1, value))
 	    assert(0);
+	  if (bigEnd_)
+	    value = byteswap(value);
 	  return;
 	}
+
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
       unsigned size2 = size - size1;
-      if (size1 == 4 and size2 == 4)
-	{
-	  uint32_t val1 = 0, val2 = 0;
-	  if (not memory_.read(pa1, val1) or not memory_.read(pa2, val2))
-	    assert(0);
-	  value = (uint64_t(val2) << 32) | val1;
-	  return;
-	}
 
       value = 0;
       uint8_t byte = 0;
@@ -1670,13 +1695,18 @@ namespace WdRiscv
 	if (memory_.read(pa2 + i, byte))
 	  value |= LOAD_TYPE(byte) << 8*destIx;
 	else assert(0);
-    }
 
+      if (bigEnd_)
+	value = byteswap(value);
+    }
 
     /// Write an item that may span 2 physical pages. See memRead.
     template <typename STORE_TYPE>
     void memWrite(uint64_t pa1, uint64_t pa2, STORE_TYPE value)
     {
+      if (bigEnd_)
+	value = byteswap(value);
+
       if (pa1 == pa2)
 	{
 	  if (not memory_.write(hartIx_, pa1, value))
@@ -1686,14 +1716,6 @@ namespace WdRiscv
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
       unsigned size2 = size - size1;
-      if constexpr (sizeof(STORE_TYPE) == 8)
-	if (size1 == 4 and size2 == 4)
-	  {
-	    uint32_t val1 = value, val2 = value >> 32;
-	    if (not memory_.write(hartIx_, pa1, val1) or not memory_.write(hartIx_, pa2, val2))
-	      assert(0);
-	    return;
-	  }
 
       if constexpr (sizeof(STORE_TYPE) > 1)
 	{
@@ -1718,13 +1740,6 @@ namespace WdRiscv
       unsigned size = sizeof(value);
       unsigned size1 = size - (pa1 & (size - 1));
       unsigned size2 = size - size1;
-      if (size1 == 4 and size2 == 4)
-	{
-	  uint32_t val1 = 0, val2 = 0;
-	  memory_.peek(pa1, val1, usePma); memory_.peek(pa2, val2, usePma);
-	  value = (uint64_t(val2) << 32) | val1;
-	  return;
-	}
 
       value = 0;
       uint8_t byte = 0;
@@ -1835,15 +1850,6 @@ namespace WdRiscv
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
 
-    /// Return true if it is legal to execute a vector instruction and
-    /// mark MSTATUS.VS dirty if it is.
-    bool checkVecExec()
-    {
-      if (not isVecLegal()) return false;
-      if (mstatus_.bits_.VS != unsigned(VecStatus::Dirty)) markVsDirty();
-      return true;
-    }
-
     // We avoid the cost of locating MSTATUS in the CSRs register file
     // by caching its value in this class. We do this whenever MSTATUS
     // is written/poked.
@@ -1870,6 +1876,9 @@ namespace WdRiscv
 
     /// Write the cached value of mstatus (or mstatus/mstatush) into the CSR.
     void writeMstatus();
+
+    /// Update big endian mode.
+    void updateBigEndian();
 
     /// Helper to reset: Return count of implemented PMP registers.
     /// If one pmp register is implemented, make sure they are all
@@ -2338,25 +2347,34 @@ namespace WdRiscv
       return 0x1f;
     }
 
-    // Return true if maskable vector instruction is legal for current
-    // selected element width and group multiplier. Take an illegal
-    // instuction exception and return false otherwise.
-    bool checkMaskableInst(const DecodedInst* di);
+    // Return true if maskable integer vector instruction is legal for
+    // current sew and lmul, current vstart, and mask-register
+    // destination register overlap. Check if vector extension is
+    // enabled. Take an illegal instuction exception and return false
+    // otherwise. This is for non-load, non-mask destination,
+    // non-reduction instructions.
+    bool checkVecIntInst(const DecodedInst* di);
 
-    // Return true if maskable vector instruction is legal. Take an
-    // illegal instuction exception and return false otherwise.
-    bool checkMaskableInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
+    // Same as above but with explicit group multiplier and element width.
+    bool checkVecIntInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
     // Return true if given arithmetic (non load/store) instruction is
-    // legal. Take an illegal instruction exception and return false
-    // otherwise.
-    bool checkArithmeticInst(const DecodedInst* di);
+    // legal. Check if vector extension is enabled. Check if the
+    // currnet sew/lmul is legal. Return true if legal. Take an
+    // illegal instruction exception and return false otherwise. This
+    // is for integer instructions.
+    bool checkSewLmulVstart(const DecodedInst* di);
+
+    // Similar to above but includes check for floating point operations (is F/D/ZFH
+    // enabled ...).
+    bool checkFpSewLmulVstart(const DecodedInst* di, bool wide = false,
+			      bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
     // Return true if maskable floating point vecotr instruction is
     // legal. Take an illegal instuction exception and return false
     // otherwise.
-    bool checkFpMaskableInst(const DecodedInst* di, bool wide = false,
-                             bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
+    bool checkVecFpInst(const DecodedInst* di, bool wide = false,
+			bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
     // Return true if vector operands are mutliples of the given group
     // multiplier (scaled by 8). Return false initiating an illegal instruction
@@ -2371,20 +2389,25 @@ namespace WdRiscv
     // Similar to above but for 1 vector operand instructions.
     bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned groupX8);
 
-    // Return true if vector operands are mutliples of the given group
-    // multiplier (scaled by 8) for mask instructions (such as
-    // vmseq). Return false initiating an illegal instruction trap
-    // otherwise.
-    bool checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
-			       unsigned op2, unsigned groupX8);
+    // Return if mask producing instruction (e.g. vmseq) is
+    // legal. Check if vector operands are mutliples of the given
+    // group multiplier (scaled by 8). Return true if legal.  Return
+    // false initiating an illegal instruction trap otherwise.
+    bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
+			  unsigned groupX8);
 
-    bool checkMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
-			       unsigned groupX8);
+    // Similar to the above but for 3 vector operand instructions.
+    bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
+			  unsigned op2, unsigned groupX8);
 
-    bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+
+    // Similar to the above but for floating point instructions.
+    bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned groupX8);
 
-    bool checkFpMaskVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
+    // Similar to the above but for floating point instructions with 3
+    // vector operands.
+    bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8);
 
     // Check reduction vector operand against the group multiplier. Return true
@@ -2420,6 +2443,14 @@ namespace WdRiscv
     // Emit a trace record for the given branch instruction in the
     // branch trace file.
     void traceBranch(const DecodedInst* di);
+
+    // Called at the end of successul vector instruction to clear the vstart
+    // register and mark VS dirty if a vector register was updated.
+    void postVecSuccess();
+
+    // Called at the end of a trapping vector instruction to mark VS
+    // dirty if a vector register was updated.
+    void postVecFail(const DecodedInst* di);
 
     // The program counter is adjusted (size of current instruction
     // added) before any of the following exec methods are called. To
@@ -4425,9 +4456,7 @@ namespace WdRiscv
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
 
     bool clearMprvOnRet_ = true;
-
-    // not required to clear reservation sets on xret
-    bool cancelLrOnRet_ = true;
+    bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
 
@@ -4444,6 +4473,7 @@ namespace WdRiscv
     bool tracePtw_ = false;          // Trace paget table walk.
     bool tracePmp_ = false;          // Trace PMP accesses
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
+    bool seiPin_ = false;            // Supervisor external interrupt pin value.
     unsigned mxlen_ = 8*sizeof(URV);
     FILE* consoleOut_ = nullptr;
 
@@ -4480,6 +4510,8 @@ namespace WdRiscv
     bool pmpEnabled_ = false; // True if one or more pmp register defined.
     PmpManager pmpManager_;
 
+    bool bigEnd_ = false;   // True if big endian
+
     VirtMem virtMem_;
     Isa isa_;
     Decoder decoder_;
@@ -4513,9 +4545,22 @@ namespace WdRiscv
     uint64_t bbCacheHit_ = 0;
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;            // Basic block file.
-    FILE* branchTraceFile_ = nullptr;   // Branch trace file.
 
-    Mcm<URV>* mcm_ = nullptr;
+    std::string branchTraceFile_;       // Branch trace file.
+    struct BranchRecord
+    {
+      BranchRecord(char type = 0, uint64_t pc = 0, uint64_t nextPc = 0, uint8_t size = 0)
+	: pc_(pc), nextPc_(nextPc), type_(type), size_(size)
+      { }
+
+      uint64_t pc_ = 0;
+      uint64_t nextPc_ = 0;
+      char type_ = 0;
+      uint8_t size_ = 0;
+    };
+    boost::circular_buffer<BranchRecord> branchBuffer_;
+
+    std::shared_ptr<Mcm<URV>> mcm_;
 
     FILE* initStateFile_ = nullptr;
     std::unordered_set<uint64_t> initInstrLines_;

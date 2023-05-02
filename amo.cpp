@@ -102,11 +102,8 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 	}
     }
 
-  if (not hasMcmVal and not memory_.read(addr, uval))
-    {
-      assert(0);
-      return false;
-    }
+  if (not hasMcmVal)
+    memRead(addr, addr, uval);
 
   value = SRV(int32_t(uval)); // Sign extend.
   return true;  // Success.
@@ -147,11 +144,8 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
   uint64_t uval = 0;
   bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, addr, ldStSize_, uval);
 
-  if (not hasMcm and not memory_.read(addr, uval))
-    {
-      assert(0);
-      return false;
-    }
+  if (not hasMcm)
+    memRead(addr, addr, uval);
 
   value = uval;
   return true;  // Success.
@@ -224,11 +218,8 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
 	}
     }
 
-  if (not hasMcmVal and not memory_.read(addr1, uval))
-    {
-      assert(0);
-      return false;
-    }
+  if (not hasMcmVal)
+    memRead(addr1, addr1, uval);
 
   URV value = uval;
   if (not std::is_same<ULT, LOAD_TYPE>::value)
@@ -337,8 +328,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   // If we write to special location, end the simulation.
   if (toHostValid_ and addr1 == toHost_ and storeVal != 0)
     {
-      if (not memory_.write(hartIx_, addr1, storeVal))
-	assert(0);
+      memWrite(addr1, addr1, storeVal);
       throw CoreException(CoreException::Stop, "write to to-host",
 			  toHost_, storeVal);
     }
@@ -346,8 +336,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (mcm_)
     return true;  // Memory updated when merge buffer is written.
 
-  if (not memory_.write(hartIx_, addr1, storeVal))
-    assert(0);
+  memWrite(addr1, addr1, storeVal);
 
   invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
   return true;

@@ -284,11 +284,11 @@ Interactive<URV>::peekAllIntRegs(Hart<URV>& hart, std::ostream& out)
 
   for (unsigned i = 0; i < hart.intRegCount(); ++i)
     {
-      std::string name;
+      std::string_view name;
       URV val = 0;
       if (hart.peekIntReg(i, val, name))
 	{
-	  std::string tag = name;
+	  std::string tag = std::string(name);
 	  if (abiNames)
 	    tag += "(" + std::to_string(i) + ")";
 	  tag += ":";
@@ -317,7 +317,7 @@ Interactive<URV>::peekAllCsrs(Hart<URV>& hart, std::ostream& out)
   for (size_t i = 0; i <= size_t(CsrNumber::MAX_CSR_); ++i)
     {
       CsrNumber csr = CsrNumber(i);
-      std::string name;
+      std::string_view name;
       URV val = 0;
       if (hart.peekCsr(csr, val, name))
 	{
@@ -860,7 +860,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       size_t addr = 0;
       if (not parseCmdLineNumber("address", addrStr, addr))
 	return false;
-      bool usePma = false; // Ignore physicla memory attributes.
+      bool usePma = false; // Ignore physical memory attributes.
       uint32_t word = value; // Memory peek/poke in words.
       if (hart.pokeMemory(addr, word, usePma))
 	return true;
@@ -1683,6 +1683,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "sei_pin")
+    {
+      if (not seiPinCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "h" or command == "?" or command == "help")
     {
       helpCommand(tokens);
@@ -2017,11 +2026,41 @@ Interactive<URV>::checkInterruptCommand(Hart<URV>& hart, const std::string& line
     {
       std::cerr << "Invalid check_interupt command: " << line << '\n';
       std::cerr << "Expecting: check_interrupt [<mip-value>]\n";
+      return false;
     }
 
   InterruptCause cause;
   if (hart.isInterruptPossible(mip, cause))
     std::cout << unsigned(cause) << '\n';
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::seiPinCommand(Hart<URV>& hart, const std::string& line,
+				const std::vector<std::string>& tokens)
+{
+  // sei_pin [0|1]
+  unsigned val = 0;
+  if (tokens.size() == 2)
+    {
+      if (not parseCmdLineNumber("pin-value", tokens.at(1), val))
+	return false;
+      if (val != 0 and val != 1)
+	{
+	  std::cerr << "Invalid pin-value: " << tokens.at(1) << '\n';
+	  return false;
+	}
+      hart.setSeiPin(val);
+    }
+  else
+    {
+      std::cerr << "Invalid sei_pin command: " << line << '\n';
+      std::cerr << "Expecting: sei_pin 0|1\n";
+      return false;
+    }
 
   return true;
 }

@@ -14,7 +14,9 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <string_view>
 #include <nlohmann/json_fwd.hpp>
 
 
@@ -138,7 +140,7 @@ namespace WdRiscv
 
     /// Return true if this object has a configuration for the
     /// given CSR.
-    bool hasCsrConfig(const std::string& csrName) const;
+    bool hasCsrConfig(std::string_view csrName) const;
 
   protected:
 
@@ -153,7 +155,7 @@ namespace WdRiscv
     HartConfig(const HartConfig&) = delete;
     void operator= (const HartConfig&) = delete;
 
-    nlohmann::json* config_;
+    std::unique_ptr<nlohmann::json> config_;
   };
 
 }

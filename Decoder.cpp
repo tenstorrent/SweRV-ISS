@@ -2641,7 +2641,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		    return instTable_.getEntry(InstId::illegal);
 		  else // sfence.vma
                     {
-                      op2 = iform.rs2();
+		      op0 = iform.fields.rs1;
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::sfence_vma);
                     }
 		}

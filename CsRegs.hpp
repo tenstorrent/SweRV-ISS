@@ -416,7 +416,7 @@ namespace WdRiscv
       VSIREG     = 0x251,
       VSTOPEI    = 0x25c,
       VSTOPI     = 0xeb0,
-      HIDELEGh   = 0x613,
+      HIDELEGH   = 0x613,
       NHIENH     = 0x618,
       HVIPH      = 0x655,
       HVIPRIO1H  = 0x656,
@@ -449,9 +449,9 @@ namespace WdRiscv
     /// in the mask corresponds to a non-writable (preserved) bit in the
     /// register value. To make the whole register writable, set mask to
     /// all ones.
-    Csr(const std::string& name, CsrNumber number, bool mandatory,
+    Csr(std::string name, CsrNumber number, bool mandatory,
 	bool implemented, URV value, URV writeMask = ~URV(0))
-      : name_(name), number_(unsigned(number)), mandatory_(mandatory),
+      : name_(std::move(name)), number_(unsigned(number)), mandatory_(mandatory),
 	implemented_(implemented), initialValue_(value), value_(value),
 	writeMask_(writeMask), pokeMask_(writeMask)
     {
@@ -533,7 +533,7 @@ namespace WdRiscv
     { return CsrNumber(number_); }
 
     /// Return the name of this register.
-    const std::string& getName() const
+    std::string_view getName() const
     { return name_; }
 
     /// Register a pre-poke call back which will get invoked with CSR and
@@ -561,7 +561,7 @@ namespace WdRiscv
     { postReset_.push_back(func); }
 
     /// Get field width of CSR
-    unsigned width(std::string field) const
+    unsigned width(std::string_view field) const
     {
       for (auto& f : fields_)
         {
@@ -611,10 +611,10 @@ namespace WdRiscv
     { privMode_ = mode; }
 
     /// Configure.
-    void config(const std::string& name, CsrNumber num, bool mandatory,
+    void config(std::string name, CsrNumber num, bool mandatory,
 		bool implemented, URV value, URV writeMask, URV pokeMask,
 		bool isDebug)
-    { name_ = name; number_ = unsigned(num); mandatory_ = mandatory;
+    { name_ = std::move(name); number_ = unsigned(num); mandatory_ = mandatory;
       implemented_ = implemented; initialValue_ = value;
       writeMask_ = writeMask; pokeMask_ = pokeMask;
       debug_ = isDebug; *valuePtr_ = value; }
@@ -719,7 +719,7 @@ namespace WdRiscv
     void setFields(const std::vector<Field>& fields)
     { fields_ = fields; }
 
-    bool field(std::string field, URV& val) const
+    bool field(std::string_view field, URV& val) const
     {
       unsigned start = 0;
       for (auto& f : fields_)
@@ -791,7 +791,7 @@ namespace WdRiscv
     /// Return pointer to the control-and-status register
     /// corresponding to the given name or nullptr if no such
     /// register.
-    Csr<URV>* findCsr(const std::string& name);
+    Csr<URV>* findCsr(std::string_view name);
 
     /// Return pointer to the control-and-status register
     /// corresponding to the given number or nullptr if no such
@@ -843,7 +843,7 @@ namespace WdRiscv
     /// on success or nullptr if given name is already in use or if the
     /// csr number is out of bounds or if it is associated with an
     /// already defined CSR.
-    Csr<URV>* defineCsr(const std::string& name, CsrNumber number,
+    Csr<URV>* defineCsr(std::string name, CsrNumber number,
 			bool mandatory, bool implemented, URV value,
 			URV writeMask, URV pokeMask, bool isDebug = false,
 			bool quiet = false);
@@ -1038,7 +1038,7 @@ namespace WdRiscv
     void reset();
 
     /// Configure CSR. Return true on success and false on failure.
-    bool configCsr(const std::string& name, bool implemented, URV resetValue,
+    bool configCsr(std::string_view name, bool implemented, URV resetValue,
                    URV mask, URV pokeMask, bool debug, bool shared);
 
     /// Configure CSR. Return true on success and false on failure.
@@ -1320,6 +1320,11 @@ namespace WdRiscv
     unsigned getPmpG() const
     { return pmpG_; }
 
+    /// Set the max number of guest interrupt count. This should be
+    /// done before hypervisor mode is enable.
+    void setGuestInterruptCount(unsigned value)
+    { geilen_ = value; }
+
     /// Enable user mode.
     void enableUserMode(bool flag)
     { userEnabled_ = flag; }
@@ -1404,7 +1409,8 @@ namespace WdRiscv
     bool hasPerfEventSet_ = false;
     std::unordered_set<unsigned> perfEventSet_;
 
-    unsigned pmpG_ = 0;  // PMP G value: ln2(pmpGrain) - 2
+    unsigned pmpG_ = 0;     // PMP G value: ln2(pmpGrain) - 2
+    unsigned geilen_ = 0;   // Guest interrupt count.
 
     bool userEnabled_ = false;    // User mode enabled
     bool superEnabled_ = false;   // Supervisor

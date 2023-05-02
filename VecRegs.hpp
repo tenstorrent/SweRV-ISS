@@ -14,11 +14,12 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <cstddef>
 #include <vector>
 #include <unordered_map>
-#include <string>
+#include <string_view>
 #include <cassert>
 #include "FpRegs.hpp"
 
@@ -285,7 +286,7 @@ namespace WdRiscv
     /// given name returning true on success and false if no such
     /// register.  For example, if name is "v2" then ix will be set to
     /// 2.
-    bool findReg(const std::string& name, unsigned& ix) const;
+    bool findReg(std::string_view name, unsigned& ix) const;
 
     /// Get the addresses, data, and element size of the memory
     /// locations accessed by the most recent instruction. Return true
@@ -375,47 +376,53 @@ namespace WdRiscv
       return gm8*bytesPerReg_/eewInBits;
     }
 
-    static std::string to_string(GroupMultiplier group)
+    static constexpr std::string_view to_string(GroupMultiplier group)
     {
-      static std::vector<std::string> vec =
-        {"m1", "m2", "m4", "m8", "m?", "mf8", "mf4", "mf2"};
+      using namespace std::string_view_literals;
+
+      constexpr auto vec =
+        std::array{"m1"sv, "m2"sv, "m4"sv, "m8"sv, "m?"sv, "mf8"sv, "mf4"sv, "mf2"sv};
       return size_t(group) < vec.size()? vec.at(size_t(group)) : "m?";
     }
 
-    static std::string to_string(ElementWidth ew)
+    static constexpr std::string_view to_string(ElementWidth ew)
     {
-      static std::vector<std::string> vec =
-        {"e8", "e16", "e32", "e64", "e128", "e256", "e512", "e1024"};
+      using namespace std::string_view_literals;
+
+      constexpr auto vec =
+        std::array{"e8"sv, "e16"sv, "e32"sv, "e64"sv, "e128"sv, "e256"sv, "e512"sv, "e1024"sv};
       return size_t(ew) < vec.size()? vec.at(size_t(ew)) : "e?";
     }
 
-    static bool to_lmul(std::string lmul, GroupMultiplier& group)
+    static bool to_lmul(std::string_view lmul, GroupMultiplier& group)
     {
-      static std::unordered_map<std::string, GroupMultiplier> map(
+      static const std::unordered_map<std::string_view, GroupMultiplier> map(
         { {"m1", GroupMultiplier::One}, {"m2", GroupMultiplier::Two},
           {"m4", GroupMultiplier::Four}, {"m8", GroupMultiplier::Eight},
           {"m?", GroupMultiplier::Reserved}, {"mf8", GroupMultiplier::Eighth},
           {"mf4", GroupMultiplier::Quarter}, {"mf2", GroupMultiplier::Half} });
 
-      if (map.find(lmul) != map.end())
+      auto lmul_it = map.find(lmul);
+      if (lmul_it != map.end())
         {
-          group = map.at(lmul);
+          group = lmul_it->second;
           return true;
         }
       return false;
     }
 
-    static bool to_sew(std::string sew, ElementWidth& ew)
+    static bool to_sew(std::string_view sew, ElementWidth& ew)
     {
-      static std::unordered_map<std::string, ElementWidth> map(
+      static const std::unordered_map<std::string_view, ElementWidth> map(
         { {"e8", ElementWidth::Byte}, {"e16", ElementWidth::Half},
           {"e32", ElementWidth::Word}, {"e64", ElementWidth::Word2},
           {"e128", ElementWidth::Word4}, {"e256", ElementWidth::Word8},
           {"e512", ElementWidth::Word16}, {"e1024", ElementWidth::Word32} });
 
-      if (map.find(sew) != map.end())
+      auto sew_it = map.find(sew);
+      if (sew_it != map.end())
         {
-          ew = map.at(sew);
+          ew = sew_it->second;
           return true;
         }
       return false;
@@ -450,6 +457,16 @@ namespace WdRiscv
         }
       return -1;
     }
+
+    /// Return the number of the last written vector regsiter or -1 if no
+    /// no register has been written since the last clearLastWrittenReg.
+    int getLastWrittenReg() const
+    { return lastWrittenReg_; }
+
+    /// Set effective group multipliers of the operands of a vector
+    /// instruction (this is used to record logging information).
+    void setOpEmul(unsigned emul0, unsigned emul1 = 1, unsigned emul2 = 1)
+    { opsEmul_.at(0) = emul0; opsEmul_.at(1) = emul1; opsEmul_.at(2) = emul2; }
 
     /// For instructions that do not use the write method, mark the
     /// last written register and the effective element widht.
