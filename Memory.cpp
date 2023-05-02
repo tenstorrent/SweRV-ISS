@@ -580,12 +580,6 @@ Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
       return false;
     }
 
-  if (reader.get_encoding() != ELFDATA2LSB)
-    {
-      std::cerr << "Only little-endian ELF is currently supported\n";
-      return false;
-    }
-
   if (reader.get_machine() != EM_RISCV)
     {
       std::cerr << "Warning: non-riscv ELF file\n";

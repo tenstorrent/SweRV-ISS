@@ -23,7 +23,6 @@
 #include <type_traits>
 #include <functional>
 #include <atomic>
-#include <byteswap.h>
 #include <boost/circular_buffer.hpp>
 #include "InstId.hpp"
 #include "InstEntry.hpp"
@@ -40,6 +39,7 @@
 #include "Isa.hpp"
 #include "Decoder.hpp"
 #include "Disassembler.hpp"
+#include "util.hpp"
 
 
 namespace WdRiscv
@@ -80,23 +80,6 @@ namespace WdRiscv
     uint64_t val_ = 0;
   };
     
-
-  /// Until we have C++23 and std::byteswap
-  template <typename T,
-              std::enable_if_t<std::is_integral<T>::value, int> = 0>
-  inline T byteswap(T x)
-  {
-    if constexpr (sizeof(x) == 1)
-      return x;
-    if constexpr (sizeof(x) == 2)
-      return bswap_16(x);
-    if constexpr (sizeof(x) == 4)
-      return bswap_32(x);
-    if constexpr (sizeof(x) == 8)
-      return bswap_64(x);
-    assert(0);
-    return 0;
-  }
 
   /// Changes made by the execution of one instruction. Useful for
   /// test pattern generation.
@@ -1676,7 +1659,7 @@ namespace WdRiscv
 	  if (not memory_.read(pa1, value))
 	    assert(0);
 	  if (bigEnd_)
-	    value = byteswap(value);
+	    value = util::byteswap(value);
 	  return;
 	}
 
@@ -1697,7 +1680,7 @@ namespace WdRiscv
 	else assert(0);
 
       if (bigEnd_)
-	value = byteswap(value);
+	value = util::byteswap(value);
     }
 
     /// Write an item that may span 2 physical pages. See memRead.
@@ -1705,7 +1688,7 @@ namespace WdRiscv
     void memWrite(uint64_t pa1, uint64_t pa2, STORE_TYPE value)
     {
       if (bigEnd_)
-	value = byteswap(value);
+	value = util::byteswap(value);
 
       if (pa1 == pa2)
 	{

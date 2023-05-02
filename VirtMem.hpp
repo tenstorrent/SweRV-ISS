@@ -15,11 +15,11 @@
 #pragma once
 
 #include <iosfwd>
-#include <byteswap.h>
 #include "trapEnums.hpp"
 #include "Memory.hpp"
 #include "Tlb.hpp"
 #include "Pte.hpp"
+#include "util.hpp"
 
 
 namespace WdRiscv
@@ -212,7 +212,7 @@ namespace WdRiscv
       if (not memory_.read(addr, data))
 	return false;
       if (bigEnd)
-	data = bswap_32(data);
+	data = util::byteswap(data);
       return true;
     }
 
@@ -223,7 +223,7 @@ namespace WdRiscv
       if (not memory_.read(addr, data))
 	return false;
       if (bigEnd)
-	data = bswap_64(data);
+	data = util::byteswap(data);
       return true;
     }
 
@@ -232,7 +232,7 @@ namespace WdRiscv
     bool memWrite(uint64_t addr, bool bigEnd, uint32_t data)
     {
       if (bigEnd)
-	data = bswap_32(data);
+	data = util::byteswap(data);
       return memory_.write(hartIx_, addr, data);
     }
 
@@ -241,7 +241,7 @@ namespace WdRiscv
     bool memWrite(uint64_t addr, bool bigEnd, uint64_t data)
     {
       if (bigEnd)
-	data = bswap_64(data);
+	data = util::byteswap(data);
       return memory_.write(hartIx_, addr, data);
     }
 
