@@ -3854,7 +3854,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   for (auto addr : argvAddrs)
     {
       if (bigEnd_)
-	addr = byteswap(addr);
+	addr = util::byteswap(addr);
       if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
 	return false;
     }
@@ -3865,7 +3865,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   if (memory_.findElfSymbol("environ", sym))
     {
       if (bigEnd_)
-	ea = byteswap(ea);
+	ea = util::byteswap(ea);
       pokeMemory(URV(sym.addr_), ea, true);
     }
 
@@ -3873,7 +3873,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   for (auto addr : envpAddrs)
     {
       if (bigEnd_)
-	addr = byteswap(addr);
+	addr = util::byteswap(addr);
       if (not pokeMemory(sp + ix++*sizeof(URV), addr, true))
 	return false;
     }
@@ -3881,7 +3881,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   // Put argc on the stack.
   URV argc = args.size();
   if (bigEnd_)
-    argc = byteswap(argc);
+    argc = util::byteswap(argc);
   if (not pokeMemory(sp, argc, true))
     return false;
 
@@ -10512,6 +10512,11 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
     }
 
   URV next = prev | intRegs_.read(di->op1());
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   if (di->op1() == 0)
     {
       updatePerformanceCountersForCsr(*di);
@@ -10520,10 +10525,6 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
         postCsrInst_(hartIx_, csr);
       return;
     }
-
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -10553,6 +10554,11 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
     }
 
   URV next = prev & (~ intRegs_.read(di->op1()));
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   if (di->op1() == 0)
     {
       updatePerformanceCountersForCsr(*di);
@@ -10561,10 +10567,6 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
         postCsrInst_(hartIx_, csr);
       return;
     }
-
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -10628,6 +10630,11 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
     }
 
   URV next = prev | imm;
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   if (imm == 0)
     {
       updatePerformanceCountersForCsr(*di);
@@ -10636,10 +10643,6 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
         postCsrInst_(hartIx_, csr);
       return;
     }
-
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
@@ -10671,6 +10674,11 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
     }
 
   URV next = prev & (~ imm);
+
+  // MIP read value is ored with supervisor external interrupt pin.
+  if (csr == CsrNumber::MIP)
+    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
   if (imm == 0)
     {
       updatePerformanceCountersForCsr(*di);
@@ -10679,10 +10687,6 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
         postCsrInst_(hartIx_, csr);
       return;
     }
-
-  // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
-    prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
 
