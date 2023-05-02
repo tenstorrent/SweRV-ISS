@@ -92,4 +92,21 @@ namespace util
 
     return result;
   }
+
+  /// Until we have C++23 and std::byteswap
+  template <typename T,
+              std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  constexpr T byteswap(T x)
+  {
+    if constexpr (sizeof(x) == 1)
+      return x;
+    if constexpr (sizeof(x) == 2)
+      return __builtin_bswap16(x);
+    if constexpr (sizeof(x) == 4)
+      return __builtin_bswap32(x);
+    if constexpr (sizeof(x) == 8)
+      return __builtin_bswap64(x);
+    assert(0);
+    return 0;
+  }
 }
