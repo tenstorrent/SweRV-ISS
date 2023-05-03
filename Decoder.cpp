@@ -1836,15 +1836,6 @@ const InstEntry&
 Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		uint32_t& op3) const
 {
-#pragma GCC diagnostic ignored "-Wpedantic"
-
-  static void *opcodeLabels[] = { &&l0, &&l1, &&l2, &&l3, &&l4, &&l5,
-				  &&l6, &&l7, &&l8, &&l9, &&l10, &&l11,
-				  &&l12, &&l13, &&l14, &&l15, &&l16, &&l17,
-				  &&l18, &&l19, &&l20, &&l21, &&l22, &&l23,
-				  &&l24, &&l25, &&l26, &&l27, &&l28, &&l29,
-				  &&l30, &&l31 };
-
   if (isCompressedInst(inst))
     {
       return decode16(uint16_t(inst), op0, op1, op2);
@@ -1857,871 +1848,875 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
     {
       unsigned opcode = (inst & 0x7f) >> 2;  // Upper 5 bits of opcode.
 
-      goto *opcodeLabels[opcode];
-
-
-    l0:  // 00000   I-form
-      {
-	IFormInst iform(inst);
-	op0 = iform.fields.rd;
-	op1 = iform.fields.rs1;
-	op2 = iform.immed(); 
-	switch (iform.fields.funct3)
-	  {
-	  case 0:  return instTable_.getEntry(InstId::lb);
-	  case 1:  return instTable_.getEntry(InstId::lh);
-	  case 2:  return instTable_.getEntry(InstId::lw);
-	  case 3:  return instTable_.getEntry(InstId::ld);
-	  case 4:  return instTable_.getEntry(InstId::lbu);
-	  case 5:  return instTable_.getEntry(InstId::lhu);
-	  case 6:  return instTable_.getEntry(InstId::lwu);
-	  default: return instTable_.getEntry(InstId::illegal);
-	  }
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l1:        // 00001
-      {
-	IFormInst iform(inst);
-	op0 = iform.fields.rd;
-	op1 = iform.fields.rs1;
-	uint32_t f3 = iform.fields.funct3;
-        if (f3 == 1 or f3 == 2 or f3 == 3)
-          op2 = iform.immed();  // flh, flw, or fld
-        else
-          op2 = iform.rs2();  // vector load
-
-        if (f3 == 0)  return decodeVecLoad(f3, iform.uimmed(), op3);
-	if (f3 == 1)  return instTable_.getEntry(InstId::flh);
-	if (f3 == 2)  return instTable_.getEntry(InstId::flw);
-	if (f3 == 3)  return instTable_.getEntry(InstId::fld);
-        if (f3 == 5)  return decodeVecLoad(f3, iform.uimmed(), op3);
-        if (f3 == 6)  return decodeVecLoad(f3, iform.uimmed(), op3);
-        if (f3 == 7)  return decodeVecLoad(f3, iform.uimmed(), op3);
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l2:       // 00010  I-form
-      {
-        return instTable_.getEntry(InstId::illegal);
-      }
-
-    l7:
-      return instTable_.getEntry(InstId::illegal);
-
-    l9:       // 01001
-      {
-	// For store instructions: op0 is the stored register.
-	SFormInst sform(inst);
-	op0 = sform.bits.rs2;
-	op1 = sform.bits.rs1;
-	op2 = sform.immed();
-	unsigned f3 = sform.bits.funct3;
-        if (f3 != 1 and f3 != 2 and f3 != 3)
-          {     // vector instructions.
-            op0 = sform.vbits.rd;
-            op1 = sform.vbits.rs1;
-            op2 = sform.rs2();
-          }
-
-        if (f3 == 0)  return decodeVecStore(f3, sform.vbits.imm12, op3);
-	if (f3 == 1)  return instTable_.getEntry(InstId::fsh);
-	if (f3 == 2)  return instTable_.getEntry(InstId::fsw);
-	if (f3 == 3)  return instTable_.getEntry(InstId::fsd);
-        if (f3 == 5)  return decodeVecStore(f3, sform.vbits.imm12, op3);
-        if (f3 == 6)  return decodeVecStore(f3, sform.vbits.imm12, op3);
-        if (f3 == 7)  return decodeVecStore(f3, sform.vbits.imm12, op3);
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l10:      // 01010  S-form
-      return instTable_.getEntry(InstId::illegal);
-
-    l15:
-      return instTable_.getEntry(InstId::illegal);
-
-    l16:
-      {
-	RFormInst rform(inst);
-	op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
-	unsigned funct7 = rform.bits.funct7;
-	op3 = funct7 >> 2;
-	if ((funct7 & 3) == 0)
-	  return instTable_.getEntry(InstId::fmadd_s);
-	if ((funct7 & 3) == 1)
-	  return instTable_.getEntry(InstId::fmadd_d);
-	if ((funct7 & 3) == 2)
-	  return instTable_.getEntry(InstId::fmadd_h);
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l17:
-      {
-	RFormInst rform(inst);
-	op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
-	unsigned funct7 = rform.bits.funct7;
-	op3 = funct7 >> 2;
-	if ((funct7 & 3) == 0)
-	  return instTable_.getEntry(InstId::fmsub_s);
-	if ((funct7 & 3) == 1)
-	  return instTable_.getEntry(InstId::fmsub_d);
-	if ((funct7 & 3) == 2)
-	  return instTable_.getEntry(InstId::fmsub_h);
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l18:
-      {
-	RFormInst rform(inst);
-	op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
-	unsigned funct7 = rform.bits.funct7;
-	op3 = funct7 >> 2;
-	if ((funct7 & 3) == 0)
-	  return instTable_.getEntry(InstId::fnmsub_s);
-	if ((funct7 & 3) == 1)
-	  return instTable_.getEntry(InstId::fnmsub_d);
-	if ((funct7 & 3) == 2)
-	  return instTable_.getEntry(InstId::fnmsub_h);
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l19:
-      {
-	RFormInst rform(inst);
-	op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
-	unsigned funct7 = rform.bits.funct7;
-	op3 = funct7 >> 2;
-	if ((funct7 & 3) == 0)
-	  return instTable_.getEntry(InstId::fnmadd_s);
-	if ((funct7 & 3) == 1)
-	  return instTable_.getEntry(InstId::fnmadd_d);
-	if ((funct7 & 3) == 2)
-	  return instTable_.getEntry(InstId::fnmadd_h);
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l20: // 10100
-      return decodeFp(inst, op0, op1, op2);
-
-    l21: // 10101
-      return decodeVec(inst, op0, op1, op2, op3);
-
-    l22:
-    l23:
-    l26:
-    l29:
-    l30:
-    l31:
-      return instTable_.getEntry(InstId::illegal);
-
-    l3: // 00011  I-form
-      {
-	IFormInst iform(inst);
-	unsigned funct3 = iform.fields.funct3;
-	unsigned imm = iform.uimmed(), rd = iform.fields.rd, rs1 = iform.fields.rs1;
-	
-	if (funct3 == 0)
-	  {
-	    if (rd == 0 and rs1 == 0)
-	      {
-		if (iform.top4() == 0)
-		  return instTable_.getEntry(InstId::fence);
-		if (iform.top4() == 8)
-		  return instTable_.getEntry(InstId::fence_tso);
-	      }
-	  }
-	else if (funct3 == 1)
-	  {
-	    if (rd == 0 and rs1 == 0 and imm == 0)
-	      return instTable_.getEntry(InstId::fence_i);
-	  }
-	else if (funct3 == 2)
-	  {
-	    if (imm == 0 and rd == 0)
-	      return instTable_.getEntry(InstId::cbo_inval);
-	    if (imm == 1 and rd == 0)
-	      return instTable_.getEntry(InstId::cbo_clean);
-	    if (imm == 2 and rd == 0)
-	      return instTable_.getEntry(InstId::cbo_flush);
-	    if (imm == 4 and rd == 0)
-	      return instTable_.getEntry(InstId::cbo_zero);
-	  }
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l4:  // 00100  I-form
-      {
-	IFormInst iform(inst);
-	op0 = iform.fields.rd;
-	op1 = iform.fields.rs1;
-	op2 = iform.immed();
-	unsigned funct3 = iform.fields.funct3;
-
-	if      (funct3 == 0)  return instTable_.getEntry(InstId::addi);
-	else if (funct3 == 1)
-	  {
-	    if (op2 == 0x100)
-	      return instTable_.getEntry(InstId::sha256sum0);
-	    if (op2 == 0x101)
-	      return instTable_.getEntry(InstId::sha256sum1);
-	    if (op2 == 0x102)
-	      return instTable_.getEntry(InstId::sha256sig0);
-	    if (op2 == 0x103)
-	      return instTable_.getEntry(InstId::sha256sig1);
-	    if (op2 == 0x104)
-	      return instTable_.getEntry(InstId::sha512sum0);
-	    if (op2 == 0x105)
-	      return instTable_.getEntry(InstId::sha512sum1);
-	    if (op2 == 0x106)
-	      return instTable_.getEntry(InstId::sha512sig0);
-	    if (op2 == 0x107)
-	      return instTable_.getEntry(InstId::sha512sig1);
-	    if (op2 == 0x108)
-	      return instTable_.getEntry(InstId::sm3p0);
-	    if (op2 == 0x109)
-	      return instTable_.getEntry(InstId::sm3p1);
-
-	    unsigned top5 = iform.uimmed() >> 7;
-	    unsigned amt = iform.uimmed() & 0x7f;
-	    if (top5 == 0)
-	      {
-		op2 = amt;
-		return instTable_.getEntry(InstId::slli);
-	      }
-            else if (top5 == 1)
-              {
-                unsigned top6 = iform.uimmed() >> 6;
-                if (top6 == 2)
-                  {
-                    op2 = amt & 0x3f;
-                    return instTable_.getEntry(InstId::shfli);
-                  }
-              }
-	    else if (top5 == 5)
-	      {
-		op2 = amt;
-		return instTable_.getEntry(InstId::bseti);
-	      }
-	    else if (top5 == 9)
-	      {
-		op2 = amt;
-		return instTable_.getEntry(InstId::bclri);
-	      }
-	    else if (top5 == 0x0c)
-	      {
-		if (amt == 0)    return instTable_.getEntry(InstId::clz);
-		if (amt == 1)    return instTable_.getEntry(InstId::ctz);
-		if (amt == 2)    return instTable_.getEntry(InstId::cpop);
-                if (amt == 0x04) return instTable_.getEntry(InstId::sext_b);
-                if (amt == 0x05) return instTable_.getEntry(InstId::sext_h);
-                if (amt == 0x10) return instTable_.getEntry(InstId::crc32_b);
-                if (amt == 0x11) return instTable_.getEntry(InstId::crc32_h);
-                if (amt == 0x12) return instTable_.getEntry(InstId::crc32_w);
-                if (amt == 0x13) return instTable_.getEntry(InstId::crc32_d);
-                if (amt == 0x18) return instTable_.getEntry(InstId::crc32c_b);
-                if (amt == 0x19) return instTable_.getEntry(InstId::crc32c_h);
-                if (amt == 0x1a) return instTable_.getEntry(InstId::crc32c_w);
-                if (amt == 0x1b) return instTable_.getEntry(InstId::crc32c_d);
-	      }
-	    else if (top5 == 0x0d)
-	      {
-		op2 = amt;
-                if (funct3 == 1)
-                  return instTable_.getEntry(InstId::binvi);
-	      }
-	    else if (op2 == 0x300)
-	      {
-		return instTable_.getEntry(InstId::aes64im);
-	      }
-	    else if ((op2 >> 4) == 0x31) // op2 == 0x0x31?
-	      {
-		op2 = op2 & 0xf;
-		return instTable_.getEntry(InstId::aes64ks1i);
-	      }
-	  }
-	else if (funct3 == 2)  return instTable_.getEntry(InstId::slti);
-	else if (funct3 == 3)  return instTable_.getEntry(InstId::sltiu);
-	else if (funct3 == 4)  return instTable_.getEntry(InstId::xori);
-        else if (funct3 == 5)
+      switch (opcode)
+        {
+        case 0b00000:  //   I-form
           {
-            unsigned imm   = iform.uimmed();  // 12-bit immediate
-            unsigned top5  = imm >> 7;
-            unsigned shamt = imm & 0x7f;      // Shift amount (low 7 bits of imm)
-            if (shamt & 0x40)   // Bit 6 of shamt set.
+            IFormInst iform(inst);
+            op0 = iform.fields.rd;
+            op1 = iform.fields.rs1;
+            op2 = iform.immed();
+            switch (iform.fields.funct3)
               {
-                op2 = top5;            // rs3 in op2
-                op3 = shamt & 0x3f;    // least sig 6-bits of immediate in op3
-                return instTable_.getEntry(InstId::fsri);
-              }
-
-            op2 = shamt;
-            if (top5 == 0)
-              return instTable_.getEntry(InstId::srli);
-            if (top5 == 1)
-              {
-                unsigned top6 = iform.uimmed() >> 6;
-                if (top6 == 2)
-                  {
-                    op2 = shamt & 0x3f;
-                    return instTable_.getEntry(InstId::unshfli);
-                  }
-              }
-            if (top5 == 5)
-              {
-                if (shamt == 0x7)
-                  return instTable_.getEntry(InstId::orc_b);
-                return instTable_.getEntry(InstId::gorci);
-              }
-            if (top5 == 0x8)  return instTable_.getEntry(InstId::srai);
-            if (top5 == 0x9)  return instTable_.getEntry(InstId::bexti);
-            if (top5 == 0xc)  return instTable_.getEntry(InstId::rori);
-            if (top5 == 0xd)
-              {
-                if (shamt == 0x38)
-                  return instTable_.getEntry(InstId::rev8);
-                return instTable_.getEntry(InstId::grevi);
+              case 0:  return instTable_.getEntry(InstId::lb);
+              case 1:  return instTable_.getEntry(InstId::lh);
+              case 2:  return instTable_.getEntry(InstId::lw);
+              case 3:  return instTable_.getEntry(InstId::ld);
+              case 4:  return instTable_.getEntry(InstId::lbu);
+              case 5:  return instTable_.getEntry(InstId::lhu);
+              case 6:  return instTable_.getEntry(InstId::lwu);
+              default: return instTable_.getEntry(InstId::illegal);
               }
           }
-        else if (funct3 == 6)  return instTable_.getEntry(InstId::ori);
-        else if (funct3 == 7)  return instTable_.getEntry(InstId::andi);
-      }
-      return instTable_.getEntry(InstId::illegal);
+          return instTable_.getEntry(InstId::illegal);
 
-    l5:  // 00101   U-form
-      {
-	UFormInst uform(inst);
-	op0 = uform.bits.rd;
-	op1 = uform.immed();
-	return instTable_.getEntry(InstId::auipc);
-      }
-      return instTable_.getEntry(InstId::illegal);
+        case 0b00001:
+          {
+            IFormInst iform(inst);
+            op0 = iform.fields.rd;
+            op1 = iform.fields.rs1;
+            uint32_t f3 = iform.fields.funct3;
+            if (f3 == 1 or f3 == 2 or f3 == 3)
+              op2 = iform.immed();  // flh, flw, or fld
+            else
+              op2 = iform.rs2();  // vector load
 
-    l6:  // 00110  I-form
-      {
-	IFormInst iform(inst);
-	op0 = iform.fields.rd;
-	op1 = iform.fields.rs1;
-	op2 = iform.immed();
-	unsigned funct3 = iform.fields.funct3;
-	if (funct3 == 0)
-	  return instTable_.getEntry(InstId::addiw);
-	else if (funct3 == 1)
-	  {
-	    if (iform.top7() == 0)
-	      {
-		op2 = iform.fields2.shamt;
-		return instTable_.getEntry(InstId::slliw);
-	      }
-            if (iform.top5() == 1)
-              {
-                op2 = op2 & 0x7f;
-                return instTable_.getEntry(InstId::slli_uw);
-              }
-            if (iform.top5() == 0x0c)
-              {
-                unsigned amt = iform.uimmed() & 0x7f;
-		if (amt == 0)
-		  return instTable_.getEntry(InstId::clzw);
-		else if (amt == 1)
-		  return instTable_.getEntry(InstId::ctzw);
-		else if (amt == 2)
-		  return instTable_.getEntry(InstId::cpopw);
-              }
+            if (f3 == 0)  return decodeVecLoad(f3, iform.uimmed(), op3);
+            if (f3 == 1)  return instTable_.getEntry(InstId::flh);
+            if (f3 == 2)  return instTable_.getEntry(InstId::flw);
+            if (f3 == 3)  return instTable_.getEntry(InstId::fld);
+            if (f3 == 5)  return decodeVecLoad(f3, iform.uimmed(), op3);
+            if (f3 == 6)  return decodeVecLoad(f3, iform.uimmed(), op3);
+            if (f3 == 7)  return decodeVecLoad(f3, iform.uimmed(), op3);
           }
-	else if (funct3 == 5)
-	  {
-            if ((iform.top7() & 3) == 2)
-              {
-                op3 = iform.immed() >> 7;
-                op2 = iform.immed() & 0x1f;
-                return instTable_.getEntry(InstId::fsriw);
-              }
+          return instTable_.getEntry(InstId::illegal);
 
-	    op2 = iform.fields2.shamt;
-	    if (iform.top7() == 0)    return instTable_.getEntry(InstId::srliw);
-            if (iform.top7() == 0x14) return instTable_.getEntry(InstId::gorciw);
-	    if (iform.top7() == 0x20) return instTable_.getEntry(InstId::sraiw);
-            if (iform.top7() == 0x30) return instTable_.getEntry(InstId::roriw);
-            if (iform.top7() == 0x34) return instTable_.getEntry(InstId::greviw);
-	  }
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l8:  // 01000  S-form
-      {
-	// For the store instructions, the stored register is op0, the
-	// base-address register is op1 and the offset is op2.
-	SFormInst sform(inst);
-	op0 = sform.bits.rs2;
-	op1 = sform.bits.rs1;
-	op2 = sform.immed();
-	uint32_t funct3 = sform.bits.funct3;
-
-	if (funct3 == 0) return instTable_.getEntry(InstId::sb);
-	if (funct3 == 1) return instTable_.getEntry(InstId::sh);
-	if (funct3 == 2) return instTable_.getEntry(InstId::sw);
-	if (funct3 == 3 and isRv64()) return instTable_.getEntry(InstId::sd);
-      }
-      return instTable_.getEntry(InstId::illegal);
-
-    l11:  // 01011  R-form atomics
-      {
-        RFormInst rf(inst);
-        uint32_t top5 = rf.top5(), f3 = rf.bits.funct3;
-        op0 = rf.bits.rd; op1 = rf.bits.rs1; op2 = rf.bits.rs2;
-
-        if (f3 == 2)
+        case 0b00010:       //   I-form
           {
-            if (top5 == 0)    return instTable_.getEntry(InstId::amoadd_w);
-            if (top5 == 1)    return instTable_.getEntry(InstId::amoswap_w);
-            if (top5 == 2 and op2==0)    return instTable_.getEntry(InstId::lr_w);
-            if (top5 == 3)    return instTable_.getEntry(InstId::sc_w);
-            if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_w);
-            if (top5 == 8)    return instTable_.getEntry(InstId::amoor_w);
-            if (top5 == 0x0c) return instTable_.getEntry(InstId::amoand_w);
-            if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_w);
-            if (top5 == 0x14) return instTable_.getEntry(InstId::amomax_w);
-            if (top5 == 0x18) return instTable_.getEntry(InstId::amominu_w);
-            if (top5 == 0x1c) return instTable_.getEntry(InstId::amomaxu_w);
+            return instTable_.getEntry(InstId::illegal);
           }
-        else if (f3 == 3)
-          {
-            if (top5 == 0)    return instTable_.getEntry(InstId::amoadd_d);
-            if (top5 == 1)    return instTable_.getEntry(InstId::amoswap_d);
-            if (top5 == 2 and op2 == 0)    return instTable_.getEntry(InstId::lr_d);
-            if (top5 == 3)    return instTable_.getEntry(InstId::sc_d);
-            if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_d);
-            if (top5 == 8)    return instTable_.getEntry(InstId::amoor_d);
-            if (top5 == 0xc)  return instTable_.getEntry(InstId::amoand_d);
-            if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_d);
-            if (top5 == 0x14) return instTable_.getEntry(InstId::amomax_d);
-            if (top5 == 0x18) return instTable_.getEntry(InstId::amominu_d);
-            if (top5 == 0x1c) return instTable_.getEntry(InstId::amomaxu_d);
-          }
-      }
-      return instTable_.getEntry(InstId::illegal);
 
-    l12:  // 01100  R-form
-      {
-	RFormInst rform(inst);
-	op0 = rform.bits.rd;
-	op1 = rform.bits.rs1;
-	op2 = rform.bits.rs2;
-	unsigned funct7 = rform.bits.funct7, funct3 = rform.bits.funct3;
-	if (funct7 == 0)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::add);
-	    if (funct3 == 1) return instTable_.getEntry(InstId::sll);
-	    if (funct3 == 2) return instTable_.getEntry(InstId::slt);
-	    if (funct3 == 3) return instTable_.getEntry(InstId::sltu);
-	    if (funct3 == 4) return instTable_.getEntry(InstId::xor_);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::srl);
-	    if (funct3 == 6) return instTable_.getEntry(InstId::or_);
-	    if (funct3 == 7) return instTable_.getEntry(InstId::and_);
-	  }
-	else if (funct7 == 1)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::mul);
-	    if (funct3 == 1) return instTable_.getEntry(InstId::mulh);
-	    if (funct3 == 2) return instTable_.getEntry(InstId::mulhsu);
-	    if (funct3 == 3) return instTable_.getEntry(InstId::mulhu);
-	    if (funct3 == 4) return instTable_.getEntry(InstId::div);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::divu);
-	    if (funct3 == 6) return instTable_.getEntry(InstId::rem);
-	    if (funct3 == 7) return instTable_.getEntry(InstId::remu);
-	  }
-	else if (funct7 == 4)
-	  {
-            if (funct3 == 1) return instTable_.getEntry(InstId::shfl);
-	    if (funct3 == 3) return instTable_.getEntry(InstId::bmator);
-	    if (funct3 == 4) return instTable_.getEntry(InstId::pack);
-            if (funct3 == 5) return instTable_.getEntry(InstId::unshfl);
-            if (funct3 == 6) return instTable_.getEntry(InstId::bcompress);
-            if (funct3 == 7) return instTable_.getEntry(InstId::packh);
-	  }
-	else if (funct7 == 5)
-	  {
-	    if (funct3 == 1) return instTable_.getEntry(InstId::clmul);
-	    if (funct3 == 2) return instTable_.getEntry(InstId::clmulr);
-	    if (funct3 == 3) return instTable_.getEntry(InstId::clmulh);
-	    if (funct3 == 4) return instTable_.getEntry(InstId::min);
-	    if (funct3 == 6) return instTable_.getEntry(InstId::max);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::minu);
-	    if (funct3 == 7) return instTable_.getEntry(InstId::maxu);
-	  }
-	else if (funct7 == 0x10)
-	  {
-            if (funct3 == 2) return instTable_.getEntry(InstId::sh1add);
-            if (funct3 == 4) return instTable_.getEntry(InstId::sh2add);
-            if (funct3 == 6) return instTable_.getEntry(InstId::sh3add);
-	  }
-	else if (funct7 == 0x14)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::xperm_w);
-	    if (funct3 == 1) return instTable_.getEntry(InstId::bset);
-	    if (funct3 == 2) return instTable_.getEntry(InstId::xperm_n);
-	    if (funct3 == 4) return instTable_.getEntry(InstId::xperm_b);
-	    if (funct3 == 6) return instTable_.getEntry(InstId::xperm_h);
-            if (funct3 == 5) return instTable_.getEntry(InstId::gorc);
-	  }
-	else if (funct7 == 0x19)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64es);
-	  }
-	else if (funct7 == 0x1b)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64esm);
-	  }
-	else if (funct7 == 0x1d)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64ds);
-	  }
-	else if (funct7 == 0x1f)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64dsm);
-	  }
-	else if (funct7 == 0x20)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sub);
-	    if (funct3 == 4) return instTable_.getEntry(InstId::xnor);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::sra);
-	    if (funct3 == 6) return instTable_.getEntry(InstId::orn);
-	    if (funct3 == 7) return instTable_.getEntry(InstId::andn);
-	  }
-	else if (funct7 == 0x24)
-	  {
-	    if (funct3 == 1) return instTable_.getEntry(InstId::bclr);
-            if (funct3 == 3) return instTable_.getEntry(InstId::bmatxor);
-            if (funct3 == 4) return instTable_.getEntry(InstId::packu);
-            if (funct3 == 6) return instTable_.getEntry(InstId::bdecompress);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::bext);
-            if (funct3 == 7) return instTable_.getEntry(InstId::bfp);
-	  }
-	else if (funct7 == 0x28)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum0r);
-	  }
-	else if (funct7 == 0x29)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum1r);
-	  }
-	else if (funct7 == 0x2a)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0l);
-	  }
-	else if (funct7 == 0x2b)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1l);
-	  }
-	else if (funct7 == 0x2e)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0h);
-	  }
-	else if (funct7 == 0x2f)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1h);
-	  }
-	else if (funct7 == 0x30)
-	  {
-	    if (funct3 == 1) return instTable_.getEntry(InstId::rol);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::ror);
-	  }
-	else if (funct7 == 0x34)
-	  {
-	    if (funct3 == 1) return instTable_.getEntry(InstId::binv);
-            if (funct3 == 5) return instTable_.getEntry(InstId::grev);
-	  }
-	else if (funct7 == 0x3f)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::aes64ks2);
-	  }
-	else if ((funct7 & 0x1f) == 0x11)
-	  {
-            if (funct3 == 0)
-              {
-                op3 = inst >> 30;  // Upper 2 bits.
-                return instTable_.getEntry(InstId::aes32esi);
-              }
-	  }
-	else if ((funct7 & 0x1f) == 0x15)
-	  {
-            if (funct3 == 0)
-              {
-                op3 = inst >> 30;  // Upper 2 bits.
-                return instTable_.getEntry(InstId::aes32dsi);
-              }
-	  }
-	else if ((funct7 & 0x1f) == 0x17)
-	  {
-            if (funct3 == 0)
-              {
-                op3 = inst >> 30;  // Upper 2 bits.
-                return instTable_.getEntry(InstId::aes32dsmi);
-              }
-	  }
-	else if ((funct7 & 0x1f) == 0x13)
-	  {
-            if (funct3 == 0)
-              {
-                op3 = inst >> 30;  // Upper 2 bits.
-                return instTable_.getEntry(InstId::aes32esmi);
-              }
-	  }
-        else if ((funct7 & 0x1f) == 0x18)
+        case 0b00111:
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b01001:
           {
-            if (funct3 == 0)
-              {
-				op3 = inst >> 30;  // Upper 2 bits.
-                return instTable_.getEntry(InstId::sm4ed);
+            // For store instructions: op0 is the stored register.
+            SFormInst sform(inst);
+            op0 = sform.bits.rs2;
+            op1 = sform.bits.rs1;
+            op2 = sform.immed();
+            unsigned f3 = sform.bits.funct3;
+            if (f3 != 1 and f3 != 2 and f3 != 3)
+              {     // vector instructions.
+                op0 = sform.vbits.rd;
+                op1 = sform.vbits.rs1;
+                op2 = sform.rs2();
               }
+
+            if (f3 == 0)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+            if (f3 == 1)  return instTable_.getEntry(InstId::fsh);
+            if (f3 == 2)  return instTable_.getEntry(InstId::fsw);
+            if (f3 == 3)  return instTable_.getEntry(InstId::fsd);
+            if (f3 == 5)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+            if (f3 == 6)  return decodeVecStore(f3, sform.vbits.imm12, op3);
+            if (f3 == 7)  return decodeVecStore(f3, sform.vbits.imm12, op3);
           }
-        else if ((funct7 & 0x1f) == 0x1a)
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b01010:      //  S-form
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b01111:
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b10000:
           {
-	    if (funct3 == 0)
-	      {
-		op3 = inst >> 30;  // Upper 2 bits.
-		return instTable_.getEntry(InstId::sm4ks);
-	      }
-	  }
-        else if (funct7 & 2)
-          {
+            RFormInst rform(inst);
+            op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
+            unsigned funct7 = rform.bits.funct7;
             op3 = funct7 >> 2;
-            if ((funct7 & 3) == 3)
+            if ((funct7 & 3) == 0)
+              return instTable_.getEntry(InstId::fmadd_s);
+            if ((funct7 & 3) == 1)
+              return instTable_.getEntry(InstId::fmadd_d);
+            if ((funct7 & 3) == 2)
+              return instTable_.getEntry(InstId::fmadd_h);
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b10001:
+          {
+            RFormInst rform(inst);
+            op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
+            unsigned funct7 = rform.bits.funct7;
+            op3 = funct7 >> 2;
+            if ((funct7 & 3) == 0)
+              return instTable_.getEntry(InstId::fmsub_s);
+            if ((funct7 & 3) == 1)
+              return instTable_.getEntry(InstId::fmsub_d);
+            if ((funct7 & 3) == 2)
+              return instTable_.getEntry(InstId::fmsub_h);
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b10010:
+          {
+            RFormInst rform(inst);
+            op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
+            unsigned funct7 = rform.bits.funct7;
+            op3 = funct7 >> 2;
+            if ((funct7 & 3) == 0)
+              return instTable_.getEntry(InstId::fnmsub_s);
+            if ((funct7 & 3) == 1)
+              return instTable_.getEntry(InstId::fnmsub_d);
+            if ((funct7 & 3) == 2)
+              return instTable_.getEntry(InstId::fnmsub_h);
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b10011:
+          {
+            RFormInst rform(inst);
+            op0 = rform.bits.rd, op1 = rform.bits.rs1, op2 = rform.bits.rs2;
+            unsigned funct7 = rform.bits.funct7;
+            op3 = funct7 >> 2;
+            if ((funct7 & 3) == 0)
+              return instTable_.getEntry(InstId::fnmadd_s);
+            if ((funct7 & 3) == 1)
+              return instTable_.getEntry(InstId::fnmadd_d);
+            if ((funct7 & 3) == 2)
+              return instTable_.getEntry(InstId::fnmadd_h);
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b10100:
+          return decodeFp(inst, op0, op1, op2);
+
+        case 0b10101:
+          return decodeVec(inst, op0, op1, op2, op3);
+
+        case 0b10110:
+        case 0b10111:
+        case 0b11010:
+        case 0b11101:
+        case 0b11110:
+        case 0b11111:
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b00011: //  I-form
+          {
+            IFormInst iform(inst);
+            unsigned funct3 = iform.fields.funct3;
+            unsigned imm = iform.uimmed(), rd = iform.fields.rd, rs1 = iform.fields.rs1;
+
+            if (funct3 == 0)
               {
-                if (funct3 == 1)  return instTable_.getEntry(InstId::cmix);
-                if (funct3 == 5)  return instTable_.getEntry(InstId::cmov);
+                if (rd == 0 and rs1 == 0)
+                  {
+                    if (iform.top4() == 0)
+                      return instTable_.getEntry(InstId::fence);
+                    if (iform.top4() == 8)
+                      return instTable_.getEntry(InstId::fence_tso);
+                  }
               }
-            else if ((funct7 & 3) == 2)
+            else if (funct3 == 1)
               {
-                if (funct3 == 1)  return instTable_.getEntry(InstId::fsl);
-                if (funct3 == 5)  return instTable_.getEntry(InstId::fsr);
+                if (rd == 0 and rs1 == 0 and imm == 0)
+                  return instTable_.getEntry(InstId::fence_i);
+              }
+            else if (funct3 == 2)
+              {
+                if (imm == 0 and rd == 0)
+                  return instTable_.getEntry(InstId::cbo_inval);
+                if (imm == 1 and rd == 0)
+                  return instTable_.getEntry(InstId::cbo_clean);
+                if (imm == 2 and rd == 0)
+                  return instTable_.getEntry(InstId::cbo_flush);
+                if (imm == 4 and rd == 0)
+                  return instTable_.getEntry(InstId::cbo_zero);
               }
           }
-      }
-      return instTable_.getEntry(InstId::illegal);
+          return instTable_.getEntry(InstId::illegal);
 
-    l13:  // 01101  U-form
-      {
-	UFormInst uform(inst);
-	op0 = uform.bits.rd;
-	op1 = uform.immed();
-	return instTable_.getEntry(InstId::lui);
-      }
+        case 0b00100:  //  I-form
+          {
+            IFormInst iform(inst);
+            op0 = iform.fields.rd;
+            op1 = iform.fields.rs1;
+            op2 = iform.immed();
+            unsigned funct3 = iform.fields.funct3;
 
-    l14: // 01110  R-Form
-      {
-	const RFormInst rform(inst);
-	op0 = rform.bits.rd;
-	op1 = rform.bits.rs1;
-	op2 = rform.bits.rs2;
-	unsigned funct7 = rform.bits.funct7, funct3 = rform.bits.funct3;
-        if ((funct7 & 3) == 2)
-          {
-	    if (funct3 == 1) return instTable_.getEntry(InstId::fslw);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::fsrw);
-          }
-        else if (funct7 == 0)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::addw);
-	    if (funct3 == 1) return instTable_.getEntry(InstId::sllw);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::srlw);
-	  }
-	else if (funct7 == 1)
-	  {
-	    if (funct3 == 0) return instTable_.getEntry(InstId::mulw);
-	    if (funct3 == 4) return instTable_.getEntry(InstId::divw);
-	    if (funct3 == 5) return instTable_.getEntry(InstId::divuw);
-	    if (funct3 == 6) return instTable_.getEntry(InstId::remw);
-	    if (funct3 == 7) return instTable_.getEntry(InstId::remuw);
-	  }
-        else if (funct7 == 4)
-          {
-            if (funct3 == 0) return instTable_.getEntry(InstId::add_uw);
-            if (funct3 == 1) return instTable_.getEntry(InstId::shflw);
-            if (funct3 == 4) return instTable_.getEntry(InstId::packw);
-            if (funct3 == 5) return instTable_.getEntry(InstId::unshflw);
-            if (funct3 == 6) return instTable_.getEntry(InstId::bcompressw);
-          }
-	else if (funct7 == 0x10)
-          {
-            if (funct3 == 2) return instTable_.getEntry(InstId::sh1add_uw);
-            if (funct3 == 4) return instTable_.getEntry(InstId::sh2add_uw);
-            if (funct3 == 6) return instTable_.getEntry(InstId::sh3add_uw);
-          }
-	else if (funct7 == 0x14)
-          {
-            if (funct3 == 5) return instTable_.getEntry(InstId::gorcw);
-          }
-	else if (funct7 == 0x20)
-	  {
-	    if (funct3 == 0)  return instTable_.getEntry(InstId::subw);
-	    if (funct3 == 5)  return instTable_.getEntry(InstId::sraw);
-	  }
-	else if (funct7 == 0x24)
-	  {
-            if (funct3 == 4) return instTable_.getEntry(InstId::packuw);
-            if (funct3 == 6) return instTable_.getEntry(InstId::bdecompressw);
-            if (funct3 == 7) return instTable_.getEntry(InstId::bfpw);
-	  }
-        else if (funct7 == 0x30)
-          {
-            if (funct3 == 1) return instTable_.getEntry(InstId::rolw);
-            if (funct3 == 5) return instTable_.getEntry(InstId::rorw);
-          }
-	else if (funct7 == 0x34)
-          {
-            if (funct3 == 5) return instTable_.getEntry(InstId::grevw);
-          }
-      }
-      return instTable_.getEntry(InstId::illegal);
+            if      (funct3 == 0)  return instTable_.getEntry(InstId::addi);
+            else if (funct3 == 1)
+              {
+                if (op2 == 0x100)
+                  return instTable_.getEntry(InstId::sha256sum0);
+                if (op2 == 0x101)
+                  return instTable_.getEntry(InstId::sha256sum1);
+                if (op2 == 0x102)
+                  return instTable_.getEntry(InstId::sha256sig0);
+                if (op2 == 0x103)
+                  return instTable_.getEntry(InstId::sha256sig1);
+                if (op2 == 0x104)
+                  return instTable_.getEntry(InstId::sha512sum0);
+                if (op2 == 0x105)
+                  return instTable_.getEntry(InstId::sha512sum1);
+                if (op2 == 0x106)
+                  return instTable_.getEntry(InstId::sha512sig0);
+                if (op2 == 0x107)
+                  return instTable_.getEntry(InstId::sha512sig1);
+                if (op2 == 0x108)
+                  return instTable_.getEntry(InstId::sm3p0);
+                if (op2 == 0x109)
+                  return instTable_.getEntry(InstId::sm3p1);
 
-    l24: // 11000   B-form
-      {
-	BFormInst bform(inst);
-	op0 = bform.bits.rs1;
-	op1 = bform.bits.rs2;
-	op2 = bform.immed();
-	uint32_t funct3 = bform.bits.funct3;
-	if (funct3 == 0)  return instTable_.getEntry(InstId::beq);
-	if (funct3 == 1)  return instTable_.getEntry(InstId::bne);
-	if (funct3 == 4)  return instTable_.getEntry(InstId::blt);
-	if (funct3 == 5)  return instTable_.getEntry(InstId::bge);
-	if (funct3 == 6)  return instTable_.getEntry(InstId::bltu);
-	if (funct3 == 7)  return instTable_.getEntry(InstId::bgeu);
-      }
-      return instTable_.getEntry(InstId::illegal);
+                unsigned top5 = iform.uimmed() >> 7;
+                unsigned amt = iform.uimmed() & 0x7f;
+                if (top5 == 0)
+                  {
+                    op2 = amt;
+                    return instTable_.getEntry(InstId::slli);
+                  }
+                else if (top5 == 1)
+                  {
+                    unsigned top6 = iform.uimmed() >> 6;
+                    if (top6 == 2)
+                      {
+                        op2 = amt & 0x3f;
+                        return instTable_.getEntry(InstId::shfli);
+                      }
+                  }
+                else if (top5 == 5)
+                  {
+                    op2 = amt;
+                    return instTable_.getEntry(InstId::bseti);
+                  }
+                else if (top5 == 9)
+                  {
+                    op2 = amt;
+                    return instTable_.getEntry(InstId::bclri);
+                  }
+                else if (top5 == 0x0c)
+                  {
+                    if (amt == 0)    return instTable_.getEntry(InstId::clz);
+                    if (amt == 1)    return instTable_.getEntry(InstId::ctz);
+                    if (amt == 2)    return instTable_.getEntry(InstId::cpop);
+                    if (amt == 0x04) return instTable_.getEntry(InstId::sext_b);
+                    if (amt == 0x05) return instTable_.getEntry(InstId::sext_h);
+                    if (amt == 0x10) return instTable_.getEntry(InstId::crc32_b);
+                    if (amt == 0x11) return instTable_.getEntry(InstId::crc32_h);
+                    if (amt == 0x12) return instTable_.getEntry(InstId::crc32_w);
+                    if (amt == 0x13) return instTable_.getEntry(InstId::crc32_d);
+                    if (amt == 0x18) return instTable_.getEntry(InstId::crc32c_b);
+                    if (amt == 0x19) return instTable_.getEntry(InstId::crc32c_h);
+                    if (amt == 0x1a) return instTable_.getEntry(InstId::crc32c_w);
+                    if (amt == 0x1b) return instTable_.getEntry(InstId::crc32c_d);
+                  }
+                else if (top5 == 0x0d)
+                  {
+                    op2 = amt;
+                    if (funct3 == 1)
+                      return instTable_.getEntry(InstId::binvi);
+                  }
+                else if (op2 == 0x300)
+                  {
+                    return instTable_.getEntry(InstId::aes64im);
+                  }
+                else if ((op2 >> 4) == 0x31) // op2 == 0x0x31?
+                  {
+                    op2 = op2 & 0xf;
+                    return instTable_.getEntry(InstId::aes64ks1i);
+                  }
+              }
+            else if (funct3 == 2)  return instTable_.getEntry(InstId::slti);
+            else if (funct3 == 3)  return instTable_.getEntry(InstId::sltiu);
+            else if (funct3 == 4)  return instTable_.getEntry(InstId::xori);
+            else if (funct3 == 5)
+              {
+                unsigned imm   = iform.uimmed();  // 12-bit immediate
+                unsigned top5  = imm >> 7;
+                unsigned shamt = imm & 0x7f;      // Shift amount (low 7 bits of imm)
+                if (shamt & 0x40)   // Bit 6 of shamt set.
+                  {
+                    op2 = top5;            // rs3 in op2
+                    op3 = shamt & 0x3f;    // least sig 6-bits of immediate in op3
+                    return instTable_.getEntry(InstId::fsri);
+                  }
 
-    l25:  // 11001  I-form
-      {
-	IFormInst iform(inst);
-	op0 = iform.fields.rd;
-	op1 = iform.fields.rs1;
-	op2 = iform.immed();
-	if (iform.fields.funct3 == 0)
-	  return instTable_.getEntry(InstId::jalr);
-      }
-      return instTable_.getEntry(InstId::illegal);
+                op2 = shamt;
+                if (top5 == 0)
+                  return instTable_.getEntry(InstId::srli);
+                if (top5 == 1)
+                  {
+                    unsigned top6 = iform.uimmed() >> 6;
+                    if (top6 == 2)
+                      {
+                        op2 = shamt & 0x3f;
+                        return instTable_.getEntry(InstId::unshfli);
+                      }
+                  }
+                if (top5 == 5)
+                  {
+                    if (shamt == 0x7)
+                      return instTable_.getEntry(InstId::orc_b);
+                    return instTable_.getEntry(InstId::gorci);
+                  }
+                if (top5 == 0x8)  return instTable_.getEntry(InstId::srai);
+                if (top5 == 0x9)  return instTable_.getEntry(InstId::bexti);
+                if (top5 == 0xc)  return instTable_.getEntry(InstId::rori);
+                if (top5 == 0xd)
+                  {
+                    if (shamt == 0x38)
+                      return instTable_.getEntry(InstId::rev8);
+                    return instTable_.getEntry(InstId::grevi);
+                  }
+              }
+            else if (funct3 == 6)  return instTable_.getEntry(InstId::ori);
+            else if (funct3 == 7)  return instTable_.getEntry(InstId::andi);
+          }
+          return instTable_.getEntry(InstId::illegal);
 
-    l27:  // 11011  J-form
-      {
-	JFormInst jform(inst);
-	op0 = jform.bits.rd;
-	op1 = jform.immed();
-	return instTable_.getEntry(InstId::jal);
-      }
+        case 0b00101:  //   U-form
+          {
+            UFormInst uform(inst);
+            op0 = uform.bits.rd;
+            op1 = uform.immed();
+            return instTable_.getEntry(InstId::auipc);
+          }
+          return instTable_.getEntry(InstId::illegal);
 
-    l28:  // 11100  I-form
-      {
-	IFormInst iform(inst);
-	op0 = iform.fields.rd;
-	op1 = iform.fields.rs1;
-	op2 = iform.uimmed(); // csr
-	unsigned f3 = iform.fields.funct3;
-	switch (f3)
-	  {
-	  case 0:
-	    {
-	      uint32_t funct7 = op2 >> 5;
-	      if (funct7 == 0) // ecall ebreak 
-		{
-		  if (op1 != 0 or op0 != 0)
-		    return instTable_.getEntry(InstId::illegal);
-		  else if (op2 == 0)
-		    return instTable_.getEntry(InstId::ecall);
-		  else if (op2 == 1)
-		    return instTable_.getEntry(InstId::ebreak);
-		  else if (op2 == 0x0d and op0 == 0 and op1 == 0)
-		    return instTable_.getEntry(InstId::wrs_nto);
-		  else if (op2 == 0x1d and op0 == 0 and op1 == 0)
-		    return instTable_.getEntry(InstId::wrs_sto);
-		}
-	      else if (funct7 == 9)
-		{
-		  if (op0 != 0)
-		    return instTable_.getEntry(InstId::illegal);
-		  else // sfence.vma
+        case 0b00110:  //  I-form
+          {
+            IFormInst iform(inst);
+            op0 = iform.fields.rd;
+            op1 = iform.fields.rs1;
+            op2 = iform.immed();
+            unsigned funct3 = iform.fields.funct3;
+            if (funct3 == 0)
+              return instTable_.getEntry(InstId::addiw);
+            else if (funct3 == 1)
+              {
+                if (iform.top7() == 0)
+                  {
+                    op2 = iform.fields2.shamt;
+                    return instTable_.getEntry(InstId::slliw);
+                  }
+                if (iform.top5() == 1)
+                  {
+                    op2 = op2 & 0x7f;
+                    return instTable_.getEntry(InstId::slli_uw);
+                  }
+                if (iform.top5() == 0x0c)
+                  {
+                    unsigned amt = iform.uimmed() & 0x7f;
+                    if (amt == 0)
+                      return instTable_.getEntry(InstId::clzw);
+                    else if (amt == 1)
+                      return instTable_.getEntry(InstId::ctzw);
+                    else if (amt == 2)
+                      return instTable_.getEntry(InstId::cpopw);
+                  }
+              }
+            else if (funct3 == 5)
+              {
+                if ((iform.top7() & 3) == 2)
+                  {
+                    op3 = iform.immed() >> 7;
+                    op2 = iform.immed() & 0x1f;
+                    return instTable_.getEntry(InstId::fsriw);
+                  }
+
+                op2 = iform.fields2.shamt;
+                if (iform.top7() == 0)    return instTable_.getEntry(InstId::srliw);
+                if (iform.top7() == 0x14) return instTable_.getEntry(InstId::gorciw);
+                if (iform.top7() == 0x20) return instTable_.getEntry(InstId::sraiw);
+                if (iform.top7() == 0x30) return instTable_.getEntry(InstId::roriw);
+                if (iform.top7() == 0x34) return instTable_.getEntry(InstId::greviw);
+              }
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b01000:  //  S-form
+          {
+            // For the store instructions, the stored register is op0, the
+            // base-address register is op1 and the offset is op2.
+            SFormInst sform(inst);
+            op0 = sform.bits.rs2;
+            op1 = sform.bits.rs1;
+            op2 = sform.immed();
+            uint32_t funct3 = sform.bits.funct3;
+
+            if (funct3 == 0) return instTable_.getEntry(InstId::sb);
+            if (funct3 == 1) return instTable_.getEntry(InstId::sh);
+            if (funct3 == 2) return instTable_.getEntry(InstId::sw);
+            if (funct3 == 3 and isRv64()) return instTable_.getEntry(InstId::sd);
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b01011:  //  R-form atomics
+          {
+            RFormInst rf(inst);
+            uint32_t top5 = rf.top5(), f3 = rf.bits.funct3;
+            op0 = rf.bits.rd; op1 = rf.bits.rs1; op2 = rf.bits.rs2;
+
+            if (f3 == 2)
+              {
+                if (top5 == 0)    return instTable_.getEntry(InstId::amoadd_w);
+                if (top5 == 1)    return instTable_.getEntry(InstId::amoswap_w);
+                if (top5 == 2 and op2==0)    return instTable_.getEntry(InstId::lr_w);
+                if (top5 == 3)    return instTable_.getEntry(InstId::sc_w);
+                if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_w);
+                if (top5 == 8)    return instTable_.getEntry(InstId::amoor_w);
+                if (top5 == 0x0c) return instTable_.getEntry(InstId::amoand_w);
+                if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_w);
+                if (top5 == 0x14) return instTable_.getEntry(InstId::amomax_w);
+                if (top5 == 0x18) return instTable_.getEntry(InstId::amominu_w);
+                if (top5 == 0x1c) return instTable_.getEntry(InstId::amomaxu_w);
+              }
+            else if (f3 == 3)
+              {
+                if (top5 == 0)    return instTable_.getEntry(InstId::amoadd_d);
+                if (top5 == 1)    return instTable_.getEntry(InstId::amoswap_d);
+                if (top5 == 2 and op2 == 0)    return instTable_.getEntry(InstId::lr_d);
+                if (top5 == 3)    return instTable_.getEntry(InstId::sc_d);
+                if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_d);
+                if (top5 == 8)    return instTable_.getEntry(InstId::amoor_d);
+                if (top5 == 0xc)  return instTable_.getEntry(InstId::amoand_d);
+                if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_d);
+                if (top5 == 0x14) return instTable_.getEntry(InstId::amomax_d);
+                if (top5 == 0x18) return instTable_.getEntry(InstId::amominu_d);
+                if (top5 == 0x1c) return instTable_.getEntry(InstId::amomaxu_d);
+              }
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b01100:  //  R-form
+          {
+            RFormInst rform(inst);
+            op0 = rform.bits.rd;
+            op1 = rform.bits.rs1;
+            op2 = rform.bits.rs2;
+            unsigned funct7 = rform.bits.funct7, funct3 = rform.bits.funct3;
+            if (funct7 == 0)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::add);
+                if (funct3 == 1) return instTable_.getEntry(InstId::sll);
+                if (funct3 == 2) return instTable_.getEntry(InstId::slt);
+                if (funct3 == 3) return instTable_.getEntry(InstId::sltu);
+                if (funct3 == 4) return instTable_.getEntry(InstId::xor_);
+                if (funct3 == 5) return instTable_.getEntry(InstId::srl);
+                if (funct3 == 6) return instTable_.getEntry(InstId::or_);
+                if (funct3 == 7) return instTable_.getEntry(InstId::and_);
+              }
+            else if (funct7 == 1)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::mul);
+                if (funct3 == 1) return instTable_.getEntry(InstId::mulh);
+                if (funct3 == 2) return instTable_.getEntry(InstId::mulhsu);
+                if (funct3 == 3) return instTable_.getEntry(InstId::mulhu);
+                if (funct3 == 4) return instTable_.getEntry(InstId::div);
+                if (funct3 == 5) return instTable_.getEntry(InstId::divu);
+                if (funct3 == 6) return instTable_.getEntry(InstId::rem);
+                if (funct3 == 7) return instTable_.getEntry(InstId::remu);
+              }
+            else if (funct7 == 4)
+              {
+                if (funct3 == 1) return instTable_.getEntry(InstId::shfl);
+                if (funct3 == 3) return instTable_.getEntry(InstId::bmator);
+                if (funct3 == 4) return instTable_.getEntry(InstId::pack);
+                if (funct3 == 5) return instTable_.getEntry(InstId::unshfl);
+                if (funct3 == 6) return instTable_.getEntry(InstId::bcompress);
+                if (funct3 == 7) return instTable_.getEntry(InstId::packh);
+              }
+            else if (funct7 == 5)
+              {
+                if (funct3 == 1) return instTable_.getEntry(InstId::clmul);
+                if (funct3 == 2) return instTable_.getEntry(InstId::clmulr);
+                if (funct3 == 3) return instTable_.getEntry(InstId::clmulh);
+                if (funct3 == 4) return instTable_.getEntry(InstId::min);
+                if (funct3 == 6) return instTable_.getEntry(InstId::max);
+                if (funct3 == 5) return instTable_.getEntry(InstId::minu);
+                if (funct3 == 7) return instTable_.getEntry(InstId::maxu);
+              }
+            else if (funct7 == 0x10)
+              {
+                if (funct3 == 2) return instTable_.getEntry(InstId::sh1add);
+                if (funct3 == 4) return instTable_.getEntry(InstId::sh2add);
+                if (funct3 == 6) return instTable_.getEntry(InstId::sh3add);
+              }
+            else if (funct7 == 0x14)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::xperm_w);
+                if (funct3 == 1) return instTable_.getEntry(InstId::bset);
+                if (funct3 == 2) return instTable_.getEntry(InstId::xperm_n);
+                if (funct3 == 4) return instTable_.getEntry(InstId::xperm_b);
+                if (funct3 == 6) return instTable_.getEntry(InstId::xperm_h);
+                if (funct3 == 5) return instTable_.getEntry(InstId::gorc);
+              }
+            else if (funct7 == 0x19)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::aes64es);
+              }
+            else if (funct7 == 0x1b)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::aes64esm);
+              }
+            else if (funct7 == 0x1d)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::aes64ds);
+              }
+            else if (funct7 == 0x1f)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::aes64dsm);
+              }
+            else if (funct7 == 0x20)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::sub);
+                if (funct3 == 4) return instTable_.getEntry(InstId::xnor);
+                if (funct3 == 5) return instTable_.getEntry(InstId::sra);
+                if (funct3 == 6) return instTable_.getEntry(InstId::orn);
+                if (funct3 == 7) return instTable_.getEntry(InstId::andn);
+              }
+            else if (funct7 == 0x24)
+              {
+                if (funct3 == 1) return instTable_.getEntry(InstId::bclr);
+                if (funct3 == 3) return instTable_.getEntry(InstId::bmatxor);
+                if (funct3 == 4) return instTable_.getEntry(InstId::packu);
+                if (funct3 == 6) return instTable_.getEntry(InstId::bdecompress);
+                if (funct3 == 5) return instTable_.getEntry(InstId::bext);
+                if (funct3 == 7) return instTable_.getEntry(InstId::bfp);
+              }
+            else if (funct7 == 0x28)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum0r);
+              }
+            else if (funct7 == 0x29)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::sha512sum1r);
+              }
+            else if (funct7 == 0x2a)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0l);
+              }
+            else if (funct7 == 0x2b)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1l);
+              }
+            else if (funct7 == 0x2e)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig0h);
+              }
+            else if (funct7 == 0x2f)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::sha512sig1h);
+              }
+            else if (funct7 == 0x30)
+              {
+                if (funct3 == 1) return instTable_.getEntry(InstId::rol);
+                if (funct3 == 5) return instTable_.getEntry(InstId::ror);
+              }
+            else if (funct7 == 0x34)
+              {
+                if (funct3 == 1) return instTable_.getEntry(InstId::binv);
+                if (funct3 == 5) return instTable_.getEntry(InstId::grev);
+              }
+            else if (funct7 == 0x3f)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::aes64ks2);
+              }
+            else if ((funct7 & 0x1f) == 0x11)
+              {
+                if (funct3 == 0)
+                  {
+                    op3 = inst >> 30;  // Upper 2 bits.
+                    return instTable_.getEntry(InstId::aes32esi);
+                  }
+              }
+            else if ((funct7 & 0x1f) == 0x15)
+              {
+                if (funct3 == 0)
+                  {
+                    op3 = inst >> 30;  // Upper 2 bits.
+                    return instTable_.getEntry(InstId::aes32dsi);
+                  }
+              }
+            else if ((funct7 & 0x1f) == 0x17)
+              {
+                if (funct3 == 0)
+                  {
+                    op3 = inst >> 30;  // Upper 2 bits.
+                    return instTable_.getEntry(InstId::aes32dsmi);
+                  }
+              }
+            else if ((funct7 & 0x1f) == 0x13)
+              {
+                if (funct3 == 0)
+                  {
+                    op3 = inst >> 30;  // Upper 2 bits.
+                    return instTable_.getEntry(InstId::aes32esmi);
+                  }
+              }
+            else if ((funct7 & 0x1f) == 0x18)
+              {
+                if (funct3 == 0)
+                  {
+                    op3 = inst >> 30;  // Upper 2 bits.
+                    return instTable_.getEntry(InstId::sm4ed);
+                  }
+              }
+            else if ((funct7 & 0x1f) == 0x1a)
+              {
+                if (funct3 == 0)
+                  {
+                    op3 = inst >> 30;  // Upper 2 bits.
+                    return instTable_.getEntry(InstId::sm4ks);
+                  }
+              }
+            else if (funct7 & 2)
+              {
+                op3 = funct7 >> 2;
+                if ((funct7 & 3) == 3)
+                  {
+                    if (funct3 == 1)  return instTable_.getEntry(InstId::cmix);
+                    if (funct3 == 5)  return instTable_.getEntry(InstId::cmov);
+                  }
+                else if ((funct7 & 3) == 2)
+                  {
+                    if (funct3 == 1)  return instTable_.getEntry(InstId::fsl);
+                    if (funct3 == 5)  return instTable_.getEntry(InstId::fsr);
+                  }
+              }
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b01101:  //  U-form
+          {
+            UFormInst uform(inst);
+            op0 = uform.bits.rd;
+            op1 = uform.immed();
+            return instTable_.getEntry(InstId::lui);
+          }
+
+        case 0b01110: //  R-Form
+          {
+            const RFormInst rform(inst);
+            op0 = rform.bits.rd;
+            op1 = rform.bits.rs1;
+            op2 = rform.bits.rs2;
+            unsigned funct7 = rform.bits.funct7, funct3 = rform.bits.funct3;
+            if ((funct7 & 3) == 2)
+              {
+                if (funct3 == 1) return instTable_.getEntry(InstId::fslw);
+                if (funct3 == 5) return instTable_.getEntry(InstId::fsrw);
+              }
+            else if (funct7 == 0)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::addw);
+                if (funct3 == 1) return instTable_.getEntry(InstId::sllw);
+                if (funct3 == 5) return instTable_.getEntry(InstId::srlw);
+              }
+            else if (funct7 == 1)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::mulw);
+                if (funct3 == 4) return instTable_.getEntry(InstId::divw);
+                if (funct3 == 5) return instTable_.getEntry(InstId::divuw);
+                if (funct3 == 6) return instTable_.getEntry(InstId::remw);
+                if (funct3 == 7) return instTable_.getEntry(InstId::remuw);
+              }
+            else if (funct7 == 4)
+              {
+                if (funct3 == 0) return instTable_.getEntry(InstId::add_uw);
+                if (funct3 == 1) return instTable_.getEntry(InstId::shflw);
+                if (funct3 == 4) return instTable_.getEntry(InstId::packw);
+                if (funct3 == 5) return instTable_.getEntry(InstId::unshflw);
+                if (funct3 == 6) return instTable_.getEntry(InstId::bcompressw);
+              }
+            else if (funct7 == 0x10)
+              {
+                if (funct3 == 2) return instTable_.getEntry(InstId::sh1add_uw);
+                if (funct3 == 4) return instTable_.getEntry(InstId::sh2add_uw);
+                if (funct3 == 6) return instTable_.getEntry(InstId::sh3add_uw);
+              }
+            else if (funct7 == 0x14)
+              {
+                if (funct3 == 5) return instTable_.getEntry(InstId::gorcw);
+              }
+            else if (funct7 == 0x20)
+              {
+                if (funct3 == 0)  return instTable_.getEntry(InstId::subw);
+                if (funct3 == 5)  return instTable_.getEntry(InstId::sraw);
+              }
+            else if (funct7 == 0x24)
+              {
+                if (funct3 == 4) return instTable_.getEntry(InstId::packuw);
+                if (funct3 == 6) return instTable_.getEntry(InstId::bdecompressw);
+                if (funct3 == 7) return instTable_.getEntry(InstId::bfpw);
+              }
+            else if (funct7 == 0x30)
+              {
+                if (funct3 == 1) return instTable_.getEntry(InstId::rolw);
+                if (funct3 == 5) return instTable_.getEntry(InstId::rorw);
+              }
+            else if (funct7 == 0x34)
+              {
+                if (funct3 == 5) return instTable_.getEntry(InstId::grevw);
+              }
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b11000: //  B-form
+          {
+            BFormInst bform(inst);
+            op0 = bform.bits.rs1;
+            op1 = bform.bits.rs2;
+            op2 = bform.immed();
+            uint32_t funct3 = bform.bits.funct3;
+            if (funct3 == 0)  return instTable_.getEntry(InstId::beq);
+            if (funct3 == 1)  return instTable_.getEntry(InstId::bne);
+            if (funct3 == 4)  return instTable_.getEntry(InstId::blt);
+            if (funct3 == 5)  return instTable_.getEntry(InstId::bge);
+            if (funct3 == 6)  return instTable_.getEntry(InstId::bltu);
+            if (funct3 == 7)  return instTable_.getEntry(InstId::bgeu);
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b11001:  //  I-form
+          {
+            IFormInst iform(inst);
+            op0 = iform.fields.rd;
+            op1 = iform.fields.rs1;
+            op2 = iform.immed();
+            if (iform.fields.funct3 == 0)
+              return instTable_.getEntry(InstId::jalr);
+          }
+          return instTable_.getEntry(InstId::illegal);
+
+        case 0b11011:  //  J-form
+          {
+            JFormInst jform(inst);
+            op0 = jform.bits.rd;
+            op1 = jform.immed();
+            return instTable_.getEntry(InstId::jal);
+          }
+
+        case 0b11100:  //  I-form
+          {
+            IFormInst iform(inst);
+            op0 = iform.fields.rd;
+            op1 = iform.fields.rs1;
+            op2 = iform.uimmed(); // csr
+            unsigned f3 = iform.fields.funct3;
+            switch (f3)
+              {
+              case 0:
+                {
+                  uint32_t funct7 = op2 >> 5;
+                  if (funct7 == 0) // ecall ebreak
                     {
-		      op0 = iform.fields.rs1;
-                      op1 = iform.rs2();
-                      return instTable_.getEntry(InstId::sfence_vma);
+                      if (op1 != 0 or op0 != 0)
+                        return instTable_.getEntry(InstId::illegal);
+                      else if (op2 == 0)
+                        return instTable_.getEntry(InstId::ecall);
+                      else if (op2 == 1)
+                        return instTable_.getEntry(InstId::ebreak);
+                      else if (op2 == 0x0d and op0 == 0 and op1 == 0)
+                        return instTable_.getEntry(InstId::wrs_nto);
+                      else if (op2 == 0x1d and op0 == 0 and op1 == 0)
+                        return instTable_.getEntry(InstId::wrs_sto);
                     }
-		}
-	      else if (funct7 == 0xb and op0 == 0)
-		{
-		  op2 = iform.rs2();
-		  return instTable_.getEntry(InstId::sinval_vma);
-		}
-	      else if (funct7 == 0xc)
-		{
-		  op2 = iform.rs2();
-		  if (op0 == 0 and op1 == 0 and op2 == 0 and f3 == 0)
-		    return instTable_.getEntry(InstId::sfence_w_inval);
-		  if (op0 == 0 and op1 == 0 and op2 == 1 and f3 == 0)
-		    return instTable_.getEntry(InstId::sfence_inval_ir);
-		  return instTable_.getEntry(InstId::illegal);
-		}
-	      else if (funct7 == 0x11 and op0 == 0)
-		{
-		  op2 = iform.rs2();
-		  return instTable_.getEntry(InstId::hfence_vvma);
-		}
-	      else if (funct7 == 0x13 and op0 == 0)
-		{
-		  op2 = iform.rs2();
-		  return instTable_.getEntry(InstId::hinval_vvma);
-		}
-	      else if (funct7 == 0x31 and op0 == 0)
-		{
-		  op2 = iform.rs2();
-		  return instTable_.getEntry(InstId::hfence_gvma);
-		}
-	      else if (funct7 == 0x33 and op0 == 0)
-		{
-		  op2 = iform.rs2();
-		  return instTable_.getEntry(InstId::hinval_vvma);
-		}
-	      else if (op2 == 0x102 and op0 == 0 and op1 == 0)
-		return instTable_.getEntry(InstId::sret);
-	      else if (op2 == 0x302 and op0 == 0 and op1 == 0)
-		return instTable_.getEntry(InstId::mret);
-	      else if (op2 == 0x105 and op0 == 0 and op1 == 0)
-		return instTable_.getEntry(InstId::wfi);
-	      else if (op2 == 0x7b2 and op0 == 0 and op1 == 0)
-		return instTable_.getEntry(InstId::dret);
-	    }
-	    break;
-	  case 1:  return instTable_.getEntry(InstId::csrrw);
-	  case 2:  return instTable_.getEntry(InstId::csrrs);
-	  case 3:  return instTable_.getEntry(InstId::csrrc);
-	  case 5:  return instTable_.getEntry(InstId::csrrwi);
-	  case 6:  return instTable_.getEntry(InstId::csrrsi);
-	  case 7:  return instTable_.getEntry(InstId::csrrci);
-	  case 4:
-	    {
-	      unsigned top12 = op2;
-	      if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
-	      if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
-	      if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);
-	      if (top12 == 0x641) return instTable_.getEntry(InstId::hlv_hu);
-	      if (top12 == 0x680) return instTable_.getEntry(InstId::hlv_w);
-	      if (top12 == 0x643) return instTable_.getEntry(InstId::hlvx_hu);
-	      if (top12 == 0x683) return instTable_.getEntry(InstId::hlvx_wu);
-	      if (top12 == 0x681) return instTable_.getEntry(InstId::hlv_wu);
-	      if (top12 == 0x6c0) return instTable_.getEntry(InstId::hlv_d);
-	      
-	      unsigned top7 = op2 >> 5;
-	      unsigned rd = iform.fields.rd;
-	      op0 = op2 & 0x1f;  // rs2 field
-	      if (top7 == 0x31 and rd == 0) return instTable_.getEntry(InstId::hsv_b);
-	      if (top7 == 0x33 and rd == 0) return instTable_.getEntry(InstId::hsv_h);
-	      if (top7 == 0x35 and rd == 0) return instTable_.getEntry(InstId::hsv_w);
-	      if (top7 == 0x37 and rd == 0) return instTable_.getEntry(InstId::hsv_d);
-	    }
-	    break;
-	  default: return instTable_.getEntry(InstId::illegal);
-	  }
-	return instTable_.getEntry(InstId::illegal);
-      }
+                  else if (funct7 == 9)
+                    {
+                      if (op0 != 0)
+                        return instTable_.getEntry(InstId::illegal);
+                      else // sfence.vma
+                        {
+                          op0 = iform.fields.rs1;
+                          op1 = iform.rs2();
+                          return instTable_.getEntry(InstId::sfence_vma);
+                        }
+                    }
+                  else if (funct7 == 0xb and op0 == 0)
+                    {
+                      op2 = iform.rs2();
+                      return instTable_.getEntry(InstId::sinval_vma);
+                    }
+                  else if (funct7 == 0xc)
+                    {
+                      op2 = iform.rs2();
+                      if (op0 == 0 and op1 == 0 and op2 == 0 and f3 == 0)
+                        return instTable_.getEntry(InstId::sfence_w_inval);
+                      if (op0 == 0 and op1 == 0 and op2 == 1 and f3 == 0)
+                        return instTable_.getEntry(InstId::sfence_inval_ir);
+                      return instTable_.getEntry(InstId::illegal);
+                    }
+                  else if (funct7 == 0x11 and op0 == 0)
+                    {
+                      op2 = iform.rs2();
+                      return instTable_.getEntry(InstId::hfence_vvma);
+                    }
+                  else if (funct7 == 0x13 and op0 == 0)
+                    {
+                      op2 = iform.rs2();
+                      return instTable_.getEntry(InstId::hinval_vvma);
+                    }
+                  else if (funct7 == 0x31 and op0 == 0)
+                    {
+                      op2 = iform.rs2();
+                      return instTable_.getEntry(InstId::hfence_gvma);
+                    }
+                  else if (funct7 == 0x33 and op0 == 0)
+                    {
+                      op2 = iform.rs2();
+                      return instTable_.getEntry(InstId::hinval_vvma);
+                    }
+                  else if (op2 == 0x102 and op0 == 0 and op1 == 0)
+                    return instTable_.getEntry(InstId::sret);
+                  else if (op2 == 0x302 and op0 == 0 and op1 == 0)
+                    return instTable_.getEntry(InstId::mret);
+                  else if (op2 == 0x105 and op0 == 0 and op1 == 0)
+                    return instTable_.getEntry(InstId::wfi);
+                  else if (op2 == 0x7b2 and op0 == 0 and op1 == 0)
+                    return instTable_.getEntry(InstId::dret);
+                }
+                break;
+              case 1:  return instTable_.getEntry(InstId::csrrw);
+              case 2:  return instTable_.getEntry(InstId::csrrs);
+              case 3:  return instTable_.getEntry(InstId::csrrc);
+              case 5:  return instTable_.getEntry(InstId::csrrwi);
+              case 6:  return instTable_.getEntry(InstId::csrrsi);
+              case 7:  return instTable_.getEntry(InstId::csrrci);
+              case 4:
+                {
+                  unsigned top12 = op2;
+                  if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
+                  if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
+                  if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);
+                  if (top12 == 0x641) return instTable_.getEntry(InstId::hlv_hu);
+                  if (top12 == 0x680) return instTable_.getEntry(InstId::hlv_w);
+                  if (top12 == 0x643) return instTable_.getEntry(InstId::hlvx_hu);
+                  if (top12 == 0x683) return instTable_.getEntry(InstId::hlvx_wu);
+                  if (top12 == 0x681) return instTable_.getEntry(InstId::hlv_wu);
+                  if (top12 == 0x6c0) return instTable_.getEntry(InstId::hlv_d);
+
+                  unsigned top7 = op2 >> 5;
+                  unsigned rd = iform.fields.rd;
+                  op0 = op2 & 0x1f;  // rs2 field
+                  if (top7 == 0x31 and rd == 0) return instTable_.getEntry(InstId::hsv_b);
+                  if (top7 == 0x33 and rd == 0) return instTable_.getEntry(InstId::hsv_h);
+                  if (top7 == 0x35 and rd == 0) return instTable_.getEntry(InstId::hsv_w);
+                  if (top7 == 0x37 and rd == 0) return instTable_.getEntry(InstId::hsv_d);
+                }
+                break;
+              default: return instTable_.getEntry(InstId::illegal);
+              }
+            return instTable_.getEntry(InstId::illegal);
+          }
+
+        default:
+          assert(0 and "Shouldn't be able to get here");
+          __builtin_unreachable();
+        }
     }
   else
     return instTable_.getEntry(InstId::illegal);
