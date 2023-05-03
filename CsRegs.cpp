@@ -2172,14 +2172,14 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MEDELEG, {{"medeleg", xlen}});
   setCsrFields(CsrNumber::MIDELEG, {{"mideleg", xlen}});
   setCsrFields(CsrNumber::MIE,
-    {{"zero", 1}, {"SSIP", 1}, {"zero", 1}, {"MSIP", 1},
-     {"zero", 1}, {"STIP", 1}, {"zero", 1}, {"MTIP", 1},
-     {"zero", 1}, {"SEIP", 1}, {"zero", 1}, {"MEIP", 1},
-     {"zero", xlen - 12}});
-  setCsrFields(CsrNumber::MIP,
     {{"zero", 1}, {"SSIE", 1}, {"zero", 1}, {"MSIE", 1},
      {"zero", 1}, {"STIE", 1}, {"zero", 1}, {"MTIE", 1},
      {"zero", 1}, {"SEIE", 1}, {"zero", 1}, {"MEIE", 1},
+     {"zero", xlen - 12}});
+  setCsrFields(CsrNumber::MIP,
+    {{"zero", 1}, {"SSIP", 1}, {"zero", 1}, {"MSIP", 1},
+     {"zero", 1}, {"STIP", 1}, {"zero", 1}, {"MTIP", 1},
+     {"zero", 1}, {"SEIP", 1}, {"zero", 1}, {"MEIP", 1},
      {"zero", xlen - 12}});
   setCsrFields(CsrNumber::MTVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
 
@@ -2315,11 +2315,11 @@ CsRegs<URV>::addSupervisorFields()
   setCsrFields(CsrNumber::SCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
   setCsrFields(CsrNumber::STVAL, {{"stval", xlen}});
   setCsrFields(CsrNumber::SIE,
-    {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
-     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
-  setCsrFields(CsrNumber::SIP,
     {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
      {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
+  setCsrFields(CsrNumber::SIP,
+    {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
+     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
   setCsrFields(CsrNumber::SENVCFG,
     {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1},
      {"CBZE", 1}, {"res1", xlen - 8}});
