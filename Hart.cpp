@@ -5146,4276 +5146,3379 @@ template <typename URV>
 void
 Hart<URV>::execute(const DecodedInst* di)
 {
-#pragma GCC diagnostic ignored "-Wpedantic"
-
-  // Setup an array of labels to index it by the decoded instruction
-  // id to jump to execute function of that instruction. A table of
-  // methods would be a lot cleaner (no goto) but it would cost 20%
-  // more in execution time.
-  static void* labels[] =
-    {
-     &&illegal,
-     &&lui,
-     &&auipc,
-     &&jal,
-     &&jalr,
-     &&beq,
-     &&bne,
-     &&blt,
-     &&bge,
-     &&bltu,
-     &&bgeu,
-     &&lb,
-     &&lh,
-     &&lw,
-     &&lbu,
-     &&lhu,
-     &&sb,
-     &&sh,
-     &&sw,
-     &&addi,
-     &&slti,
-     &&sltiu,
-     &&xori,
-     &&ori,
-     &&andi,
-     &&slli,
-     &&srli,
-     &&srai,
-     &&add,
-     &&sub,
-     &&sll,
-     &&slt,
-     &&sltu,
-     &&xor_,
-     &&srl,
-     &&sra,
-     &&or_,
-     &&and_,
-     &&fence,
-     &&fence_tso,
-     &&fence_i,
-     &&ecall,
-     &&ebreak,
-     &&csrrw,
-     &&csrrs,
-     &&csrrc,
-     &&csrrwi,
-     &&csrrsi,
-     &&csrrci,
-     &&lwu,
-     &&ld,
-     &&sd,
-     &&addiw,
-     &&slliw,
-     &&srliw,
-     &&sraiw,
-     &&addw,
-     &&subw,
-     &&sllw,
-     &&srlw,
-     &&sraw,
-     &&mul,
-     &&mulh,
-     &&mulhsu,
-     &&mulhu,
-     &&div,
-     &&divu,
-     &&rem,
-     &&remu,
-     &&mulw,
-     &&divw,
-     &&divuw,
-     &&remw,
-     &&remuw,
-     &&lr_w,
-     &&sc_w,
-     &&amoswap_w,
-     &&amoadd_w,
-     &&amoxor_w,
-     &&amoand_w,
-     &&amoor_w,
-     &&amomin_w,
-     &&amomax_w,
-     &&amominu_w,
-     &&amomaxu_w,
-     &&lr_d,
-     &&sc_d,
-     &&amoswap_d,
-     &&amoadd_d,
-     &&amoxor_d,
-     &&amoand_d,
-     &&amoor_d,
-     &&amomin_d,
-     &&amomax_d,
-     &&amominu_d,
-     &&amomaxu_d,
-     &&flw,
-     &&fsw,
-     &&fmadd_s,
-     &&fmsub_s,
-     &&fnmsub_s,
-     &&fnmadd_s,
-     &&fadd_s,
-     &&fsub_s,
-     &&fmul_s,
-     &&fdiv_s,
-     &&fsqrt_s,
-     &&fsgnj_s,
-     &&fsgnjn_s,
-     &&fsgnjx_s,
-     &&fmin_s,
-     &&fmax_s,
-     &&fcvt_w_s,
-     &&fcvt_wu_s,
-     &&fmv_x_w,
-     &&feq_s,
-     &&flt_s,
-     &&fle_s,
-     &&fclass_s,
-     &&fcvt_s_w,
-     &&fcvt_s_wu,
-     &&fmv_w_x,
-     &&fcvt_l_s,
-     &&fcvt_lu_s,
-     &&fcvt_s_l,
-     &&fcvt_s_lu,
-     &&fld,
-     &&fsd,
-     &&fmadd_d,
-     &&fmsub_d,
-     &&fnmsub_d,
-     &&fnmadd_d,
-     &&fadd_d,
-     &&fsub_d,
-     &&fmul_d,
-     &&fdiv_d,
-     &&fsqrt_d,
-     &&fsgnj_d,
-     &&fsgnjn_d,
-     &&fsgnjx_d,
-     &&fmin_d,
-     &&fmax_d,
-     &&fcvt_s_d,
-     &&fcvt_d_s,
-     &&feq_d,
-     &&flt_d,
-     &&fle_d,
-     &&fclass_d,
-     &&fcvt_w_d,
-     &&fcvt_wu_d,
-     &&fcvt_d_w,
-     &&fcvt_d_wu,
-     &&fcvt_l_d,
-     &&fcvt_lu_d,
-     &&fmv_x_d,
-     &&fcvt_d_l,
-     &&fcvt_d_lu,
-     &&fmv_d_x,
-     &&flh,
-     &&fsh,
-     &&fmadd_h,
-     &&fmsub_h,
-     &&fnmsub_h,
-     &&fnmadd_h,
-     &&fadd_h,
-     &&fsub_h,
-     &&fmul_h,
-     &&fdiv_h,
-     &&fsqrt_h,
-     &&fsgnj_h,
-     &&fsgnjn_h,
-     &&fsgnjx_h,
-     &&fmin_h,
-     &&fmax_h,
-     &&fcvt_s_h,
-     &&fcvt_d_h,
-     &&fcvt_h_s,
-     &&fcvt_h_d,
-     &&fcvt_w_h,
-     &&fcvt_wu_h,
-     &&fmv_x_h,
-     &&feq_h,
-     &&flt_h,
-     &&fle_h,
-     &&fclass_h,
-     &&fcvt_h_w,
-     &&fcvt_h_wu,
-     &&fmv_h_x,
-     &&fcvt_l_h,
-     &&fcvt_lu_h,
-     &&fcvt_h_l,
-     &&fcvt_h_lu,
-     &&mret,
-     &&sret,
-     &&wfi,
-     &&dret,
-     &&sfence_vma,
-     &&c_addi4spn,
-     &&c_fld,
-     &&c_lq,
-     &&c_lw,
-     &&c_flw,
-     &&c_ld,
-     &&c_fsd,
-     &&c_sq,
-     &&c_sw,
-     &&c_fsw,
-     &&c_sd,
-     &&c_addi,
-     &&c_jal,
-     &&c_li,
-     &&c_addi16sp,
-     &&c_lui,
-     &&c_srli,
-     &&c_srli64,
-     &&c_srai,
-     &&c_srai64,
-     &&c_andi,
-     &&c_sub,
-     &&c_xor,
-     &&c_or,
-     &&c_and,
-     &&c_subw,
-     &&c_addw,
-     &&c_j,
-     &&c_beqz,
-     &&c_bnez,
-     &&c_slli,
-     &&c_slli64,
-     &&c_fldsp,
-     &&c_lwsp,
-     &&c_flwsp,
-     &&c_ldsp,
-     &&c_jr,
-     &&c_mv,
-     &&c_ebreak,
-     &&c_jalr,
-     &&c_add,
-     &&c_fsdsp,
-     &&c_swsp,
-     &&c_fswsp,
-     &&c_addiw,
-     &&c_sdsp,
-
-     &&andn,
-     &&clz,
-     &&clzw,
-     &&cpop,
-     &&cpopw,
-     &&ctz,
-     &&ctzw,
-     &&max,
-     &&maxu,
-     &&min,
-     &&minu,
-     &&orc_b,
-     &&orn,
-     &&rev8,  // was bswap
-     &&rol,
-     &&rolw,
-     &&ror,
-     &&rori,
-     &&roriw,
-     &&rorw,
-     &&sext_b,
-     &&sext_h,
-     &&xnor,
-
-     &&pack,
-     &&packh,
-     &&packu,
-     &&packw,
-     &&packuw,
-     &&grev,
-     &&grevi,
-     &&grevw,
-     &&greviw,
-     &&gorc,
-     &&gorci,
-     &&gorcw,
-     &&gorciw,
-     &&shfl,
-     &&shflw,
-     &&shfli,
-     &&unshfl,
-     &&unshfli,
-     &&unshflw,
-     &&xperm_n,
-     &&xperm_b,
-     &&xperm_h,
-     &&xperm_w,
-
-     // zbs
-     &&bset,
-     &&bclr,
-     &&binv,
-     &&bext,
-     &&bseti,
-     &&bclri,
-     &&binvi,
-     &&bexti,
-
-     // zbe
-     &&bcompress,
-     &&bdecompress,
-     &&bcompressw,
-     &&bdecompressw,
-
-     // zbf
-     &&bfp,
-     &&bfpw,
-
-     // zbc
-     &&clmul,
-     &&clmulh,
-     &&clmulr,
-
-     // zba
-     &&sh1add,
-     &&sh2add,
-     &&sh3add,
-     &&sh1add_uw,
-     &&sh2add_uw,
-     &&sh3add_uw,
-     &&add_uw,
-     &&slli_uw,
-
-     // zbr
-     &&crc32_b,
-     &&crc32_h,
-     &&crc32_w,
-     &&crc32_d,
-     &&crc32c_b,
-     &&crc32c_h,
-     &&crc32c_w,
-     &&crc32c_d,
-
-     // zbm
-     &&bmator,
-     &&bmatxor,
-     &&bmatflip,
-
-     // zbt
-     &&cmov,
-     &&cmix,
-     &&fsl,
-     &&fsr,
-     &&fsri,
-     &&fslw,
-     &&fsrw,
-     &&fsriw,
-
-     // vevtor
-     &&vsetvli,
-     &&vsetivli,
-     &&vsetvl,
-     &&vadd_vv,
-     &&vadd_vx,
-     &&vadd_vi,
-     &&vsub_vv,
-     &&vsub_vx,
-     &&vrsub_vx,
-     &&vrsub_vi,
-     &&vwaddu_vv,
-     &&vwaddu_vx,
-     &&vwsubu_vv,
-     &&vwsubu_vx,
-     &&vwadd_vv,
-     &&vwadd_vx,
-     &&vwsub_vv,
-     &&vwsub_vx,
-     &&vwaddu_wv,
-     &&vwaddu_wx,
-     &&vwsubu_wv,
-     &&vwsubu_wx,
-     &&vwadd_wv,
-     &&vwadd_wx,
-     &&vwsub_wv,
-     &&vwsub_wx,
-
-     &&vmseq_vv,
-     &&vmseq_vx,
-     &&vmseq_vi,
-     &&vmsne_vv,
-     &&vmsne_vx,
-     &&vmsne_vi,
-     &&vmsltu_vv,
-     &&vmsltu_vx,
-     &&vmslt_vv,
-     &&vmslt_vx,
-     &&vmsleu_vv,
-     &&vmsleu_vx,
-     &&vmsleu_vi,
-     &&vmsle_vv,
-     &&vmsle_vx,
-     &&vmsle_vi,
-     &&vmsgtu_vx,
-     &&vmsgtu_vi,
-     &&vmsgt_vx,
-     &&vmsgt_vi,
-
-     &&vminu_vv,
-     &&vminu_vx,
-     &&vmin_vv,
-     &&vmin_vx,
-     &&vmaxu_vv,
-     &&vmaxu_vx,
-     &&vmax_vv,
-     &&vmax_vx,
-     &&vand_vv,
-     &&vand_vx,
-     &&vand_vi,
-     &&vor_vv,
-     &&vor_vx,
-     &&vor_vi,
-     &&vxor_vv,
-     &&vxor_vx,
-     &&vxor_vi,
-     &&vsll_vv,
-     &&vsll_vx,
-     &&vsll_vi,
-     &&vsrl_vv,
-     &&vsrl_vx,
-     &&vsrl_vi,
-     &&vsra_vv,
-     &&vsra_vx,
-     &&vsra_vi,
-     &&vnsrl_wv,
-     &&vnsrl_wx,
-     &&vnsrl_wi,
-     &&vnsra_wv,
-     &&vnsra_wx,
-     &&vnsra_wi,
-     &&vrgather_vv,
-     &&vrgather_vx,
-     &&vrgather_vi,
-     &&vrgatherei16_vv,
-     &&vcompress_vm,
-     &&vredsum_vs,
-     &&vredand_vs,
-     &&vredor_vs,
-     &&vredxor_vs,
-     &&vredminu_vs,
-     &&vredmin_vs,
-     &&vredmaxu_vs,
-     &&vredmax_vs,
-     &&vwredsumu_vs,
-     &&vwredsum_vs,
-
-     &&vmand_mm,
-     &&vmnand_mm,
-     &&vmandnot_mm,
-     &&vmxor_mm,
-     &&vmor_mm,
-     &&vmnor_mm,
-     &&vmornot_mm,
-     &&vmxnor_mm,
-     &&vcpop_m,
-     &&vfirst_m,
-     &&vmsbf_m,
-     &&vmsif_m,
-     &&vmsof_m,
-     &&viota_m,
-     &&vid_v,
-     &&vslideup_vx,
-     &&vslideup_vi,
-     &&vslide1up_vx,
-     &&vslidedown_vx,
-     &&vslidedown_vi,
-     &&vslide1down_vx,
-     &&vfslide1up_vf,
-     &&vfslide1down_vf,
-     &&vmul_vv,
-     &&vmul_vx,
-     &&vmulh_vv,
-     &&vmulh_vx,
-     &&vmulhu_vv,
-     &&vmulhu_vx,
-     &&vmulhsu_vv,
-     &&vmulhsu_vx,
-     &&vmadd_vv,
-     &&vmadd_vx,
-     &&vnmsub_vv,
-     &&vnmsub_vx,
-     &&vmacc_vv,
-     &&vmacc_vx,
-     &&vnmsac_vv,
-     &&vnmsac_vx,
-     &&vwmulu_vv,
-     &&vwmulu_vx,
-     &&vwmul_vv,
-     &&vwmul_vx,
-     &&vwmulsu_vv,
-     &&vwmulsu_vx,
-     &&vwmaccu_vv,
-     &&vwmaccu_vx,
-     &&vwmacc_vv,
-     &&vwmacc_vx,
-     &&vwmaccsu_vv,
-     &&vwmaccsu_vx,
-     &&vwmaccus_vx,
-     &&vdivu_vv,
-     &&vdivu_vx,
-     &&vdiv_vv,
-     &&vdiv_vx,
-     &&vremu_vv,
-     &&vremu_vx,
-     &&vrem_vv,
-     &&vrem_vx,
-     &&vsext_vf2,
-     &&vsext_vf4,
-     &&vsext_vf8,
-     &&vzext_vf2,
-     &&vzext_vf4,
-     &&vzext_vf8,
-     &&vadc_vvm,
-     &&vadc_vxm,
-     &&vadc_vim,
-     &&vsbc_vvm,
-     &&vsbc_vxm,
-     &&vmadc_vvm,
-     &&vmadc_vxm,
-     &&vmadc_vim,
-     &&vmsbc_vvm,
-     &&vmsbc_vxm,
-     &&vmerge_vvm,
-     &&vmerge_vxm,
-     &&vmerge_vim,
-     &&vmv_x_s,
-     &&vmv_s_x,
-     &&vfmv_f_s,
-     &&vfmv_s_f,
-     &&vmv_v_v,
-     &&vmv_v_x,
-     &&vmv_v_i,
-     &&vmv1r_v,
-     &&vmv2r_v,
-     &&vmv4r_v,
-     &&vmv8r_v,
-     &&vsaddu_vv,
-     &&vsaddu_vx,
-     &&vsaddu_vi,
-     &&vsadd_vv,
-     &&vsadd_vx,
-     &&vsadd_vi,
-     &&vssubu_vv,
-     &&vssubu_vx,
-     &&vssub_vv,
-     &&vssub_vx,
-     &&vaaddu_vv,
-     &&vaaddu_vx,
-     &&vaadd_vv,
-     &&vaadd_vx,
-     &&vasubu_vv,
-     &&vasubu_vx,
-     &&vasub_vv,
-     &&vasub_vx,
-     &&vsmul_vv,
-     &&vsmul_vx,
-     &&vssrl_vv,
-     &&vssrl_vx,
-     &&vssrl_vi,
-     &&vssra_vv,
-     &&vssra_vx,
-     &&vssra_vi,
-     &&vnclipu_wv,
-     &&vnclipu_wx,
-     &&vnclipu_wi,
-     &&vnclip_wv,
-     &&vnclip_wx,
-     &&vnclip_wi,
-
-     &&vle8_v,
-     &&vle16_v,
-     &&vle32_v,
-     &&vle64_v,
-     &&vle128_v,
-     &&vle256_v,
-     &&vle512_v,
-     &&vle1024_v,
-     &&vse8_v,
-     &&vse16_v,
-     &&vse32_v,
-     &&vse64_v,
-     &&vse128_v,
-     &&vse256_v,
-     &&vse512_v,
-     &&vse1024_v,
-
-     &&vlm_v,
-     &&vsm_v,
-
-     &&vlre8_v,
-     &&vlre16_v,
-     &&vlre32_v,
-     &&vlre64_v,
-     &&vlre128_v,
-     &&vlre256_v,
-     &&vlre512_v,
-     &&vlre1024_v,
-     &&vs1r_v,
-     &&vs2r_v,
-     &&vs4r_v,
-     &&vs8r_v,
-
-     &&vle8ff_v,
-     &&vle16ff_v,
-     &&vle32ff_v,
-     &&vle64ff_v,
-     &&vle128ff_v,
-     &&vle256ff_v,
-     &&vle512ff_v,
-     &&vle1024ff_v,
-
-     &&vlse8_v,
-     &&vlse16_v,
-     &&vlse32_v,
-     &&vlse64_v,
-     &&vlse128_v,
-     &&vlse256_v,
-     &&vlse512_v,
-     &&vlse1024_v,
-     &&vsse8_v,
-     &&vsse16_v,
-     &&vsse32_v,
-     &&vsse64_v,
-     &&vsse128_v,
-     &&vsse256_v,
-     &&vsse512_v,
-     &&vsse1024_v,
-
-     &&vloxei8_v,
-     &&vloxei16_v,
-     &&vloxei32_v,
-     &&vloxei64_v,
-     &&vluxei8_v,
-     &&vluxei16_v,
-     &&vluxei32_v,
-     &&vluxei64_v,
-     &&vsoxei8_v,
-     &&vsoxei16_v,
-     &&vsoxei32_v,
-     &&vsoxei64_v,
-     &&vsuxei8_v,
-     &&vsuxei16_v,
-     &&vsuxei32_v,
-     &&vsuxei64_v,
-
-     &&vlsege8_v,
-     &&vlsege16_v,
-     &&vlsege32_v,
-     &&vlsege64_v,
-     &&vlsege128_v,
-     &&vlsege256_v,
-     &&vlsege512_v,
-     &&vlsege1024_v,
-     &&vssege8_v,
-     &&vssege16_v,
-     &&vssege32_v,
-     &&vssege64_v,
-     &&vssege128_v,
-     &&vssege256_v,
-     &&vssege512_v,
-     &&vssege1024_v,
-
-     &&vlssege8_v,
-     &&vlssege16_v,
-     &&vlssege32_v,
-     &&vlssege64_v,
-     &&vlssege128_v,
-     &&vlssege256_v,
-     &&vlssege512_v,
-     &&vlssege1024_v,
-     &&vsssege8_v,
-     &&vsssege16_v,
-     &&vsssege32_v,
-     &&vsssege64_v,
-     &&vsssege128_v,
-     &&vsssege256_v,
-     &&vsssege512_v,
-     &&vsssege1024_v,
-
-     &&vluxsegei8_v,
-     &&vluxsegei16_v,
-     &&vluxsegei32_v,
-     &&vluxsegei64_v,
-     &&vluxsegei128_v,
-     &&vluxsegei256_v,
-     &&vluxsegei512_v,
-     &&vluxsegei1024_v,
-     &&vsuxsegei8_v,
-     &&vsuxsegei16_v,
-     &&vsuxsegei32_v,
-     &&vsuxsegei64_v,
-     &&vsuxsegei128_v,
-     &&vsuxsegei256_v,
-     &&vsuxsegei512_v,
-     &&vsuxsegei1024_v,
-
-     &&vloxsegei8_v,
-     &&vloxsegei16_v,
-     &&vloxsegei32_v,
-     &&vloxsegei64_v,
-     &&vloxsegei128_v,
-     &&vloxsegei256_v,
-     &&vloxsegei512_v,
-     &&vloxsegei1024_v,
-     &&vsoxsegei8_v,
-     &&vsoxsegei16_v,
-     &&vsoxsegei32_v,
-     &&vsoxsegei64_v,
-     &&vsoxsegei128_v,
-     &&vsoxsegei256_v,
-     &&vsoxsegei512_v,
-     &&vsoxsegei1024_v,
-
-     &&vlsege8ff_v,
-     &&vlsege16ff_v,
-     &&vlsege32ff_v,
-     &&vlsege64ff_v,
-     &&vlsege128ff_v,
-     &&vlsege256ff_v,
-     &&vlsege512ff_v,
-     &&vlsege1024ff_v,
-
-     &&vfadd_vv,
-     &&vfadd_vf,
-     &&vfsub_vv,
-     &&vfsub_vf,
-     &&vfrsub_vf,
-
-     &&vfwadd_vv,
-     &&vfwadd_vf,
-     &&vfwsub_vv,
-     &&vfwsub_vf,
-     &&vfwadd_wv,
-     &&vfwadd_wf,
-     &&vfwsub_wv,
-     &&vfwsub_wf,
-
-     &&vfmul_vv,
-     &&vfmul_vf,
-     &&vfdiv_vv,
-     &&vfdiv_vf,
-     &&vfrdiv_vf,
-     &&vfwmul_vv,
-     &&vfwmul_vf,
-
-     &&vfmadd_vv,
-     &&vfmadd_vf,
-     &&vfnmadd_vv,
-     &&vfnmadd_vf,
-     &&vfmsub_vv,
-     &&vfmsub_vf,
-     &&vfnmsub_vv,
-     &&vfnmsub_vf,
-     &&vfmacc_vv,
-     &&vfmacc_vf,
-     &&vfnmacc_vv,
-     &&vfnmacc_vf,
-     &&vfmsac_vv,
-     &&vfmsac_vf,
-     &&vfnmsac_vv,
-     &&vfnmsac_vf,
-     &&vfwmacc_vv,
-     &&vfwmacc_vf,
-     &&vfwnmacc_vv,
-     &&vfwnmacc_vf,
-     &&vfwmsac_vv,
-     &&vfwmsac_vf,
-     &&vfwnmsac_vv,
-     &&vfwnmsac_vf,
-     &&vfsqrt_v,
-     &&vfmerge_vfm,
-     &&vfmv_v_f,
-     &&vmfeq_vv,
-     &&vmfeq_vf,
-     &&vmfne_vv,
-     &&vmfne_vf,
-     &&vmflt_vv,
-     &&vmflt_vf,
-     &&vmfle_vv,
-     &&vmfle_vf,
-     &&vmfgt_vf,
-     &&vmfge_vf,
-     &&vfclass_v,
-     &&vfcvt_xu_f_v,
-     &&vfcvt_x_f_v,
-     &&vfcvt_rtz_xu_f_v,
-     &&vfcvt_rtz_x_f_v,
-     &&vfcvt_f_xu_v,
-     &&vfcvt_f_x_v,
-
-     &&vfwcvt_xu_f_v,
-     &&vfwcvt_x_f_v,
-     &&vfwcvt_rtz_xu_f_v,
-     &&vfwcvt_rtz_x_f_v,
-     &&vfwcvt_f_xu_v,
-     &&vfwcvt_f_x_v,
-     &&vfwcvt_f_f_v,
-
-     &&vfncvt_xu_f_w,
-     &&vfncvt_x_f_w,
-     &&vfncvt_rtz_xu_f_w,
-     &&vfncvt_rtz_x_f_w,
-     &&vfncvt_f_xu_w,
-     &&vfncvt_f_x_w,
-     &&vfncvt_f_f_w,
-     &&vfncvt_rod_f_f_w,
-     &&vfredsum_vs,
-     &&vfredosum_vs,
-     &&vfredmin_vs,
-     &&vfredmax_vs,
-     &&vfwredsum_vs,
-     &&vfwredosum_vs,
-     &&vfrsqrt7_v,
-     &&vfrec7_v,
-     &&vfmin_vv,
-     &&vfmin_vf,
-     &&vfmax_vv,
-     &&vfmax_vf,
-     &&vfsgnj_vv,
-     &&vfsgnj_vf,
-     &&vfsgnjn_vv,
-     &&vfsgnjn_vf,
-     &&vfsgnjx_vv,
-     &&vfsgnjx_vf,
-
-     // zk
-     &&aes32dsi,
-     &&aes32dsmi,
-     &&aes32esi,
-     &&aes32esmi,
-     &&aes64ds,
-     &&aes64dsm,
-     &&aes64es,
-     &&aes64esm,
-     &&aes64im,
-     &&aes64ks1i,
-     &&aes64ks2,
-     &&sha256sig0,
-     &&sha256sig1,
-     &&sha256sum0,
-     &&sha256sum1,
-     &&sha512sig0h,
-     &&sha512sig0l,
-     &&sha512sig1h,
-     &&sha512sig1l,
-     &&sha512sum0r,
-     &&sha512sum1r,
-     &&sha512sig0,
-     &&sha512sig1,
-     &&sha512sum0,
-     &&sha512sum1,
-     &&sm3p0,
-     &&sm3p1,
-     &&sm4ed,
-     &&sm4ks,
-
-     &&sinval_vma,
-     &&sfence_w_inval,
-     &&sfence_inval_ir,
-
-     &&cbo_clean,
-     &&cbo_flush,
-     &&cbo_inval,
-     &&cbo_zero,
-
-     &&wrs_nto,
-     &&wrs_sto,
-
-     &&hfence_vvma,
-     &&hfence_gvma,
-     &&hlv_b,
-     &&hlv_bu,
-     &&hlv_h,
-     &&hlv_hu,
-     &&hlv_w,
-     &&hlvx_hu,
-     &&hlvx_wu,
-     &&hsv_b,
-     &&hsv_h,
-     &&hsv_w,
-     &&hlv_wu,
-     &&hlv_d,
-     &&hsv_d,
-     &&hinval_vvma,
-     &&hinval_gvma,
-    };
-
   const InstEntry* entry = di->instEntry();
-  size_t id = size_t(entry->instId());
-  assert(id < sizeof(labels));
-  goto *labels[id];
-
- illegal:
-  illegalInst(di);
-  return;
-
- lui:
-  execLui(di);
-  return;
-
- auipc:
-  execAuipc(di);
-  return;
-
- jal:
-  execJal(di);
-  return;
-
- jalr:
-  execJalr(di);
-  return;
-
- beq:
-  execBeq(di);
-  return;
-
- bne:
-  execBne(di);
-  return;
-
- blt:
-  execBlt(di);
-  return;
-
- bge:
-  execBge(di);
-  return;
-
- bltu:
-  execBltu(di);
-  return;
-
- bgeu:
-  execBgeu(di);
-  return;
-
- lb:
-  execLb(di);
-  return;
-
- lh:
-  execLh(di);
-  return;
-
- lw:
-  execLw(di);
-  return;
-
- lbu:
-  execLbu(di);
-  return;
-
- lhu:
-  execLhu(di);
-  return;
-
- sb:
-  execSb(di);
-  return;
-
- sh:
-  execSh(di);
-  return;
-
- sw:
-  execSw(di);
-  return;
-
- addi:
-  execAddi(di);
-  return;
-
- slti:
-  execSlti(di);
-  return;
-
- sltiu:
-  execSltiu(di);
-  return;
-
- xori:
-  execXori(di);
-  return;
-
- ori:
-  execOri(di);
-  return;
-
- andi:
-  execAndi(di);
-  return;
-
- slli:
-  execSlli(di);
-  return;
-
- srli:
-  execSrli(di);
-  return;
-
- srai:
-  execSrai(di);
-  return;
-
- add:
-  execAdd(di);
-  return;
-
- sub:
-  execSub(di);
-  return;
-
- sll:
-  execSll(di);
-  return;
-
- slt:
-  execSlt(di);
-  return;
-
- sltu:
-  execSltu(di);
-  return;
-
- xor_:
-  execXor(di);
-  return;
-
- srl:
-  execSrl(di);
-  return;
-
- sra:
-  execSra(di);
-  return;
-
- or_:
-  execOr(di);
-  return;
-
- and_:
-  execAnd(di);
-  return;
-
- fence:
-  execFence(di);
-  return;
-
- fence_tso:
-  execFence_tso(di);
-  return;
-
- fence_i:
-  execFencei(di);
-  return;
-
- ecall:
-  execEcall(di);
-  return;
-
- ebreak:
-  execEbreak(di);
-  return;
-
- csrrw:
-  execCsrrw(di);
-  return;
-
- csrrs:
-  execCsrrs(di);
-  return;
-
- csrrc:
-  execCsrrc(di);
-  return;
-
- csrrwi:
-  execCsrrwi(di);
-  return;
-
- csrrsi:
-  execCsrrsi(di);
-  return;
-
- csrrci:
-  execCsrrci(di);
-  return;
-
- lwu:
-  execLwu(di);
-  return;
-
- ld:
-  execLd(di);
-  return;
-
- sd:
-  execSd(di);
-  return;
-
- addiw:
-  execAddiw(di);
-  return;
-
- slliw:
-  execSlliw(di);
-  return;
-
- srliw:
-  execSrliw(di);
-  return;
-
- sraiw:
-  execSraiw(di);
-  return;
-
- addw:
-  execAddw(di);
-  return;
-
- subw:
-  execSubw(di);
-  return;
-
- sllw:
-  execSllw(di);
-  return;
-
- srlw:
-  execSrlw(di);
-  return;
-
- sraw:
-  execSraw(di);
-  return;
-
- mul:
-  execMul(di);
-  return;
-
- mulh:
-  execMulh(di);
-  return;
-
- mulhsu:
-  execMulhsu(di);
-  return;
-
- mulhu:
-  execMulhu(di);
-  return;
-
- div:
-  execDiv(di);
-  return;
-
- divu:
-  execDivu(di);
-  return;
-
- rem:
-  execRem(di);
-  return;
-
- remu:
-  execRemu(di);
-  return;
-
- mulw:
-  execMulw(di);
-  return;
-
- divw:
-  execDivw(di);
-  return;
-
- divuw:
-  execDivuw(di);
-  return;
-
- remw:
-  execRemw(di);
-  return;
-
- remuw:
-  execRemuw(di);
-  return;
-
- lr_w:
-  execLr_w(di);
-  return;
-
- sc_w:
-  execSc_w(di);
-  return;
-
- amoswap_w:
-  execAmoswap_w(di);
-  return;
-
- amoadd_w:
-  execAmoadd_w(di);
-  return;
-
- amoxor_w:
-  execAmoxor_w(di);
-  return;
-
- amoand_w:
-  execAmoand_w(di);
-  return;
-
- amoor_w:
-  execAmoor_w(di);
-  return;
-
- amomin_w:
-  execAmomin_w(di);
-  return;
-
- amomax_w:
-  execAmomax_w(di);
-  return;
-
- amominu_w:
-  execAmominu_w(di);
-  return;
-
- amomaxu_w:
-  execAmomaxu_w(di);
-  return;
-
- lr_d:
-  execLr_d(di);
-  return;
-
- sc_d:
-  execSc_d(di);
-  return;
-
- amoswap_d:
-  execAmoswap_d(di);
-  return;
-
- amoadd_d:
-  execAmoadd_d(di);
-  return;
-
- amoxor_d:
-  execAmoxor_d(di);
-  return;
-
- amoand_d:
-  execAmoand_d(di);
-  return;
-
- amoor_d:
-  execAmoor_d(di);
-  return;
-
- amomin_d:
-  execAmomin_d(di);
-  return;
-
- amomax_d:
-  execAmomax_d(di);
-  return;
-
- amominu_d:
-  execAmominu_d(di);
-  return;
-
- amomaxu_d:
-  execAmomaxu_d(di);
-  return;
-
- flw:
-  execFlw(di);
-  return;
-
- fsw:
-  execFsw(di);
-  return;
-
- fmadd_s:
-  execFmadd_s(di);
-  return;
-
- fmsub_s:
-  execFmsub_s(di);
-  return;
-
- fnmsub_s:
-  execFnmsub_s(di);
-  return;
-
- fnmadd_s:
-  execFnmadd_s(di);
-  return;
-
- fadd_s:
-  execFadd_s(di);
-  return;
-
- fsub_s:
-  execFsub_s(di);
-  return;
-
- fmul_s:
-  execFmul_s(di);
-  return;
-
- fdiv_s:
-  execFdiv_s(di);
-  return;
-
- fsqrt_s:
-  execFsqrt_s(di);
-  return;
-
- fsgnj_s:
-  execFsgnj_s(di);
-  return;
-
- fsgnjn_s:
-  execFsgnjn_s(di);
-  return;
-
- fsgnjx_s:
-  execFsgnjx_s(di);
-  return;
-
- fmin_s:
-  execFmin_s(di);
-  return;
-
- fmax_s:
-  execFmax_s(di);
-  return;
-
- fcvt_w_s:
-  execFcvt_w_s(di);
-  return;
-
- fcvt_wu_s:
-  execFcvt_wu_s(di);
-  return;
-
- fmv_x_w:
-  execFmv_x_w(di);
-  return;
-
- feq_s:
-  execFeq_s(di);
-  return;
-
- flt_s:
-  execFlt_s(di);
-  return;
-
- fle_s:
-  execFle_s(di);
-  return;
-
- fclass_s:
-  execFclass_s(di);
-  return;
-
- fcvt_s_w:
-  execFcvt_s_w(di);
-  return;
-
- fcvt_s_wu:
-  execFcvt_s_wu(di);
-  return;
-
- fmv_w_x:
-  execFmv_w_x(di);
-  return;
-
- fcvt_l_s:
-  execFcvt_l_s(di);
-  return;
-
- fcvt_lu_s:
-  execFcvt_lu_s(di);
-  return;
-
- fcvt_s_l:
-  execFcvt_s_l(di);
-  return;
-
- fcvt_s_lu:
-  execFcvt_s_lu(di);
-  return;
-
- fld:
-  execFld(di);
-  return;
-
- fsd:
-  execFsd(di);
-  return;
-
- fmadd_d:
-  execFmadd_d(di);
-  return;
-
- fmsub_d:
-  execFmsub_d(di);
-  return;
-
- fnmsub_d:
-  execFnmsub_d(di);
-  return;
-
- fnmadd_d:
-  execFnmadd_d(di);
-  return;
-
- fadd_d:
-  execFadd_d(di);
-  return;
-
- fsub_d:
-  execFsub_d(di);
-  return;
-
- fmul_d:
-  execFmul_d(di);
-  return;
-
- fdiv_d:
-  execFdiv_d(di);
-  return;
-
- fsqrt_d:
-  execFsqrt_d(di);
-  return;
-
- fsgnj_d:
-  execFsgnj_d(di);
-  return;
-
- fsgnjn_d:
-  execFsgnjn_d(di);
-  return;
-
- fsgnjx_d:
-  execFsgnjx_d(di);
-  return;
-
- fmin_d:
-  execFmin_d(di);
-  return;
-
- fmax_d:
-  execFmax_d(di);
-  return;
-
- fcvt_s_d:
-  execFcvt_s_d(di);
-  return;
-
- fcvt_d_s:
-  execFcvt_d_s(di);
-  return;
-
- feq_d:
-  execFeq_d(di);
-  return;
-
- flt_d:
-  execFlt_d(di);
-  return;
-
- fle_d:
-  execFle_d(di);
-  return;
-
- fclass_d:
-  execFclass_d(di);
-  return;
-
- fcvt_w_d:
-  execFcvt_w_d(di);
-  return;
-
- fcvt_wu_d:
-  execFcvt_wu_d(di);
-  return;
-
- fcvt_d_w:
-  execFcvt_d_w(di);
-  return;
-
- fcvt_d_wu:
-  execFcvt_d_wu(di);
-  return;
-
- fcvt_l_d:
-  execFcvt_l_d(di);
-  return;
-
- fcvt_lu_d:
-  execFcvt_lu_d(di);
-  return;
-
- fmv_x_d:
-  execFmv_x_d(di);
-  return;
-
- fcvt_d_l:
-  execFcvt_d_l(di);
-  return;
-
- fcvt_d_lu:
-  execFcvt_d_lu(di);
-  return;
-
- fmv_d_x:
-  execFmv_d_x(di);
-  return;
-
- flh:
-  execFlh(di);
-  return;
-
- fsh:
-  execFsh(di);
-  return;
-
- fmadd_h:
-  execFmadd_h(di);
-  return;
-
- fmsub_h:
-  execFmsub_h(di);
-  return;
-
- fnmsub_h:
-  execFnmsub_h(di);
-  return;
-
- fnmadd_h:
-  execFnmadd_h(di);
-  return;
-
- fadd_h:
-  execFadd_h(di);
-  return;
-
- fsub_h:
-  execFsub_h(di);
-  return;
-
- fmul_h:
-  execFmul_h(di);
-  return;
-
- fdiv_h:
-  execFdiv_h(di);
-  return;
-
- fsqrt_h:
-  execFsqrt_h(di);
-  return;
-
- fsgnj_h:
-  execFsgnj_h(di);
-  return;
-
- fsgnjn_h:
-  execFsgnjn_h(di);
-  return;
-
- fsgnjx_h:
-  execFsgnjx_h(di);
-  return;
-
- fmin_h:
-  execFmin_h(di);
-  return;
-
- fmax_h:
-  execFmax_h(di);
-  return;
-
- fcvt_s_h:
-  execFcvt_s_h(di);
-  return;
-
- fcvt_d_h:
-  execFcvt_d_h(di);
-  return;
-
- fcvt_h_s:
-  execFcvt_h_s(di);
-  return;
-
- fcvt_h_d:
-  execFcvt_h_d(di);
-  return;
-
- fcvt_w_h:
-  execFcvt_w_h(di);
-  return;
-
- fcvt_wu_h:
-  execFcvt_wu_h(di);
-  return;
-
- fmv_x_h:
-  execFmv_x_h(di);
-  return;
-
- feq_h:
-  execFeq_h(di);
-  return;
-
- flt_h:
-  execFlt_h(di);
-  return;
-
- fle_h:
-  execFle_h(di);
-  return;
-
- fclass_h:
-  execFclass_h(di);
-  return;
-
- fcvt_h_w:
-  execFcvt_h_w(di);
-  return;
-
- fcvt_h_wu:
-  execFcvt_h_wu(di);
-  return;
-
- fmv_h_x:
-  execFmv_h_x(di);
-  return;
-
- fcvt_l_h:
-  execFcvt_l_h(di);
-  return;
-
- fcvt_lu_h:
-  execFcvt_lu_h(di);
-  return;
-
- fcvt_h_l:
-  execFcvt_h_l(di);
-  return;
-
- fcvt_h_lu:
-  execFcvt_h_lu(di);
-  return;
-
- mret:
-  execMret(di);
-  return;
-
- sret:
-  execSret(di);
-  return;
-
- wfi:
-  execWfi(di);
-  return;
-
- dret:
-  execDret(di);
-  return;
-
- sfence_vma:
-  execSfence_vma(di);
-  return;
-
- c_addi4spn:
-  if (not isRvc()) illegalInst(di); else execAddi(di);
-  return;
-
- c_fld:
-  if (not isRvc()) illegalInst(di); else execFld(di);
-  return;
-
- c_lq:
-  if (not isRvc()) illegalInst(di); else illegalInst(di);
-  return;
-
- c_lw:
-  if (not isRvc()) illegalInst(di); else execLw(di);
-  return;
-
- c_flw:
-  if (not isRvc()) illegalInst(di); else execFlw(di);
-  return;
-
- c_ld:
-  if (not isRvc()) illegalInst(di); else execLd(di);
-  return;
-
- c_fsd:
-  if (not isRvc()) illegalInst(di); else execFsd(di);
-  return;
-
- c_sq:
-  if (not isRvc()) illegalInst(di); else illegalInst(di);
-  return;
-
- c_sw:
-  if (not isRvc()) illegalInst(di); else execSw(di);
-  return;
-
- c_fsw:
-  if (not isRvc()) illegalInst(di); else execFsw(di);
-  return;
-
- c_sd:
-  if (not isRvc()) illegalInst(di); else execSd(di);
-  return;
-
- c_addi:
-  if (not isRvc()) illegalInst(di); else execAddi(di);
-  return;
-
- c_jal:
-  if (not isRvc()) illegalInst(di); else execJal(di);
-  return;
-
- c_li:
-  if (not isRvc()) illegalInst(di); else execAddi(di);
-  return;
-
- c_addi16sp:
-  if (not isRvc()) illegalInst(di); else execAddi(di);
-  return;
-
- c_lui:
-  if (not isRvc()) illegalInst(di); else execLui(di);
-  return;
-
- c_srli:
-  if (not isRvc()) illegalInst(di); else execSrli(di);
-  return;
-
- c_srli64:
-  illegalInst(di); // Only valid in rv128 which is not supported.
-  return;
-
- c_srai:
-  if (not isRvc()) illegalInst(di); else execSrai(di);
-  return;
-
- c_srai64:
-  illegalInst(di); // Only valid in rv128 which is not supported.
-  return;
-
- c_andi:
-  if (not isRvc()) illegalInst(di); else execAndi(di);
-  return;
-
- c_sub:
-  if (not isRvc()) illegalInst(di); else execSub(di);
-  return;
-
- c_xor:
-  if (not isRvc()) illegalInst(di); else execXor(di);
-  return;
-
- c_or:
-  if (not isRvc()) illegalInst(di); else execOr(di);
-  return;
-
- c_and:
-  if (not isRvc()) illegalInst(di); else execAnd(di);
-  return;
-
- c_subw:
-  if (not isRvc()) illegalInst(di); else execSubw(di);
-  return;
-
- c_addw:
-  if (not isRvc()) illegalInst(di); else execAddw(di);
-  return;
-
- c_j:
-  if (not isRvc()) illegalInst(di); else execJal(di);
-  return;
-
- c_beqz:
-  if (not isRvc()) illegalInst(di); else execBeq(di);
-  return;
-
- c_bnez:
-  if (not isRvc()) illegalInst(di); else execBne(di);
-  return;
-
- c_slli:
-  if (not isRvc()) illegalInst(di); else execSlli(di);
-  return;
-
- c_slli64:
-  if (not isRvc()) illegalInst(di); else execSlli(di);
-  return;
-
- c_fldsp:
-  if (not isRvc()) illegalInst(di); else execFld(di);
-  return;
-
- c_lwsp:
-  if (not isRvc()) illegalInst(di); else execLw(di);
-  return;
-
- c_flwsp:
-  if (not isRvc()) illegalInst(di); else execFlw(di);
-  return;
-
- c_ldsp:
-  if (not isRvc()) illegalInst(di); else execLd(di);
-  return;
-
- c_jr:
-  if (not isRvc()) illegalInst(di); else execJalr(di);
-  return;
-
- c_mv:
-  if (not isRvc()) illegalInst(di); else execAdd(di);
-  return;
-
- c_ebreak:
-  if (not isRvc()) illegalInst(di); else execEbreak(di);
-  return;
-
- c_jalr:
-  if (not isRvc()) illegalInst(di); else execJalr(di);
-  return;
-
- c_add:
-  if (not isRvc()) illegalInst(di); else execAdd(di);
-  return;
-
- c_fsdsp:
-  if (not isRvc()) illegalInst(di); else execFsd(di);
-  return;
-
- c_swsp:
-  if (not isRvc()) illegalInst(di); else execSw(di);
-  return;
-
- c_fswsp:
-  if (not isRvc()) illegalInst(di); else execFsw(di);
-  return;
-
- c_addiw:
-  if (not isRvc()) illegalInst(di); else execAddiw(di);
-  return;
-
- c_sdsp:
-  if (not isRvc()) illegalInst(di); else execSd(di);
-  return;
-
- clz:
-  execClz(di);
-  return;
-
- ctz:
-  execCtz(di);
-  return;
-
- cpop:
-  execCpop(di);
-  return;
-
- clzw:
-  execClzw(di);
-  return;
-
- ctzw:
-  execCtzw(di);
-  return;
-
- cpopw:
-  execCpopw(di);
-  return;
-
- min:
-  execMin(di);
-  return;
-
- max:
-  execMax(di);
-  return;
-
- minu:
-  execMinu(di);
-  return;
-
- maxu:
-  execMaxu(di);
-  return;
-
- sext_b:
-  execSext_b(di);
-  return;
-
- sext_h:
-  execSext_h(di);
-  return;
-
- andn:
-  execAndn(di);
-  return;
-
- orc_b:
-  execOrc_b(di);
-  return;
-
- orn:
-  execOrn(di);
-  return;
-
- xnor:
-  execXnor(di);
-  return;
-
- rol:
-  execRol(di);
-  return;
-
- ror:
-  execRor(di);
-  return;
-
- rori:
-  execRori(di);
-  return;
-
- rolw:
-  execRolw(di);
-  return;
-
- rorw:
-  execRorw(di);
-  return;
-
- roriw:
-  execRoriw(di);
-  return;
-
- rev8:
-  execRev8(di);
-  return;
-
- pack:
-  execPack(di);
-  return;
-
- packh:
-  execPackh(di);
-  return;
-
- packu:
-  execPacku(di);
-  return;
-
- packw:
-  execPackw(di);
-  return;
-
- packuw:
-  execPackuw(di);
-  return;
-
- grev:
-  execGrev(di);
-  return;
-
- grevi:
-  execGrevi(di);
-  return;
-
- grevw:
-  execGrevw(di);
-  return;
-
- greviw:
-  execGreviw(di);
-  return;
-
- gorc:
-  execGorc(di);
-  return;
-
- gorci:
-  execGorci(di);
-  return;
-
- gorcw:
-  execGorcw(di);
-  return;
-
- gorciw:
-  execGorciw(di);
-  return;
-
- shfl:
-  execShfl(di);
-  return;
-
- shflw:
-  execShflw(di);
-  return;
-
- shfli:
-  execShfli(di);
-  return;
-
- unshfl:
-  execUnshfl(di);
-  return;
-
- unshfli:
-  execUnshfli(di);
-  return;
-
- unshflw:
-  execUnshflw(di);
-  return;
-
- xperm_n:
-  execXperm_n(di);
-  return;
-
- xperm_b:
-  execXperm_b(di);
-  return;
-
- xperm_h:
-  execXperm_h(di);
-  return;
-
- xperm_w:
-  execXperm_w(di);
-  return;
-
- bset:
-  execBset(di);
-  return;
-
- bclr:
-  execBclr(di);
-  return;
-
- binv:
-  execBinv(di);
-  return;
-
- bext:
-  execBext(di);
-  return;
-
- bseti:
-  execBseti(di);
-  return;
-
- bclri:
-  execBclri(di);
-  return;
-
- binvi:
-  execBinvi(di);
-  return;
-
- bexti:
-  execBexti(di);
-  return;
-
- bcompress:
-  execBcompress(di);
-  return;
-
- bdecompress:
-  execBdecompress(di);
-  return;
-
- bcompressw:
-  execBcompressw(di);
-  return;
-
- bdecompressw:
-  execBdecompressw(di);
-  return;
-
- bfp:
-  execBfp(di);
-  return;
-
- bfpw:
-  execBfpw(di);
-  return;
-
- clmul:
-  execClmul(di);
-  return;
-
- clmulh:
-  execClmulh(di);
-  return;
-
- clmulr:
-  execClmulr(di);
-  return;
-
- sh1add:
-  execSh1add(di);
-  return;
-
- sh2add:
-  execSh2add(di);
-  return;
-
- sh3add:
-  execSh3add(di);
-  return;
-
- sh1add_uw:
-  execSh1add_uw(di);
-  return;
-
- sh2add_uw:
-  execSh2add_uw(di);
-  return;
-
- sh3add_uw:
-  execSh3add_uw(di);
-  return;
-
- add_uw:
-  execAdd_uw(di);
-  return;
-
- slli_uw:
-  execSlli_uw(di);
-  return;
-
- crc32_b:
-  execCrc32_b(di);
-  return;
-
- crc32_h:
-  execCrc32_h(di);
-  return;
-
- crc32_w:
-  execCrc32_w(di);
-  return;
-
- crc32_d:
-  execCrc32_d(di);
-  return;
-
- crc32c_b:
-  execCrc32c_b(di);
-  return;
-
- crc32c_h:
-  execCrc32c_h(di);
-  return;
-
- crc32c_w:
-  execCrc32c_w(di);
-  return;
-
- crc32c_d:
-  execCrc32c_d(di);
-  return;
-
- bmator:
-  execBmator(di);
-  return;
-
- bmatxor:
-  execBmatxor(di);
-  return;
-
- bmatflip:
-  execBmatflip(di);
-  return;
-
- cmov:
-  execCmov(di);
-  return;
-
- cmix:
-  execCmix(di);
-  return;
-
- fsl:
-  execFsl(di);
-  return;
-
- fsr:
-  execFsr(di);
-  return;
-
- fsri:
-  execFsri(di);
-  return;
-
- fslw:
-  execFslw(di);
-  return;
-
- fsrw:
-  execFsrw(di);
-  return;
-
- fsriw:
-  execFsriw(di);
-  return;
-
- vsetvli:
-  execVsetvli(di);
-  return;
-
- vsetivli:
-  execVsetivli(di);
-  return;
-
- vsetvl:
-  execVsetvl(di);
-  return;
-
- vadd_vv:
-  execVadd_vv(di);
-  return;
-
- vadd_vx:
-  execVadd_vx(di);
-  return;
-
- vadd_vi:
-  execVadd_vi(di);
-  return;
-
- vsub_vv:
-  execVsub_vv(di);
-  return;
-
- vsub_vx:
-  execVsub_vx(di);
-  return;
-
- vrsub_vx:
-  execVrsub_vx(di);
-  return;
-
- vrsub_vi:
-  execVrsub_vi(di);
-  return;
-
- vwaddu_vv:
-  execVwaddu_vv(di);
-  return;
-
- vwaddu_vx:
-  execVwaddu_vx(di);
-  return;
-
- vwsubu_vv:
-  execVwsubu_vv(di);
-  return;
-
- vwsubu_vx:
-  execVwsubu_vx(di);
-  return;
-
- vwadd_vv:
-  execVwadd_vv(di);
-  return;
-
- vwadd_vx:
-  execVwadd_vx(di);
-  return;
-
- vwsub_vv:
-  execVwsub_vv(di);
-  return;
-
- vwsub_vx:
-  execVwsub_vx(di);
-  return;
-
- vwaddu_wv:
-  execVwaddu_wv(di);
-  return;
-
- vwaddu_wx:
-  execVwaddu_wx(di);
-  return;
-
- vwsubu_wv:
-  execVwsubu_wv(di);
-  return;
-
- vwsubu_wx:
-  execVwsubu_wx(di);
-  return;
-
- vwadd_wv:
-  execVwadd_wv(di);
-  return;
-
- vwadd_wx:
-  execVwadd_wx(di);
-  return;
-
- vwsub_wv:
-  execVwsub_wv(di);
-  return;
-
- vwsub_wx:
-  execVwsub_wx(di);
-  return;
-
- vmseq_vv:
-  execVmseq_vv(di);
-  return;
-
- vmseq_vx:
-  execVmseq_vx(di);
-  return;
-
- vmseq_vi:
-  execVmseq_vi(di);
-  return;
-
- vmsne_vv:
-  execVmsne_vv(di);
-  return;
-
- vmsne_vx:
-  execVmsne_vx(di);
-  return;
-
- vmsne_vi:
-  execVmsne_vi(di);
-  return;
-
- vmsltu_vv:
-  execVmsltu_vv(di);
-  return;
-
- vmsltu_vx:
-  execVmsltu_vx(di);
-  return;
-
- vmslt_vv:
-  execVmslt_vv(di);
-  return;
-
- vmslt_vx:
-  execVmslt_vx(di);
-  return;
-
- vmsleu_vv:
-  execVmsleu_vv(di);
-  return;
-
- vmsleu_vx:
-  execVmsleu_vx(di);
-  return;
-
- vmsleu_vi:
-  execVmsleu_vi(di);
-  return;
-
- vmsle_vv:
-  execVmsle_vv(di);
-  return;
-
- vmsle_vx:
-  execVmsle_vx(di);
-  return;
-
- vmsle_vi:
-  execVmsle_vi(di);
-  return;
-
- vmsgtu_vx:
-  execVmsgtu_vx(di);
-  return;
-
- vmsgtu_vi:
-  execVmsgtu_vi(di);
-  return;
-
- vmsgt_vx:
-  execVmsgt_vx(di);
-  return;
-
- vmsgt_vi:
-  execVmsgt_vi(di);
-  return;
-
- vminu_vv:
-  execVminu_vv(di);
-  return;
-
- vminu_vx:
-  execVminu_vx(di);
-  return;
-
- vmin_vv:
-  execVmin_vv(di);
-  return;
-
- vmin_vx:
-  execVmin_vx(di);
-  return;
-
- vmaxu_vv:
-  execVmaxu_vv(di);
-  return;
-
- vmaxu_vx:
-  execVmaxu_vx(di);
-  return;
-
- vmax_vv:
-  execVmax_vv(di);
-  return;
-
- vmax_vx:
-  execVmax_vx(di);
-  return;
-
- vand_vv:
-  execVand_vv(di);
-  return;
-
- vand_vx:
-  execVand_vx(di);
-  return;
-
- vand_vi:
-  execVand_vi(di);
-  return;
-
- vor_vv:
-  execVor_vv(di);
-  return;
-
- vor_vx:
-  execVor_vx(di);
-  return;
-
- vor_vi:
-  execVor_vi(di);
-  return;
-
- vxor_vv:
-  execVxor_vv(di);
-  return;
-
- vxor_vx:
-  execVxor_vx(di);
-  return;
-
- vxor_vi:
-  execVxor_vi(di);
-  return;
-
- vsll_vv:
-  execVsll_vv(di);
-  return;
-
- vsll_vx:
-  execVsll_vx(di);
-  return;
-
- vsll_vi:
-  execVsll_vi(di);
-  return;
-
- vsrl_vv:
-  execVsrl_vv(di);
-  return;
-
- vsrl_vx:
-  execVsrl_vx(di);
-  return;
-
- vsrl_vi:
-  execVsrl_vi(di);
-  return;
-
- vsra_vv:
-  execVsra_vv(di);
-  return;
-
- vsra_vx:
-  execVsra_vx(di);
-  return;
-
- vsra_vi:
-  execVsra_vi(di);
-  return;
-
- vnsrl_wv:
-  execVnsrl_wv(di);
-  return;
-
- vnsrl_wx:
-  execVnsrl_wx(di);
-  return;
-
- vnsrl_wi:
-  execVnsrl_wi(di);
-  return;
-
- vnsra_wv:
-  execVnsra_wv(di);
-  return;
-
- vnsra_wx:
-  execVnsra_wx(di);
-  return;
-
- vnsra_wi:
-  execVnsra_wi(di);
-  return;
-
- vrgather_vv:
-  execVrgather_vv(di);
-  return;
-
- vrgather_vx:
-  execVrgather_vx(di);
-  return;
-
- vrgather_vi:
-  execVrgather_vi(di);
-  return;
-
- vrgatherei16_vv:
-  execVrgatherei16_vv(di);
-  return;
-
- vcompress_vm:
-  execVcompress_vm(di);
-  return;
-
- vredsum_vs:
-  execVredsum_vs(di);
-  return;
-
- vredand_vs:
-  execVredand_vs(di);
-  return;
-
- vredor_vs:
-  execVredor_vs(di);
-  return;
-
- vredxor_vs:
-  execVredxor_vs(di);
-  return;
-
- vredminu_vs:
-  execVredminu_vs(di);
-  return;
-
- vredmin_vs:
-  execVredmin_vs(di);
-  return;
-
- vredmaxu_vs:
-  execVredmaxu_vs(di);
-  return;
-
- vredmax_vs:
-  execVredmax_vs(di);
-  return;
-
- vwredsumu_vs:
-  execVwredsumu_vs(di);
-  return;
-
- vwredsum_vs:
-  execVwredsum_vs(di);
-  return;
-
- vmand_mm:
-  execVmand_mm(di);
-  return;
-
- vmnand_mm:
-  execVmnand_mm(di);
-  return;
-
- vmandnot_mm:
-  execVmandnot_mm(di);
-  return;
-
- vmxor_mm:
-  execVmxor_mm(di);
-  return;
-
- vmor_mm:
-  execVmor_mm(di);
-  return;
-
- vmnor_mm:
-  execVmnor_mm(di);
-  return;
-
- vmornot_mm:
-  execVmornot_mm(di);
-  return;
-
- vmxnor_mm:
-  execVmxnor_mm(di);
-  return;
-
- vcpop_m:
-  execVcpop_m(di);
-  return;
-
- vfirst_m:
-  execVfirst_m(di);
-  return;
-
- vmsbf_m:
-  execVmsbf_m(di);
-  return;
-
- vmsif_m:
-  execVmsif_m(di);
-  return;
-
- vmsof_m:
-  execVmsof_m(di);
-  return;
-
- viota_m:
-  execViota_m(di);
-  return;
-
- vid_v:
-  execVid_v(di);
-  return;
-
- vslideup_vx:
-  execVslideup_vx(di);
-  return;
-
- vslideup_vi:
-  execVslideup_vi(di);
-  return;
-
- vslide1up_vx:
-  execVslide1up_vx(di);
-  return;
-
- vslidedown_vx:
-  execVslidedown_vx(di);
-  return;
-
- vslidedown_vi:
-  execVslidedown_vi(di);
-  return;
-
- vslide1down_vx:
-  execVslide1down_vx(di);
-  return;
-
- vfslide1up_vf:
-  execVfslide1up_vf(di);
-  return;
-
- vfslide1down_vf:
-  execVfslide1down_vf(di);
-  return;
-
- vmul_vv:
-  execVmul_vv(di);
-  return;
-
- vmul_vx:
-  execVmul_vx(di);
-  return;
-
- vmulh_vv:
-  execVmulh_vv(di);
-  return;
-
- vmulh_vx:
-  execVmulh_vx(di);
-  return;
-
- vmulhu_vv:
-  execVmulhu_vv(di);
-  return;
-
- vmulhu_vx:
-  execVmulhu_vx(di);
-  return;
-
- vmulhsu_vv:
-  execVmulhsu_vv(di);
-  return;
-
- vmulhsu_vx:
-  execVmulhsu_vx(di);
-  return;
-
- vmadd_vv:
-  execVmadd_vv(di);
-  return;
-
- vmadd_vx:
-  execVmadd_vx(di);
-  return;
-
- vnmsub_vv:
-  execVnmsub_vv(di);
-  return;
-
- vnmsub_vx:
-  execVnmsub_vx(di);
-  return;
-
- vmacc_vv:
-  execVmacc_vv(di);
-  return;
-
- vmacc_vx:
-  execVmacc_vx(di);
-  return;
-
- vnmsac_vv:
-  execVnmsac_vv(di);
-  return;
-
- vnmsac_vx:
-  execVnmsac_vx(di);
-  return;
-
- vwmulu_vv:
-  execVwmulu_vv(di);
-  return;
-
- vwmulu_vx:
-  execVwmulu_vx(di);
-  return;
-
- vwmul_vv:
-  execVwmul_vv(di);
-  return;
-
- vwmul_vx:
-  execVwmul_vx(di);
-  return;
-
- vwmulsu_vv:
-  execVwmulsu_vv(di);
-  return;
-
- vwmulsu_vx:
-  execVwmulsu_vx(di);
-  return;
-
- vwmaccu_vv:
-  execVwmaccu_vv(di);
-  return;
-
- vwmaccu_vx:
-  execVwmaccu_vx(di);
-  return;
-
- vwmacc_vv:
-  execVwmacc_vv(di);
-  return;
-
- vwmacc_vx:
-  execVwmacc_vx(di);
-  return;
-
- vwmaccsu_vv:
-  execVwmaccsu_vv(di);
-  return;
-
- vwmaccsu_vx:
-  execVwmaccsu_vx(di);
-  return;
-
- vwmaccus_vx:
-  execVwmaccus_vx(di);
-  return;
-
- vdivu_vv:
-  execVdivu_vv(di);
-  return;
-
- vdivu_vx:
-  execVdivu_vx(di);
-  return;
-
- vdiv_vv:
-  execVdiv_vv(di);
-  return;
-
- vdiv_vx:
-  execVdiv_vx(di);
-  return;
-
- vremu_vv:
-  execVremu_vv(di);
-  return;
-
- vremu_vx:
-  execVremu_vx(di);
-  return;
-
- vrem_vv:
-  execVrem_vv(di);
-  return;
-
- vrem_vx:
-  execVrem_vx(di);
-  return;
-
- vsext_vf2:
-  execVsext_vf2(di);
-  return;
-
- vsext_vf4:
-  execVsext_vf4(di);
-  return;
-
- vsext_vf8:
-  execVsext_vf8(di);
-  return;
-
- vzext_vf2:
-  execVzext_vf2(di);
-  return;
-
- vzext_vf4:
-  execVzext_vf4(di);
-  return;
-
- vzext_vf8:
-  execVzext_vf8(di);
-  return;
-
- vadc_vvm:
-  execVadc_vvm(di);
-  return;
-
- vadc_vxm:
-  execVadc_vxm(di);
-  return;
-
- vadc_vim:
-  execVadc_vim(di);
-  return;
-
- vsbc_vvm:
-  execVsbc_vvm(di);
-  return;
-
- vsbc_vxm:
-  execVsbc_vxm(di);
-  return;
-
- vmadc_vvm:
-  execVmadc_vvm(di);
-  return;
-
- vmadc_vxm:
-  execVmadc_vxm(di);
-  return;
-
- vmadc_vim:
-  execVmadc_vim(di);
-  return;
-
- vmsbc_vvm:
-  execVmsbc_vvm(di);
-  return;
-
- vmsbc_vxm:
-  execVmsbc_vxm(di);
-  return;
-
- vmerge_vvm:
-  execVmerge_vvm(di);
-  return;
-
- vmerge_vxm:
-  execVmerge_vxm(di);
-  return;
-
- vmerge_vim:
-  execVmerge_vim(di);
-  return;
-
- vmv_x_s:
-  execVmv_x_s(di);
-  return;
-
- vmv_s_x:
-  execVmv_s_x(di);
-  return;
-
- vfmv_f_s:
-  execVfmv_f_s(di);
-  return;
-
- vfmv_s_f:
-  execVfmv_s_f(di);
-  return;
-
- vmv_v_v:
-  execVmv_v_v(di);
-  return;
-
- vmv_v_x:
-  execVmv_v_x(di);
-  return;
-
- vmv_v_i:
-  execVmv_v_i(di);
-  return;
-
- vmv1r_v:
-  execVmv1r_v(di);
-  return;
-
- vmv2r_v:
-  execVmv2r_v(di);
-  return;
-
- vmv4r_v:
-  execVmv4r_v(di);
-  return;
-
- vmv8r_v:
-  execVmv8r_v(di);
-  return;
-
- vsaddu_vv:
-  execVsaddu_vv(di);
-  return;
-
- vsaddu_vx:
-  execVsaddu_vx(di);
-  return;
-
- vsaddu_vi:
-  execVsaddu_vi(di);
-  return;
-
- vsadd_vv:
-  execVsadd_vv(di);
-  return;
-
- vsadd_vx:
-  execVsadd_vx(di);
-  return;
-
- vsadd_vi:
-  execVsadd_vi(di);
-  return;
-
- vssubu_vv:
-  execVssubu_vv(di);
-  return;
-
- vssubu_vx:
-  execVssubu_vx(di);
-  return;
-
- vssub_vv:
-  execVssub_vv(di);
-  return;
-
- vssub_vx:
-  execVssub_vx(di);
-  return;
-
- vaaddu_vv:
-  execVaaddu_vv(di);
-  return;
-
- vaaddu_vx:
-  execVaaddu_vx(di);
-  return;
-
- vaadd_vv:
-  execVaadd_vv(di);
-  return;
-
- vaadd_vx:
-  execVaadd_vx(di);
-  return;
-
- vasubu_vv:
-  execVasubu_vv(di);
-  return;
-
- vasubu_vx:
-  execVasubu_vx(di);
-  return;
-
- vasub_vv:
-  execVasub_vv(di);
-  return;
-
- vasub_vx:
-  execVasub_vx(di);
-  return;
-
- vsmul_vv:
-  execVsmul_vv(di);
-  return;
-
- vsmul_vx:
-  execVsmul_vx(di);
-  return;
-
- vssrl_vv:
-  execVssrl_vv(di);
-  return;
-
- vssrl_vx:
-  execVssrl_vx(di);
-  return;
-
- vssrl_vi:
-  execVssrl_vi(di);
-  return;
-
- vssra_vv:
-  execVssra_vv(di);
-  return;
-
- vssra_vx:
-  execVssra_vx(di);
-  return;
-
- vssra_vi:
-  execVssra_vi(di);
-  return;
-
- vnclipu_wv:
-  execVnclipu_wv(di);
-  return;
-
- vnclipu_wx:
-  execVnclipu_wx(di);
-  return;
-
- vnclipu_wi:
-  execVnclipu_wi(di);
-  return;
-
- vnclip_wv:
-  execVnclip_wv(di);
-  return;
-
- vnclip_wx:
-  execVnclip_wx(di);
-  return;
-
- vnclip_wi:
-  execVnclip_wi(di);
-  return;
-
- vle8_v:
-  execVle8_v(di);
-  return;
-
- vle16_v:
-  execVle16_v(di);
-  return;
-
- vle32_v:
-  execVle32_v(di);
-  return;
-
- vle64_v:
-  execVle64_v(di);
-  return;
-
- vle128_v:
-  execVle128_v(di);
-  return;
-
- vle256_v:
-  execVle256_v(di);
-  return;
-
- vle512_v:
-  execVle512_v(di);
-  return;
-
- vle1024_v:
-  execVle1024_v(di);
-  return;
-
- vse8_v:
-  execVse8_v(di);
-  return;
-
- vse16_v:
-  execVse16_v(di);
-  return;
-
- vse32_v:
-  execVse32_v(di);
-  return;
-
- vse64_v:
-  execVse64_v(di);
-  return;
-
- vse128_v:
-  execVse128_v(di);
-  return;
-
- vse256_v:
-  execVse256_v(di);
-  return;
-
- vse512_v:
-  execVse512_v(di);
-  return;
-
- vse1024_v:
-  execVse1024_v(di);
-  return;
-
- vlm_v:
-  execVlm_v(di);
-  return;
-
- vsm_v:
-  execVsm_v(di);
-  return;
-
- vlre8_v:
-  execVlre8_v(di);
-  return;
-
- vlre16_v:
-  execVlre16_v(di);
-  return;
-
- vlre32_v:
-  execVlre32_v(di);
-  return;
-
- vlre64_v:
-  execVlre64_v(di);
-  return;
-
- vlre128_v:
-  execVlre128_v(di);
-  return;
-
- vlre256_v:
-  execVlre256_v(di);
-  return;
-
- vlre512_v:
-  execVlre512_v(di);
-  return;
-
- vlre1024_v:
-  execVlre1024_v(di);
-  return;
-
- vs1r_v:
-  execVs1r_v(di);
-  return;
-
- vs2r_v:
-  execVs2r_v(di);
-  return;
-
- vs4r_v:
-  execVs4r_v(di);
-  return;
-
- vs8r_v:
-  execVs8r_v(di);
-  return;
-
- vle8ff_v:
-  execVle8ff_v(di);
-  return;
-
- vle16ff_v:
-  execVle16ff_v(di);
-  return;
-
- vle32ff_v:
-  execVle32ff_v(di);
-  return;
-
- vle64ff_v:
-  execVle64ff_v(di);
-  return;
-
- vle128ff_v:
-  execVle128ff_v(di);
-  return;
-
- vle256ff_v:
-  execVle256ff_v(di);
-  return;
-
- vle512ff_v:
-  execVle512ff_v(di);
-  return;
-
- vle1024ff_v:
-  execVle1024ff_v(di);
-  return;
-
- vlse8_v:
-  execVlse8_v(di);
-  return;
-
- vlse16_v:
-  execVlse16_v(di);
-  return;
-
- vlse32_v:
-  execVlse32_v(di);
-  return;
-
- vlse64_v:
-  execVlse64_v(di);
-  return;
-
- vlse128_v:
-  execVlse128_v(di);
-  return;
-
- vlse256_v:
-  execVlse256_v(di);
-  return;
-
- vlse512_v:
-  execVlse512_v(di);
-  return;
-
- vlse1024_v:
-  execVlse1024_v(di);
-  return;
-
- vsse8_v:
-  execVsse8_v(di);
-  return;
-
- vsse16_v:
-  execVsse16_v(di);
-  return;
-
- vsse32_v:
-  execVsse32_v(di);
-  return;
-
- vsse64_v:
-  execVsse64_v(di);
-  return;
-
- vsse128_v:
-  execVsse128_v(di);
-  return;
-
- vsse256_v:
-  execVsse256_v(di);
-  return;
-
- vsse512_v:
-  execVsse512_v(di);
-  return;
-
- vsse1024_v:
-  execVsse1024_v(di);
-  return;
-
- vloxei8_v:
-  execVloxei8_v(di);
-  return;
-
- vloxei16_v:
-  execVloxei16_v(di);
-  return;
-
- vloxei32_v:
-  execVloxei32_v(di);
-  return;
-
- vloxei64_v:
-  execVloxei64_v(di);
-  return;
-
- vluxei8_v:
-  execVluxei8_v(di);
-  return;
-
- vluxei16_v:
-  execVluxei16_v(di);
-  return;
-
- vluxei32_v:
-  execVluxei32_v(di);
-  return;
-
- vluxei64_v:
-  execVluxei64_v(di);
-  return;
-
- vsoxei8_v:
-  execVsoxei8_v(di);
-  return;
-
- vsoxei16_v:
-  execVsoxei16_v(di);
-  return;
-
- vsoxei32_v:
-  execVsoxei32_v(di);
-  return;
-
- vsoxei64_v:
-  execVsoxei64_v(di);
-  return;
-
- vsuxei8_v:
-  execVsuxei8_v(di);
-  return;
-
- vsuxei16_v:
-  execVsuxei16_v(di);
-  return;
-
- vsuxei32_v:
-  execVsuxei32_v(di);
-  return;
-
- vsuxei64_v:
-  execVsuxei64_v(di);
-  return;
-
- vlsege8_v:
-  execVlsege8_v(di);
-  return;
-
- vlsege16_v:
-  execVlsege16_v(di);
-  return;
-
- vlsege32_v:
-  execVlsege32_v(di);
-  return;
-
- vlsege64_v:
-  execVlsege64_v(di);
-  return;
-
- vlsege128_v:
-  execVlsege128_v(di);
-  return;
-
- vlsege256_v:
-  execVlsege256_v(di);
-  return;
-
- vlsege512_v:
-  execVlsege512_v(di);
-  return;
-
- vlsege1024_v:
-  execVlsege1024_v(di);
-  return;
-
- vssege8_v:
-  execVssege8_v(di);
-  return;
-
- vssege16_v:
-  execVssege16_v(di);
-  return;
-
- vssege32_v:
-  execVssege32_v(di);
-  return;
-
- vssege64_v:
-  execVssege64_v(di);
-  return;
-
- vssege128_v:
-  execVssege128_v(di);
-  return;
-
- vssege256_v:
-  execVssege256_v(di);
-  return;
-
- vssege512_v:
-  execVssege512_v(di);
-  return;
-
- vssege1024_v:
-  execVssege1024_v(di);
-  return;
-
- vlssege8_v:
-  execVlssege8_v(di);
-  return;
-
- vlssege16_v:
-  execVlssege16_v(di);
-  return;
-
- vlssege32_v:
-  execVlssege32_v(di);
-  return;
-
- vlssege64_v:
-  execVlssege64_v(di);
-  return;
-
- vlssege128_v:
-  execVlssege128_v(di);
-  return;
-
- vlssege256_v:
-  execVlssege256_v(di);
-  return;
-
- vlssege512_v:
-  execVlssege512_v(di);
-  return;
-
- vlssege1024_v:
-  execVlssege1024_v(di);
-  return;
-
- vsssege8_v:
-  execVsssege8_v(di);
-  return;
-
- vsssege16_v:
-  execVsssege16_v(di);
-  return;
-
- vsssege32_v:
-  execVsssege32_v(di);
-  return;
-
- vsssege64_v:
-  execVsssege64_v(di);
-  return;
-
- vsssege128_v:
-  execVsssege128_v(di);
-  return;
-
- vsssege256_v:
-  execVsssege256_v(di);
-  return;
-
- vsssege512_v:
-  execVsssege512_v(di);
-  return;
-
- vsssege1024_v:
-  execVsssege1024_v(di);
-  return;
-
- vluxsegei8_v:
-  execVluxsegei8_v(di);
-  return;
-
- vluxsegei16_v:
-  execVluxsegei16_v(di);
-  return;
-
- vluxsegei32_v:
-  execVluxsegei32_v(di);
-  return;
-
- vluxsegei64_v:
-  execVluxsegei64_v(di);
-  return;
-
- vluxsegei128_v:
-  execVluxsegei128_v(di);
-  return;
-
- vluxsegei256_v:
-  execVluxsegei256_v(di);
-  return;
-
- vluxsegei512_v:
-  execVluxsegei512_v(di);
-  return;
-
- vluxsegei1024_v:
-  execVluxsegei1024_v(di);
-  return;
-
- vsuxsegei8_v:
-  execVsuxsegei8_v(di);
-  return;
-
- vsuxsegei16_v:
-  execVsuxsegei16_v(di);
-  return;
-
- vsuxsegei32_v:
-  execVsuxsegei32_v(di);
-  return;
-
- vsuxsegei64_v:
-  execVsuxsegei64_v(di);
-  return;
-
- vsuxsegei128_v:
-  execVsuxsegei128_v(di);
-  return;
-
- vsuxsegei256_v:
-  execVsuxsegei256_v(di);
-  return;
-
- vsuxsegei512_v:
-  execVsuxsegei512_v(di);
-  return;
-
- vsuxsegei1024_v:
-  execVsuxsegei1024_v(di);
-  return;
-
- vloxsegei8_v:
-  execVloxsegei8_v(di);
-  return;
-
- vloxsegei16_v:
-  execVloxsegei16_v(di);
-  return;
-
- vloxsegei32_v:
-  execVloxsegei32_v(di);
-  return;
-
- vloxsegei64_v:
-  execVloxsegei64_v(di);
-  return;
-
- vloxsegei128_v:
-  execVloxsegei128_v(di);
-  return;
-
- vloxsegei256_v:
-  execVloxsegei256_v(di);
-  return;
-
- vloxsegei512_v:
-  execVloxsegei512_v(di);
-  return;
-
- vloxsegei1024_v:
-  execVloxsegei1024_v(di);
-  return;
-
- vsoxsegei8_v:
-  execVsoxsegei8_v(di);
-  return;
-
- vsoxsegei16_v:
-  execVsoxsegei16_v(di);
-  return;
-
- vsoxsegei32_v:
-  execVsoxsegei32_v(di);
-  return;
-
- vsoxsegei64_v:
-  execVsoxsegei64_v(di);
-  return;
-
- vsoxsegei128_v:
-  execVsoxsegei128_v(di);
-  return;
-
- vsoxsegei256_v:
-  execVsoxsegei256_v(di);
-  return;
-
- vsoxsegei512_v:
-  execVsoxsegei512_v(di);
-  return;
-
- vsoxsegei1024_v:
-  execVsoxsegei1024_v(di);
-  return;
-
- vlsege8ff_v:
-  execVlsege8ff_v(di);
-  return;
-
- vlsege16ff_v:
-  execVlsege16ff_v(di);
-  return;
-
- vlsege32ff_v:
-  execVlsege32ff_v(di);
-  return;
-
- vlsege64ff_v:
-  execVlsege64ff_v(di);
-  return;
-
- vlsege128ff_v:
-  execVlsege128ff_v(di);
-  return;
-
- vlsege256ff_v:
-  execVlsege256ff_v(di);
-  return;
-
- vlsege512ff_v:
-  execVlsege512ff_v(di);
-  return;
-
- vlsege1024ff_v:
-  execVlsege1024ff_v(di);
-  return;
-
- vfadd_vv:
-  execVfadd_vv(di);
-  return;
-
- vfadd_vf:
-  execVfadd_vf(di);
-  return;
-
- vfsub_vv:
-  execVfsub_vv(di);
-  return;
-
- vfsub_vf:
-  execVfsub_vf(di);
-  return;
-
- vfrsub_vf:
-  execVfrsub_vf(di);
-  return;
-
- vfwadd_vv:
-  execVfwadd_vv(di);
-  return;
-
- vfwadd_vf:
-  execVfwadd_vf(di);
-  return;
-
- vfwsub_vv:
-  execVfwsub_vv(di);
-  return;
-
- vfwsub_vf:
-  execVfwsub_vf(di);
-  return;
-
- vfwadd_wv:
-  execVfwadd_wv(di);
-  return;
-
- vfwadd_wf:
-  execVfwadd_wf(di);
-  return;
-
- vfwsub_wv:
-  execVfwsub_wv(di);
-  return;
-
- vfwsub_wf:
-  execVfwsub_wf(di);
-  return;
-
- vfmul_vv:
-  execVfmul_vv(di);
-  return;
-
- vfmul_vf:
-  execVfmul_vf(di);
-  return;
-
- vfdiv_vv:
-  execVfdiv_vv(di);
-  return;
-
- vfdiv_vf:
-  execVfdiv_vf(di);
-  return;
-
- vfrdiv_vf:
-  execVfrdiv_vf(di);
-  return;
-
- vfwmul_vv:
-  execVfwmul_vv(di);
-  return;
-
- vfwmul_vf:
-  execVfwmul_vf(di);
-  return;
-
- vfmadd_vv:
-  execVfmadd_vv(di);
-  return;
-
- vfmadd_vf:
-  execVfmadd_vf(di);
-  return;
-
- vfnmadd_vv:
-  execVfnmadd_vv(di);
-  return;
-
- vfnmadd_vf:
-  execVfnmadd_vf(di);
-  return;
-
- vfmsub_vv:
-  execVfmsub_vv(di);
-  return;
-
- vfmsub_vf:
-  execVfmsub_vf(di);
-  return;
-
- vfnmsub_vv:
-  execVfnmsub_vv(di);
-  return;
-
- vfnmsub_vf:
-  execVfnmsub_vf(di);
-  return;
-
- vfmacc_vv:
-  execVfmacc_vv(di);
-  return;
-
- vfmacc_vf:
-  execVfmacc_vf(di);
-  return;
-
- vfnmacc_vv:
-  execVfnmacc_vv(di);
-  return;
-
- vfnmacc_vf:
-  execVfnmacc_vf(di);
-  return;
-
- vfmsac_vv:
-  execVfmsac_vv(di);
-  return;
-
- vfmsac_vf:
-  execVfmsac_vf(di);
-  return;
-
- vfnmsac_vv:
-  execVfnmsac_vv(di);
-  return;
-
- vfnmsac_vf:
-  execVfnmsac_vf(di);
-  return;
-
- vfwmacc_vv:
-  execVfwmacc_vv(di);
-  return;
-
- vfwmacc_vf:
-  execVfwmacc_vf(di);
-  return;
-
- vfwnmacc_vv:
-  execVfwnmacc_vv(di);
-  return;
-
- vfwnmacc_vf:
-  execVfwnmacc_vf(di);
-  return;
-
- vfwmsac_vv:
-  execVfwmsac_vv(di);
-  return;
-
- vfwmsac_vf:
-  execVfwmsac_vf(di);
-  return;
-
- vfwnmsac_vv:
-  execVfwnmsac_vv(di);
-  return;
-
- vfwnmsac_vf:
-  execVfwnmsac_vf(di);
-  return;
-
- vfsqrt_v:
-  execVfsqrt_v(di);
-  return;
-
- vfmerge_vfm:
-  execVfmerge_vfm(di);
-  return;
-
- vfmv_v_f:
-  execVfmv_v_f(di);
-  return;
-
- vmfeq_vv:
-  execVmfeq_vv(di);
-  return;
-
- vmfeq_vf:
-  execVmfeq_vf(di);
-  return;
-
- vmfne_vv:
-  execVmfne_vv(di);
-  return;
-
- vmfne_vf:
-  execVmfne_vf(di);
-  return;
-
- vmflt_vv:
-  execVmflt_vv(di);
-  return;
-
- vmflt_vf:
-  execVmflt_vf(di);
-  return;
-
- vmfle_vv:
-  execVmfle_vv(di);
-  return;
-
- vmfle_vf:
-  execVmfle_vf(di);
-  return;
-
- vmfgt_vf:
-  execVmfgt_vf(di);
-  return;
-
- vmfge_vf:
-  execVmfge_vf(di);
-  return;
-
- vfclass_v:
-  execVfclass_v(di);
-  return;
-
- vfcvt_xu_f_v:
-  execVfcvt_xu_f_v(di);
-  return;
-
- vfcvt_x_f_v:
-  execVfcvt_x_f_v(di);
-  return;
-
- vfcvt_rtz_xu_f_v:
-  execVfcvt_rtz_xu_f_v(di);
-  return;
-
- vfcvt_rtz_x_f_v:
-  execVfcvt_rtz_x_f_v(di);
-  return;
-
- vfcvt_f_xu_v:
-  execVfcvt_f_xu_v(di);
-  return;
-
- vfcvt_f_x_v:
-  execVfcvt_f_x_v(di);
-  return;
-
- vfwcvt_xu_f_v:
-  execVfwcvt_xu_f_v(di);
-  return;
-
- vfwcvt_x_f_v:
-  execVfwcvt_x_f_v(di);
-  return;
-
- vfwcvt_rtz_xu_f_v:
-  execVfwcvt_rtz_xu_f_v(di);
-  return;
-
- vfwcvt_rtz_x_f_v:
-  execVfwcvt_rtz_x_f_v(di);
-  return;
-
- vfwcvt_f_xu_v:
-  execVfwcvt_f_xu_v(di);
-  return;
-
- vfwcvt_f_x_v:
-  execVfwcvt_f_x_v(di);
-  return;
-
- vfwcvt_f_f_v:
-  execVfwcvt_f_f_v(di);
-  return;
-
- vfncvt_xu_f_w:
-  execVfncvt_xu_f_w(di);
-  return;
-
- vfncvt_x_f_w:
-  execVfncvt_x_f_w(di);
-  return;
-
- vfncvt_rtz_xu_f_w:
-  execVfncvt_rtz_xu_f_w(di);
-  return;
-
- vfncvt_rtz_x_f_w:
-  execVfncvt_rtz_x_f_w(di);
-  return;
-
- vfncvt_f_xu_w:
-  execVfncvt_f_xu_w(di);
-  return;
-
- vfncvt_f_x_w:
-  execVfncvt_f_x_w(di);
-  return;
-
- vfncvt_f_f_w:
-  execVfncvt_f_f_w(di);
-  return;
-
- vfncvt_rod_f_f_w:
-  execVfncvt_rod_f_f_w(di);
-  return;
-
- vfredsum_vs:
-  execVfredsum_vs(di);
-  return;
-
- vfredosum_vs:
-  execVfredosum_vs(di);
-  return;
-
- vfredmin_vs:
-  execVfredmin_vs(di);
-  return;
-
- vfredmax_vs:
-  execVfredmax_vs(di);
-  return;
-
- vfwredsum_vs:
-  execVfwredsum_vs(di);
-  return;
-
- vfwredosum_vs:
-  execVfwredosum_vs(di);
-  return;
-
- vfrsqrt7_v:
-  execVfrsqrt7_v(di);
-  return;
-
- vfrec7_v:
-  execVfrec7_v(di);
-  return;
-
- vfmin_vv:
-  execVfmin_vv(di);
-  return;
-
- vfmin_vf:
-  execVfmin_vf(di);
-  return;
-
- vfmax_vv:
-  execVfmax_vv(di);
-  return;
-
- vfmax_vf:
-  execVfmax_vf(di);
-  return;
-
- vfsgnj_vv:
-  execVfsgnj_vv(di);
-  return;
-
- vfsgnj_vf:
-  execVfsgnj_vf(di);
-  return;
-
- vfsgnjn_vv:
-  execVfsgnjn_vv(di);
-  return;
-
- vfsgnjn_vf:
-  execVfsgnjn_vf(di);
-  return;
-
- vfsgnjx_vv:
-  execVfsgnjx_vv(di);
-  return;
-
- vfsgnjx_vf:
-  execVfsgnjx_vf(di);
-  return;
-
- aes32dsi:
-  execAes32dsi(di);
-  return;
-
- aes32dsmi:
-  execAes32dsmi(di);
-  return;
-
- aes32esi:
-  execAes32esi(di);
-  return;
-
- aes32esmi:
-  execAes32esmi(di);
-  return;
-
- aes64ds:
-  execAes64ds(di);
-  return;
-
- aes64dsm:
-  execAes64dsm(di);
-  return;
-
- aes64es:
-  execAes64es(di);
-  return;
-
- aes64esm:
-  execAes64esm(di);
-  return;
-
- aes64im:
-  execAes64im(di);
-  return;
-
- aes64ks1i:
-  execAes64ks1i(di);
-  return;
-
- aes64ks2:
-  execAes64ks2(di);
-  return;
-
- sha256sig0:
-  execSha256sig0(di);
-  return;
-
- sha256sig1:
-  execSha256sig1(di);
-  return;
-
- sha256sum0:
-  execSha256sum0(di);
-  return;
-
- sha256sum1:
-  execSha256sum1(di);
-  return;
-
- sha512sig0h:
-  execSha512sig0h(di);
-  return;
-
- sha512sig0l:
-  execSha512sig0l(di);
-  return;
-
- sha512sig1h:
-  execSha512sig1h(di);
-  return;
-
- sha512sig1l:
-  execSha512sig1l(di);
-  return;
-
- sha512sum0r:
-  execSha512sum0r(di);
-  return;
-
- sha512sum1r:
-  execSha512sum1r(di);
-  return;
-
- sha512sig0:
-  execSha512sig0(di);
-  return;
-
- sha512sig1:
-  execSha512sig1(di);
-  return;
-
- sha512sum0:
-  execSha512sum0(di);
-  return;
-
- sha512sum1:
-  execSha512sum1(di);
-  return;
-
- sm3p0:
-  execSm3p0(di);
-  return;
-
- sm3p1:
-  execSm3p1(di);
-  return;
-
- sm4ed:
-  execSm4ed(di);
-  return;
-
- sm4ks:
-  execSm4ks(di);
-  return;
-
- sinval_vma:
-  execSinval_vma(di);
-  return;
-
- sfence_w_inval:
-  execSfence_w_inval(di);
-  return;
-
- sfence_inval_ir:
-  execSfence_inval_ir(di);
-  return;
-
- cbo_clean:
-  execCbo_clean(di);
-  return;
-
- cbo_flush:
-  execCbo_flush(di);
-  return;
-
- cbo_inval:
-  execCbo_inval(di);
-  return;
-
- cbo_zero:
-  execCbo_zero(di);
-  return;
-
- wrs_nto:
-  execWrs_nto(di);
-  return;
-
- wrs_sto:
-  execWrs_sto(di);
-  return;
-
- hfence_vvma:
-  execHfence_vvma(di);
-  return;
-
- hfence_gvma:
-  execHfence_gvma(di);
-  return;
-
- hlv_b:
-  execHlv_b(di);
-  return;
-
- hlv_bu:
-  execHlv_bu(di);
-  return;
-
- hlv_h:
-  execHlv_h(di);
-  return;
-
- hlv_hu:
-  execHlv_hu(di);
-  return;
-
- hlv_w:
-  execHlv_w(di);
-  return;
-
- hlvx_hu:
-  execHlvx_hu(di);
-  return;
-
- hlvx_wu:
-  execHlvx_wu(di);
-  return;
-
- hsv_b:
-  execHsv_b(di);
-  return;
-
- hsv_h:
-  execHsv_h(di);
-  return;
-
- hsv_w:
-  execHsv_w(di);
-  return;
-
- hlv_wu:
-  execHlv_wu(di);
-  return;
-
- hlv_d:
-  execHlv_d(di);
-  return;
-
- hsv_d:
-  execHsv_d(di);
-  return;
-
- hinval_vvma:
-  execHinval_vvma(di);
-  return;
-
- hinval_gvma:
-  execHinval_gvma(di);
-  return;
+
+  switch (entry->instId())
+    {
+    case InstId::illegal:
+      illegalInst(di);
+      return;
+
+    case InstId::lui:
+      execLui(di);
+      return;
+
+    case InstId::auipc:
+      execAuipc(di);
+      return;
+
+    case InstId::jal:
+      execJal(di);
+      return;
+
+    case InstId::jalr:
+      execJalr(di);
+      return;
+
+    case InstId::beq:
+      execBeq(di);
+      return;
+
+    case InstId::bne:
+      execBne(di);
+      return;
+
+    case InstId::blt:
+      execBlt(di);
+      return;
+
+    case InstId::bge:
+      execBge(di);
+      return;
+
+    case InstId::bltu:
+      execBltu(di);
+      return;
+
+    case InstId::bgeu:
+      execBgeu(di);
+      return;
+
+    case InstId::lb:
+      execLb(di);
+      return;
+
+    case InstId::lh:
+      execLh(di);
+      return;
+
+    case InstId::lw:
+      execLw(di);
+      return;
+
+    case InstId::lbu:
+      execLbu(di);
+      return;
+
+    case InstId::lhu:
+      execLhu(di);
+      return;
+
+    case InstId::sb:
+      execSb(di);
+      return;
+
+    case InstId::sh:
+      execSh(di);
+      return;
+
+    case InstId::sw:
+      execSw(di);
+      return;
+
+    case InstId::addi:
+      execAddi(di);
+      return;
+
+    case InstId::slti:
+      execSlti(di);
+      return;
+
+    case InstId::sltiu:
+      execSltiu(di);
+      return;
+
+    case InstId::xori:
+      execXori(di);
+      return;
+
+    case InstId::ori:
+      execOri(di);
+      return;
+
+    case InstId::andi:
+      execAndi(di);
+      return;
+
+    case InstId::slli:
+      execSlli(di);
+      return;
+
+    case InstId::srli:
+      execSrli(di);
+      return;
+
+    case InstId::srai:
+      execSrai(di);
+      return;
+
+    case InstId::add:
+      execAdd(di);
+      return;
+
+    case InstId::sub:
+      execSub(di);
+      return;
+
+    case InstId::sll:
+      execSll(di);
+      return;
+
+    case InstId::slt:
+      execSlt(di);
+      return;
+
+    case InstId::sltu:
+      execSltu(di);
+      return;
+
+    case InstId::xor_:
+      execXor(di);
+      return;
+
+    case InstId::srl:
+      execSrl(di);
+      return;
+
+    case InstId::sra:
+      execSra(di);
+      return;
+
+    case InstId::or_:
+      execOr(di);
+      return;
+
+    case InstId::and_:
+      execAnd(di);
+      return;
+
+    case InstId::fence:
+      execFence(di);
+      return;
+
+    case InstId::fence_tso:
+      execFence_tso(di);
+      return;
+
+    case InstId::fence_i:
+      execFencei(di);
+      return;
+
+    case InstId::ecall:
+      execEcall(di);
+      return;
+
+    case InstId::ebreak:
+      execEbreak(di);
+      return;
+
+    case InstId::csrrw:
+      execCsrrw(di);
+      return;
+
+    case InstId::csrrs:
+      execCsrrs(di);
+      return;
+
+    case InstId::csrrc:
+      execCsrrc(di);
+      return;
+
+    case InstId::csrrwi:
+      execCsrrwi(di);
+      return;
+
+    case InstId::csrrsi:
+      execCsrrsi(di);
+      return;
+
+    case InstId::csrrci:
+      execCsrrci(di);
+      return;
+
+    case InstId::lwu:
+      execLwu(di);
+      return;
+
+    case InstId::ld:
+      execLd(di);
+      return;
+
+    case InstId::sd:
+      execSd(di);
+      return;
+
+    case InstId::addiw:
+      execAddiw(di);
+      return;
+
+    case InstId::slliw:
+      execSlliw(di);
+      return;
+
+    case InstId::srliw:
+      execSrliw(di);
+      return;
+
+    case InstId::sraiw:
+      execSraiw(di);
+      return;
+
+    case InstId::addw:
+      execAddw(di);
+      return;
+
+    case InstId::subw:
+      execSubw(di);
+      return;
+
+    case InstId::sllw:
+      execSllw(di);
+      return;
+
+    case InstId::srlw:
+      execSrlw(di);
+      return;
+
+    case InstId::sraw:
+      execSraw(di);
+      return;
+
+    case InstId::mul:
+      execMul(di);
+      return;
+
+    case InstId::mulh:
+      execMulh(di);
+      return;
+
+    case InstId::mulhsu:
+      execMulhsu(di);
+      return;
+
+    case InstId::mulhu:
+      execMulhu(di);
+      return;
+
+    case InstId::div:
+      execDiv(di);
+      return;
+
+    case InstId::divu:
+      execDivu(di);
+      return;
+
+    case InstId::rem:
+      execRem(di);
+      return;
+
+    case InstId::remu:
+      execRemu(di);
+      return;
+
+    case InstId::mulw:
+      execMulw(di);
+      return;
+
+    case InstId::divw:
+      execDivw(di);
+      return;
+
+    case InstId::divuw:
+      execDivuw(di);
+      return;
+
+    case InstId::remw:
+      execRemw(di);
+      return;
+
+    case InstId::remuw:
+      execRemuw(di);
+      return;
+
+    case InstId::lr_w:
+      execLr_w(di);
+      return;
+
+    case InstId::sc_w:
+      execSc_w(di);
+      return;
+
+    case InstId::amoswap_w:
+      execAmoswap_w(di);
+      return;
+
+    case InstId::amoadd_w:
+      execAmoadd_w(di);
+      return;
+
+    case InstId::amoxor_w:
+      execAmoxor_w(di);
+      return;
+
+    case InstId::amoand_w:
+      execAmoand_w(di);
+      return;
+
+    case InstId::amoor_w:
+      execAmoor_w(di);
+      return;
+
+    case InstId::amomin_w:
+      execAmomin_w(di);
+      return;
+
+    case InstId::amomax_w:
+      execAmomax_w(di);
+      return;
+
+    case InstId::amominu_w:
+      execAmominu_w(di);
+      return;
+
+    case InstId::amomaxu_w:
+      execAmomaxu_w(di);
+      return;
+
+    case InstId::lr_d:
+      execLr_d(di);
+      return;
+
+    case InstId::sc_d:
+      execSc_d(di);
+      return;
+
+    case InstId::amoswap_d:
+      execAmoswap_d(di);
+      return;
+
+    case InstId::amoadd_d:
+      execAmoadd_d(di);
+      return;
+
+    case InstId::amoxor_d:
+      execAmoxor_d(di);
+      return;
+
+    case InstId::amoand_d:
+      execAmoand_d(di);
+      return;
+
+    case InstId::amoor_d:
+      execAmoor_d(di);
+      return;
+
+    case InstId::amomin_d:
+      execAmomin_d(di);
+      return;
+
+    case InstId::amomax_d:
+      execAmomax_d(di);
+      return;
+
+    case InstId::amominu_d:
+      execAmominu_d(di);
+      return;
+
+    case InstId::amomaxu_d:
+      execAmomaxu_d(di);
+      return;
+
+    case InstId::flw:
+      execFlw(di);
+      return;
+
+    case InstId::fsw:
+      execFsw(di);
+      return;
+
+    case InstId::fmadd_s:
+      execFmadd_s(di);
+      return;
+
+    case InstId::fmsub_s:
+      execFmsub_s(di);
+      return;
+
+    case InstId::fnmsub_s:
+      execFnmsub_s(di);
+      return;
+
+    case InstId::fnmadd_s:
+      execFnmadd_s(di);
+      return;
+
+    case InstId::fadd_s:
+      execFadd_s(di);
+      return;
+
+    case InstId::fsub_s:
+      execFsub_s(di);
+      return;
+
+    case InstId::fmul_s:
+      execFmul_s(di);
+      return;
+
+    case InstId::fdiv_s:
+      execFdiv_s(di);
+      return;
+
+    case InstId::fsqrt_s:
+      execFsqrt_s(di);
+      return;
+
+    case InstId::fsgnj_s:
+      execFsgnj_s(di);
+      return;
+
+    case InstId::fsgnjn_s:
+      execFsgnjn_s(di);
+      return;
+
+    case InstId::fsgnjx_s:
+      execFsgnjx_s(di);
+      return;
+
+    case InstId::fmin_s:
+      execFmin_s(di);
+      return;
+
+    case InstId::fmax_s:
+      execFmax_s(di);
+      return;
+
+    case InstId::fcvt_w_s:
+      execFcvt_w_s(di);
+      return;
+
+    case InstId::fcvt_wu_s:
+      execFcvt_wu_s(di);
+      return;
+
+    case InstId::fmv_x_w:
+      execFmv_x_w(di);
+      return;
+
+    case InstId::feq_s:
+      execFeq_s(di);
+      return;
+
+    case InstId::flt_s:
+      execFlt_s(di);
+      return;
+
+    case InstId::fle_s:
+      execFle_s(di);
+      return;
+
+    case InstId::fclass_s:
+      execFclass_s(di);
+      return;
+
+    case InstId::fcvt_s_w:
+      execFcvt_s_w(di);
+      return;
+
+    case InstId::fcvt_s_wu:
+      execFcvt_s_wu(di);
+      return;
+
+    case InstId::fmv_w_x:
+      execFmv_w_x(di);
+      return;
+
+    case InstId::fcvt_l_s:
+      execFcvt_l_s(di);
+      return;
+
+    case InstId::fcvt_lu_s:
+      execFcvt_lu_s(di);
+      return;
+
+    case InstId::fcvt_s_l:
+      execFcvt_s_l(di);
+      return;
+
+    case InstId::fcvt_s_lu:
+      execFcvt_s_lu(di);
+      return;
+
+    case InstId::fld:
+      execFld(di);
+      return;
+
+    case InstId::fsd:
+      execFsd(di);
+      return;
+
+    case InstId::fmadd_d:
+      execFmadd_d(di);
+      return;
+
+    case InstId::fmsub_d:
+      execFmsub_d(di);
+      return;
+
+    case InstId::fnmsub_d:
+      execFnmsub_d(di);
+      return;
+
+    case InstId::fnmadd_d:
+      execFnmadd_d(di);
+      return;
+
+    case InstId::fadd_d:
+      execFadd_d(di);
+      return;
+
+    case InstId::fsub_d:
+      execFsub_d(di);
+      return;
+
+    case InstId::fmul_d:
+      execFmul_d(di);
+      return;
+
+    case InstId::fdiv_d:
+      execFdiv_d(di);
+      return;
+
+    case InstId::fsqrt_d:
+      execFsqrt_d(di);
+      return;
+
+    case InstId::fsgnj_d:
+      execFsgnj_d(di);
+      return;
+
+    case InstId::fsgnjn_d:
+      execFsgnjn_d(di);
+      return;
+
+    case InstId::fsgnjx_d:
+      execFsgnjx_d(di);
+      return;
+
+    case InstId::fmin_d:
+      execFmin_d(di);
+      return;
+
+    case InstId::fmax_d:
+      execFmax_d(di);
+      return;
+
+    case InstId::fcvt_s_d:
+      execFcvt_s_d(di);
+      return;
+
+    case InstId::fcvt_d_s:
+      execFcvt_d_s(di);
+      return;
+
+    case InstId::feq_d:
+      execFeq_d(di);
+      return;
+
+    case InstId::flt_d:
+      execFlt_d(di);
+      return;
+
+    case InstId::fle_d:
+      execFle_d(di);
+      return;
+
+    case InstId::fclass_d:
+      execFclass_d(di);
+      return;
+
+    case InstId::fcvt_w_d:
+      execFcvt_w_d(di);
+      return;
+
+    case InstId::fcvt_wu_d:
+      execFcvt_wu_d(di);
+      return;
+
+    case InstId::fcvt_d_w:
+      execFcvt_d_w(di);
+      return;
+
+    case InstId::fcvt_d_wu:
+      execFcvt_d_wu(di);
+      return;
+
+    case InstId::fcvt_l_d:
+      execFcvt_l_d(di);
+      return;
+
+    case InstId::fcvt_lu_d:
+      execFcvt_lu_d(di);
+      return;
+
+    case InstId::fmv_x_d:
+      execFmv_x_d(di);
+      return;
+
+    case InstId::fcvt_d_l:
+      execFcvt_d_l(di);
+      return;
+
+    case InstId::fcvt_d_lu:
+      execFcvt_d_lu(di);
+      return;
+
+    case InstId::fmv_d_x:
+      execFmv_d_x(di);
+      return;
+
+    case InstId::flh:
+      execFlh(di);
+      return;
+
+    case InstId::fsh:
+      execFsh(di);
+      return;
+
+    case InstId::fmadd_h:
+      execFmadd_h(di);
+      return;
+
+    case InstId::fmsub_h:
+      execFmsub_h(di);
+      return;
+
+    case InstId::fnmsub_h:
+      execFnmsub_h(di);
+      return;
+
+    case InstId::fnmadd_h:
+      execFnmadd_h(di);
+      return;
+
+    case InstId::fadd_h:
+      execFadd_h(di);
+      return;
+
+    case InstId::fsub_h:
+      execFsub_h(di);
+      return;
+
+    case InstId::fmul_h:
+      execFmul_h(di);
+      return;
+
+    case InstId::fdiv_h:
+      execFdiv_h(di);
+      return;
+
+    case InstId::fsqrt_h:
+      execFsqrt_h(di);
+      return;
+
+    case InstId::fsgnj_h:
+      execFsgnj_h(di);
+      return;
+
+    case InstId::fsgnjn_h:
+      execFsgnjn_h(di);
+      return;
+
+    case InstId::fsgnjx_h:
+      execFsgnjx_h(di);
+      return;
+
+    case InstId::fmin_h:
+      execFmin_h(di);
+      return;
+
+    case InstId::fmax_h:
+      execFmax_h(di);
+      return;
+
+    case InstId::fcvt_s_h:
+      execFcvt_s_h(di);
+      return;
+
+    case InstId::fcvt_d_h:
+      execFcvt_d_h(di);
+      return;
+
+    case InstId::fcvt_h_s:
+      execFcvt_h_s(di);
+      return;
+
+    case InstId::fcvt_h_d:
+      execFcvt_h_d(di);
+      return;
+
+    case InstId::fcvt_w_h:
+      execFcvt_w_h(di);
+      return;
+
+    case InstId::fcvt_wu_h:
+      execFcvt_wu_h(di);
+      return;
+
+    case InstId::fmv_x_h:
+      execFmv_x_h(di);
+      return;
+
+    case InstId::feq_h:
+      execFeq_h(di);
+      return;
+
+    case InstId::flt_h:
+      execFlt_h(di);
+      return;
+
+    case InstId::fle_h:
+      execFle_h(di);
+      return;
+
+    case InstId::fclass_h:
+      execFclass_h(di);
+      return;
+
+    case InstId::fcvt_h_w:
+      execFcvt_h_w(di);
+      return;
+
+    case InstId::fcvt_h_wu:
+      execFcvt_h_wu(di);
+      return;
+
+    case InstId::fmv_h_x:
+      execFmv_h_x(di);
+      return;
+
+    case InstId::fcvt_l_h:
+      execFcvt_l_h(di);
+      return;
+
+    case InstId::fcvt_lu_h:
+      execFcvt_lu_h(di);
+      return;
+
+    case InstId::fcvt_h_l:
+      execFcvt_h_l(di);
+      return;
+
+    case InstId::fcvt_h_lu:
+      execFcvt_h_lu(di);
+      return;
+
+    case InstId::mret:
+      execMret(di);
+      return;
+
+    case InstId::sret:
+      execSret(di);
+      return;
+
+    case InstId::wfi:
+      execWfi(di);
+      return;
+
+    case InstId::dret:
+      execDret(di);
+      return;
+
+    case InstId::sfence_vma:
+      execSfence_vma(di);
+      return;
+
+    case InstId::c_addi4spn:
+      if (not isRvc()) illegalInst(di); else execAddi(di);
+      return;
+
+    case InstId::c_fld:
+      if (not isRvc()) illegalInst(di); else execFld(di);
+      return;
+
+    case InstId::c_lq:
+      if (not isRvc()) illegalInst(di); else illegalInst(di);
+      return;
+
+    case InstId::c_lw:
+      if (not isRvc()) illegalInst(di); else execLw(di);
+      return;
+
+    case InstId::c_flw:
+      if (not isRvc()) illegalInst(di); else execFlw(di);
+      return;
+
+    case InstId::c_ld:
+      if (not isRvc()) illegalInst(di); else execLd(di);
+      return;
+
+    case InstId::c_fsd:
+      if (not isRvc()) illegalInst(di); else execFsd(di);
+      return;
+
+    case InstId::c_sq:
+      if (not isRvc()) illegalInst(di); else illegalInst(di);
+      return;
+
+    case InstId::c_sw:
+      if (not isRvc()) illegalInst(di); else execSw(di);
+      return;
+
+    case InstId::c_fsw:
+      if (not isRvc()) illegalInst(di); else execFsw(di);
+      return;
+
+    case InstId::c_sd:
+      if (not isRvc()) illegalInst(di); else execSd(di);
+      return;
+
+    case InstId::c_addi:
+      if (not isRvc()) illegalInst(di); else execAddi(di);
+      return;
+
+    case InstId::c_jal:
+      if (not isRvc()) illegalInst(di); else execJal(di);
+      return;
+
+    case InstId::c_li:
+      if (not isRvc()) illegalInst(di); else execAddi(di);
+      return;
+
+    case InstId::c_addi16sp:
+      if (not isRvc()) illegalInst(di); else execAddi(di);
+      return;
+
+    case InstId::c_lui:
+      if (not isRvc()) illegalInst(di); else execLui(di);
+      return;
+
+    case InstId::c_srli:
+      if (not isRvc()) illegalInst(di); else execSrli(di);
+      return;
+
+    case InstId::c_srli64:
+      illegalInst(di);  // Only valid in rv128 which is not supported.
+      return;
+
+    case InstId::c_srai:
+      if (not isRvc()) illegalInst(di); else execSrai(di);
+      return;
+
+    case InstId::c_srai64:
+      illegalInst(di);  // Only valid in rv128 which is not supported.
+      return;
+
+    case InstId::c_andi:
+      if (not isRvc()) illegalInst(di); else execAndi(di);
+      return;
+
+    case InstId::c_sub:
+      if (not isRvc()) illegalInst(di); else execSub(di);
+      return;
+
+    case InstId::c_xor:
+      if (not isRvc()) illegalInst(di); else execXor(di);
+      return;
+
+    case InstId::c_or:
+      if (not isRvc()) illegalInst(di); else execOr(di);
+      return;
+
+    case InstId::c_and:
+      if (not isRvc()) illegalInst(di); else execAnd(di);
+      return;
+
+    case InstId::c_subw:
+      if (not isRvc()) illegalInst(di); else execSubw(di);
+      return;
+
+    case InstId::c_addw:
+      if (not isRvc()) illegalInst(di); else execAddw(di);
+      return;
+
+    case InstId::c_j:
+      if (not isRvc()) illegalInst(di); else execJal(di);
+      return;
+
+    case InstId::c_beqz:
+      if (not isRvc()) illegalInst(di); else execBeq(di);
+      return;
+
+    case InstId::c_bnez:
+      if (not isRvc()) illegalInst(di); else execBne(di);
+      return;
+
+    case InstId::c_slli:
+      if (not isRvc()) illegalInst(di); else execSlli(di);
+      return;
+
+    case InstId::c_slli64:
+      if (not isRvc()) illegalInst(di); else execSlli(di);
+      return;
+
+    case InstId::c_fldsp:
+      if (not isRvc()) illegalInst(di); else execFld(di);
+      return;
+
+    case InstId::c_lwsp:
+      if (not isRvc()) illegalInst(di); else execLw(di);
+      return;
+
+    case InstId::c_flwsp:
+      if (not isRvc()) illegalInst(di); else execFlw(di);
+      return;
+
+    case InstId::c_ldsp:
+      if (not isRvc()) illegalInst(di); else execLd(di);
+      return;
+
+    case InstId::c_jr:
+      if (not isRvc()) illegalInst(di); else execJalr(di);
+      return;
+
+    case InstId::c_mv:
+      if (not isRvc()) illegalInst(di); else execAdd(di);
+      return;
+
+    case InstId::c_ebreak:
+      if (not isRvc()) illegalInst(di); else execEbreak(di);
+      return;
+
+    case InstId::c_jalr:
+      if (not isRvc()) illegalInst(di); else execJalr(di);
+      return;
+
+    case InstId::c_add:
+      if (not isRvc()) illegalInst(di); else execAdd(di);
+      return;
+
+    case InstId::c_fsdsp:
+      if (not isRvc()) illegalInst(di); else execFsd(di);
+      return;
+
+    case InstId::c_swsp:
+      if (not isRvc()) illegalInst(di); else execSw(di);
+      return;
+
+    case InstId::c_fswsp:
+      if (not isRvc()) illegalInst(di); else execFsw(di);
+      return;
+
+    case InstId::c_addiw:
+      if (not isRvc()) illegalInst(di); else execAddiw(di);
+      return;
+
+    case InstId::c_sdsp:
+      if (not isRvc()) illegalInst(di); else execSd(di);
+      return;
+
+    case InstId::clz:
+      execClz(di);
+      return;
+
+    case InstId::ctz:
+      execCtz(di);
+      return;
+
+    case InstId::cpop:
+      execCpop(di);
+      return;
+
+    case InstId::clzw:
+      execClzw(di);
+      return;
+
+    case InstId::ctzw:
+      execCtzw(di);
+      return;
+
+    case InstId::cpopw:
+      execCpopw(di);
+      return;
+
+    case InstId::min:
+      execMin(di);
+      return;
+
+    case InstId::max:
+      execMax(di);
+      return;
+
+    case InstId::minu:
+      execMinu(di);
+      return;
+
+    case InstId::maxu:
+      execMaxu(di);
+      return;
+
+    case InstId::sext_b:
+      execSext_b(di);
+      return;
+
+    case InstId::sext_h:
+      execSext_h(di);
+      return;
+
+    case InstId::andn:
+      execAndn(di);
+      return;
+
+    case InstId::orc_b:
+      execOrc_b(di);
+      return;
+
+    case InstId::orn:
+      execOrn(di);
+      return;
+
+    case InstId::xnor:
+      execXnor(di);
+      return;
+
+    case InstId::rol:
+      execRol(di);
+      return;
+
+    case InstId::ror:
+      execRor(di);
+      return;
+
+    case InstId::rori:
+      execRori(di);
+      return;
+
+    case InstId::rolw:
+      execRolw(di);
+      return;
+
+    case InstId::rorw:
+      execRorw(di);
+      return;
+
+    case InstId::roriw:
+      execRoriw(di);
+      return;
+
+    case InstId::rev8:
+      execRev8(di);
+      return;
+
+    case InstId::pack:
+      execPack(di);
+      return;
+
+    case InstId::packh:
+      execPackh(di);
+      return;
+
+    case InstId::packu:
+      execPacku(di);
+      return;
+
+    case InstId::packw:
+      execPackw(di);
+      return;
+
+    case InstId::packuw:
+      execPackuw(di);
+      return;
+
+    case InstId::grev:
+      execGrev(di);
+      return;
+
+    case InstId::grevi:
+      execGrevi(di);
+      return;
+
+    case InstId::grevw:
+      execGrevw(di);
+      return;
+
+    case InstId::greviw:
+      execGreviw(di);
+      return;
+
+    case InstId::gorc:
+      execGorc(di);
+      return;
+
+    case InstId::gorci:
+      execGorci(di);
+      return;
+
+    case InstId::gorcw:
+      execGorcw(di);
+      return;
+
+    case InstId::gorciw:
+      execGorciw(di);
+      return;
+
+    case InstId::shfl:
+      execShfl(di);
+      return;
+
+    case InstId::shflw:
+      execShflw(di);
+      return;
+
+    case InstId::shfli:
+      execShfli(di);
+      return;
+
+    case InstId::unshfl:
+      execUnshfl(di);
+      return;
+
+    case InstId::unshfli:
+      execUnshfli(di);
+      return;
+
+    case InstId::unshflw:
+      execUnshflw(di);
+      return;
+
+    case InstId::xperm_n:
+      execXperm_n(di);
+      return;
+
+    case InstId::xperm_b:
+      execXperm_b(di);
+      return;
+
+    case InstId::xperm_h:
+      execXperm_h(di);
+      return;
+
+    case InstId::xperm_w:
+      execXperm_w(di);
+      return;
+
+    case InstId::bset:
+      execBset(di);
+      return;
+
+    case InstId::bclr:
+      execBclr(di);
+      return;
+
+    case InstId::binv:
+      execBinv(di);
+      return;
+
+    case InstId::bext:
+      execBext(di);
+      return;
+
+    case InstId::bseti:
+      execBseti(di);
+      return;
+
+    case InstId::bclri:
+      execBclri(di);
+      return;
+
+    case InstId::binvi:
+      execBinvi(di);
+      return;
+
+    case InstId::bexti:
+      execBexti(di);
+      return;
+
+    case InstId::bcompress:
+      execBcompress(di);
+      return;
+
+    case InstId::bdecompress:
+      execBdecompress(di);
+      return;
+
+    case InstId::bcompressw:
+      execBcompressw(di);
+      return;
+
+    case InstId::bdecompressw:
+      execBdecompressw(di);
+      return;
+
+    case InstId::bfp:
+      execBfp(di);
+      return;
+
+    case InstId::bfpw:
+      execBfpw(di);
+      return;
+
+    case InstId::clmul:
+      execClmul(di);
+      return;
+
+    case InstId::clmulh:
+      execClmulh(di);
+      return;
+
+    case InstId::clmulr:
+      execClmulr(di);
+      return;
+
+    case InstId::sh1add:
+      execSh1add(di);
+      return;
+
+    case InstId::sh2add:
+      execSh2add(di);
+      return;
+
+    case InstId::sh3add:
+      execSh3add(di);
+      return;
+
+    case InstId::sh1add_uw:
+      execSh1add_uw(di);
+      return;
+
+    case InstId::sh2add_uw:
+      execSh2add_uw(di);
+      return;
+
+    case InstId::sh3add_uw:
+      execSh3add_uw(di);
+      return;
+
+    case InstId::add_uw:
+      execAdd_uw(di);
+      return;
+
+    case InstId::slli_uw:
+      execSlli_uw(di);
+      return;
+
+    case InstId::crc32_b:
+      execCrc32_b(di);
+      return;
+
+    case InstId::crc32_h:
+      execCrc32_h(di);
+      return;
+
+    case InstId::crc32_w:
+      execCrc32_w(di);
+      return;
+
+    case InstId::crc32_d:
+      execCrc32_d(di);
+      return;
+
+    case InstId::crc32c_b:
+      execCrc32c_b(di);
+      return;
+
+    case InstId::crc32c_h:
+      execCrc32c_h(di);
+      return;
+
+    case InstId::crc32c_w:
+      execCrc32c_w(di);
+      return;
+
+    case InstId::crc32c_d:
+      execCrc32c_d(di);
+      return;
+
+    case InstId::bmator:
+      execBmator(di);
+      return;
+
+    case InstId::bmatxor:
+      execBmatxor(di);
+      return;
+
+    case InstId::bmatflip:
+      execBmatflip(di);
+      return;
+
+    case InstId::cmov:
+      execCmov(di);
+      return;
+
+    case InstId::cmix:
+      execCmix(di);
+      return;
+
+    case InstId::fsl:
+      execFsl(di);
+      return;
+
+    case InstId::fsr:
+      execFsr(di);
+      return;
+
+    case InstId::fsri:
+      execFsri(di);
+      return;
+
+    case InstId::fslw:
+      execFslw(di);
+      return;
+
+    case InstId::fsrw:
+      execFsrw(di);
+      return;
+
+    case InstId::fsriw:
+      execFsriw(di);
+      return;
+
+    case InstId::vsetvli:
+      execVsetvli(di);
+      return;
+
+    case InstId::vsetivli:
+      execVsetivli(di);
+      return;
+
+    case InstId::vsetvl:
+      execVsetvl(di);
+      return;
+
+    case InstId::vadd_vv:
+      execVadd_vv(di);
+      return;
+
+    case InstId::vadd_vx:
+      execVadd_vx(di);
+      return;
+
+    case InstId::vadd_vi:
+      execVadd_vi(di);
+      return;
+
+    case InstId::vsub_vv:
+      execVsub_vv(di);
+      return;
+
+    case InstId::vsub_vx:
+      execVsub_vx(di);
+      return;
+
+    case InstId::vrsub_vx:
+      execVrsub_vx(di);
+      return;
+
+    case InstId::vrsub_vi:
+      execVrsub_vi(di);
+      return;
+
+    case InstId::vwaddu_vv:
+      execVwaddu_vv(di);
+      return;
+
+    case InstId::vwaddu_vx:
+      execVwaddu_vx(di);
+      return;
+
+    case InstId::vwsubu_vv:
+      execVwsubu_vv(di);
+      return;
+
+    case InstId::vwsubu_vx:
+      execVwsubu_vx(di);
+      return;
+
+    case InstId::vwadd_vv:
+      execVwadd_vv(di);
+      return;
+
+    case InstId::vwadd_vx:
+      execVwadd_vx(di);
+      return;
+
+    case InstId::vwsub_vv:
+      execVwsub_vv(di);
+      return;
+
+    case InstId::vwsub_vx:
+      execVwsub_vx(di);
+      return;
+
+    case InstId::vwaddu_wv:
+      execVwaddu_wv(di);
+      return;
+
+    case InstId::vwaddu_wx:
+      execVwaddu_wx(di);
+      return;
+
+    case InstId::vwsubu_wv:
+      execVwsubu_wv(di);
+      return;
+
+    case InstId::vwsubu_wx:
+      execVwsubu_wx(di);
+      return;
+
+    case InstId::vwadd_wv:
+      execVwadd_wv(di);
+      return;
+
+    case InstId::vwadd_wx:
+      execVwadd_wx(di);
+      return;
+
+    case InstId::vwsub_wv:
+      execVwsub_wv(di);
+      return;
+
+    case InstId::vwsub_wx:
+      execVwsub_wx(di);
+      return;
+
+    case InstId::vmseq_vv:
+      execVmseq_vv(di);
+      return;
+
+    case InstId::vmseq_vx:
+      execVmseq_vx(di);
+      return;
+
+    case InstId::vmseq_vi:
+      execVmseq_vi(di);
+      return;
+
+    case InstId::vmsne_vv:
+      execVmsne_vv(di);
+      return;
+
+    case InstId::vmsne_vx:
+      execVmsne_vx(di);
+      return;
+
+    case InstId::vmsne_vi:
+      execVmsne_vi(di);
+      return;
+
+    case InstId::vmsltu_vv:
+      execVmsltu_vv(di);
+      return;
+
+    case InstId::vmsltu_vx:
+      execVmsltu_vx(di);
+      return;
+
+    case InstId::vmslt_vv:
+      execVmslt_vv(di);
+      return;
+
+    case InstId::vmslt_vx:
+      execVmslt_vx(di);
+      return;
+
+    case InstId::vmsleu_vv:
+      execVmsleu_vv(di);
+      return;
+
+    case InstId::vmsleu_vx:
+      execVmsleu_vx(di);
+      return;
+
+    case InstId::vmsleu_vi:
+      execVmsleu_vi(di);
+      return;
+
+    case InstId::vmsle_vv:
+      execVmsle_vv(di);
+      return;
+
+    case InstId::vmsle_vx:
+      execVmsle_vx(di);
+      return;
+
+    case InstId::vmsle_vi:
+      execVmsle_vi(di);
+      return;
+
+    case InstId::vmsgtu_vx:
+      execVmsgtu_vx(di);
+      return;
+
+    case InstId::vmsgtu_vi:
+      execVmsgtu_vi(di);
+      return;
+
+    case InstId::vmsgt_vx:
+      execVmsgt_vx(di);
+      return;
+
+    case InstId::vmsgt_vi:
+      execVmsgt_vi(di);
+      return;
+
+    case InstId::vminu_vv:
+      execVminu_vv(di);
+      return;
+
+    case InstId::vminu_vx:
+      execVminu_vx(di);
+      return;
+
+    case InstId::vmin_vv:
+      execVmin_vv(di);
+      return;
+
+    case InstId::vmin_vx:
+      execVmin_vx(di);
+      return;
+
+    case InstId::vmaxu_vv:
+      execVmaxu_vv(di);
+      return;
+
+    case InstId::vmaxu_vx:
+      execVmaxu_vx(di);
+      return;
+
+    case InstId::vmax_vv:
+      execVmax_vv(di);
+      return;
+
+    case InstId::vmax_vx:
+      execVmax_vx(di);
+      return;
+
+    case InstId::vand_vv:
+      execVand_vv(di);
+      return;
+
+    case InstId::vand_vx:
+      execVand_vx(di);
+      return;
+
+    case InstId::vand_vi:
+      execVand_vi(di);
+      return;
+
+    case InstId::vor_vv:
+      execVor_vv(di);
+      return;
+
+    case InstId::vor_vx:
+      execVor_vx(di);
+      return;
+
+    case InstId::vor_vi:
+      execVor_vi(di);
+      return;
+
+    case InstId::vxor_vv:
+      execVxor_vv(di);
+      return;
+
+    case InstId::vxor_vx:
+      execVxor_vx(di);
+      return;
+
+    case InstId::vxor_vi:
+      execVxor_vi(di);
+      return;
+
+    case InstId::vsll_vv:
+      execVsll_vv(di);
+      return;
+
+    case InstId::vsll_vx:
+      execVsll_vx(di);
+      return;
+
+    case InstId::vsll_vi:
+      execVsll_vi(di);
+      return;
+
+    case InstId::vsrl_vv:
+      execVsrl_vv(di);
+      return;
+
+    case InstId::vsrl_vx:
+      execVsrl_vx(di);
+      return;
+
+    case InstId::vsrl_vi:
+      execVsrl_vi(di);
+      return;
+
+    case InstId::vsra_vv:
+      execVsra_vv(di);
+      return;
+
+    case InstId::vsra_vx:
+      execVsra_vx(di);
+      return;
+
+    case InstId::vsra_vi:
+      execVsra_vi(di);
+      return;
+
+    case InstId::vnsrl_wv:
+      execVnsrl_wv(di);
+      return;
+
+    case InstId::vnsrl_wx:
+      execVnsrl_wx(di);
+      return;
+
+    case InstId::vnsrl_wi:
+      execVnsrl_wi(di);
+      return;
+
+    case InstId::vnsra_wv:
+      execVnsra_wv(di);
+      return;
+
+    case InstId::vnsra_wx:
+      execVnsra_wx(di);
+      return;
+
+    case InstId::vnsra_wi:
+      execVnsra_wi(di);
+      return;
+
+    case InstId::vrgather_vv:
+      execVrgather_vv(di);
+      return;
+
+    case InstId::vrgather_vx:
+      execVrgather_vx(di);
+      return;
+
+    case InstId::vrgather_vi:
+      execVrgather_vi(di);
+      return;
+
+    case InstId::vrgatherei16_vv:
+      execVrgatherei16_vv(di);
+      return;
+
+    case InstId::vcompress_vm:
+      execVcompress_vm(di);
+      return;
+
+    case InstId::vredsum_vs:
+      execVredsum_vs(di);
+      return;
+
+    case InstId::vredand_vs:
+      execVredand_vs(di);
+      return;
+
+    case InstId::vredor_vs:
+      execVredor_vs(di);
+      return;
+
+    case InstId::vredxor_vs:
+      execVredxor_vs(di);
+      return;
+
+    case InstId::vredminu_vs:
+      execVredminu_vs(di);
+      return;
+
+    case InstId::vredmin_vs:
+      execVredmin_vs(di);
+      return;
+
+    case InstId::vredmaxu_vs:
+      execVredmaxu_vs(di);
+      return;
+
+    case InstId::vredmax_vs:
+      execVredmax_vs(di);
+      return;
+
+    case InstId::vwredsumu_vs:
+      execVwredsumu_vs(di);
+      return;
+
+    case InstId::vwredsum_vs:
+      execVwredsum_vs(di);
+      return;
+
+    case InstId::vmand_mm:
+      execVmand_mm(di);
+      return;
+
+    case InstId::vmnand_mm:
+      execVmnand_mm(di);
+      return;
+
+    case InstId::vmandnot_mm:
+      execVmandnot_mm(di);
+      return;
+
+    case InstId::vmxor_mm:
+      execVmxor_mm(di);
+      return;
+
+    case InstId::vmor_mm:
+      execVmor_mm(di);
+      return;
+
+    case InstId::vmnor_mm:
+      execVmnor_mm(di);
+      return;
+
+    case InstId::vmornot_mm:
+      execVmornot_mm(di);
+      return;
+
+    case InstId::vmxnor_mm:
+      execVmxnor_mm(di);
+      return;
+
+    case InstId::vcpop_m:
+      execVcpop_m(di);
+      return;
+
+    case InstId::vfirst_m:
+      execVfirst_m(di);
+      return;
+
+    case InstId::vmsbf_m:
+      execVmsbf_m(di);
+      return;
+
+    case InstId::vmsif_m:
+      execVmsif_m(di);
+      return;
+
+    case InstId::vmsof_m:
+      execVmsof_m(di);
+      return;
+
+    case InstId::viota_m:
+      execViota_m(di);
+      return;
+
+    case InstId::vid_v:
+      execVid_v(di);
+      return;
+
+    case InstId::vslideup_vx:
+      execVslideup_vx(di);
+      return;
+
+    case InstId::vslideup_vi:
+      execVslideup_vi(di);
+      return;
+
+    case InstId::vslide1up_vx:
+      execVslide1up_vx(di);
+      return;
+
+    case InstId::vslidedown_vx:
+      execVslidedown_vx(di);
+      return;
+
+    case InstId::vslidedown_vi:
+      execVslidedown_vi(di);
+      return;
+
+    case InstId::vslide1down_vx:
+      execVslide1down_vx(di);
+      return;
+
+    case InstId::vfslide1up_vf:
+      execVfslide1up_vf(di);
+      return;
+
+    case InstId::vfslide1down_vf:
+      execVfslide1down_vf(di);
+      return;
+
+    case InstId::vmul_vv:
+      execVmul_vv(di);
+      return;
+
+    case InstId::vmul_vx:
+      execVmul_vx(di);
+      return;
+
+    case InstId::vmulh_vv:
+      execVmulh_vv(di);
+      return;
+
+    case InstId::vmulh_vx:
+      execVmulh_vx(di);
+      return;
+
+    case InstId::vmulhu_vv:
+      execVmulhu_vv(di);
+      return;
+
+    case InstId::vmulhu_vx:
+      execVmulhu_vx(di);
+      return;
+
+    case InstId::vmulhsu_vv:
+      execVmulhsu_vv(di);
+      return;
+
+    case InstId::vmulhsu_vx:
+      execVmulhsu_vx(di);
+      return;
+
+    case InstId::vmadd_vv:
+      execVmadd_vv(di);
+      return;
+
+    case InstId::vmadd_vx:
+      execVmadd_vx(di);
+      return;
+
+    case InstId::vnmsub_vv:
+      execVnmsub_vv(di);
+      return;
+
+    case InstId::vnmsub_vx:
+      execVnmsub_vx(di);
+      return;
+
+    case InstId::vmacc_vv:
+      execVmacc_vv(di);
+      return;
+
+    case InstId::vmacc_vx:
+      execVmacc_vx(di);
+      return;
+
+    case InstId::vnmsac_vv:
+      execVnmsac_vv(di);
+      return;
+
+    case InstId::vnmsac_vx:
+      execVnmsac_vx(di);
+      return;
+
+    case InstId::vwmulu_vv:
+      execVwmulu_vv(di);
+      return;
+
+    case InstId::vwmulu_vx:
+      execVwmulu_vx(di);
+      return;
+
+    case InstId::vwmul_vv:
+      execVwmul_vv(di);
+      return;
+
+    case InstId::vwmul_vx:
+      execVwmul_vx(di);
+      return;
+
+    case InstId::vwmulsu_vv:
+      execVwmulsu_vv(di);
+      return;
+
+    case InstId::vwmulsu_vx:
+      execVwmulsu_vx(di);
+      return;
+
+    case InstId::vwmaccu_vv:
+      execVwmaccu_vv(di);
+      return;
+
+    case InstId::vwmaccu_vx:
+      execVwmaccu_vx(di);
+      return;
+
+    case InstId::vwmacc_vv:
+      execVwmacc_vv(di);
+      return;
+
+    case InstId::vwmacc_vx:
+      execVwmacc_vx(di);
+      return;
+
+    case InstId::vwmaccsu_vv:
+      execVwmaccsu_vv(di);
+      return;
+
+    case InstId::vwmaccsu_vx:
+      execVwmaccsu_vx(di);
+      return;
+
+    case InstId::vwmaccus_vx:
+      execVwmaccus_vx(di);
+      return;
+
+    case InstId::vdivu_vv:
+      execVdivu_vv(di);
+      return;
+
+    case InstId::vdivu_vx:
+      execVdivu_vx(di);
+      return;
+
+    case InstId::vdiv_vv:
+      execVdiv_vv(di);
+      return;
+
+    case InstId::vdiv_vx:
+      execVdiv_vx(di);
+      return;
+
+    case InstId::vremu_vv:
+      execVremu_vv(di);
+      return;
+
+    case InstId::vremu_vx:
+      execVremu_vx(di);
+      return;
+
+    case InstId::vrem_vv:
+      execVrem_vv(di);
+      return;
+
+    case InstId::vrem_vx:
+      execVrem_vx(di);
+      return;
+
+    case InstId::vsext_vf2:
+      execVsext_vf2(di);
+      return;
+
+    case InstId::vsext_vf4:
+      execVsext_vf4(di);
+      return;
+
+    case InstId::vsext_vf8:
+      execVsext_vf8(di);
+      return;
+
+    case InstId::vzext_vf2:
+      execVzext_vf2(di);
+      return;
+
+    case InstId::vzext_vf4:
+      execVzext_vf4(di);
+      return;
+
+    case InstId::vzext_vf8:
+      execVzext_vf8(di);
+      return;
+
+    case InstId::vadc_vvm:
+      execVadc_vvm(di);
+      return;
+
+    case InstId::vadc_vxm:
+      execVadc_vxm(di);
+      return;
+
+    case InstId::vadc_vim:
+      execVadc_vim(di);
+      return;
+
+    case InstId::vsbc_vvm:
+      execVsbc_vvm(di);
+      return;
+
+    case InstId::vsbc_vxm:
+      execVsbc_vxm(di);
+      return;
+
+    case InstId::vmadc_vvm:
+      execVmadc_vvm(di);
+      return;
+
+    case InstId::vmadc_vxm:
+      execVmadc_vxm(di);
+      return;
+
+    case InstId::vmadc_vim:
+      execVmadc_vim(di);
+      return;
+
+    case InstId::vmsbc_vvm:
+      execVmsbc_vvm(di);
+      return;
+
+    case InstId::vmsbc_vxm:
+      execVmsbc_vxm(di);
+      return;
+
+    case InstId::vmerge_vvm:
+      execVmerge_vvm(di);
+      return;
+
+    case InstId::vmerge_vxm:
+      execVmerge_vxm(di);
+      return;
+
+    case InstId::vmerge_vim:
+      execVmerge_vim(di);
+      return;
+
+    case InstId::vmv_x_s:
+      execVmv_x_s(di);
+      return;
+
+    case InstId::vmv_s_x:
+      execVmv_s_x(di);
+      return;
+
+    case InstId::vfmv_f_s:
+      execVfmv_f_s(di);
+      return;
+
+    case InstId::vfmv_s_f:
+      execVfmv_s_f(di);
+      return;
+
+    case InstId::vmv_v_v:
+      execVmv_v_v(di);
+      return;
+
+    case InstId::vmv_v_x:
+      execVmv_v_x(di);
+      return;
+
+    case InstId::vmv_v_i:
+      execVmv_v_i(di);
+      return;
+
+    case InstId::vmv1r_v:
+      execVmv1r_v(di);
+      return;
+
+    case InstId::vmv2r_v:
+      execVmv2r_v(di);
+      return;
+
+    case InstId::vmv4r_v:
+      execVmv4r_v(di);
+      return;
+
+    case InstId::vmv8r_v:
+      execVmv8r_v(di);
+      return;
+
+    case InstId::vsaddu_vv:
+      execVsaddu_vv(di);
+      return;
+
+    case InstId::vsaddu_vx:
+      execVsaddu_vx(di);
+      return;
+
+    case InstId::vsaddu_vi:
+      execVsaddu_vi(di);
+      return;
+
+    case InstId::vsadd_vv:
+      execVsadd_vv(di);
+      return;
+
+    case InstId::vsadd_vx:
+      execVsadd_vx(di);
+      return;
+
+    case InstId::vsadd_vi:
+      execVsadd_vi(di);
+      return;
+
+    case InstId::vssubu_vv:
+      execVssubu_vv(di);
+      return;
+
+    case InstId::vssubu_vx:
+      execVssubu_vx(di);
+      return;
+
+    case InstId::vssub_vv:
+      execVssub_vv(di);
+      return;
+
+    case InstId::vssub_vx:
+      execVssub_vx(di);
+      return;
+
+    case InstId::vaaddu_vv:
+      execVaaddu_vv(di);
+      return;
+
+    case InstId::vaaddu_vx:
+      execVaaddu_vx(di);
+      return;
+
+    case InstId::vaadd_vv:
+      execVaadd_vv(di);
+      return;
+
+    case InstId::vaadd_vx:
+      execVaadd_vx(di);
+      return;
+
+    case InstId::vasubu_vv:
+      execVasubu_vv(di);
+      return;
+
+    case InstId::vasubu_vx:
+      execVasubu_vx(di);
+      return;
+
+    case InstId::vasub_vv:
+      execVasub_vv(di);
+      return;
+
+    case InstId::vasub_vx:
+      execVasub_vx(di);
+      return;
+
+    case InstId::vsmul_vv:
+      execVsmul_vv(di);
+      return;
+
+    case InstId::vsmul_vx:
+      execVsmul_vx(di);
+      return;
+
+    case InstId::vssrl_vv:
+      execVssrl_vv(di);
+      return;
+
+    case InstId::vssrl_vx:
+      execVssrl_vx(di);
+      return;
+
+    case InstId::vssrl_vi:
+      execVssrl_vi(di);
+      return;
+
+    case InstId::vssra_vv:
+      execVssra_vv(di);
+      return;
+
+    case InstId::vssra_vx:
+      execVssra_vx(di);
+      return;
+
+    case InstId::vssra_vi:
+      execVssra_vi(di);
+      return;
+
+    case InstId::vnclipu_wv:
+      execVnclipu_wv(di);
+      return;
+
+    case InstId::vnclipu_wx:
+      execVnclipu_wx(di);
+      return;
+
+    case InstId::vnclipu_wi:
+      execVnclipu_wi(di);
+      return;
+
+    case InstId::vnclip_wv:
+      execVnclip_wv(di);
+      return;
+
+    case InstId::vnclip_wx:
+      execVnclip_wx(di);
+      return;
+
+    case InstId::vnclip_wi:
+      execVnclip_wi(di);
+      return;
+
+    case InstId::vle8_v:
+      execVle8_v(di);
+      return;
+
+    case InstId::vle16_v:
+      execVle16_v(di);
+      return;
+
+    case InstId::vle32_v:
+      execVle32_v(di);
+      return;
+
+    case InstId::vle64_v:
+      execVle64_v(di);
+      return;
+
+    case InstId::vle128_v:
+      execVle128_v(di);
+      return;
+
+    case InstId::vle256_v:
+      execVle256_v(di);
+      return;
+
+    case InstId::vle512_v:
+      execVle512_v(di);
+      return;
+
+    case InstId::vle1024_v:
+      execVle1024_v(di);
+      return;
+
+    case InstId::vse8_v:
+      execVse8_v(di);
+      return;
+
+    case InstId::vse16_v:
+      execVse16_v(di);
+      return;
+
+    case InstId::vse32_v:
+      execVse32_v(di);
+      return;
+
+    case InstId::vse64_v:
+      execVse64_v(di);
+      return;
+
+    case InstId::vse128_v:
+      execVse128_v(di);
+      return;
+
+    case InstId::vse256_v:
+      execVse256_v(di);
+      return;
+
+    case InstId::vse512_v:
+      execVse512_v(di);
+      return;
+
+    case InstId::vse1024_v:
+      execVse1024_v(di);
+      return;
+
+    case InstId::vlm_v:
+      execVlm_v(di);
+      return;
+
+    case InstId::vsm_v:
+      execVsm_v(di);
+      return;
+
+    case InstId::vlre8_v:
+      execVlre8_v(di);
+      return;
+
+    case InstId::vlre16_v:
+      execVlre16_v(di);
+      return;
+
+    case InstId::vlre32_v:
+      execVlre32_v(di);
+      return;
+
+    case InstId::vlre64_v:
+      execVlre64_v(di);
+      return;
+
+    case InstId::vlre128_v:
+      execVlre128_v(di);
+      return;
+
+    case InstId::vlre256_v:
+      execVlre256_v(di);
+      return;
+
+    case InstId::vlre512_v:
+      execVlre512_v(di);
+      return;
+
+    case InstId::vlre1024_v:
+      execVlre1024_v(di);
+      return;
+
+    case InstId::vs1r_v:
+      execVs1r_v(di);
+      return;
+
+    case InstId::vs2r_v:
+      execVs2r_v(di);
+      return;
+
+    case InstId::vs4r_v:
+      execVs4r_v(di);
+      return;
+
+    case InstId::vs8r_v:
+      execVs8r_v(di);
+      return;
+
+    case InstId::vle8ff_v:
+      execVle8ff_v(di);
+      return;
+
+    case InstId::vle16ff_v:
+      execVle16ff_v(di);
+      return;
+
+    case InstId::vle32ff_v:
+      execVle32ff_v(di);
+      return;
+
+    case InstId::vle64ff_v:
+      execVle64ff_v(di);
+      return;
+
+    case InstId::vle128ff_v:
+      execVle128ff_v(di);
+      return;
+
+    case InstId::vle256ff_v:
+      execVle256ff_v(di);
+      return;
+
+    case InstId::vle512ff_v:
+      execVle512ff_v(di);
+      return;
+
+    case InstId::vle1024ff_v:
+      execVle1024ff_v(di);
+      return;
+
+    case InstId::vlse8_v:
+      execVlse8_v(di);
+      return;
+
+    case InstId::vlse16_v:
+      execVlse16_v(di);
+      return;
+
+    case InstId::vlse32_v:
+      execVlse32_v(di);
+      return;
+
+    case InstId::vlse64_v:
+      execVlse64_v(di);
+      return;
+
+    case InstId::vlse128_v:
+      execVlse128_v(di);
+      return;
+
+    case InstId::vlse256_v:
+      execVlse256_v(di);
+      return;
+
+    case InstId::vlse512_v:
+      execVlse512_v(di);
+      return;
+
+    case InstId::vlse1024_v:
+      execVlse1024_v(di);
+      return;
+
+    case InstId::vsse8_v:
+      execVsse8_v(di);
+      return;
+
+    case InstId::vsse16_v:
+      execVsse16_v(di);
+      return;
+
+    case InstId::vsse32_v:
+      execVsse32_v(di);
+      return;
+
+    case InstId::vsse64_v:
+      execVsse64_v(di);
+      return;
+
+    case InstId::vsse128_v:
+      execVsse128_v(di);
+      return;
+
+    case InstId::vsse256_v:
+      execVsse256_v(di);
+      return;
+
+    case InstId::vsse512_v:
+      execVsse512_v(di);
+      return;
+
+    case InstId::vsse1024_v:
+      execVsse1024_v(di);
+      return;
+
+    case InstId::vloxei8_v:
+      execVloxei8_v(di);
+      return;
+
+    case InstId::vloxei16_v:
+      execVloxei16_v(di);
+      return;
+
+    case InstId::vloxei32_v:
+      execVloxei32_v(di);
+      return;
+
+    case InstId::vloxei64_v:
+      execVloxei64_v(di);
+      return;
+
+    case InstId::vluxei8_v:
+      execVluxei8_v(di);
+      return;
+
+    case InstId::vluxei16_v:
+      execVluxei16_v(di);
+      return;
+
+    case InstId::vluxei32_v:
+      execVluxei32_v(di);
+      return;
+
+    case InstId::vluxei64_v:
+      execVluxei64_v(di);
+      return;
+
+    case InstId::vsoxei8_v:
+      execVsoxei8_v(di);
+      return;
+
+    case InstId::vsoxei16_v:
+      execVsoxei16_v(di);
+      return;
+
+    case InstId::vsoxei32_v:
+      execVsoxei32_v(di);
+      return;
+
+    case InstId::vsoxei64_v:
+      execVsoxei64_v(di);
+      return;
+
+    case InstId::vsuxei8_v:
+      execVsuxei8_v(di);
+      return;
+
+    case InstId::vsuxei16_v:
+      execVsuxei16_v(di);
+      return;
+
+    case InstId::vsuxei32_v:
+      execVsuxei32_v(di);
+      return;
+
+    case InstId::vsuxei64_v:
+      execVsuxei64_v(di);
+      return;
+
+    case InstId::vlsege8_v:
+      execVlsege8_v(di);
+      return;
+
+    case InstId::vlsege16_v:
+      execVlsege16_v(di);
+      return;
+
+    case InstId::vlsege32_v:
+      execVlsege32_v(di);
+      return;
+
+    case InstId::vlsege64_v:
+      execVlsege64_v(di);
+      return;
+
+    case InstId::vlsege128_v:
+      execVlsege128_v(di);
+      return;
+
+    case InstId::vlsege256_v:
+      execVlsege256_v(di);
+      return;
+
+    case InstId::vlsege512_v:
+      execVlsege512_v(di);
+      return;
+
+    case InstId::vlsege1024_v:
+      execVlsege1024_v(di);
+      return;
+
+    case InstId::vssege8_v:
+      execVssege8_v(di);
+      return;
+
+    case InstId::vssege16_v:
+      execVssege16_v(di);
+      return;
+
+    case InstId::vssege32_v:
+      execVssege32_v(di);
+      return;
+
+    case InstId::vssege64_v:
+      execVssege64_v(di);
+      return;
+
+    case InstId::vssege128_v:
+      execVssege128_v(di);
+      return;
+
+    case InstId::vssege256_v:
+      execVssege256_v(di);
+      return;
+
+    case InstId::vssege512_v:
+      execVssege512_v(di);
+      return;
+
+    case InstId::vssege1024_v:
+      execVssege1024_v(di);
+      return;
+
+    case InstId::vlssege8_v:
+      execVlssege8_v(di);
+      return;
+
+    case InstId::vlssege16_v:
+      execVlssege16_v(di);
+      return;
+
+    case InstId::vlssege32_v:
+      execVlssege32_v(di);
+      return;
+
+    case InstId::vlssege64_v:
+      execVlssege64_v(di);
+      return;
+
+    case InstId::vlssege128_v:
+      execVlssege128_v(di);
+      return;
+
+    case InstId::vlssege256_v:
+      execVlssege256_v(di);
+      return;
+
+    case InstId::vlssege512_v:
+      execVlssege512_v(di);
+      return;
+
+    case InstId::vlssege1024_v:
+      execVlssege1024_v(di);
+      return;
+
+    case InstId::vsssege8_v:
+      execVsssege8_v(di);
+      return;
+
+    case InstId::vsssege16_v:
+      execVsssege16_v(di);
+      return;
+
+    case InstId::vsssege32_v:
+      execVsssege32_v(di);
+      return;
+
+    case InstId::vsssege64_v:
+      execVsssege64_v(di);
+      return;
+
+    case InstId::vsssege128_v:
+      execVsssege128_v(di);
+      return;
+
+    case InstId::vsssege256_v:
+      execVsssege256_v(di);
+      return;
+
+    case InstId::vsssege512_v:
+      execVsssege512_v(di);
+      return;
+
+    case InstId::vsssege1024_v:
+      execVsssege1024_v(di);
+      return;
+
+    case InstId::vluxsegei8_v:
+      execVluxsegei8_v(di);
+      return;
+
+    case InstId::vluxsegei16_v:
+      execVluxsegei16_v(di);
+      return;
+
+    case InstId::vluxsegei32_v:
+      execVluxsegei32_v(di);
+      return;
+
+    case InstId::vluxsegei64_v:
+      execVluxsegei64_v(di);
+      return;
+
+    case InstId::vluxsegei128_v:
+      execVluxsegei128_v(di);
+      return;
+
+    case InstId::vluxsegei256_v:
+      execVluxsegei256_v(di);
+      return;
+
+    case InstId::vluxsegei512_v:
+      execVluxsegei512_v(di);
+      return;
+
+    case InstId::vluxsegei1024_v:
+      execVluxsegei1024_v(di);
+      return;
+
+    case InstId::vsuxsegei8_v:
+      execVsuxsegei8_v(di);
+      return;
+
+    case InstId::vsuxsegei16_v:
+      execVsuxsegei16_v(di);
+      return;
+
+    case InstId::vsuxsegei32_v:
+      execVsuxsegei32_v(di);
+      return;
+
+    case InstId::vsuxsegei64_v:
+      execVsuxsegei64_v(di);
+      return;
+
+    case InstId::vsuxsegei128_v:
+      execVsuxsegei128_v(di);
+      return;
+
+    case InstId::vsuxsegei256_v:
+      execVsuxsegei256_v(di);
+      return;
+
+    case InstId::vsuxsegei512_v:
+      execVsuxsegei512_v(di);
+      return;
+
+    case InstId::vsuxsegei1024_v:
+      execVsuxsegei1024_v(di);
+      return;
+
+    case InstId::vloxsegei8_v:
+      execVloxsegei8_v(di);
+      return;
+
+    case InstId::vloxsegei16_v:
+      execVloxsegei16_v(di);
+      return;
+
+    case InstId::vloxsegei32_v:
+      execVloxsegei32_v(di);
+      return;
+
+    case InstId::vloxsegei64_v:
+      execVloxsegei64_v(di);
+      return;
+
+    case InstId::vloxsegei128_v:
+      execVloxsegei128_v(di);
+      return;
+
+    case InstId::vloxsegei256_v:
+      execVloxsegei256_v(di);
+      return;
+
+    case InstId::vloxsegei512_v:
+      execVloxsegei512_v(di);
+      return;
+
+    case InstId::vloxsegei1024_v:
+      execVloxsegei1024_v(di);
+      return;
+
+    case InstId::vsoxsegei8_v:
+      execVsoxsegei8_v(di);
+      return;
+
+    case InstId::vsoxsegei16_v:
+      execVsoxsegei16_v(di);
+      return;
+
+    case InstId::vsoxsegei32_v:
+      execVsoxsegei32_v(di);
+      return;
+
+    case InstId::vsoxsegei64_v:
+      execVsoxsegei64_v(di);
+      return;
+
+    case InstId::vsoxsegei128_v:
+      execVsoxsegei128_v(di);
+      return;
+
+    case InstId::vsoxsegei256_v:
+      execVsoxsegei256_v(di);
+      return;
+
+    case InstId::vsoxsegei512_v:
+      execVsoxsegei512_v(di);
+      return;
+
+    case InstId::vsoxsegei1024_v:
+      execVsoxsegei1024_v(di);
+      return;
+
+    case InstId::vlsege8ff_v:
+      execVlsege8ff_v(di);
+      return;
+
+    case InstId::vlsege16ff_v:
+      execVlsege16ff_v(di);
+      return;
+
+    case InstId::vlsege32ff_v:
+      execVlsege32ff_v(di);
+      return;
+
+    case InstId::vlsege64ff_v:
+      execVlsege64ff_v(di);
+      return;
+
+    case InstId::vlsege128ff_v:
+      execVlsege128ff_v(di);
+      return;
+
+    case InstId::vlsege256ff_v:
+      execVlsege256ff_v(di);
+      return;
+
+    case InstId::vlsege512ff_v:
+      execVlsege512ff_v(di);
+      return;
+
+    case InstId::vlsege1024ff_v:
+      execVlsege1024ff_v(di);
+      return;
+
+    case InstId::vfadd_vv:
+      execVfadd_vv(di);
+      return;
+
+    case InstId::vfadd_vf:
+      execVfadd_vf(di);
+      return;
+
+    case InstId::vfsub_vv:
+      execVfsub_vv(di);
+      return;
+
+    case InstId::vfsub_vf:
+      execVfsub_vf(di);
+      return;
+
+    case InstId::vfrsub_vf:
+      execVfrsub_vf(di);
+      return;
+
+    case InstId::vfwadd_vv:
+      execVfwadd_vv(di);
+      return;
+
+    case InstId::vfwadd_vf:
+      execVfwadd_vf(di);
+      return;
+
+    case InstId::vfwsub_vv:
+      execVfwsub_vv(di);
+      return;
+
+    case InstId::vfwsub_vf:
+      execVfwsub_vf(di);
+      return;
+
+    case InstId::vfwadd_wv:
+      execVfwadd_wv(di);
+      return;
+
+    case InstId::vfwadd_wf:
+      execVfwadd_wf(di);
+      return;
+
+    case InstId::vfwsub_wv:
+      execVfwsub_wv(di);
+      return;
+
+    case InstId::vfwsub_wf:
+      execVfwsub_wf(di);
+      return;
+
+    case InstId::vfmul_vv:
+      execVfmul_vv(di);
+      return;
+
+    case InstId::vfmul_vf:
+      execVfmul_vf(di);
+      return;
+
+    case InstId::vfdiv_vv:
+      execVfdiv_vv(di);
+      return;
+
+    case InstId::vfdiv_vf:
+      execVfdiv_vf(di);
+      return;
+
+    case InstId::vfrdiv_vf:
+      execVfrdiv_vf(di);
+      return;
+
+    case InstId::vfwmul_vv:
+      execVfwmul_vv(di);
+      return;
+
+    case InstId::vfwmul_vf:
+      execVfwmul_vf(di);
+      return;
+
+    case InstId::vfmadd_vv:
+      execVfmadd_vv(di);
+      return;
+
+    case InstId::vfmadd_vf:
+      execVfmadd_vf(di);
+      return;
+
+    case InstId::vfnmadd_vv:
+      execVfnmadd_vv(di);
+      return;
+
+    case InstId::vfnmadd_vf:
+      execVfnmadd_vf(di);
+      return;
+
+    case InstId::vfmsub_vv:
+      execVfmsub_vv(di);
+      return;
+
+    case InstId::vfmsub_vf:
+      execVfmsub_vf(di);
+      return;
+
+    case InstId::vfnmsub_vv:
+      execVfnmsub_vv(di);
+      return;
+
+    case InstId::vfnmsub_vf:
+      execVfnmsub_vf(di);
+      return;
+
+    case InstId::vfmacc_vv:
+      execVfmacc_vv(di);
+      return;
+
+    case InstId::vfmacc_vf:
+      execVfmacc_vf(di);
+      return;
+
+    case InstId::vfnmacc_vv:
+      execVfnmacc_vv(di);
+      return;
+
+    case InstId::vfnmacc_vf:
+      execVfnmacc_vf(di);
+      return;
+
+    case InstId::vfmsac_vv:
+      execVfmsac_vv(di);
+      return;
+
+    case InstId::vfmsac_vf:
+      execVfmsac_vf(di);
+      return;
+
+    case InstId::vfnmsac_vv:
+      execVfnmsac_vv(di);
+      return;
+
+    case InstId::vfnmsac_vf:
+      execVfnmsac_vf(di);
+      return;
+
+    case InstId::vfwmacc_vv:
+      execVfwmacc_vv(di);
+      return;
+
+    case InstId::vfwmacc_vf:
+      execVfwmacc_vf(di);
+      return;
+
+    case InstId::vfwnmacc_vv:
+      execVfwnmacc_vv(di);
+      return;
+
+    case InstId::vfwnmacc_vf:
+      execVfwnmacc_vf(di);
+      return;
+
+    case InstId::vfwmsac_vv:
+      execVfwmsac_vv(di);
+      return;
+
+    case InstId::vfwmsac_vf:
+      execVfwmsac_vf(di);
+      return;
+
+    case InstId::vfwnmsac_vv:
+      execVfwnmsac_vv(di);
+      return;
+
+    case InstId::vfwnmsac_vf:
+      execVfwnmsac_vf(di);
+      return;
+
+    case InstId::vfsqrt_v:
+      execVfsqrt_v(di);
+      return;
+
+    case InstId::vfmerge_vfm:
+      execVfmerge_vfm(di);
+      return;
+
+    case InstId::vfmv_v_f:
+      execVfmv_v_f(di);
+      return;
+
+    case InstId::vmfeq_vv:
+      execVmfeq_vv(di);
+      return;
+
+    case InstId::vmfeq_vf:
+      execVmfeq_vf(di);
+      return;
+
+    case InstId::vmfne_vv:
+      execVmfne_vv(di);
+      return;
+
+    case InstId::vmfne_vf:
+      execVmfne_vf(di);
+      return;
+
+    case InstId::vmflt_vv:
+      execVmflt_vv(di);
+      return;
+
+    case InstId::vmflt_vf:
+      execVmflt_vf(di);
+      return;
+
+    case InstId::vmfle_vv:
+      execVmfle_vv(di);
+      return;
+
+    case InstId::vmfle_vf:
+      execVmfle_vf(di);
+      return;
+
+    case InstId::vmfgt_vf:
+      execVmfgt_vf(di);
+      return;
+
+    case InstId::vmfge_vf:
+      execVmfge_vf(di);
+      return;
+
+    case InstId::vfclass_v:
+      execVfclass_v(di);
+      return;
+
+    case InstId::vfcvt_xu_f_v:
+      execVfcvt_xu_f_v(di);
+      return;
+
+    case InstId::vfcvt_x_f_v:
+      execVfcvt_x_f_v(di);
+      return;
+
+    case InstId::vfcvt_rtz_xu_f_v:
+      execVfcvt_rtz_xu_f_v(di);
+      return;
+
+    case InstId::vfcvt_rtz_x_f_v:
+      execVfcvt_rtz_x_f_v(di);
+      return;
+
+    case InstId::vfcvt_f_xu_v:
+      execVfcvt_f_xu_v(di);
+      return;
+
+    case InstId::vfcvt_f_x_v:
+      execVfcvt_f_x_v(di);
+      return;
+
+    case InstId::vfwcvt_xu_f_v:
+      execVfwcvt_xu_f_v(di);
+      return;
+
+    case InstId::vfwcvt_x_f_v:
+      execVfwcvt_x_f_v(di);
+      return;
+
+    case InstId::vfwcvt_rtz_xu_f_v:
+      execVfwcvt_rtz_xu_f_v(di);
+      return;
+
+    case InstId::vfwcvt_rtz_x_f_v:
+      execVfwcvt_rtz_x_f_v(di);
+      return;
+
+    case InstId::vfwcvt_f_xu_v:
+      execVfwcvt_f_xu_v(di);
+      return;
+
+    case InstId::vfwcvt_f_x_v:
+      execVfwcvt_f_x_v(di);
+      return;
+
+    case InstId::vfwcvt_f_f_v:
+      execVfwcvt_f_f_v(di);
+      return;
+
+    case InstId::vfncvt_xu_f_w:
+      execVfncvt_xu_f_w(di);
+      return;
+
+    case InstId::vfncvt_x_f_w:
+      execVfncvt_x_f_w(di);
+      return;
+
+    case InstId::vfncvt_rtz_xu_f_w:
+      execVfncvt_rtz_xu_f_w(di);
+      return;
+
+    case InstId::vfncvt_rtz_x_f_w:
+      execVfncvt_rtz_x_f_w(di);
+      return;
+
+    case InstId::vfncvt_f_xu_w:
+      execVfncvt_f_xu_w(di);
+      return;
+
+    case InstId::vfncvt_f_x_w:
+      execVfncvt_f_x_w(di);
+      return;
+
+    case InstId::vfncvt_f_f_w:
+      execVfncvt_f_f_w(di);
+      return;
+
+    case InstId::vfncvt_rod_f_f_w:
+      execVfncvt_rod_f_f_w(di);
+      return;
+
+    case InstId::vfredsum_vs:
+      execVfredsum_vs(di);
+      return;
+
+    case InstId::vfredosum_vs:
+      execVfredosum_vs(di);
+      return;
+
+    case InstId::vfredmin_vs:
+      execVfredmin_vs(di);
+      return;
+
+    case InstId::vfredmax_vs:
+      execVfredmax_vs(di);
+      return;
+
+    case InstId::vfwredsum_vs:
+      execVfwredsum_vs(di);
+      return;
+
+    case InstId::vfwredosum_vs:
+      execVfwredosum_vs(di);
+      return;
+
+    case InstId::vfrsqrt7_v:
+      execVfrsqrt7_v(di);
+      return;
+
+    case InstId::vfrec7_v:
+      execVfrec7_v(di);
+      return;
+
+    case InstId::vfmin_vv:
+      execVfmin_vv(di);
+      return;
+
+    case InstId::vfmin_vf:
+      execVfmin_vf(di);
+      return;
+
+    case InstId::vfmax_vv:
+      execVfmax_vv(di);
+      return;
+
+    case InstId::vfmax_vf:
+      execVfmax_vf(di);
+      return;
+
+    case InstId::vfsgnj_vv:
+      execVfsgnj_vv(di);
+      return;
+
+    case InstId::vfsgnj_vf:
+      execVfsgnj_vf(di);
+      return;
+
+    case InstId::vfsgnjn_vv:
+      execVfsgnjn_vv(di);
+      return;
+
+    case InstId::vfsgnjn_vf:
+      execVfsgnjn_vf(di);
+      return;
+
+    case InstId::vfsgnjx_vv:
+      execVfsgnjx_vv(di);
+      return;
+
+    case InstId::vfsgnjx_vf:
+      execVfsgnjx_vf(di);
+      return;
+
+    case InstId::aes32dsi:
+      execAes32dsi(di);
+      return;
+
+    case InstId::aes32dsmi:
+      execAes32dsmi(di);
+      return;
+
+    case InstId::aes32esi:
+      execAes32esi(di);
+      return;
+
+    case InstId::aes32esmi:
+      execAes32esmi(di);
+      return;
+
+    case InstId::aes64ds:
+      execAes64ds(di);
+      return;
+
+    case InstId::aes64dsm:
+      execAes64dsm(di);
+      return;
+
+    case InstId::aes64es:
+      execAes64es(di);
+      return;
+
+    case InstId::aes64esm:
+      execAes64esm(di);
+      return;
+
+    case InstId::aes64im:
+      execAes64im(di);
+      return;
+
+    case InstId::aes64ks1i:
+      execAes64ks1i(di);
+      return;
+
+    case InstId::aes64ks2:
+      execAes64ks2(di);
+      return;
+
+    case InstId::sha256sig0:
+      execSha256sig0(di);
+      return;
+
+    case InstId::sha256sig1:
+      execSha256sig1(di);
+      return;
+
+    case InstId::sha256sum0:
+      execSha256sum0(di);
+      return;
+
+    case InstId::sha256sum1:
+      execSha256sum1(di);
+      return;
+
+    case InstId::sha512sig0h:
+      execSha512sig0h(di);
+      return;
+
+    case InstId::sha512sig0l:
+      execSha512sig0l(di);
+      return;
+
+    case InstId::sha512sig1h:
+      execSha512sig1h(di);
+      return;
+
+    case InstId::sha512sig1l:
+      execSha512sig1l(di);
+      return;
+
+    case InstId::sha512sum0r:
+      execSha512sum0r(di);
+      return;
+
+    case InstId::sha512sum1r:
+      execSha512sum1r(di);
+      return;
+
+    case InstId::sha512sig0:
+      execSha512sig0(di);
+      return;
+
+    case InstId::sha512sig1:
+      execSha512sig1(di);
+      return;
+
+    case InstId::sha512sum0:
+      execSha512sum0(di);
+      return;
+
+    case InstId::sha512sum1:
+      execSha512sum1(di);
+      return;
+
+    case InstId::sm3p0:
+      execSm3p0(di);
+      return;
+
+    case InstId::sm3p1:
+      execSm3p1(di);
+      return;
+
+    case InstId::sm4ed:
+      execSm4ed(di);
+      return;
+
+    case InstId::sm4ks:
+      execSm4ks(di);
+      return;
+
+    case InstId::sinval_vma:
+      execSinval_vma(di);
+      return;
+
+    case InstId::sfence_w_inval:
+      execSfence_w_inval(di);
+      return;
+
+    case InstId::sfence_inval_ir:
+      execSfence_inval_ir(di);
+      return;
+
+    case InstId::cbo_clean:
+      execCbo_clean(di);
+      return;
+
+    case InstId::cbo_flush:
+      execCbo_flush(di);
+      return;
+
+    case InstId::cbo_inval:
+      execCbo_inval(di);
+      return;
+
+    case InstId::cbo_zero:
+      execCbo_zero(di);
+      return;
+
+    case InstId::wrs_nto:
+      execWrs_nto(di);
+      return;
+
+    case InstId::wrs_sto:
+      execWrs_sto(di);
+      return;
+
+    case InstId::hfence_vvma:
+      execHfence_vvma(di);
+      return;
+
+    case InstId::hfence_gvma:
+      execHfence_gvma(di);
+      return;
+
+    case InstId::hlv_b:
+      execHlv_b(di);
+      return;
+
+    case InstId::hlv_bu:
+      execHlv_bu(di);
+      return;
+
+    case InstId::hlv_h:
+      execHlv_h(di);
+      return;
+
+    case InstId::hlv_hu:
+      execHlv_hu(di);
+      return;
+
+    case InstId::hlv_w:
+      execHlv_w(di);
+      return;
+
+    case InstId::hlvx_hu:
+      execHlvx_hu(di);
+      return;
+
+    case InstId::hlvx_wu:
+      execHlvx_wu(di);
+      return;
+
+    case InstId::hsv_b:
+      execHsv_b(di);
+      return;
+
+    case InstId::hsv_h:
+      execHsv_h(di);
+      return;
+
+    case InstId::hsv_w:
+      execHsv_w(di);
+      return;
+
+    case InstId::hlv_wu:
+      execHlv_wu(di);
+      return;
+
+    case InstId::hlv_d:
+      execHlv_d(di);
+      return;
+
+    case InstId::hsv_d:
+      execHsv_d(di);
+      return;
+
+    case InstId::hinval_vvma:
+      execHinval_vvma(di);
+      return;
+
+    case InstId::hinval_gvma:
+      execHinval_gvma(di);
+      return;
+    }
+  assert(0 && "Shouldn't be able to get here if all cases above returned");
 }
 
 
