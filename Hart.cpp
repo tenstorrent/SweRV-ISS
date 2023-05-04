@@ -9471,7 +9471,13 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
   if (csRegs_.read(csr, privMode_, value))
     return true;
 
-  illegalInst(di);
+  // Check if HS qualified (section 9.6.1 of privileged spec).
+  bool hsq = virtMode_ and isRvs() and csRegs_.read(csr, PrivilegeMode::Supervisor, value);
+  if (hsq)
+    virtualInst(di);  // HS qualified 
+  else
+    illegalInst(di);
+  
   return false;
 }
 
