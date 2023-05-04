@@ -255,7 +255,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
 		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
-		     CN::SATP, CN::MEDELEG, CN::MIDELEG } )
+		     CN::SENVCFG, CN::SATP, CN::MEDELEG, CN::MIDELEG } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
