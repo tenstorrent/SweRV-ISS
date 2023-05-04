@@ -4543,7 +4543,7 @@ Hart<URV>::openTcpForGdb()
 }
 
 
-extern void (*tracerExtension)(void*);
+extern void (*__tracerExtension)(void*);
 
 
 /// Run indefinitely.  If the tohost address is defined, then run till
@@ -4563,7 +4563,7 @@ Hart<URV>::run(FILE* file)
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
-		  or tracerExtension or hasInterruptor_ or initStateFile_);
+		  or __tracerExtension or hasInterruptor_ or initStateFile_);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 

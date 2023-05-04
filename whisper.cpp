@@ -532,7 +532,7 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
         ("branchwindow", po::value<std::string>(),
          "Trace branches in the last n instructions.")
         ("tracerlib", po::value(&args.tracerLib),
-         "Path to tracer extension shared library which should provide C symbol tracerExtension."
+         "Path to tracer extension shared library which should provide C symbol tracerExtension32 or tracerExtension64."
          "Optionally include arguments after a colon to be exposed to the shared library "
          "as C symbol tracerExtensionArgs (ex. tracer.so or tracer.so:hello42).")
 	("setreg", po::value(&args.regInits)->multitoken(),
@@ -1630,8 +1630,8 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 }
 
 
-void (*tracerExtension)(void*) = nullptr;
-void (*tracerExtensionInit)() = nullptr;
+extern void (*__tracerExtension)(void*);
+void (*__tracerExtensionInit)() = nullptr;
 extern "C" {
   std::string tracerExtensionArgs = "";
 }
@@ -1661,8 +1661,8 @@ loadTracerLibrary(const std::string& tracerLib)
   std::string entry("tracerExtension");
   entry += sizeof(URV) == 4 ? "32" : "64";
 
-  tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, entry.c_str()));
-  if (not tracerExtension)
+  __tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, entry.c_str()));
+  if (not __tracerExtension)
     {
       std::cerr << "Error: Could not find symbol tracerExtension in " << tracerLib << '\n';
       return false;
@@ -1671,9 +1671,9 @@ loadTracerLibrary(const std::string& tracerLib)
   entry = "tracerExtensionInit";
   entry += sizeof(URV) == 4 ? "32" : "64";
 
-  tracerExtensionInit = reinterpret_cast<void (*)()>(dlsym(soPtr, entry.c_str()));
-  if (tracerExtensionInit)
-    tracerExtensionInit();
+  __tracerExtensionInit = reinterpret_cast<void (*)()>(dlsym(soPtr, entry.c_str()));
+  if (__tracerExtensionInit)
+    __tracerExtensionInit();
 
   return true;
 }
