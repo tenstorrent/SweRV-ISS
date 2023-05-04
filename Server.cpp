@@ -257,8 +257,9 @@ receiveMessage(char* shm, WhisperMessage& msg)
   // reserve first byte for locking
   std::atomic_char* guard = (std::atomic_char*) shm;
   while (std::atomic_load(guard) != 's');
-
-  deserializeMessage(shm + 1, sizeof(msg), msg);
+  // Byte alignment for WhisperMessage - get next address after guard aligned on 4-byte boundary.
+  char* buffer = shm + (sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm) % sizeof(uint32_t)));
+  deserializeMessage(buffer, sizeof(msg), msg);
   return true;
 }
 
@@ -269,8 +270,9 @@ sendMessage(char* shm, WhisperMessage& msg)
   // reserve first byte for locking
   std::atomic_char* guard = (std::atomic_char*) shm;
   while (std::atomic_load(guard) != 's'); // redundant
-
-  serializeMessage(msg, shm + 1, sizeof(msg));
+  // Byte alignment for WhisperMessage - get next address after guard aligned on 4-byte boundary.
+  char* buffer = shm + (sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm) % sizeof(uint32_t)));
+  serializeMessage(msg, buffer, sizeof(msg));
   std::atomic_store(guard, 'c');
   return true;
 }
