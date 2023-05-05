@@ -36,13 +36,13 @@ simulator. In particular you would need:
 3. The Whisper source code which can be downloaded from 
    [github.](https://github.com/tenstorrent/SweRV-ISS)
 
-4. The g++ compiler version 10 or higher to compiler Whisper. The g++
+4. The g++ compiler version 12 or higher to compiler Whisper. The g++
    compiler can be installed from a Linux distribution. Alternatively,
    the source code can be downloaded from
    [gnu.org/software/gcc.](https://www.gnu.org/software/gcc)
 
-5. The boost library version 1.67 of higher compiled with c++-14 or
-   c++-17. Boost source can be downloaded from
+5. The boost library version 1.75 of higher compiled with c++-20.
+   Boost source can be downloaded from
    [boost.org.](https://www.boost.org)
 
 
