@@ -1536,6 +1536,11 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	    }
 	  modes.push_back(mode);
 	}
+      if (std::find(modes.begin(), modes.end(), VirtMem::Mode::Bare) == modes.end())
+	{
+	  cerr << "Bare mode added to config file address_translation_modes\n";
+	  modes.push_back(VirtMem::Mode::Bare);
+	}
       if (not atmErrors)
 	hart.configAddressTranslationModes(modes);
       else
