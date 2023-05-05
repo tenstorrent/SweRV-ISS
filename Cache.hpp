@@ -15,10 +15,7 @@
 #pragma once
 
 #include <cstdint>
-#include <map>
-#include <unordered_map>
 #include <vector>
-#include <cassert>
 
 
 namespace WdRiscv

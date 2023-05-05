@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <boost/algorithm/string.hpp>
 #include <iomanip>
 
 #include <unistd.h>
@@ -132,7 +131,7 @@ loadVecRegNumAndValue(std::istream& stream, unsigned& num,
   if (not (stream >> vvs))
     return false;
 
-  if (not (boost::starts_with(vvs, "0x") or boost::starts_with(vvs, "0X")))
+  if (not (vvs.starts_with("0x") or vvs.starts_with("0X")))
     return false;
 
   vvs = vvs.substr(2);  // Skip leading 0x

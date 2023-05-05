@@ -2,7 +2,7 @@
 
 
 image:
-  name: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/risc-p-cores/risc-p-cores/dev:67bb6d2970e9174de23ecb3bf20fa9ca01b1921437a2694789a56e3c272f5793
+  name: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/risc-p-cores/risc-p-cores/dev:27700ba4afaf78ea2e5e432a0032234db5b0837d4da1fdb906e9dbdcc5fe661b
   entrypoint: [""]
 
 
@@ -25,7 +25,7 @@ stages:
 build-job:
   stage: build
   script:
-    - make SOFT_FLOAT=1 STATIC_LINK=0 -j32
+    - CC=clang CXX=clang++ make SOFT_FLOAT=1 STATIC_LINK=0 -j32
   artifacts:
     paths:
       - build-Linux/whisper

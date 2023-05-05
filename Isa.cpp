@@ -1,4 +1,4 @@
-#include <boost/algorithm/string.hpp>
+#include <cassert>
 #include <charconv>
 #include <iostream>
 #include "Isa.hpp"
@@ -339,9 +339,9 @@ Isa::applyIsaString(std::string_view isaStr)
   std::string_view isa = isaStr;
 
   // Check and skip rv prefix.
-  if (boost::starts_with(isa, "rv32") or boost::starts_with(isa, "rv64"))
+  if (isa.starts_with("rv32") or isa.starts_with("rv64"))
     isa = isa.substr(4);
-  else if (boost::starts_with(isa, "rv") and isa.size() > 2 and std::isdigit(isa.at(2)))
+  else if (isa.starts_with("rv") and isa.size() > 2 and std::isdigit(isa.at(2)))
     {
       std::cerr << "Unsupported ISA: " << isa << '\n';
       return false;

@@ -101,7 +101,7 @@ template <typename URV>
 Csr<URV>*
 CsRegs<URV>::findCsr(std::string_view name)
 {
-  const auto iter = nameToNumber_.find(std::string(name)); // The string constructor can be avoided in C++20
+  const auto iter = nameToNumber_.find(name);
   if (iter == nameToNumber_.end())
     return nullptr;
 
@@ -655,7 +655,7 @@ bool
 CsRegs<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
                        URV mask, URV pokeMask, bool isDebug, bool shared)
 {
-  auto iter = nameToNumber_.find(std::string(name)); // The string constructor can be avoided in C++20
+  auto iter = nameToNumber_.find(name);
   if (iter == nameToNumber_.end())
     return false;
 

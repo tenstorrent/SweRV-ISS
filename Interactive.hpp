@@ -18,6 +18,7 @@
 #include <unordered_map>
 #include "System.hpp"
 #include "Hart.hpp"
+#include "util.hpp"
 
 
 namespace WdRiscv
@@ -143,7 +144,7 @@ namespace WdRiscv
 		     FILE* commandLog,
 		     std::ifstream& replayStream, bool& done);
 
-    typedef std::unordered_map<std::string, std::string> StringMap;
+    typedef std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>> StringMap;
 
     /// Process time=<number>, and/or hart=<number>
     /// tokens present in an interactive command. Update time_,

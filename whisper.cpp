@@ -1996,9 +1996,9 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
   unsigned isaLen = 0;
   if (not args.isa.empty())
     {
-      if (boost::starts_with(args.isa, "rv32"))
+      if (args.isa.starts_with("rv32"))
 	isaLen = 32;
-      else if (boost::starts_with(args.isa, "rv64"))
+      else if (args.isa.starts_with("rv64"))
 	isaLen = 64;
     }
 

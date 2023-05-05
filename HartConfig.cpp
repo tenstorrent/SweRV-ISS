@@ -17,6 +17,8 @@
 #include <charconv>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
+#include <unordered_set>
 #include "HartConfig.hpp"
 #include "System.hpp"
 #include "Core.hpp"
