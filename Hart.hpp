@@ -354,6 +354,9 @@ namespace WdRiscv
     void configEventNumber(URV userNumber, EventNumber eventId)
     { csRegs_.mPerfRegs_.configEventNumber(userNumber, eventId); }
 
+    void configAddressTranslationModes(const std::vector<VirtMem::Mode>& modes)
+    { virtMem_.setSupportedModes(modes); }
+
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
     /// flag is true.
