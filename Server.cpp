@@ -217,8 +217,7 @@ receiveMessage(int soc, WhisperMessage& msg)
       p += l;
     }
 
-  memcpy(&msg, buffer, sizeof(msg));
-  //deserializeMessage(buffer, sizeof(buffer), msg);
+  deserializeMessage(buffer, sizeof(buffer), msg);
 
   return true;
 }
