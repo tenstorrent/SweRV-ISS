@@ -37,7 +37,8 @@ namespace WdRiscv
     friend class Hart<uint32_t>;
     friend class Hart<uint64_t>;
 
-    enum Mode { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10, Sv64 = 11 };
+    enum Mode { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10, Sv64 = 11,
+		Limit_ = 12};
 
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
             PmpManager& pmpMgr, unsigned tlbSize);
@@ -143,6 +144,27 @@ namespace WdRiscv
     unsigned numDataWalks() const
     { return dataWalks_.size(); }
 
+    /// Mark items in the modes array as supported translation modes.
+    void setSupportedModes(const std::vector<Mode>& modes)
+    {
+      std::fill(supportedModes_.begin(), supportedModes_.end(), false);
+      for (auto mode : modes)
+	{
+	  unsigned ix = unsigned(mode);
+	  if (ix < supportedModes_.size())
+	    supportedModes_.at(ix) = true;
+	}
+    }
+
+    /// Return true if given mode is supported. On construction all
+    /// modes are supported but that can be modified with
+    /// setSupportedModes.
+    bool isModeSupported(Mode mode)
+    {
+      unsigned ix = unsigned(mode);
+      return ix < supportedModes_.size() ? supportedModes_.at(ix) : false;
+    }
+
     /// Return the addresses of the instruction page table entries
     /// used in the last page table walk. Return empty vector if the
     /// last executed instruction did not induce an instruction page
@@ -191,6 +213,33 @@ namespace WdRiscv
           case 4: return "256T";
           default: return "";
         }
+    }
+
+    /// Return string representing translation mode. Example: Sv32 yields "sv32".
+    static constexpr std::string_view to_string(Mode mode)
+    {
+      using namespace std::string_view_literals;
+      constexpr auto vec =
+        std::array{"bare"sv, "sv32"sv, "sv?"sv, "sv?"sv, "sv?"sv, "sv?"sv,
+		   "sv?"sv, "sv?"sv, "sv39"sv, "sv48"sv, "sv57"sv, "sv64"sv};
+      return size_t(mode) < vec.size()? vec.at(size_t(mode)) : "sv?";
+    }
+
+    /// Set mode to the translation mode corresponding to modeStr
+    /// returning true if successful. Return false leaving mode
+    /// unmodified if modeStr does not correspond to a mode.
+    static bool to_mode(std::string_view modeStr, Mode& mode)
+    {
+      static const std::unordered_map<std::string_view, Mode> map(
+        { {"bare", Mode::Bare }, {"sv32", Mode::Sv32 }, {"sv39", Mode::Sv39 },
+	  {"sv48", Mode::Sv48 }, {"sv57", Mode::Sv57 }, {"sv64", Mode::Sv64 } });
+      auto iter = map.find(modeStr);
+      if (iter != map.end())
+	{
+	  mode = iter->second;
+	  return true;
+	}
+      return false;
     }
 
   protected:
@@ -459,6 +508,8 @@ namespace WdRiscv
     bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read
 
     FILE* attFile_ = nullptr;
+
+    std::vector<bool> supportedModes_; // Indexed by Mode.
 
     // Addresses of PTEs used in most recent insruction an data translations.
     typedef std::vector<uint64_t> Walk;

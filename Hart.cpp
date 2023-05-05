@@ -116,6 +116,8 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   // held in the hart.
   if constexpr (sizeof(URV) == 4)
     {
+      virtMem_.setSupportedModes({VirtMem::Mode::Bare, VirtMem::Mode::Sv32});
+
       URV* low = reinterpret_cast<URV*> (&retiredInsts_);
       csRegs_.findCsr(CsrNumber::MINSTRET)->tie(low);
       csRegs_.findCsr(CsrNumber::INSTRET)->tie(low);
@@ -138,6 +140,9 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
     }
   else
     {
+      virtMem_.setSupportedModes({VirtMem::Mode::Bare, VirtMem::Mode::Sv39,
+	  VirtMem::Mode::Sv48, VirtMem::Mode::Sv57 });
+
       csRegs_.findCsr(CsrNumber::MINSTRET)->tie(&retiredInsts_);
       csRegs_.findCsr(CsrNumber::MCYCLE)->tie(&cycleCount_);
 
@@ -9542,6 +9547,18 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
       URV cMask = URV(1) << ('c' - 'a');
       if (misa and (misa->getWriteMask() & cMask) and (val & cMask) == 0)
 	return;  // Cannot turn-off C-extension if PC is not word aligned.
+    }
+
+  if (csr == CsrNumber::SATP)
+    {
+      unsigned modeBits = 0;
+      if constexpr (sizeof(URV) == 4)
+	modeBits = (val >> 31) & 1;
+      else
+	modeBits = (val >> 60) & 0xf;
+      VirtMem::Mode mode = VirtMem::Mode(modeBits);
+      if (not virtMem_.isModeSupported(mode))
+	return;
     }
 
   // Update CSR.

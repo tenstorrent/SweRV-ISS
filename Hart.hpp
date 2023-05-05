@@ -4496,6 +4496,7 @@ namespace WdRiscv
     bool bigEnd_ = false;   // True if big endian
 
     VirtMem virtMem_;
+
     Isa isa_;
     Decoder decoder_;
     Disassembler disas_;
