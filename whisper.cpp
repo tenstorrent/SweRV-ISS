@@ -1197,6 +1197,9 @@ runServer(System<URV>& system, const std::string& serverFile,
       return -1;
     }
 
+  int one = 1;
+  setsockopt(soc, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+
   sockaddr_in serverAddr;
   memset(&serverAddr, 0, sizeof(serverAddr));
   serverAddr.sin_family = AF_INET;
@@ -1243,6 +1246,9 @@ runServer(System<URV>& system, const std::string& serverFile,
       perror("Socket accept failed");
       return false;
     }
+
+  one = 1;
+  setsockopt(newSoc, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 
   bool ok = true;
 
