@@ -18,6 +18,7 @@
 #include <memory>               // For shared_ptr
 #include <functional>
 #include <string_view>
+#include <unordered_map>
 #include "Memory.hpp"
 #include "SparseMem.hpp"
 

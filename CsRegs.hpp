@@ -24,6 +24,7 @@
 #include "Triggers.hpp"
 #include "PerfRegs.hpp"
 #include "CsrFields.hpp"
+#include "util.hpp"
 
 
 namespace WdRiscv
@@ -1386,7 +1387,7 @@ namespace WdRiscv
 
     bool rv32_ = sizeof(URV) == 4;
     std::vector< Csr<URV> > regs_;
-    std::unordered_map<std::string, CsrNumber> nameToNumber_;
+    std::unordered_map<std::string, CsrNumber, util::string_hash, std::equal_to<>> nameToNumber_;
 
     Triggers<URV> triggers_;
 

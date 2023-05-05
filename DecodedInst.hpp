@@ -14,9 +14,8 @@
 
 #pragma once
 
+#include <string_view>
 #include <vector>
-#include <string>
-#include <unordered_map>
 #include "InstEntry.hpp"
 #include "InstId.hpp"
 

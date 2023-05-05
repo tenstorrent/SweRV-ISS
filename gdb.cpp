@@ -17,7 +17,6 @@
 #include <iostream>
 #include <sstream>
 #include <boost/format.hpp>
-#include <boost/algorithm/string.hpp>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include "Hart.hpp"
@@ -429,7 +428,7 @@ void
 processXferQuery(const std::string& packet, WdRiscv::Hart<URV>& hart,
                  std::ostream& reply)
 {
-  if (not boost::starts_with(packet, "qXfer:features:read:target.xml:"))
+  if (not packet.starts_with("qXfer:features:read:target.xml:"))
     {
       reply << "";
       return;
@@ -735,9 +734,9 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd)
 	    reply << "l";
 	  else if (packet == "qTStatus")
 	    reply << "T0;tnotrun:0";
-          else if (boost::starts_with(packet, "qSupported"))
+          else if (packet.starts_with("qSupported"))
             reply << "qXfer:features:read+";
-          else if (boost::starts_with(packet, "qXfer"))
+          else if (packet.starts_with("qXfer"))
             processXferQuery(packet, hart, reply);
 	  else
 	    {

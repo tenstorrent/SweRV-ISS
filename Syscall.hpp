@@ -18,7 +18,7 @@
 #include <unordered_set>
 #include <map>
 #include <string>
-
+#include "util.hpp"
 
 
 namespace WdRiscv
@@ -142,8 +142,8 @@ namespace WdRiscv
     std::unordered_map<int, int> fdMap_;
     std::unordered_map<int, bool> fdIsRead_;
     std::unordered_map<int, std::string> fdPath_;
-    std::unordered_set<std::string> readPaths_;
-    std::unordered_set<std::string> writePaths_;
+    std::unordered_set<std::string, util::string_hash, std::equal_to<>> readPaths_;
+    std::unordered_set<std::string, util::string_hash, std::equal_to<>> writePaths_;
 
     std::vector<AddrLen> memChanges_;  // Memory locations changed by syscall.
   };

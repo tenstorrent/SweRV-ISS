@@ -15,7 +15,6 @@
 #pragma once
 
 #include <vector>
-#include <unordered_map>
 #include "InstId.hpp"
 #include "VecRegs.hpp"
 
