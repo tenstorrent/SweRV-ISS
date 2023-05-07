@@ -276,6 +276,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
       switch (f6)
         {
         case 0:    return instTable_.getEntry(InstId::vadd_vv);
+        case 1:    return instTable_.getEntry(InstId::vandn_vv);
         case 2:    return instTable_.getEntry(InstId::vsub_vv);
         case 4:    return instTable_.getEntry(InstId::vminu_vv);
         case 5:    return instTable_.getEntry(InstId::vmin_vv);
@@ -290,6 +291,8 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x11: return instTable_.getEntry(InstId::vmadc_vvm);
         case 0x12: return instTable_.getEntry(InstId::vsbc_vvm);
         case 0x13: return instTable_.getEntry(InstId::vmsbc_vvm);
+	case 0x14: return instTable_.getEntry(InstId::vrol_vv);
+	case 0x15: return instTable_.getEntry(InstId::vrol_vv);
         case 0x17:
           if (vm == 0) return instTable_.getEntry(InstId::vmerge_vvm);
           if (vm == 1)
@@ -320,6 +323,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x2f: return instTable_.getEntry(InstId::vnclip_wv);
         case 0x30: return instTable_.getEntry(InstId::vwredsumu_vs);
         case 0x31: return instTable_.getEntry(InstId::vwredsum_vs);
+	case 0x35: return instTable_.getEntry(InstId::vwsll_vv);
         }
       return instTable_.getEntry(InstId::illegal);  
     }
@@ -448,6 +452,8 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 9:    return instTable_.getEntry(InstId::vaadd_vv);
         case 0xa:  return instTable_.getEntry(InstId::vasubu_vv);
         case 0xb:  return instTable_.getEntry(InstId::vasub_vv);
+	case 0xc:  return instTable_.getEntry(InstId::vclmul_vv);
+	case 0xd:  return instTable_.getEntry(InstId::vclmulh_vv);
         case 0x10:
           if (op2 == 0)    return instTable_.getEntry(InstId::vmv_x_s);
           if (op2 == 0x10) return instTable_.getEntry(InstId::vcpop_m);
@@ -460,6 +466,12 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           if (op2 == 3)  return instTable_.getEntry(InstId::vsext_vf8);
           if (op2 == 5)  return instTable_.getEntry(InstId::vsext_vf4);
           if (op2 == 7)  return instTable_.getEntry(InstId::vsext_vf2);
+	  if (op2 == 8)  return instTable_.getEntry(InstId::vbrev8_v);
+	  if (op2 == 9)  return instTable_.getEntry(InstId::vrev8_v);
+	  if (op2 == 10)  return instTable_.getEntry(InstId::vbrev_v);
+	  if (op2 == 12)  return instTable_.getEntry(InstId::vclz_v);
+	  if (op2 == 13)  return instTable_.getEntry(InstId::vctz_v);
+	  if (op2 == 14)  return instTable_.getEntry(InstId::vcpop_v);
           return instTable_.getEntry(InstId::illegal);
         case 0x14:
           if (op2 == 1)    return instTable_.getEntry(InstId::vmsbf_m);
@@ -541,7 +553,9 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0xf:  op2 = uimm; return instTable_.getEntry(InstId::vslidedown_vi);
         case 0x10: return instTable_.getEntry(InstId::vadc_vim);
         case 0x11: return instTable_.getEntry(InstId::vmadc_vim);
-        case 0x17:
+	case 0x14: return instTable_.getEntry(InstId::vror_vi); // Bit 26 is zero.
+	case 0x15: op2 = uimm | 0x2f; return instTable_.getEntry(InstId::vror_vi); // Bit 26 is 1.
+	case 0x17:
           if (vm == 0) return instTable_.getEntry(InstId::vmerge_vim);
           if (vm == 1)
             {
@@ -573,6 +587,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x2d: op2 = uimm; return instTable_.getEntry(InstId::vnsra_wi);
         case 0x2e: op2 = uimm; return instTable_.getEntry(InstId::vnclipu_wi);
         case 0x2f: op2 = uimm; return instTable_.getEntry(InstId::vnclip_wi);
+	case 0x35: op2 = uimm; return instTable_.getEntry(InstId::vwsll_vi);
         }
       return instTable_.getEntry(InstId::illegal);  
     }
@@ -586,6 +601,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
       switch (f6)
         {
         case 0:    return instTable_.getEntry(InstId::vadd_vx);
+        case 1:    return instTable_.getEntry(InstId::vandn_vx);
         case 2:    return instTable_.getEntry(InstId::vsub_vx);
         case 3:    return instTable_.getEntry(InstId::vrsub_vx);
         case 4:    return instTable_.getEntry(InstId::vminu_vx);
@@ -602,6 +618,8 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x11: return instTable_.getEntry(InstId::vmadc_vxm);
         case 0x12: return instTable_.getEntry(InstId::vsbc_vxm);
         case 0x13: return instTable_.getEntry(InstId::vmsbc_vxm);
+	case 0x14: return instTable_.getEntry(InstId::vror_vx);
+	case 0x15: return instTable_.getEntry(InstId::vrol_vx);
         case 0x17:
           if (vm == 0) return instTable_.getEntry(InstId::vmerge_vxm);
           if (vm == 1)
@@ -632,6 +650,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x2d: return instTable_.getEntry(InstId::vnsra_wx);
         case 0x2e: return instTable_.getEntry(InstId::vnclipu_wx);
         case 0x2f: return instTable_.getEntry(InstId::vnclip_wx);
+	case 0x35: return instTable_.getEntry(InstId::vwsll_vx);
         }
       return instTable_.getEntry(InstId::illegal);  
     }
@@ -648,6 +667,8 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 9:    return instTable_.getEntry(InstId::vaadd_vx);
         case 0xa:  return instTable_.getEntry(InstId::vasubu_vx);
         case 0xb:  return instTable_.getEntry(InstId::vasub_vx);
+        case 0xc:  return instTable_.getEntry(InstId::vclmul_vx);
+        case 0xd:  return instTable_.getEntry(InstId::vclmulh_vx);
         case 0xe:   return instTable_.getEntry(InstId::vslide1up_vx);
         case 0xf:   return instTable_.getEntry(InstId::vslide1down_vx);
         case 0x10:
@@ -1174,6 +1195,113 @@ Decoder::decodeVecStore(uint32_t f3, uint32_t imm12, uint32_t& fieldCount) const
     }
 
   return instTable_.getEntry(InstId::illegal);
+}
+
+
+const InstEntry&
+Decoder::decodeVecCrypto(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) const
+{
+  RFormInst rform(inst);
+  unsigned f3 = rform.bits.funct3, f6 = rform.top6();
+  unsigned vm = (inst >> 25) & 1;
+  bool masked = vm == 0;
+  const InstEntry& illegal = instTable_.getEntry(InstId::illegal);
+
+  if (f3 == 2)
+    {
+      op0 = rform.bits.rd;
+      op1 = rform.bits.rs2; // operand order reversed
+      op2 = rform.bits.rs1;
+
+      switch(f6)
+	{
+	case 0x18:
+	  if (op2 == 0 and not masked)
+	    return instTable_.getEntry(InstId::vaesdm_vv);
+	  if (op2 == 1 and not masked)
+	    return instTable_.getEntry(InstId::vaesdf_vv);
+	  if (op2 == 2 and not masked)
+	    return instTable_.getEntry(InstId::vaesem_vv);
+	  if (op2 == 3 and not masked)
+	    return instTable_.getEntry(InstId::vaesef_vv);
+	  if (op2 == 0x11 and not masked)
+	    return instTable_.getEntry(InstId::vgmul_vv);
+	  break;
+
+	case 0x19:
+	  if (op2 == 0 and not masked)
+	    return instTable_.getEntry(InstId::vaesdm_vs);
+	  if (op2 == 1 and not masked)
+	    return instTable_.getEntry(InstId::vaesdf_vs);
+	  if (op2 == 2 and not masked)
+	    return instTable_.getEntry(InstId::vaesem_vs);
+	  if (op2 == 3 and not masked)
+	    return instTable_.getEntry(InstId::vaesef_vs);
+	  break;
+
+	case 0x1d:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vsha2ms_vv);
+	  break;
+
+	case 0x20:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vsm3me_vv);
+	  break;
+
+	case 0x21:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vsm4k_vi);
+	  break;
+
+	case 0x22:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vaeskf1_vi);
+	  break;
+
+	case 0x2b:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vsm3c_vi);
+	  break;
+
+	case 0x28:
+	  if (op2 == 8 and not masked)
+	    return instTable_.getEntry(InstId::vsm4r_vv);
+	  break;
+
+	case 0x29:
+	  if (op2 == 7 and not masked)
+	    return instTable_.getEntry(InstId::vaesz_vs);
+	  if (op2 == 8 and not masked)
+	    return instTable_.getEntry(InstId::vsm4r_vs);
+	  break;
+
+	case 0x2a:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vaeskf2_vi);
+	  break;
+
+	case 0x2c:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vghsh_vv);
+	  break;
+
+	case 0x2e:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vsha2ch_vv);
+	  break;
+
+	case 0x2f:
+	  if (not masked)
+	    return instTable_.getEntry(InstId::vsha2cl_vv);
+	  break;
+
+	default:
+	  return illegal;
+	}
+    }
+
+  return illegal;
 }
 
 
@@ -1999,7 +2127,11 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0b10110:
         case 0b10111:
         case 0b11010:
+          return instTable_.getEntry(InstId::illegal);
+
         case 0b11101:
+	  return decodeVecCrypto(inst, op0, op1, op2);
+
         case 0b11110:
         case 0b11111:
           return instTable_.getEntry(InstId::illegal);

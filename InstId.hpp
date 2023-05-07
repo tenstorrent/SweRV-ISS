@@ -927,6 +927,61 @@ namespace WdRiscv
      vfsgnjx_vv,
      vfsgnjx_vf,
 
+     // Vector crypto (Zvbbb)
+     vandn_vv,
+     vandn_vx,
+     vbrev_v,
+     vbrev8_v,
+     vrev8_v,
+     vclz_v,
+     vctz_v,
+     vcpop_v,
+     vrol_vv,
+     vrol_vx,
+     vror_vv,
+     vror_vx,
+     vror_vi,
+     vwsll_vv,
+     vwsll_vx,
+     vwsll_vi,
+
+     // Vector crypto (Zvbc)
+     vclmul_vv,
+     vclmul_vx,
+     vclmulh_vv,
+     vclmulh_vx,
+
+     // Vector crypto (zvkg)
+     vghsh_vv,
+     vgmul_vv,
+
+     // Vector crypto (zvkned)
+     vaesdf_vv,
+     vaesdf_vs,
+     vaesef_vv,
+     vaesef_vs,
+     vaesem_vv,
+     vaesem_vs,
+     vaesdm_vv,
+     vaesdm_vs,
+     vaeskf1_vi,
+     vaeskf2_vi,
+     vaesz_vs,
+
+     // Vector crypto (Zvknha/b)
+     vsha2ms_vv,
+     vsha2ch_vv,
+     vsha2cl_vv,
+
+     // Vector crypto (Zvksed)
+     vsm4k_vi,
+     vsm4r_vv,
+     vsm4r_vs,
+
+     // Vector crypto (Zvksh)
+     vsm3me_vv,
+     vsm3c_vi,
+
      // Crypto (rvk)
      aes32dsi,
      aes32dsmi,
