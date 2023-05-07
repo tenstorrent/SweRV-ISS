@@ -8303,6 +8303,170 @@ Hart<URV>::execute(const DecodedInst* di)
       execVfsgnjx_vf(di);
       return;
 
+    case InstId::vandn_vv:
+      execVandn_vv(di);
+      return;
+
+    case InstId::vandn_vx:
+      execVandn_vx(di);
+      return;
+
+    case InstId::vbrev_v:
+      execVbrev_v(di);
+      return;
+
+    case InstId::vbrev8_v:
+      execVbrev8_v(di);
+      return;
+
+    case InstId::vrev8_v:
+      execVrev8_v(di);
+      return;
+
+    case InstId::vclz_v:
+      execVclz_v(di);
+      return;
+
+    case InstId::vctz_v:
+      execVctz_v(di);
+      return;
+
+    case InstId::vcpop_v:
+      execVcpop_v(di);
+      return;
+
+    case InstId::vrol_vv:
+      execVrol_vv(di);
+      return;
+
+    case InstId::vrol_vx:
+      execVrol_vx(di);
+      return;
+
+    case InstId::vror_vv:
+      execVror_vv(di);
+      return;
+
+    case InstId::vror_vx:
+      execVror_vx(di);
+      return;
+
+    case InstId::vror_vi:
+      execVror_vi(di);
+      return;
+
+    case InstId::vwsll_vv:
+      execVwsll_vv(di);
+      return;
+
+    case InstId::vwsll_vx:
+      execVwsll_vx(di);
+      return;
+
+    case InstId::vwsll_vi:
+      execVwsll_vi(di);
+      return;
+
+    case InstId::vclmul_vv:
+      execVclmul_vv(di);
+      return;
+
+    case InstId::vclmul_vx:
+      execVclmul_vx(di);
+      return;
+
+    case InstId::vclmulh_vv:
+      execVclmulh_vv(di);
+      return;
+
+    case InstId::vclmulh_vx:
+      execVclmulh_vx(di);
+      return;
+
+    case InstId::vghsh_vv:
+      execVghsh_vv(di);
+      return;
+
+    case InstId::vgmul_vv:
+      execVgmul_vv(di);
+      return;
+
+    case InstId::vaesdf_vv:
+      execVaesdf_vv(di);
+      return;
+
+    case InstId::vaesdf_vs:
+      execVaesdf_vs(di);
+      return;
+
+    case InstId::vaesef_vv:
+      execVaesef_vv(di);
+      return;
+
+    case InstId::vaesef_vs:
+      execVaesef_vs(di);
+      return;
+
+    case InstId::vaesem_vv:
+      execVaesem_vv(di);
+      return;
+
+    case InstId::vaesem_vs:
+      execVaesem_vs(di);
+      return;
+
+    case InstId::vaesdm_vv:
+      execVaesdm_vv(di);
+      return;
+
+    case InstId::vaesdm_vs:
+      execVaesdm_vs(di);
+      return;
+
+    case InstId::vaeskf1_vi:
+      execVaeskf1_vi(di);
+      return;
+
+    case InstId::vaeskf2_vi:
+      execVaeskf2_vi(di);
+      return;
+
+    case InstId::vaesz_vs:
+      execVaesz_vs(di);
+      return;
+
+    case InstId::vsha2ms_vv:
+      execVsha2ms_vv(di);
+      return;
+
+    case InstId::vsha2ch_vv:
+      execVsha2ch_vv(di);
+      return;
+
+    case InstId::vsha2cl_vv:
+      execVsha2cl_vv(di);
+      return;
+
+    case InstId::vsm4k_vi:
+      execVsm4k_vi(di);
+      return;
+
+    case InstId::vsm4r_vv:
+      execVsm4r_vv(di);
+      return;
+
+    case InstId::vsm4r_vs:
+      execVsm4r_vs(di);
+      return;
+
+    case InstId::vsm3me_vv:
+      execVsm3me_vv(di);
+      return;
+
+    case InstId::vsm3c_vi:
+      execVsm3c_vi(di);
+      return;
+
     case InstId::aes32dsi:
       execAes32dsi(di);
       return;
