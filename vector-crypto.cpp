@@ -797,7 +797,42 @@ template <typename URV>
 void
 Hart<URV>::execVror_vi(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  int32_t imm = di->op2As<int32_t>();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  URV e2 = imm;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Half:
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Word:
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Word2:
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
