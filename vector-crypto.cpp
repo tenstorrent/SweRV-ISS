@@ -87,6 +87,7 @@ void
 Hart<URV>::execVandn_vx(const DecodedInst* di)
 {
   postVecFail(di);  // Temporary
+  return; // Temporary
 
   if (not checkVecIntInst(di))
     return;
@@ -126,11 +127,127 @@ Hart<URV>::execVandn_vx(const DecodedInst* di)
 }
 
 
+template<typename T>
+T
+bitReverse(T x)
+{
+  T result{0};
+  unsigned bitCount = sizeof(T)*8;
+  for (unsigned i = 0; i < bitCount; ++i, x >>= 1)
+    result |= (x & T{1}) << (bitCount - 1 - i);
+  return result;
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vbrev_v(unsigned vd, unsigned vs1, unsigned group,
+		   unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1 = 0, dest = 0;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = bitReverse(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
 template <typename URV>
 void
 Hart<URV>::execVbrev_v(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di);  // Temporary
+  return; // Temporary
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vbrev_v<uint8_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Half:
+      vbrev_v<uint16_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      vbrev_v<uint32_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word2:
+      vbrev_v<uint64_t>(vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1 = 0, dest = 0;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+	  ELEM_TYPE result{0};
+	  for (unsigned byteIx = 0; byteIx < sizeof(e1); ++byteIx)
+	    {
+	      uint8_t byte = (e1 >> 8*byteIx); // Ith least sig byte of e1
+	      byte = bitReverse(byte);
+	      result |= ELEM_TYPE{byte} << 8*byteIx;
+	    }
+          dest = result;
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
 }
 
 
@@ -138,7 +255,73 @@ template <typename URV>
 void
 Hart<URV>::execVbrev8_v(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di);  // Temporary
+  return; // Temporary
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vbrev8_v<uint8_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Half:
+      vbrev8_v<uint16_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      vbrev8_v<uint32_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word2:
+      vbrev8_v<uint64_t>(vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vrev8_v(unsigned vd, unsigned vs1, unsigned group,
+		   unsigned start, unsigned elems, bool masked)
+{
+  unsigned errors = 0;
+  ELEM_TYPE e1 = 0, dest = 0;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, group);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = util::byteswap(e1);
+          if (not vecRegs_.write(vd, ix, group, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
 }
 
 
@@ -146,7 +329,42 @@ template <typename URV>
 void
 Hart<URV>::execVrev8_v(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di);  // Temporary
+  return; // Temporary
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vrev8_v<uint8_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Half:
+      vrev8_v<uint16_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word:
+      vrev8_v<uint32_t>(vd, vs1, group, start, elems, masked);
+      break;
+    case EW::Word2:
+      vrev8_v<uint64_t>(vd, vs1, group, start, elems, masked);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
