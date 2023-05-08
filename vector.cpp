@@ -3309,11 +3309,9 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
 }
 
 
-template <typename T>
-struct MyMin : public std::binary_function<T, T, T>
+struct MyMin
 {
-  MyMin() {};
-
+  template <typename T>
   constexpr T operator() (const T& a, const T& b) const
   { return a < b ? a : b; }
 };
@@ -3340,16 +3338,16 @@ Hart<URV>::execVminu_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<uint8_t>());
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     case EW::Half:
-      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<uint16_t>());
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     case EW::Word:
-      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<uint32_t>());
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     case EW::Word2:
-      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<uint64_t>());
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     default:
       postVecFail(di);
@@ -3382,16 +3380,16 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMin<uint8_t>());
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMin<uint16_t>());
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMin<uint32_t>());
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMin<uint64_t>());
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     default:
       postVecFail(di);
@@ -3423,16 +3421,16 @@ Hart<URV>::execVmin_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<int8_t>());
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     case EW::Half:
-      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<int16_t>());
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     case EW::Word:
-      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<int32_t>());
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     case EW::Word2:
-      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyMin<int64_t>());
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
       break;
     default:
       postVecFail(di);
@@ -3465,16 +3463,16 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMin<int8_t>());
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMin<int16_t>());
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMin<int32_t>());
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMin<int64_t>());
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
       break;
     default:
       postVecFail(di);
@@ -3485,11 +3483,9 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
 }
 
 
-template <typename T>
-struct MyMax : public std::binary_function<T, T, T>
+struct MyMax
 {
-  MyMax() {};
-
+  template <typename T>
   constexpr T operator() (const T& a, const T& b) const
   { return a > b ? a : b; }
 };
@@ -3516,16 +3512,16 @@ Hart<URV>::execVmaxu_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<uint8_t>());
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     case EW::Half:
-      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<uint16_t>());
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     case EW::Word:
-      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<uint32_t>());
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     case EW::Word2:
-      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<uint64_t>());
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     default:
       postVecFail(di);
@@ -3558,16 +3554,16 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMax<uint8_t>());
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMax<uint16_t>());
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMax<uint32_t>());
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMax<uint64_t>());
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     default:
       postVecFail(di);
@@ -3599,16 +3595,16 @@ Hart<URV>::execVmax_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<int8_t>());
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     case EW::Half:
-      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<int16_t>());
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     case EW::Word:
-      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<int32_t>());
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     case EW::Word2:
-      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyMax<int64_t>());
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
       break;
     default:
       postVecFail(di);
@@ -3641,16 +3637,16 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMax<int8_t>());
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMax<int16_t>());
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMax<int32_t>());
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMax<int64_t>());
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
       break;
     default:
       postVecFail(di);

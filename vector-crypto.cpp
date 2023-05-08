@@ -30,11 +30,9 @@ using namespace WdRiscv;
 
 
 /// Function operator to compute bitwise a and not b (a & ~b).
-template <typename T>
-struct MyAndn : public std::binary_function<T, T, T>
+struct MyAndn 
 {
-  MyAndn() {};
-
+  template <typename T>
   constexpr T operator() (const T& a, const T& b) const
   { return a & ~b; }
 };
@@ -64,16 +62,16 @@ Hart<URV>::execVandn_vv(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint8_t>());
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn());
       break;
     case EW::Half:
-      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint16_t>());
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn());
       break;
     case EW::Word:
-      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint32_t>());
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn());
       break;
     case EW::Word2:
-      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint64_t>());
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn());
       break;
     default:
       postVecFail(di);
@@ -108,16 +106,16 @@ Hart<URV>::execVandn_vx(const DecodedInst* di)
   switch (sew)
     {
     case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyAndn<int8_t>());
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyAndn());
       break;
     case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyAndn<int16_t>());
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyAndn());
       break;
     case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyAndn<int32_t>());
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyAndn());
       break;
     case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyAndn<int64_t>());
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyAndn());
       break;
     default:
       postVecFail(di);
