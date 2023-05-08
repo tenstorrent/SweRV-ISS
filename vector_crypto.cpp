@@ -31,329 +31,329 @@ using namespace WdRiscv;
 
 template <typename URV>
 void
-Hart<URV>::execVandn_vv(const DecodedInst*)
+Hart<URV>::execVandn_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVandn_vx(const DecodedInst*)
+Hart<URV>::execVandn_vx(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVbrev_v(const DecodedInst*)
+Hart<URV>::execVbrev_v(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVbrev8_v(const DecodedInst*)
+Hart<URV>::execVbrev8_v(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVrev8_v(const DecodedInst*)
+Hart<URV>::execVrev8_v(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVclz_v(const DecodedInst*)
+Hart<URV>::execVclz_v(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVctz_v(const DecodedInst*)
+Hart<URV>::execVctz_v(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVcpop_v(const DecodedInst*)
+Hart<URV>::execVcpop_v(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVrol_vv(const DecodedInst*)
+Hart<URV>::execVrol_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVrol_vx(const DecodedInst*)
+Hart<URV>::execVrol_vx(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVror_vv(const DecodedInst*)
+Hart<URV>::execVror_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVror_vx(const DecodedInst*)
+Hart<URV>::execVror_vx(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVror_vi(const DecodedInst*)
+Hart<URV>::execVror_vi(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVwsll_vv(const DecodedInst*)
+Hart<URV>::execVwsll_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVwsll_vx(const DecodedInst*)
+Hart<URV>::execVwsll_vx(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVwsll_vi(const DecodedInst*)
+Hart<URV>::execVwsll_vi(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVclmul_vv(const DecodedInst*)
+Hart<URV>::execVclmul_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVclmul_vx(const DecodedInst*)
+Hart<URV>::execVclmul_vx(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVclmulh_vv(const DecodedInst*)
+Hart<URV>::execVclmulh_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVclmulh_vx(const DecodedInst*)
+Hart<URV>::execVclmulh_vx(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVghsh_vv(const DecodedInst*)
+Hart<URV>::execVghsh_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVgmul_vv(const DecodedInst*)
+Hart<URV>::execVgmul_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesdf_vv(const DecodedInst*)
+Hart<URV>::execVaesdf_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesdf_vs(const DecodedInst*)
+Hart<URV>::execVaesdf_vs(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesef_vv(const DecodedInst*)
+Hart<URV>::execVaesef_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesef_vs(const DecodedInst*)
+Hart<URV>::execVaesef_vs(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesem_vv(const DecodedInst*)
+Hart<URV>::execVaesem_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesem_vs(const DecodedInst*)
+Hart<URV>::execVaesem_vs(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesdm_vv(const DecodedInst*)
+Hart<URV>::execVaesdm_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesdm_vs(const DecodedInst*)
+Hart<URV>::execVaesdm_vs(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaeskf1_vi(const DecodedInst*)
+Hart<URV>::execVaeskf1_vi(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaeskf2_vi(const DecodedInst*)
+Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVaesz_vs(const DecodedInst*)
+Hart<URV>::execVaesz_vs(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsha2ms_vv(const DecodedInst*)
+Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsha2ch_vv(const DecodedInst*)
+Hart<URV>::execVsha2ch_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsha2cl_vv(const DecodedInst*)
+Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsm4k_vi(const DecodedInst*)
+Hart<URV>::execVsm4k_vi(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsm4r_vv(const DecodedInst*)
+Hart<URV>::execVsm4r_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsm4r_vs(const DecodedInst*)
+Hart<URV>::execVsm4r_vs(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsm3me_vv(const DecodedInst*)
+Hart<URV>::execVsm3me_vv(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
 template <typename URV>
 void
-Hart<URV>::execVsm3c_vi(const DecodedInst*)
+Hart<URV>::execVsm3c_vi(const DecodedInst* di)
 {
-  assert(0);
+  postVecFail(di);
 }
 
 
