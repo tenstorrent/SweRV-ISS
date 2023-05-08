@@ -590,11 +590,63 @@ Hart<URV>::execVcpop_v(const DecodedInst* di)
 }
 
 
+/// Function operator to rotate a left by b bits. Only the least sig
+/// n bits of b are used, n is log2(width of T). For example, if T is
+/// uint32_t then only least sig 5 bits of b are used.
+struct
+MyRol
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  {
+    unsigned width = sizeof(T)*8;  // Bit count of T
+    unsigned mask = width - 1;
+    unsigned amount = b & mask;
+    return (a << amount) | (a >> ((width - amount) & mask));
+  }
+};
+
+
 template <typename URV>
 void
 Hart<URV>::execVrol_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di); // Temporary.
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyRol());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyRol());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyRol());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyRol());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
@@ -602,15 +654,100 @@ template <typename URV>
 void
 Hart<URV>::execVrol_vx(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  SRV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyRol());
+      break;
+    case EW::Half:
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyRol());
+      break;
+    case EW::Word:
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyRol());
+      break;
+    case EW::Word2:
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyRol());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
+
+
+/// Function operator to rotate a right by b bits.
+/// Only the least sig n bits of b are used, n is log2(width of T).
+struct
+MyRor
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  {
+    unsigned width = sizeof(T)*8;  // Bit count of T
+    unsigned mask = width - 1;
+    unsigned amount = b & mask;
+    return (a >> amount) | (a << ((width - amount) & mask));
+  }
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVror_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di); // Temporary.
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyRor());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
@@ -618,7 +755,41 @@ template <typename URV>
 void
 Hart<URV>::execVror_vx(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  SRV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Half:
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Word:
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    case EW::Word2:
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyRor());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
