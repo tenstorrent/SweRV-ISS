@@ -29,11 +29,58 @@
 using namespace WdRiscv;
 
 
+/// Function operator to compute bitwise a and not b (a & ~b).
+template <typename T>
+struct MyAndn : public std::binary_function<T, T, T>
+{
+  MyAndn() {};
+
+  constexpr T operator() (const T& a, const T& b) const
+  { return a & ~b; }
+};
+
+
+
 template <typename URV>
 void
 Hart<URV>::execVandn_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di); // Temporary.
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint8_t>());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint16_t>());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint32_t>());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyAndn<uint64_t>());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
@@ -41,7 +88,43 @@ template <typename URV>
 void
 Hart<URV>::execVandn_vx(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di);  // Temporary
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  SRV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyAndn<int8_t>());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyAndn<int16_t>());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyAndn<int32_t>());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyAndn<int64_t>());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 

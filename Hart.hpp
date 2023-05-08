@@ -2778,26 +2778,25 @@ namespace WdRiscv
     void execVsetivli(const DecodedInst*);
     void execVsetvl(const DecodedInst*);
 
+    /// Helper to vector vv instructions (eg vadd.vv, vsub.vv). Operation
+    /// to be performed (eg. add, sub) is passed in op.
     template<typename ELEM_TYPE>
-    void vadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
+    void vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		unsigned start, unsigned elems, bool masked,
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+
+    /// Helper to vector vv instructions (eg vadd.vx, vsub.vx). Operation
+    /// to be performed (eg. add, sub) is passed in op.
+    template<typename ELEM_TYPE>
+    void vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		unsigned start, unsigned elems, bool masked,
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+
     void execVadd_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVadd_vx(const DecodedInst*);
-
     void execVadd_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVsub_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVsub_vx(const DecodedInst*);
 
 
@@ -2909,96 +2908,28 @@ namespace WdRiscv
     void execVmsgt_vx(const DecodedInst*);
     void execVmsgt_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vminu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVminu_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vminu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVminu_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmin_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmin_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmin_vx(const DecodedInst*);
 
 
-    template<typename ELEM_TYPE>
-    void vmaxu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmaxu_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmaxu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmaxu_vx(const DecodedInst*);
-
-
-    template<typename ELEM_TYPE>
-    void vmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmax_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmax_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmax_vx(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vand_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVand_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vand_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVand_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vand_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVand_vi(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vor_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                unsigned start, unsigned elems, bool masked);
     void execVor_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                unsigned start, unsigned elems, bool masked);
     void execVor_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vor_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                unsigned start, unsigned elems, bool masked);
     void execVor_vi(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vxor_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVxor_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vxor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVxor_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vxor_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVxor_vi(const DecodedInst*);
-
 
     template<typename ELEM_TYPE>
     void vsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
