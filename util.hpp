@@ -111,6 +111,56 @@ namespace util
     return 0;
   }
 
+  template <typename T,
+              std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  constexpr T countLeadingZeros(T x)
+  {
+    if (x == 0)
+      return 8*sizeof(x);
+    if constexpr (sizeof(x) == 1)
+      return __builtin_clz(x) - 24;
+    if constexpr (sizeof(x) == 2)
+      return __builtin_clz(x) - 16;
+    if constexpr (sizeof(x) == 4)
+      return __builtin_clz(x);
+    if constexpr (sizeof(x) == 8)
+      return __builtin_clzl(x);
+    assert(0);
+    return 0;
+  }
+
+  template <typename T,
+              std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  constexpr T countTrailingZeros(T x)
+  {
+    if constexpr (sizeof(x) == 1)
+      return x == 0 ? 8 : __builtin_ctz(x);
+    if constexpr (sizeof(x) == 2)
+      return x == 0 ? 16 : __builtin_ctz(x);
+    if constexpr (sizeof(x) == 4)
+      return __builtin_ctz(x);
+    if constexpr (sizeof(x) == 8)
+      return __builtin_ctzl(x);
+    assert(0);
+    return 0;
+  }
+
+  template <typename T,
+              std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  constexpr T countOnes(T x)
+  {
+    if constexpr (sizeof(x) == 1)
+      return __builtin_popcount(x);
+    if constexpr (sizeof(x) == 2)
+      return __builtin_popcount(x);
+    if constexpr (sizeof(x) == 4)
+      return __builtin_popcount(x);
+    if constexpr (sizeof(x) == 8)
+      return __builtin_popcountl(x);
+    assert(0);
+    return 0;
+  }
+
   struct string_hash  // C++20's transparent hashing
   {
     using hash_type      = std::hash<std::string_view>;

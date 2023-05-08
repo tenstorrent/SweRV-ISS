@@ -4138,9 +4138,21 @@ namespace WdRiscv
 		unsigned start, unsigned elems, bool masked);
     void execVrev8_v(const DecodedInst*);
 
+    template<typename ELEM_TYPE>
+    void vclz_v(unsigned vd, unsigned vs1, unsigned group,
+		unsigned start, unsigned elems, bool masked);
     void execVclz_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vctz_v(unsigned vd, unsigned vs1, unsigned group,
+		unsigned start, unsigned elems, bool masked);
     void execVctz_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vcpop_v(unsigned vd, unsigned vs1, unsigned group,
+		 unsigned start, unsigned elems, bool masked);
     void execVcpop_v(const DecodedInst*);
+
     void execVrol_vv(const DecodedInst*);
     void execVrol_vx(const DecodedInst*);
     void execVror_vv(const DecodedInst*);
