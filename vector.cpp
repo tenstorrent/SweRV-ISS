@@ -1422,35 +1422,12 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
 }
 
 
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vrsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
+struct MyRsub
 {
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e2 - e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return b - a; }
+};
 
 
 template <typename URV>
@@ -1461,7 +1438,7 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(), vs1 = di->op1(), rs2 = di->op2();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -1469,50 +1446,29 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrsub_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vrsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vrsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vrsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vrsub_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = imm, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e2 - e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -1524,9 +1480,8 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -1537,15 +1492,23 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrsub_vi<int8_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Half: vrsub_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word: vrsub_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word2: vrsub_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 

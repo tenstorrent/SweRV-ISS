@@ -2799,15 +2799,7 @@ namespace WdRiscv
     void execVsub_vv(const DecodedInst*);
     void execVsub_vx(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vrsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVrsub_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vrsub_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVrsub_vi(const DecodedInst*);
 
     template<typename ELEM_TYPE>
