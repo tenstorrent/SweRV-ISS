@@ -602,7 +602,7 @@ MyRol
   {
     unsigned width = sizeof(T)*8;  // Bit count of T
     unsigned mask = width - 1;
-    unsigned amount = b & mask;
+    unsigned amount = unsigned(b & mask);
     return (a << amount) | (a >> ((width - amount) & mask));
   }
 };
@@ -707,7 +707,7 @@ MyRor
   {
     unsigned width = sizeof(T)*8;  // Bit count of T
     unsigned mask = width - 1;
-    unsigned amount = b & mask;
+    unsigned amount = unsigned(b & mask);
     return (a >> amount) | (a << ((width - amount) & mask));
   }
 };
@@ -858,7 +858,7 @@ MySll
   {
     unsigned width = sizeof(T)*8;  // Bit count of T
     unsigned mask = width - 1;
-    unsigned amount = b & mask;
+    unsigned amount = unsigned(b & mask);
     return a >> amount;
   }
 };
