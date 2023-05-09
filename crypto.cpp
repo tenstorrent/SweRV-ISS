@@ -105,7 +105,6 @@ aes_mixcolumn_inv(uint32_t x)
 }
 
 
-static
 uint32_t
 aes_decode_rcon(uint8_t r)
 {
@@ -229,7 +228,6 @@ aes_sbox_inv(uint8_t x)
 }
 
 
-static
 uint32_t
 aes_subword_fwd(uint32_t x)
 {
@@ -334,8 +332,6 @@ aes_rv64_shiftrows_inv(uint64_t rs2, uint64_t rs1)
 }
 
 
-#if 0
-static
 __uint128_t
 aes_shift_rows_fwd(__uint128_t x)
 {
@@ -363,21 +359,6 @@ aes_shift_rows_fwd(__uint128_t x)
 
 
 __uint128_t
-aes_subbytes_fwd(__uint128_t x)
-{
-  uint32_t oc0 = aes_subword_fwd(aes_get_column(x, 0));
-  uint32_t oc1 = aes_subword_fwd(aes_get_column(x, 1));
-  uint32_t oc2 = aes_subword_fwd(aes_get_column(x, 2));
-  uint32_t oc3 = aes_subword_fwd(aes_get_column(x, 3));
-
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
-  return res;
-}
-
-
-static
-__uint128_t
 aes_mixcolumns_fwd(__uint128_t x)
 {
   uint32_t oc0 = aes_mixcolumn_fwd(aes_get_column(x, 0));
@@ -390,6 +371,8 @@ aes_mixcolumns_fwd(__uint128_t x)
   return res;
 }
 
+
+#if 0
 
 static
 __uint128_t
@@ -405,6 +388,20 @@ aes_mixcolumns_inv(__uint128_t x)
   return res;
 }
 #endif
+
+
+__uint128_t
+aes_subbytes_fwd(__uint128_t x)
+{
+  uint32_t oc0 = aes_subword_fwd(aes_get_column(x, 0));
+  uint32_t oc1 = aes_subword_fwd(aes_get_column(x, 1));
+  uint32_t oc2 = aes_subword_fwd(aes_get_column(x, 2));
+  uint32_t oc3 = aes_subword_fwd(aes_get_column(x, 3));
+
+  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
+		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  return res;
+}
 
 
 __uint128_t

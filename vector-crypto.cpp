@@ -1443,6 +1443,22 @@ aes_shift_rows_inv(__uint128_t x);
 extern __uint128_t
 aes_subbytes_inv(__uint128_t x);
 
+extern __uint128_t
+aes_subbytes_fwd(__uint128_t x);
+
+extern __uint128_t
+aes_shift_rows_fwd(__uint128_t x);
+
+extern __uint128_t
+aes_mixcolumns_fwd(__uint128_t x);;
+
+extern uint32_t
+aes_subword_fwd(uint32_t x);
+
+extern uint32_t
+aes_decode_rcon(uint8_t r);
+
+
 
 template <typename URV>
 void
@@ -1542,7 +1558,46 @@ template <typename URV>
 void
 Hart<URV>::execVaesef_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, i, groupx8, rkey))
+	assert(0);
+      __uint128_t sb = aes_subbytes_fwd(state);
+      __uint128_t sr = aes_shift_rows_fwd(sb);
+      __uint128_t ark = sr ^ rkey;
+      if (not vecRegs_.write(vd, i, groupx8, ark))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1550,7 +1605,46 @@ template <typename URV>
 void
 Hart<URV>::execVaesef_vs(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
+	assert(0);
+      __uint128_t sb = aes_subbytes_fwd(state);
+      __uint128_t sr = aes_shift_rows_fwd(sb);
+      __uint128_t ark = sr ^ rkey;
+      if (not vecRegs_.write(vd, i, groupx8, ark))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1558,7 +1652,47 @@ template <typename URV>
 void
 Hart<URV>::execVaesem_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, i, groupx8, rkey))
+	assert(0);
+      __uint128_t sb = aes_subbytes_fwd(state);
+      __uint128_t sr = aes_shift_rows_fwd(sb);
+      __uint128_t mix = aes_mixcolumns_fwd(sr);
+      __uint128_t ark = mix ^ rkey;
+      if (not vecRegs_.write(vd, i, groupx8, ark))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1566,7 +1700,47 @@ template <typename URV>
 void
 Hart<URV>::execVaesem_vs(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
+	assert(0);
+      __uint128_t sb = aes_subbytes_fwd(state);
+      __uint128_t sr = aes_shift_rows_fwd(sb);
+      __uint128_t mix = aes_mixcolumns_fwd(sr);
+      __uint128_t ark = mix ^ rkey;
+      if (not vecRegs_.write(vd, i, groupx8, ark))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1574,7 +1748,47 @@ template <typename URV>
 void
 Hart<URV>::execVaesdm_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, i, groupx8, rkey))
+	assert(0);
+      __uint128_t sr = aes_shift_rows_inv(state);
+      __uint128_t sb = aes_subbytes_inv(sr);
+      __uint128_t ark = sb ^ rkey;
+      __uint128_t mix = aes_mixcolumns_fwd(ark);
+      if (not vecRegs_.write(vd, i, groupx8, mix))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1582,7 +1796,55 @@ template <typename URV>
 void
 Hart<URV>::execVaesdm_vs(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
+	assert(0);
+      __uint128_t sr = aes_shift_rows_inv(state);
+      __uint128_t sb = aes_subbytes_inv(sr);
+      __uint128_t ark = sb ^ rkey;
+      __uint128_t mix = aes_mixcolumns_fwd(ark);
+      if (not vecRegs_.write(vd, i, groupx8, mix))
+	assert(0);
+    }
+
+  postVecSuccess();
+}
+
+
+/// Rotate a word right by 8 bits.
+uint32_t
+aes_rotword(uint32_t x)
+{
+  return x >> 8 | ((x & 0xff) << 24);
 }
 
 
@@ -1590,7 +1852,52 @@ template <typename URV>
 void
 Hart<URV>::execVaeskf1_vi(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  round = di->op2();
+  if (round > 10 or round == 0)
+    round ^= 0x8; // Flip bit 3.
+  unsigned r = round - 1;
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t e1{0};
+      if (not vecRegs_.read(vs1, i, groupx8, e1))
+	assert(0);
+      uint32_t crk0 = e1, crk1 = e1 >> 32, crk2 = e1 >> 64, crk3 = e1 >> 96;
+      uint32_t w0 = aes_subword_fwd(aes_rotword(crk3)) ^ aes_decode_rcon(r) ^ crk0;
+      uint32_t w1 = w0 ^ crk1;
+      uint32_t w2 = w1 ^ crk2;
+      uint32_t w3 = w2 ^ crk3;
+
+      __uint128_t res = (__uint128_t(w0) | (__uint128_t(w1) << 32) |
+			 (__uint128_t(w2) << 64) | (__uint128_t(w3) << 96));
+      if (not vecRegs_.write(vd, i, groupx8, res))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1598,7 +1905,57 @@ template <typename URV>
 void
 Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  round = di->op2();
+  if (round > 10 or round == 0)
+    round ^= 0x8; // Flip bit 3.
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t e1{0}, d{0};
+      if (not vecRegs_.read(vs1, i, groupx8, e1))
+	assert(0);
+      uint32_t crk3 = e1 >> 96;
+
+      if (not vecRegs_.read(vs1, i, groupx8, d))
+	assert(0);
+      uint32_t rkb0 = d, rkb1 = d >> 32, rkb2 = d >> 64, rkb3 = d >> 96;
+
+      uint32_t w0 = (round & 1) ? aes_subword_fwd(crk3) & rkb0 :
+	aes_subword_fwd(aes_rotword(crk3)) ^ aes_decode_rcon(round >> 1) ^ rkb0;
+      uint32_t w1 = w0 ^ rkb1;
+      uint32_t w2 = w1 ^ rkb2;
+      uint32_t w3 = w2 ^ rkb3;
+
+      __uint128_t res = (__uint128_t(w0) | (__uint128_t(w1) << 32) |
+			 (__uint128_t(w2) << 64) | (__uint128_t(w3) << 96));
+      if (not vecRegs_.write(vd, i, groupx8, res))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1606,7 +1963,45 @@ template <typename URV>
 void
 Hart<URV>::execVaesz_vs(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, i, groupx8, rkey))
+	assert(0);
+
+      __uint128_t ark = state ^ rkey;
+      if (not vecRegs_.write(vd, i, groupx8, ark))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
