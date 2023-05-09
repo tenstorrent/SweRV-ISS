@@ -3066,14 +3066,7 @@ namespace WdRiscv
     void execVfslide1up_vf(const DecodedInst*);
     void execVfslide1down_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmul_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmul_vx(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmul_vx(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -4158,9 +4151,18 @@ namespace WdRiscv
     void execVror_vv(const DecodedInst*);
     void execVror_vx(const DecodedInst*);
     void execVror_vi(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
     void execVwsll_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
     void execVwsll_vx(const DecodedInst*);
     void execVwsll_vi(const DecodedInst*);
+
     void execVclmul_vv(const DecodedInst*);
     void execVclmul_vx(const DecodedInst*);
     void execVclmulh_vv(const DecodedInst*);

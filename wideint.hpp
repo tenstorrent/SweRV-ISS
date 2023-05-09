@@ -1535,4 +1535,47 @@ namespace WdRiscv
   inline Int1024 operator ^ (Int1024 a, Int1024 b)
   { a ^= b; return a; }
 
+
+  /// Return the width in bits of the given integer type T. This is
+  /// usually 8*sizeof(T).
+  template <typename T>
+  unsigned
+  integerWidth()
+  {
+    if constexpr (std::is_same<Int128, T>::value)   return 128;
+    if constexpr (std::is_same<Int256, T>::value)   return 256;
+    if constexpr (std::is_same<Int512, T>::value)   return 512;
+    if constexpr (std::is_same<Int1024, T>::value)  return 1024;
+    if constexpr (std::is_same<Uint128, T>::value)  return 128;
+    if constexpr (std::is_same<Uint256, T>::value)  return 256;
+    if constexpr (std::is_same<Uint512, T>::value)  return 512;
+    if constexpr (std::is_same<Uint1024, T>::value) return 1024;
+
+    return 8*sizeof(T);
+  }
+
+
+  /// Return the integral type that is twice as wide as the given
+  /// type. For example:
+  ///    makeDoubleWide<uint16_t>::type
+  /// yields the type
+  ///    uint32_t.
+  template <typename T>
+  struct makeDoubleWide;
+
+  template <> struct makeDoubleWide<uint8_t>    { typedef uint16_t type; };
+  template <> struct makeDoubleWide<uint16_t>   { typedef uint32_t type; };
+  template <> struct makeDoubleWide<uint32_t>   { typedef uint64_t type; };
+  template <> struct makeDoubleWide<uint64_t>   { typedef Uint128  type; };
+  template <> struct makeDoubleWide<Uint128>    { typedef Uint256  type; };
+  template <> struct makeDoubleWide<Uint256>    { typedef Uint512  type; };
+  template <> struct makeDoubleWide<Uint512>    { typedef Uint1024 type; };
+
+  template <> struct makeDoubleWide<int8_t>     { typedef int16_t type; };
+  template <> struct makeDoubleWide<int16_t>    { typedef int32_t type; };
+  template <> struct makeDoubleWide<int32_t>    { typedef int64_t type; };
+  template <> struct makeDoubleWide<int64_t>    { typedef Int128  type; };
+  template <> struct makeDoubleWide<Int128>     { typedef Int256  type; };
+  template <> struct makeDoubleWide<Int256>     { typedef Int512  type; };
+  template <> struct makeDoubleWide<Int512>     { typedef Int1024 type; };
 }

@@ -44,6 +44,7 @@ void
 Hart<URV>::execVandn_vv(const DecodedInst* di)
 {
   postVecFail(di); // Temporary.
+  return; // Temporary
 
   if (not checkVecIntInst(di))
     return;
@@ -612,6 +613,7 @@ void
 Hart<URV>::execVrol_vv(const DecodedInst* di)
 {
   postVecFail(di); // Temporary.
+  return; // Temporary
 
   if (not checkVecIntInst(di))
     return;
@@ -654,6 +656,9 @@ template <typename URV>
 void
 Hart<URV>::execVrol_vx(const DecodedInst* di)
 {
+  postVecFail(di); // Temporary.
+  return; // Temporary
+
   if (not checkVecIntInst(di))
     return;
 
@@ -713,6 +718,7 @@ void
 Hart<URV>::execVror_vv(const DecodedInst* di)
 {
   postVecFail(di); // Temporary.
+  return; // Temporary
 
   if (not checkVecIntInst(di))
     return;
@@ -755,6 +761,9 @@ template <typename URV>
 void
 Hart<URV>::execVror_vx(const DecodedInst* di)
 {
+  postVecFail(di); // Temporary.
+  return; // Temporary
+
   if (not checkVecIntInst(di))
     return;
 
@@ -797,6 +806,9 @@ template <typename URV>
 void
 Hart<URV>::execVror_vi(const DecodedInst* di)
 {
+  postVecFail(di); // Temporary.
+  return; // Temporary
+
   if (not checkVecIntInst(di))
     return;
 
@@ -836,11 +848,141 @@ Hart<URV>::execVror_vi(const DecodedInst* di)
 }
 
 
+/// Function operator to shift a left by b bits.
+/// Only the least sig n bits of b are used, n is log2(width of T).
+struct
+MySll
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  {
+    unsigned width = sizeof(T)*8;  // Bit count of T
+    unsigned mask = width - 1;
+    unsigned amount = b & mask;
+    return a >> amount;
+  }
+};
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  unsigned errors = 0, wideGroup = group*2;
+
+  ELEM_TYPE e1 = 0, e2 = 0;
+  DWT dest = 0;
+
+  MySll mySll;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, wideGroup);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
+        {
+	  dest = mySll(DWT(e1), DWT(e2));
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
+}
+
+
 template <typename URV>
 void
 Hart<URV>::execVwsll_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di); // Temporary.
+  return; // Temporary
+
+  if (not checkVecIntInst(di))
+    return;
+
+  unsigned group = vecRegs_.groupMultiplierX8();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned elems = vecRegs_.elemCount(), start = csRegs_.peekVstart();
+
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vwsll_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked);
+      break;
+    case EW::Half:
+      vwsll_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked);
+      break;
+    case EW::Word:
+      vwsll_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked);
+      break;
+    case EW::Word2:
+      vwsll_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+  postVecSuccess();
+
+}
+
+
+template <typename URV>
+template<typename ELEM_TYPE>
+void
+Hart<URV>::vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+                    unsigned start, unsigned elems, bool masked)
+{
+  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  unsigned errors = 0, wideGroup = group*2;
+
+  ELEM_TYPE e1 = 0;
+  DWT dest = 0;
+
+  MySll mySll;
+
+  for (unsigned ix = start; ix < elems; ++ix)
+    {
+      if (masked and not vecRegs_.isActive(0, ix))
+	{
+	  vecRegs_.touchReg(vd, wideGroup);
+	  continue;
+	}
+
+      if (vecRegs_.read(vs1, ix, group, e1))
+        {
+          dest = mySll(DWT(e1), DWT(e2));
+          if (not vecRegs_.write(vd, ix, wideGroup, dest))
+            errors++;
+        }
+      else
+        errors++;
+    }
+
+  assert(errors == 0);
 }
 
 
@@ -848,7 +990,44 @@ template <typename URV>
 void
 Hart<URV>::execVwsll_vx(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di); // Temporary.
+  return; // Temporary
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  URV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vwsll_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked);
+      break;
+    case EW::Half:
+      vwsll_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked);
+      break;
+    case EW::Word:
+      vwsll_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked);
+      break;
+    case EW::Word2:
+      vwsll_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
@@ -856,7 +1035,45 @@ template <typename URV>
 void
 Hart<URV>::execVwsll_vi(const DecodedInst* di)
 {
-  postVecFail(di);
+  postVecFail(di); // Temporary.
+  return; // Temporary
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  uint32_t imm = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  URV e2 = imm;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vwsll_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked);
+      break;
+    case EW::Half:
+      vwsll_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked);
+      break;
+    case EW::Word:
+      vwsll_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked);
+      break;
+    case EW::Word2:
+      vwsll_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 

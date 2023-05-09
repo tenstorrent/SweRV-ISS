@@ -161,52 +161,8 @@ namespace std
 
 namespace WdRiscv
 {
-  /// Return the width in bits of the given integer type T. This is
-  /// usually 8*sizeof(T).
-  template <typename T>
-  unsigned
-  integerWidth()
-  {
-    if constexpr (std::is_same<Int128, T>::value)   return 128;
-    if constexpr (std::is_same<Int256, T>::value)   return 256;
-    if constexpr (std::is_same<Int512, T>::value)   return 512;
-    if constexpr (std::is_same<Int1024, T>::value)  return 1024;
-    if constexpr (std::is_same<Uint128, T>::value)  return 128;
-    if constexpr (std::is_same<Uint256, T>::value)  return 256;
-    if constexpr (std::is_same<Uint512, T>::value)  return 512;
-    if constexpr (std::is_same<Uint1024, T>::value) return 1024;
-
-    return 8*sizeof(T);
-  }
-
-
-  /// Return the integral type that is twice as wide as the given
-  /// type. For example:
-  ///    makeDoubleWide<uint16_t>::type
-  /// yields the type
-  ///    uint32_t.
-  template <typename T>
-  struct makeDoubleWide;
-
-  template <> struct makeDoubleWide<uint8_t>    { typedef uint16_t type; };
-  template <> struct makeDoubleWide<uint16_t>   { typedef uint32_t type; };
-  template <> struct makeDoubleWide<uint32_t>   { typedef uint64_t type; };
-  template <> struct makeDoubleWide<uint64_t>   { typedef Uint128  type; };
-  template <> struct makeDoubleWide<Uint128>    { typedef Uint256  type; };
-  template <> struct makeDoubleWide<Uint256>    { typedef Uint512  type; };
-  template <> struct makeDoubleWide<Uint512>    { typedef Uint1024 type; };
-
-  template <> struct makeDoubleWide<int8_t>     { typedef int16_t type; };
-  template <> struct makeDoubleWide<int16_t>    { typedef int32_t type; };
-  template <> struct makeDoubleWide<int32_t>    { typedef int64_t type; };
-  template <> struct makeDoubleWide<int64_t>    { typedef Int128  type; };
-  template <> struct makeDoubleWide<Int128>     { typedef Int256  type; };
-  template <> struct makeDoubleWide<Int256>     { typedef Int512  type; };
-  template <> struct makeDoubleWide<Int512>     { typedef Int1024 type; };
-
   template <> struct makeDoubleWide<Float16>    { typedef float   type; };
   template <> struct makeDoubleWide<float>      { typedef double  type; };
-
 
   /// Return the integral type that is the same width as the given
   /// floating point type. For example:
@@ -6900,37 +6856,6 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 
 
 template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 * e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execVmul_vv(const DecodedInst* di)
 {
@@ -6949,47 +6874,24 @@ Hart<URV>::execVmul_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmul_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Half:
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word:
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmul_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 * e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -7010,17 +6912,26 @@ Hart<URV>::execVmul_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmul_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmul_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmul_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vmul_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
   postVecSuccess();
 }
