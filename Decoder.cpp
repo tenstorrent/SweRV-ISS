@@ -1874,6 +1874,8 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  unsigned rd = cif.bits.rd;
 	  if (isRv64())
 	    {
+	      if (rd == 0)
+		return expanded; // Illegal (rd == 0 reserved).
 	      op0 = rd; op1 = RegSp; op2 = cif.ldspImmed();
 	      encodeLd(op0, op1, op2, expanded);
               return expanded;
