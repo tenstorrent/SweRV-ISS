@@ -1,11 +1,11 @@
 // Copyright 2022 Tenstorrent Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -232,7 +232,7 @@ printBranch3(const Disassembler& disas, std::ostream& stream,
       sign = '-';
       imm = -imm;
     }
-      
+
   stream << sign << " 0x" << std::hex << imm << std::dec;
 }
 
@@ -272,7 +272,7 @@ printFence(const Disassembler& , std::ostream& stream,
   if (di.isFencePredWrite())  pred += "w";
   if (di.isFencePredInput())  pred += "i";
   if (di.isFencePredOutput()) pred += "o";
-  
+
   if (di.isFenceSuccRead())   succ += "r";
   if (di.isFenceSuccWrite())  succ += "w";
   if (di.isFenceSuccInput())  succ += "i";
@@ -348,15 +348,6 @@ printSc(const Disassembler& disas, std::ostream& stream, const char* inst,
 
 
 static
-std::string
-insertFieldCountInName(std::string_view name, unsigned count, unsigned n)
-{
-  std::string res = util::join("", name.substr(0, n), std::to_string(count), name.substr(n));
-  return res;
-}
-
-
-static
 void
 printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
@@ -365,17 +356,7 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
 
   if (opcode7 == 0x7 or opcode7 == 0x27)
     {  // Vector load store
-      std::string_view name = di.name();
-      if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
-	name = insertFieldCountInName(name, di.vecFieldCount(), 2);
-      else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or
-	       (id >= InstId::vlsege8ff_v and id <= InstId::vlsege1024ff_v))
-	name = insertFieldCountInName(name, di.vecFieldCount(), 5);
-      else if (id >= InstId::vlssege8_v and id <= InstId::vsssege1024_v)
-	name = insertFieldCountInName(name, di.vecFieldCount(), 6);
-      else if (id >= InstId::vluxsegei8_v and id <= InstId::vsoxsegei1024_v)
-	name = insertFieldCountInName(name, di.vecFieldCount(), 7);
-      out << name << " v" << di.op0();
+      out << di.name() << " v" << di.op0();
       out << ", ("  << disas.intRegName(di.op1()) << ")";
       if (di.operandCount() == 3)
 	{
@@ -454,7 +435,7 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
 	out << sep << "v0.t";
     }
 }
-	  
+
 
 static
 void
@@ -534,7 +515,7 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
     case InstId::fence:
       printFence(*this, out, di);
       break;
-      
+
     case InstId::csrrw:
     case InstId::csrrs:
     case InstId::csrrc:
