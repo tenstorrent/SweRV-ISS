@@ -1356,14 +1356,14 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
 
   for (unsigned i = egStart; i < egLen; ++i)
     {
-      Uint128 x{0}, y{0}, h{0}, z{0}; 
+      __uint128_t x{0}, y{0}, h{0}, z{0}; 
       if (not vecRegs_.read(vd, i, groupx8, y))
 	assert(0);
       if (not vecRegs_.read(vs2, i, groupx8, x))
 	assert(0);
       if (not vecRegs_.read(vs1, i, groupx8, h))
 	assert(0);
-      Uint128 s = brev8(y ^ x);
+      __uint128_t s = brev8(y ^ x);
 
       for (unsigned bit = 0; bit < 128; bit++) {
         if ((s >> i) & 1)
@@ -1374,7 +1374,7 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
         if (reduce)
           h ^= 0x87;
       }
-      Uint128 res = brev8(z);
+      __uint128_t res = brev8(z);
       if (not vecRegs_.write(vd, i, groupx8, res))
 	assert(0);
     }
@@ -1413,7 +1413,7 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
 
   for (unsigned i = egStart; i < egLen; ++i)
     {
-      Uint128 x{0}, y{0}, h{0}, z{0};
+      __uint128_t y{0}, h{0}, z{0};
       if (not vecRegs_.read(vd, i, groupx8, y))
 	assert(0);
       if (not vecRegs_.read(vs1, i, groupx8, h))
@@ -1427,7 +1427,7 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
 	  if (reduce)
 	    h ^= 0x87;
 	}
-      Uint128 res = brev8(z);
+      __uint128_t res = brev8(z);
       vecRegs_.write(vd, i, groupx8, res);
     }
 
