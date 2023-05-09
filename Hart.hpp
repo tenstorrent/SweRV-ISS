@@ -987,6 +987,10 @@ namespace WdRiscv
     void enableRvzvkg(bool flag)
     { enableExtension(RvExtension::Zvkg, flag); }
 
+    /// Enable/disable the aes final round extension part of vector cryptography.
+    void enableRvzvkned(bool flag)
+    { enableExtension(RvExtension::Zvkned, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1282,6 +1286,10 @@ namespace WdRiscv
     /// Return true if the vector ghash extension is enabled.
     bool isRvzvkg() const
     { return extensionIsEnabled(RvExtension::Zvkg); }
+
+    /// Return true if the vector ghash extension is enabled.
+    bool isRvzvkned() const
+    { return extensionIsEnabled(RvExtension::Zvkned); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).

@@ -241,7 +241,6 @@ aes_subword_fwd(uint32_t x)
 }
 
 
-#if 0
 static
 uint32_t
 aes_subword_inv(uint32_t x)
@@ -261,7 +260,6 @@ aes_get_column(__uint128_t state, uint8_t c)
   uint32_t res = state >> (32*c & 0x7f);
   return res;
 }
-#endif
 
 
 static
@@ -364,34 +362,6 @@ aes_shift_rows_fwd(__uint128_t x)
 }
 
 
-static
-__uint128_t
-aes_shift_rows_inv(__uint128_t x)
-{
-  uint32_t ic3 = aes_get_column(x, 3);
-  uint32_t ic2 = aes_get_column(x, 2);
-  uint32_t ic1 = aes_get_column(x, 1);
-  uint32_t ic0 = aes_get_column(x, 0);
-
-  uint32_t oc0 = ( ((ic0 >> 24) << 24) | (ic3 & uint32_t(0xff0000)) |
-		   (ic2 & uint32_t(0xff00)) | (ic1 & uint32_t(0xff)) );
-
-  uint32_t oc1 = ( ((ic1 >> 14) << 24) | (ic0 & uint32_t(0xff0000)) |
-		   (ic3 & uint32_t(0xff00)) | (ic2 & uint32_t(0xff)) );
-
-  uint32_t oc2 = ( ((ic2 >> 24) << 24) | (ic1 & uint32_t(0xff0000)) |
-		   (ic0 & uint32_t(0xff00)) | (ic3 & uint32_t(0xff)) );
-
-  uint32_t oc3 = ( ((ic3 >> 24) << 24) | (ic2 & uint32_t(0xff0000)) |
-		   (ic1 & uint32_t(0xff00)) | (ic0 & uint32_t(0xff)) );
-
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
-  return res;
-}
-
-
-static
 __uint128_t
 aes_subbytes_fwd(__uint128_t x)
 {
@@ -399,21 +369,6 @@ aes_subbytes_fwd(__uint128_t x)
   uint32_t oc1 = aes_subword_fwd(aes_get_column(x, 1));
   uint32_t oc2 = aes_subword_fwd(aes_get_column(x, 2));
   uint32_t oc3 = aes_subword_fwd(aes_get_column(x, 3));
-
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
-  return res;
-}
-
-
-static
-__uint128_t
-aes_subbytes_inv(__uint128_t x)
-{
-  uint32_t oc0 = aes_subword_inv(aes_get_column(x, 0));
-  uint32_t oc1 = aes_subword_inv(aes_get_column(x, 1));
-  uint32_t oc2 = aes_subword_inv(aes_get_column(x, 2));
-  uint32_t oc3 = aes_subword_inv(aes_get_column(x, 3));
 
   __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
 		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
@@ -450,6 +405,47 @@ aes_mixcolumns_inv(__uint128_t x)
   return res;
 }
 #endif
+
+
+__uint128_t
+aes_subbytes_inv(__uint128_t x)
+{
+  uint32_t oc0 = aes_subword_inv(aes_get_column(x, 0));
+  uint32_t oc1 = aes_subword_inv(aes_get_column(x, 1));
+  uint32_t oc2 = aes_subword_inv(aes_get_column(x, 2));
+  uint32_t oc3 = aes_subword_inv(aes_get_column(x, 3));
+
+  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
+		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  return res;
+}
+
+
+__uint128_t
+aes_shift_rows_inv(__uint128_t x)
+{
+  uint32_t ic3 = aes_get_column(x, 3);
+  uint32_t ic2 = aes_get_column(x, 2);
+  uint32_t ic1 = aes_get_column(x, 1);
+  uint32_t ic0 = aes_get_column(x, 0);
+
+  uint32_t oc0 = ( ((ic0 >> 24) << 24) | (ic3 & uint32_t(0xff0000)) |
+		   (ic2 & uint32_t(0xff00)) | (ic1 & uint32_t(0xff)) );
+
+  uint32_t oc1 = ( ((ic1 >> 14) << 24) | (ic0 & uint32_t(0xff0000)) |
+		   (ic3 & uint32_t(0xff00)) | (ic2 & uint32_t(0xff)) );
+
+  uint32_t oc2 = ( ((ic2 >> 24) << 24) | (ic1 & uint32_t(0xff0000)) |
+		   (ic0 & uint32_t(0xff00)) | (ic3 & uint32_t(0xff)) );
+
+  uint32_t oc3 = ( ((ic3 >> 24) << 24) | (ic2 & uint32_t(0xff0000)) |
+		   (ic1 & uint32_t(0xff00)) | (ic0 & uint32_t(0xff)) );
+
+  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
+		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  return res;
+}
+
 
 template <typename URV>
 void

@@ -1357,11 +1357,11 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 x{0}, y{0}, h{0}, z{0}; 
-      if (not vecRegs_.read(vd, i*8, groupx8, y))
+      if (not vecRegs_.read(vd, i, groupx8, y))
 	assert(0);
-      if (not vecRegs_.read(vs2, i*8, groupx8, x))
+      if (not vecRegs_.read(vs2, i, groupx8, x))
 	assert(0);
-      if (not vecRegs_.read(vs1, i*8, groupx8, h))
+      if (not vecRegs_.read(vs1, i, groupx8, h))
 	assert(0);
       Uint128 s = brev8(y ^ x);
 
@@ -1375,7 +1375,7 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
           h ^= 0x87;
       }
       Uint128 res = brev8(z);
-      if (not vecRegs_.write(vd, i*8, groupx8, res))
+      if (not vecRegs_.write(vd, i, groupx8, res))
 	assert(0);
     }
 
@@ -1403,10 +1403,10 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
       return;
     }
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned elems = vecRegs_.elemCount();
 
-  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1414,9 +1414,9 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 x{0}, y{0}, h{0}, z{0};
-      if (not vecRegs_.read(vd, i*8, groupx8, y))
+      if (not vecRegs_.read(vd, i, groupx8, y))
 	assert(0);
-      if (not vecRegs_.read(vs1, i*8, groupx8, h))
+      if (not vecRegs_.read(vs1, i, groupx8, h))
 	assert(0);
       for (unsigned bit = 0; bit < 128; bit++)
 	{
@@ -1428,7 +1428,60 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
 	    h ^= 0x87;
 	}
       Uint128 res = brev8(z);
-      vecRegs_.write(vd, i*8, groupx8, res);
+      vecRegs_.write(vd, i, groupx8, res);
+    }
+
+  postVecSuccess();
+}
+
+
+extern __uint128_t
+aes_shift_rows_inv(__uint128_t x);
+
+extern __uint128_t
+aes_subbytes_inv(__uint128_t x);
+
+
+template <typename URV>
+void
+Hart<URV>::execVaesdf_vv(const DecodedInst* di)
+{
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or sew != EW::Word)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned elems = vecRegs_.elemCount();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, i, groupx8, rkey))
+	assert(0);
+      __uint128_t sr = aes_shift_rows_inv(state);
+      __uint128_t sb = aes_subbytes_inv(sr);
+      __uint128_t ark = sb ^ rkey;
+      if (not vecRegs_.write(vd, i, groupx8, ark))
+	assert(0);
     }
 
   postVecSuccess();
@@ -1437,17 +1490,47 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVaesdf_vv(const DecodedInst* di)
-{
-  postVecFail(di);
-}
-
-
-template <typename URV>
-void
 Hart<URV>::execVaesdf_vs(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkned() or group*vecRegs_.bitsPerRegister() < egw or sew != EW::Word)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned elems = vecRegs_.elemCount();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      __uint128_t state{0}, rkey{0};
+      if (not vecRegs_.read(vd, i, groupx8, state))
+	assert(0);
+      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
+	assert(0);
+      __uint128_t sr = aes_shift_rows_inv(state);
+      __uint128_t sb = aes_subbytes_inv(sr);
+      __uint128_t ark = sb ^ rkey;
+      if (not vecRegs_.write(vd, i, groupx8, ark))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
