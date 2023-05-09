@@ -975,6 +975,14 @@ namespace WdRiscv
     void enableRvzvfhmin(bool flag)
     { enableExtension(RvExtension::Zvfhmin, flag); }
 
+    /// Enable/disable the vector bit-manip extension part of vector cryptography.
+    void enableRvzvbb(bool flag)
+    { enableExtension(RvExtension::Zvbb, flag); }
+
+    /// Enable/disable the vector bit-manip extension part of vector cryptography.
+    void enableRvzvbc(bool flag)
+    { enableExtension(RvExtension::Zvbc, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1258,6 +1266,14 @@ namespace WdRiscv
     /// point extension is enabled.
     bool isRvzvfhmin() const
     { return extensionIsEnabled(RvExtension::Zvfhmin); }
+
+    /// Return true if the bit-manip vector extension is enabled.
+    bool isRvzvbb() const
+    { return extensionIsEnabled(RvExtension::Zvbb); }
+
+    /// Return true if the bit-manip vector extension is enabled.
+    bool isRvzvbc() const
+    { return extensionIsEnabled(RvExtension::Zvbc); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).

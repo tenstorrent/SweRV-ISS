@@ -43,8 +43,11 @@ template <typename URV>
 void
 Hart<URV>::execVandn_vv(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -87,8 +90,11 @@ template <typename URV>
 void
 Hart<URV>::execVandn_vx(const DecodedInst* di)
 {
-  postVecFail(di);  // Temporary
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -175,8 +181,11 @@ template <typename URV>
 void
 Hart<URV>::execVbrev_v(const DecodedInst* di)
 {
-  postVecFail(di);  // Temporary
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -256,8 +265,11 @@ template <typename URV>
 void
 Hart<URV>::execVbrev8_v(const DecodedInst* di)
 {
-  postVecFail(di);  // Temporary
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -330,8 +342,11 @@ template <typename URV>
 void
 Hart<URV>::execVrev8_v(const DecodedInst* di)
 {
-  postVecFail(di);  // Temporary
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -404,8 +419,11 @@ template <typename URV>
 void
 Hart<URV>::execVclz_v(const DecodedInst* di)
 {
-  postVecFail(di);  // Temporary
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -478,8 +496,11 @@ template <typename URV>
 void
 Hart<URV>::execVctz_v(const DecodedInst* di)
 {
-  postVecFail(di);  // Temporary
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -552,8 +573,11 @@ template <typename URV>
 void
 Hart<URV>::execVcpop_v(const DecodedInst* di)
 {
-  postVecFail(di);  // Temporary
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -612,8 +636,11 @@ template <typename URV>
 void
 Hart<URV>::execVrol_vv(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -656,8 +683,11 @@ template <typename URV>
 void
 Hart<URV>::execVrol_vx(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -717,8 +747,11 @@ template <typename URV>
 void
 Hart<URV>::execVror_vv(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -761,8 +794,11 @@ template <typename URV>
 void
 Hart<URV>::execVror_vx(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -806,8 +842,11 @@ template <typename URV>
 void
 Hart<URV>::execVror_vi(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -904,8 +943,11 @@ template <typename URV>
 void
 Hart<URV>::execVwsll_vv(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -990,8 +1032,11 @@ template <typename URV>
 void
 Hart<URV>::execVwsll_vx(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -1035,8 +1080,11 @@ template <typename URV>
 void
 Hart<URV>::execVwsll_vi(const DecodedInst* di)
 {
-  postVecFail(di); // Temporary.
-  return; // Temporary
+  if (not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
 
   if (not checkVecIntInst(di))
     return;
@@ -1077,11 +1125,57 @@ Hart<URV>::execVwsll_vi(const DecodedInst* di)
 }
 
 
+/// Function operator to perform carry-less multiply of a and b.
+struct
+MyClmul
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  {
+    unsigned width = sizeof(T)*8;  // Bit count of T
+    T res{0};
+    for (unsigned i = 0; i < width; ++i)
+      if ((b >> i) & 1)
+	res ^= a << i;
+    return res;
+  }
+};
+
+
 template <typename URV>
 void
 Hart<URV>::execVclmul_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not isRvzbc())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+  
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyClmul());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1089,15 +1183,93 @@ template <typename URV>
 void
 Hart<URV>::execVclmul_vx(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not isRvzbc())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  SRV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyClmul());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
+
+
+/// Function operator to perform carry-less multiply of a and b and
+/// return the upper w bits of the product. W is the width of T.
+struct
+MyClmulh
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  {
+    unsigned width = sizeof(T)*8;  // Bit count of T
+    T res{0};
+    for (unsigned i = 0; i < width; ++i)
+      if ((b >> i) & 1)
+	res ^= (a >> (width - i));
+    return res;
+  }
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVclmulh_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not isRvzbc())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+  
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyClmulh());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1105,7 +1277,38 @@ template <typename URV>
 void
 Hart<URV>::execVclmulh_vx(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not isRvzbc())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  SRV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyClmulh());
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 

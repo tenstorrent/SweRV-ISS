@@ -360,6 +360,10 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzvfh(true);
   if (isa_.isEnabled(RvExtension::Zvfhmin))
     enableRvzvfhmin(true);
+  if (isa_.isEnabled(RvExtension::Zvbb))
+    enableRvzvbb(true);
+  if (isa_.isEnabled(RvExtension::Zvbc))
+    enableRvzvbc(true);
 }
 
 

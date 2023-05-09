@@ -6247,7 +6247,7 @@ InstTable::setupInstVec()
         OperandType::FpReg, OperandMode::Read, rs2Mask,
       },
 
-      // Vector crypto (Zvbbb)
+      // Vector crypto (Zvbb)
       { "vandn.vv", InstId::vandn_vv,
 	0b000001'0'00000'00000'000'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits

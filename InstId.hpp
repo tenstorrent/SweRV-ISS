@@ -927,7 +927,7 @@ namespace WdRiscv
      vfsgnjx_vv,
      vfsgnjx_vf,
 
-     // Vector crypto (Zvbbb)
+     // Vector crypto (Zvbb)
      vandn_vv,
      vandn_vx,
      vbrev_v,
