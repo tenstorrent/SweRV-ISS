@@ -983,6 +983,10 @@ namespace WdRiscv
     void enableRvzvbc(bool flag)
     { enableExtension(RvExtension::Zvbc, flag); }
 
+    /// Enable/disable the vector ghash extension part of vector cryptography.
+    void enableRvzvkg(bool flag)
+    { enableExtension(RvExtension::Zvkg, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1274,6 +1278,10 @@ namespace WdRiscv
     /// Return true if the bit-manip vector extension is enabled.
     bool isRvzvbc() const
     { return extensionIsEnabled(RvExtension::Zvbc); }
+
+    /// Return true if the vector ghash extension is enabled.
+    bool isRvzvkg() const
+    { return extensionIsEnabled(RvExtension::Zvkg); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
