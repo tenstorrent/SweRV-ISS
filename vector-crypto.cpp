@@ -223,6 +223,21 @@ Hart<URV>::execVbrev_v(const DecodedInst* di)
 }
 
 
+template <typename T>
+T brev8(const T& x)
+{
+  T res{0};
+  for (unsigned byteIx = 0; byteIx < sizeof(x); ++byteIx)
+    {
+      uint8_t byte = (x >> 8*byteIx);
+      byte = bitReverse(byte);
+      res |= T{byte} << 8*byteIx;
+    }
+  return res;
+}
+
+
+
 template <typename URV>
 template<typename ELEM_TYPE>
 void
@@ -242,14 +257,7 @@ Hart<URV>::vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  ELEM_TYPE result{0};
-	  for (unsigned byteIx = 0; byteIx < sizeof(e1); ++byteIx)
-	    {
-	      uint8_t byte = (e1 >> 8*byteIx); // Ith least sig byte of e1
-	      byte = bitReverse(byte);
-	      result |= ELEM_TYPE{byte} << 8*byteIx;
-	    }
-          dest = result;
+	  dest = brev8(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -1312,15 +1320,66 @@ Hart<URV>::execVclmulh_vx(const DecodedInst* di)
 }
 
 
+struct
+MyGhsh
+{
+};  
+
+
 template <typename URV>
 void
 Hart<URV>::execVghsh_vv(const DecodedInst* di)
 {
-  if (not isRvzvkg())
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkg() or group*vecRegs_.bitsPerRegister() < egw or sew != EW::Word)
     {
       illegalInst(di);
       return;
     }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned elems = vecRegs_.elemCount();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      Uint128 x{0}, y{0}, h{0}, z{0}; 
+      if (not vecRegs_.read(vd, i*8, groupx8, y))
+	assert(0);
+      if (not vecRegs_.read(vs2, i*8, groupx8, x))
+	assert(0);
+      if (not vecRegs_.read(vs1, i*8, groupx8, h))
+	assert(0);
+      Uint128 s = brev8(y ^ x);
+
+      for (unsigned bit = 0; bit < 128; bit++) {
+        if ((s >> i) & 1)
+	  z ^= h;
+
+	bool reduce = (h >> 127) & 1;
+        h <<= 1;
+        if (reduce)
+          h ^= 0x87;
+      }
+      Uint128 res = brev8(z);
+      if (not vecRegs_.write(vd, i*8, groupx8, res))
+	assert(0);
+    }
+
+  postVecSuccess();
 }
 
 
@@ -1328,11 +1387,51 @@ template <typename URV>
 void
 Hart<URV>::execVgmul_vv(const DecodedInst* di)
 {
-  if (not isRvzvkg())
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvkg() or group*vecRegs_.bitsPerRegister() < egw or sew != EW::Word)
     {
       illegalInst(di);
       return;
     }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned elems = vecRegs_.elemCount();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      Uint128 x{0}, y{0}, h{0}, z{0};
+      if (not vecRegs_.read(vd, i*8, groupx8, y))
+	assert(0);
+      if (not vecRegs_.read(vs1, i*8, groupx8, h))
+	assert(0);
+      for (unsigned bit = 0; bit < 128; bit++)
+	{
+	  if ((y >> bit) & 1)
+	    z ^= h;
+	  bool reduce = (h >> 127) & 1;
+	  h <<= 1;
+	  if (reduce)
+	    h ^= 0x87;
+	}
+      Uint128 res = brev8(z);
+      vecRegs_.write(vd, i*8, groupx8, res);
+    }
+
+  postVecSuccess();
 }
 
 
