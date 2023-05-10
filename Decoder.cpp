@@ -1676,7 +1676,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	{
 	  CsFormInst cs(inst);  // Double check this
 	  op1=8+cs.bits.rs1p; op0=8+cs.bits.rs2p; op2 = cs.sdImmed();
-	  encodeFsd(op0, op1, op2, expanded);
+	  encodeFsd(op1, op0, op2, expanded);
 	  return expanded;
 	}
 
@@ -1928,7 +1928,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	{
 	  CswspFormInst csw(inst);
 	  op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.sdImmed();
-	  encodeFsd(op0, op1, op2, expanded);
+	  encodeFsd(op1, op0, op2, expanded);
 	  return expanded;
 	}
 
@@ -1946,12 +1946,12 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	    {
 	      CswspFormInst csw(inst);
 	      op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.sdImmed();
-	      encodeSd(op0, op1, op2, expanded);
+	      encodeSd(op1, op0, op2, expanded);
               return expanded;
 	    }
 	  CswspFormInst csw(inst);
 	  op1 = RegSp; op0 = csw.bits.rs2; op2 = csw.swImmed();
-	  encodeFsw(op0, op1, op2, expanded);
+	  encodeFsw(op1, op0, op2, expanded);
 	  return expanded;
 	}
 
