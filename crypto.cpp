@@ -164,6 +164,17 @@ sm4_sbox(uint8_t x)
 }
 
 
+uint32_t
+sm4_subword(uint32_t x)
+{
+  uint32_t a3 = sm4_sbox(x >> 24);
+  uint32_t a2 = sm4_sbox(x >> 16);
+  uint32_t a1 = sm4_sbox(x >> 8);
+  uint32_t a0 = sm4_sbox(x);
+  return (a3 << 24) | (a2 << 16) | (a1 << 8) | a0;
+}
+
+
 static
 uint8_t
 aes_sbox_fwd(uint8_t x)

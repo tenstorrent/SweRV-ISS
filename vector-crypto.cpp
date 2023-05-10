@@ -1458,6 +1458,8 @@ aes_subword_fwd(uint32_t x);
 extern uint32_t
 aes_decode_rcon(uint8_t r);
 
+extern uint32_t
+sm4_subword(uint32_t x);
 
 
 template <typename URV>
@@ -2045,6 +2047,22 @@ sig1(uint64_t x)
 }
 
 
+template <typename ET, typename ET4>
+void
+vsha2ms(ET4& dd, ET4& e1, ET4& e2)
+{
+  unsigned etw = sizeof(ET)*8;  // element type width
+  ET w0{ET(dd)}, w1{ET(dd >> etw)}, w2{ET(dd >> 2*etw)}, w3{ET(dd >> 3*etw)};
+  ET w4{ET(e1)}, w9{ET(e1 >> etw)}, w10 {ET(e1 >> 2*etw)}, w11{ET(e1 >> 3*etw)};
+  ET w12{ET(e2)}, w13{ET(e2 >> etw)}, w14{ET(e2 >> 2*etw)}, w15{ET(e2 >> 3*etw)};
+  ET w16 = sig1(w14) + w9  + sig0(w1) + w0;
+  ET w17 = sig1(w15) + w10 + sig0(w2) + w1;
+  ET w18 = sig1(w16) + w11 + sig0(w3) + w2;
+  ET w19 = sig1(w17) + w12 + sig0(w4) + w3;
+  dd = (ET4(w16) | (ET4(w17) << etw) | (ET4(w18) << 2*etw) | (ET4(w19) << 3*etw) );
+}
+
+
 template <typename URV>
 void
 Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
@@ -2059,9 +2077,12 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
   unsigned egw = 4*vecRegs_.elemWidthInBits(), egs = 4;
   unsigned elems = vecRegs_.elemCount();
   EW sew = vecRegs_.elemWidth();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
   bool bad = (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs)
-	      or (not isRvzvknha() and not isRvzvknhb()));
+	      or (not isRvzvknha() and not isRvzvknhb()) or
+	      not (vs1 + group <= vd or vd + group <= vs1) or
+	      not (vs2 + group <= vd or vd + group <= vs2));
   if (isRvzvknha() and sew != EW::Word)
     bad = true;
   else if (isRvzvknha() and (sew != EW::Word or sew != EW::Word2))
@@ -2073,8 +2094,6 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
       return;
     }
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
     return;
 
@@ -2084,22 +2103,11 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
     {
       for (unsigned i = egStart; i < egLen; ++i)
 	{
-	  __uint128_t dd{0}, e1{0}, e2{0};
+	  Uint128 dd{0}, e1{0}, e2{0};
 	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  uint32_t w0 = dd, w1 = dd >> 32, w2 = dd >> 64, w3 = dd >> 96;
-
 	  if (not vecRegs_.read(vd, i, groupx8, e1)) assert(0);
-	  uint32_t w4 = e1, w9 = e1 >> 32, w10 = e1 >> 64, w11 = e1 >> 96;
-
 	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
-	  uint32_t w12 = e2, w13 = e2 >> 32, w14 = e2 >> 64, w15 = e2 >> 96;
-
-	  uint32_t w16 = sig1(w14) + w9  + sig0(w1) + w0;
-	  uint32_t w17 = sig1(w15) + w10 + sig0(w2) + w1;
-	  uint32_t w18 = sig1(w16) + w11 + sig0(w3) + w2;
-	  uint32_t w19 = sig1(w17) + w12 + sig0(w4) + w3;
-	  dd = ( __uint128_t(w16) | (__uint128_t(w17) << 32) |
-		 (__uint128_t(w18) << 64) | (__uint128_t(w19) << 96) );
+	  vsha2ms<uint32_t, Uint128>(dd, e1, e2);
 	  vecRegs_.write(vd, i, groupx8, dd);
 	}
     }
@@ -2109,23 +2117,9 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 	{
 	  Uint256 dd{0}, e1{0}, e2{0};
 	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  uint64_t w0 = uint64_t{dd}, w1 = uint64_t{dd >> 32}, w2 = uint64_t{dd >> 64};
-	  uint64_t w3 = uint64_t{dd >> 96};
-
 	  if (not vecRegs_.read(vd, i, groupx8, e1)) assert(0);
-	  uint64_t w4 = uint64_t{e1}, w9 = uint64_t{e1 >> 64}, w10 = uint64_t{e1 >> 128};
-	  uint64_t w11 = uint64_t{e1 >> 192};
-
 	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
-	  uint64_t w12 = uint64_t{e2}, w13 = uint64_t{e2 >> 64}, w14 = uint64_t{e2 >> 128};
-	  uint64_t w15 = uint64_t{e2 >> 192};
-
-	  uint64_t w16 = sig1(w14) + w9  + sig0(w1) + w0;
-	  uint64_t w17 = sig1(w15) + w10 + sig0(w2) + w1;
-	  uint64_t w18 = sig1(w16) + w11 + sig0(w3) + w2;
-	  uint64_t w19 = sig1(w17) + w12 + sig0(w4) + w3;
-	  dd = ( Uint256(w16) | (Uint256(w17) << 64) |
-		 (Uint256(w18) << 128) | (Uint256(w19) << 192) );
+	  vsha2ms<uint64_t, Uint256>(dd, e1, e2);
 	  vecRegs_.write(vd, i, groupx8, dd);
 	}
     }
@@ -2134,11 +2128,183 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 }
 
 
+static
+uint32_t
+sum0(uint32_t x)
+{
+  MyRor ror;
+  return ror(x, uint32_t(2)) ^ ror(x, uint32_t(13)) ^ ror(x, uint32_t(22));
+}
+
+static
+uint64_t
+sum0(uint64_t x)
+{
+  MyRor ror;
+  return ror(x, uint64_t(28)) ^ ror(x, uint64_t(34)) ^ ror(x, uint64_t(39));
+}
+
+
+static
+uint32_t
+sum1(uint32_t x)
+{
+  MyRor ror;
+  return ror(x, uint32_t(6)) ^ ror(x, uint32_t(11)) ^ ror(x, uint32_t(25));
+}
+
+
+static
+uint64_t
+sum1(uint64_t x)
+{
+  MyRor ror;
+  return ror(x, uint64_t(14)) ^ ror(x, uint64_t(18)) ^ ror(x, uint64_t(41));
+}
+
+
+static
+uint32_t
+ch(uint32_t x, uint32_t y, uint32_t z)
+{
+  return (x & y) ^ ((~x) & z);
+}
+
+
+static
+uint64_t
+ch(uint64_t x, uint64_t y, uint64_t z)
+{
+  return (x & y) ^ ((~x) & z);
+}
+
+
+static
+uint32_t
+maj(uint32_t x, uint32_t y, uint32_t z)
+{
+  return (x & y) ^ (x & z) ^ (y & z);
+}
+
+
+static
+uint64_t
+maj(uint64_t x, uint64_t y, uint64_t z)
+{
+  return (x & y) ^ (x & z) ^ (y & z);
+}
+
+
+template <typename ET, typename ET4>
+void
+vsha2c(ET4& dd, ET4& e1, ET4& e2, bool high)
+{
+  unsigned etw = sizeof(ET)*8;  // element type width
+  ET f{ET(e1)}, e{ET(e1 >> etw)}, b{ET(e1 >> 2*etw)}, a{ET(e1 >> 3*etw)};
+  ET h{ET(dd)}, g{ET(dd >> etw)}, d{ET(dd >> 2*etw)}, c{ET(dd >> 3*etw)};
+
+  ET m0{ET(e2)}, m1{ET(e2 >> etw)}, m2{ET(e2 >> 2*etw)}, m3{ET(e2 >> 3*etw)};
+
+  ET w0{}, w1{};
+  if (high)
+    {
+      w0 = m2;
+      w1 = m3;
+    }
+  else
+    {
+      w0 = m0;
+      w1 = m1;
+    }
+  ET t1 = h + sum1(e) + ch(e, f, g) + w0;
+  ET t2 = sum0(a) + maj(a, b, c);
+  h  = g;
+  g  = f;
+  f  = e;
+  e  = d + t1;
+  d  = c;
+  c  = b;
+  b  = a;
+  a  = t1 + t2;
+  t1  = h + sum1(e) + ch(e, f, g) + w1;
+  t2  = sum0(a) + maj(a, b, c);
+  h = g;
+  g = f;
+  f = e;
+  e = d + t1;
+  d = c;
+  c = b;
+  b = a;
+  a = t1 + t2;
+  dd = ET4{f} | (ET4{e} << etw) | (ET4{b} << 2*etw) | (ET4{f} << 3*etw);
+}
+
 template <typename URV>
 void
 Hart<URV>::execVsha2ch_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 4*vecRegs_.elemWidthInBits(), egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  bool bad = (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs)
+	      or (not isRvzvknha() and not isRvzvknhb()) or
+	      not (vs1 + group <= vd or vd + group <= vs1) or
+	      not (vs2 + group <= vd or vd + group <= vs2));
+  if (isRvzvknha() and sew != EW::Word)
+    bad = true;
+  else if (isRvzvknha() and (sew != EW::Word or sew != EW::Word2))
+    bad = true;
+
+  if (bad)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  switch (sew)
+    {
+    case EW::Word:
+      for (unsigned i = egStart; i < egLen; ++i)
+	{
+	  Uint128 e1{0}, e2{0}, dd{0};
+	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vsha2c<uint32_t, Uint128>(dd, e1, e2, true);
+	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	}
+      break;
+    case EW::Word2:
+      for (unsigned i = egStart; i < egLen; ++i)
+	{
+	  Uint256 e1{0}, e2{0}, dd{0};
+	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vsha2c<uint64_t, Uint256>(dd, e1, e2, true);
+	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	}
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
 
 
@@ -2146,15 +2312,163 @@ template <typename URV>
 void
 Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 4*vecRegs_.elemWidthInBits(), egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  bool bad = (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs)
+	      or (not isRvzvknha() and not isRvzvknhb()) or
+	      not (vs1 + group <= vd or vd + group <= vs1) or
+	      not (vs2 + group <= vd or vd + group <= vs2));
+  if (isRvzvknha() and sew != EW::Word)
+    bad = true;
+  else if (isRvzvknha() and (sew != EW::Word or sew != EW::Word2))
+    bad = true;
+
+  if (bad)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  switch (sew)
+    {
+    case EW::Word:
+      for (unsigned i = egStart; i < egLen; ++i)
+	{
+	  Uint128 e1{0}, e2{0}, dd{0};
+	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vsha2c<uint32_t, Uint128>(dd, e1, e2, false);
+	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	}
+      break;
+    case EW::Word2:
+      for (unsigned i = egStart; i < egLen; ++i)
+	{
+	  Uint256 e1{0}, e2{0}, dd{0};
+	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vsha2c<uint64_t, Uint256>(dd, e1, e2, false);
+	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	}
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
 }
+
+
+static
+uint32_t
+round_key(uint32_t x, uint32_t s)
+{
+  MyRol rol;
+  return x ^ s ^ rol(s, uint32_t(13)) ^ rol(s, uint32_t(23));
+}
+	  
+
+static
+uint32_t ck[] = {
+  0x00070E15, 0x1C232A31, 0x383F464D, 0x545B6269,
+  0x70777E85, 0x8C939AA1, 0xA8AFB6BD, 0xC4CBD2D9,
+  0xE0E7EEF5, 0xFC030A11, 0x181F262D, 0x343B4249,
+  0x50575E65, 0x6C737A81, 0x888F969D, 0xA4ABB2B9,
+  0xC0C7CED5, 0xDCE3EAF1, 0xF8FF060D, 0x141B2229,
+  0x30373E45, 0x4C535A61, 0x686F767D, 0x848B9299,
+  0xA0A7AEB5, 0xBCC3CAD1, 0xD8DFE6ED, 0xF4FB0209,
+  0x10171E25, 0x2C333A41, 0x484F565D, 0x646B7279
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVsm4k_vi(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvksed() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+  uint32_t rnd = imm & 7; // Lower 3 bits
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      Uint128 e1{0};
+      if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+      uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
+	rk3 = uint32_t(e1 >> 96);
+
+      uint32_t b = rk1 ^ rk2 ^ rk3 ^ ck[4 * rnd];
+      uint32_t s = sm4_subword(b);
+      uint32_t rk4 = round_key(rk0, s);
+
+      b = rk2 ^ rk3 ^ rk4 ^ ck[4 * rnd + 1];
+      s = sm4_subword(b);
+      uint32_t rk5 = round_key(rk1, s);
+
+      b = rk3 ^ rk4 ^ rk5 ^ ck[4 * rnd + 2];
+      s = sm4_subword(b);
+      uint32_t rk6 = round_key(rk2, s);
+
+      b = rk4 ^ rk5 ^ rk6 ^ ck[4 * rnd + 3];
+      s = sm4_subword(b);
+      uint32_t rk7 = round_key(rk3, s);
+
+      Uint128 dd = (Uint128{rk4} | (Uint128{rk5} << 32) | (Uint128{rk6} << 64) |
+		    (Uint128{rk7} << 86));
+      if (not vecRegs_.write(vd, i, groupx8, dd))
+	assert(0);
+    }
+
+  postVecSuccess();
+}
+
+
+static
+uint32_t
+sm4_round(uint32_t x, uint32_t s)
+{
+  MyRol rol;
+  return ( x ^ s ^ rol(s, uint32_t(2)) ^ rol(s, uint32_t(10)) ^
+	   rol(s, uint32_t(18)) ^ rol(s, uint32_t(24)));
 }
 
 
@@ -2162,7 +2476,65 @@ template <typename URV>
 void
 Hart<URV>::execVsm4r_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvksed() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      Uint128 e1{}, dd{};
+      if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+      if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+
+      uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
+	rk3 = uint32_t(e1 >> 96);
+
+      uint32_t x0 = uint32_t(dd), x1 = uint32_t(dd >> 32), x2 = uint32_t(dd >> 64),
+	x3 = uint32_t(dd >> 96);
+
+      uint32_t b  = x1 ^ x2 ^ x3 ^ rk0;
+      uint32_t s = sm4_subword(b);
+      uint32_t x4 = sm4_round(x0, s);
+
+      b = x2 ^ x3 ^ x4 ^ rk1;
+      s = sm4_subword(b);
+      uint32_t x5 = sm4_round(x1, s);
+
+      b = x3 ^ x4 ^ x5 ^ rk2;
+      s = sm4_subword(b);
+      uint32_t x6 = sm4_round(x2, s);
+
+      b = x4 ^ x5 ^ x6 ^ rk3;
+      s = sm4_subword(b);
+      uint32_t x7 = sm4_round(x3, s);
+
+      dd = Uint128{x4} | (Uint128{x5} << 32) | (Uint128{x6} << 64) | (Uint128{x7} << 96);
+      if (not vecRegs_.write(vd, i, groupx8, dd))
+	assert(0);
+    }
+      
+  postVecSuccess();
 }
 
 
@@ -2170,7 +2542,65 @@ template <typename URV>
 void
 Hart<URV>::execVsm4r_vs(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 128, egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  if (not isRvzvksed() or group*vecRegs_.bitsPerRegister() < egw or
+      sew != EW::Word or (elems % egs) or (start % egs))
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      Uint128 e1{}, dd{};
+      if (not vecRegs_.read(vs1, 0, groupx8, e1)) assert(0);
+      if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+
+      uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
+	rk3 = uint32_t(e1 >> 96);
+
+      uint32_t x0 = uint32_t(dd), x1 = uint32_t(dd >> 32), x2 = uint32_t(dd >> 64),
+	x3 = uint32_t(dd >> 96);
+
+      uint32_t b  = x1 ^ x2 ^ x3 ^ rk0;
+      uint32_t s = sm4_subword(b);
+      uint32_t x4 = sm4_round(x0, s);
+
+      b = x2 ^ x3 ^ x4 ^ rk1;
+      s = sm4_subword(b);
+      uint32_t x5 = sm4_round(x1, s);
+
+      b = x3 ^ x4 ^ x5 ^ rk2;
+      s = sm4_subword(b);
+      uint32_t x6 = sm4_round(x2, s);
+
+      b = x4 ^ x5 ^ x6 ^ rk3;
+      s = sm4_subword(b);
+      uint32_t x7 = sm4_round(x3, s);
+
+      dd = Uint128{x4} | (Uint128{x5} << 32) | (Uint128{x6} << 64) | (Uint128{x7} << 96);
+      if (not vecRegs_.write(vd, i, groupx8, dd))
+	assert(0);
+    }
+      
+  postVecSuccess();
 }
 
 

@@ -372,6 +372,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzvknha(true);
   if (isa_.isEnabled(RvExtension::Zvknhb))
     enableRvzvknhb(true);
+  if (isa_.isEnabled(RvExtension::Zvksed))
+    enableRvzvksed(true);
 }
 
 
