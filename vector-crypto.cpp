@@ -2093,7 +2093,6 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 
 	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
 	  uint32_t w12 = e2, w13 = e2 >> 32, w14 = e2 >> 64, w15 = e2 >> 96;
-	  w13 = w13; // Avoid compiler warning
 
 	  uint32_t w16 = sig1(w14) + w9  + sig0(w1) + w0;
 	  uint32_t w17 = sig1(w15) + w10 + sig0(w2) + w1;
@@ -2110,14 +2109,16 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 	{
 	  Uint256 dd{0}, e1{0}, e2{0};
 	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  uint64_t w0 = dd, w1 = dd >> 32, w2 = dd >> 64, w3 = dd >> 96;
+	  uint64_t w0 = uint64_t{dd}, w1 = uint64_t{dd >> 32}, w2 = uint64_t{dd >> 64};
+	  uint64_t w3 = uint64_t{dd >> 96};
 
 	  if (not vecRegs_.read(vd, i, groupx8, e1)) assert(0);
-	  uint64_t w4 = e1, w9 = e1 >> 64, w10 = e1 >> 128, w11 = e1 >> 192;
+	  uint64_t w4 = uint64_t{e1}, w9 = uint64_t{e1 >> 64}, w10 = uint64_t{e1 >> 128};
+	  uint64_t w11 = uint64_t{e1 >> 192};
 
 	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
-	  uint64_t w12 = e2, w13 = e2 >> 64, w14 = e2 >> 128, w15 = e2 >> 192;
-	  w13 = w13; // Avoid compiler warning.
+	  uint64_t w12 = uint64_t{e2}, w13 = uint64_t{e2 >> 64}, w14 = uint64_t{e2 >> 128};
+	  uint64_t w15 = uint64_t{e2 >> 192};
 
 	  uint64_t w16 = sig1(w14) + w9  + sig0(w1) + w0;
 	  uint64_t w17 = sig1(w15) + w10 + sig0(w2) + w1;
