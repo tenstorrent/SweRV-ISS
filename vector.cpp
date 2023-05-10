@@ -685,7 +685,7 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  unsigned destEew = 1, destGroupX8 = 8, srcEew = vecRegs_.elementWidthInBits();
+  unsigned destEew = 1, destGroupX8 = 8, srcEew = vecRegs_.elemWidthInBits();
   if (not checkDestSourceOverlap(op0, destEew, destGroupX8, op1, srcEew, groupX8) or
       not checkDestSourceOverlap(op0, destEew, destGroupX8, op2, srcEew, groupX8))
     {
@@ -718,7 +718,7 @@ Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = sew * 2;
 
   // Destination EEW > source EEW, no overlap except in highest destination
@@ -752,7 +752,7 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = 2*sew;
 
   bool overlapOk = checkDestSourceOverlap(op0, sewx2, wideGroupX8, op2, sew, groupX8);
@@ -805,7 +805,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = 2*sew;
 
   bool overlapOk = checkDestSourceOverlap(op0, sew, groupX8, op1, sewx2, wideGroupX8);
@@ -835,7 +835,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = 2*sew;
 
   bool overlapOk = checkDestSourceOverlap(op0, sew, groupX8, op1, sewx2, wideGroupX8);
@@ -931,7 +931,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   else
     {
       uint32_t gm8 = vecRegs_.groupMultiplierX8(gm);
-      unsigned bitsPerElem = vecRegs_.elementWidthInBits(ew);
+      unsigned bitsPerElem = vecRegs_.elemWidthInBits(ew);
       unsigned vlmax = (gm8*vecRegs_.bitsPerRegister()/bitsPerElem) / 8;
       if (vlmax == 0)
         vill = true;
@@ -1056,7 +1056,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
   else
     {
       uint32_t gm8 = vecRegs_.groupMultiplierX8(gm);
-      unsigned bitsPerElem = vecRegs_.elementWidthInBits(ew);
+      unsigned bitsPerElem = vecRegs_.elemWidthInBits(ew);
       unsigned vlmax = (gm8*vecRegs_.bitsPerRegister()/bitsPerElem) / 8;
       if (vlmax == 0)
         vill = true;
@@ -4988,7 +4988,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-  unsigned widthInBytes = vecRegs_.elementWidthInBytes(sew);
+  unsigned widthInBytes = vecRegs_.elemWidthInBytes(sew);
   bool masked = di->isMasked();
 
   unsigned v2Group = (2*group) / widthInBytes;
@@ -9411,7 +9411,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/2; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -9493,7 +9493,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/4; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -9575,7 +9575,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/8; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -9689,7 +9689,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/2; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -9771,7 +9771,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/4; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -9853,7 +9853,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/8; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -13126,7 +13126,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
@@ -13267,7 +13267,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
   if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
@@ -13493,7 +13493,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
-  unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
+  unsigned elemBytes = vecRegs_.elemWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
   URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
@@ -13784,7 +13784,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
   if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
@@ -13932,7 +13932,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
   if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
@@ -14081,8 +14081,8 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
@@ -14312,8 +14312,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
@@ -14559,7 +14559,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
@@ -14726,7 +14726,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
@@ -15062,8 +15062,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
@@ -15236,8 +15236,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;

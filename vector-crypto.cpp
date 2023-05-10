@@ -2005,11 +2005,131 @@ Hart<URV>::execVaesz_vs(const DecodedInst* di)
 }
 
 
+template <typename T>
+T
+rotateRight(T x, unsigned n)
+{
+  unsigned width = sizeof(x) * 8;
+  if (n == width)
+    return x;
+  assert(n < width);
+  return (x >> n) | (x << (width - n));
+}
+
+
+uint32_t
+sig0(uint32_t x)
+{
+  return rotateRight(x, 7) ^ rotateRight(x, 18) ^ (x >> 3);
+}
+
+
+uint64_t
+sig0(uint64_t x)
+{
+  return rotateRight(x, 1) ^ rotateRight(x, 8) ^ (x >> 7);
+}
+
+
+uint32_t
+sig1(uint32_t x)
+{
+  return rotateRight(x, 17) ^ rotateRight(x, 19) ^ (x >> 10);
+}
+
+
+uint64_t
+sig1(uint64_t x)
+{
+  return rotateRight(x, 19) ^ rotateRight(x, 61) ^ (x >> 6);
+}
+
+
 template <typename URV>
 void
 Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 4*vecRegs_.elemWidthInBits(), egs = 4;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+
+  bool bad = (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs)
+	      or (not isRvzvknha() and not isRvzvknhb()));
+  if (isRvzvknha() and sew != EW::Word)
+    bad = true;
+  else if (isRvzvknha() and (sew != EW::Word or sew != EW::Word2))
+    bad = true;
+
+  if (bad)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  if (sew == EW::Word)
+    {
+      for (unsigned i = egStart; i < egLen; ++i)
+	{
+	  __uint128_t dd{0}, e1{0}, e2{0};
+	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+	  uint32_t w0 = dd, w1 = dd >> 32, w2 = dd >> 64, w3 = dd >> 96;
+
+	  if (not vecRegs_.read(vd, i, groupx8, e1)) assert(0);
+	  uint32_t w4 = e1, w9 = e1 >> 32, w10 = e1 >> 64, w11 = e1 >> 96;
+
+	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
+	  uint32_t w12 = e2, w13 = e2 >> 32, w14 = e2 >> 64, w15 = e2 >> 96;
+	  w13 = w13; // Avoid compiler warning
+
+	  uint32_t w16 = sig1(w14) + w9  + sig0(w1) + w0;
+	  uint32_t w17 = sig1(w15) + w10 + sig0(w2) + w1;
+	  uint32_t w18 = sig1(w16) + w11 + sig0(w3) + w2;
+	  uint32_t w19 = sig1(w17) + w12 + sig0(w4) + w3;
+	  dd = ( __uint128_t(w16) | (__uint128_t(w17) << 32) |
+		 (__uint128_t(w18) << 64) | (__uint128_t(w19) << 96) );
+	  vecRegs_.write(vd, i, groupx8, dd);
+	}
+    }
+  else
+    {
+      for (unsigned i = egStart; i < egLen; ++i)
+	{
+	  Uint256 dd{0}, e1{0}, e2{0};
+	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+	  uint64_t w0 = dd, w1 = dd >> 32, w2 = dd >> 64, w3 = dd >> 96;
+
+	  if (not vecRegs_.read(vd, i, groupx8, e1)) assert(0);
+	  uint64_t w4 = e1, w9 = e1 >> 64, w10 = e1 >> 128, w11 = e1 >> 192;
+
+	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
+	  uint64_t w12 = e2, w13 = e2 >> 64, w14 = e2 >> 128, w15 = e2 >> 192;
+	  w13 = w13; // Avoid compiler warning.
+
+	  uint64_t w16 = sig1(w14) + w9  + sig0(w1) + w0;
+	  uint64_t w17 = sig1(w15) + w10 + sig0(w2) + w1;
+	  uint64_t w18 = sig1(w16) + w11 + sig0(w3) + w2;
+	  uint64_t w19 = sig1(w17) + w12 + sig0(w4) + w3;
+	  dd = ( Uint256(w16) | (Uint256(w17) << 64) |
+		 (Uint256(w18) << 128) | (Uint256(w19) << 192) );
+	  vecRegs_.write(vd, i, groupx8, dd);
+	}
+    }
+
+  postVecSuccess();
 }
 
 

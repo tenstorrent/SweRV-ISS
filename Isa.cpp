@@ -53,6 +53,8 @@ static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS
   { "zvbc", RvExtension::Zvbc },
   { "zvkg", RvExtension::Zvkg },
   { "zvkned", RvExtension::Zvkned },
+  { "zvknha", RvExtension::Zvknha },
+  { "zvknhb", RvExtension::Zvknhb },
 };
 static_assert(std::size(STRING_EXT_PAIRS) == static_cast<unsigned>(RvExtension::None));
 

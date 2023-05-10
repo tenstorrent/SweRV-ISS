@@ -991,6 +991,14 @@ namespace WdRiscv
     void enableRvzvkned(bool flag)
     { enableExtension(RvExtension::Zvkned, flag); }
 
+    /// Enable/disable the zvknha (vector secure hash) extension part of vector cryptography.
+    void enableRvzvknha(bool flag)
+    { enableExtension(RvExtension::Zvknha, flag); }
+
+    /// Enable/disable the zvknhb (vector secure hash) extension part of vector cryptography.
+    void enableRvzvknhb(bool flag)
+    { enableExtension(RvExtension::Zvknhb, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1290,6 +1298,14 @@ namespace WdRiscv
     /// Return true if the vector ghash extension is enabled.
     bool isRvzvkned() const
     { return extensionIsEnabled(RvExtension::Zvkned); }
+
+    /// Return true if the vector secure hash extension is enabled.
+    bool isRvzvknha() const
+    { return extensionIsEnabled(RvExtension::Zvknha); }
+
+    /// Return true if the vector secure hash extension is enabled.
+    bool isRvzvknhb() const
+    { return extensionIsEnabled(RvExtension::Zvknhb); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
