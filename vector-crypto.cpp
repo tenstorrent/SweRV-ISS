@@ -624,15 +624,15 @@ Hart<URV>::execVcpop_v(const DecodedInst* di)
 
 
 /// Function operator to rotate a left by b bits. Only the least sig
-/// n bits of b are used, n is log2(width of T). For example, if T is
+/// n bits of b are used, n is log2(width of T1). For example, if T1 is
 /// uint32_t then only least sig 5 bits of b are used.
 struct
 MyRol
 {
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
+  template <typename T1, typename T2>
+  constexpr T1 operator() (const T1& a, const T2& b) const
   {
-    unsigned width = sizeof(T)*8;  // Bit count of T
+    unsigned width = sizeof(T1)*8;  // Bit count of T1
     unsigned mask = width - 1;
     unsigned amount = unsigned(b & mask);
     return (a << amount) | (a >> ((width - amount) & mask));
@@ -2382,7 +2382,7 @@ uint32_t
 round_key(uint32_t x, uint32_t s)
 {
   MyRol rol;
-  return x ^ s ^ rol(s, uint32_t(13)) ^ rol(s, uint32_t(23));
+  return x ^ s ^ rol(s, 13) ^ rol(s, 23);
 }
 	  
 
@@ -2467,8 +2467,7 @@ uint32_t
 sm4_round(uint32_t x, uint32_t s)
 {
   MyRol rol;
-  return ( x ^ s ^ rol(s, uint32_t(2)) ^ rol(s, uint32_t(10)) ^
-	   rol(s, uint32_t(18)) ^ rol(s, uint32_t(24)));
+  return x ^ s ^ rol(s, 2) ^ rol(s, 10) ^ rol(s, 18) ^ rol(s, 24);
 }
 
 
@@ -2604,11 +2603,181 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
 }
 
 
+static
+uint32_t p1(uint32_t x)
+{
+  MyRol rol;
+  return x ^ rol(x, 15) ^ rol(x, 23);
+}
+
+
+static
+uint32_t
+zvksh_w(uint32_t m16, uint32_t m9, uint32_t m3, uint32_t m13, uint32_t m6)
+{
+  MyRol rol;
+  return p1(m16 ^ m9 ^ rol(m3, 15)) ^ rol(m13, 7) ^ m6;
+}
+
+  
 template <typename URV>
 void
 Hart<URV>::execVsm3me_vv(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 256, egs = 8;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  bool bad = (not isRvzvksh() or group*vecRegs_.bitsPerRegister() < egw or
+	      sew != EW::Word or (elems % egs) or (start % egs) or
+	      not (vs1 + group <= vd or vd + group <= vs1) or
+	      not (vs2 + group <= vd or vd + group <= vs2));
+  if (bad)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs, egStart = start / egs;
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      Uint256 e1{0}, e2{0};
+      if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+      if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+
+      uint32_t w0 = uint32_t{e2}, w1 = uint32_t{e2>>32}, w2 = uint32_t{e2>>32*2},
+	w3 = uint32_t{e2>>32*3}, w4 = uint32_t{e2>>32*4}, w5 = uint32_t{e2>>32*5},
+	w6 = uint32_t{e2>>32*6}, w7 = uint32_t{e2>>32*7};
+
+      uint32_t w8 = uint32_t{e1}, w9 = uint32_t{e1>>32}, w10 = uint32_t{e1>>32*2},
+	w11 = uint32_t{e1>>32*3}, w12 = uint32_t{e1>>32*4}, w13 = uint32_t{e1>>32*5},
+	w14 = uint32_t{e1>>32*6}, w15 = uint32_t{e1>>32*7};
+
+      // Byte Swap inputs from big-endian to little-endian
+      w15 = util::byteswap(w15);
+      w14 = util::byteswap(w14);
+      w13 = util::byteswap(w13);
+      w12 = util::byteswap(w12);
+      w11 = util::byteswap(w11);
+      w10 = util::byteswap(w10);
+      w9  = util::byteswap(w9);
+      w8  = util::byteswap(w8);
+      w7  = util::byteswap(w7);
+      w6  = util::byteswap(w6);
+      w5  = util::byteswap(w5);
+      w4  = util::byteswap(w4);
+      w3  = util::byteswap(w3);
+      w2  = util::byteswap(w2);
+      w1  = util::byteswap(w1);
+      w0  = util::byteswap(w0);
+
+      // Note that some of the newly computed words are used in later invocations.
+      uint32_t w16 = zvksh_w(w0 ,  w7 ,  w13 ,  w3  , w10 );
+      uint32_t w17 = zvksh_w(w1 ,  w8 ,  w14 ,  w4  , w11 );
+      uint32_t w18 = zvksh_w(w2 ,  w9 ,  w15 ,  w5  , w12 );
+      uint32_t w19 = zvksh_w(w3 , w10 ,  w16 ,  w6  , w13 );
+      uint32_t w20 = zvksh_w(w4 , w11 ,  w17 ,  w7  , w14 );
+      uint32_t w21 = zvksh_w(w5 , w12 ,  w18 ,  w8  , w15 );
+      uint32_t w22 = zvksh_w(w6 , w13 ,  w19 ,  w9  , w16 );
+      uint32_t w23 = zvksh_w(w7 , w14 ,  w20 ,  w10 , w17 );
+
+      // Byte swap outputs from little-endian back to big-endian
+      w16 = util::byteswap(w16);
+      w17 = util::byteswap(w17);
+      w18 = util::byteswap(w18);
+      w19 = util::byteswap(w19);
+      w20 = util::byteswap(w20);
+      w21 = util::byteswap(w21);
+      w22 = util::byteswap(w22);
+      w23 = util::byteswap(w23);
+
+      typedef Uint256 U256;
+      U256 dd = ( U256{w16} | (U256{w17} << 32) | (U256{w18} << 32*2) |
+		  (U256{w19} << 32*3) | (U256{w20} << 32*4) | (U256{w21} << 32*5) |
+		  (U256{w22} << 32*6) | (U256{w23} << 32*7) );
+	
+      if (not vecRegs_.write(vd, i, groupx8, dd))
+	assert(0);
+    }
+      
+  postVecSuccess();
+}
+
+
+static
+uint32_t
+FF1(uint32_t x, uint32_t y, uint32_t z)
+{
+  return x ^ y ^ z;
+}
+
+
+static
+uint32_t
+FF2(uint32_t x, uint32_t y, uint32_t z)
+{
+  return  (x & y) | (x & z) | (y & z);
+}
+
+
+static
+uint32_t
+FF_j(uint32_t x, uint32_t y, uint32_t z, uint32_t j)
+{
+  return j <= 15 ? FF1(x, y, z) : FF2(x, y, z);
+}
+
+
+static
+uint32_t
+GG1(uint32_t x, uint32_t y, uint32_t z)
+{
+  return x ^ y ^ z;
+}
+
+
+static
+uint32_t
+GG2(uint32_t x, uint32_t y, uint32_t z)
+{
+  return (x & y) | (~x & z);
+}
+
+
+static
+uint32_t
+GG_j(uint32_t x, uint32_t y, uint32_t z, uint32_t j)
+{
+  return j <= 15 ? GG1(x, y, z) : GG2(x, y, z);
+}
+
+
+static
+uint32_t
+T_j(uint32_t j)
+{
+  return j <= 15 ? 0x79CC4519 : 0x7A879D8A;
+}
+    
+
+static
+uint32_t
+P_0(uint32_t x)
+{
+  MyRol rol;
+  return x ^ rol(x,  9) ^ rol(x, 17);
 }
 
 
@@ -2616,7 +2785,113 @@ template <typename URV>
 void
 Hart<URV>::execVsm3c_vi(const DecodedInst* di)
 {
-  postVecFail(di);
+  if (not checkVecIntInst(di))
+    return;
+
+  typedef ElementWidth EW;
+
+  unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned group = groupx8 > 8 ? groupx8/8 : 1;
+  unsigned egw = 256, egs = 8;
+  unsigned elems = vecRegs_.elemCount();
+  EW sew = vecRegs_.elemWidth();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
+
+  bool bad = (not isRvzvksh() or group*vecRegs_.bitsPerRegister() < egw or
+	      sew != EW::Word or (elems % egs) or (start % egs) or
+	      not (vs1 + group <= vd or vd + group <= vs1));
+  if (bad)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  unsigned egLen = elems / egs,  egStart = start / egs,  rnds = imm;
+  MyRol rol;  // Rotate left
+
+  for (unsigned i = egStart; i < egLen; ++i)
+    {
+      Uint256 el1{0}, dd{0};
+      if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+      if (not vecRegs_.read(vs1, i, groupx8, el1)) assert(0);
+
+      // load state
+      uint32_t ai{uint32_t{dd}}, bi{uint32_t{dd >> 32}}, ci{uint32_t{dd >> 2*32}},
+	di{uint32_t{dd >> 3*32}}, ei{uint32_t{dd >> 4*32}}, fi{uint32_t{dd >> 5*32}},
+	gi{uint32_t{dd >> 6*32}}, hi{uint32_t{dd >> 7*32}};;
+
+      //load message schedule
+      uint32_t w0i{uint32_t{el1}}, w1i{uint32_t{el1 >> 32}}, u_w2{uint32_t{el1 >> 2*32}},
+	u_w3{uint32_t{el1 >> 3*32}}, w4i{uint32_t{el1 >> 4*32}}, w5i{uint32_t{el1 >> 5*32}},
+	u_w6{uint32_t{el1 >> 6*32}}, u_w7{uint32_t{el1 >> 7*32}};;
+
+      // u_w inputs are unused
+      // perform endian swap
+      uint32_t h = util::byteswap(hi);
+      uint32_t g = util::byteswap(gi);
+      uint32_t f = util::byteswap(fi);
+      uint32_t e = util::byteswap(ei);
+      uint32_t d = util::byteswap(di);
+      uint32_t c = util::byteswap(ci);
+      uint32_t b = util::byteswap(bi);
+      uint32_t a = util::byteswap(ai);
+      uint32_t w5 = util::byteswap(w5i);
+      uint32_t w4 = util::byteswap(w4i);
+      uint32_t w1 = util::byteswap(w1i);
+      uint32_t w0 = util::byteswap(w0i);
+
+      uint32_t x0 = w0 ^ w4;
+      uint32_t x1 = w1 ^ w5;
+      uint32_t j = 2 * rnds;
+      uint32_t ss1 = rol(rol(a, 12) + e + rol(T_j(j), j % 32), 7);
+      uint32_t ss2 = ss1 ^ rol(a, 12);
+      uint32_t tt1 = FF_j(a, b, c, j) + d + ss2 + x0;
+      uint32_t tt2 = GG_j(e, f, g, j) + h + ss1 + w0;
+      d = c;
+      uint32_t c1 = rol(b, 9);
+      b = a;
+      uint32_t a1 = tt1;
+      h = g;
+      uint32_t g1 = rol(f, 19);
+      f = e;
+      uint32_t e1 = P_0(tt2);
+      j = 2 * rnds + 1;
+      ss1 = rol(rol(a1, 12) + e1 + rol(T_j(j), j % 32), 7);
+      ss2 = ss1 ^ rol(a1, 12);
+      tt1 = FF_j(a1, b, c1, j) + d + ss2 + x1;
+      tt2 = GG_j(e1, f, g1, j) + h + ss1 + w1;
+      d = c1;
+      uint32_t c2 = rol(b, 9);
+      b = a1;
+      uint32_t a2 = tt1;
+      h = g1;
+      uint32_t g2 = rol(f, 19);
+      f = e1;
+      uint32_t e2 = P_0(tt2);
+
+      // Swap back to big endian
+      g1 = util::byteswap(g1);
+      g2 = util::byteswap(g2);
+      e1 = util::byteswap(e1);
+      e2 = util::byteswap(e2);
+      c1 = util::byteswap(c1);
+      c2 = util::byteswap(c2);
+      a1 = util::byteswap(a1);
+      a2 = util::byteswap(a2);
+      
+      typedef Uint256 U256;
+      dd = ( U256{a2} | (U256{a1} << 32) | (U256{c2} << 32*2) | (U256{c1} << 32*3) |
+	     (U256{e2} << 32*4) | (U256{e1} << 32*5) | (U256{g2} << 32*6) |
+	     (U256{g1} << 32*7) );
+  
+      if (not vecRegs_.write(vd, i, groupx8, dd))
+	assert(0);
+    }
+      
+  postVecSuccess();
 }
 
 

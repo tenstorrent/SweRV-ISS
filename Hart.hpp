@@ -1003,6 +1003,10 @@ namespace WdRiscv
     void enableRvzvksed(bool flag)
     { enableExtension(RvExtension::Zvksed, flag); }
 
+    /// Enable/disable the zvksh vector cryptography extension.
+    void enableRvzvksh(bool flag)
+    { enableExtension(RvExtension::Zvksh, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1314,6 +1318,10 @@ namespace WdRiscv
     /// Return true if the vector ShangMi extension is enabled.
     bool isRvzvksed() const
     { return extensionIsEnabled(RvExtension::Zvksed); }
+
+    /// Return true if the vector Zvksh extension is enabled.
+    bool isRvzvksh() const
+    { return extensionIsEnabled(RvExtension::Zvksh); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
