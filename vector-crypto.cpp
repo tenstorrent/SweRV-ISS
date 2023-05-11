@@ -736,14 +736,14 @@ Hart<URV>::execVrol_vx(const DecodedInst* di)
 
 
 /// Function operator to rotate a right by b bits.
-/// Only the least sig n bits of b are used, n is log2(width of T).
+/// Only the least sig n bits of b are used, n is log2(width of T1).
 struct
 MyRor
 {
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
+  template <typename T1, typename T2>
+  constexpr T1 operator() (const T1& a, const T2& b) const
   {
-    unsigned width = sizeof(T)*8;  // Bit count of T
+    unsigned width = sizeof(T1)*8;  // Bit count of T1
     unsigned mask = width - 1;
     unsigned amount = unsigned(b & mask);
     return (a >> amount) | (a << ((width - amount) & mask));
@@ -2054,7 +2054,7 @@ vsha2ms(ET4& dd, ET4& e1, ET4& e2)
   unsigned etw = sizeof(ET)*8;  // element type width
   ET w0{ET(dd)}, w1{ET(dd >> etw)}, w2{ET(dd >> 2*etw)}, w3{ET(dd >> 3*etw)};
   ET w4{ET(e1)}, w9{ET(e1 >> etw)}, w10 {ET(e1 >> 2*etw)}, w11{ET(e1 >> 3*etw)};
-  ET w12{ET(e2)}, w13{ET(e2 >> etw)}, w14{ET(e2 >> 2*etw)}, w15{ET(e2 >> 3*etw)};
+  ET w12{ET(e2)}, /* w13{ET(e2 >> etw)}, */ w14{ET(e2 >> 2*etw)}, w15{ET(e2 >> 3*etw)};
   ET w16 = sig1(w14) + w9  + sig0(w1) + w0;
   ET w17 = sig1(w15) + w10 + sig0(w2) + w1;
   ET w18 = sig1(w16) + w11 + sig0(w3) + w2;
@@ -2133,7 +2133,7 @@ uint32_t
 sum0(uint32_t x)
 {
   MyRor ror;
-  return ror(x, uint32_t(2)) ^ ror(x, uint32_t(13)) ^ ror(x, uint32_t(22));
+  return ror(x, 2) ^ ror(x, 13) ^ ror(x, 22);
 }
 
 static
@@ -2141,7 +2141,7 @@ uint64_t
 sum0(uint64_t x)
 {
   MyRor ror;
-  return ror(x, uint64_t(28)) ^ ror(x, uint64_t(34)) ^ ror(x, uint64_t(39));
+  return ror(x, 28) ^ ror(x, 34) ^ ror(x, 39);
 }
 
 
@@ -2150,7 +2150,7 @@ uint32_t
 sum1(uint32_t x)
 {
   MyRor ror;
-  return ror(x, uint32_t(6)) ^ ror(x, uint32_t(11)) ^ ror(x, uint32_t(25));
+  return ror(x, 6) ^ ror(x, 11) ^ ror(x, 25);
 }
 
 
@@ -2159,7 +2159,7 @@ uint64_t
 sum1(uint64_t x)
 {
   MyRor ror;
-  return ror(x, uint64_t(14)) ^ ror(x, uint64_t(18)) ^ ror(x, uint64_t(41));
+  return ror(x, 14) ^ ror(x, 18) ^ ror(x, 41);
 }
 
 
@@ -2824,9 +2824,10 @@ Hart<URV>::execVsm3c_vi(const DecodedInst* di)
 	gi{uint32_t{dd >> 6*32}}, hi{uint32_t{dd >> 7*32}};;
 
       //load message schedule
-      uint32_t w0i{uint32_t{el1}}, w1i{uint32_t{el1 >> 32}}, u_w2{uint32_t{el1 >> 2*32}},
-	u_w3{uint32_t{el1 >> 3*32}}, w4i{uint32_t{el1 >> 4*32}}, w5i{uint32_t{el1 >> 5*32}},
-	u_w6{uint32_t{el1 >> 6*32}}, u_w7{uint32_t{el1 >> 7*32}};;
+      uint32_t w0i{uint32_t{el1}}, w1i{uint32_t{el1 >> 32}}, /* u_w2{uint32_t{el1 >> 2*32}},
+								u_w3{uint32_t{el1 >> 3*32}}, */
+	w4i{uint32_t{el1 >> 4*32}}, w5i{uint32_t{el1 >> 5*32}}
+	/* u_w6{uint32_t{el1 >> 6*32}}, u_w7{uint32_t{el1 >> 7*32}} */;
 
       // u_w inputs are unused
       // perform endian swap
