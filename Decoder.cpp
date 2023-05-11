@@ -2473,6 +2473,11 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (funct3 == 5) return instTable_.getEntry(InstId::minu);
                 if (funct3 == 7) return instTable_.getEntry(InstId::maxu);
               }
+	    else if (funct7 == 7)
+	      {
+		if (funct3 == 5) return instTable_.getEntry(InstId::czero_eqz);
+		if (funct3 == 7) return instTable_.getEntry(InstId::czero_nez);
+	      }
             else if (funct7 == 0x10)
               {
                 if (funct3 == 2) return instTable_.getEntry(InstId::sh1add);

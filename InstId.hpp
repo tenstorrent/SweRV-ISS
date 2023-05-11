@@ -1049,6 +1049,10 @@ namespace WdRiscv
      hinval_vvma,
      hinval_gvma,
 
-     maxId = hinval_gvma
+     // Zicond: interger conditional operations
+     czero_eqz,
+     czero_nez,
+
+     maxId = czero_nez
     };
 }

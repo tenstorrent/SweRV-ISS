@@ -376,6 +376,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzvksed(true);
   if (isa_.isEnabled(RvExtension::Zvksh))
     enableRvzvksh(true);
+  if (isa_.isEnabled(RvExtension::Zicond))
+    enableRvzicond(true);
 }
 
 
@@ -8702,6 +8704,14 @@ Hart<URV>::execute(const DecodedInst* di)
     case InstId::hinval_gvma:
       execHinval_gvma(di);
       return;
+
+    case InstId::czero_eqz:
+      execCzero_eqz(di);
+      return;
+
+    case InstId::czero_nez:
+      execCzero_nez(di);
+      return;
     }
   assert(0 && "Shouldn't be able to get here if all cases above returned");
 }
@@ -10799,6 +10809,38 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCzero_eqz(const DecodedInst* di)
+{
+  if (not isRvzicond())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = intRegs_.read(di->op1());
+  URV condition = intRegs_.read(di->op2());
+  URV res = (condition == 0) ? 0 : value;
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCzero_nez(const DecodedInst* di)
+{
+  if (not isRvzicond())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = intRegs_.read(di->op1());
+  URV condition = intRegs_.read(di->op2());
+  URV res = (condition != 0) ? 0 : value;
+  intRegs_.write(di->op0(), res);
 }
 
 

@@ -7016,5 +7016,22 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
+      // zicond
+      { "czero.eqz", InstId::czero_eqz,
+	0b0000111'00000'00000'101'00000'0110011, // Opcode
+        0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
+	RvExtension::I, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+      { "czero.nez", InstId::czero_nez,
+	0b0000111'00000'00000'111'00000'0110011, // Opcode
+        0b1111111'00000'00000'111'00000'1111111, // Mask of opcode bits
+	RvExtension::I, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
     };
 }
