@@ -95,7 +95,7 @@ class whisper(pluginTemplate):
       for ext in ["I", "M", "F", "D", "C"]:
           if ext in ispec["ISA"]:
             self.isa += ext.lower()
-      for ext in ["Zba", "Zbb", "Zbc", "Zbkb", "Zbkx", "Zbs", "Zknd", "Zkne", "Zknh", "Zksed", "Zksh"]:
+      for ext in ["Zfh", "Zba", "Zbb", "Zbc", "Zbkb", "Zbkx", "Zbs", "Zknd", "Zkne", "Zknh", "Zksed", "Zksh"]:
           if ext in ispec["ISA"]:
             self.isa += '_' + ext.lower()
 

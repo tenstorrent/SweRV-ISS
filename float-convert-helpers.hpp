@@ -21,13 +21,9 @@
 #include <cfenv>
 #include <cstdint>
 #include <limits>
-#include <optional>
 #include <type_traits>
-#include "FpRegs.hpp"
+#include "float16-compat.hpp"
 #include "softfloat-util.hpp"
-
-template <typename T>
-using is_fp = std::bool_constant<std::is_floating_point<T>::value || std::is_same<T, WdRiscv::Float16>::value>;
 
 /// Converts an integer value to a floating point value.  The
 /// destination floating point type must be specified in the
@@ -37,9 +33,9 @@ template <typename To, typename From>
 auto fpConvertTo(From x)
   -> typename std::enable_if<is_fp<To>::value && std::numeric_limits<From>::is_integer, To>::type
 {
-  using namespace WdRiscv;
-
 #ifdef SOFT_FLOAT
+
+  using namespace WdRiscv;
 
   if constexpr (std::is_same<From, int8_t>::value || std::is_same<From, int16_t>::value)
     return fpConvertTo<To>(static_cast<int32_t>(x));
@@ -94,10 +90,7 @@ auto fpConvertTo(From x)
 
 #else
 
-  if constexpr (std::is_same<To, Float16>::value)
-    return Float16::fromFloat(float(x));
-  else
-    return static_cast<To>(x);
+  return static_cast<To>(x);
 
 #endif
 
@@ -112,9 +105,9 @@ template <typename To, typename From>
 auto fpConvertTo(From x)
   -> typename std::enable_if<std::numeric_limits<To>::is_integer && is_fp<From>::value, To>::type
 {
-  using namespace WdRiscv;
-
 #ifdef SOFT_FLOAT
+
+  using namespace WdRiscv;
 
   if constexpr (std::is_same<To, int8_t>::value || std::is_same<To, uint8_t>::value ||
                 std::is_same<To, int16_t>::value || std::is_same<To, uint16_t>::value)
@@ -187,11 +180,7 @@ auto fpConvertTo(From x)
 
 #else
 
-  double working;
-  if constexpr (std::is_same<From, Float16>::value)
-    working = x.toFloat();
-  else
-    working = x;
+  double working = static_cast<double>(x);
 
   To   result;
   bool valid = false;
@@ -259,9 +248,9 @@ template <typename To, bool CANONICALIZE_NAN, typename From>
 auto fpConvertTo(From x)
   -> typename std::enable_if<is_fp<To>::value && is_fp<From>::value, To>::type
 {
-  using namespace WdRiscv;
-
 #ifdef SOFT_FLOAT
+
+  using namespace WdRiscv;
 
   if constexpr (std::is_same<To, Float16>::value)
     {
@@ -307,27 +296,10 @@ auto fpConvertTo(From x)
 
 #else
 
-  To result;
-  if constexpr (std::is_same<To, Float16>::value)
-    {
-      if constexpr (std::is_same<From, Float16>::value)
-        result = x;
-      else
-        result = Float16::fromFloat(float(x));
-      if constexpr (CANONICALIZE_NAN)
-        if (result.isNan())
-          result = Float16::quietNan();
-    }
-  else
-    {
-      if constexpr (std::is_same<From, Float16>::value)
-        result = static_cast<To>(x.toFloat());
-      else
-        result = static_cast<To>(x);
-      if constexpr (CANONICALIZE_NAN)
-        if (std::isnan(result))
-          result = std::numeric_limits<To>::quiet_NaN();
-    }
+  To result = static_cast<To>(x);
+  if constexpr (CANONICALIZE_NAN)
+    if (std::isnan(result))
+      result = std::numeric_limits<To>::quiet_NaN();
   return result;
 
 #endif

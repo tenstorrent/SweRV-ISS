@@ -29,6 +29,7 @@
 #include "InstEntry.hpp"
 #include "IntRegs.hpp"
 #include "CsRegs.hpp"
+#include "float16-compat.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
 #include "Memory.hpp"
@@ -1996,7 +1997,7 @@ namespace WdRiscv
     /// register. No-op if a trigger has tripped.
     template <typename float_type>
     auto updateAccruedFpBits(float_type res)
-      -> typename std::enable_if<std::is_floating_point<float_type>::value, void>::type;
+      -> typename std::enable_if<is_fp<float_type>::value, void>::type;
 
     /// Set the flags field in FCSR to the least sig 5 bits of the
     /// given value
