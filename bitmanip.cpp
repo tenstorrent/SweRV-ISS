@@ -15,15 +15,10 @@ Hart<URV>::execClz(const DecodedInst* di)
 
   URV v1 = intRegs_.read(di->op1());
 
-  if (v1 == 0)
-    v1 = mxlen_;
+  if (mxlen_ == 32)
+    v1 = std::countl_zero(static_cast<uint32_t>(v1));
   else
-    {
-      if (mxlen_ == 32)
-        v1 = __builtin_clz(v1);
-      else
-        v1 = __builtin_clzl(v1);
-    }
+    v1 = std::countl_zero(v1);
 
   intRegs_.write(di->op0(), v1);
 }
@@ -42,9 +37,9 @@ Hart<URV>::execCtz(const DecodedInst* di)
   URV v1 = intRegs_.read(di->op1());
 
   if (mxlen_ == 32)
-    v1 = __builtin_ctz(v1);
+    v1 = std::countr_zero(static_cast<uint32_t>(v1));
   else
-    v1 = __builtin_ctzl(v1);
+    v1 = std::countr_zero(v1);
 
   intRegs_.write(di->op0(), v1);
 }
@@ -83,10 +78,7 @@ Hart<URV>::execClzw(const DecodedInst* di)
 
   uint32_t v1 = intRegs_.read(di->op1());
 
-  if (v1 == 0)
-    v1 = 32;
-  else
-    v1 = __builtin_clz(v1);
+  v1 = std::countl_zero(v1);
 
   intRegs_.write(di->op0(), v1);
 }
@@ -103,7 +95,7 @@ Hart<URV>::execCtzw(const DecodedInst* di)
     }
 
   uint32_t v1 = intRegs_.read(di->op1());
-  v1 = __builtin_ctz(v1);
+  v1 = std::countr_zero(v1);
 
   intRegs_.write(di->op0(), v1);
 }
