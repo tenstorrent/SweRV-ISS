@@ -15,12 +15,15 @@
 
 #pragma once
 
+#include <bit>
+#include <cassert>
 #include <cstdint>
 #include <cstddef>
 #include <cmath>
+#include <limits>
 #include <type_traits>
-#include <cassert>
 #include <vector>
+#include "float16-compat.hpp"
 #include "FpRegNames.hpp"
 
 namespace WdRiscv
@@ -82,175 +85,6 @@ namespace WdRiscv
 
   template <typename URV>
   class Hart;
-
-
-  /// Unsigned-float union: reinterpret bits as uint32_t or float
-  union Uint32FloatUnion
-  {
-    Uint32FloatUnion(uint32_t u) : u(u)
-    { }
-
-    Uint32FloatUnion(float f) : f(f)
-    { }
-
-    uint32_t u = 0;
-    float f;
-  };
-
-
-  /// Unsigned-float union: reinterpret bits as uint64_t or double
-  union Uint64DoubleUnion
-  {
-    Uint64DoubleUnion(uint64_t u) : u(u)
-    { }
-
-    Uint64DoubleUnion(double d) : d(d)
-    { }
-
-    uint64_t u = 0;
-    double d;
-  };
-
-
-  /// Model a half-precision floating point number.
-  class Float16
-  {
-  public:
-
-    /// Default constructor: value will be zero.
-    Float16()
-      : i16(0)
-    { }
-
-    /// Return true if this Float16 is equal to the given Float16.
-    bool operator == (const Float16& x) const
-    { return this->toFloat() == x.toFloat(); }
-
-    /// Return true if this Float16 is not equal to the given Float16.
-    bool operator != (const Float16& x) const
-    { return this->toFloat() != x.toFloat(); }
-
-    /// Return true if this Float16 is less than the given Float16.
-    bool operator < (const Float16& x) const
-    { return this->toFloat() < x.toFloat(); }
-
-    /// Return true if this Float16 is less than or equal to the given
-    /// Float16.
-    bool operator <= (const Float16& x) const
-    { return this->toFloat() <= x.toFloat(); }
-
-    /// Return true if this Float16 is grater than the given Float16.
-    bool operator > (const Float16& x) const
-    { return this->toFloat() > x.toFloat(); }
-
-    /// Return true if this Float16 is greater than or equal to the given
-    /// Float16.
-    bool operator >= (const Float16& x) const
-    { return this->toFloat() >= x.toFloat(); }
-
-    /// Return the bits of the Float16 as uint16_t (no conversion from
-    /// float to itneger).
-    uint16_t bits() const
-    { return i16; }
-
-    /// Convert this Float16 to a float.
-    float toFloat() const;
-
-    /// Convert this Float16 to a float.
-    explicit operator float() const { return this->toFloat(); }
-
-    /// Convert this Float16 to a double.
-    explicit operator double() const { return this->toFloat(); }
-
-    /// Return the sign bit of this Float16 in the least significant
-    /// bit of the result.
-    unsigned signBit() const
-    { return i16 >> 15; }
-
-    /// Return true if this number is subnormal.
-    bool isSubnormal() const
-    {
-      // Exponent bits (bits 7 to 14) must be zero and significand non-zero.
-      return expBits() == 0 and sigBits() != 0;
-    }
-
-    /// Clear the sign bit of this number.
-    void clearSign()
-    { i16 &= uint16_t(0x7fff); }
-
-    /// Set the sign bit of this number.
-    void setSign()
-    { i16 |= uint16_t(0x8000); }
-
-    /// Set the sign bit of this number to bit0 of the given number.
-    void setSign(unsigned n)
-    { i16 &= uint16_t(0x7fff); i16 |= (n&1) << 15; }
-
-    /// Return copy of this Float16 with cleared  mantissa (bits 9 to 0).
-    Float16 clearMantissa() const
-    { Float16 x{*this}; x.i16 &= 0xfc00; return x; }
-
-    /// Return the negative of this Float16.
-    Float16 negate() const
-    { Float16 x{*this}; x.i16 ^= 0x8000; return x; }
-
-    /// Return true is this number encodes infinity
-    bool isInf() const
-    { return expBits() == 0x1f and sigBits() == 0; }
-
-    /// Return true if this number encodes a zero (plus or minus zero).
-    bool isZero() const
-    { return uint16_t(i16 << 1) == 0; }
-
-    /// Return true if this number encodes not-a-number.
-    bool isNan() const
-    { return expBits() == 0x1f and sigBits() != 0; }
-
-    /// Return true if this number encodes a signaling not-a-number.
-    bool isSnan() const
-    { return expBits() == 0x1f and sigBits() != 0 and ((sigBits() >> 9) & 1) == 0; }
-
-    /// Return the exponent bits as is (without adjusting for bias).
-    unsigned expBits() const
-    { return (i16 >> 10) & 0x1f; }
-
-    /// Return the significand bits excluding hidden bits.
-    unsigned sigBits() const
-    { return i16 & 0x3ff; }
-
-    /// Return a half precison float from the given single precison number.
-    static Float16 fromFloat(float x);
-
-    /// Return a half precison float from the given bit pattern interpreted
-    /// as a half-precision floating point number.
-    static Float16 fromBits(uint16_t x)
-    { Float16 res; res.i16 = x; return res; }
-
-    /// Return a Float16 with magnitude of x and sign of y.
-    static Float16 copySign(Float16 x, Float16 y)
-    { x.i16 &= 0x7fff;  x.i16 |= (y.i16 >> 15 << 15); return x; }
-
-    /// Return the quiet NAN Float16 number.
-    static Float16 quietNan()
-    { Float16 x; x.i16 = 0b0111'1110'0000'0000; return x; }
-
-    /// Return the signaling NAN Float16 number.
-    static Float16 signalingNan()
-    { Float16 x; x.i16 = 0b0111'1101'0000'0000; return x; }
-
-    /// Return infinity in Float16.
-    static Float16 infinity()
-    { Float16 x; x.i16 = 0b0111'1100'0000'0000; return x; }
-
-  private:
-
-    uint16_t i16 = 0;
-  } __attribute__((packed));
-
-
-  /// Unary minus operator.
-  inline Float16 operator - (Float16 x)
-  { return x.negate(); }
 
 
   /// Model a RISCV floating point register file. We use double precision
@@ -514,7 +348,7 @@ namespace WdRiscv
     if (flen_ == 16 or u.isBoxedHalf())
       return u.hp;
 
-    return Float16::quietNan();
+    return std::numeric_limits<Float16>::quiet_NaN();
   }
 
 
@@ -537,8 +371,8 @@ namespace WdRiscv
   {
     if (std::isnan(f))
       {
-	Uint32FloatUnion ufu(f);
-	return ((ufu.u >> 22) & 1) == 0; // Most sig bit of significand must be zero.
+	uint32_t u = std::bit_cast<uint32_t>(f);
+	return ((u >> 22) & 1) == 0; // Most sig bit of significand must be zero.
       }
     return false;
   }
@@ -548,7 +382,12 @@ namespace WdRiscv
   inline bool
   isSnan(Float16 f16)
   {
-    return f16.isSnan();
+    if (std::isnan(f16))
+      {
+	uint16_t u = std::bit_cast<uint16_t>(f16);
+	return ((u >> 9) & 1) == 0; // Most sig bit of significant must be zero.
+      }
+    return false;
   }
 
 
@@ -558,8 +397,8 @@ namespace WdRiscv
   {
     if (std::isnan(d))
       {
-	Uint64DoubleUnion udu(d);
-	return ((udu.u >> 51) & 1) == 0; // Most sig bit of significant must be zero.
+	uint64_t u = std::bit_cast<uint64_t>(d);
+	return ((u >> 51) & 1) == 0; // Most sig bit of significant must be zero.
       }
     return false;
   }

@@ -140,22 +140,6 @@ namespace std
   {
     typedef WdRiscv::Int1024 type;
   };
-
-  WdRiscv::Float16 fminf(WdRiscv::Float16 a, WdRiscv::Float16 b)
-  {
-    return WdRiscv::Float16::fromFloat(fminf(a.toFloat(), b.toFloat()));
-  }
-
-  WdRiscv::Float16 fmaxf(WdRiscv::Float16 a, WdRiscv::Float16 b)
-  {
-    return WdRiscv::Float16::fromFloat(fmaxf(a.toFloat(), b.toFloat()));
-  }
-
-  bool signbit(WdRiscv::Float16 x)
-  { return x.signBit(); }
-
-  WdRiscv::Float16 copysign(WdRiscv::Float16 a, WdRiscv::Float16 b)
-  { return WdRiscv::Float16::copySign(a, b); }
 }
 
 
@@ -6751,11 +6735,12 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 
     case ElementWidth::Half:
       {
-	Float16 val = fpRegs_.readHalf(rs2);
-	uint16_t replacement = val.bits();
 	vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, 0))
-	  vecRegs_.write(vd, 0, group, replacement);
+          {
+            Float16 f = fpRegs_.readHalf(rs2);
+            vecRegs_.write(vd, 0, group, std::bit_cast<uint16_t>(f));
+          }
       }
       break;
 
@@ -6764,8 +6749,8 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 	vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, 0))
 	  {
-	    Uint32FloatUnion uf(fpRegs_.readSingle(rs2));
-	    vecRegs_.write(vd, 0, group, uf.u);
+            float f = fpRegs_.readSingle(rs2);
+            vecRegs_.write(vd, 0, group, std::bit_cast<uint32_t>(f));
 	  }
       }
       break;
@@ -6775,8 +6760,8 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 	vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, 0))
 	  {
-	    Uint64DoubleUnion ud(fpRegs_.readDouble(rs2));
-	    vecRegs_.write(vd, 0, group, ud.u);
+            double d = fpRegs_.readDouble(rs2);
+            vecRegs_.write(vd, 0, group, std::bit_cast<uint64_t>(d));
 	  }
       }
       break;
@@ -6817,11 +6802,12 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 
     case ElementWidth::Half:
       {
-	Float16 val = fpRegs_.readHalf(rs2);
-	uint16_t replacement = val.bits();
 	vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked);
-	if (not masked or vecRegs_.isActive(0, elems-1))
-	  vecRegs_.write(vd, elems-1, group, replacement);
+        if (not masked or vecRegs_.isActive(0, elems - 1))
+          {
+            Float16 f = fpRegs_.readHalf(rs2);
+            vecRegs_.write(vd, elems - 1, group, std::bit_cast<uint16_t>(f));
+          }
       }
       break;
 
@@ -6830,8 +6816,8 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 	vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, elems-1))
 	  {
-	    Uint32FloatUnion uf(fpRegs_.readSingle(rs2));
-	    vecRegs_.write(vd, elems-1, group, uf.u);
+            float f = fpRegs_.readSingle(rs2);
+            vecRegs_.write(vd, elems-1, group, std::bit_cast<uint32_t>(f));
 	  }
       }
       break;
@@ -6841,8 +6827,8 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 	vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, elems-1))
 	  {
-	    Uint64DoubleUnion ud(fpRegs_.readDouble(rs2));
-	    vecRegs_.write(vd, elems-1, group, ud.u);
+            double d = fpRegs_.readDouble(rs2);
+            vecRegs_.write(vd, elems-1, group, std::bit_cast<uint64_t>(d));
 	  }
       }
       break;
@@ -15760,54 +15746,13 @@ Hart<URV>::execVlsege1024ff_v(const DecodedInst* di)
 }
 
 
-namespace std
-{
-  static
-  bool isnan(Float16 x)
-  {
-    return x.isNan();
-  }
-}
-
-
-// Quiet NAN for float and double.
+// Quiet NAN for Float16, float and double.
 template <typename T>
 static
 T
 getQuietNan()
 {
   return std::numeric_limits<T>::quiet_NaN();
-}
-
-
-// Quiet NAN for Float16
-template<>
-Float16
-getQuietNan()
-{
-  return Float16::quietNan();
-}
-
-
-Float16
-operator+ (Float16 f1, Float16 f2)
-{
-  float x = f1.toFloat() + f2.toFloat();
-  return Float16::fromFloat(x);
-}
-
-
-Float16
-operator* (Float16 f1, Float16 f2)
-{
-  return Float16::fromFloat(f1.toFloat() * f2.toFloat());
-}
-
-
-Float16
-operator/ (Float16 f1, Float16 f2)
-{
-  return Float16::fromFloat(f1.toFloat() / f2.toFloat());
 }
 
 
@@ -15844,8 +15789,7 @@ double minfp(double a, double b)
 static
 Float16 minfp(Float16 a, Float16 b)
 {
-  float c = std::fminf(a.toFloat(), b.toFloat());
-  return Float16::fromFloat(c);
+  return std::fmin(a, b);
 }
 
 
@@ -15895,8 +15839,7 @@ double maxfp(double a, double b)
 static
 Float16 maxfp(Float16 a, Float16 b)
 {
-  float c = std::fmaxf(a.toFloat(), b.toFloat());
-  return Float16::fromFloat(c);
+  return std::fmax(a, b);
 }
 
 
@@ -15938,9 +15881,6 @@ doFsqrt(FT f1)
 #ifdef SOFT_FLOAT
   res = softSqrt(f1);
 #else
-  if constexpr (std::is_same<FT, Float16>::value)
-    res = FT::fromFloat(std::sqrt(float(f1)));
-  else
     res = std::sqrt(f1);
 #endif
 
@@ -15982,82 +15922,73 @@ doFdiv(FT f1, FT f2)
 }
 
 
+static constexpr std::array<uint32_t, 128> frsqrt7Table = {
+  52,  51,  50,  48,  47,  46,  44,  43,  42,  41,  40,  39,  38,  36,  35,  34,
+  33,  32,  31,  30,  30,  29,  28,  27,  26,  25,  24,  23,  23,  22,  21,  20,
+  19,  19,  18,  17,  16,  16,  15,  14,  14,  13,  12,  12,  11,  10,  10,  9,
+  9,   8,   7,   7,   6,   6,   5,   4,   4,   3,   3,   2,   2,   1,   1,   0,
+  127, 125, 123, 121, 119, 118, 116, 114, 113, 111, 109, 108, 106, 105, 103, 102,
+  100, 99,  97,  96,  95,  93,  92,  91,  90,  88,  87,  86,  85,  84,  83,  82,
+  80,  79,  78,  77,  76,  75,  74,  73,  72,  71,  70,  70,  69,  68,  67,  66,
+  65,  64,  63,  63,  62,  61,  60,  59,  59,  58,  57,  56,  56,  55,  54,  53
+};
+
+
 // Approximate 1 / sqrt(val)
-double
-doFrsqrt7(double val, bool& divByZero, bool& invalid)
+template <typename T>
+static T
+doFrsqrt7(T val, bool& divByZero, bool& invalid)
 {
+  static constexpr int bias            = std::numeric_limits<T>::max_exponent - 1;
+  static constexpr int bitsOfPrecision = std::numeric_limits<T>::digits - 1;
+
+  using uint_fsize_t = typename getSameWidthUintType<T>::type;
+
   divByZero = false;
   invalid = false;
 
   bool signBit = std::signbit(val);
-  if (val == 0)
+  if (val == T{})
     {
-      val = std::numeric_limits<double>::infinity();
+      val = std::numeric_limits<T>::infinity();
       if (signBit)
 	val = -val;
       divByZero = true;
     }
   else if (std::isinf(val) and not signBit)
     {
-      val = 0;
+      val = T{};
     }
   else if (std::isnan(val))
     {
       if (isSnan(val))
 	invalid = true;
-      val = std::numeric_limits<double>::quiet_NaN();
+      val = std::numeric_limits<T>::quiet_NaN();
     }
   else if (signBit)
     {
-      val = std::numeric_limits<double>::quiet_NaN();
+      val = std::numeric_limits<T>::quiet_NaN();
       invalid = true;
     }
   else
     {
-      static uint32_t table[128] = {
-	52,  51,  50,  48,  47,  46,  44,  43,  42,  41,  40,  39,  38,  36,  35,  34,
-	33,  32,  31,  30,  30,  29,  28,  27,  26,  25,  24,  23,  23,  22,  21,  20,
-	19,  19,  18,  17,  16,  16,  15,  14,	14,  13,  12,  12,  11,  10,  10,  9,
-	9,   8,   7,   7,   6,   6,   5,   4,   4,   3,   3,   2,   2,   1,   1,   0,
-	127, 125, 123, 121, 119, 118, 116, 114, 113, 111, 109, 108, 106, 105, 103, 102,
-	100, 99,  97,  96,  95,  93,  92,  91,  90,  88,  87,  86,  85,  84,  83,  82,
-	80,  79,  78,  77,  76,  75,  74,  73,  72,  71,  70,  70,  69,  68,  67,  66,
-	65,  64,  63,  63,  62,  61,  60,  59,  59,  58,  57,  56,  56,  55,  54,  53
-      };
-
-      int bias = 1023;
-      int inExp = 0;
-      double inFrac = std::frexp(val, &inExp);
+      int inExp  = 0;
+      T   inFrac = std::frexp(val, &inExp);
       inExp += bias - 1;
-      Uint64DoubleUnion ud(inFrac);
-      int sigMs6 = (ud.u >> 46) & 0x3f;  // Most sig 6 bits of significand
-      uint64_t outExp = (3*bias - 1 - inExp) / 2;
-      int index = (uint64_t(inExp & 1) << 6) |  sigMs6;
-      uint64_t outSigMs7 = table[index];
-      ud.u = (outSigMs7 << 45) | (outExp << 52);
-      val = ud.d;
+      uint_fsize_t u         = std::bit_cast<uint_fsize_t>(inFrac);
+      int          sigMs6    = (u >> (bitsOfPrecision - 6)) & 0x3f;  // Most sig 6 bits of significand
+      uint_fsize_t outExp    = (3 * bias - 1 - inExp) / 2;
+      int          index     = (uint_fsize_t(inExp & 1) << 6) | sigMs6;
+      uint_fsize_t outSigMs7 = frsqrt7Table[index];
+      u                      = (outSigMs7 << (bitsOfPrecision - 7)) | (outExp << bitsOfPrecision);
+      val                    = std::bit_cast<T>(u);
     }
 
   return val;
 }
 
 
-float
-doFrsqrt7(float val, bool& divByZero, bool& invalid)
-{
-  return doFrsqrt7(double(val), divByZero, invalid);
-}
-
-
-Float16
-doFrsqrt7(Float16 val, bool& divByZero, bool& invalid)
-{
-  float ff = doFrsqrt7(val.toFloat(), divByZero, invalid);
-  return Float16::fromFloat(ff);
-}
-
-
-static constexpr uint32_t frec7Table[128] = {
+static constexpr std::array<uint32_t, 128> frec7Table = {
   127, 125, 123, 121, 119, 117, 116, 114, 112, 110, 109, 107, 105, 104, 102, 100, 
   99,  97,  96,  94,  93,  91,  90,  88,  87,  85,  84,  83,  81,  80,  79,  77,  
   76,  75,  74,  72,  71,  70,  69,  68,  66,  65,  64,  63,  62,  61,  60,  59,  
@@ -16069,34 +16000,39 @@ static constexpr uint32_t frec7Table[128] = {
 };
 
 // Approximate 1 / x
-double
-static doFrec7(double val, RoundingMode mode, FpFlags& flags)
+template <typename T>
+static T
+doFrec7(T val, RoundingMode mode, FpFlags& flags)
 {
+  static constexpr int bias            = std::numeric_limits<T>::max_exponent - 1;
+  static constexpr int bitsOfPrecision = std::numeric_limits<T>::digits - 1;
+
+  using uint_fsize_t = typename getSameWidthUintType<T>::type;
+
   flags = FpFlags::None;
   bool signBit = std::signbit(val);
-  
-  if (val == 0)
+
+  if (val == T{})
     {
-      val = std::numeric_limits<double>::infinity();
+      val = std::numeric_limits<T>::infinity();
       if (signBit)
 	val = -val;
       flags = FpFlags(unsigned(FpFlags::DivByZero) | unsigned(flags));
     }
   else if (std::isinf(val))
     {
-      val = signBit? -0.0 : +0.0;
+      val = signBit? -T{} : T{};
     }
   else if (std::isnan(val))
     {
       if (isSnan(val))
 	flags = FpFlags(unsigned(FpFlags::Invalid) | unsigned(flags));
-      val = std::numeric_limits<double>::quiet_NaN();
+      val = std::numeric_limits<T>::quiet_NaN();
     }
   else
     {
-      int bias = 1023;
-      int inExp = 0;
-      double inFrac = std::frexp(val, &inExp);
+      int inExp  = 0;
+      T   inFrac = std::frexp(val, &inExp);
       inExp += bias - 1;
 
       if (inExp < -1 or inExp > 2*bias)
@@ -16104,7 +16040,7 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	  auto upDown = signBit? RoundingMode::Up : RoundingMode::Down;
 	  if (mode == upDown or mode == RoundingMode::Zero)
 	    {
-	      val = std::numeric_limits<double>::max();
+	      val = std::numeric_limits<T>::max();
 	      if (signBit)
 		val = -val;
 	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
@@ -16112,7 +16048,7 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	    }
 	  else
 	    {
-	      val = std::numeric_limits<double>::infinity();
+	      val = std::numeric_limits<T>::infinity();
 	      if (signBit)
 		val = -val;
 	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
@@ -16121,103 +16057,25 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	}
       else
         {
-          Uint64DoubleUnion ud(inFrac);
-          int               sigMs7    = (ud.u >> 45) & 0x7f;  // Most sig 7 bits of significand
-          int               outExp    = (2*bias - 1 - inExp);
-          uint64_t          outSigMs7 = static_cast<uint64_t>(frec7Table[sigMs7]) << 45;
+          uint_fsize_t u         = std::bit_cast<uint_fsize_t>(inFrac);
+          int          sigMs7    = (u >> (bitsOfPrecision - 7)) & 0x7f;  // Most sig 7 bits of significand
+          int          outExp    = (2*bias - 1 - inExp);
+          uint_fsize_t outSigMs7 = static_cast<uint_fsize_t>(frec7Table[sigMs7]) << (bitsOfPrecision - 7);
 
           if (outExp < 1)
             {
-              outSigMs7 = ((UINT64_C(1) << 52) | outSigMs7) >> (1 - outExp);
+              outSigMs7 = ((static_cast<uint_fsize_t>(1) << bitsOfPrecision) | outSigMs7) >> (1 - outExp);
               outExp    = 0;
             }
 
-          ud.u = outSigMs7 | (static_cast<uint64_t>(outExp) << 52) | (static_cast<uint64_t>(signBit) << 63);
-          val  = ud.d;
+          u   = outSigMs7                                              |
+                (static_cast<uint_fsize_t>(outExp) << bitsOfPrecision) |
+                (static_cast<uint_fsize_t>(signBit) << (std::numeric_limits<uint16_t>::digits - 1));
+          val = std::bit_cast<T>(u);
         }
     }
 
   return val;
-}
-
-
-static float
-doFrec7(float val, RoundingMode mode, FpFlags& flags)
-{
-  flags = FpFlags::None;
-  bool signBit = std::signbit(val);
-  
-  if (val == 0)
-    {
-      val = std::numeric_limits<float>::infinity();
-      if (signBit)
-	val = -val;
-      flags = FpFlags(unsigned(FpFlags::DivByZero) | unsigned(flags));
-    }
-  else if (std::isinf(val))
-    {
-      val = signBit? -0.0 : +0.0;
-    }
-  else if (std::isnan(val))
-    {
-      if (isSnan(val))
-	flags = FpFlags(unsigned(FpFlags::Invalid) | unsigned(flags));
-      val = std::numeric_limits<float>::quiet_NaN();
-    }
-  else
-    {
-      int bias = 127;
-      int inExp = 0;
-      float inFrac = std::frexp(val, &inExp);
-      inExp += bias - 1;
-
-      if (inExp < -1 or inExp > 2*bias)
-	{
-	  auto upDown = signBit? RoundingMode::Up : RoundingMode::Down;
-	  if (mode == upDown or mode == RoundingMode::Zero)
-	    {
-	      val = std::numeric_limits<float>::max();
-	      if (signBit)
-		val = -val;
-	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
-			      unsigned(flags));
-	    }
-	  else
-	    {
-	      val = std::numeric_limits<float>::infinity();
-	      if (signBit)
-		val = -val;
-	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
-			      unsigned(flags));
-	    }
-	}
-      else
-        {
-          Uint32FloatUnion uf(inFrac);
-          int              sigMs7    = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
-          int              outExp    = (2*bias - 1 - inExp);
-          uint32_t         outSigMs7 = frec7Table[sigMs7] << 16;
-
-          if (outExp < 1)
-            {
-              outSigMs7 = ((UINT32_C(1) << 23) | outSigMs7) >> (1 - outExp);
-              outExp    = 0;
-            }
-
-          uf.u = outSigMs7 | (static_cast<uint32_t>(outExp) << 23) | (static_cast<uint32_t>(signBit) << 31);
-          val  = uf.f;
-        }
-    }
-
-  return val;
-}
-
-
-static Float16
-doFrec7(Float16 val, RoundingMode mode, FpFlags& flags)
-{
-  float ff = doFrec7(val.toFloat(), mode, flags);
-  return Float16::fromFloat(ff);
 }
 
 
@@ -16533,11 +16391,15 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 static float
 fpWiden(Float16 x)
 {
-  if (x.isSnan())
+#ifdef SOFT_FLOAT
+  return softToNative(f16_to_f32(nativeToSoft(x)));
+#else
+  if (isSnan(x))
     return std::numeric_limits<float>::signaling_NaN();
   if (std::isnan(x))
     return getQuietNan<float>();
-  return x.toFloat();
+  return static_cast<float>(x);
+#endif
 }
 
 
@@ -16545,11 +16407,15 @@ fpWiden(Float16 x)
 static double
 fpWiden(float x)
 {
+#ifdef SOFT_FLOAT
+  return softToNative(f32_to_f64(nativeToSoft(x)));
+#else
   if (isSnan(x))
     return std::numeric_limits<double>::signaling_NaN();
   if (std::isnan(x))
     return getQuietNan<double>();
   return x;
+#endif
 }
 
 
@@ -17471,7 +17337,7 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
