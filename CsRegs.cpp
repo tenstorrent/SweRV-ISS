@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cfenv>
 #include <array>
+#include <bit>
 #include "CsRegs.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
@@ -235,7 +236,7 @@ CsRegs<URV>::readSignExtend(CsrNumber number, PrivilegeMode mode, URV& value) co
 
   auto csr = getImplementedCsr(number, virtMode_);
   URV mask = csr->getWriteMask();
-  unsigned lz = sizeof(URV) == 8 ? __builtin_clzl(mask)  : __builtin_clz(mask);
+  unsigned lz = std::countl_zero(mask);
 
   typedef typename std::make_signed_t<URV> SRV;
   SRV svalue = value;

@@ -490,7 +490,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
         }
       else
         {
-          rzi = __builtin_ctzl(~pmpVal); // rightmost-zero-bit ix.
+          rzi = std::countr_zero(~pmpVal); // rightmost-zero-bit ix.
           napot = (napot >> rzi) << rzi; // Clear bits below rightmost zero bit.
         }
 

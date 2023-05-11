@@ -333,25 +333,25 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 
   if (modeStage2_ == Sv32)
     {
-      // Part 1 of address translation: Bits 63-34 must be zero
+      // Part 2 of address translation: Bits 63-34 must be zero
       lowerMaskBitIndex   = 34;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte32, Va32x4>;
     }
   else if (modeStage2_ == Sv39)
     {
-      // Part 1 of address translation: Bits 63-41 must be zero
+      // Part 2 of address translation: Bits 63-41 must be zero
       lowerMaskBitIndex   = 41;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte39, Va39x4>;
     }
   else if (modeStage2_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-50 must be zero
+      // Part 2 of address translation: Bits 63-50 must be zero
       lowerMaskBitIndex   = 50;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte48, Va48x4>;
     }
   else if (modeStage2_ == Sv57)
     {
-      // Part 1 of address translation: Bits 63-59 must be zero
+      // Part 2 of address translation: Bits 63-59 must be zero
       lowerMaskBitIndex   = 59;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte57, Va57x4>;
     }

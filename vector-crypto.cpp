@@ -411,7 +411,7 @@ Hart<URV>::vclz_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          dest = util::countLeadingZeros(e1);
+          dest = std::countl_zero(e1);  // Count leading zeros.
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -488,7 +488,7 @@ Hart<URV>::vctz_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          dest = util::countTrailingZeros(e1);
+          dest = std::countr_zero(e1);  // Count trailing zeros.
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -565,7 +565,7 @@ Hart<URV>::vcpop_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          dest = util::countOnes(e1);
+          dest = std::popcount(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
