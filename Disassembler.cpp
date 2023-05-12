@@ -82,9 +82,10 @@ printInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
       return;
     }
 
-  unsigned width = std::max(size_t(9), di.name().size() + 1);
+  std::string name = di.name();
+  unsigned width = std::max(size_t(9), name.size() + 1);
 
-  out << std::left << std::setw(width) << di.name();
+  out << std::left << std::setw(width) << name;
   unsigned opCount = di.operandCount();
 
   const char* sep = "";
@@ -393,7 +394,8 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
       return;
     }
 
-  std::string_view name = di.name();
+  std::string      nameStr = di.name();
+  std::string_view name    = nameStr;
   if (id >= InstId::vmadc_vvm and id <= InstId::vmsbc_vxm and not di.isMasked())
     name = name.substr(0, name.size() - 1);
   out << name;
@@ -441,8 +443,9 @@ static
 void
 printCbo(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
-  unsigned width = std::max(size_t(9), di.name().size() + 1);
-  out << std::left << std::setw(width) << di.name();
+  std::string name = di.name();
+  unsigned width = std::max(size_t(9), name.size() + 1);
+  out << std::left << std::setw(width) << name;
   out << "0(" << disas.intRegName(di.ithOperand(0)) << ")";
 }
 

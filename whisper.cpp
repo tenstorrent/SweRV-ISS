@@ -45,6 +45,11 @@
 #include "Filesystem.hpp"
 
 
+#if !defined(SOL_TCP) && defined(IPPROTO_TCP)
+#define SOL_TCP IPPROTO_TCP
+#endif
+
+
 using namespace WdRiscv;
 
 
