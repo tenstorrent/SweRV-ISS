@@ -16070,7 +16070,7 @@ doFrec7(T val, RoundingMode mode, FpFlags& flags)
 
           u   = outSigMs7                                              |
                 (static_cast<uint_fsize_t>(outExp) << bitsOfPrecision) |
-                (static_cast<uint_fsize_t>(signBit) << (std::numeric_limits<uint16_t>::digits - 1));
+                (static_cast<uint_fsize_t>(signBit) << (std::numeric_limits<uint_fsize_t>::digits - 1));
           val = std::bit_cast<T>(u);
         }
     }

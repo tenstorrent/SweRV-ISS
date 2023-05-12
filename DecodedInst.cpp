@@ -55,13 +55,13 @@ insertFieldCountInName(std::string_view name, unsigned count, unsigned n)
 }
 
 
-std::string_view
+std::string
 DecodedInst::name() const
 {
   if (entry_)
     {
       auto id = entry_->instId();
-      auto name = entry_->name();
+      auto name = std::string(entry_->name());
       if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
         name = insertFieldCountInName(name, vecFieldCount(), 2);
       else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or

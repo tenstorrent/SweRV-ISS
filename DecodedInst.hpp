@@ -295,7 +295,7 @@ namespace WdRiscv
     { return entry_? entry_->instId() : InstId::illegal; }
 
     /// Return the instruction name.
-    std::string_view name() const;
+    std::string name() const;
 
     /// Associated a value with the ith operand. This has no effect if
     /// i is out of bounds or if the ith operand is an immediate. Note
