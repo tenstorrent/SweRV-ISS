@@ -9741,17 +9741,23 @@ template <typename URV>
 bool
 Hart<URV>::isCsrWriteable(CsrNumber csr) const
 {
-  if (isRvh() and csRegs_.isHypervisor(csr) and virtMode_)
-    return false;
+  typedef PrivilegeMode PM;
+
+  if (virtMode_)
+    {
+      if (csRegs_.isHypervisor(csr) or
+	  (privMode_ == PM::User and not csRegs_.isWriteable(csr, PM::User)))
+	return false;
+    }
 
   if (not csRegs_.isWriteable(csr, privMode_))
     return false;
 
-  if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
+  if (csr == CsrNumber::SATP and privMode_ == PM::Supervisor)
     if (mstatus_.bits_.TVM)
       return false;
 
-  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+  if (csr == CsrNumber::HGATP and privMode_ == PM::Supervisor and not virtMode_)
     if (mstatus_.bits_.TVM)
       return false;
 
@@ -9777,22 +9783,17 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 {
   typedef PrivilegeMode PM;
 
-  // Check if HS qualified (section 9.6.1 of privileged spec).
-
-  if (virtMode_)
+  if (not isCsrWriteable(csr))
     {
-      if (csRegs_.isHypervisor(csr) or
-	  (privMode_ == PM::User and not csRegs_.isWriteable(csr, PM::User)))
+      if (virtMode_)
 	{
 	  if (isRvs() and csRegs_.isWriteable(csr, PM::Supervisor))
 	    virtualInst(di);   // HS-qualified
 	  else
 	    illegalInst(di);
 	}
-    }
-  else if (not csRegs_.isWriteable(csr, privMode_))
-    {
-      illegalInst(di);
+      else
+	illegalInst(di);
       return;
     }
 
