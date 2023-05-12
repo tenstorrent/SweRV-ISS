@@ -9678,7 +9678,7 @@ template <typename URV>
 bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 {
-  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
+  if (isRvh() and csRegs_.isHypervisor(csr) and virtMode_)
     {
       virtualInst(di);
       return false;
@@ -9732,7 +9732,7 @@ template <typename URV>
 bool
 Hart<URV>::isCsrWriteable(CsrNumber csr) const
 {
-  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
+  if (isRvh() and csRegs_.isHypervisor(csr) and virtMode_)
     return false;
 
   if (not csRegs_.isWriteable(csr, privMode_))
@@ -9768,7 +9768,10 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 {
   if (not isCsrWriteable(csr))
     {
-      illegalInst(di);
+      if (isRvh() and csRegs_.isHypervisor(csr) and virtMode_)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 
