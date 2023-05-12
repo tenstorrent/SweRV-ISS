@@ -117,29 +117,15 @@ Hart<URV>::effectiveRoundingMode(unsigned instMode)
 
 
 /// Return the exponent bits of the given floating point value.
-unsigned
-fpExponentBits(Float16 hp)
+template <typename T>
+constexpr auto
+fpExponentBits(T hp)
+  -> typename std::enable_if<is_fp<T>::value, unsigned>::type
 {
-  uint16_t u = std::bit_cast<uint16_t>(hp);
-  return (u << 1) >> 11;
-}
+  using uint_fsize_t = typename getSameWidthUintType<T>::type;
 
-
-/// Return the exponent bits of the given floating point value.
-unsigned
-fpExponentBits(float sp)
-{
-  uint32_t u = std::bit_cast<uint32_t>(sp);
-  return (u << 1) >> 24;
-}
-
-
-/// Return the exponent bits of the given double precision value.
-unsigned
-fpExponentBits(double dp)
-{
-  uint64_t u = std::bit_cast<uint64_t>(dp);
-  return (u << 1) >> 53;
+  uint_fsize_t u = std::bit_cast<uint_fsize_t>(hp);
+  return (u << 1) >> std::numeric_limits<T>::digits;
 }
 
 
@@ -2905,12 +2891,15 @@ template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;
 
 template unsigned WdRiscv::fpClassifyRiscv<Float16>(Float16);
+template unsigned WdRiscv::fpClassifyRiscv<BFloat16>(BFloat16);
 template unsigned WdRiscv::fpClassifyRiscv<float>(float);
 template unsigned WdRiscv::fpClassifyRiscv<double>(double);
 
 template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<Float16>(Float16);
+template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<BFloat16>(BFloat16);
 template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<float>(float);
 template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<double>(double);
 template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<Float16>(Float16);
+template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<BFloat16>(BFloat16);
 template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<float>(float);
 template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<double>(double);
