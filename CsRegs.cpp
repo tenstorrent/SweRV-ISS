@@ -629,6 +629,25 @@ CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
 
 
 template <typename URV>
+bool
+CsRegs<URV>::isReadable(CsrNumber number, PrivilegeMode mode ) const
+{
+  const Csr<URV>* csr = getImplementedCsr(number, virtMode_);
+  if (not csr)
+    return false;
+
+  if (mode < csr->privilegeMode())
+    return false;
+
+  if (csr->isDebug() and not inDebugMode())
+    return false;  // Debug-mode register.
+
+  return true;
+}
+
+
+
+template <typename URV>
 void
 CsRegs<URV>::reset()
 {

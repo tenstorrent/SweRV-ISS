@@ -818,6 +818,10 @@ namespace WdRiscv
     /// in the given mode.
     bool isWriteable(CsrNumber number, PrivilegeMode mode) const;
 
+    /// Return true if given register is readable by a CSR instruction
+    /// in the given mode.
+    bool isReadable(CsrNumber number, PrivilegeMode mode) const;
+
     /// Fill the nums vector with the numbers of the CSRs written by
     /// the last instruction.
     void getLastWrittenRegs(std::vector<CsrNumber>& csrNums) const
