@@ -1012,6 +1012,10 @@ namespace WdRiscv
     void enableRvzicond(bool flag)
     { enableExtension(RvExtension::Zicond, flag); }
 
+    /// Enable/disable the zcb extension.
+    void enableRvzcb(bool flag)
+    { enableExtension(RvExtension::Zcb, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1331,6 +1335,10 @@ namespace WdRiscv
     /// Return true if the zicon extension is enabled.
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
+
+    /// Return true if the zcb extension is enabled.
+    bool isRvzcb() const
+    { return extensionIsEnabled(RvExtension::Zcb); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
@@ -4325,6 +4333,9 @@ namespace WdRiscv
     // zicond
     void execCzero_eqz(const DecodedInst*);
     void execCzero_nez(const DecodedInst*);
+
+    // Zcb
+    void execC_zext_h(const DecodedInst*);
 
   private:
 

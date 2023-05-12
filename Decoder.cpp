@@ -1356,6 +1356,35 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  return instTable_.getEntry(InstId::c_flw);
 	}
 
+      if (funct3 == 4)  // Zcb instructions
+	{
+	  ClbFormInst cl(inst);
+	  unsigned f6 = cl.bits.funct6;
+	  if (f6 == 0x20)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      return instTable_.getEntry(InstId::c_lbu);
+	    }
+	  else if (f6 == 0x21)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      if (cl.funct1() == 0)
+		return instTable_.getEntry(InstId::c_lhu);
+	      return instTable_.getEntry(InstId::c_lh);
+	    }
+	  else if (f6 == 0x22)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      return instTable_.getEntry(InstId::c_sb);
+	    }
+	  else if (f6 == 0x23)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      if (cl.funct1() == 0)
+		return instTable_.getEntry(InstId::c_sh);
+	    }
+	}
+
       if (funct3 == 5)  // c.fsd
 	{
 	  CsFormInst cs(inst);  // Double check this
@@ -1476,11 +1505,28 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	      return instTable_.getEntry(InstId::c_and);
 	    }
 	  // Bit 5 of immed is 1
+	  if (imm34 == 3)  // Zcb insrructions
+	    {
+	      unsigned imm012 = immed & 7;
+	      op0 = op1 = rd;
+	      if (imm012 == 0)
+		return instTable_.getEntry(InstId::c_zext_b);
+	      if (imm012 == 1)
+		return instTable_.getEntry(InstId::c_sext_b);
+	      else if (imm012 == 2)
+		return instTable_.getEntry(InstId::c_zext_h);
+	      else if (imm012 == 3)
+		return instTable_.getEntry(InstId::c_sext_h);
+	      else if (imm012 == 4)
+		return instTable_.getEntry(InstId::c_zext_w);
+	      else if (imm012 == 5)
+		return instTable_.getEntry(InstId::c_not);
+	    }
+	  if (imm34 == 2) return instTable_.getEntry(InstId::c_mul);
 	  if (not isRv64())
 	    return instTable_.getEntry(InstId::illegal);
 	  if (imm34 == 0) return instTable_.getEntry(InstId::c_subw);
 	  if (imm34 == 1) return instTable_.getEntry(InstId::c_addw);
-	  if (imm34 == 2) return instTable_.getEntry(InstId::illegal);
 	  return instTable_.getEntry(InstId::illegal);
 	}
 

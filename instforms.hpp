@@ -828,6 +828,29 @@ namespace WdRiscv
   };
 
 
+  // Pack/unpack Zcb instructions (CLB, CSB, CLH, CSH. CU. and CMMV formats).
+  union ClbFormInst
+  {
+    ClbFormInst(uint16_t inst)
+    { code = inst; }
+
+    unsigned funct1() const
+    { return bits.uimm >> 1; }
+
+    uint32_t code;
+
+    struct
+    {
+      unsigned opcode : 2;
+      unsigned rdp : 3;  // rd-prime (or rs2-prime) field
+      unsigned uimm : 2;
+      unsigned rs1p : 3;
+      unsigned funct6 : 6;
+      unsigned unused : 16;
+    } bits;
+  };
+
+
   // We make all encode functions have the same signature. Instruction
   // that do not require certain arguments are passed zero for those
   // arguments.

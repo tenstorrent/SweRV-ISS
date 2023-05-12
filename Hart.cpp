@@ -378,6 +378,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzvksh(true);
   if (isa_.isEnabled(RvExtension::Zicond))
     enableRvzicond(true);
+  if (isa_.isEnabled(RvExtension::Zcb))
+    enableRvzcb(true);
 }
 
 
@@ -8712,7 +8714,56 @@ Hart<URV>::execute(const DecodedInst* di)
     case InstId::czero_nez:
       execCzero_nez(di);
       return;
+
+    case InstId::c_lbu:
+      if (not isRvzcb()) illegalInst(di); else execLbu(di);
+      return;
+
+    case InstId::c_lhu:
+      if (not isRvzcb()) illegalInst(di); else execLhu(di);
+      return;
+
+    case InstId::c_lh:
+      if (not isRvzcb()) illegalInst(di); else execLh(di);
+      return;
+
+    case InstId::c_sb:
+      if (not isRvzcb()) illegalInst(di); else execSb(di);
+      return;
+
+    case InstId::c_sh:
+      if (not isRvzcb()) illegalInst(di); else execSh(di);
+      return;
+
+    case InstId::c_zext_b:
+      if (not isRvzcb()) illegalInst(di); else execAndi(di);
+      return;
+
+    case InstId::c_sext_b:
+      if (not isRvzcb()) illegalInst(di); else execSext_b(di);
+      return;
+
+    case InstId::c_zext_h:
+      execC_zext_h(di);
+      return;
+
+    case InstId::c_sext_h:
+      if (not isRvzcb()) illegalInst(di); else execSext_h(di);
+      return;
+
+    case InstId::c_zext_w:
+      if (not isRvzcb()) illegalInst(di); else execAdd_uw(di);
+      return;
+
+    case InstId::c_not:
+      if (not isRvzcb()) illegalInst(di); else execXor(di);
+      return;
+
+    case InstId::c_mul:
+      if (not isRvzcb()) illegalInst(di); else execMul(di);
+      return;
     }
+
   assert(0 && "Shouldn't be able to get here if all cases above returned");
 }
 
@@ -10841,6 +10892,21 @@ Hart<URV>::execCzero_nez(const DecodedInst* di)
   URV condition = intRegs_.read(di->op2());
   URV res = (condition != 0) ? 0 : value;
   intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execC_zext_h(const DecodedInst* di)
+{
+  if (not isRvzcb())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = intRegs_.read(di->op1());
+  value &= 0xffff;
+  intRegs_.write(di->op0(), value);
 }
 
 

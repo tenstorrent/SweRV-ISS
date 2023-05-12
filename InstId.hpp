@@ -1053,6 +1053,20 @@ namespace WdRiscv
      czero_eqz,
      czero_nez,
 
-     maxId = czero_nez
+     // Zcb
+     c_lbu,
+     c_lhu,
+     c_lh,
+     c_sb,
+     c_sh,
+     c_zext_b,
+     c_sext_b,
+     c_zext_h,
+     c_sext_h,
+     c_zext_w,
+     c_not,
+     c_mul,
+
+     maxId = c_mul
     };
 }
