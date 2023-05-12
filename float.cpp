@@ -240,7 +240,7 @@ Hart<URV>::setFpStatus(FpStatus value)
       writeMstatus();
     }
 
-  if (virtMode_ and mstatus_.bits_.FS != unsigned(value))
+  if (virtMode_ and vsstatus_.bits_.FS != unsigned(value))
     {
       vsstatus_.bits_.FS = unsigned(value);
       csRegs_.poke(CsrNumber::VSSTATUS, vsstatus_.value_);
