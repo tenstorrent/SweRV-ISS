@@ -22,9 +22,6 @@
 
 using Float16 = std::float16_t;
 
-template <typename T>
-using is_fp = std::is_floating_point<T>;
-
 // Otherwise check for _Float16 by checking for a builtin compiler macro.
 #elif defined(__FLT16_MAX__)
 
@@ -32,42 +29,53 @@ using is_fp = std::is_floating_point<T>;
 
 using Float16 = _Float16;
 
+#endif
+
+
+// If using C++23 or later and std::bfloat16_t is defined, use it.
+#if defined(__STDCPP_BFLOAT16_T__)
+#include <stdfloat>
+
+#define NATIVE_BF16 1
+
+using BFloat16 = std::bfloat16_t;
+
+// template <typename T>
+// using is_fp = std::is_floating_point<T>;
+
+// Otherwise check for _Float16 by checking for a builtin compiler macro.
+#elif defined(__BFLT16_MAX__)
+
+#define NATIVE_BF16 1
+
+using BFloat16 = __bf16;
+
+#endif
+
+
 // Last resort, use a custom Float16 class
-#else
+#if not defined(NATIVE_FP16) or not defined(NATIVE_BF16)
 
 #include <bit>
 #include <cfenv>
+#include <cmath>
 #include <compare>
 #include <cstdint>
 #include <functional>
 #include <type_traits>
 
-// Define these macros for compatibility with older compilers
-#ifndef __FLT16_MANT_DIG__
-#define __FLT16_MANT_DIG__ 11
-#endif
-
-#ifndef __FLT16_DECIMAL_DIG__
-#define __FLT16_DECIMAL_DIG__ 5
-#endif
-
-#ifndef __FLT16_MAX_EXP__
-#define __FLT16_MAX_EXP__ 16
-#endif
-
-#ifndef __FLT16_MIN_EXP__
-#define __FLT16_MIN_EXP__ -13
-#endif
-
-/// Model a half-precision floating point number.
-class Float16
+/// Model a 16-bit floating point number.
+template <unsigned _NUM_SIGNIFICAND_BITS,
+          unsigned _MAX_EXPONENT,
+          int _MIN_EXPONENT>
+class Float16Template
 {
 private:
 
-  static constexpr unsigned NUM_EXPONENT_BITS    = __FLT16_DECIMAL_DIG__;
-  static constexpr unsigned NUM_SIGNIFICAND_BITS = __FLT16_MANT_DIG__;
-  static constexpr unsigned MAX_EXPONENT         = __FLT16_MAX_EXP__;
-  static constexpr int      MIN_EXPONENT         = __FLT16_MIN_EXP__;
+  static constexpr unsigned NUM_SIGNIFICAND_BITS = _NUM_SIGNIFICAND_BITS;
+  static constexpr unsigned NUM_EXPONENT_BITS    = 16 - _NUM_SIGNIFICAND_BITS;
+  static constexpr unsigned MAX_EXPONENT         = _MAX_EXPONENT;
+  static constexpr int      MIN_EXPONENT         = _MIN_EXPONENT;
 
   static constexpr unsigned EXP_MASK = ((1 << NUM_EXPONENT_BITS) - 1);
   static constexpr unsigned SIG_MASK = ((1 << (NUM_SIGNIFICAND_BITS - 1)) - 1);
@@ -103,21 +111,27 @@ private:
         return (uint16_t{sign} << 15) | (uint16_t{EXP_MASK} << (NUM_SIGNIFICAND_BITS - 1));
       }
 
-    exp  = exp - (std::numeric_limits<float>::max_exponent - MAX_EXPONENT);
+    exp = exp - (std::numeric_limits<float>::max_exponent - MAX_EXPONENT);
     if (exp < MIN_EXPONENT)
       return uint16_t{sign} << 15;
-    if (exp < 1)
+
+    if constexpr (std::numeric_limits<float>::max_exponent != MAX_EXPONENT)
       {
-        // In Float16 number would be subnormal. Adjust.
-        int shift = -exp;
-        sig       = sig | (1 << 23);  // Put back implied most sig digit.
-        sig       = sig >> (shift + 1);
-        exp       = 0;
+        if (exp < 1)
+          {
+            // In Float16 number would be subnormal. Adjust.
+            int shift = -exp;
+            sig       = sig | (1 << 23);  // Put back implied most sig digit.
+            sig       = sig >> (shift + 1);
+            exp       = 0;
+          }
       }
     else if (exp >= static_cast<int>(EXP_MASK))
       return (uint16_t{sign} << 15) | (uint16_t{EXP_MASK} << (NUM_SIGNIFICAND_BITS - 1));
 
-    return (uint16_t{sign} << 15) | uint16_t(exp << 10) | uint16_t(sig >> (std::numeric_limits<float>::digits - NUM_SIGNIFICAND_BITS));
+    return (uint16_t{sign} << 15)                       |
+            uint16_t(exp << (NUM_SIGNIFICAND_BITS - 1)) |
+            uint16_t(sig >> (std::numeric_limits<float>::digits - NUM_SIGNIFICAND_BITS));
   }
 
   /// Convert this Float16 to a float.
@@ -149,9 +163,12 @@ private:
 
         // Subnormal in half precision would be normal in float.
         // Renormalize.
-        unsigned shift = std::countl_zero(sig) - (std::numeric_limits<decltype(sig)>::digits - NUM_SIGNIFICAND_BITS);
-        sig            = sig << shift;
-        exp            = -shift;
+        if constexpr (std::numeric_limits<float>::max_exponent != MAX_EXPONENT)
+          {
+            unsigned shift = std::countl_zero(sig) - (std::numeric_limits<decltype(sig)>::digits - NUM_SIGNIFICAND_BITS);
+            sig            = sig << shift;
+            exp            = -shift;
+          }
       }
 
     // Update exponent for float bias.
@@ -163,9 +180,9 @@ private:
   // Helper to avoid duplicating for each binary operation.
   // Needs to be defined above the uses.
   template <template <typename Operand> typename Op>
-  static constexpr Float16 binaryOp(const Float16& a, const Float16& b)
+  static constexpr Float16Template binaryOp(const Float16Template& a, const Float16Template& b)
   {
-    Float16 result;
+    Float16Template result;
     result.u16 = bitsFromFloat(Op<float>{}(a.toFloat(),
                                            b.toFloat()));
     return result;
@@ -174,7 +191,7 @@ private:
 public:
 
   /// Default constructor: value will be zero.
-  constexpr Float16() = default;
+  constexpr Float16Template() = default;
 
   /// Convert this Float16 to another arithmetic type.
   template <typename T>
@@ -182,22 +199,22 @@ public:
   explicit constexpr operator T() const { return static_cast<T>(toFloat()); }
 
   /// Returns the whether this Float16 is equal to to another.
-  constexpr auto operator==(const Float16& other) const
+  constexpr auto operator==(const Float16Template& other) const
   {
     return toFloat() == other.toFloat();
   }
 
   /// Returns the result of the comparison of this Float16 to another.
   /// Allows all other ordered operators.
-  constexpr auto operator<=>(const Float16& other) const
+  constexpr auto operator<=>(const Float16Template& other) const
   {
     return toFloat() <=> other.toFloat();
   }
 
   /// Unary minus operator.
-  constexpr Float16 operator-() const
+  constexpr Float16Template operator-() const
   {
-    Float16 ret;
+    Float16Template ret;
     ret.u16 = u16 xor 0x8000;
     return ret;
   }
@@ -210,28 +227,28 @@ public:
   /// Construct a Float16 from an arithmetic type
   template <typename T>
   requires std::is_arithmetic<T>::value
-  explicit constexpr Float16(T v) : u16(bitsFromFloat(static_cast<float>(v))) {}
+  explicit constexpr Float16Template(T v) : u16(bitsFromFloat(static_cast<float>(v))) {}
 
   /// Binary addition operator.
-  constexpr Float16 operator+(const Float16& other)
+  constexpr Float16Template operator+(const Float16Template& other)
   {
     return binaryOp<std::plus>(*this, other);
   }
 
   /// Binary subtraction operator.
-  constexpr Float16 operator-(const Float16& other)
+  constexpr Float16Template operator-(const Float16Template& other)
   {
     return binaryOp<std::minus>(*this, other);
   }
 
   /// Binary multiplication operator.
-  constexpr Float16 operator*(const Float16& other)
+  constexpr Float16Template operator*(const Float16Template& other)
   {
     return binaryOp<std::multiplies>(*this, other);
   }
 
   /// Binary division operator.
-  constexpr Float16 operator/(const Float16& other)
+  constexpr Float16Template operator/(const Float16Template& other)
   {
     return binaryOp<std::divides>(*this, other);
   }
@@ -254,8 +271,8 @@ protected:
   { return u16 & SIG_MASK; }
 
   /// Return a Float16 with magnitude of this and sign of v.
-  constexpr Float16 copySign(Float16 v) const
-  { Float16 r;  r.u16 = ((u16 & 0x7fff) | (v.u16 & 0x8000)); return r; }
+  constexpr Float16Template copySign(Float16Template v) const
+  { Float16Template r;  r.u16 = ((u16 & 0x7fff) | (v.u16 & 0x8000)); return r; }
 
   /// Return true is this number encodes infinity
   constexpr bool isInf() const
@@ -271,7 +288,7 @@ protected:
 
   /// Decomposes given floating point value num into a normalized fraction
   /// and an integral power of two.
-  constexpr Float16 frexp(int* exp) const
+  constexpr Float16Template frexp(int* exp) const
   {
     if ((expBits() == 0 && sigBits() == 0) || isNan() || isInf())
       {
@@ -280,15 +297,15 @@ protected:
       }
 
     uint16_t sig = sigBits();
-    *exp = static_cast<int>(expBits()) - (MAX_EXPONENT - 2);
+    *exp         = static_cast<int>(expBits()) - (MAX_EXPONENT - 2);
     if (expBits() == 0)
-    {
-      uint16_t shift = std::countl_zero(sig) - (std::numeric_limits<decltype(sig)>::digits - NUM_SIGNIFICAND_BITS);
-      *exp = *exp - shift + 1;
-      sig  = (sig << shift) & SIG_MASK;
-    }
+      {
+        uint16_t shift = std::countl_zero(sig) - (std::numeric_limits<decltype(sig)>::digits - NUM_SIGNIFICAND_BITS);
+        *exp           = *exp - shift + 1;
+        sig            = (sig << shift) & SIG_MASK;
+      }
 
-    Float16 ret;
+    Float16Template ret;
     ret.u16 = (signBit() << 15) | ((MAX_EXPONENT - 2) << (NUM_SIGNIFICAND_BITS - 1)) | sig;
     return ret;
   }
@@ -297,19 +314,11 @@ protected:
 private:
   uint16_t u16 = 0;
 } __attribute__((packed));
-static_assert(sizeof(Float16) == sizeof(uint16_t));
-
-#endif
-
 
 // If not using a native float16 type, define a helper class
 // that has access to the custom Float16's protected members.
 // This helper class prevents accidentally using a Float16
 // member function outside of this file.
-#if not defined(NATIVE_FP16)
-
-#include <cmath>
-
 struct _fphelpers
 {
   /// Return a Float16 with magnitude of x and sign of y.
@@ -361,6 +370,53 @@ struct _fphelpers
 #endif
 
 
+#if not defined(NATIVE_FP16)
+
+// Define these macros for compatibility with older compilers
+#ifndef __FLT16_MANT_DIG__
+#define __FLT16_MANT_DIG__ 11
+#endif
+
+#ifndef __FLT16_MAX_EXP__
+#define __FLT16_MAX_EXP__ 16
+#endif
+
+#ifndef __FLT16_MIN_EXP__
+#define __FLT16_MIN_EXP__ -13
+#endif
+
+/// Model a 16-bit floating point number.
+using Float16 = Float16Template<__FLT16_MANT_DIG__,
+                                __FLT16_MAX_EXP__,
+                                __FLT16_MIN_EXP__>;
+static_assert(sizeof(Float16) == sizeof(uint16_t));
+#endif
+
+
+#if not defined(NATIVE_BF16)
+
+// Define these macros for compatibility with older compilers
+#ifndef __BFLT16_MANT_DIG__
+#define __BFLT16_MANT_DIG__ 8
+#endif
+
+#ifndef __BFLT16_MAX_EXP__
+#define __BFLT16_MAX_EXP__ 128
+#endif
+
+#ifndef __BFLT16_MIN_EXP__
+#define __BFLT16_MIN_EXP__ -125
+#endif
+
+/// Model a 16-bit brain floating point number.
+using BFloat16 = Float16Template<__BFLT16_MANT_DIG__,
+                                 __BFLT16_MAX_EXP__,
+                                 __BFLT16_MIN_EXP__>;
+static_assert(sizeof(BFloat16) == sizeof(uint16_t));
+
+#endif
+
+
 // When not using C++23 (or later), create the std::numeric_limits and
 // float.h/math.c versions of some functions for float16.  This allows
 // common templated behavior for all floating-point types outside of this
@@ -371,9 +427,6 @@ struct _fphelpers
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
-
-template <typename T>
-struct is_fp : std::bool_constant<std::is_floating_point<T>::value or std::is_same<T, Float16>::value> {};
 
 namespace std
 {
@@ -513,5 +566,187 @@ namespace std
   }
 #endif
 }
+
+#endif
+
+// When not using C++23 (or later), create the std::numeric_limits and
+// float.h/math.c versions of some functions for bfloat16.  This allows
+// common templated behavior for all floating-point types outside of this
+// file.
+#if not defined(__STDCPP_BFLOAT16_T__)
+
+#include <bit>
+#include <cfloat>
+#include <cmath>
+#include <cstdint>
+
+namespace std
+{
+  template<>
+  struct numeric_limits<BFloat16>
+  {
+    static inline constexpr auto digits       = __BFLT16_MANT_DIG__;
+    static inline constexpr auto max_exponent = __BFLT16_MAX_EXP__;
+
+    static constexpr auto min() noexcept
+    {
+      // Use raw hex here to avoid BF16 literal
+      return std::bit_cast<BFloat16>(uint16_t{0b0000'0000'1000'0000});
+    }
+
+    static constexpr auto max() noexcept
+    {
+      // Use raw hex here to avoid BF16 literal
+      return std::bit_cast<BFloat16>(uint16_t{0b0111'1111'0111'1111});
+    }
+
+    static constexpr auto infinity() noexcept
+    {
+      // Use raw hex here to avoid BF16 literal
+      return std::bit_cast<BFloat16>(uint16_t{0b0111'1111'1000'0000});
+    }
+
+    static constexpr auto quiet_NaN() noexcept
+    {
+      // Use raw hex here to avoid BF16 literal
+      return std::bit_cast<BFloat16>(uint16_t{0b0111'1111'1100'0000});
+    }
+
+    static constexpr auto signaling_NaN() noexcept
+    {
+      // Use raw hex here to avoid BF16 literal
+      return std::bit_cast<BFloat16>(uint16_t{0b0111'1111'1010'0000});
+    }
+  };
+
+  inline auto copysign(BFloat16 a, BFloat16 b)
+  {
+#ifndef NATIVE_BF16
+    return _fphelpers::copySign(a, b);
+#else
+    return static_cast<BFloat16>(std::copysignf(static_cast<float>(a),
+                                                static_cast<float>(b)));
+#endif
+  }
+
+  inline auto fmax(BFloat16 a, BFloat16 b)
+  {
+#ifndef NATIVE_BF16
+    if (_fphelpers::isNan(a))
+      return b;
+    if (_fphelpers::isNan(b))
+      return a;
+    return a >= b ? a : b;
+#else
+    return static_cast<BFloat16>(std::fmaxf(static_cast<float>(a),
+                                            static_cast<float>(b)));
+#endif
+  }
+
+  inline auto fmin(BFloat16 a, BFloat16 b)
+  {
+#ifndef NATIVE_BF16
+    if (_fphelpers::isNan(a))
+      return b;
+    if (_fphelpers::isNan(b))
+      return a;
+    return a <= b ? a : b;
+#else
+    return static_cast<BFloat16>(std::fminf(static_cast<float>(a),
+                                            static_cast<float>(b)));
+#endif
+  }
+
+  inline decltype(FP_NORMAL) fpclassify(BFloat16 v)
+  {
+#ifndef NATIVE_BF16
+    return _fphelpers::classify(v);
+#else
+    return std::fpclassify(static_cast<float>(v));
+#endif
+  }
+
+  inline auto frexp(BFloat16 v, int* p)
+  {
+#ifndef NATIVE_BF16
+    return _fphelpers::frexp(v, p);
+#else
+    return static_cast<BFloat16>(std::frexp(static_cast<float>(v), p));
+#endif
+  }
+
+  inline bool isinf(BFloat16 v)
+  {
+#ifndef NATIVE_BF16
+    return _fphelpers::isInf(v);
+#else
+    return std::isinf(static_cast<float>(v));
+#endif
+  }
+
+  inline bool isnan(BFloat16 v)
+  {
+#ifndef NATIVE_BF16
+    return _fphelpers::isNan(v);
+#else
+    return std::isnan(static_cast<float>(v));
+#endif
+  }
+
+  inline bool signbit(BFloat16 v)
+  {
+#ifndef NATIVE_BF16
+    return _fphelpers::signBit(v);
+#else
+    return std::signbit(static_cast<float>(v));
+#endif
+  }
+
+// SoftFloat has its own versions of these files, so don't allow them to be called
+// when using SoftFloat
+#ifndef SOFT_FLOAT
+  inline auto fma(BFloat16 a, BFloat16 b, BFloat16 c)
+  {
+    return static_cast<BFloat16>(std::fmaf(static_cast<float>(a),
+                                           static_cast<float>(b),
+                                           static_cast<float>(c)));
+  }
+
+  inline auto sqrt(BFloat16 v)
+  {
+    return static_cast<BFloat16>(static_cast<float>(v));
+  }
+#endif
+}
+
+#endif
+
+
+// Create a helper template to determine whether a type is a float type or not.
+#if defined(__STDCPP_FLOAT16_T__) and defined(__STDCPP_BFLOAT16_T__)
+
+// Float16 and BFloat16 are C++23 native types.  Just alias std::is_floating_point;
+template <typename T>
+using is_fp = std::is_floating_point<T>;
+
+#elif defined(__STDCPP_FLOAT16_T__)
+
+// Float16 is a C++23 native type.  Add an explicit check for BFloat16 to std::is_floating_point;
+template <typename T>
+struct is_fp : std::bool_constant<std::is_floating_point<T>::value or std::is_same<T, BFloat16>::value> {};
+
+#elif defined(__STDCPP_BFLOAT16_T__)
+
+// BFloat16 is a C++23 native type.  Add an explicit check for Float16 to std::is_floating_point;
+template <typename T>
+struct is_fp : std::bool_constant<std::is_floating_point<T>::value or std::is_same<T, Float16>::value> {};
+
+#else
+
+// Neither Float16 nor BFloat16 are C++23 native types.  Add explicity checks for both to std::is_floating_point
+template <typename T>
+struct is_fp : std::bool_constant<std::is_floating_point<T>::value or
+                                  std::is_same<T, Float16>::value  or
+                                  std::is_same<T, BFloat16>::value> {};
 
 #endif

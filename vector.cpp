@@ -148,46 +148,6 @@ namespace WdRiscv
   template <> struct makeDoubleWide<Float16>    { typedef float   type; };
   template <> struct makeDoubleWide<float>      { typedef double  type; };
 
-  /// Return the integral type that is the same width as the given
-  /// floating point type. For example:
-  ///    getSameWidthIntegerType<float>::type
-  /// yields the type
-  ///    int32_t.
-  template <typename T>
-  struct getSameWidthIntType;
-
-  template <> struct getSameWidthIntType<Float16>  { typedef int16_t  type; };
-  template <> struct getSameWidthIntType<float>    { typedef int32_t  type; };
-  template <> struct getSameWidthIntType<double>   { typedef int64_t  type; };
-
-  /// Return the unsigned integral type that is the same width as the given
-  /// floating point type. For example:
-  ///    getSameWidthIntegerType<float>::type
-  /// yields the type
-  ///    uint32_t.
-  template <typename T>
-  struct getSameWidthUintType;
-
-  template <> struct getSameWidthUintType<Float16>  { typedef uint16_t  type; };
-  template <> struct getSameWidthUintType<float>    { typedef uint32_t  type; };
-  template <> struct getSameWidthUintType<double>   { typedef uint64_t  type; };
-
-  /// Return the floating point type that is the same width as the given
-  /// integer type. For example:
-  ///    getSameWidthFloatType<int32_t>::type
-  /// yields the type
-  ///    float.
-  template <typename T>
-  struct getSameWidthFloatType;
-
-  template <> struct getSameWidthFloatType<int16_t>   { typedef Float16  type; };
-  template <> struct getSameWidthFloatType<int32_t>   { typedef float    type; };
-  template <> struct getSameWidthFloatType<int64_t>   { typedef double   type; };
-  template <> struct getSameWidthFloatType<uint16_t>  { typedef Float16  type; };
-  template <> struct getSameWidthFloatType<uint32_t>  { typedef float    type; };
-  template <> struct getSameWidthFloatType<uint64_t>  { typedef double   type; };
-
-
   /// Set result to the upper half of a*b computed in double width
   /// intermediate.
   template <typename T>

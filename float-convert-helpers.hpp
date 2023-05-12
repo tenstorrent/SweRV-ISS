@@ -304,3 +304,45 @@ auto fpConvertTo(From x)
 
 #endif
 }
+
+
+/// Return the integral type that is the same width as the given
+/// floating point type. For example:
+///    getSameWidthIntegerType<float>::type
+/// yields the type
+///    int32_t.
+template <typename T>
+struct getSameWidthIntType;
+
+template <> struct getSameWidthIntType<BFloat16> { using type = int16_t; };
+template <> struct getSameWidthIntType<Float16>  { using type = int16_t; };
+template <> struct getSameWidthIntType<float>    { using type = int32_t; };
+template <> struct getSameWidthIntType<double>   { using type = int64_t; };
+
+/// Return the unsigned integral type that is the same width as the given
+/// floating point type. For example:
+///    getSameWidthIntegerType<float>::type
+/// yields the type
+///    uint32_t.
+template <typename T>
+struct getSameWidthUintType;
+
+template <> struct getSameWidthUintType<BFloat16> { using type = uint16_t; };
+template <> struct getSameWidthUintType<Float16>  { using type = uint16_t; };
+template <> struct getSameWidthUintType<float>    { using type = uint32_t; };
+template <> struct getSameWidthUintType<double>   { using type = uint64_t; };
+
+/// Return the floating point type that is the same width as the given
+/// integer type. For example:
+///    getSameWidthFloatType<int32_t>::type
+/// yields the type
+///    float.
+template <typename T>
+struct getSameWidthFloatType;
+
+template <> struct getSameWidthFloatType<int16_t>   { using type = Float16; };
+template <> struct getSameWidthFloatType<int32_t>   { using type = float; };
+template <> struct getSameWidthFloatType<int64_t>   { using type = double; };
+template <> struct getSameWidthFloatType<uint16_t>  { using type = Float16; };
+template <> struct getSameWidthFloatType<uint32_t>  { using type = float; };
+template <> struct getSameWidthFloatType<uint64_t>  { using type = double; };

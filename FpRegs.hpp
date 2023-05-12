@@ -24,6 +24,7 @@
 #include <type_traits>
 #include <vector>
 #include "float16-compat.hpp"
+#include "float-convert-helpers.hpp"
 #include "FpRegNames.hpp"
 
 namespace WdRiscv
@@ -366,39 +367,17 @@ namespace WdRiscv
 
 
   /// Return true if given float is a signaling not-a-number.
-  inline bool
-  isSnan(float f)
+  template <typename T>
+  inline auto
+  isSnan(T f)
+    -> typename std::enable_if<is_fp<T>::value, bool>::type
   {
+    using uint_fsize_t = typename getSameWidthUintType<T>::type;
+
     if (std::isnan(f))
       {
-	uint32_t u = std::bit_cast<uint32_t>(f);
-	return ((u >> 22) & 1) == 0; // Most sig bit of significand must be zero.
-      }
-    return false;
-  }
-
-
-  /// Return true if given float is a signaling not-a-number.
-  inline bool
-  isSnan(Float16 f16)
-  {
-    if (std::isnan(f16))
-      {
-	uint16_t u = std::bit_cast<uint16_t>(f16);
-	return ((u >> 9) & 1) == 0; // Most sig bit of significant must be zero.
-      }
-    return false;
-  }
-
-
-  /// Return true if given double is a signaling not-a-number.
-  inline bool
-  isSnan(double d)
-  {
-    if (std::isnan(d))
-      {
-	uint64_t u = std::bit_cast<uint64_t>(d);
-	return ((u >> 51) & 1) == 0; // Most sig bit of significant must be zero.
+        uint_fsize_t u = std::bit_cast<uint_fsize_t>(f);
+        return ((u >> (std::numeric_limits<T>::digits - 2)) & 1) == 0; // Most sig bit of significand must be zero.
       }
     return false;
   }
