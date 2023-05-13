@@ -493,6 +493,15 @@ namespace WdRiscv
     bool mapsToVirtual() const
     { return mapsToVirtual_; }
 
+    /// Return true if this is a high-half of a CSR (e.g. MSTATUSH is
+    /// the high half of MSTATUS).
+    bool isHighHalf() const
+    { return high_; }
+
+    /// Mark this CSR as a high-half (e.g. MSTATUSH is a high half).
+    void markAsHighHalf(bool flag)
+    { high_ = flag; }
+
     /// Return true if this register has been marked as a debug-mode
     /// register.
     bool isDebug() const
@@ -752,6 +761,7 @@ namespace WdRiscv
     URV value_ = 0;
     URV prev_ = 0;
     bool hasPrev_ = false;
+    bool high_ = false;
 
     // This will point to value_ except when shadowing the value of
     // some other register.
@@ -817,6 +827,14 @@ namespace WdRiscv
     /// Return true if given register is writable by a CSR instruction
     /// in the given mode.
     bool isWriteable(CsrNumber number, PrivilegeMode mode) const;
+
+    /// Return true if this is a high-half of a CSR (e.g. MSTATUSH is
+    /// the high half of MSTATUS).
+    bool isHighHalf(CsrNumber number) const
+    {
+      const Csr<URV>* csr = getImplementedCsr(number, virtMode_);
+      return csr ? csr->isHighHalf() : false;
+    }
 
     /// Return true if given register is readable by a CSR instruction
     /// in the given mode.

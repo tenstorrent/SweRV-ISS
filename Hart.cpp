@@ -9680,17 +9680,26 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
   typedef PrivilegeMode PM;
 
   // Check if HS qualified (section 9.6.1 of privileged spec).
-  bool hsq = isRvs() and csRegs_.isWriteable(csr, PM::Supervisor);
+  bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor);
   if (virtMode_)
     {
       if (csRegs_.isHypervisor(csr) or
 	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User)))
 	{
-	  if (hsq)
-	    virtualInst(di);   // HS-qualified
+	  if (not csRegs_.isHighHalf(csr))
+	    {
+	      if (hsq) virtualInst(di); else illegalInst(di);
+	      return false;
+	    }
 	  else
-	    illegalInst(di);
-	  return false;
+	    {
+	      if (sizeof(URV) == 4)
+		{
+		  if (hsq) virtualInst(di); else illegalInst(di);
+		}
+	      else
+		illegalInst(di);
+	    }
 	}
     }
 
@@ -9786,10 +9795,20 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
     {
       if (virtMode_)
 	{
-	  if (isRvs() and csRegs_.isWriteable(csr, PM::Supervisor))
-	    virtualInst(di);   // HS-qualified
+	  bool hsq = isRvs() and csRegs_.isWriteable(csr, PM::Supervisor); // HS qualified
+	  if (not csRegs_.isHighHalf(csr))
+	    {
+	      if (hsq) virtualInst(di); else illegalInst(di);
+	    }
 	  else
-	    illegalInst(di);
+	    {
+	      if (sizeof(URV) == 4)
+		{
+		  if (hsq) virtualInst(di); else illegalInst(di);
+		}
+	      else
+		illegalInst(di);
+	    }
 	}
       else
 	illegalInst(di);
