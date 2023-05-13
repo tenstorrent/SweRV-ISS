@@ -4628,71 +4628,70 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   typedef InterruptCause IC;
   typedef PrivilegeMode PM;
 
-  // Check for machine-level interrupts if MIE enabled or if user/supervisor.
-
   URV delegVal = csRegs_.peekMideleg();
   URV hDelegVal = csRegs_.peekHideleg();
 
-  for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
-			     IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-			     IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
+  if (mstatus_.bits_.MIE or privMode_ != PM::Machine)
     {
-      URV mask = URV(1) << unsigned(ic);
-      bool delegated = (mask & delegVal) != 0;
-      bool enabled = false;
-      if (privMode_ == PM::Machine)
-	{
-	  if (delegated)
-	    continue;
-	  enabled = mstatus_.bits_.MIE;
-	}
-      else if (privMode_ == PM::Supervisor)
-	{
-	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (not virtMode_)
-	    if (hDelegated)
-	      continue;
-	  enabled = virtMode_ ? vsstatus_.bits_.SIE : mstatus_.bits_.SIE;
-	}
-      else if (privMode_ == PM::User)
-	enabled = true;
-
-      if (enabled and (mie & mask & mip))
-	{
-	  cause = ic;
-	  return true;
-	}
-    }
-
-  if (isRvh())
-    {
-      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+      // Check for interrupts destined for machine-level (not-delegated).
+      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
+				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+				 IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = true;
-	  bool enabled = false;
-	  if (privMode_ == PM::Machine)
-	    {
-	      if (delegated)
-		continue;
-	      enabled = mstatus_.bits_.MIE;
-	    }
-	  else if (privMode_ == PM::Supervisor)
-	    {
-	      bool hDelegated = (mask & hDelegVal) != 0;
-	      if (not virtMode_)
-		if (hDelegated)
-		  continue;
-	      enabled = virtMode_ ? vsstatus_.bits_.SIE : mstatus_.bits_.SIE;
-	    }
-	  else if (privMode_ == PM::User)
-	    enabled = true;
-
-	  if (enabled and (mie & mask & mip))
+	  bool delegated = (mask & delegVal) != 0;
+	  bool enabled = (mie & mask & mip) != 0;
+	  if (enabled and not delegated)
 	    {
 	      cause = ic;
 	      return true;
 	    }
+	}
+    }
+  if (privMode_ == PM::Machine)
+    return false;
+
+  if (mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User)
+    {
+      // Check for interrupts destined for S or HS privilege.
+      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
+				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+				 IC::VS_TIMER } )
+	{
+	  URV mask = URV(1) << unsigned(ic);
+	  bool delegated = (mask & delegVal) != 0;
+	  if (not delegated)
+	    continue;
+	  bool hDelegated = (mask & hDelegVal) != 0;
+	  if (virtMode_)
+	    if (hDelegated)
+	      continue;
+	  if (mie & mask & mip)
+	    {
+	      cause = ic;
+	      return true;
+	    }
+	}
+    }
+  if (privMode_ == PM::Supervisor and not virtMode_)
+    return false;
+
+  // Check for interrupts destined to VS privilege.
+  for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+    {
+      URV mask = URV(1) << unsigned(ic);
+      bool delegated = (mask & delegVal) != 0;
+      bool hDelegated = (mask & hDelegVal) != 0;
+      if (not delegated or not hDelegated)
+	continue;
+      if (mie & mask & mip)
+	{
+	  cause = ic;
+	  return true;
 	}
     }
 
