@@ -1552,6 +1552,20 @@ CsRegs<URV>::defineHypervisorRegs()
   // additional machine CSRs
   csr = defineCsr("mtval2",      Csrn::MTVAL2,      !mand, !imp, 0, wam, wam);
   csr = defineCsr("mtinst",      Csrn::MTINST,      !mand, !imp, 0, wam, wam);
+
+  // In MIE/MIP bits corresponding to VSEIP/VSTIP/VSSIP are writeable pokeable.
+  csr = findCsr(Csrn::MIP);
+  if (csr)
+    {
+      csr->setWriteMask(csr->getWriteMask() | 0x444);
+      csr->setPokeMask(csr->getPokeMask() | 0x444);
+    }
+  csr = findCsr(Csrn::MIE);
+  if (csr)
+    {
+      csr->setWriteMask(csr->getWriteMask() | 0x444);
+      csr->setPokeMask(csr->getPokeMask() | 0x444);
+    }
 }
 
 
