@@ -2853,7 +2853,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       if (type != Pmp::Type::Off)
         updateMemoryProtection();
     }
-  else if (csr == CsrNumber::SATP or csr == CsrNumber::HGATP)
+  else if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
     updateAddressTranslation();
   else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
@@ -9833,7 +9833,7 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	return;  // Cannot turn-off C-extension if PC is not word aligned.
     }
 
-  if (csr == CsrNumber::SATP)
+  if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
     {
       unsigned modeBits = 0;
       if constexpr (sizeof(URV) == 4)
