@@ -965,9 +965,12 @@ template <typename URV>
 void
 Hart<URV>::postVecSuccess()
 {
-  if (vecRegs_.getLastWrittenReg() >= 0)
-    markVsDirty();
   csRegs_.clearVstart();
+
+  // Writing to vstart should mark VS as dirty, so do so
+  // regardless of whether any vector operand registers
+  // were written.
+  markVsDirty();
 }
 
 
