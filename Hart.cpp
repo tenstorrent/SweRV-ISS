@@ -9401,33 +9401,33 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
 
   // Invalidate whole TLB. This is overkill. 
-  if (di->op1() == 0 and di->op2() == 0)
+  if (di->op0() == 0 and di->op1() == 0)
     tlb.invalidate();
-  else if (di->op1() == 0 and di->op2() != 0)
+  else if (di->op0() == 0 and di->op1() != 0)
     {
-      URV asid = intRegs_.read(di->op2());
+      URV asid = intRegs_.read(di->op1());
       tlb.invalidateAsid(asid);
     }
-  else if (di->op1() != 0 and di->op2() == 0)
+  else if (di->op0() != 0 and di->op1() == 0)
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      URV asid = intRegs_.read(di->op2());
+      URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
-  // std::cerr << "sfence.vma " << di->op1() << ' ' << di->op2() << '\n';
-  if (di->op1() == 0)
+  // std::cerr << "sfence.vma " << di->op0() << ' ' << di->op1() << '\n';
+  if (di->op0() == 0)
     invalidateDecodeCache();
   else
     {
-      uint64_t va = intRegs_.read(di->op1());
+      uint64_t va = intRegs_.read(di->op0());
       uint64_t pageStart = virtMem_.pageStartAddress(va);
       uint64_t last = pageStart + virtMem_.pageSize();
       for (uint64_t addr = pageStart; addr < last; addr += 4)
