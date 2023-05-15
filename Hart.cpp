@@ -8741,7 +8741,7 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_sext_b:
-      if (not isRvzcb()) illegalInst(di); else execSext_b(di);
+      if (not isRvzcb() or not isRvzbb()) illegalInst(di); else execSext_b(di);
       return;
 
     case InstId::c_zext_h:
@@ -8749,11 +8749,11 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_sext_h:
-      if (not isRvzcb()) illegalInst(di); else execSext_h(di);
+      if (not isRvzcb() or not isRvzbb()) illegalInst(di); else execSext_h(di);
       return;
 
     case InstId::c_zext_w:
-      if (not isRvzcb()) illegalInst(di); else execAdd_uw(di);
+      if (not isRvzcb() or not isRvzba()) illegalInst(di); else execAdd_uw(di);
       return;
 
     case InstId::c_not:
@@ -11041,7 +11041,7 @@ template <typename URV>
 void
 Hart<URV>::execC_zext_h(const DecodedInst* di)
 {
-  if (not isRvzcb())
+  if (not isRvzcb() or not isRvzbb())
     {
       illegalInst(di);
       return;

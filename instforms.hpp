@@ -1258,4 +1258,51 @@ namespace WdRiscv
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
   bool encodeCbnez(uint32_t rs1p, uint32_t imm, uint32_t x, uint32_t& inst);
+
+  inline bool encodeSext_b(uint32_t rd, uint32_t rs1, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0x60401013 | (rd << 7) | (rs1 << 15);
+    return true;
+  }
+
+  inline bool encodeZext_h(uint32_t rd, uint32_t rs1, bool rv64, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0x080004033;
+    if (rv64)
+      inst |= 8;
+    inst = inst | (rd << 7) | (rs1 << 15);
+    return true;
+  }
+
+  inline bool encodeSext_h(uint32_t rd, uint32_t rs1, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0xc0501013 | (rd << 7) | (rs1 << 15);
+    return true;
+  }
+
+  inline bool encodeAdd_uw(uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0x08000003b | (rd << 7) | (rs1 << 15) | (rs2 << 20);
+    return true;
+  }
 }

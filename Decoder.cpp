@@ -1530,12 +1530,15 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	      return instTable_.getEntry(InstId::c_and);
 	    }
 	  // Bit 5 of immed is 1
-	  if (imm34 == 3)  // Zcb insrructions
+	  if (imm34 == 3)  // Zcb instructions
 	    {
 	      unsigned imm012 = immed & 7;
 	      op0 = op1 = rd;
 	      if (imm012 == 0)
-		return instTable_.getEntry(InstId::c_zext_b);
+		{
+		  op2 = 0xff;
+		  return instTable_.getEntry(InstId::c_zext_b);
+		}
 	      if (imm012 == 1)
 		return instTable_.getEntry(InstId::c_sext_b);
 	      else if (imm012 == 2)
@@ -1545,7 +1548,10 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	      else if (imm012 == 4)
 		return instTable_.getEntry(InstId::c_zext_w);
 	      else if (imm012 == 5)
-		return instTable_.getEntry(InstId::c_not);
+		{
+		  op2 = -1;
+		  return instTable_.getEntry(InstId::c_not);
+		}
 	    }
 	  if (imm34 == 2) return instTable_.getEntry(InstId::c_mul);
 	  if (not isRv64())
@@ -1743,6 +1749,37 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  return expanded;
 	}
 
+      if (funct3 == 4)  // Zcb instructions
+	{
+	  ClbFormInst cl(inst);
+	  unsigned f6 = cl.bits.funct6;
+	  if (f6 == 0x20)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      encodeLbu(op0, op1, op2, expanded);
+	    }
+	  else if (f6 == 0x21)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      if (cl.funct1() == 0)
+		encodeLhu(op0, op1, op2, expanded);
+	      else
+		encodeLh(op0, op1, op2, expanded);
+	    }
+	  else if (f6 == 0x22)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      encodeSb(op1, op0, op2, expanded);
+	    }
+	  else if (f6 == 0x23)
+	    {
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      if (cl.funct1() == 0)
+		encodeSh(op1, op0, op2, expanded);
+	    }
+	  return expanded;
+	}
+
       if (funct3 == 5)  // c.fsd
 	{
 	  CsFormInst cs(inst);  // Double check this
@@ -1877,6 +1914,29 @@ Decoder::expandCompressedInst(uint16_t inst) const
               return expanded;
 	    }
 	  // Bit 5 of immed is 1
+	  if (imm34 == 3)  // Zcb insrructions
+	    {
+	      unsigned imm012 = immed & 7;
+	      op0 = op1 = rd;
+	      if (imm012 == 0)
+		encodeAndi(op0, op0, 0xff, expanded);  // c.zext.b
+	      if (imm012 == 1)
+		encodeSext_b(op0, op1, expanded);
+	      else if (imm012 == 2)
+		encodeZext_h(op0, op1, isRv64(), expanded);
+	      else if (imm012 == 3)
+		encodeSext_h(op0, op1, expanded);
+	      else if (imm012 == 4)
+		encodeAdd_uw(op0, op1, 0, expanded);
+	      else if (imm012 == 5)
+		encodeXori(op0, op1, -1, expanded);  // c.not
+	      return expanded;
+	    }
+	  if (imm34 == 2)
+	    {
+	      encodeMul(op0, op1, op2, expanded);
+	      return expanded;
+	    }
 	  if (not isRv64())
 	    return expanded; // Illegal
 	  if      (imm34 == 0)     encodeSubw(op0, op1, op2, expanded);
