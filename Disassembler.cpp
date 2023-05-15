@@ -457,6 +457,8 @@ printLfi(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
   std::string name = di.name();
   out << std::left << std::setw(9) << name;
   out << disas.fpRegName(di.op0()) << ", ";
+  const char* infOr64k = (di.instId() == InstId::fli_h) ? "inf" : "65536.0";
+    
   switch(di.op1())
     {
     case 0:  out << "-1.0";           break;
@@ -489,7 +491,7 @@ printLfi(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
     case 27: out << "256.0";          break;
     case 28: out << "32768.0";        break;
     case 29: out << "65536.0";        break;
-    case 30: out << "inf";            break;
+    case 30: out << infOr64k;         break;
     case 31: out << "nan";            break;
     default : out << "?";             break;
     }
