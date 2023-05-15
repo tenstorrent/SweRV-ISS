@@ -2887,6 +2887,319 @@ Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
 }
 
 
+
+template <typename URV>
+void
+Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFli_h(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFli_s(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFli_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFleq_h(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFleq_s(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFleq_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFltq_h(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFltq_s(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFltq_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmaxm_h(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmaxm_s(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmaxm_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFminm_h(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFminm_s(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFminm_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmvh_x_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmvp_d_x(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFround_h(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFround_s(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFround_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFroundnx_h(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFroundnx_s(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFroundnx_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
 template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;
 

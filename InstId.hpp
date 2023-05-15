@@ -1067,6 +1067,32 @@ namespace WdRiscv
      c_not,
      c_mul,
 
-     maxId = c_mul
+     // Zfa
+     fcvtmod_w_d,
+     fli_h,
+     fli_s,
+     fli_d,
+     fleq_h,
+     fleq_s,
+     fleq_d,
+     fltq_h,
+     fltq_s,
+     fltq_d,
+     fmaxm_h,
+     fmaxm_s,
+     fmaxm_d,
+     fminm_h,
+     fminm_s,
+     fminm_d,
+     fmvh_x_d,
+     fmvp_d_x,
+     fround_h,
+     fround_s,
+     fround_d,
+     froundnx_h,
+     froundnx_s,
+     froundnx_d,
+
+     maxId = froundnx_d
     };
 }

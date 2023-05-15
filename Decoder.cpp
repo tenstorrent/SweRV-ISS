@@ -82,22 +82,29 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
       if (top5 == 5)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fmin_d);
+	  if (f3 == 2)          return instTable_.getEntry(InstId::fminm_d);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::fmax_d);
+	  if (f3 == 3)          return instTable_.getEntry(InstId::fmaxm_d);
 	  return instTable_.getEntry(InstId::illegal);
 	}
       if (top5==8 and op2==0)   return instTable_.getEntry(InstId::fcvt_d_s);
+      if (top5==8 and op2==4)   return instTable_.getEntry(InstId::fround_d);
+      if (top5==8 and op2==0)   return instTable_.getEntry(InstId::froundnx_d);
       if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_d_h);
       if (top5==0xb and op2==0) return instTable_.getEntry(InstId::fsqrt_d);
       if (top5 == 0x14)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_d);
+	  if (f3 == 4)          return instTable_.getEntry(InstId::fleq_d);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::flt_d);
+	  if (f3 == 5)          return instTable_.getEntry(InstId::fltq_d);
 	  if (f3 == 2)          return instTable_.getEntry(InstId::feq_d);
 	  return instTable_.getEntry(InstId::illegal);
 	}
       if (top5 == 0x18)
 	{
 	  if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_w_d);
+	  if (op2 ==8 && f3==1) return instTable_.getEntry(InstId::fcvtmod_w_d);
 	  if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_wu_d);
 	  if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_l_d);
 	  if (op2 == 3)         return instTable_.getEntry(InstId::fcvt_lu_d);
@@ -115,12 +122,16 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	{
 	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_x_d);
 	  if (op2==0 and f3==1) return instTable_.getEntry(InstId::fclass_d);
+	  if (op2==1 and f3==0) return instTable_.getEntry(InstId::fmvh_x_d);
 	  return instTable_.getEntry(InstId::illegal);
 	}
       if (top5 == 0x1e)
 	{
 	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_d_x);
+	  if (op2==1 and f3==0) return instTable_.getEntry(InstId::fli_d);
 	}
+      if (top5 == 0x26)
+	if (f3==0) return instTable_.getEntry(InstId::fmvp_d_x);
 
       return instTable_.getEntry(InstId::illegal);
     }
@@ -141,17 +152,23 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
       if (top5 == 5)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fmin_s);
+	  if (f3 == 2)          return instTable_.getEntry(InstId::fminm_s);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::fmax_s);
+	  if (f3 == 3)          return instTable_.getEntry(InstId::fmaxm_s);
 	  return instTable_.getEntry(InstId::illegal);
 	}
       if (top5==8 and op2==1)   return instTable_.getEntry(InstId::fcvt_s_d);
       if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_s_h);
+      if (top5==8 and op2==4)   return instTable_.getEntry(InstId::fround_s);
+      if (top5==8 and op2==5)   return instTable_.getEntry(InstId::froundnx_s);
       if (top5==0xb and op2==0) return instTable_.getEntry(InstId::fsqrt_s);
       if (top5 == 0x14)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_s);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::flt_s);
 	  if (f3 == 2)          return instTable_.getEntry(InstId::feq_s);
+	  if (f3 == 4)          return instTable_.getEntry(InstId::fleq_s);
+	  if (f3 == 5)          return instTable_.getEntry(InstId::fltq_s);
 	  return instTable_.getEntry(InstId::illegal);
 	}
       if (top5 == 0x18)
@@ -179,6 +196,7 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
       if (top5 == 0x1e)
 	{
 	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_w_x);
+	  if (op2==1 and f3==0) return instTable_.getEntry(InstId::fli_s);
 	}
 
       return instTable_.getEntry(InstId::illegal);
@@ -200,16 +218,22 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
       if (top5 == 5)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fmin_h);
+	  if (f3 == 2)          return instTable_.getEntry(InstId::fminm_h);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::fmax_h);
+	  if (f3 == 3)          return instTable_.getEntry(InstId::fmaxm_h);
 	  return instTable_.getEntry(InstId::illegal);
 	}
       if (top5==8 and op2==0)   return instTable_.getEntry(InstId::fcvt_h_s);
+      if (top5==8 and op2==4)   return instTable_.getEntry(InstId::fround_h);
+      if (top5==8 and op2==5)   return instTable_.getEntry(InstId::froundnx_h);
       if (top5==8 and op2==1)   return instTable_.getEntry(InstId::fcvt_h_d);
       if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_h);
       if (top5 == 0x14)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_h);
+	  if (f3 == 4)          return instTable_.getEntry(InstId::fleq_h);
 	  if (f3 == 1)          return instTable_.getEntry(InstId::flt_h);
+	  if (f3 == 5)          return instTable_.getEntry(InstId::fltq_h);
 	  if (f3 == 2)          return instTable_.getEntry(InstId::feq_h);
 	  return instTable_.getEntry(InstId::illegal);
 	}
@@ -238,6 +262,7 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
       if (top5 == 0x1e)
 	{
 	  if (op2==0 and f3==0) return instTable_.getEntry(InstId::fmv_h_x);
+	  if (op2==1 and f3==0) return instTable_.getEntry(InstId::fli_h);
 	}
 
       return instTable_.getEntry(InstId::illegal);

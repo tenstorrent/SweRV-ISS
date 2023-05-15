@@ -380,6 +380,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicond(true);
   if (isa_.isEnabled(RvExtension::Zcb))
     enableRvzcb(true);
+  if (isa_.isEnabled(RvExtension::Zfa))
+    enableRvzfa(true);
 }
 
 
@@ -8760,6 +8762,103 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::c_mul:
       if (not isRvzcb()) illegalInst(di); else execMul(di);
+      return;
+
+    // Zfa
+    case InstId::fcvtmod_w_d:
+      execFcvtmod_w_d(di);
+      return;
+
+    case InstId::fli_h:
+      execFli_h(di);
+      return;
+
+    case InstId::fli_s:
+      execFli_s(di);
+      return;
+
+    case InstId::fli_d:
+      execFli_d(di);
+      return;
+
+    case InstId::fleq_h:
+      execFleq_h(di);
+      return;
+
+    case InstId::fleq_s:
+      execFleq_s(di);
+      return;
+
+    case InstId::fleq_d:
+      execFleq_d(di);
+      return;
+
+    case InstId::fltq_h:
+      execFltq_h(di);
+      return;
+
+    case InstId::fltq_s:
+      execFltq_s(di);
+      return;
+
+    case InstId::fltq_d:
+      execFltq_d(di);
+      return;
+
+    case InstId::fmaxm_h:
+      execFmaxm_h(di);
+      return;
+
+    case InstId::fmaxm_s:
+      execFmaxm_s(di);
+      return;
+
+    case InstId::fmaxm_d:
+      execFmaxm_d(di);
+      return;
+
+    case InstId::fminm_h:
+      execFminm_h(di);
+      return;
+
+    case InstId::fminm_s:
+      execFminm_s(di);
+      return;
+
+    case InstId::fminm_d:
+      execFminm_d(di);
+      return;
+
+    case InstId::fmvh_x_d:
+      execFmvh_x_d(di);
+      return;
+
+    case InstId::fmvp_d_x:
+      execFmvp_d_x(di);
+      return;
+
+    case InstId::fround_h:
+      execFround_h(di);
+      return;
+
+    case InstId::fround_s:
+      execFround_s(di);
+      return;
+
+    case InstId::fround_d:
+      execFround_d(di);
+      return;
+
+    case InstId::froundnx_h:
+      execFroundnx_h(di);
+      return;
+
+    case InstId::froundnx_s:
+      execFroundnx_s(di);
+      return;
+
+    case InstId::froundnx_d:
+      execFroundnx_d(di);
       return;
     }
 

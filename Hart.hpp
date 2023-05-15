@@ -1016,6 +1016,10 @@ namespace WdRiscv
     void enableRvzcb(bool flag)
     { enableExtension(RvExtension::Zcb, flag); }
 
+    /// Enable/disable the zfa extension.
+    void enableRvzfa(bool flag)
+    { enableExtension(RvExtension::Zfa, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1338,6 +1342,10 @@ namespace WdRiscv
 
     /// Return true if the zcb extension is enabled.
     bool isRvzcb() const
+    { return extensionIsEnabled(RvExtension::Zcb); }
+
+    /// Return true if the zcb extension is enabled.
+    bool isRvzfa() const
     { return extensionIsEnabled(RvExtension::Zcb); }
 
     /// Return true if current program is considered finihsed (either
@@ -4336,6 +4344,32 @@ namespace WdRiscv
 
     // Zcb
     void execC_zext_h(const DecodedInst*);
+
+    // Zfa
+    void execFcvtmod_w_d(const DecodedInst*);
+    void execFli_h(const DecodedInst*);
+    void execFli_s(const DecodedInst*);
+    void execFli_d(const DecodedInst*);
+    void execFleq_h(const DecodedInst*);
+    void execFleq_s(const DecodedInst*);
+    void execFleq_d(const DecodedInst*);
+    void execFltq_h(const DecodedInst*);
+    void execFltq_s(const DecodedInst*);
+    void execFltq_d(const DecodedInst*);
+    void execFmaxm_h(const DecodedInst*);
+    void execFmaxm_s(const DecodedInst*);
+    void execFmaxm_d(const DecodedInst*);
+    void execFminm_h(const DecodedInst*);
+    void execFminm_s(const DecodedInst*);
+    void execFminm_d(const DecodedInst*);
+    void execFmvh_x_d(const DecodedInst*);
+    void execFmvp_d_x(const DecodedInst*);
+    void execFround_h(const DecodedInst*);
+    void execFround_s(const DecodedInst*);
+    void execFround_d(const DecodedInst*);
+    void execFroundnx_h(const DecodedInst*);
+    void execFroundnx_s(const DecodedInst*);
+    void execFroundnx_d(const DecodedInst*);
 
   private:
 
