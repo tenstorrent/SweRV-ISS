@@ -446,7 +446,53 @@ printCbo(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
   std::string name = di.name();
   unsigned width = std::max(size_t(9), name.size() + 1);
   out << std::left << std::setw(width) << name;
-  out << "0(" << disas.intRegName(di.ithOperand(0)) << ")";
+  out << "0(" << disas.intRegName(di.op0()) << ")";
+}
+
+
+static
+void
+printLfi(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
+{
+  std::string name = di.name();
+  out << std::left << std::setw(9) << name;
+  out << disas.fpRegName(di.op0()) << ", ";
+  switch(di.op1())
+    {
+    case 0:  out << "-1.0";           break;
+    case 1:  out << "min";            break;
+    case 2:  out << "1.52587891e-05"; break;
+    case 3:  out << "3.05175781e-05"; break;
+    case 4:  out << "0.00390625";     break;
+    case 5:  out << "0.0078125";      break;
+    case 6:  out << "0.0625";         break;
+    case 7:  out << "0.125";          break;
+    case 8:  out << "0.25";           break;
+    case 9:  out << "0.3125";         break;
+    case 10: out << "0.375";          break;
+    case 11: out << "0.4375";         break;
+    case 12: out << "0.5";            break;
+    case 13: out << "0.625";          break;
+    case 14: out << "0.75";           break;
+    case 15: out << "0.875";          break;
+    case 16: out << "1.0";            break;
+    case 17: out << "1.25";           break;
+    case 18: out << "1.5";            break;
+    case 19: out << "1.75";           break;
+    case 20: out << "2.0";            break;
+    case 21: out << "2.5";            break;
+    case 22: out << "3.0";            break;
+    case 23: out << "4.0";            break;
+    case 24: out << "8.0";            break;
+    case 25: out << "16.0";           break;
+    case 26: out << "128.0";          break;
+    case 27: out << "256.0";          break;
+    case 28: out << "32768.0";        break;
+    case 29: out << "65536.0";        break;
+    case 30: out << "inf";            break;
+    case 31: out << "nan";            break;
+    default : out << "?";             break;
+    }
 }
 
 
@@ -772,6 +818,12 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
     case InstId::cbo_inval:
     case InstId::cbo_zero:
       printCbo(*this, out, di);
+      break;
+
+    case InstId::fli_h:
+    case InstId::fli_s:
+    case InstId::fli_d:
+      printLfi(*this, out, di);
       break;
 
     default:
