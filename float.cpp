@@ -97,7 +97,7 @@ Hart<URV>::orFcsrFlags(FpFlags flags)
   // Mark FS as dirty if the instruction generated any FP flags even if they
   // are the same as the current flags.
   if (unsigned(flags))
-      markFsDirty();
+    markFsDirty();
 }
 
 

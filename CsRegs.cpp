@@ -1885,7 +1885,7 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
       peek(number, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-  else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
+  else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS or number == CsrNumber::VSSTATUS)
     value = legalizeMstatusValue(value);
 
   csr->poke(value);
