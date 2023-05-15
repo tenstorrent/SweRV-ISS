@@ -17,6 +17,7 @@
 #include <cmath>
 #include <climits>
 #include <cassert>
+#include <optional>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "float-convert-helpers.hpp"
 #include "wideint.hpp"
@@ -290,6 +291,34 @@ namespace WdRiscv
 
 
 using namespace WdRiscv;
+
+
+// Floating-point widening operations may raise floating-point exceptions.
+// In the case of a scalar operand, the widening operation should not
+// raise any exceptions when all vector elements are masked off.  As a
+// result, this class exists to perform the widening instruction just
+// prior to first actual use (i.e. within the vector instruction's
+// operation) and cache the result so that successive uses don't have to
+// re-perform the widening.
+template <typename ELEM_TYPE>
+class WidenedFpScalar
+{
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
+
+  public:
+    constexpr WidenedFpScalar(ELEM_TYPE value): v_{value} {};
+
+    constexpr operator ELEM_TYPE2X()
+    {
+      if (not vDw_.has_value())
+        vDw_ = fpConvertTo<ELEM_TYPE2X, true>(v_);
+      return *vDw_;
+    }
+
+  private:
+    ELEM_TYPE v_;
+    std::optional<ELEM_TYPE2X> vDw_;
+};
 
 
 template <typename URV>
@@ -16347,38 +16376,6 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 }
 
 
-// Widen a half to a float to covering signaling NaN.
-static float
-fpWiden(Float16 x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(f16_to_f32(nativeToSoft(x)));
-#else
-  if (isSnan(x))
-    return std::numeric_limits<float>::signaling_NaN();
-  if (std::isnan(x))
-    return getQuietNan<float>();
-  return static_cast<float>(x);
-#endif
-}
-
-
-// Widen a float to a double covering signaling NaN.
-static double
-fpWiden(float x)
-{
-#ifdef SOFT_FLOAT
-  return softToNative(f32_to_f64(nativeToSoft(x)));
-#else
-  if (isSnan(x))
-    return std::numeric_limits<double>::signaling_NaN();
-  if (std::isnan(x))
-    return getQuietNan<double>();
-  return x;
-#endif
-}
-
-
 template <typename URV>
 template <typename ELEM_TYPE>
 void
@@ -16403,8 +16400,8 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -16467,7 +16464,7 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X e2dw = fpWiden(e2);
+  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
 
@@ -16481,8 +16478,8 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = fpWiden(e1);
-          dest = doFadd(e1dw, e2dw);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -16555,8 +16552,8 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, -e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -16619,7 +16616,7 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X negE2dw = fpWiden(-e2);
+  WidenedFpScalar negE2dw{-e2};
 
   unsigned group2x = group*2;
 
@@ -16633,8 +16630,8 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = fpWiden(e1);
-          dest = doFadd(e1dw, negE2dw);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(negE2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -16707,7 +16704,7 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -16769,7 +16766,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X e2dw = fpWiden(e2);
+  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
 
@@ -16783,7 +16780,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw))
         {
-          dest = doFadd(e1dw, e2dw);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -16856,7 +16853,7 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, -e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -16917,7 +16914,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X negE2dw = fpWiden(-e2);
+  WidenedFpScalar negE2dw{-e2};
 
   unsigned group2x = group*2;
 
@@ -16931,7 +16928,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw))
         {
-          dest = doFadd(e1dw, negE2dw);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(negE2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17311,8 +17308,8 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFmul(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17373,7 +17370,7 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X e2dw = fpWiden(e2);
+  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
 
@@ -17387,8 +17384,8 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = fpWiden(e1);
-          dest = doFmul(e1dw, e2dw);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          dest = doFmul(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -18487,8 +18484,8 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18548,7 +18545,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -18562,7 +18559,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18636,8 +18633,8 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18697,7 +18694,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -18711,7 +18708,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18785,8 +18782,8 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18846,7 +18843,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -18860,7 +18857,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18934,8 +18931,8 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18996,7 +18993,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -19010,7 +19007,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -20679,7 +20676,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          dest = fpWiden(e1);
+          dest = fpConvertTo<ELEM_TYPE2X, false>(e1);
           if (isSnan(dest))
             {
               dest = getQuietNan<ELEM_TYPE2X>();
@@ -21584,7 +21581,7 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       anyActive = true;
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          ELEM_TYPE2X e1dw = fpWiden(e1);
+          ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
           result           = doFadd(result, e1dw);
         }
       else
@@ -21664,7 +21661,7 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
-	  ELEM_TYPE2X e1dw = fpWiden(e1);
+	  ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  result = doFadd(result, e1dw);
 	}
       else
