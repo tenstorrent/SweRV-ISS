@@ -110,4 +110,16 @@ namespace util
     assert(0);
     return 0;
   }
+
+  struct string_hash  // C++20's transparent hashing
+  {
+    using hash_type      = std::hash<std::string_view>;
+    using is_transparent = void;
+
+    template <typename T>
+    auto operator()(T&& str) const -> decltype(hash_type{}(std::forward<T>(str)))
+    {
+      return hash_type{}(std::forward<T>(str));
+    }
+  };
 }

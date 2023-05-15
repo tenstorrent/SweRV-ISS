@@ -17,6 +17,7 @@
 #include <cmath>
 #include <climits>
 #include <cassert>
+#include <optional>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "float-convert-helpers.hpp"
 #include "wideint.hpp"
@@ -140,113 +141,13 @@ namespace std
   {
     typedef WdRiscv::Int1024 type;
   };
-
-  WdRiscv::Float16 fminf(WdRiscv::Float16 a, WdRiscv::Float16 b)
-  {
-    return WdRiscv::Float16::fromFloat(fminf(a.toFloat(), b.toFloat()));
-  }
-
-  WdRiscv::Float16 fmaxf(WdRiscv::Float16 a, WdRiscv::Float16 b)
-  {
-    return WdRiscv::Float16::fromFloat(fmaxf(a.toFloat(), b.toFloat()));
-  }
-
-  bool signbit(WdRiscv::Float16 x)
-  { return x.signBit(); }
-
-  WdRiscv::Float16 copysign(WdRiscv::Float16 a, WdRiscv::Float16 b)
-  { return WdRiscv::Float16::copySign(a, b); }
 }
 
 
 namespace WdRiscv
 {
-  /// Return the width in bits of the given integer type T. This is
-  /// usually 8*sizeof(T).
-  template <typename T>
-  unsigned
-  integerWidth()
-  {
-    if constexpr (std::is_same<Int128, T>::value)   return 128;
-    if constexpr (std::is_same<Int256, T>::value)   return 256;
-    if constexpr (std::is_same<Int512, T>::value)   return 512;
-    if constexpr (std::is_same<Int1024, T>::value)  return 1024;
-    if constexpr (std::is_same<Uint128, T>::value)  return 128;
-    if constexpr (std::is_same<Uint256, T>::value)  return 256;
-    if constexpr (std::is_same<Uint512, T>::value)  return 512;
-    if constexpr (std::is_same<Uint1024, T>::value) return 1024;
-
-    return 8*sizeof(T);
-  }
-
-
-  /// Return the integral type that is twice as wide as the given
-  /// type. For example:
-  ///    makeDoubleWide<uint16_t>::type
-  /// yields the type
-  ///    uint32_t.
-  template <typename T>
-  struct makeDoubleWide;
-
-  template <> struct makeDoubleWide<uint8_t>    { typedef uint16_t type; };
-  template <> struct makeDoubleWide<uint16_t>   { typedef uint32_t type; };
-  template <> struct makeDoubleWide<uint32_t>   { typedef uint64_t type; };
-  template <> struct makeDoubleWide<uint64_t>   { typedef Uint128  type; };
-  template <> struct makeDoubleWide<Uint128>    { typedef Uint256  type; };
-  template <> struct makeDoubleWide<Uint256>    { typedef Uint512  type; };
-  template <> struct makeDoubleWide<Uint512>    { typedef Uint1024 type; };
-
-  template <> struct makeDoubleWide<int8_t>     { typedef int16_t type; };
-  template <> struct makeDoubleWide<int16_t>    { typedef int32_t type; };
-  template <> struct makeDoubleWide<int32_t>    { typedef int64_t type; };
-  template <> struct makeDoubleWide<int64_t>    { typedef Int128  type; };
-  template <> struct makeDoubleWide<Int128>     { typedef Int256  type; };
-  template <> struct makeDoubleWide<Int256>     { typedef Int512  type; };
-  template <> struct makeDoubleWide<Int512>     { typedef Int1024 type; };
-
   template <> struct makeDoubleWide<Float16>    { typedef float   type; };
   template <> struct makeDoubleWide<float>      { typedef double  type; };
-
-
-  /// Return the integral type that is the same width as the given
-  /// floating point type. For example:
-  ///    getSameWidthIntegerType<float>::type
-  /// yields the type
-  ///    int32_t.
-  template <typename T>
-  struct getSameWidthIntType;
-
-  template <> struct getSameWidthIntType<Float16>  { typedef int16_t  type; };
-  template <> struct getSameWidthIntType<float>    { typedef int32_t  type; };
-  template <> struct getSameWidthIntType<double>   { typedef int64_t  type; };
-
-  /// Return the unsigned integral type that is the same width as the given
-  /// floating point type. For example:
-  ///    getSameWidthIntegerType<float>::type
-  /// yields the type
-  ///    uint32_t.
-  template <typename T>
-  struct getSameWidthUintType;
-
-  template <> struct getSameWidthUintType<Float16>  { typedef uint16_t  type; };
-  template <> struct getSameWidthUintType<float>    { typedef uint32_t  type; };
-  template <> struct getSameWidthUintType<double>   { typedef uint64_t  type; };
-
-  /// Return the floating point type that is the same width as the given
-  /// integer type. For example:
-  ///    getSameWidthFloatType<int32_t>::type
-  /// yields the type
-  ///    float.
-  template <typename T>
-  struct getSameWidthFloatType;
-
-  template <> struct getSameWidthFloatType<int16_t>   { typedef Float16  type; };
-  template <> struct getSameWidthFloatType<int32_t>   { typedef float    type; };
-  template <> struct getSameWidthFloatType<int64_t>   { typedef double   type; };
-  template <> struct getSameWidthFloatType<uint16_t>  { typedef Float16  type; };
-  template <> struct getSameWidthFloatType<uint32_t>  { typedef float    type; };
-  template <> struct getSameWidthFloatType<uint64_t>  { typedef double   type; };
-
 
   /// Set result to the upper half of a*b computed in double width
   /// intermediate.
@@ -390,6 +291,34 @@ namespace WdRiscv
 
 
 using namespace WdRiscv;
+
+
+// Floating-point widening operations may raise floating-point exceptions.
+// In the case of a scalar operand, the widening operation should not
+// raise any exceptions when all vector elements are masked off.  As a
+// result, this class exists to perform the widening instruction just
+// prior to first actual use (i.e. within the vector instruction's
+// operation) and cache the result so that successive uses don't have to
+// re-perform the widening.
+template <typename ELEM_TYPE>
+class WidenedFpScalar
+{
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
+
+  public:
+    constexpr WidenedFpScalar(ELEM_TYPE value): v_{value} {};
+
+    constexpr operator ELEM_TYPE2X()
+    {
+      if (not vDw_.has_value())
+        vDw_ = fpConvertTo<ELEM_TYPE2X, true>(v_);
+      return *vDw_;
+    }
+
+  private:
+    ELEM_TYPE v_;
+    std::optional<ELEM_TYPE2X> vDw_;
+};
 
 
 template <typename URV>
@@ -729,7 +658,7 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
 
-  unsigned destEew = 1, destGroupX8 = 8, srcEew = vecRegs_.elementWidthInBits();
+  unsigned destEew = 1, destGroupX8 = 8, srcEew = vecRegs_.elemWidthInBits();
   if (not checkDestSourceOverlap(op0, destEew, destGroupX8, op1, srcEew, groupX8) or
       not checkDestSourceOverlap(op0, destEew, destGroupX8, op2, srcEew, groupX8))
     {
@@ -762,7 +691,7 @@ Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = sew * 2;
 
   // Destination EEW > source EEW, no overlap except in highest destination
@@ -796,7 +725,7 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = 2*sew;
 
   bool overlapOk = checkDestSourceOverlap(op0, sewx2, wideGroupX8, op2, sew, groupX8);
@@ -849,7 +778,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = 2*sew;
 
   bool overlapOk = checkDestSourceOverlap(op0, sew, groupX8, op1, sewx2, wideGroupX8);
@@ -879,7 +808,7 @@ Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
   unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
-  unsigned sew = vecRegs_.elementWidthInBits();
+  unsigned sew = vecRegs_.elemWidthInBits();
   unsigned sewx2 = 2*sew;
 
   bool overlapOk = checkDestSourceOverlap(op0, sew, groupX8, op1, sewx2, wideGroupX8);
@@ -975,7 +904,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   else
     {
       uint32_t gm8 = vecRegs_.groupMultiplierX8(gm);
-      unsigned bitsPerElem = vecRegs_.elementWidthInBits(ew);
+      unsigned bitsPerElem = vecRegs_.elemWidthInBits(ew);
       unsigned vlmax = (gm8*vecRegs_.bitsPerRegister()/bitsPerElem) / 8;
       if (vlmax == 0)
         vill = true;
@@ -1036,9 +965,12 @@ template <typename URV>
 void
 Hart<URV>::postVecSuccess()
 {
-  if (vecRegs_.getLastWrittenReg() >= 0)
-    markVsDirty();
   csRegs_.clearVstart();
+
+  // Writing to vstart should mark VS as dirty, so do so
+  // regardless of whether any vector operand registers
+  // were written.
+  markVsDirty();
 }
 
 
@@ -1100,7 +1032,7 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
   else
     {
       uint32_t gm8 = vecRegs_.groupMultiplierX8(gm);
-      unsigned bitsPerElem = vecRegs_.elementWidthInBits(ew);
+      unsigned bitsPerElem = vecRegs_.elemWidthInBits(ew);
       unsigned vlmax = (gm8*vecRegs_.bitsPerRegister()/bitsPerElem) / 8;
       if (vlmax == 0)
         vill = true;
@@ -1156,8 +1088,9 @@ Hart<URV>::execVsetvl(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
+Hart<URV>::vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked,
+		  std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
@@ -1172,7 +1105,7 @@ Hart<URV>::vadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-          dest = e1 + e2;
+          dest = op(e1, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -1203,15 +1136,23 @@ Hart<URV>::execVadd_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vadd_vv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:   vadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, std::plus());
+      break;
+    case EW::Half:
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, std::plus());
+      break;
+    case EW::Word:
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, std::plus());
+      break;
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, std::plus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
@@ -1219,8 +1160,9 @@ Hart<URV>::execVadd_vv(const DecodedInst* di)
 template <typename URV>
 template <typename ELEM_TYPE>
 void
-Hart<URV>::vadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
+Hart<URV>::vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		  unsigned start, unsigned elems, bool masked,
+		  std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
@@ -1235,7 +1177,7 @@ Hart<URV>::vadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          dest = e1 + e2;
+          dest = op(e1, e2);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
         }
@@ -1268,15 +1210,23 @@ Hart<URV>::execVadd_vx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vadd_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half:   vadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word:   vadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2:  vadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::plus());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::plus());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::plus());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::plus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
@@ -1301,48 +1251,24 @@ Hart<URV>::execVadd_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vadd_vx<int8_t> (vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Half:   vadd_vx<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word:   vadd_vx<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word2:  vadd_vx<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, imm, group, start, elems, masked, std::plus());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, imm, group, start, elems, masked, std::plus());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, imm, group, start, elems, masked, std::plus());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, imm, group, start, elems, masked, std::plus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 - e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -1365,47 +1291,24 @@ Hart<URV>::execVsub_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vsub_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, std::minus());
+      break;
+    case EW::Half:
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, std::minus());
+      break;
+    case EW::Word:
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, std::minus());
+      break;
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, std::minus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 - e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -1425,51 +1328,38 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vsub_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
 
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vrsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
+struct MyRsub
 {
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e2 - e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return b - a; }
+};
 
 
 template <typename URV>
@@ -1480,7 +1370,7 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(), vs1 = di->op1(), rs2 = di->op2();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -1488,50 +1378,29 @@ Hart<URV>::execVrsub_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrsub_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vrsub_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vrsub_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vrsub_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vrsub_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = imm, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e2 - e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -1543,9 +1412,8 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -1556,15 +1424,23 @@ Hart<URV>::execVrsub_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vrsub_vi<int8_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Half: vrsub_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word: vrsub_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word2: vrsub_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, imm, group, start, elems, masked, MyRsub());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
@@ -2170,14 +2046,18 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vadd_vx<uint16_t>(vd, vs1, uint8_t(e2), group*2, start, elems, masked); break;
-    case EW::Half: vadd_vx<uint32_t>(vd, vs1, uint16_t(e2), group*2, start, elems, masked); break;
-    case EW::Word: vadd_vx<uint64_t>(vd, vs1, uint32_t(e2), group*2, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<uint16_t>(vd, vs1, uint8_t(e2), group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Half:
+      vop_vx<uint32_t>(vd, vs1, uint16_t(e2), group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Word:
+      vop_vx<uint64_t>(vd, vs1, uint32_t(e2), group*2, start, elems, masked, std::plus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
   postVecSuccess();
 }
@@ -2211,15 +2091,20 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vadd_vx<int16_t>(vd, vs1, int8_t(e2),  group*2, start, elems, masked); break;
-    case EW::Half: vadd_vx<int32_t>(vd, vs1, int16_t(e2), group*2, start, elems, masked); break;
-    case EW::Word: vadd_vx<int64_t>(vd, vs1, int32_t(e2), group*2, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int16_t>(vd, vs1, int8_t(e2),  group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Half:
+      vop_vx<int32_t>(vd, vs1, int16_t(e2), group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Word:
+      vop_vx<int64_t>(vd, vs1, int32_t(e2), group*2, start, elems, masked, std::plus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
@@ -2252,15 +2137,20 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vadd_vx<uint16_t>(vd, vs1, -uint16_t(uint8_t(e2)),  group*2, start, elems, masked); break;
-    case EW::Half: vadd_vx<uint32_t>(vd, vs1, -uint32_t(uint16_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word: vadd_vx<uint64_t>(vd, vs1, -uint64_t(uint32_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<uint16_t>(vd, vs1, -uint16_t(uint8_t(e2)),  group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Half:
+      vop_vx<uint32_t>(vd, vs1, -uint32_t(uint16_t(e2)), group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Word:
+      vop_vx<uint64_t>(vd, vs1, -uint64_t(uint32_t(e2)), group*2, start, elems, masked, std::plus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
@@ -2293,15 +2183,20 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vadd_vx<int16_t>(vd, vs1, -int16_t(int8_t(e2)),  group*2, start, elems, masked); break;
-    case EW::Half: vadd_vx<int32_t>(vd, vs1, -int32_t(int16_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word: vadd_vx<int64_t>(vd, vs1, -int64_t(int32_t(e2)), group*2, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int16_t>(vd, vs1, -int16_t(int8_t(e2)),  group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Half:
+      vop_vx<int32_t>(vd, vs1, -int32_t(int16_t(e2)), group*2, start, elems, masked, std::plus());
+      break;
+    case EW::Word:
+      vop_vx<int64_t>(vd, vs1, -int64_t(int32_t(e2)), group*2, start, elems, masked, std::plus());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
@@ -3309,35 +3204,12 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
 }
 
 
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vminu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
+struct MyMin
 {
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 < e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return a < b ? a : b; }
+};
 
 
 template <typename URV>
@@ -3360,50 +3232,24 @@ Hart<URV>::execVminu_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vminu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:   vminu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vminu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vminu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vminu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  // Spec (sep 24, 2020) says this should be sign extended.
-  ELEM_TYPE e2 = intRegs_.read(rs2);
-  ELEM_TYPE e1 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 < e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3416,7 +3262,6 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -3424,50 +3269,29 @@ Hart<URV>::execVminu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  URV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vminu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half:   vminu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:   vminu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2:  vminu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Half:
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word:
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word2:
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 < e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3491,47 +3315,24 @@ Hart<URV>::execVmin_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vmin_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:   vmin_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vmin_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vmin_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Half:
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word:
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyMin());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmin_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 < e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3543,8 +3344,7 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -3552,51 +3352,38 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vmin_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half:   vmin_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:   vmin_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2:  vmin_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
 
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmaxu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
+struct MyMax
 {
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 > e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return a > b ? a : b; }
+};
 
 
 template <typename URV>
@@ -3619,50 +3406,24 @@ Hart<URV>::execVmaxu_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vmaxu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:   vmaxu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vmaxu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vmaxu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmaxu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  // Spec (sep 24, 2020) says this should be sign extended.
-  ELEM_TYPE e2 = intRegs_.read(rs2);
-  ELEM_TYPE e1 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 > e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3675,7 +3436,6 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -3683,50 +3443,29 @@ Hart<URV>::execVmaxu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  URV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vmaxu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half:   vmaxu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:   vmaxu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2:  vmaxu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Half:
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word:
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word2:
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 > e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3750,47 +3489,24 @@ Hart<URV>::execVmax_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vmax_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:   vmax_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vmax_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vmax_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Half:
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word:
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, MyMax());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmax_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 > e2 ? e1 : e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3803,7 +3519,6 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -3811,50 +3526,29 @@ Hart<URV>::execVmax_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vmax_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half:   vmax_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:   vmax_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2:  vmax_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vand_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 & e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3878,49 +3572,24 @@ Hart<URV>::execVand_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vand_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:   vand_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vand_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vand_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_and());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vand_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  // Spec says sign extend scalar register. We comply.
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 & e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -3933,7 +3602,6 @@ Hart<URV>::execVand_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -3941,52 +3609,29 @@ Hart<URV>::execVand_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte:   vand_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half:   vand_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word:   vand_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2:  vand_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::bit_and());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vand_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  // Spec says sign extend immediate. We comply.
-  ELEM_TYPE e1 = 0, e2 = imm, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 & e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -4000,7 +3645,6 @@ Hart<URV>::execVand_vi(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -4011,47 +3655,24 @@ Hart<URV>::execVand_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vand_vi<int8_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Half: vand_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word: vand_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word2: vand_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, imm, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, imm, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, imm, group, start, elems, masked, std::bit_and());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, imm, group, start, elems, masked, std::bit_and());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vor_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 | e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -4075,49 +3696,24 @@ Hart<URV>::execVor_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vor_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_or());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  // Spec says sign extend scalar register. We comply.
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 | e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -4129,8 +3725,7 @@ Hart<URV>::execVor_vx(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -4138,52 +3733,29 @@ Hart<URV>::execVor_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vor_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::bit_or());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vor_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                  unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  ELEM_TYPE val2 = imm;
-  ELEM_TYPE e1 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 | val2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -4195,9 +3767,8 @@ Hart<URV>::execVor_vi(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -4208,47 +3779,24 @@ Hart<URV>::execVor_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vor_vi<int8_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Half: vor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word: vor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word2: vor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, imm, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, imm, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, imm, group, start, elems, masked, std::bit_or());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, imm, group, start, elems, masked, std::bit_or());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vxor_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 ^ e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -4272,49 +3820,24 @@ Hart<URV>::execVxor_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vxor_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vxor_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vxor_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vxor_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Half:
+      vop_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Word:
+      vop_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Word2:
+      vop_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked, std::bit_xor());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vxor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  // Spec says sign extend scalar register. We comply.
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 ^ e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -4326,8 +3849,7 @@ Hart<URV>::execVxor_vx(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
-
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -4335,52 +3857,29 @@ Hart<URV>::execVxor_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vxor_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vxor_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vxor_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vxor_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::bit_xor());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vxor_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-
-  ELEM_TYPE val2 = imm;
-  ELEM_TYPE e1 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 ^ val2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -4392,9 +3891,8 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
     return;
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned vd = di->op0(), vs1 = di->op1();
   int32_t imm = di->op2As<int32_t>();
-
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
@@ -4405,15 +3903,23 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vxor_vi<int8_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Half: vxor_vi<int16_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word: vxor_vi<int32_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word2: vxor_vi<int64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, imm, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, imm, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, imm, group, start, elems, masked, std::bit_xor());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, imm, group, start, elems, masked, std::bit_xor());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
 }
 
@@ -5458,7 +4964,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-  unsigned widthInBytes = vecRegs_.elementWidthInBytes(sew);
+  unsigned widthInBytes = vecRegs_.elemWidthInBytes(sew);
   bool masked = di->isMasked();
 
   unsigned v2Group = (2*group) / widthInBytes;
@@ -7221,11 +6727,12 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 
     case ElementWidth::Half:
       {
-	Float16 val = fpRegs_.readHalf(rs2);
-	uint16_t replacement = val.bits();
 	vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, 0))
-	  vecRegs_.write(vd, 0, group, replacement);
+          {
+            Float16 f = fpRegs_.readHalf(rs2);
+            vecRegs_.write(vd, 0, group, std::bit_cast<uint16_t>(f));
+          }
       }
       break;
 
@@ -7234,8 +6741,8 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 	vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, 0))
 	  {
-	    Uint32FloatUnion uf(fpRegs_.readSingle(rs2));
-	    vecRegs_.write(vd, 0, group, uf.u);
+            float f = fpRegs_.readSingle(rs2);
+            vecRegs_.write(vd, 0, group, std::bit_cast<uint32_t>(f));
 	  }
       }
       break;
@@ -7245,8 +6752,8 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
 	vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, 0))
 	  {
-	    Uint64DoubleUnion ud(fpRegs_.readDouble(rs2));
-	    vecRegs_.write(vd, 0, group, ud.u);
+            double d = fpRegs_.readDouble(rs2);
+            vecRegs_.write(vd, 0, group, std::bit_cast<uint64_t>(d));
 	  }
       }
       break;
@@ -7287,11 +6794,12 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 
     case ElementWidth::Half:
       {
-	Float16 val = fpRegs_.readHalf(rs2);
-	uint16_t replacement = val.bits();
 	vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked);
-	if (not masked or vecRegs_.isActive(0, elems-1))
-	  vecRegs_.write(vd, elems-1, group, replacement);
+        if (not masked or vecRegs_.isActive(0, elems - 1))
+          {
+            Float16 f = fpRegs_.readHalf(rs2);
+            vecRegs_.write(vd, elems - 1, group, std::bit_cast<uint16_t>(f));
+          }
       }
       break;
 
@@ -7300,8 +6808,8 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 	vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, elems-1))
 	  {
-	    Uint32FloatUnion uf(fpRegs_.readSingle(rs2));
-	    vecRegs_.write(vd, elems-1, group, uf.u);
+            float f = fpRegs_.readSingle(rs2);
+            vecRegs_.write(vd, elems-1, group, std::bit_cast<uint32_t>(f));
 	  }
       }
       break;
@@ -7311,8 +6819,8 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
 	vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked);
 	if (not masked or vecRegs_.isActive(0, elems-1))
 	  {
-	    Uint64DoubleUnion ud(fpRegs_.readDouble(rs2));
-	    vecRegs_.write(vd, elems-1, group, ud.u);
+            double d = fpRegs_.readDouble(rs2);
+            vecRegs_.write(vd, elems-1, group, std::bit_cast<uint64_t>(d));
 	  }
       }
       break;
@@ -7322,37 +6830,6 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
       return;
     }
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 * e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -7375,47 +6852,24 @@ Hart<URV>::execVmul_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmul_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Half:
+      vop_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word:
+      vop_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word2:
+      vop_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked, std::multiplies());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
+
   postVecSuccess();
-}
-
-
-template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vmul_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 * e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
 }
 
 
@@ -7436,17 +6890,26 @@ Hart<URV>::execVmul_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
+  SRV e2 = SRV(intRegs_.read(rs2));
+
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Byte: vmul_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmul_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmul_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word2: vmul_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word4:  postVecFail(di); return;
-    case EW::Word8:  postVecFail(di); return;
-    case EW::Word16: postVecFail(di); return;
-    case EW::Word32: postVecFail(di); return;
+    case EW::Byte:
+      vop_vx<int8_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
   postVecSuccess();
 }
@@ -9926,7 +9389,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/2; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -10008,7 +9471,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/4; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -10090,7 +9553,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/8; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -10204,7 +9667,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/2; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -10286,7 +9749,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/4; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -10368,7 +9831,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
       postVecFail(di);
       return;
     }
-  unsigned dw = vecRegs_.elementWidthInBits();  // destination width
+  unsigned dw = vecRegs_.elemWidthInBits();  // destination width
   unsigned sw = dw/8; // source width.
   if (not checkDestSourceOverlap(vd, dw, group, vs1, sw, fromGroup))
     {
@@ -13641,7 +13104,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
@@ -13782,7 +13245,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
   if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
@@ -14008,7 +13471,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
-  unsigned elemBytes = vecRegs_.elementWidthInBytes(eew);
+  unsigned elemBytes = vecRegs_.elemWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
   URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
@@ -14299,7 +13762,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
   if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
@@ -14447,7 +13910,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
   if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
@@ -14596,8 +14059,8 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
@@ -14827,8 +14290,8 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
@@ -15074,7 +14537,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
@@ -15241,7 +14704,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elementWidthInBits(eew) / vecRegs_.elementWidthInBits();
+  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
@@ -15577,8 +15040,8 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
@@ -15751,8 +15214,8 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.maskedAddr_.clear();
   vecRegs_.stData_.clear();
 
-  uint32_t elemWidth = vecRegs_.elementWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elementWidthInBits(offsetEew);
+  uint32_t elemWidth = vecRegs_.elemWidthInBits();
+  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
@@ -16275,54 +15738,13 @@ Hart<URV>::execVlsege1024ff_v(const DecodedInst* di)
 }
 
 
-namespace std
-{
-  static
-  bool isnan(Float16 x)
-  {
-    return x.isNan();
-  }
-}
-
-
-// Quiet NAN for float and double.
+// Quiet NAN for Float16, float and double.
 template <typename T>
 static
 T
 getQuietNan()
 {
   return std::numeric_limits<T>::quiet_NaN();
-}
-
-
-// Quiet NAN for Float16
-template<>
-Float16
-getQuietNan()
-{
-  return Float16::quietNan();
-}
-
-
-Float16
-operator+ (Float16 f1, Float16 f2)
-{
-  float x = f1.toFloat() + f2.toFloat();
-  return Float16::fromFloat(x);
-}
-
-
-Float16
-operator* (Float16 f1, Float16 f2)
-{
-  return Float16::fromFloat(f1.toFloat() * f2.toFloat());
-}
-
-
-Float16
-operator/ (Float16 f1, Float16 f2)
-{
-  return Float16::fromFloat(f1.toFloat() / f2.toFloat());
 }
 
 
@@ -16359,8 +15781,7 @@ double minfp(double a, double b)
 static
 Float16 minfp(Float16 a, Float16 b)
 {
-  float c = std::fminf(a.toFloat(), b.toFloat());
-  return Float16::fromFloat(c);
+  return std::fmin(a, b);
 }
 
 
@@ -16410,8 +15831,7 @@ double maxfp(double a, double b)
 static
 Float16 maxfp(Float16 a, Float16 b)
 {
-  float c = std::fmaxf(a.toFloat(), b.toFloat());
-  return Float16::fromFloat(c);
+  return std::fmax(a, b);
 }
 
 
@@ -16453,9 +15873,6 @@ doFsqrt(FT f1)
 #ifdef SOFT_FLOAT
   res = softSqrt(f1);
 #else
-  if constexpr (std::is_same<FT, Float16>::value)
-    res = FT::fromFloat(std::sqrt(float(f1)));
-  else
     res = std::sqrt(f1);
 #endif
 
@@ -16497,82 +15914,73 @@ doFdiv(FT f1, FT f2)
 }
 
 
+static constexpr std::array<uint32_t, 128> frsqrt7Table = {
+  52,  51,  50,  48,  47,  46,  44,  43,  42,  41,  40,  39,  38,  36,  35,  34,
+  33,  32,  31,  30,  30,  29,  28,  27,  26,  25,  24,  23,  23,  22,  21,  20,
+  19,  19,  18,  17,  16,  16,  15,  14,  14,  13,  12,  12,  11,  10,  10,  9,
+  9,   8,   7,   7,   6,   6,   5,   4,   4,   3,   3,   2,   2,   1,   1,   0,
+  127, 125, 123, 121, 119, 118, 116, 114, 113, 111, 109, 108, 106, 105, 103, 102,
+  100, 99,  97,  96,  95,  93,  92,  91,  90,  88,  87,  86,  85,  84,  83,  82,
+  80,  79,  78,  77,  76,  75,  74,  73,  72,  71,  70,  70,  69,  68,  67,  66,
+  65,  64,  63,  63,  62,  61,  60,  59,  59,  58,  57,  56,  56,  55,  54,  53
+};
+
+
 // Approximate 1 / sqrt(val)
-double
-doFrsqrt7(double val, bool& divByZero, bool& invalid)
+template <typename T>
+static T
+doFrsqrt7(T val, bool& divByZero, bool& invalid)
 {
+  static constexpr int bias            = std::numeric_limits<T>::max_exponent - 1;
+  static constexpr int bitsOfPrecision = std::numeric_limits<T>::digits - 1;
+
+  using uint_fsize_t = typename getSameWidthUintType<T>::type;
+
   divByZero = false;
   invalid = false;
 
   bool signBit = std::signbit(val);
-  if (val == 0)
+  if (val == T{})
     {
-      val = std::numeric_limits<double>::infinity();
+      val = std::numeric_limits<T>::infinity();
       if (signBit)
 	val = -val;
       divByZero = true;
     }
   else if (std::isinf(val) and not signBit)
     {
-      val = 0;
+      val = T{};
     }
   else if (std::isnan(val))
     {
       if (isSnan(val))
 	invalid = true;
-      val = std::numeric_limits<double>::quiet_NaN();
+      val = std::numeric_limits<T>::quiet_NaN();
     }
   else if (signBit)
     {
-      val = std::numeric_limits<double>::quiet_NaN();
+      val = std::numeric_limits<T>::quiet_NaN();
       invalid = true;
     }
   else
     {
-      static uint32_t table[128] = {
-	52,  51,  50,  48,  47,  46,  44,  43,  42,  41,  40,  39,  38,  36,  35,  34,
-	33,  32,  31,  30,  30,  29,  28,  27,  26,  25,  24,  23,  23,  22,  21,  20,
-	19,  19,  18,  17,  16,  16,  15,  14,	14,  13,  12,  12,  11,  10,  10,  9,
-	9,   8,   7,   7,   6,   6,   5,   4,   4,   3,   3,   2,   2,   1,   1,   0,
-	127, 125, 123, 121, 119, 118, 116, 114, 113, 111, 109, 108, 106, 105, 103, 102,
-	100, 99,  97,  96,  95,  93,  92,  91,  90,  88,  87,  86,  85,  84,  83,  82,
-	80,  79,  78,  77,  76,  75,  74,  73,  72,  71,  70,  70,  69,  68,  67,  66,
-	65,  64,  63,  63,  62,  61,  60,  59,  59,  58,  57,  56,  56,  55,  54,  53
-      };
-
-      int bias = 1023;
-      int inExp = 0;
-      double inFrac = std::frexp(val, &inExp);
+      int inExp  = 0;
+      T   inFrac = std::frexp(val, &inExp);
       inExp += bias - 1;
-      Uint64DoubleUnion ud(inFrac);
-      int sigMs6 = (ud.u >> 46) & 0x3f;  // Most sig 6 bits of significand
-      uint64_t outExp = (3*bias - 1 - inExp) / 2;
-      int index = (uint64_t(inExp & 1) << 6) |  sigMs6;
-      uint64_t outSigMs7 = table[index];
-      ud.u = (outSigMs7 << 45) | (outExp << 52);
-      val = ud.d;
+      uint_fsize_t u         = std::bit_cast<uint_fsize_t>(inFrac);
+      int          sigMs6    = (u >> (bitsOfPrecision - 6)) & 0x3f;  // Most sig 6 bits of significand
+      uint_fsize_t outExp    = (3 * bias - 1 - inExp) / 2;
+      int          index     = (uint_fsize_t(inExp & 1) << 6) | sigMs6;
+      uint_fsize_t outSigMs7 = frsqrt7Table[index];
+      u                      = (outSigMs7 << (bitsOfPrecision - 7)) | (outExp << bitsOfPrecision);
+      val                    = std::bit_cast<T>(u);
     }
 
   return val;
 }
 
 
-float
-doFrsqrt7(float val, bool& divByZero, bool& invalid)
-{
-  return doFrsqrt7(double(val), divByZero, invalid);
-}
-
-
-Float16
-doFrsqrt7(Float16 val, bool& divByZero, bool& invalid)
-{
-  float ff = doFrsqrt7(val.toFloat(), divByZero, invalid);
-  return Float16::fromFloat(ff);
-}
-
-
-static constexpr uint32_t frec7Table[128] = {
+static constexpr std::array<uint32_t, 128> frec7Table = {
   127, 125, 123, 121, 119, 117, 116, 114, 112, 110, 109, 107, 105, 104, 102, 100, 
   99,  97,  96,  94,  93,  91,  90,  88,  87,  85,  84,  83,  81,  80,  79,  77,  
   76,  75,  74,  72,  71,  70,  69,  68,  66,  65,  64,  63,  62,  61,  60,  59,  
@@ -16584,34 +15992,39 @@ static constexpr uint32_t frec7Table[128] = {
 };
 
 // Approximate 1 / x
-double
-static doFrec7(double val, RoundingMode mode, FpFlags& flags)
+template <typename T>
+static T
+doFrec7(T val, RoundingMode mode, FpFlags& flags)
 {
+  static constexpr int bias            = std::numeric_limits<T>::max_exponent - 1;
+  static constexpr int bitsOfPrecision = std::numeric_limits<T>::digits - 1;
+
+  using uint_fsize_t = typename getSameWidthUintType<T>::type;
+
   flags = FpFlags::None;
   bool signBit = std::signbit(val);
-  
-  if (val == 0)
+
+  if (val == T{})
     {
-      val = std::numeric_limits<double>::infinity();
+      val = std::numeric_limits<T>::infinity();
       if (signBit)
 	val = -val;
       flags = FpFlags(unsigned(FpFlags::DivByZero) | unsigned(flags));
     }
   else if (std::isinf(val))
     {
-      val = signBit? -0.0 : +0.0;
+      val = signBit? -T{} : T{};
     }
   else if (std::isnan(val))
     {
       if (isSnan(val))
 	flags = FpFlags(unsigned(FpFlags::Invalid) | unsigned(flags));
-      val = std::numeric_limits<double>::quiet_NaN();
+      val = std::numeric_limits<T>::quiet_NaN();
     }
   else
     {
-      int bias = 1023;
-      int inExp = 0;
-      double inFrac = std::frexp(val, &inExp);
+      int inExp  = 0;
+      T   inFrac = std::frexp(val, &inExp);
       inExp += bias - 1;
 
       if (inExp < -1 or inExp > 2*bias)
@@ -16619,7 +16032,7 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	  auto upDown = signBit? RoundingMode::Up : RoundingMode::Down;
 	  if (mode == upDown or mode == RoundingMode::Zero)
 	    {
-	      val = std::numeric_limits<double>::max();
+	      val = std::numeric_limits<T>::max();
 	      if (signBit)
 		val = -val;
 	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
@@ -16627,7 +16040,7 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	    }
 	  else
 	    {
-	      val = std::numeric_limits<double>::infinity();
+	      val = std::numeric_limits<T>::infinity();
 	      if (signBit)
 		val = -val;
 	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
@@ -16636,103 +16049,25 @@ static doFrec7(double val, RoundingMode mode, FpFlags& flags)
 	}
       else
         {
-          Uint64DoubleUnion ud(inFrac);
-          int               sigMs7    = (ud.u >> 45) & 0x7f;  // Most sig 7 bits of significand
-          int               outExp    = (2*bias - 1 - inExp);
-          uint64_t          outSigMs7 = static_cast<uint64_t>(frec7Table[sigMs7]) << 45;
+          uint_fsize_t u         = std::bit_cast<uint_fsize_t>(inFrac);
+          int          sigMs7    = (u >> (bitsOfPrecision - 7)) & 0x7f;  // Most sig 7 bits of significand
+          int          outExp    = (2*bias - 1 - inExp);
+          uint_fsize_t outSigMs7 = static_cast<uint_fsize_t>(frec7Table[sigMs7]) << (bitsOfPrecision - 7);
 
           if (outExp < 1)
             {
-              outSigMs7 = ((UINT64_C(1) << 52) | outSigMs7) >> (1 - outExp);
+              outSigMs7 = ((static_cast<uint_fsize_t>(1) << bitsOfPrecision) | outSigMs7) >> (1 - outExp);
               outExp    = 0;
             }
 
-          ud.u = outSigMs7 | (static_cast<uint64_t>(outExp) << 52) | (static_cast<uint64_t>(signBit) << 63);
-          val  = ud.d;
+          u   = outSigMs7                                              |
+                (static_cast<uint_fsize_t>(outExp) << bitsOfPrecision) |
+                (static_cast<uint_fsize_t>(signBit) << (std::numeric_limits<uint_fsize_t>::digits - 1));
+          val = std::bit_cast<T>(u);
         }
     }
 
   return val;
-}
-
-
-static float
-doFrec7(float val, RoundingMode mode, FpFlags& flags)
-{
-  flags = FpFlags::None;
-  bool signBit = std::signbit(val);
-  
-  if (val == 0)
-    {
-      val = std::numeric_limits<float>::infinity();
-      if (signBit)
-	val = -val;
-      flags = FpFlags(unsigned(FpFlags::DivByZero) | unsigned(flags));
-    }
-  else if (std::isinf(val))
-    {
-      val = signBit? -0.0 : +0.0;
-    }
-  else if (std::isnan(val))
-    {
-      if (isSnan(val))
-	flags = FpFlags(unsigned(FpFlags::Invalid) | unsigned(flags));
-      val = std::numeric_limits<float>::quiet_NaN();
-    }
-  else
-    {
-      int bias = 127;
-      int inExp = 0;
-      float inFrac = std::frexp(val, &inExp);
-      inExp += bias - 1;
-
-      if (inExp < -1 or inExp > 2*bias)
-	{
-	  auto upDown = signBit? RoundingMode::Up : RoundingMode::Down;
-	  if (mode == upDown or mode == RoundingMode::Zero)
-	    {
-	      val = std::numeric_limits<float>::max();
-	      if (signBit)
-		val = -val;
-	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
-			      unsigned(flags));
-	    }
-	  else
-	    {
-	      val = std::numeric_limits<float>::infinity();
-	      if (signBit)
-		val = -val;
-	      flags = FpFlags(unsigned(FpFlags::Inexact) | unsigned(FpFlags::Overflow) |
-			      unsigned(flags));
-	    }
-	}
-      else
-        {
-          Uint32FloatUnion uf(inFrac);
-          int              sigMs7    = (uf.u >> 16) & 0x7f;  // Most sig 7 bits of significand
-          int              outExp    = (2*bias - 1 - inExp);
-          uint32_t         outSigMs7 = frec7Table[sigMs7] << 16;
-
-          if (outExp < 1)
-            {
-              outSigMs7 = ((UINT32_C(1) << 23) | outSigMs7) >> (1 - outExp);
-              outExp    = 0;
-            }
-
-          uf.u = outSigMs7 | (static_cast<uint32_t>(outExp) << 23) | (static_cast<uint32_t>(signBit) << 31);
-          val  = uf.f;
-        }
-    }
-
-  return val;
-}
-
-
-static Float16
-doFrec7(Float16 val, RoundingMode mode, FpFlags& flags)
-{
-  float ff = doFrec7(val.toFloat(), mode, flags);
-  return Float16::fromFloat(ff);
 }
 
 
@@ -17044,30 +16379,6 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
 }
 
 
-// Widen a half to a float to covering signaling NaN.
-static float
-fpWiden(Float16 x)
-{
-  if (x.isSnan())
-    return std::numeric_limits<float>::signaling_NaN();
-  if (std::isnan(x))
-    return getQuietNan<float>();
-  return x.toFloat();
-}
-
-
-// Widen a float to a double covering signaling NaN.
-static double
-fpWiden(float x)
-{
-  if (isSnan(x))
-    return std::numeric_limits<double>::signaling_NaN();
-  if (std::isnan(x))
-    return getQuietNan<double>();
-  return x;
-}
-
-
 template <typename URV>
 template <typename ELEM_TYPE>
 void
@@ -17092,8 +16403,8 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17156,7 +16467,7 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X e2dw = fpWiden(e2);
+  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
 
@@ -17170,8 +16481,8 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = fpWiden(e1);
-          dest = doFadd(e1dw, e2dw);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17244,8 +16555,8 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, -e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17308,7 +16619,7 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X negE2dw = fpWiden(-e2);
+  WidenedFpScalar negE2dw{-e2};
 
   unsigned group2x = group*2;
 
@@ -17322,8 +16633,8 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = fpWiden(e1);
-          dest = doFadd(e1dw, negE2dw);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(negE2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17396,7 +16707,7 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17458,7 +16769,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X e2dw = fpWiden(e2);
+  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
 
@@ -17472,7 +16783,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw))
         {
-          dest = doFadd(e1dw, e2dw);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17545,7 +16856,7 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFadd(e1dw, -e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -17606,7 +16917,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X negE2dw = fpWiden(-e2);
+  WidenedFpScalar negE2dw{-e2};
 
   unsigned group2x = group*2;
 
@@ -17620,7 +16931,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw))
         {
-          dest = doFadd(e1dw, negE2dw);
+          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(negE2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17986,7 +17297,7 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
-  ELEM_TYPE2X e1dw{}, e2dw{e2}, dest{};
+  ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
   unsigned group2x = group*2;
 
@@ -18000,8 +17311,8 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = doFmul(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -18062,7 +17373,7 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
-  ELEM_TYPE2X e2dw = fpWiden(e2);
+  WidenedFpScalar e2dw{e2};
 
   unsigned group2x = group*2;
 
@@ -18076,8 +17387,8 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  e1dw = fpWiden(e1);
-          dest = doFmul(e1dw, e2dw);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+          dest = doFmul(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19176,8 +18487,8 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19237,7 +18548,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -19251,7 +18562,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19325,8 +18636,8 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19386,7 +18697,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -19400,7 +18711,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19474,8 +18785,8 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19535,7 +18846,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -19549,7 +18860,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19623,8 +18934,8 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs2, ix, group, e2) and
 	  vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e1dw = fpWiden(e1);
-	  e2dw = fpWiden(e2);
+	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
 	  dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -19685,7 +18996,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  ELEM_TYPE2X e1dw = fpWiden(e1);
+  WidenedFpScalar e1dw{e1};
 
   unsigned group2x = group*2;
 
@@ -19699,7 +19010,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
-	  e2dw = fpWiden(e2);
+	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
           dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -21368,7 +20679,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          dest = fpWiden(e1);
+          dest = fpConvertTo<ELEM_TYPE2X, false>(e1);
           if (isSnan(dest))
             {
               dest = getQuietNan<ELEM_TYPE2X>();
@@ -22273,7 +21584,7 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       anyActive = true;
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-          ELEM_TYPE2X e1dw = fpWiden(e1);
+          ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
           result           = doFadd(result, e1dw);
         }
       else
@@ -22353,7 +21664,7 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 
       if (vecRegs_.read(vs1, ix, group, e1))
 	{
-	  ELEM_TYPE2X e1dw = fpWiden(e1);
+	  ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
 	  result = doFadd(result, e1dw);
 	}
       else

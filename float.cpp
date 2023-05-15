@@ -97,7 +97,7 @@ Hart<URV>::orFcsrFlags(FpFlags flags)
   // Mark FS as dirty if the instruction generated any FP flags even if they
   // are the same as the current flags.
   if (unsigned(flags))
-      markFsDirty();
+    markFsDirty();
 }
 
 
@@ -117,20 +117,15 @@ Hart<URV>::effectiveRoundingMode(unsigned instMode)
 
 
 /// Return the exponent bits of the given floating point value.
-unsigned
-fpExponentBits(float sp)
+template <typename T>
+constexpr auto
+fpExponentBits(T hp)
+  -> typename std::enable_if<is_fp<T>::value, unsigned>::type
 {
-  Uint32FloatUnion uf(sp);
-  return (uf.u << 1) >> 24;
-}
+  using uint_fsize_t = typename getSameWidthUintType<T>::type;
 
-
-/// Return the exponent bits of the given double precision value.
-unsigned
-fpExponentBits(double dp)
-{
-  Uint64DoubleUnion ud(dp);
-  return (ud.u << 1) >> 53;
+  uint_fsize_t u = std::bit_cast<uint_fsize_t>(hp);
+  return (u << 1) >> std::numeric_limits<T>::digits;
 }
 
 
@@ -141,7 +136,7 @@ template <typename float_type>
 inline
 auto
 Hart<URV>::updateAccruedFpBits(float_type)
-  -> typename std::enable_if<std::is_floating_point<float_type>::value>::type
+  -> typename std::enable_if<is_fp<float_type>::value>::type
 {
 }
 
@@ -168,7 +163,7 @@ template <typename URV>
 template <typename float_type>
 auto
 Hart<URV>::updateAccruedFpBits([[maybe_unused]] float_type res)
-  -> typename std::enable_if<std::is_floating_point<float_type>::value, void>::type
+  -> typename std::enable_if<is_fp<float_type>::value, void>::type
 {
   if (triggerTripped_)
     return;
@@ -231,7 +226,7 @@ Hart<URV>::setFpStatus(FpStatus value)
       writeMstatus();
     }
 
-  if (virtMode_ and mstatus_.bits_.FS != unsigned(value))
+  if (virtMode_ and vsstatus_.bits_.FS != unsigned(value))
     {
       vsstatus_.bits_.FS = unsigned(value);
       csRegs_.poke(CsrNumber::VSSTATUS, vsstatus_.value_);
@@ -433,8 +428,7 @@ Hart<URV>::execFlw(const DecodedInst* di)
   uint64_t data = 0;
   if (load<uint32_t>(virtAddr, false /*hyper*/, data))
     {
-      Uint32FloatUnion ufu{uint32_t(data)};
-      fpRegs_.writeSingle(di->op0(), ufu.f);
+      fpRegs_.writeSingle(di->op0(), std::bit_cast<float>(static_cast<uint32_t>(data)));
       markFsDirty();
       return;
     }
@@ -504,14 +498,14 @@ fusedMultiplyAdd(Float16 x, Float16 y, Float16 z)
 
 #ifndef SOFT_FLOAT
   #ifndef FP_FAST_FMAF
-  res = Float16::fromFloat(x.toFloat() * y.toFloat() + z.toFloat());
+  res = x * y + z;
   #else
-  res = Float16::fromFloat(std::fma(x.toFloat(), y.toFloat(), z.toFloat()));
+  res = std::fma(x, y, z);
   #endif
-  if ((x.isInf() and y.isZero()) or (x.isZero() and y.isInf()))
+  if ((std::isinf(x) and y == Float16{}) or (x == Float16{} and std::isinf(y)))
     std::feraiseexcept(FE_INVALID);
-  if (res.isNan())
-    res = Float16::quietNan();
+  if (std::isnan(res))
+    res = std::numeric_limits<Float16>::quiet_NaN();
 #else
   float16_t tmp = f16_mulAdd(nativeToSoft(x), nativeToSoft(y), nativeToSoft(z));
   res = softToNative(tmp);
@@ -567,9 +561,9 @@ subnormalAdjust(double x)
 Float16
 subnormalAdjust(Float16 x)
 {
-  if (not x.isSubnormal())
+  if (std::fpclassify(x) != FP_SUBNORMAL)
     return x;
-  return x.clearMantissa();
+  return std::signbit(x) == 0 ? Float16{} : -Float16{};
 }
 
 
@@ -1093,53 +1087,6 @@ WdRiscv::fpClassifyRiscv(FT val)
 }
 
 
-template <>
-unsigned
-WdRiscv::fpClassifyRiscv(Float16 val)
-{
-  unsigned result = 0;
-  bool pos = not val.signBit();
-
-  if (val.isInf())
-    {
-      if (pos)
-	result |= unsigned(FpClassifyMasks::PosInfinity);
-      else
-	result |= unsigned(FpClassifyMasks::NegInfinity);
-    }
-  else if (val.isSubnormal())
-    {
-      if (pos)
-	result |= unsigned(FpClassifyMasks::PosSubnormal);
-      else
-	result |= unsigned(FpClassifyMasks::NegSubnormal);
-    }
-  else if (val.isZero())
-    {
-      if (pos)
-	result |= unsigned(FpClassifyMasks::PosZero);
-      else
-	result |= unsigned(FpClassifyMasks::NegZero);
-    }
-  else if (val.isNan())
-    {
-      if (val.isSnan())
-	result |= unsigned(FpClassifyMasks::SignalingNan);
-      else
-	result |= unsigned(FpClassifyMasks::QuietNan);
-    }
-  else
-    {
-      if (pos)
-	result |= unsigned(FpClassifyMasks::PosNormal);
-      else
-	result |= unsigned(FpClassifyMasks::NegNormal);
-    }
-
-  return result;
-}
-
-
 template <typename URV>
 void
 Hart<URV>::execFclass_s(const DecodedInst* di)
@@ -1206,8 +1153,7 @@ Hart<URV>::execFmv_w_x(const DecodedInst* di)
 
   uint32_t u1 = intRegs_.read(di->op1());
 
-  Uint32FloatUnion ufu(u1);
-  fpRegs_.writeSingle(di->op0(), ufu.f);
+  fpRegs_.writeSingle(di->op0(), std::bit_cast<float>(u1));
 
   markFsDirty();
 }
@@ -1358,8 +1304,7 @@ Hart<URV>::execFld(const DecodedInst* di)
   uint64_t data = 0;
   if (load<uint64_t>(virtAddr, false /*hyper*/, data))
     {
-      Uint64DoubleUnion udu{data};
-      fpRegs_.writeDouble(di->op0(), udu.d);
+      fpRegs_.writeDouble(di->op0(), std::bit_cast<double>(data));
 
       markFsDirty();
       return;
@@ -1387,9 +1332,7 @@ Hart<URV>::execFsd(const DecodedInst* di)
   URV addr = base + di->op2As<SRV>();
   double val = fpRegs_.readDouble(rs2);
 
-  Uint64DoubleUnion udu{val};
-
-  store<uint64_t>(addr, false /*hyper*/, udu.u);
+  store<uint64_t>(addr, false /*hyper*/, std::bit_cast<uint64_t>(val));
 }
 
 
@@ -2074,9 +2017,7 @@ Hart<URV>::execFmv_d_x(const DecodedInst* di)
 
   uint64_t u1 = intRegs_.read(di->op1());
 
-  Uint64DoubleUnion udu{u1};
-
-  fpRegs_.writeDouble(di->op0(), udu.d);
+  fpRegs_.writeDouble(di->op0(), std::bit_cast<double>(u1));
 
   markFsDirty();
 }
@@ -2122,8 +2063,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
   uint64_t data = 0;
   if (load<uint16_t>(virtAddr, false /*hyper*/,  data))
     {
-      Float16 f16 = Float16::fromBits(data);
-      fpRegs_.writeHalf(di->op0(), f16);
+      fpRegs_.writeHalf(di->op0(), std::bit_cast<Float16>(static_cast<uint16_t>(data)));
       markFsDirty();
       return;
     }
@@ -2171,7 +2111,7 @@ Hart<URV>::execFmadd_h(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2185,13 +2125,13 @@ Hart<URV>::execFmsub_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-  Float16 f3 = fpRegs_.readHalf(di->op3()).negate();
+  Float16 f3 = -fpRegs_.readHalf(di->op3());
 
   Float16 res = fusedMultiplyAdd(f1, f2, f3);
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2203,7 +2143,7 @@ Hart<URV>::execFnmsub_h(const DecodedInst* di)
   if (not checkRoundingModeHp(di))
     return;
 
-  Float16 f1 = fpRegs_.readHalf(di->op1()).negate();
+  Float16 f1 = -fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
   Float16 f3 = fpRegs_.readHalf(di->op3());
 
@@ -2211,7 +2151,7 @@ Hart<URV>::execFnmsub_h(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2225,15 +2165,15 @@ Hart<URV>::execFnmadd_h(const DecodedInst* di)
 
   // we want -(f[op1] * f[op2]) - f[op3]
 
-  Float16 f1 = fpRegs_.readHalf(di->op1()).negate();
+  Float16 f1 = -fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-  Float16 f3 = fpRegs_.readHalf(di->op3()).negate();
+  Float16 f3 = -fpRegs_.readHalf(di->op3());
 
   Float16 res = fusedMultiplyAdd(f1, f2, f3);
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2251,14 +2191,14 @@ Hart<URV>::execFadd_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_add(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16::fromFloat(f1.toFloat() + f2.toFloat());
-  if (res.isNan())
-    res = Float16::quietNan();
+  Float16 res = f1 + f2;
+  if (std::isnan(res))
+    res = std::numeric_limits<Float16>::quiet_NaN();
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2276,14 +2216,14 @@ Hart<URV>::execFsub_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_sub(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16::fromFloat(f1.toFloat() - f2.toFloat());
-  if (res.isNan())
-    res = Float16::quietNan();
+  Float16 res = f1 - f2;
+  if (std::isnan(res))
+    res = std::numeric_limits<Float16>::quiet_NaN();
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2301,14 +2241,14 @@ Hart<URV>::execFmul_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_mul(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16::fromFloat(f1.toFloat() * f2.toFloat());
-  if (res.isNan())
-    res = Float16::quietNan();
+  Float16 res = f1 * f2;
+  if (std::isnan(res))
+    res = std::numeric_limits<Float16>::quiet_NaN();
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2326,14 +2266,14 @@ Hart<URV>::execFdiv_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_div(nativeToSoft(f1), nativeToSoft(f2)));
 #else
-  Float16 res = Float16::fromFloat(f1.toFloat() / f2.toFloat());
-  if (res.isNan())
-    res = Float16::quietNan();
+  Float16 res = f1 / f2;
+  if (std::isnan(res))
+    res = std::numeric_limits<Float16>::quiet_NaN();
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2350,14 +2290,14 @@ Hart<URV>::execFsqrt_h(const DecodedInst* di)
 #ifdef SOFT_FLOAT
   Float16 res = softToNative(f16_sqrt(nativeToSoft(f1)));
 #else
-  Float16 res = Float16::fromFloat(std::sqrt(f1.toFloat()));
-  if (res.isNan())
-    res = Float16::quietNan();
+  Float16 res = std::sqrt(f1);
+  if (std::isnan(res))
+    res = std::numeric_limits<Float16>::quiet_NaN();
 #endif
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
   markFsDirty();
 }
 
@@ -2374,7 +2314,7 @@ Hart<URV>::execFsgnj_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-  Float16 res = Float16::copySign(f1, f2);  // Magnitude of f1 and sign of f2
+  Float16 res = std::copysign(f1, f2);  // Magnitude of f1 and sign of f2
   fpRegs_.writeHalf(di->op0(), res);
 
   markFsDirty();
@@ -2393,8 +2333,8 @@ Hart<URV>::execFsgnjn_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-  Float16 res = Float16::copySign(f1, f2);  // Magnitude of f1 and sign of f2
-  res = res.negate();  // Magnitude of f1 and negative the sign of f2
+  Float16 res = std::copysign(f1, f2);  // Magnitude of f1 and sign of f2
+  res = -res;  // Magnitude of f1 and negative the sign of f2
   fpRegs_.writeHalf(di->op0(), res);
 
   markFsDirty();
@@ -2414,8 +2354,8 @@ Hart<URV>::execFsgnjx_h(const DecodedInst* di)
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
 
-  unsigned sign1 = f1.signBit();
-  unsigned sign2 = f2.signBit();
+  unsigned sign1 = std::signbit(f1);
+  unsigned sign2 = std::signbit(f2);
   unsigned sign = sign1 ^ sign2;
 
   Float16 res = sign != sign1? -f1 : f1;
@@ -2439,20 +2379,20 @@ Hart<URV>::execFmin_h(const DecodedInst* di)
   Float16 in2 = fpRegs_.readHalf(di->op2());
   Float16 res;
 
-  bool isNan1 = in1.isNan(), isNan2 = in2.isNan();
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
   if (isNan1 and isNan2)
-    res = Float16::quietNan();
+    res = std::numeric_limits<Float16>::quiet_NaN();
   else if (isNan1)
     res = in2;
   else if (isNan2)
     res = in1;
   else
-    res = Float16::fromFloat(std::fminf(in1.toFloat(), in2.toFloat()));
+    res = std::fmin(in1, in2);
 
-  if (in1.isSnan() or in2.isSnan())
+  if (isSnan(in1) or isSnan(in2))
     orFcsrFlags(FpFlags::Invalid);
-  else if (in1.signBit() != in2.signBit() and in1 == in2)
-    res.setSign();  // Make sure min(-0, +0) is -0.
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, -Float16{});  // Make sure min(-0, +0) is -0.
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -2474,20 +2414,20 @@ Hart<URV>::execFmax_h(const DecodedInst* di)
   Float16 in2 = fpRegs_.readHalf(di->op2());
   Float16 res;
 
-  bool isNan1 = in1.isNan(), isNan2 = in2.isNan();
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
   if (isNan1 and isNan2)
-    res = Float16::quietNan();
+    res = std::numeric_limits<Float16>::quiet_NaN();
   else if (isNan1)
     res = in2;
   else if (isNan2)
     res = in1;
   else
-    res = Float16::fromFloat(std::fmaxf(in1.toFloat(), in2.toFloat()));
+    res = std::fmax(in1, in2);
 
-  if (in1.isSnan() or in2.isSnan())
+  if (isSnan(in1) or isSnan(in2))
     orFcsrFlags(FpFlags::Invalid);
-  else if (in1.signBit() != in2.signBit() and in1 == in2)
-    res.clearSign();  // Make sure max(-0, +0) is +0.
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, Float16{});  // Make sure max(-0, +0) is +0.
 
   fpRegs_.writeHalf(di->op0(), res);
 
@@ -2570,7 +2510,7 @@ Hart<URV>::execFcvt_h_s(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
 
   markFsDirty();
 }
@@ -2597,7 +2537,7 @@ Hart<URV>::execFcvt_h_d(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
 
   markFsDirty();
 }
@@ -2671,8 +2611,8 @@ Hart<URV>::execFeq_h(const DecodedInst* di)
       return;
     }
 
-  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
-  float f2 = fpRegs_.readHalf(di->op2()).toFloat();
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
 
   URV res = 0;
 
@@ -2698,8 +2638,8 @@ Hart<URV>::execFlt_h(const DecodedInst* di)
       return;
     }
 
-  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
-  float f2 = fpRegs_.readHalf(di->op2()).toFloat();
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
 
   URV res = 0;
 
@@ -2707,7 +2647,7 @@ Hart<URV>::execFlt_h(const DecodedInst* di)
     orFcsrFlags(FpFlags::Invalid);
   else
     res = (f1 < f2)? 1 : 0;
-    
+
   intRegs_.write(di->op0(), res);
 }
 
@@ -2722,8 +2662,8 @@ Hart<URV>::execFle_h(const DecodedInst* di)
       return;
     }
 
-  float f1 = fpRegs_.readHalf(di->op1()).toFloat();
-  float f2 = fpRegs_.readHalf(di->op2()).toFloat();
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
 
   URV res = 0;
 
@@ -2731,7 +2671,7 @@ Hart<URV>::execFle_h(const DecodedInst* di)
     orFcsrFlags(FpFlags::Invalid);
   else
     res = (f1 <= f2)? 1 : 0;
-    
+
   intRegs_.write(di->op0(), res);
 }
 
@@ -2767,7 +2707,7 @@ Hart<URV>::execFcvt_h_w(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
 
   markFsDirty();
 }
@@ -2788,7 +2728,7 @@ Hart<URV>::execFcvt_h_wu(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
 
   markFsDirty();
 }
@@ -2808,9 +2748,7 @@ Hart<URV>::execFmv_h_x(const DecodedInst* di)
 
   URV u1 = intRegs_.read(di->op1());
 
-  Float16 f16 = Float16::fromBits(uint16_t(u1));
-
-  fpRegs_.writeHalf(di->op0(), f16);
+  fpRegs_.writeHalf(di->op0(), std::bit_cast<Float16>(static_cast<uint16_t>(u1)));
 
   markFsDirty();
 }
@@ -2908,7 +2846,7 @@ Hart<uint64_t>::execFcvt_h_l(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
 
   markFsDirty();
 }
@@ -2943,8 +2881,774 @@ Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
 
   fpRegs_.writeHalf(di->op0(), res);
 
-  updateAccruedFpBits(res.toFloat());
+  updateAccruedFpBits(res);
 
+  markFsDirty();
+}
+
+
+
+template <typename URV>
+void
+Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
+{
+  if (not isRvzfa())
+    {
+      illegalInst(di);
+      return;
+    }
+  illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFli_h(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 res{};
+
+  switch(di->op1())
+    {
+    case 0:  res = fpConvertTo<Float16,true>(-1.0f);           break;
+    case 1:  res = std::bit_cast<Float16>(uint16_t(0x0400));   break;  // min normal
+    case 2:  res = fpConvertTo<Float16,true>(1.0f / 65536.0f); break;  // 2 to the -16
+    case 3:  res = fpConvertTo<Float16,true>(1.0f / 32768.0f); break;  // 2 to the -15
+    case 4:  res = fpConvertTo<Float16,true>(1.0f / 256.0f);   break;  // 2 to the -8
+    case 5:  res = fpConvertTo<Float16,true>(1.0f / 128.0f);   break;  // 2 to the -7
+    case 6:  res = fpConvertTo<Float16,true>(0.0625f);         break;  // 2 to the -4
+    case 7:  res = fpConvertTo<Float16,true>(0.125f);          break;  // 2 to the -3
+    case 8:  res = fpConvertTo<Float16,true>(0.25f);           break;  // 1/4
+    case 9:  res = fpConvertTo<Float16,true>(0.3125f);         break;  // 10/32
+    case 10: res = fpConvertTo<Float16,true>(0.375f);          break;  // 3/8
+    case 11: res = fpConvertTo<Float16,true>(0.4375f);         break;  // 7/16
+    case 12: res = fpConvertTo<Float16,true>(0.5f);            break;  // 1/2
+    case 13: res = fpConvertTo<Float16,true>(0.625f);          break;  // 5/8
+    case 14: res = fpConvertTo<Float16,true>(0.75f);           break;  // 3/4
+    case 15: res = fpConvertTo<Float16,true>(0.875f);          break;  // 7/8
+    case 16: res = fpConvertTo<Float16,true>(1.0f);            break; 
+    case 17: res = fpConvertTo<Float16,true>(1.25f);           break; 
+    case 18: res = fpConvertTo<Float16,true>(1.5f);            break; 
+    case 20: res = fpConvertTo<Float16,true>(2.0f);            break; 
+    case 21: res = fpConvertTo<Float16,true>(2.5f);            break; 
+    case 22: res = fpConvertTo<Float16,true>(3.0f);            break; 
+    case 23: res = fpConvertTo<Float16,true>(4.0f);            break; 
+    case 24: res = fpConvertTo<Float16,true>(8.0f);            break; 
+    case 25: res = fpConvertTo<Float16,true>(16.0f);           break; 
+    case 26: res = fpConvertTo<Float16,true>(128.0f);          break;
+    case 27: res = fpConvertTo<Float16,true>(256.0f);          break; 
+    case 28: res = fpConvertTo<Float16,true>(32768.0f);        break; 
+    case 29: res = std::numeric_limits<Float16>::infinity();   break;
+    case 30: res = std::numeric_limits<Float16>::infinity();    break;
+    case 31: res = std::numeric_limits<Float16>::quiet_NaN();  break;
+    default:                                                   break;
+    }
+
+  fpRegs_.writeHalf(di->op0(), res);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFli_s(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float res = 0;
+
+  switch(di->op1())
+    {
+    case 0:  res = -1.0f;                                   break;
+    case 1:  res = std::bit_cast<float>(0x00800000);        break;  // min normal
+    case 2:  res = 1.0f / 65536.0f;                         break;  // 2 to the -16
+    case 3:  res = 1.0f / 32768.0f;                         break;  // 2 to the -15
+    case 4:  res = 1.0f / 256.0f;                           break;  // 2 to the -8
+    case 5:  res = 1.0f / 128.0f;                           break;  // 2 to the -7
+    case 6:  res = 0.0625f;                                 break;  // 2 to the -4
+    case 7:  res = 0.125f;                                  break;  // 2 to the -3
+    case 8:  res = 0.25f;                                   break;  // 1/4
+    case 9:  res = 0.3125f;                                 break;  // 10/32
+    case 10: res = 0.375f;                                  break;  // 3/8
+    case 11: res = 0.4375f;                                 break;  // 7/16
+    case 12: res = 0.5f;                                    break;  // 1/2
+    case 13: res = 0.625f;                                  break;  // 5/8
+    case 14: res = 0.75f;                                   break;  // 3/4
+    case 15: res = 0.875f;                                  break;  // 7/8
+    case 16: res = 1.0f;                                    break; 
+    case 17: res = 1.25f;                                   break; 
+    case 18: res = 1.5f;                                    break; 
+    case 20: res = 2.0f;                                    break; 
+    case 21: res = 2.5f;                                    break; 
+    case 22: res = 3.0f;                                    break; 
+    case 23: res = 4.0f;                                    break; 
+    case 24: res = 8.0f;                                    break; 
+    case 25: res = 16.0f;                                   break; 
+    case 26: res = 128.0f;                                  break;
+    case 27: res = 256.0f;                                  break; 
+    case 28: res = 32768.0f;                                break; 
+    case 29: res = 65536.0f;                                break; 
+    case 30: res = std::numeric_limits<float>::infinity();  break;
+    case 31: res = std::numeric_limits<float>::quiet_NaN(); break;
+    default:                                                break;
+    }
+
+  fpRegs_.writeSingle(di->op0(), res);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFli_d(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  double res = 0;
+  double minNormal = std::bit_cast<double>(0x0010000000000000);
+
+  switch(di->op1())
+    {
+    case 0:  res = -1.0;                                     break;
+    case 1:  res = minNormal;                                break;
+    case 2:  res = 1.0 / 65536.0;                            break;  // 2 to the -16
+    case 3:  res = 1.0 / 32768.0;                            break;  // 2 to the -15
+    case 4:  res = 1.0 / 256.0;                              break;  // 2 to the -8
+    case 5:  res = 1.0 / 128.0;                              break;  // 2 to the -7
+    case 6:  res = 0.0625;                                   break;  // 2 to the -4
+    case 7:  res = 0.125;                                    break;  // 2 to the -3
+    case 8:  res = 0.25;                                     break;  // 1/4
+    case 9:  res = 0.3125;                                   break;  // 10/32
+    case 10: res = 0.375;                                    break;  // 3/8
+    case 11: res = 0.4375;                                   break;  // 7/16
+    case 12: res = 0.5;                                      break;  // 1/2
+    case 13: res = 0.625;                                    break;  // 5/8
+    case 14: res = 0.75;                                     break;  // 3/4
+    case 15: res = 0.875;                                    break;  // 7/8
+    case 16: res = 1.0;                                      break; 
+    case 17: res = 1.25;                                     break; 
+    case 18: res = 1.5;                                      break; 
+    case 20: res = 2.0;                                      break; 
+    case 21: res = 2.5;                                      break; 
+    case 22: res = 3.0;                                      break; 
+    case 23: res = 4.0;                                      break; 
+    case 24: res = 8.0;                                      break; 
+    case 25: res = 16.0;                                     break; 
+    case 26: res = 128.0;                                    break;
+    case 27: res = 256.0;                                    break; 
+    case 28: res = 32768.0;                                  break; 
+    case 29: res = 65536.0;                                  break; 
+    case 30: res = std::numeric_limits<double>::infinity();  break;
+    case 31: res = std::numeric_limits<double>::quiet_NaN(); break;
+    default:                                                 break;
+    }
+
+  fpRegs_.writeDouble(di->op0(), res);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFleq_h(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+
+  URV res = 0;
+
+  if (std::isnan(f1) or std::isnan(f2))
+    res = 0;
+  else
+    res = (f1 <= f2)? 1 : 0;
+
+  intRegs_.write(di->op0(), res);
+
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFleq_s(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readSingle(di->op1());
+  float f2 = fpRegs_.readSingle(di->op2());
+
+  URV res = 0;
+
+  if (std::isnan(f1) or std::isnan(f2))
+    res = 0;
+  else
+    res = (f1 <= f2)? 1 : 0;
+
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFleq_d(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isDpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  double d1 = fpRegs_.readDouble(di->op1());
+  double d2 = fpRegs_.readDouble(di->op2());
+
+  URV res = 0;
+
+  if (std::isnan(d1) or std::isnan(d2))
+    res = 0;
+  else
+    res = (d1 <= d2)? 1 : 0;
+
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFltq_h(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f2 = fpRegs_.readHalf(di->op2());
+
+  URV res = 0;
+
+  if (std::isnan(f1) or std::isnan(f2))
+    res = 0;
+  else
+    res = (f1 < f2)? 1 : 0;
+
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFltq_s(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readSingle(di->op1());
+  float f2 = fpRegs_.readSingle(di->op2());
+
+  URV res = 0;
+
+  if (std::isnan(f1) or std::isnan(f2))
+    res = 0;
+  else
+    res = (f1 < f2)? 1 : 0;
+    
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFltq_d(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isDpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  double d1 = fpRegs_.readDouble(di->op1());
+  double d2 = fpRegs_.readDouble(di->op2());
+
+  URV res = 0;
+
+  if (std::isnan(d1) or std::isnan(d2))
+    res = 0;
+  else
+    res = (d1 < d2)? 1 : 0;
+
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmaxm_h(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+  Float16 in1 = fpRegs_.readHalf(di->op1());
+  Float16 in2 = fpRegs_.readHalf(di->op2());
+  Float16 res;
+
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
+  if (isNan1 or isNan2)
+    res = std::numeric_limits<Float16>::quiet_NaN();
+  else
+    res = std::fmax(in1, in2);
+
+  if (isSnan(in1) or isSnan(in2))
+    orFcsrFlags(FpFlags::Invalid);
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, Float16{});  // Make sure max(-0, +0) is +0.
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmaxm_s(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float in1 = fpRegs_.readSingle(di->op1());
+  float in2 = fpRegs_.readSingle(di->op2());
+  float res = 0;
+
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
+  if (isNan1 or isNan2)
+    res = std::numeric_limits<float>::quiet_NaN();
+  else
+    res = std::fmaxf(in1, in2);
+
+  if (isSnan(in1) or isSnan(in2))
+    orFcsrFlags(FpFlags::Invalid);
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, 1.0F);  // Make sure max(-0, +0) is +0.
+
+  fpRegs_.writeSingle(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmaxm_d(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isDpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+  double in1 = fpRegs_.readDouble(di->op1());
+  double in2 = fpRegs_.readDouble(di->op2());
+  double res = 0;
+
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
+  if (isNan1 or isNan2)
+    res = std::numeric_limits<double>::quiet_NaN();
+  else
+    res = std::fmax(in1, in2);
+
+  if (isSnan(in1) or isSnan(in2))
+    orFcsrFlags(FpFlags::Invalid);
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, 1.0);  // Make sure max(-0, +0) is +0.
+
+  fpRegs_.writeDouble(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFminm_h(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 in1 = fpRegs_.readHalf(di->op1());
+  Float16 in2 = fpRegs_.readHalf(di->op2());
+  Float16 res;
+
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
+  if (isNan1 or isNan2)
+    res = std::numeric_limits<Float16>::quiet_NaN();
+  else
+    res = std::fmin(in1, in2);
+
+  if (isSnan(in1) or isSnan(in2))
+    orFcsrFlags(FpFlags::Invalid);
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, -Float16{});  // Make sure min(-0, +0) is -0.
+
+  fpRegs_.writeHalf(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFminm_s(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+  float in1 = fpRegs_.readSingle(di->op1());
+  float in2 = fpRegs_.readSingle(di->op2());
+  float res = 0;
+
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
+  if (isNan1 or isNan2)
+    res = std::numeric_limits<float>::quiet_NaN();
+  else
+    res = std::fminf(in1, in2);
+
+  if (isSnan(in1) or isSnan(in2))
+    orFcsrFlags(FpFlags::Invalid);
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, -1.0F);  // Make sure min(-0, +0) is -0.
+
+  fpRegs_.writeSingle(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFminm_d(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isDpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  double in1 = fpRegs_.readDouble(di->op1());
+  double in2 = fpRegs_.readDouble(di->op2());
+  double res = 0;
+
+  bool isNan1 = std::isnan(in1), isNan2 = std::isnan(in2);
+  if (isNan1 or isNan2)
+    res = std::numeric_limits<double>::quiet_NaN();
+  else
+    res = fmin(in1, in2);
+
+  if (isSnan(in1) or isSnan(in2))
+    orFcsrFlags(FpFlags::Invalid);
+  else if (std::signbit(in1) != std::signbit(in2) and in1 == in2)
+    res = std::copysign(res, -1.0);  // Make sure min(-0, +0) is -0.
+
+  fpRegs_.writeDouble(di->op0(), res);
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmvh_x_d(const DecodedInst* di)
+{
+  if (mxlen_ == 32)
+    {
+      if (not isRvzfa() or not isDpLegal())
+	{
+	  illegalInst(di);
+	  return;
+	}
+      uint64_t v1 = fpRegs_.readBitsRaw(di->op1());
+      v1 >>= 32;
+      intRegs_.write(di->op0(), v1);
+    }
+  else
+    illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFmvp_d_x(const DecodedInst* di)
+{
+  if (mxlen_ == 32)
+    {
+      if (not isRvzfa() or not isDpLegal())
+	{
+	  illegalInst(di);
+	  return;
+	}
+      uint32_t v1 = intRegs_.read(di->op1());
+      uint32_t v2 = intRegs_.read(di->op2());
+      uint64_t v0 = (uint64_t(v2) << 32) | v1;
+      fpRegs_.writeDouble(di->op0(), std::bit_cast<double>(v0));
+      markFsDirty();
+    }
+  else
+    illegalInst(di);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFround_h(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f0 = f1;
+
+  if (isSnan(f1))
+    {
+      f0 = std::numeric_limits<Float16>::quiet_NaN();
+      orFcsrFlags(FpFlags::Invalid);
+    }
+  else if (f1 == Float16{} or f1 == -Float16{} or std::isinf(f1)) // zero or infinity
+    ;
+  else
+    {
+      int exp = 0;
+      std::frexp(f1, &exp);
+      if (exp < 10)
+	{
+	  SRV intVal = fpConvertTo<int32_t>(f1);
+	  f0 = fpConvertTo<Float16>(intVal);
+	}
+    }
+
+  fpRegs_.writeHalf(di->op0(), f0);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFround_s(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readSingle(di->op1());
+  float f0 = f1;
+
+  if (isSnan(f1))
+    {
+      f0 = std::numeric_limits<float>::quiet_NaN();
+      orFcsrFlags(FpFlags::Invalid);
+    }
+  else if (f1 == 0 or std::isinf(f1)) // zero or infinity
+    ;
+  else
+    {
+      int exp = 0;
+      std::frexp(f1, &exp);
+      if (exp < 23)
+	{
+	  int32_t intVal = fpConvertTo<int32_t>(f1);
+	  f0 = fpConvertTo<float>(intVal);
+	}
+    }
+
+  fpRegs_.writeSingle(di->op0(), f0);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFround_d(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  double d1 = fpRegs_.readSingle(di->op1());
+  double d0 = d1;
+
+  if (isSnan(d1))
+    {
+      d0 = std::numeric_limits<double>::quiet_NaN();
+      orFcsrFlags(FpFlags::Invalid);
+    }
+  else if (d1 == 0 or std::isinf(d1)) // zero or infinity
+    ;
+  else
+    {
+      int exp = 0;
+      std::frexp(d1, &exp);
+      if (exp < 52)
+	{
+	  int64_t intVal = fpConvertTo<int64_t>(d1);
+	  d0 = fpConvertTo<double>(intVal);
+	}
+    }
+
+  fpRegs_.writeDouble(di->op0(), d0);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFroundnx_h(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isZfhLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  Float16 f1 = fpRegs_.readHalf(di->op1());
+  Float16 f0 = f1;
+
+  if (isSnan(f1))
+    {
+      f0 = std::numeric_limits<Float16>::quiet_NaN();
+      orFcsrFlags(FpFlags::Invalid);
+    }
+  else if (f1 == Float16{} or f1 == -Float16{} or std::isinf(f1)) // zero or infinity
+    ;
+  else
+    {
+      int exp = 0;
+      std::frexp(f1, &exp);
+      if (exp < 10)
+	{
+	  SRV intVal = fpConvertTo<int32_t>(f1);
+	  f0 = fpConvertTo<Float16>(intVal);
+	  if (f0 != f1)
+	    orFcsrFlags(FpFlags::Inexact);
+	}
+    }
+
+  fpRegs_.writeHalf(di->op0(), f0);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFroundnx_s(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  float f1 = fpRegs_.readSingle(di->op1());
+  float f0 = f1;
+
+  if (isSnan(f1))
+    {
+      f0 = std::numeric_limits<float>::quiet_NaN();
+      orFcsrFlags(FpFlags::Invalid);
+    }
+  else if (f1 == 0 or std::isinf(f1)) // zero or infinity
+    ;
+  else
+    {
+      int exp = 0;
+      std::frexp(f1, &exp);
+      if (exp < 23)
+	{
+	  int32_t intVal = fpConvertTo<int32_t>(f1);
+	  f0 = fpConvertTo<float>(intVal);
+	  if (f0 != f1)
+	    orFcsrFlags(FpFlags::Inexact);
+	}
+    }
+
+  fpRegs_.writeSingle(di->op0(), f0);
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFroundnx_d(const DecodedInst* di)
+{
+  if (not isRvzfa() or not isFpLegal())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  double d1 = fpRegs_.readSingle(di->op1());
+  double d0 = d1;
+
+  if (isSnan(d1))
+    {
+      d0 = std::numeric_limits<double>::quiet_NaN();
+      orFcsrFlags(FpFlags::Invalid);
+    }
+  else if (d1 == 0 or std::isinf(d1)) // zero or infinity
+    ;
+  else
+    {
+      int exp = 0;
+      std::frexp(d1, &exp);
+      if (exp < 52)
+	{
+	  int64_t intVal = fpConvertTo<int64_t>(d1);
+	  d0 = fpConvertTo<double>(intVal);
+	  if (d0 != d1)
+	    orFcsrFlags(FpFlags::Inexact);
+	}
+    }
+
+  fpRegs_.writeDouble(di->op0(), d0);
   markFsDirty();
 }
 
@@ -2952,10 +3656,16 @@ Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
 template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;
 
+template unsigned WdRiscv::fpClassifyRiscv<Float16>(Float16);
+template unsigned WdRiscv::fpClassifyRiscv<BFloat16>(BFloat16);
 template unsigned WdRiscv::fpClassifyRiscv<float>(float);
 template unsigned WdRiscv::fpClassifyRiscv<double>(double);
 
+template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<Float16>(Float16);
+template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<BFloat16>(BFloat16);
 template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<float>(float);
 template void WdRiscv::Hart<uint32_t>::updateAccruedFpBits<double>(double);
+template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<Float16>(Float16);
+template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<BFloat16>(BFloat16);
 template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<float>(float);
 template void WdRiscv::Hart<uint64_t>::updateAccruedFpBits<double>(double);

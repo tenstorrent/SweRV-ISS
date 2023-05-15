@@ -17,6 +17,8 @@
 #include <charconv>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
+#include <unordered_set>
 #include "HartConfig.hpp"
 #include "System.hpp"
 #include "Core.hpp"
@@ -1137,6 +1139,7 @@ template<typename URV>
 bool
 HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 {
+  using std::cerr;
   unsigned errors = 0;
 
   // Define PC value after reset.
@@ -1194,8 +1197,8 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	    hart.configReservationSize(resBytes);
 	  else
 	    {
-	      std::cerr << "Error: Config file reservation_bytes ("
-		    << resBytes << ") is not a power of 2\n";
+	      cerr << "Error: Config file reservation_bytes ("
+		   << resBytes << ") is not a power of 2\n";
 	      errors++;
 	    }
 	}
@@ -1245,15 +1248,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       std::string etag = util::join("", "enable_", ztag);
       if (config_ -> contains(etag))
-	std::cerr << "Config file tag \"" << etag << "\" deprecated: "
-		  << "Add extension string \"" << ztag << "\" to \"isa\" tag instead.\n";
+	cerr << "Config file tag \"" << etag << "\" deprecated: "
+	     << "Add extension string \"" << ztag << "\" to \"isa\" tag instead.\n";
     }
 
   for (std::string_view ztag : { "zbe", "zbf", "zbm", "zbp", "zbr", "zbt" } )
     {
       std::string etag = util::join("", "enable_", ztag);
       if (config_ -> contains(etag))
-	std::cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
+	cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
   applyPerfEvents(hart, *config_, userMode, verbose) or errors++;
@@ -1361,7 +1364,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	hart.forceRoundingMode(RoundingMode::NearestMax);
       else
 	{
-	  std::cerr << "Invalid force_rounding_mode config: " << str << '\n';
+	  cerr << "Invalid force_rounding_mode config: " << str << '\n';
 	  errors++;
 	}
     }
@@ -1392,7 +1395,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
           if (std::find(periods.begin(), periods.end(), 0)
                           != periods.end())
             {
-              std::cerr << "Snapshot periods of 0 are ignored\n";
+              cerr << "Snapshot periods of 0 are ignored\n";
               periods.erase(std::remove(periods.begin(), periods.end(), 0), periods.end());
             }
 
@@ -1400,7 +1403,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
           if (it != periods.end())
             {
               periods.erase(it, periods.end());
-              std::cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
+              cerr << "Duplicate snapshot periods not supported, removed duplicates\n";
             }
         }
     }
@@ -1445,7 +1448,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	  hart.setCounterToTimeShift(factor);
 	else
 	  {
-	    std::cerr << "Invalid log2_counter_to_time: " << factor << " (expecting <= 6)\n";
+	    cerr << "Invalid log2_counter_to_time: " << factor << " (expecting <= 6)\n";
 	    errors++;
 	  }
       }
@@ -1454,7 +1457,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "cancel_lr_on_ret";
   if (config_ -> contains(tag))
     {
-      std::cerr << "Config tag cancel_lr_on_ret is deprecated. Use cancel_lr_on_trap.\n";
+      cerr << "Config tag cancel_lr_on_ret is deprecated. Use cancel_lr_on_trap.\n";
       if (not getJsonBoolean(tag, config_ -> at(tag), flag))
         errors++;
       else
@@ -1506,6 +1509,42 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.tracePmp(flag);
+    }
+
+  tag = "address_translation_modes";
+  if (config_ -> contains(tag))
+    {
+      unsigned atmErrors = 0;
+      std::vector<VirtMem::Mode> modes;
+      const auto& atm = config_ -> at(tag);
+      for (auto& item : atm)
+	{
+	  if (not item.is_string())
+	    {
+	      cerr << "Error: Invalid value in config file item " << tag
+		   << " -- expecting string\n";
+	      atmErrors++;
+	      continue;
+	    }
+	  std::string_view modeStr = item.get<std::string_view>();
+	  VirtMem::Mode mode;
+	  if (not VirtMem::to_mode(modeStr, mode))
+	    {
+	      cerr << "Error no such address translation mode: " << tag << '\n';
+	      atmErrors++;
+	      continue;
+	    }
+	  modes.push_back(mode);
+	}
+      if (std::find(modes.begin(), modes.end(), VirtMem::Mode::Bare) == modes.end())
+	{
+	  cerr << "Bare mode added to config file address_translation_modes\n";
+	  modes.push_back(VirtMem::Mode::Bare);
+	}
+      if (not atmErrors)
+	hart.configAddressTranslationModes(modes);
+      else
+	errors += atmErrors;
     }
 
   return errors == 0;

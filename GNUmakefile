@@ -81,7 +81,7 @@ OFLAGS := -O3
 IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I. -Ithird_party
 
 # Command to compile .cpp files.
-override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=c++17 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
+override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=c++20 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings
 
 # Rule to make a .o from a .cpp file.
 $(BUILD_DIR)/%.cpp.o:  %.cpp
@@ -110,7 +110,7 @@ RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
 	    Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
 	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp \
 	    crypto.cpp Decoder.cpp Trace.cpp cbo.cpp Uart8250.cpp \
-	    Uartsf.cpp hypervisor.cpp
+	    Uartsf.cpp hypervisor.cpp vector-crypto.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp

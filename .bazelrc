@@ -1,2 +1,2 @@
-build --cxxopt=-std=c++17
+build --cxxopt=-std=c++20
 build --linkopt="-L/usr/local/lib"

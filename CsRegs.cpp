@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cfenv>
 #include <array>
+#include <bit>
 #include "CsRegs.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
@@ -101,7 +102,7 @@ template <typename URV>
 Csr<URV>*
 CsRegs<URV>::findCsr(std::string_view name)
 {
-  const auto iter = nameToNumber_.find(std::string(name)); // The string constructor can be avoided in C++20
+  const auto iter = nameToNumber_.find(name);
   if (iter == nameToNumber_.end())
     return nullptr;
 
@@ -235,7 +236,7 @@ CsRegs<URV>::readSignExtend(CsrNumber number, PrivilegeMode mode, URV& value) co
 
   auto csr = getImplementedCsr(number, virtMode_);
   URV mask = csr->getWriteMask();
-  unsigned lz = sizeof(URV) == 8 ? __builtin_clzl(mask)  : __builtin_clz(mask);
+  unsigned lz = std::countl_zero(mask);
 
   typedef typename std::make_signed_t<URV> SRV;
   SRV svalue = value;
@@ -255,7 +256,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
 		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
-		     CN::SATP, CN::MEDELEG, CN::MIDELEG } )
+		     CN::SENVCFG, CN::SATP, CN::MEDELEG, CN::MIDELEG } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -628,6 +629,25 @@ CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
 
 
 template <typename URV>
+bool
+CsRegs<URV>::isReadable(CsrNumber number, PrivilegeMode mode ) const
+{
+  const Csr<URV>* csr = getImplementedCsr(number, virtMode_);
+  if (not csr)
+    return false;
+
+  if (mode < csr->privilegeMode())
+    return false;
+
+  if (csr->isDebug() and not inDebugMode())
+    return false;  // Debug-mode register.
+
+  return true;
+}
+
+
+
+template <typename URV>
 void
 CsRegs<URV>::reset()
 {
@@ -655,7 +675,7 @@ bool
 CsRegs<URV>::configCsr(std::string_view name, bool implemented, URV resetValue,
                        URV mask, URV pokeMask, bool isDebug, bool shared)
 {
-  auto iter = nameToNumber_.find(std::string(name)); // The string constructor can be avoided in C++20
+  auto iter = nameToNumber_.find(name);
   if (iter == nameToNumber_.end())
     return false;
 
@@ -1098,7 +1118,8 @@ CsRegs<URV>::defineMachineRegs()
   if (rv32_)
     {
       mask = 0;
-      defineCsr("mstatush", Csrn::MSTATUSH, mand, imp, 0, mask, mask);
+      auto c = defineCsr("mstatush", Csrn::MSTATUSH, mand, imp, 0, mask, mask);
+      c->markAsHighHalf(true);
     }
 
   val = 0x4000112d;  // MISA: acdfim
@@ -1193,15 +1214,20 @@ CsRegs<URV>::defineMachineRegs()
 
   defineCsr("menvcfg", Csrn::MENVCFG, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
   if (rv32_)
-    defineCsr("menvcfgh", Csrn::MENVCFGH, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
+    {
+      auto c = defineCsr("menvcfgh", Csrn::MENVCFGH, !mand, imp, 0, rom, rom);  // hardwired to zero until we get smarter
+      c->markAsHighHalf(true);
+    }
 
   // Machine Counter/Timers.
   defineCsr("mcycle",    Csrn::MCYCLE,    mand, imp, 0, wam, wam);
   defineCsr("minstret",  Csrn::MINSTRET,  mand, imp, 0, wam, wam);
   if (rv32_)
     {
-      defineCsr("mcycleh",   Csrn::MCYCLEH,   mand, imp, 0, wam, wam);
-      defineCsr("minstreth", Csrn::MINSTRETH, mand, imp, 0, wam, wam);
+      auto c = defineCsr("mcycleh",   Csrn::MCYCLEH,   mand, imp, 0, wam, wam);
+      c->markAsHighHalf(true);
+      c = defineCsr("minstreth", Csrn::MINSTRETH, mand, imp, 0, wam, wam);
+      c->markAsHighHalf(true);
     }
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
@@ -1220,7 +1246,8 @@ CsRegs<URV>::defineMachineRegs()
           name += "h";
           csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3H) + i - 3);
           bool hmand = rv32_;  // high counters mandatory only in rv32
-          defineCsr(std::move(name), csrNum, hmand, imp, 0, rom, rom);
+          auto c = defineCsr(std::move(name), csrNum, hmand, imp, 0, rom, rom);
+	  c->markAsHighHalf(true);
         }
 
       csrNum = CsrNumber(unsigned(CsrNumber::MHPMEVENT3) + i - 3);
@@ -1383,7 +1410,7 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sip and mip)
     sip->tie(mip->valuePtr_); // Sip is a shadow if mip
 
-  mask = 0x1d;
+  mask = 0xf1;
   defineCsr("senvcfg",    Csrn::SENVCFG,    !mand, !imp, 0, mask, mask);
 
   // Supervisor Protection and Translation 
@@ -1419,9 +1446,13 @@ CsRegs<URV>::defineUserRegs()
   defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
   defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);
   defineCsr("instret",  Csrn::INSTRET,  !mand, imp,  0, wam, wam);
-  defineCsr("cycleh",   Csrn::CYCLEH,   !mand, !imp, 0, wam, wam);
-  defineCsr("timeh",    Csrn::TIMEH,    !mand, !imp, 0, wam, wam);
-  defineCsr("instreth", Csrn::INSTRETH, !mand, !imp, 0, wam, wam);
+
+  auto c = defineCsr("cycleh",   Csrn::CYCLEH,   !mand, !imp, 0, wam, wam);
+  c->markAsHighHalf(true);
+  c = defineCsr("timeh",    Csrn::TIMEH,    !mand, !imp, 0, wam, wam);
+  c->markAsHighHalf(true);
+  c = defineCsr("instreth", Csrn::INSTRETH, !mand, !imp, 0, wam, wam);
+  c->markAsHighHalf(true);
 
   // Define hpmcounter3/hpmcounter3h to hpmcounter31/hpmcounter31h
   // as write-anything/read-zero (user can change that in the config
@@ -1435,7 +1466,8 @@ CsRegs<URV>::defineUserRegs()
       // High register counterpart of mhpmcounter.
       name += "h";
       csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
-      defineCsr(std::move(name), csrNum, !mand, !imp, 0, wam, wam);
+      c = defineCsr(std::move(name), csrNum, !mand, !imp, 0, wam, wam);
+      c->markAsHighHalf(true);
     }
 
   // add CSR fields
@@ -1489,13 +1521,13 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("henvcfg",     Csrn::HENVCFG,     !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
   csr = defineCsr("henvcfgh",    Csrn::HENVCFGH,    !mand, !imp, 0, wam, wam);
-  csr->setHypervisor(true);
+  csr->setHypervisor(true); csr->markAsHighHalf(true);
   csr = defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
   csr = defineCsr("htimedelta",  Csrn::HTIMEDELTA,  !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
   csr = defineCsr("htimedeltah", Csrn::HTIMEDELTAH, !mand, !imp, 0, wam, wam);
-  csr->setHypervisor(true);
+  csr->setHypervisor(true); csr->markAsHighHalf(true);
 
   // This may be already defined with trigger CSRs.
   if (not nameToNumber_.count("hcontext"))
@@ -1532,6 +1564,20 @@ CsRegs<URV>::defineHypervisorRegs()
   // additional machine CSRs
   csr = defineCsr("mtval2",      Csrn::MTVAL2,      !mand, !imp, 0, wam, wam);
   csr = defineCsr("mtinst",      Csrn::MTINST,      !mand, !imp, 0, wam, wam);
+
+  // In MIE/MIP bits corresponding to VSEIP/VSTIP/VSSIP are writeable pokeable.
+  csr = findCsr(Csrn::MIP);
+  if (csr)
+    {
+      csr->setWriteMask(csr->getWriteMask() | 0x444);
+      csr->setPokeMask(csr->getPokeMask() | 0x444);
+    }
+  csr = findCsr(Csrn::MIE);
+  if (csr)
+    {
+      csr->setWriteMask(csr->getWriteMask() | 0x444);
+      csr->setPokeMask(csr->getPokeMask() | 0x444);
+    }
 }
 
 
@@ -1684,17 +1730,17 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mtopi",      CsrNumber::MTOPI,      !mand, !imp, 0, wam, wam);
   defineCsr("mvien",      CsrNumber::MVIEN,      !mand, !imp, 0, wam, wam);
   defineCsr("mvip",       CsrNumber::MVIP,       !mand, !imp, 0, wam, wam);
-  defineCsr("midelegh",   CsrNumber::MIDELEGH,   !mand, !imp, 0, wam, wam);
-  defineCsr("mieh",       CsrNumber::MIEH,       !mand, !imp, 0, wam, wam);
-  defineCsr("mvienh",     CsrNumber::MVIENH,     !mand, !imp, 0, wam, wam);
-  defineCsr("mviph",      CsrNumber::MVIPH,      !mand, !imp, 0, wam, wam);
-  defineCsr("miph",       CsrNumber::MIPH,       !mand, !imp, 0, wam, wam);
+  defineCsr("midelegh",   CsrNumber::MIDELEGH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("mieh",       CsrNumber::MIEH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("mvienh",     CsrNumber::MVIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("mviph",      CsrNumber::MVIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("miph",       CsrNumber::MIPH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("siselect",   CsrNumber::SISELECT,   !mand, !imp, 0, wam, wam);
   defineCsr("sireg",      CsrNumber::SIREG,      !mand, !imp, 0, wam, wam);
   defineCsr("stopei",     CsrNumber::STOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("stopi",      CsrNumber::STOPI,      !mand, !imp, 0, wam, wam);
-  defineCsr("sieh",       CsrNumber::SIEH,       !mand, !imp, 0, wam, wam);
-  defineCsr("siph",       CsrNumber::SIPH,       !mand, !imp, 0, wam, wam);
+  defineCsr("sieh",       CsrNumber::SIEH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("siph",       CsrNumber::SIPH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hvien",      CsrNumber::HVIEN,      !mand, !imp, 0, wam, wam);
   defineCsr("hvictl",     CsrNumber::HVICTL,     !mand, !imp, 0, wam, wam);
   defineCsr("hviprio1",   CsrNumber::HVIPRIO1,   !mand, !imp, 0, wam, wam);
@@ -1703,13 +1749,13 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("vsireg",     CsrNumber::VSIREG,     !mand, !imp, 0, wam, wam);
   defineCsr("vstopei",    CsrNumber::VSTOPEI,    !mand, !imp, 0, wam, wam);
   defineCsr("vstopi",     CsrNumber::VSTOPI,     !mand, !imp, 0, wam, wam);
-  defineCsr("hidelegh",   CsrNumber::HIDELEGH,   !mand, !imp, 0, wam, wam);
-  defineCsr("nhienh",     CsrNumber::NHIENH,     !mand, !imp, 0, wam, wam);
-  defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam);
-  defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam);
-  defineCsr("hviprio3h",  CsrNumber::HVIPRIO3H,  !mand, !imp, 0, wam, wam);
-  defineCsr("vsieh",      CsrNumber::VSIEH,      !mand, !imp, 0, wam, wam);
-  defineCsr("vsiph",      CsrNumber::VSIPH,      !mand, !imp, 0, wam, wam);
+  defineCsr("hidelegh",   CsrNumber::HIDELEGH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("nhienh",     CsrNumber::NHIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("hviprio3h",  CsrNumber::HVIPRIO3H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("vsieh",      CsrNumber::VSIEH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("vsiph",      CsrNumber::VSIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
 }
 
 
@@ -1839,7 +1885,7 @@ CsRegs<URV>::poke(CsrNumber number, URV value)
       peek(number, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-  else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS)
+  else if (number == CsrNumber::MSTATUS or number == CsrNumber::SSTATUS or number == CsrNumber::VSSTATUS)
     value = legalizeMstatusValue(value);
 
   csr->poke(value);

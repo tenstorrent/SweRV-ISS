@@ -1136,7 +1136,6 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
               fprintf(commandLog, "hart=%" PRIu32 " step #%" PRIuMAX " # ts=%s\n",
                       hartId, uintmax_t(hart.getInstructionCount()),
                       timeStamp.c_str());
-            fflush(commandLog);
           }
         break;
 

@@ -92,7 +92,6 @@ namespace WdRiscv
     };
 
 
-  // This array can go directly in the template declaration once using C++20
   constexpr auto _getFpRegNumberToAbiNameArr()
   {
     using namespace std::string_view_literals;

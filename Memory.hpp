@@ -24,6 +24,7 @@
 #include <cassert>
 #include "PmaManager.hpp"
 #include "IoDevice.hpp"
+#include "util.hpp"
 
 
 namespace ELFIO
@@ -754,8 +755,8 @@ namespace WdRiscv
 
     bool checkUnmappedElf_ = true;
 
-    std::unordered_map<std::string, ElfSymbol> symbols_;
-    std::unordered_map<std::string, ElfSymbol> sections_;
+    std::unordered_map<std::string, ElfSymbol, util::string_hash, std::equal_to<>> symbols_;
+    std::unordered_map<std::string, ElfSymbol, util::string_hash, std::equal_to<>> sections_;
 
     std::vector<Reservation> reservations_;
     std::vector<LastWriteData> lastWriteData_;

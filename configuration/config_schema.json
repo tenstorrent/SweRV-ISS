@@ -81,6 +81,20 @@
             "$ref": "#/definitions/bool_or_bool_string",
             "description": "Use ABI register names (e.g. sp instead of x2)."
         },
+        "address_translation_modes": {
+            "description": "Supported address translation modes."
+	    "type": "array",
+	    "items" : {
+		"type": "string",
+		"enum": [
+		    "bare",
+		    "sv32",
+		    "sv39",
+		    "sv48",
+		    "sv57"
+		]
+	    }
+	},
         "cancel_lr_on_ret": {
             "$ref": "#/definitions/bool_or_bool_string"
         },

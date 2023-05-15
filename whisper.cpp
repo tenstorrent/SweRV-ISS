@@ -45,6 +45,11 @@
 #include "Filesystem.hpp"
 
 
+#if !defined(SOL_TCP) && defined(IPPROTO_TCP)
+#define SOL_TCP IPPROTO_TCP
+#endif
+
+
 using namespace WdRiscv;
 
 
@@ -270,7 +275,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 801;
+  unsigned subversion = 802;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -532,7 +537,7 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
         ("branchwindow", po::value<std::string>(),
          "Trace branches in the last n instructions.")
         ("tracerlib", po::value(&args.tracerLib),
-         "Path to tracer extension shared library which should provide C symbol tracerExtension."
+         "Path to tracer extension shared library which should provide C symbol tracerExtension32 or tracerExtension64."
          "Optionally include arguments after a colon to be exposed to the shared library "
          "as C symbol tracerExtensionArgs (ex. tracer.so or tracer.so:hello42).")
 	("setreg", po::value(&args.regInits)->multitoken(),
@@ -1197,6 +1202,9 @@ runServer(System<URV>& system, const std::string& serverFile,
       return -1;
     }
 
+  int one = 1;
+  setsockopt(soc, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+
   sockaddr_in serverAddr;
   memset(&serverAddr, 0, sizeof(serverAddr));
   serverAddr.sin_family = AF_INET;
@@ -1243,6 +1251,9 @@ runServer(System<URV>& system, const std::string& serverFile,
       perror("Socket accept failed");
       return false;
     }
+
+  one = 1;
+  setsockopt(newSoc, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 
   bool ok = true;
 
@@ -1630,8 +1641,8 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 }
 
 
-void (*tracerExtension)(void*) = nullptr;
-void (*tracerExtensionInit)() = nullptr;
+extern void (*__tracerExtension)(void*);
+void (*__tracerExtensionInit)() = nullptr;
 extern "C" {
   std::string tracerExtensionArgs = "";
 }
@@ -1661,8 +1672,8 @@ loadTracerLibrary(const std::string& tracerLib)
   std::string entry("tracerExtension");
   entry += sizeof(URV) == 4 ? "32" : "64";
 
-  tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, entry.c_str()));
-  if (not tracerExtension)
+  __tracerExtension = reinterpret_cast<void (*)(void*)>(dlsym(soPtr, entry.c_str()));
+  if (not __tracerExtension)
     {
       std::cerr << "Error: Could not find symbol tracerExtension in " << tracerLib << '\n';
       return false;
@@ -1671,9 +1682,9 @@ loadTracerLibrary(const std::string& tracerLib)
   entry = "tracerExtensionInit";
   entry += sizeof(URV) == 4 ? "32" : "64";
 
-  tracerExtensionInit = reinterpret_cast<void (*)()>(dlsym(soPtr, entry.c_str()));
-  if (tracerExtensionInit)
-    tracerExtensionInit();
+  __tracerExtensionInit = reinterpret_cast<void (*)()>(dlsym(soPtr, entry.c_str()));
+  if (__tracerExtensionInit)
+    __tracerExtensionInit();
 
   return true;
 }
@@ -1990,9 +2001,9 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
   unsigned isaLen = 0;
   if (not args.isa.empty())
     {
-      if (boost::starts_with(args.isa, "rv32"))
+      if (args.isa.starts_with("rv32"))
 	isaLen = 32;
-      else if (boost::starts_with(args.isa, "rv64"))
+      else if (args.isa.starts_with("rv64"))
 	isaLen = 64;
     }
 

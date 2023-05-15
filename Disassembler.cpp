@@ -1,11 +1,11 @@
 // Copyright 2022 Tenstorrent Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -82,9 +82,10 @@ printInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
       return;
     }
 
-  unsigned width = std::max(size_t(9), di.name().size() + 1);
+  std::string name = di.name();
+  unsigned width = std::max(size_t(9), name.size() + 1);
 
-  out << std::left << std::setw(width) << di.name();
+  out << std::left << std::setw(width) << name;
   unsigned opCount = di.operandCount();
 
   const char* sep = "";
@@ -232,7 +233,7 @@ printBranch3(const Disassembler& disas, std::ostream& stream,
       sign = '-';
       imm = -imm;
     }
-      
+
   stream << sign << " 0x" << std::hex << imm << std::dec;
 }
 
@@ -272,7 +273,7 @@ printFence(const Disassembler& , std::ostream& stream,
   if (di.isFencePredWrite())  pred += "w";
   if (di.isFencePredInput())  pred += "i";
   if (di.isFencePredOutput()) pred += "o";
-  
+
   if (di.isFenceSuccRead())   succ += "r";
   if (di.isFenceSuccWrite())  succ += "w";
   if (di.isFenceSuccInput())  succ += "i";
@@ -348,15 +349,6 @@ printSc(const Disassembler& disas, std::ostream& stream, const char* inst,
 
 
 static
-std::string
-insertFieldCountInName(std::string_view name, unsigned count, unsigned n)
-{
-  std::string res = util::join("", name.substr(0, n), std::to_string(count), name.substr(n));
-  return res;
-}
-
-
-static
 void
 printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
@@ -365,17 +357,7 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
 
   if (opcode7 == 0x7 or opcode7 == 0x27)
     {  // Vector load store
-      std::string_view name = di.name();
-      if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
-	name = insertFieldCountInName(name, di.vecFieldCount(), 2);
-      else if ((id >= InstId::vlsege8_v and id <= InstId::vssege1024_v) or
-	       (id >= InstId::vlsege8ff_v and id <= InstId::vlsege1024ff_v))
-	name = insertFieldCountInName(name, di.vecFieldCount(), 5);
-      else if (id >= InstId::vlssege8_v and id <= InstId::vsssege1024_v)
-	name = insertFieldCountInName(name, di.vecFieldCount(), 6);
-      else if (id >= InstId::vluxsegei8_v and id <= InstId::vsoxsegei1024_v)
-	name = insertFieldCountInName(name, di.vecFieldCount(), 7);
-      out << name << " v" << di.op0();
+      out << di.name() << " v" << di.op0();
       out << ", ("  << disas.intRegName(di.op1()) << ")";
       if (di.operandCount() == 3)
 	{
@@ -412,7 +394,8 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
       return;
     }
 
-  std::string_view name = di.name();
+  std::string      nameStr = di.name();
+  std::string_view name    = nameStr;
   if (id >= InstId::vmadc_vvm and id <= InstId::vmsbc_vxm and not di.isMasked())
     name = name.substr(0, name.size() - 1);
   out << name;
@@ -454,15 +437,62 @@ printVecInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di
 	out << sep << "v0.t";
     }
 }
-	  
+
 
 static
 void
 printCbo(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
-  unsigned width = std::max(size_t(9), di.name().size() + 1);
-  out << std::left << std::setw(width) << di.name();
-  out << "0(" << disas.intRegName(di.ithOperand(0)) << ")";
+  std::string name = di.name();
+  unsigned width = std::max(size_t(9), name.size() + 1);
+  out << std::left << std::setw(width) << name;
+  out << "0(" << disas.intRegName(di.op0()) << ")";
+}
+
+
+static
+void
+printLfi(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
+{
+  std::string name = di.name();
+  out << std::left << std::setw(9) << name;
+  out << disas.fpRegName(di.op0()) << ", ";
+  switch(di.op1())
+    {
+    case 0:  out << "-1.0";           break;
+    case 1:  out << "min";            break;
+    case 2:  out << "1.52587891e-05"; break;
+    case 3:  out << "3.05175781e-05"; break;
+    case 4:  out << "0.00390625";     break;
+    case 5:  out << "0.0078125";      break;
+    case 6:  out << "0.0625";         break;
+    case 7:  out << "0.125";          break;
+    case 8:  out << "0.25";           break;
+    case 9:  out << "0.3125";         break;
+    case 10: out << "0.375";          break;
+    case 11: out << "0.4375";         break;
+    case 12: out << "0.5";            break;
+    case 13: out << "0.625";          break;
+    case 14: out << "0.75";           break;
+    case 15: out << "0.875";          break;
+    case 16: out << "1.0";            break;
+    case 17: out << "1.25";           break;
+    case 18: out << "1.5";            break;
+    case 19: out << "1.75";           break;
+    case 20: out << "2.0";            break;
+    case 21: out << "2.5";            break;
+    case 22: out << "3.0";            break;
+    case 23: out << "4.0";            break;
+    case 24: out << "8.0";            break;
+    case 25: out << "16.0";           break;
+    case 26: out << "128.0";          break;
+    case 27: out << "256.0";          break;
+    case 28: out << "32768.0";        break;
+    case 29: out << "65536.0";        break;
+    case 30: out << "inf";            break;
+    case 31: out << "nan";            break;
+    default : out << "?";             break;
+    }
 }
 
 
@@ -534,7 +564,7 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
     case InstId::fence:
       printFence(*this, out, di);
       break;
-      
+
     case InstId::csrrw:
     case InstId::csrrs:
     case InstId::csrrc:
@@ -788,6 +818,12 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
     case InstId::cbo_inval:
     case InstId::cbo_zero:
       printCbo(*this, out, di);
+      break;
+
+    case InstId::fli_h:
+    case InstId::fli_s:
+    case InstId::fli_d:
+      printLfi(*this, out, di);
       break;
 
     default:

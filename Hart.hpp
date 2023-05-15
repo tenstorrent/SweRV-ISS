@@ -19,6 +19,7 @@
 #include <bitset>
 #include <vector>
 #include <iosfwd>
+#include <unordered_map>
 #include <unordered_set>
 #include <type_traits>
 #include <functional>
@@ -28,6 +29,7 @@
 #include "InstEntry.hpp"
 #include "IntRegs.hpp"
 #include "CsRegs.hpp"
+#include "float16-compat.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
 #include "Memory.hpp"
@@ -352,6 +354,9 @@ namespace WdRiscv
     /// the corresponding event-id is associated with the event counter csr.
     void configEventNumber(URV userNumber, EventNumber eventId)
     { csRegs_.mPerfRegs_.configEventNumber(userNumber, eventId); }
+
+    void configAddressTranslationModes(const std::vector<VirtMem::Mode>& modes)
+    { virtMem_.setSupportedModes(modes); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
@@ -971,6 +976,50 @@ namespace WdRiscv
     void enableRvzvfhmin(bool flag)
     { enableExtension(RvExtension::Zvfhmin, flag); }
 
+    /// Enable/disable the vector bit-manip extension part of vector cryptography.
+    void enableRvzvbb(bool flag)
+    { enableExtension(RvExtension::Zvbb, flag); }
+
+    /// Enable/disable the vector bit-manip extension part of vector cryptography.
+    void enableRvzvbc(bool flag)
+    { enableExtension(RvExtension::Zvbc, flag); }
+
+    /// Enable/disable the vector ghash extension part of vector cryptography.
+    void enableRvzvkg(bool flag)
+    { enableExtension(RvExtension::Zvkg, flag); }
+
+    /// Enable/disable the aes final round extension part of vector cryptography.
+    void enableRvzvkned(bool flag)
+    { enableExtension(RvExtension::Zvkned, flag); }
+
+    /// Enable/disable the zvknha (vector secure hash) extension part of vector cryptography.
+    void enableRvzvknha(bool flag)
+    { enableExtension(RvExtension::Zvknha, flag); }
+
+    /// Enable/disable the zvknhb (vector secure hash) extension part of vector cryptography.
+    void enableRvzvknhb(bool flag)
+    { enableExtension(RvExtension::Zvknhb, flag); }
+
+    /// Enable/disable the zvksed (vector ShangMi) extension part of vector cryptography.
+    void enableRvzvksed(bool flag)
+    { enableExtension(RvExtension::Zvksed, flag); }
+
+    /// Enable/disable the zvksh vector cryptography extension.
+    void enableRvzvksh(bool flag)
+    { enableExtension(RvExtension::Zvksh, flag); }
+
+    /// Enable/disable the zicond extension.
+    void enableRvzicond(bool flag)
+    { enableExtension(RvExtension::Zicond, flag); }
+
+    /// Enable/disable the zcb extension.
+    void enableRvzcb(bool flag)
+    { enableExtension(RvExtension::Zcb, flag); }
+
+    /// Enable/disable the zfa extension.
+    void enableRvzfa(bool flag)
+    { enableExtension(RvExtension::Zfa, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1254,6 +1303,50 @@ namespace WdRiscv
     /// point extension is enabled.
     bool isRvzvfhmin() const
     { return extensionIsEnabled(RvExtension::Zvfhmin); }
+
+    /// Return true if the bit-manip vector extension is enabled.
+    bool isRvzvbb() const
+    { return extensionIsEnabled(RvExtension::Zvbb); }
+
+    /// Return true if the bit-manip vector extension is enabled.
+    bool isRvzvbc() const
+    { return extensionIsEnabled(RvExtension::Zvbc); }
+
+    /// Return true if the vector ghash extension is enabled.
+    bool isRvzvkg() const
+    { return extensionIsEnabled(RvExtension::Zvkg); }
+
+    /// Return true if the vector ghash extension is enabled.
+    bool isRvzvkned() const
+    { return extensionIsEnabled(RvExtension::Zvkned); }
+
+    /// Return true if the vector secure hash extension is enabled.
+    bool isRvzvknha() const
+    { return extensionIsEnabled(RvExtension::Zvknha); }
+
+    /// Return true if the vector secure hash extension is enabled.
+    bool isRvzvknhb() const
+    { return extensionIsEnabled(RvExtension::Zvknhb); }
+
+    /// Return true if the vector ShangMi extension is enabled.
+    bool isRvzvksed() const
+    { return extensionIsEnabled(RvExtension::Zvksed); }
+
+    /// Return true if the vector Zvksh extension is enabled.
+    bool isRvzvksh() const
+    { return extensionIsEnabled(RvExtension::Zvksh); }
+
+    /// Return true if the zicon extension is enabled.
+    bool isRvzicond() const
+    { return extensionIsEnabled(RvExtension::Zicond); }
+
+    /// Return true if the zcb extension is enabled.
+    bool isRvzcb() const
+    { return extensionIsEnabled(RvExtension::Zcb); }
+
+    /// Return true if the zcb extension is enabled.
+    bool isRvzfa() const
+    { return extensionIsEnabled(RvExtension::Zcb); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
@@ -1920,7 +2013,7 @@ namespace WdRiscv
     /// register. No-op if a trigger has tripped.
     template <typename float_type>
     auto updateAccruedFpBits(float_type res)
-      -> typename std::enable_if<std::is_floating_point<float_type>::value, void>::type;
+      -> typename std::enable_if<is_fp<float_type>::value, void>::type;
 
     /// Set the flags field in FCSR to the least sig 5 bits of the
     /// given value
@@ -2774,37 +2867,28 @@ namespace WdRiscv
     void execVsetivli(const DecodedInst*);
     void execVsetvl(const DecodedInst*);
 
+    /// Helper to vector vv instructions (eg vadd.vv, vsub.vv). Operation
+    /// to be performed (eg. add, sub) is passed in op.
     template<typename ELEM_TYPE>
-    void vadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
+    void vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		unsigned start, unsigned elems, bool masked,
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+
+    /// Helper to vector vv instructions (eg vadd.vx, vsub.vx). Operation
+    /// to be performed (eg. add, sub) is passed in op.
+    template<typename ELEM_TYPE>
+    void vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		unsigned start, unsigned elems, bool masked,
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+
     void execVadd_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVadd_vx(const DecodedInst*);
-
     void execVadd_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVsub_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVsub_vx(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vrsub_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVrsub_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vrsub_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVrsub_vi(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -2905,96 +2989,28 @@ namespace WdRiscv
     void execVmsgt_vx(const DecodedInst*);
     void execVmsgt_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vminu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVminu_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vminu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVminu_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmin_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmin_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmin_vx(const DecodedInst*);
 
 
-    template<typename ELEM_TYPE>
-    void vmaxu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmaxu_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmaxu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmaxu_vx(const DecodedInst*);
-
-
-    template<typename ELEM_TYPE>
-    void vmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmax_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmax_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmax_vx(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vand_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVand_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vand_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVand_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vand_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVand_vi(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vor_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                unsigned start, unsigned elems, bool masked);
     void execVor_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                unsigned start, unsigned elems, bool masked);
     void execVor_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vor_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                unsigned start, unsigned elems, bool masked);
     void execVor_vi(const DecodedInst*);
 
-
-    template<typename ELEM_TYPE>
-    void vxor_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVxor_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vxor_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVxor_vx(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vxor_vi(unsigned vd, unsigned vs1, int32_t imm, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVxor_vi(const DecodedInst*);
-
 
     template<typename ELEM_TYPE>
     void vsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
@@ -3139,14 +3155,7 @@ namespace WdRiscv
     void execVfslide1up_vf(const DecodedInst*);
     void execVfslide1down_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmul_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmul_vx(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVmul_vx(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -4193,6 +4202,82 @@ namespace WdRiscv
 		   unsigned start, unsigned elems, bool masked);
     void execVfsgnjx_vf(const DecodedInst*);
 
+    void execVandn_vv(const DecodedInst*);
+    void execVandn_vx(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vbrev_v(unsigned vd, unsigned vs1, unsigned group,
+		unsigned start, unsigned elems, bool masked);
+    void execVbrev_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
+		unsigned start, unsigned elems, bool masked);
+    void execVbrev8_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vrev8_v(unsigned vd, unsigned vs1, unsigned group,
+		unsigned start, unsigned elems, bool masked);
+    void execVrev8_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vclz_v(unsigned vd, unsigned vs1, unsigned group,
+		unsigned start, unsigned elems, bool masked);
+    void execVclz_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vctz_v(unsigned vd, unsigned vs1, unsigned group,
+		unsigned start, unsigned elems, bool masked);
+    void execVctz_v(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vcpop_v(unsigned vd, unsigned vs1, unsigned group,
+		 unsigned start, unsigned elems, bool masked);
+    void execVcpop_v(const DecodedInst*);
+
+    void execVrol_vv(const DecodedInst*);
+    void execVrol_vx(const DecodedInst*);
+    void execVror_vv(const DecodedInst*);
+    void execVror_vx(const DecodedInst*);
+    void execVror_vi(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		  unsigned start, unsigned elems, bool masked);
+    void execVwsll_vv(const DecodedInst*);
+
+    template<typename ELEM_TYPE>
+    void vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+                  unsigned start, unsigned elems, bool masked);
+    void execVwsll_vx(const DecodedInst*);
+    void execVwsll_vi(const DecodedInst*);
+
+    void execVclmul_vv(const DecodedInst*);
+    void execVclmul_vx(const DecodedInst*);
+    void execVclmulh_vv(const DecodedInst*);
+    void execVclmulh_vx(const DecodedInst*);
+    void execVghsh_vv(const DecodedInst*);
+    void execVgmul_vv(const DecodedInst*);
+    void execVaesdf_vv(const DecodedInst*);
+    void execVaesdf_vs(const DecodedInst*);
+    void execVaesef_vv(const DecodedInst*);
+    void execVaesef_vs(const DecodedInst*);
+    void execVaesem_vv(const DecodedInst*);
+    void execVaesem_vs(const DecodedInst*);
+    void execVaesdm_vv(const DecodedInst*);
+    void execVaesdm_vs(const DecodedInst*);
+    void execVaeskf1_vi(const DecodedInst*);
+    void execVaeskf2_vi(const DecodedInst*);
+    void execVaesz_vs(const DecodedInst*);
+    void execVsha2ms_vv(const DecodedInst*);
+    void execVsha2ch_vv(const DecodedInst*);
+    void execVsha2cl_vv(const DecodedInst*);
+    void execVsm4k_vi(const DecodedInst*);
+    void execVsm4r_vv(const DecodedInst*);
+    void execVsm4r_vs(const DecodedInst*);
+    void execVsm3me_vv(const DecodedInst*);
+    void execVsm3c_vi(const DecodedInst*);
+
     void execAes32dsi(const DecodedInst*);
     void execAes32dsmi(const DecodedInst*);
     void execAes32esi(const DecodedInst*);
@@ -4252,6 +4337,39 @@ namespace WdRiscv
     void execHsv_d(const DecodedInst*);
     void execHinval_vvma(const DecodedInst*);
     void execHinval_gvma(const DecodedInst*);
+
+    // zicond
+    void execCzero_eqz(const DecodedInst*);
+    void execCzero_nez(const DecodedInst*);
+
+    // Zcb
+    void execC_zext_h(const DecodedInst*);
+
+    // Zfa
+    void execFcvtmod_w_d(const DecodedInst*);
+    void execFli_h(const DecodedInst*);
+    void execFli_s(const DecodedInst*);
+    void execFli_d(const DecodedInst*);
+    void execFleq_h(const DecodedInst*);
+    void execFleq_s(const DecodedInst*);
+    void execFleq_d(const DecodedInst*);
+    void execFltq_h(const DecodedInst*);
+    void execFltq_s(const DecodedInst*);
+    void execFltq_d(const DecodedInst*);
+    void execFmaxm_h(const DecodedInst*);
+    void execFmaxm_s(const DecodedInst*);
+    void execFmaxm_d(const DecodedInst*);
+    void execFminm_h(const DecodedInst*);
+    void execFminm_s(const DecodedInst*);
+    void execFminm_d(const DecodedInst*);
+    void execFmvh_x_d(const DecodedInst*);
+    void execFmvp_d_x(const DecodedInst*);
+    void execFround_h(const DecodedInst*);
+    void execFround_s(const DecodedInst*);
+    void execFround_d(const DecodedInst*);
+    void execFroundnx_h(const DecodedInst*);
+    void execFroundnx_s(const DecodedInst*);
+    void execFroundnx_d(const DecodedInst*);
 
   private:
 
@@ -4496,6 +4614,7 @@ namespace WdRiscv
     bool bigEnd_ = false;   // True if big endian
 
     VirtMem virtMem_;
+
     Isa isa_;
     Decoder decoder_;
     Disassembler disas_;

@@ -13,10 +13,11 @@
 // limitations under the License.
 
 
+#include <algorithm>
+#include <cassert>
+#include <cmath>
 #include <iostream>
 #include <fstream>
-#include <cmath>
-#include <algorithm>
 #include "Cache.hpp"
 
 using namespace WdRiscv;

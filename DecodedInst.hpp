@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,9 +14,8 @@
 
 #pragma once
 
+#include <string_view>
 #include <vector>
-#include <string>
-#include <unordered_map>
 #include "InstEntry.hpp"
 #include "InstId.hpp"
 
@@ -35,11 +34,11 @@ namespace WdRiscv
   ///
   /// Store instructions of the form "store rs2, offset(rs1)" get mapped
   /// to "store rs2, rs1, offset" assigning rs2 to op0 and offset to op2.
-  ///   
+  ///
   class DecodedInst
   {
   public:
-    
+
     /// Default contructor: Define an invalid object.
     DecodedInst()
       : addr_(0), physAddr_(0), inst_(0), size_(0), entry_(nullptr), op0_(0),
@@ -223,7 +222,7 @@ namespace WdRiscv
     /// for all vector instructions including vector load/store.
     bool isVector() const
     { return entry_ and entry_->isVector(); }
-    
+
     /// Return true if this is a vector load instruction.
     bool isVectorLoad() const
     {
@@ -296,8 +295,7 @@ namespace WdRiscv
     { return entry_? entry_->instId() : InstId::illegal; }
 
     /// Return the instruction name.
-    std::string_view name() const
-    { return entry_? entry_->name() : "illegal"; }
+    std::string name() const;
 
     /// Associated a value with the ith operand. This has no effect if
     /// i is out of bounds or if the ith operand is an immediate. Note
@@ -309,7 +307,7 @@ namespace WdRiscv
     uint64_t ithOperandValue(unsigned i) const
     { return i < 4? values_[i] : 0; }
 
-    /// Return true if this is a vector instruction with masking enabled, 
+    /// Return true if this is a vector instruction with masking enabled,
     bool isMasked() const
     { return masked_; }
 

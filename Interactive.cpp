@@ -81,20 +81,20 @@ parseCmdLineNumber(const std::string& option,
 
 static
 bool
-parseCmdLineVecData(const std::string& option,
-		    const std::string& valStr,
+parseCmdLineVecData(std::string_view option,
+		    std::string_view valStr,
 		    std::vector<uint8_t>& val)
 {
   val.clear();
 
-  if (not (boost::starts_with(valStr, "0x") or boost::starts_with(valStr, "0X")))
+  if (not (valStr.starts_with("0x") or valStr.starts_with("0X")))
     {
       std::cerr << "Value of vector " << option << " must begin with 0x: "
 		<< valStr << '\n';
       return false;
     }
 
-  std::string trimmed = valStr.substr(2); // Remove leading 0x
+  std::string_view trimmed = valStr.substr(2); // Remove leading 0x
   if (trimmed.empty())
     {
       std::cerr << "Empty value for vector " << option << ": "
@@ -111,9 +111,9 @@ parseCmdLineVecData(const std::string& option,
 
   for (size_t i = 0; i < trimmed.size(); i += 2)
     {
-      std::string byteStr = trimmed.substr(i, 2);
+      std::string_view byteStr = trimmed.substr(i, 2);
       char* end = nullptr;
-      unsigned value = strtoul(byteStr.c_str(), &end, 16);
+      unsigned value = strtoul(byteStr.data(), &end, 16);
       if (end and *end)
 	{
 	  std::cerr << "Invalid hex digit(s) in vector " << option << ": "
@@ -1112,7 +1112,7 @@ Interactive<URV>::dumpMemoryCommand(const std::string& line,
 static
 void
 extractKeywords(std::vector<std::string>& tokens,
-		std::unordered_map<std::string,std::string>& strMap)
+		std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>>& strMap)
 {
   size_t newSize = 0;
   for (size_t i = 0; i < tokens.size(); ++i)
@@ -1838,8 +1838,8 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
   std::vector<uint8_t> data;
   std::string hexDigits = tokens.at(2);
 
-  if (not (boost::starts_with(hexDigits, "0x") or
-	   boost::starts_with(hexDigits, "0X")))
+  if (not (hexDigits.starts_with("0x") or
+	   hexDigits.starts_with("0X")))
     {
       std::cerr << "Error: mbwrite data must begin with 0x: " << hexDigits << '\n';
       return false;
@@ -1883,8 +1883,8 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
   if (tokens.size() == 4)
     {
       hexDigits = tokens.at(3);
-      if (not (boost::starts_with(hexDigits, "0x")) or
-	  not (boost::starts_with(hexDigits, "0x")))
+      if (not (hexDigits.starts_with("0x")) or
+	  not (hexDigits.starts_with("0x")))
 	{
 	  std::cerr << "Error mbwrtie mask myst begin with 0x: " << hexDigits << '\n';
 	  return false;

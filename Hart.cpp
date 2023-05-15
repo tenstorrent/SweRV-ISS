@@ -116,6 +116,8 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   // held in the hart.
   if constexpr (sizeof(URV) == 4)
     {
+      virtMem_.setSupportedModes({VirtMem::Mode::Bare, VirtMem::Mode::Sv32});
+
       URV* low = reinterpret_cast<URV*> (&retiredInsts_);
       csRegs_.findCsr(CsrNumber::MINSTRET)->tie(low);
       csRegs_.findCsr(CsrNumber::INSTRET)->tie(low);
@@ -138,6 +140,9 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
     }
   else
     {
+      virtMem_.setSupportedModes({VirtMem::Mode::Bare, VirtMem::Mode::Sv39,
+	  VirtMem::Mode::Sv48, VirtMem::Mode::Sv57 });
+
       csRegs_.findCsr(CsrNumber::MINSTRET)->tie(&retiredInsts_);
       csRegs_.findCsr(CsrNumber::MCYCLE)->tie(&cycleCount_);
 
@@ -355,6 +360,28 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzvfh(true);
   if (isa_.isEnabled(RvExtension::Zvfhmin))
     enableRvzvfhmin(true);
+  if (isa_.isEnabled(RvExtension::Zvbb))
+    enableRvzvbb(true);
+  if (isa_.isEnabled(RvExtension::Zvbc))
+    enableRvzvbc(true);
+  if (isa_.isEnabled(RvExtension::Zvkg))
+    enableRvzvkg(true);
+  if (isa_.isEnabled(RvExtension::Zvkned))
+    enableRvzvkned(true);
+  if (isa_.isEnabled(RvExtension::Zvknha))
+    enableRvzvknha(true);
+  if (isa_.isEnabled(RvExtension::Zvknhb))
+    enableRvzvknhb(true);
+  if (isa_.isEnabled(RvExtension::Zvksed))
+    enableRvzvksed(true);
+  if (isa_.isEnabled(RvExtension::Zvksh))
+    enableRvzvksh(true);
+  if (isa_.isEnabled(RvExtension::Zicond))
+    enableRvzicond(true);
+  if (isa_.isEnabled(RvExtension::Zcb))
+    enableRvzcb(true);
+  if (isa_.isEnabled(RvExtension::Zfa))
+    enableRvzfa(true);
 }
 
 
@@ -469,7 +496,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
         }
       else
         {
-          rzi = __builtin_ctzl(~pmpVal); // rightmost-zero-bit ix.
+          rzi = std::countr_zero(~pmpVal); // rightmost-zero-bit ix.
           napot = (napot >> rzi) << rzi; // Clear bits below rightmost zero bit.
         }
 
@@ -2828,7 +2855,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       if (type != Pmp::Type::Off)
         updateMemoryProtection();
     }
-  else if (csr == CsrNumber::SATP or csr == CsrNumber::HGATP)
+  else if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
     updateAddressTranslation();
   else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
@@ -4543,7 +4570,7 @@ Hart<URV>::openTcpForGdb()
 }
 
 
-extern void (*tracerExtension)(void*);
+extern void (*__tracerExtension)(void*);
 
 
 /// Run indefinitely.  If the tohost address is defined, then run till
@@ -4563,7 +4590,7 @@ Hart<URV>::run(FILE* file)
   URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
   bool complex = (stopAddrValid_ or instFreq_ or enableTriggers_ or enableGdb_
                   or enableCounters_ or alarmInterval_ or file
-		  or tracerExtension or hasInterruptor_ or initStateFile_);
+		  or __tracerExtension or hasInterruptor_ or initStateFile_);
   if (complex)
     return runUntilAddress(stopAddr, file); 
 
@@ -4603,71 +4630,70 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   typedef InterruptCause IC;
   typedef PrivilegeMode PM;
 
-  // Check for machine-level interrupts if MIE enabled or if user/supervisor.
-
   URV delegVal = csRegs_.peekMideleg();
   URV hDelegVal = csRegs_.peekHideleg();
 
-  for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
-			     IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-			     IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER } )
+  if (mstatus_.bits_.MIE or privMode_ != PM::Machine)
     {
-      URV mask = URV(1) << unsigned(ic);
-      bool delegated = (mask & delegVal) != 0;
-      bool enabled = false;
-      if (privMode_ == PM::Machine)
-	{
-	  if (delegated)
-	    continue;
-	  enabled = mstatus_.bits_.MIE;
-	}
-      else if (privMode_ == PM::Supervisor)
-	{
-	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (not virtMode_)
-	    if (hDelegated)
-	      continue;
-	  enabled = virtMode_ ? vsstatus_.bits_.SIE : mstatus_.bits_.SIE;
-	}
-      else if (privMode_ == PM::User)
-	enabled = true;
-
-      if (enabled and (mie & mask & mip))
-	{
-	  cause = ic;
-	  return true;
-	}
-    }
-
-  if (isRvh())
-    {
-      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+      // Check for interrupts destined for machine-level (not-delegated).
+      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
+				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+				 IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = true;
-	  bool enabled = false;
-	  if (privMode_ == PM::Machine)
-	    {
-	      if (delegated)
-		continue;
-	      enabled = mstatus_.bits_.MIE;
-	    }
-	  else if (privMode_ == PM::Supervisor)
-	    {
-	      bool hDelegated = (mask & hDelegVal) != 0;
-	      if (not virtMode_)
-		if (hDelegated)
-		  continue;
-	      enabled = virtMode_ ? vsstatus_.bits_.SIE : mstatus_.bits_.SIE;
-	    }
-	  else if (privMode_ == PM::User)
-	    enabled = true;
-
-	  if (enabled and (mie & mask & mip))
+	  bool delegated = (mask & delegVal) != 0;
+	  bool enabled = (mie & mask & mip) != 0;
+	  if (enabled and not delegated)
 	    {
 	      cause = ic;
 	      return true;
 	    }
+	}
+    }
+  if (privMode_ == PM::Machine)
+    return false;
+
+  if (mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User)
+    {
+      // Check for interrupts destined for S or HS privilege.
+      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
+				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
+				 IC::VS_TIMER } )
+	{
+	  URV mask = URV(1) << unsigned(ic);
+	  bool delegated = (mask & delegVal) != 0;
+	  if (not delegated)
+	    continue;
+	  bool hDelegated = (mask & hDelegVal) != 0;
+	  if (virtMode_)
+	    if (hDelegated)
+	      continue;
+	  if (mie & mask & mip)
+	    {
+	      cause = ic;
+	      return true;
+	    }
+	}
+    }
+  if (privMode_ == PM::Supervisor and not virtMode_)
+    return false;
+
+  // Check for interrupts destined to VS privilege.
+  for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+    {
+      URV mask = URV(1) << unsigned(ic);
+      bool delegated = (mask & delegVal) != 0;
+      bool hDelegated = (mask & hDelegVal) != 0;
+      if (not delegated or not hDelegated)
+	continue;
+      if (mie & mask & mip)
+	{
+	  cause = ic;
+	  return true;
 	}
     }
 
@@ -8298,6 +8324,170 @@ Hart<URV>::execute(const DecodedInst* di)
       execVfsgnjx_vf(di);
       return;
 
+    case InstId::vandn_vv:
+      execVandn_vv(di);
+      return;
+
+    case InstId::vandn_vx:
+      execVandn_vx(di);
+      return;
+
+    case InstId::vbrev_v:
+      execVbrev_v(di);
+      return;
+
+    case InstId::vbrev8_v:
+      execVbrev8_v(di);
+      return;
+
+    case InstId::vrev8_v:
+      execVrev8_v(di);
+      return;
+
+    case InstId::vclz_v:
+      execVclz_v(di);
+      return;
+
+    case InstId::vctz_v:
+      execVctz_v(di);
+      return;
+
+    case InstId::vcpop_v:
+      execVcpop_v(di);
+      return;
+
+    case InstId::vrol_vv:
+      execVrol_vv(di);
+      return;
+
+    case InstId::vrol_vx:
+      execVrol_vx(di);
+      return;
+
+    case InstId::vror_vv:
+      execVror_vv(di);
+      return;
+
+    case InstId::vror_vx:
+      execVror_vx(di);
+      return;
+
+    case InstId::vror_vi:
+      execVror_vi(di);
+      return;
+
+    case InstId::vwsll_vv:
+      execVwsll_vv(di);
+      return;
+
+    case InstId::vwsll_vx:
+      execVwsll_vx(di);
+      return;
+
+    case InstId::vwsll_vi:
+      execVwsll_vi(di);
+      return;
+
+    case InstId::vclmul_vv:
+      execVclmul_vv(di);
+      return;
+
+    case InstId::vclmul_vx:
+      execVclmul_vx(di);
+      return;
+
+    case InstId::vclmulh_vv:
+      execVclmulh_vv(di);
+      return;
+
+    case InstId::vclmulh_vx:
+      execVclmulh_vx(di);
+      return;
+
+    case InstId::vghsh_vv:
+      execVghsh_vv(di);
+      return;
+
+    case InstId::vgmul_vv:
+      execVgmul_vv(di);
+      return;
+
+    case InstId::vaesdf_vv:
+      execVaesdf_vv(di);
+      return;
+
+    case InstId::vaesdf_vs:
+      execVaesdf_vs(di);
+      return;
+
+    case InstId::vaesef_vv:
+      execVaesef_vv(di);
+      return;
+
+    case InstId::vaesef_vs:
+      execVaesef_vs(di);
+      return;
+
+    case InstId::vaesem_vv:
+      execVaesem_vv(di);
+      return;
+
+    case InstId::vaesem_vs:
+      execVaesem_vs(di);
+      return;
+
+    case InstId::vaesdm_vv:
+      execVaesdm_vv(di);
+      return;
+
+    case InstId::vaesdm_vs:
+      execVaesdm_vs(di);
+      return;
+
+    case InstId::vaeskf1_vi:
+      execVaeskf1_vi(di);
+      return;
+
+    case InstId::vaeskf2_vi:
+      execVaeskf2_vi(di);
+      return;
+
+    case InstId::vaesz_vs:
+      execVaesz_vs(di);
+      return;
+
+    case InstId::vsha2ms_vv:
+      execVsha2ms_vv(di);
+      return;
+
+    case InstId::vsha2ch_vv:
+      execVsha2ch_vv(di);
+      return;
+
+    case InstId::vsha2cl_vv:
+      execVsha2cl_vv(di);
+      return;
+
+    case InstId::vsm4k_vi:
+      execVsm4k_vi(di);
+      return;
+
+    case InstId::vsm4r_vv:
+      execVsm4r_vv(di);
+      return;
+
+    case InstId::vsm4r_vs:
+      execVsm4r_vs(di);
+      return;
+
+    case InstId::vsm3me_vv:
+      execVsm3me_vv(di);
+      return;
+
+    case InstId::vsm3c_vi:
+      execVsm3c_vi(di);
+      return;
+
     case InstId::aes32dsi:
       execAes32dsi(di);
       return;
@@ -8517,7 +8707,161 @@ Hart<URV>::execute(const DecodedInst* di)
     case InstId::hinval_gvma:
       execHinval_gvma(di);
       return;
+
+    case InstId::czero_eqz:
+      execCzero_eqz(di);
+      return;
+
+    case InstId::czero_nez:
+      execCzero_nez(di);
+      return;
+
+    case InstId::c_lbu:
+      if (not isRvzcb()) illegalInst(di); else execLbu(di);
+      return;
+
+    case InstId::c_lhu:
+      if (not isRvzcb()) illegalInst(di); else execLhu(di);
+      return;
+
+    case InstId::c_lh:
+      if (not isRvzcb()) illegalInst(di); else execLh(di);
+      return;
+
+    case InstId::c_sb:
+      if (not isRvzcb()) illegalInst(di); else execSb(di);
+      return;
+
+    case InstId::c_sh:
+      if (not isRvzcb()) illegalInst(di); else execSh(di);
+      return;
+
+    case InstId::c_zext_b:
+      if (not isRvzcb()) illegalInst(di); else execAndi(di);
+      return;
+
+    case InstId::c_sext_b:
+      if (not isRvzcb() or not isRvzbb()) illegalInst(di); else execSext_b(di);
+      return;
+
+    case InstId::c_zext_h:
+      execC_zext_h(di);
+      return;
+
+    case InstId::c_sext_h:
+      if (not isRvzcb() or not isRvzbb()) illegalInst(di); else execSext_h(di);
+      return;
+
+    case InstId::c_zext_w:
+      if (not isRvzcb() or not isRvzba()) illegalInst(di); else execAdd_uw(di);
+      return;
+
+    case InstId::c_not:
+      if (not isRvzcb()) illegalInst(di); else execXor(di);
+      return;
+
+    case InstId::c_mul:
+      if (not isRvzcb()) illegalInst(di); else execMul(di);
+      return;
+
+    // Zfa
+    case InstId::fcvtmod_w_d:
+      execFcvtmod_w_d(di);
+      return;
+
+    case InstId::fli_h:
+      execFli_h(di);
+      return;
+
+    case InstId::fli_s:
+      execFli_s(di);
+      return;
+
+    case InstId::fli_d:
+      execFli_d(di);
+      return;
+
+    case InstId::fleq_h:
+      execFleq_h(di);
+      return;
+
+    case InstId::fleq_s:
+      execFleq_s(di);
+      return;
+
+    case InstId::fleq_d:
+      execFleq_d(di);
+      return;
+
+    case InstId::fltq_h:
+      execFltq_h(di);
+      return;
+
+    case InstId::fltq_s:
+      execFltq_s(di);
+      return;
+
+    case InstId::fltq_d:
+      execFltq_d(di);
+      return;
+
+    case InstId::fmaxm_h:
+      execFmaxm_h(di);
+      return;
+
+    case InstId::fmaxm_s:
+      execFmaxm_s(di);
+      return;
+
+    case InstId::fmaxm_d:
+      execFmaxm_d(di);
+      return;
+
+    case InstId::fminm_h:
+      execFminm_h(di);
+      return;
+
+    case InstId::fminm_s:
+      execFminm_s(di);
+      return;
+
+    case InstId::fminm_d:
+      execFminm_d(di);
+      return;
+
+    case InstId::fmvh_x_d:
+      execFmvh_x_d(di);
+      return;
+
+    case InstId::fmvp_d_x:
+      execFmvp_d_x(di);
+      return;
+
+    case InstId::fround_h:
+      execFround_h(di);
+      return;
+
+    case InstId::fround_s:
+      execFround_s(di);
+      return;
+
+    case InstId::fround_d:
+      execFround_d(di);
+      return;
+
+    case InstId::froundnx_h:
+      execFroundnx_h(di);
+      return;
+
+    case InstId::froundnx_s:
+      execFroundnx_s(di);
+      return;
+
+    case InstId::froundnx_d:
+      execFroundnx_d(di);
+      return;
     }
+
   assert(0 && "Shouldn't be able to get here if all cases above returned");
 }
 
@@ -9057,33 +9401,33 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
   auto& tlb = virtMode_ ? virtMem_.vsTlb_ : virtMem_.tlb_;
 
   // Invalidate whole TLB. This is overkill. 
-  if (di->op1() == 0 and di->op2() == 0)
+  if (di->op0() == 0 and di->op1() == 0)
     tlb.invalidate();
-  else if (di->op1() == 0 and di->op2() != 0)
+  else if (di->op0() == 0 and di->op1() != 0)
     {
-      URV asid = intRegs_.read(di->op2());
+      URV asid = intRegs_.read(di->op1());
       tlb.invalidateAsid(asid);
     }
-  else if (di->op1() != 0 and di->op2() == 0)
+  else if (di->op0() != 0 and di->op1() == 0)
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      URV asid = intRegs_.read(di->op2());
+      URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
-  // std::cerr << "sfence.vma " << di->op1() << ' ' << di->op2() << '\n';
-  if (di->op1() == 0)
+  // std::cerr << "sfence.vma " << di->op0() << ' ' << di->op1() << '\n';
+  if (di->op0() == 0)
     invalidateDecodeCache();
   else
     {
-      uint64_t va = intRegs_.read(di->op1());
+      uint64_t va = intRegs_.read(di->op0());
       uint64_t pageStart = virtMem_.pageStartAddress(va);
       uint64_t last = pageStart + virtMem_.pageSize();
       for (uint64_t addr = pageStart; addr < last; addr += 4)
@@ -9432,10 +9776,30 @@ template <typename URV>
 bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
 {
-  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
+  typedef PrivilegeMode PM;
+
+  // Check if HS qualified (section 9.6.1 of privileged spec).
+  bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor);
+  if (virtMode_)
     {
-      virtualInst(di);
-      return false;
+      if (csRegs_.isHypervisor(csr) or
+	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User)))
+	{
+	  if (not csRegs_.isHighHalf(csr))
+	    {
+	      if (hsq) virtualInst(di); else illegalInst(di);
+	      return false;
+	    }
+	  else
+	    {
+	      if (sizeof(URV) == 4)
+		{
+		  if (hsq) virtualInst(di); else illegalInst(di);
+		}
+	      else
+		illegalInst(di);
+	    }
+	}
     }
 
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
@@ -9471,9 +9835,7 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
   if (csRegs_.read(csr, privMode_, value))
     return true;
 
-  // Check if HS qualified (section 9.6.1 of privileged spec).
-  bool hsq = virtMode_ and isRvs() and csRegs_.read(csr, PrivilegeMode::Supervisor, value);
-  if (hsq)
+  if (virtMode_ and hsq )
     virtualInst(di);  // HS qualified 
   else
     illegalInst(di);
@@ -9486,17 +9848,23 @@ template <typename URV>
 bool
 Hart<URV>::isCsrWriteable(CsrNumber csr) const
 {
-  if (isRvh() and csRegs_.isHypervisor(csr) and privMode_ == PrivilegeMode::Supervisor and virtMode_)
-    return false;
+  typedef PrivilegeMode PM;
+
+  if (virtMode_)
+    {
+      if (csRegs_.isHypervisor(csr) or
+	  (privMode_ == PM::User and not csRegs_.isWriteable(csr, PM::User)))
+	return false;
+    }
 
   if (not csRegs_.isWriteable(csr, privMode_))
     return false;
 
-  if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
+  if (csr == CsrNumber::SATP and privMode_ == PM::Supervisor)
     if (mstatus_.bits_.TVM)
       return false;
 
-  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+  if (csr == CsrNumber::HGATP and privMode_ == PM::Supervisor and not virtMode_)
     if (mstatus_.bits_.TVM)
       return false;
 
@@ -9520,9 +9888,29 @@ void
 Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
                       unsigned intReg, URV intRegVal)
 {
+  typedef PrivilegeMode PM;
+
   if (not isCsrWriteable(csr))
     {
-      illegalInst(di);
+      if (virtMode_)
+	{
+	  bool hsq = isRvs() and csRegs_.isWriteable(csr, PM::Supervisor); // HS qualified
+	  if (not csRegs_.isHighHalf(csr))
+	    {
+	      if (hsq) virtualInst(di); else illegalInst(di);
+	    }
+	  else
+	    {
+	      if (sizeof(URV) == 4)
+		{
+		  if (hsq) virtualInst(di); else illegalInst(di);
+		}
+	      else
+		illegalInst(di);
+	    }
+	}
+      else
+	illegalInst(di);
       return;
     }
 
@@ -9542,6 +9930,18 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
       URV cMask = URV(1) << ('c' - 'a');
       if (misa and (misa->getWriteMask() & cMask) and (val & cMask) == 0)
 	return;  // Cannot turn-off C-extension if PC is not word aligned.
+    }
+
+  if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
+    {
+      unsigned modeBits = 0;
+      if constexpr (sizeof(URV) == 4)
+	modeBits = (val >> 31) & 1;
+      else
+	modeBits = (val >> 60) & 0xf;
+      VirtMem::Mode mode = VirtMem::Mode(modeBits);
+      if (not virtMem_.isModeSupported(mode))
+	return;
     }
 
   // Update CSR.
@@ -10602,6 +11002,53 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
       illegalInst(di);
       return;
     }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCzero_eqz(const DecodedInst* di)
+{
+  if (not isRvzicond())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = intRegs_.read(di->op1());
+  URV condition = intRegs_.read(di->op2());
+  URV res = (condition == 0) ? 0 : value;
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execCzero_nez(const DecodedInst* di)
+{
+  if (not isRvzicond())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = intRegs_.read(di->op1());
+  URV condition = intRegs_.read(di->op2());
+  URV res = (condition != 0) ? 0 : value;
+  intRegs_.write(di->op0(), res);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execC_zext_h(const DecodedInst* di)
+{
+  if (not isRvzcb() or not isRvzbb())
+    {
+      illegalInst(di);
+      return;
+    }
+  URV value = intRegs_.read(di->op1());
+  value &= 0xffff;
+  intRegs_.write(di->op0(), value);
 }
 
 

@@ -927,6 +927,61 @@ namespace WdRiscv
      vfsgnjx_vv,
      vfsgnjx_vf,
 
+     // Vector crypto (Zvbb)
+     vandn_vv,
+     vandn_vx,
+     vbrev_v,
+     vbrev8_v,
+     vrev8_v,
+     vclz_v,
+     vctz_v,
+     vcpop_v,
+     vrol_vv,
+     vrol_vx,
+     vror_vv,
+     vror_vx,
+     vror_vi,
+     vwsll_vv,
+     vwsll_vx,
+     vwsll_vi,
+
+     // Vector crypto (Zvbc)
+     vclmul_vv,
+     vclmul_vx,
+     vclmulh_vv,
+     vclmulh_vx,
+
+     // Vector crypto (zvkg)
+     vghsh_vv,
+     vgmul_vv,
+
+     // Vector crypto (zvkned)
+     vaesdf_vv,
+     vaesdf_vs,
+     vaesef_vv,
+     vaesef_vs,
+     vaesem_vv,
+     vaesem_vs,
+     vaesdm_vv,
+     vaesdm_vs,
+     vaeskf1_vi,
+     vaeskf2_vi,
+     vaesz_vs,
+
+     // Vector crypto (Zvknha/b)
+     vsha2ms_vv,
+     vsha2ch_vv,
+     vsha2cl_vv,
+
+     // Vector crypto (Zvksed)
+     vsm4k_vi,
+     vsm4r_vv,
+     vsm4r_vs,
+
+     // Vector crypto (Zvksh)
+     vsm3me_vv,
+     vsm3c_vi,
+
      // Crypto (rvk)
      aes32dsi,
      aes32dsmi,
@@ -994,6 +1049,50 @@ namespace WdRiscv
      hinval_vvma,
      hinval_gvma,
 
-     maxId = hinval_gvma
+     // Zicond: interger conditional operations
+     czero_eqz,
+     czero_nez,
+
+     // Zcb
+     c_lbu,
+     c_lhu,
+     c_lh,
+     c_sb,
+     c_sh,
+     c_zext_b,
+     c_sext_b,
+     c_zext_h,
+     c_sext_h,
+     c_zext_w,
+     c_not,
+     c_mul,
+
+     // Zfa
+     fcvtmod_w_d,
+     fli_h,
+     fli_s,
+     fli_d,
+     fleq_h,
+     fleq_s,
+     fleq_d,
+     fltq_h,
+     fltq_s,
+     fltq_d,
+     fmaxm_h,
+     fmaxm_s,
+     fmaxm_d,
+     fminm_h,
+     fminm_s,
+     fminm_d,
+     fmvh_x_d,
+     fmvp_d_x,
+     fround_h,
+     fround_s,
+     fround_d,
+     froundnx_h,
+     froundnx_s,
+     froundnx_d,
+
+     maxId = froundnx_d
     };
 }

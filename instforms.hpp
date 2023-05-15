@@ -828,6 +828,29 @@ namespace WdRiscv
   };
 
 
+  // Pack/unpack Zcb instructions (CLB, CSB, CLH, CSH. CU. and CMMV formats).
+  union ClbFormInst
+  {
+    ClbFormInst(uint16_t inst)
+    { code = inst; }
+
+    unsigned funct1() const
+    { return bits.uimm >> 1; }
+
+    uint32_t code;
+
+    struct
+    {
+      unsigned opcode : 2;
+      unsigned rdp : 3;  // rd-prime (or rs2-prime) field
+      unsigned uimm : 2;
+      unsigned rs1p : 3;
+      unsigned funct6 : 6;
+      unsigned unused : 16;
+    } bits;
+  };
+
+
   // We make all encode functions have the same signature. Instruction
   // that do not require certain arguments are passed zero for those
   // arguments.
@@ -1235,4 +1258,51 @@ namespace WdRiscv
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
   bool encodeCbnez(uint32_t rs1p, uint32_t imm, uint32_t x, uint32_t& inst);
+
+  inline bool encodeSext_b(uint32_t rd, uint32_t rs1, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0x60401013 | (rd << 7) | (rs1 << 15);
+    return true;
+  }
+
+  inline bool encodeZext_h(uint32_t rd, uint32_t rs1, bool rv64, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0x080004033;
+    if (rv64)
+      inst |= 8;
+    inst = inst | (rd << 7) | (rs1 << 15);
+    return true;
+  }
+
+  inline bool encodeSext_h(uint32_t rd, uint32_t rs1, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0xc0501013 | (rd << 7) | (rs1 << 15);
+    return true;
+  }
+
+  inline bool encodeAdd_uw(uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t& inst)
+  {
+    if (rd > 31 or rs1 > 31)
+      {
+	inst = 0;
+	return false;
+      }
+    inst = 0x08000003b | (rd << 7) | (rs1 << 15) | (rs2 << 20);
+    return true;
+  }
 }

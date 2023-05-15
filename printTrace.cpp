@@ -8,7 +8,7 @@ using namespace WdRiscv;
 
 static std::mutex printInstTraceMutex;
 
-extern void (*tracerExtension)(void*);
+void (*__tracerExtension)(void*) = nullptr;
 
 
 static
@@ -201,7 +201,7 @@ void
 Hart<URV>::printInstTrace(uint32_t inst, uint64_t tag, std::string& tmp,
 			  FILE* out)
 {
-  if (not out and not tracerExtension)
+  if (not out and not __tracerExtension)
     return;
 
   uint32_t ix = (currPc_ >> 1) & decodeCacheMask_;
@@ -223,10 +223,10 @@ void
 Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::string& tmp,
                                  FILE* out)
 {
-  if (tracerExtension)
+  if (__tracerExtension)
     {
       TraceRecord<URV> tr(this, di);
-      tracerExtension(&tr);
+      __tracerExtension(&tr);
     }
 
   if (not out)

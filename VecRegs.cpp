@@ -145,7 +145,7 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
   for (unsigned i = 0; i <= unsigned(ElementWidth::Word32); ++i)
     {
       ElementWidth ew = ElementWidth(i);
-      unsigned bytes = VecRegs::elementWidthInBytes(ew);
+      unsigned bytes = VecRegs::elemWidthInBytes(ew);
       auto& groupFlags = legalConfigs_.at(size_t(ew));
       if (bytes > maxBytesPerElem_ or bytes < minBytesPerElem_ )
 	{

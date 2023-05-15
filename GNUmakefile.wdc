@@ -37,7 +37,7 @@ OFLAGS := -O3 -g
 DFLAGS := -g
 
 # Command to compile .cpp files.
-override CXXFLAGS += -MMD -MP -mfma -std=c++17 $(OFLAGS) -fPIC -pedantic -Wall -Wextra
+override CXXFLAGS += -MMD -MP -mfma -std=c++20 $(OFLAGS) -fPIC -pedantic -Wall -Wextra
 
 # Pre-processor flags
 override CPPFLAGS += $(addprefix -isystem ,$(BOOST_INC))

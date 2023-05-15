@@ -105,6 +105,10 @@ namespace WdRiscv
     const InstEntry& decodeVecStore(uint32_t f3, uint32_t imm12,
 				    uint32_t& fieldCount) const;
 
+    /// Decode some of the vector crypto instructions.
+    const InstEntry& decodeVecCrypto(uint32_t inst, uint32_t& op0, uint32_t& op1,
+				     uint32_t& op2) const;
+
     /// Decode a compressed instruction.
     const InstEntry& decode16(uint16_t inst, uint32_t& op0, uint32_t& op1,
 			      uint32_t& op2) const;

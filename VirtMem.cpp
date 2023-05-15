@@ -13,6 +13,9 @@ VirtMem::VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
   : memory_(memory), pageSize_(pageSize), hartIx_(hartIx),
     pmpMgr_(pmpMgr), tlb_(tlbSize), vsTlb_(tlbSize), stage2Tlb_(tlbSize)
 {
+  supportedModes_.resize(unsigned(Mode::Limit_));
+  setSupportedModes({Mode::Bare, Mode::Sv32, Mode::Sv39, Mode::Sv48, Mode::Sv57, Mode::Sv64});
+
   pageBits_ = static_cast<unsigned>(std::log2(pageSize_));
   unsigned p2PageSize =  unsigned(1) << pageBits_;
 
@@ -330,25 +333,25 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 
   if (modeStage2_ == Sv32)
     {
-      // Part 1 of address translation: Bits 63-34 must be zero
+      // Part 2 of address translation: Bits 63-34 must be zero
       lowerMaskBitIndex   = 34;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte32, Va32x4>;
     }
   else if (modeStage2_ == Sv39)
     {
-      // Part 1 of address translation: Bits 63-41 must be zero
+      // Part 2 of address translation: Bits 63-41 must be zero
       lowerMaskBitIndex   = 41;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte39, Va39x4>;
     }
   else if (modeStage2_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-50 must be zero
+      // Part 2 of address translation: Bits 63-50 must be zero
       lowerMaskBitIndex   = 50;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte48, Va48x4>;
     }
   else if (modeStage2_ == Sv57)
     {
-      // Part 1 of address translation: Bits 63-59 must be zero
+      // Part 2 of address translation: Bits 63-59 must be zero
       lowerMaskBitIndex   = 59;
       stage2PageTableWalk = &VirtMem::stage2PageTableWalk<Pte57, Va57x4>;
     }

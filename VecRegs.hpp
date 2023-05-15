@@ -249,12 +249,12 @@ namespace WdRiscv
 
     /// Return the currently configured element width in bits (for example
     /// if SEW is Byte, then this reurns 8).
-    uint32_t elementWidthInBits() const
+    uint32_t elemWidthInBits() const
     { return sewInBits_; }
 
     /// Return the element width in bit given the symbolic element width.
     /// Rturn 0 if symbolic value is out of bounds.
-    static uint32_t elementWidthInBits(ElementWidth ew)
+    static uint32_t elemWidthInBits(ElementWidth ew)
     { return ew > ElementWidth::Word32 ? 0 : uint32_t(8) << uint32_t(ew); }
 
     /// Return the currently configured group multiplier as a unsigned
@@ -346,7 +346,7 @@ namespace WdRiscv
     }
 
     /// Convert the given symbolic element width to a byte count.
-    static uint32_t elementWidthInBytes(ElementWidth sew)
+    static uint32_t elemWidthInBytes(ElementWidth sew)
     { return uint32_t(1) << uint32_t(sew); }
 
     /// Convert the given symbolic group multiplier to a number scaled by
@@ -372,7 +372,7 @@ namespace WdRiscv
     uint32_t vlmax(GroupMultiplier gm, ElementWidth eew)
     {
       uint32_t gm8 = groupMultiplierX8(gm);
-      uint32_t eewInBits = elementWidthInBits(eew);
+      uint32_t eewInBits = elemWidthInBits(eew);
       return gm8*bytesPerReg_/eewInBits;
     }
 
@@ -578,7 +578,7 @@ namespace WdRiscv
       vill_ = illegal;
 
       groupX8_ = groupMultiplierX8(gm);
-      sewInBits_ = elementWidthInBits(sew);
+      sewInBits_ = elemWidthInBits(sew);
     }
 
   private:

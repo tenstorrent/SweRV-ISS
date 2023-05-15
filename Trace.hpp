@@ -174,7 +174,7 @@ namespace WdRiscv
     { return di_.instId(); }
 
     /// Return the instruction name of the instruction of this record.
-    std::string_view name() const
+    std::string name() const
     { return di_.name(); }
 
     /// Return currently configured element width.
