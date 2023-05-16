@@ -9980,12 +9980,13 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
     preCsrInst_(hartIx_, csr);
 
   URV prev = 0;
-  if (not doCsrRead(di, csr, prev))
-    {
-      if (postCsrInst_)
-        postCsrInst_(hartIx_, csr);
-      return;
-    }
+  if (di->op0() != 0)
+    if (not doCsrRead(di, csr, prev))
+      {
+	if (postCsrInst_)
+	  postCsrInst_(hartIx_, csr);
+	return;
+      }
 
   URV next = intRegs_.read(di->op1());
 
