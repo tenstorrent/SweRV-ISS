@@ -223,6 +223,9 @@ void
 Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::string& tmp,
                                  FILE* out)
 {
+  if (instCounter_ < logStart_)
+    return;
+
   if (__tracerExtension)
     {
       TraceRecord<URV> tr(this, di);

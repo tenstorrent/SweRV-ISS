@@ -213,7 +213,8 @@ struct Args
   std::optional<uint64_t> interruptor; // Interrupt generator mem mapped address
   std::optional<uint64_t> syscallSlam;
   std::optional<uint64_t> instCounter;
-  std::optional<uint64_t> branchWindow_;
+  std::optional<uint64_t> branchWindow;
+  std::optional<uint64_t> logStart;
   std::optional<unsigned> mcmls;
 
   unsigned regWidth = 32;
@@ -372,7 +373,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
   if (varMap.count("branchwindow"))
     {
       auto numStr = varMap["branchwindow"].as<std::string>();
-      if (not parseCmdLineNumber("branchwindow", numStr, args.branchWindow_))
+      if (not parseCmdLineNumber("branchwindow", numStr, args.branchWindow))
         ok = false;
     }
 
@@ -418,6 +419,13 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
     {
       auto numStr = varMap["instcounter"].as<std::string>();
       if (not parseCmdLineNumber("instcounter", numStr, args.instCounter))
+        ok = false;
+    }
+
+  if (varMap.count("logstart"))
+    {
+      auto numStr = varMap["logstart"].as<std::string>();
+      if (not parseCmdLineNumber("logstart", numStr, args.logStart))
         ok = false;
     }
 
@@ -540,6 +548,8 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
          "Path to tracer extension shared library which should provide C symbol tracerExtension32 or tracerExtension64."
          "Optionally include arguments after a colon to be exposed to the shared library "
          "as C symbol tracerExtensionArgs (ex. tracer.so or tracer.so:hello42).")
+	("logstart", po::value<std::string>(),
+	 "Start logging at given instruction rank.")
 	("setreg", po::value(&args.regInits)->multitoken(),
 	 "Initialize registers. Apply to all harts unless specific prefix "
 	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
@@ -1009,10 +1019,13 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     }
 
   uint64_t window = 1000000;
-  if (args.branchWindow_)
-    window = *args.branchWindow_;
+  if (args.branchWindow)
+    window = *args.branchWindow;
   if (not args.branchTraceFile.empty())
     hart.traceBranches(args.branchTraceFile, window);
+
+  if (args.logStart)
+    hart.setLogStart(*args.logStart);
 
   if (not args.loadFrom.empty())
     {
@@ -1133,6 +1146,9 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (args.csv)
     hart.enableCsvLog(args.csv);
+
+  if (args.logStart)
+    hart.setLogStart(*args.logStart);
 
   if (args.mcm)
     {
