@@ -18,6 +18,7 @@
 #include <cfenv>
 #include <array>
 #include <bit>
+#include <tuple>
 #include "CsRegs.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
@@ -386,10 +387,22 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       // Make VSEIP, VSTIP, and VSSIP read-only one.
       auto csr = findCsr(CN::MIDELEG);
       auto sgeip = geilen_ ? URV(1) << 12 : 0;  // Bit SGEIP
-      auto reset = csr->getResetValue() | sgeip | 0x444; // Bits VSEIP, VSTIP, and VSSIP.
-      auto mask = csr->getWriteMask() & ~URV(0x444) & ~sgeip;
-      auto pokeMask = csr->getPokeMask() & ~URV(0x444) & ~sgeip;
-      configCsr(CN::MIDELEG, true, reset, mask, pokeMask, false, false);
+      for (auto&& [getMaskFn, setMaskFn] : { std::pair{ &Csr<URV>::getWriteMask, &Csr<URV>::setWriteMask },
+                                             std::pair{ &Csr<URV>::getPokeMask,  &Csr<URV>::setPokeMask } })
+        {
+          auto mask = (csr->*getMaskFn)();
+          mask &= ~URV(0x444) & ~sgeip;
+          (csr->*setMaskFn)(mask);
+        }
+
+      for (auto&& [getValueFn, setValueFn] : { std::pair{ &Csr<URV>::getResetValue, &Csr<URV>::setInitialValue },
+                                               std::pair{ &Csr<URV>::read,          &Csr<URV>::poke } })
+        {
+          auto value = (csr->*getValueFn)();
+          auto newValue = value | sgeip | 0x444; // Bits VSEIP, VSTIP, and VSSIP.
+          if (value != newValue)
+            (csr->*setValueFn)(newValue);
+        }
     }
 }
 

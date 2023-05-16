@@ -2537,7 +2537,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   if (not csRegs_.write(tvalNum, privMode_, info))
     assert(0 and "Failed to write TVAL register");
 
-  bool gva = isRvh() and origVirtMode and isGvaTrap(cause);
+  bool gva = isRvh() and origVirtMode and not interrupt and isGvaTrap(cause);
 
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
@@ -9980,12 +9980,13 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
     preCsrInst_(hartIx_, csr);
 
   URV prev = 0;
-  if (not doCsrRead(di, csr, prev))
-    {
-      if (postCsrInst_)
-        postCsrInst_(hartIx_, csr);
-      return;
-    }
+  if (di->op0() != 0)
+    if (not doCsrRead(di, csr, prev))
+      {
+	if (postCsrInst_)
+	  postCsrInst_(hartIx_, csr);
+	return;
+      }
 
   URV next = intRegs_.read(di->op1());
 

@@ -505,6 +505,10 @@ namespace WdRiscv
     bool getConsoleIo(URV& address) const
     { if (conIoValid_) address = conIo_; return conIoValid_; }
 
+    /// Start logging at the given instruction rank.
+    void setLogStart(uint64_t rank)
+    { logStart_ = rank; }
+
     /// Define memory mapped locations for CLINT.
     void configClint(uint64_t clintStart, uint64_t clintLimit,
 		     bool softwareInterruptOnReset,
@@ -4602,6 +4606,7 @@ namespace WdRiscv
 
     uint64_t alarmInterval_ = 0; // Timer interrupt interval.
     uint64_t alarmLimit_ = ~uint64_t(0); // Timer interrupt when inst counter reaches this.
+    uint64_t logStart_ = 0; // Start logging at this instruction rank.
 
     bool misalDataOk_ = true;
     bool misalHasPriority_ = true;
