@@ -2537,7 +2537,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   if (not csRegs_.write(tvalNum, privMode_, info))
     assert(0 and "Failed to write TVAL register");
 
-  bool gva = isRvh() and origVirtMode and isGvaTrap(cause);
+  bool gva = isRvh() and origVirtMode and not interrupt and isGvaTrap(cause);
 
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
