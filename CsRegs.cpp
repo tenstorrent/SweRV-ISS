@@ -217,6 +217,19 @@ CsRegs<URV>::read(CsrNumber number, PrivilegeMode mode, URV& value) const
       return true;
     }
 
+  if (number == CsrNumber::TIME or number == CsrNumber::TIMEH)
+    {
+      // In virtual mode, TIME is TIME + HTIMEDELTA
+      value = csr->read();
+      if (virtMode_)
+        {
+          auto delta = getImplementedCsr((number == CsrNumber::TIME)? CsrNumber::HTIMEDELTA : CsrNumber::HTIMEDELTAH);
+          if (delta)
+            value += delta->read();
+        }
+      return true;
+    }
+
   value = csr->read();
 
   if (number >= CsrNumber::PMPADDR0 and number <= CsrNumber::PMPADDR63)
@@ -1501,13 +1514,33 @@ CsRegs<URV>::defineHypervisorRegs()
   Csr<URV>* csr = nullptr;
   csr = defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
-  csr = defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, wam, wam);
-  csr->setHypervisor(true);
-  csr = defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, wam, wam);
+
+  typedef ExceptionCause EC;
+  URV zero = ((1 << unsigned(EC::S_ENV_CALL))               |
+              (1 << unsigned(EC::VS_ENV_CALL))              |
+              (1 << unsigned(EC::M_ENV_CALL))               |
+              (1 << unsigned(EC::INST_GUEST_PAGE_FAULT))    |
+              (1 << unsigned(EC::LOAD_GUEST_PAGE_FAULT))    |
+              (1 << unsigned(EC::VIRT_INST))                |
+              (1 << unsigned(EC::STORE_GUEST_PAGE_FAULT)))  ;
+
+  URV mask = wam & ~zero;
+  URV pokeMask = mask;
+  csr = defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 
-  URV mask = 0x1444;     // Bits SGEIP, VSEIP, VSTIP, and VSSIP writeable.
-  URV pokeMask = mask;   // Same bits pokeable.
+  typedef InterruptCause IC;
+  zero = ((1 << unsigned(IC::S_SOFTWARE))  |
+          (1 << unsigned(IC::S_TIMER))     |
+          (1 << unsigned(IC::S_EXTERNAL))  |
+          (1 << unsigned(IC::G_EXTERNAL))) ;
+  mask = wam & ~zero;
+  pokeMask = mask;
+  csr = defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, mask, pokeMask);
+  csr->setHypervisor(true);
+
+  mask = 0x1444;     // Bits SGEIP, VSEIP, VSTIP, and VSSIP writeable.
+  pokeMask = mask;   // Same bits pokeable.
   csr = defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 

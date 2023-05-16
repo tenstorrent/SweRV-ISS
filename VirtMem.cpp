@@ -441,26 +441,26 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
       TlbEntry* entry = vsTlb_.findEntryUpdateTime(virPageNum, vsAsid_);
       if (entry)
 	{
-	  // Use TLB entry.
 	  if (priv == PrivilegeMode::User and not entry->user_)
-            return stage2PageFaultType(read, write, exec);
+            return stage1PageFaultType(read, write, exec);
 	  if (priv == PrivilegeMode::Supervisor)
 	    if (entry->user_ and (exec or not vsSum_))
-              return stage2PageFaultType(read, write, exec);
+              return stage1PageFaultType(read, write, exec);
 	  bool ra = entry->read_ or ((execReadable_ or s1ExecReadable_) and entry->exec_);
 	  if (xForR_)
 	    ra = entry->exec_;
 	  bool wa = entry->write_, xa = entry->exec_;
 	  if ((read and not ra) or (write and not wa) or (exec and not xa))
-            return stage2PageFaultType(read, write, exec);
+            return stage1PageFaultType(read, write, exec);
 	  if (not entry->accessed_ or (write and not entry->dirty_))
 	    {
 	      if (faultOnFirstAccess_)
-                return stage2PageFaultType(read, write, exec);
+                return stage1PageFaultType(read, write, exec);
 	      entry->accessed_ = true;
 	      if (write)
 		entry->dirty_ = true;
 	    }
+	  // Use TLB entry.
 	  gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	}
       else
@@ -878,9 +878,8 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  return ec;
 	}
 
-      // TODO: see above
-      /* if (trace_) */
-      /*   walkVec.back().push_back(pteAddr); */
+      if (trace_)
+        walkVec.back().push_back(pteAddr);
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
