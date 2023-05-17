@@ -2550,6 +2550,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
       mstatus_.bits_.GVA = gva;
       mstatus_.bits_.MPV = origVirtMode;
       writeMstatus();
+      if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, 0))
+	assert(0 and "Failed to write MTINST register");
     }
   else if (nextMode == PM::Supervisor)
     {
