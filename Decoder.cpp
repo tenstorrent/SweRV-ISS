@@ -87,10 +87,14 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  if (f3 == 3)          return instTable_.getEntry(InstId::fmaxm_d);
 	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (top5==8 and op2==0)   return instTable_.getEntry(InstId::fcvt_d_s);
-      if (top5==8 and op2==4)   return instTable_.getEntry(InstId::fround_d);
-      if (top5==8 and op2==0)   return instTable_.getEntry(InstId::froundnx_d);
-      if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_d_h);
+      if (top5 == 8)
+        {
+          if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_d_s);
+          if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_d_h);
+          if (op2 == 4)         return instTable_.getEntry(InstId::fround_d);
+          if (op2 == 5)         return instTable_.getEntry(InstId::froundnx_d);
+          return instTable_.getEntry(InstId::illegal);
+        }
       if (top5==0xb and op2==0) return instTable_.getEntry(InstId::fsqrt_d);
       if (top5 == 0x14)
 	{
@@ -157,10 +161,15 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  if (f3 == 3)          return instTable_.getEntry(InstId::fmaxm_s);
 	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (top5==8 and op2==1)   return instTable_.getEntry(InstId::fcvt_s_d);
-      if (top5==8 and op2==2)   return instTable_.getEntry(InstId::fcvt_s_h);
-      if (top5==8 and op2==4)   return instTable_.getEntry(InstId::fround_s);
-      if (top5==8 and op2==5)   return instTable_.getEntry(InstId::froundnx_s);
+      if (top5 == 8)
+        {
+          if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_s_d);
+          if (op2 == 2)         return instTable_.getEntry(InstId::fcvt_s_h);
+          if (op2 == 4)         return instTable_.getEntry(InstId::fround_s);
+          if (op2 == 5)         return instTable_.getEntry(InstId::froundnx_s);
+          if (op2 == 6)         return instTable_.getEntry(InstId::fcvt_s_bf16);
+          return instTable_.getEntry(InstId::illegal);
+        }
       if (top5==0xb and op2==0) return instTable_.getEntry(InstId::fsqrt_s);
       if (top5 == 0x14)
 	{
@@ -223,10 +232,15 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  if (f3 == 3)          return instTable_.getEntry(InstId::fmaxm_h);
 	  return instTable_.getEntry(InstId::illegal);
 	}
-      if (top5==8 and op2==0)   return instTable_.getEntry(InstId::fcvt_h_s);
-      if (top5==8 and op2==4)   return instTable_.getEntry(InstId::fround_h);
-      if (top5==8 and op2==5)   return instTable_.getEntry(InstId::froundnx_h);
-      if (top5==8 and op2==1)   return instTable_.getEntry(InstId::fcvt_h_d);
+      if (top5 == 8)
+        {
+          if (op2 == 0)         return instTable_.getEntry(InstId::fcvt_h_s);
+          if (op2 == 1)         return instTable_.getEntry(InstId::fcvt_h_d);
+          if (op2 == 4)         return instTable_.getEntry(InstId::fround_h);
+          if (op2 == 5)         return instTable_.getEntry(InstId::froundnx_h);
+          if (op2 == 8)         return instTable_.getEntry(InstId::fcvt_bf16_s);
+          return instTable_.getEntry(InstId::illegal);
+        }
       if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_h);
       if (top5 == 0x14)
 	{
@@ -372,32 +386,37 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 8:    return instTable_.getEntry(InstId::vfsgnj_vv);
 	case 9:    return instTable_.getEntry(InstId::vfsgnjn_vv);
 	case 0xa:  return instTable_.getEntry(InstId::vfsgnjx_vv);
-        case 0x10: 
+        case 0x10:
 	  if (op2 == 0)  return instTable_.getEntry(InstId::vfmv_f_s);
 	  return instTable_.getEntry(InstId::illegal);
 	case 0x12:
-	  if (op2 == 0)    return instTable_.getEntry(InstId::vfcvt_xu_f_v);
-	  if (op2 == 1)    return instTable_.getEntry(InstId::vfcvt_x_f_v);
-	  if (op2 == 2)    return instTable_.getEntry(InstId::vfcvt_f_xu_v);
-	  if (op2 == 3)    return instTable_.getEntry(InstId::vfcvt_f_x_v);
-	  if (op2 == 6)    return instTable_.getEntry(InstId::vfcvt_rtz_xu_f_v);
-	  if (op2 == 7)    return instTable_.getEntry(InstId::vfcvt_rtz_x_f_v);
-	  if (op2 == 8)    return instTable_.getEntry(InstId::vfwcvt_xu_f_v);
-	  if (op2 == 9)    return instTable_.getEntry(InstId::vfwcvt_x_f_v);
-	  if (op2 == 0xa)  return instTable_.getEntry(InstId::vfwcvt_f_xu_v);
-	  if (op2 == 0xb)  return instTable_.getEntry(InstId::vfwcvt_f_x_v);
-	  if (op2 == 0xc)  return instTable_.getEntry(InstId::vfwcvt_f_f_v);
-	  if (op2 == 0xe)  return instTable_.getEntry(InstId::vfwcvt_rtz_xu_f_v);
-	  if (op2 == 0xf)  return instTable_.getEntry(InstId::vfwcvt_rtz_x_f_v);
-	  if (op2 == 0x10) return instTable_.getEntry(InstId::vfncvt_xu_f_w);
-	  if (op2 == 0x11) return instTable_.getEntry(InstId::vfncvt_x_f_w);
-	  if (op2 == 0x12) return instTable_.getEntry(InstId::vfncvt_f_xu_w);
-	  if (op2 == 0x13) return instTable_.getEntry(InstId::vfncvt_f_x_w);
-	  if (op2 == 0x14) return instTable_.getEntry(InstId::vfncvt_f_f_w);
-	  if (op2 == 0x15) return instTable_.getEntry(InstId::vfncvt_rod_f_f_w);
-	  if (op2 == 0x16) return instTable_.getEntry(InstId::vfncvt_rtz_xu_f_w);
-	  if (op2 == 0x17) return instTable_.getEntry(InstId::vfncvt_rtz_x_f_w);
-	  break;
+          switch (op2)
+          {
+            case 0:    return instTable_.getEntry(InstId::vfcvt_xu_f_v);
+            case 1:    return instTable_.getEntry(InstId::vfcvt_x_f_v);
+            case 2:    return instTable_.getEntry(InstId::vfcvt_f_xu_v);
+            case 3:    return instTable_.getEntry(InstId::vfcvt_f_x_v);
+            case 6:    return instTable_.getEntry(InstId::vfcvt_rtz_xu_f_v);
+            case 7:    return instTable_.getEntry(InstId::vfcvt_rtz_x_f_v);
+            case 8:    return instTable_.getEntry(InstId::vfwcvt_xu_f_v);
+            case 9:    return instTable_.getEntry(InstId::vfwcvt_x_f_v);
+            case 0xa:  return instTable_.getEntry(InstId::vfwcvt_f_xu_v);
+            case 0xb:  return instTable_.getEntry(InstId::vfwcvt_f_x_v);
+            case 0xc:  return instTable_.getEntry(InstId::vfwcvt_f_f_v);
+            case 0xd:  return instTable_.getEntry(InstId::vfwcvtbf16_f_f_v);
+            case 0xe:  return instTable_.getEntry(InstId::vfwcvt_rtz_xu_f_v);
+            case 0xf:  return instTable_.getEntry(InstId::vfwcvt_rtz_x_f_v);
+            case 0x10: return instTable_.getEntry(InstId::vfncvt_xu_f_w);
+            case 0x11: return instTable_.getEntry(InstId::vfncvt_x_f_w);
+            case 0x12: return instTable_.getEntry(InstId::vfncvt_f_xu_w);
+            case 0x13: return instTable_.getEntry(InstId::vfncvt_f_x_w);
+            case 0x14: return instTable_.getEntry(InstId::vfncvt_f_f_w);
+            case 0x15: return instTable_.getEntry(InstId::vfncvt_rod_f_f_w);
+            case 0x16: return instTable_.getEntry(InstId::vfncvt_rtz_xu_f_w);
+            case 0x17: return instTable_.getEntry(InstId::vfncvt_rtz_x_f_w);
+            case 0x1d: return instTable_.getEntry(InstId::vfncvtbf16_f_f_w);
+          }
+          break;
 	case 0x13:
 	  if (op2 == 0)    return instTable_.getEntry(InstId::vfsqrt_v);
 	  if (op2 == 4)    return instTable_.getEntry(InstId::vfrsqrt7_v);
@@ -409,6 +428,9 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x1b: return instTable_.getEntry(InstId::vmflt_vv);
 	case 0x1c: return instTable_.getEntry(InstId::vmfne_vv);
 	case 0x20: return instTable_.getEntry(InstId::vfdiv_vv);
+        case 0x23:
+          std::swap(op1, op2);  // per spec
+          return instTable_.getEntry(InstId::vfwmaccbf16_vv);
 	case 0x24: return instTable_.getEntry(InstId::vfmul_vv);
 	case 0x28:
           std::swap(op1, op2);  // per spec
@@ -785,6 +807,9 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x1f: return instTable_.getEntry(InstId::vmfge_vf);
 	case 0x20: return instTable_.getEntry(InstId::vfdiv_vf);
 	case 0x21: return instTable_.getEntry(InstId::vfrdiv_vf);
+        case 0x23:
+          std::swap(op1, op2);  // per spec
+          return instTable_.getEntry(InstId::vfwmaccbf16_vf);
 	case 0x24: return instTable_.getEntry(InstId::vfmul_vf);
 	case 0x27: return instTable_.getEntry(InstId::vfrsub_vf);
 	case 0x28:

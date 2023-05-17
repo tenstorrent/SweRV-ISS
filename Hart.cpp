@@ -328,6 +328,8 @@ Hart<URV>::processExtensions(bool verbose)
   enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
   enableRvzbs(isa_.isEnabled(RvExtension::Zbs));
 
+  if (isa_.isEnabled(RvExtension::Zfbfmin))
+    enableRvzfbfmin(true);
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
   if (isa_.isEnabled(RvExtension::Zfhmin))
@@ -356,14 +358,18 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzawrs(true);
   if (extensionIsEnabled(RvExtension::M) or isa_.isEnabled(RvExtension::Zmmul))
     enableRvzmmul(true);
-  if (isa_.isEnabled(RvExtension::Zvfh))
-    enableRvzvfh(true);
-  if (isa_.isEnabled(RvExtension::Zvfhmin))
-    enableRvzvfhmin(true);
   if (isa_.isEnabled(RvExtension::Zvbb))
     enableRvzvbb(true);
   if (isa_.isEnabled(RvExtension::Zvbc))
     enableRvzvbc(true);
+  if (isa_.isEnabled(RvExtension::Zvfbfmin))
+    enableRvzvfbfmin(true);
+  if (isa_.isEnabled(RvExtension::Zvfbfwma))
+    enableRvzvfbfwma(true);
+  if (isa_.isEnabled(RvExtension::Zvfh))
+    enableRvzvfh(true);
+  if (isa_.isEnabled(RvExtension::Zvfhmin))
+    enableRvzvfhmin(true);
   if (isa_.isEnabled(RvExtension::Zvkg))
     enableRvzvkg(true);
   if (isa_.isEnabled(RvExtension::Zvkned))
@@ -2550,6 +2556,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
       mstatus_.bits_.GVA = gva;
       mstatus_.bits_.MPV = origVirtMode;
       writeMstatus();
+      if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, 0))
+	assert(0 and "Failed to write MTINST register");
     }
   else if (nextMode == PM::Supervisor)
     {
@@ -4669,9 +4677,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 	  if (not delegated)
 	    continue;
 	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (virtMode_)
-	    if (hDelegated)
-	      continue;
+	  if (hDelegated)
+	    continue;
 	  if (mie & mask & mip)
 	    {
 	      cause = ic;
@@ -4682,18 +4689,21 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (privMode_ == PM::Supervisor and not virtMode_)
     return false;
 
-  // Check for interrupts destined to VS privilege.
-  for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+  if (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User))
     {
-      URV mask = URV(1) << unsigned(ic);
-      bool delegated = (mask & delegVal) != 0;
-      bool hDelegated = (mask & hDelegVal) != 0;
-      if (not delegated or not hDelegated)
-	continue;
-      if (mie & mask & mip)
+      // Check for interrupts destined to VS privilege.
+      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
 	{
-	  cause = ic;
-	  return true;
+	  URV mask = URV(1) << unsigned(ic);
+	  bool delegated = (mask & delegVal) != 0;
+	  bool hDelegated = (mask & hDelegVal) != 0;
+	  if (not delegated or not hDelegated)
+	    continue;
+	  if (mie & mask & mip)
+	    {
+	      cause = ic;
+	      return true;
+	    }
 	}
     }
 
@@ -5942,6 +5952,14 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::fcvt_h_lu:
       execFcvt_h_lu(di);
+      return;
+
+    case InstId::fcvt_bf16_s:
+      execFcvt_bf16_s(di);
+      return;
+
+    case InstId::fcvt_s_bf16:
+      execFcvt_s_bf16(di);
       return;
 
     case InstId::mret:
@@ -8386,6 +8404,22 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::vwsll_vi:
       execVwsll_vi(di);
+      return;
+
+    case InstId::vfncvtbf16_f_f_w:
+      execVfncvtbf16_f_f_w(di);
+      return;
+
+    case InstId::vfwcvtbf16_f_f_v:
+      execVfwcvtbf16_f_f_v(di);
+      return;
+
+    case InstId::vfwmaccbf16_vv:
+      execVfwmaccbf16_vv(di);
+      return;
+
+    case InstId::vfwmaccbf16_vf:
+      execVfwmaccbf16_vf(di);
       return;
 
     case InstId::vclmul_vv:

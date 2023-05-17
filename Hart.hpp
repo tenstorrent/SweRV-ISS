@@ -1024,6 +1024,18 @@ namespace WdRiscv
     void enableRvzfa(bool flag)
     { enableExtension(RvExtension::Zfa, flag); }
 
+    /// Enable/disable the scalar BF16 conversion extension (Zfbfmin).
+    void enableRvzfbfmin(bool flag)
+    { enableExtension(RvExtension::Zfbfmin, flag); }
+
+    /// Enable/disable the vector bfloat conversions extension (Zvfbfmin).
+    void enableRvzvfbfmin(bool flag)
+    { enableExtension(RvExtension::Zvfbfmin, flag); }
+
+    /// Enable/disable the vector BF16 widening mul-add extension (Zvfbfwma).
+    void enableRvzvfbfwma(bool flag)
+    { enableExtension(RvExtension::Zvfbfwma, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1154,6 +1166,10 @@ namespace WdRiscv
     /// extension is enabled.
     bool isRvzfhmin() const
     { return extensionIsEnabled(RvExtension::Zfhmin); }
+
+    /// Return true if the scalar BF16 converts extension is enabled.
+    bool isRvzfbfmin() const
+    { return extensionIsEnabled(RvExtension::Zfbfmin); }
 
     /// Return true if rv64d (double precision floating point)
     /// extension is enabled in this hart.
@@ -1307,6 +1323,16 @@ namespace WdRiscv
     /// point extension is enabled.
     bool isRvzvfhmin() const
     { return extensionIsEnabled(RvExtension::Zvfhmin); }
+
+    /// Return true if the vector bfloat conversions extension is
+    /// enabled.
+    bool isRvzvfbfmin() const
+    { return extensionIsEnabled(RvExtension::Zvfbfmin); }
+
+    /// Return true if the vector BF16 widening mul-add extension
+    /// extension is enabled.
+    bool isRvzvfbfwma() const
+    { return extensionIsEnabled(RvExtension::Zvfbfwma); }
 
     /// Return true if the bit-manip vector extension is enabled.
     bool isRvzvbb() const
@@ -1858,13 +1884,13 @@ namespace WdRiscv
     }
 
     // Return true if it is legal to execute a zfh instruction: f and zfh
-    // extensions must be enabled and FS feild of MSTATUS must not be
+    // extensions must be enabled and FS field of MSTATUS must not be
     // OFF.
     bool isZfhLegal() const
     { return isRvf() and isRvzfh() and isFpEnabled(); }
 
     // Return true if it is legal to execute a zfhmin instruction: f and zfhmin
-    // extensions must be enabled and FS feild of MSTATUS must not be
+    // extensions must be enabled and FS field of MSTATUS must not be
     // OFF.
     bool isZfhminLegal() const
     { return isRvf() and (isRvzfhmin() or isRvzfh()) and isFpEnabled(); }
@@ -1880,6 +1906,24 @@ namespace WdRiscv
     // MSTATUS must not be OFF.
     bool isZvfhminLegal() const
     { return isRvf() and isRvv() and (isRvzvfhmin() or isRvzvfh()) and isFpEnabled(); }
+
+    // Return true if it is legal to execute a zfhmin instruction: f and zfhmin
+    // extensions must be enabled and FS field of MSTATUS must not be
+    // OFF.
+    bool isZfbfminLegal() const
+    { return isRvf() and isRvzfbfmin() and isFpEnabled(); }
+
+    // Return true if it is legal to execute a zvfbfmin instruction: f,
+    // v, and zvfbfmin extensions must be enabled and FS field of
+    // MSTATUS must not be OFF.
+    bool isZvfbfminLegal() const
+    { return isRvf() and isRvv() and isRvzvfbfmin() and isFpEnabled(); }
+
+    // Return true if it is legal to execute a zvfbfwma instruction: f,
+    // v, and zvfbfwma extensions must be enabled and FS field of
+    // MSTATUS must not be OFF.
+    bool isZvfbfwmaLegal() const
+    { return isRvf() and isRvv() and isRvzvfbfwma() and isFpEnabled(); }
 
     // Return true if it is legal to execute an FP instruction: F extension must
     // be enabled and FS field of MSTATUS must not be OFF.
@@ -2051,6 +2095,12 @@ namespace WdRiscv
       return fcsrValue_ & mask;
     }
 
+    /// Intended to be called from within the checkRoundingMode<size>
+    /// functions; if the instruction rounding mode is not valid,
+    /// the take an illegal-instruction exception returning false;
+    /// otherwise, return true.
+    bool checkRoundingModeCommon(const DecodedInst* di);
+
     /// Preamble to single precision instruction execution: If F
     /// extension is not enabled or if the instruction rounding mode
     /// is not valid returning, the take an illegal-instruction
@@ -2064,6 +2114,10 @@ namespace WdRiscv
     /// Similar to checkRoundingModeSp but for for double-precision (D
     /// extension) instructions.
     bool checkRoundingModeDp(const DecodedInst* di);
+
+    /// Similar to checkRoundingModeSp but for for bfloat16 (zfbfmin
+    /// extension) instructions.
+    bool checkRoundingModeBf16(const DecodedInst* di);
 
     /// Record the destination register and corresponding value (prior
     /// to execution) for a div/rem instruction. This is so we
@@ -4374,6 +4428,18 @@ namespace WdRiscv
     void execFroundnx_h(const DecodedInst*);
     void execFroundnx_s(const DecodedInst*);
     void execFroundnx_d(const DecodedInst*);
+
+    // Zfbfmin
+    void execFcvt_bf16_s(const DecodedInst*);
+    void execFcvt_s_bf16(const DecodedInst*);
+
+    // Zvfbfmin
+    void execVfncvtbf16_f_f_w(const DecodedInst*);
+    void execVfwcvtbf16_f_f_v(const DecodedInst*);
+
+    // Zfbfmin
+    void execVfwmaccbf16_vv(const DecodedInst*);
+    void execVfwmaccbf16_vf(const DecodedInst*);
 
   private:
 

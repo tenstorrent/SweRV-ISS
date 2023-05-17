@@ -147,6 +147,7 @@ namespace std
 namespace WdRiscv
 {
   template <> struct makeDoubleWide<Float16>    { typedef float   type; };
+  template <> struct makeDoubleWide<BFloat16>   { typedef float   type; };
   template <> struct makeDoubleWide<float>      { typedef double  type; };
 
   /// Set result to the upper half of a*b computed in double width
@@ -22493,6 +22494,142 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
     default:        postVecFail(di); return;
     }
 
+  postVecSuccess();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfncvtbf16_f_f_w(const DecodedInst* di)
+{
+  // Double-wide float to float.
+  if (not checkVecFpInst(di, true, &Hart::isZvfbfminLegal))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:   postVecFail(di); return;
+    case EW::Half:   vfncvt_f_f_w<BFloat16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:   postVecFail(di); return;
+    default:         postVecFail(di); return;
+    }
+
+  updateAccruedFpBits(0.0f);
+  postVecSuccess();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwcvtbf16_f_f_v(const DecodedInst* di)
+{
+  // Float to double-wide float.
+  if (not checkVecFpInst(di, true, &Hart::isZvfbfminLegal))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte: postVecFail(di); return;
+    case EW::Half: vfwcvt_f_f_v<BFloat16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word: postVecFail(di); return;
+    default:       postVecFail(di); return;
+    }
+  postVecSuccess();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwmaccbf16_vv(const DecodedInst* di)
+{
+  if (not checkVecFpInst(di, true, &Hart::isZvfbfwmaLegal))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half:   vfwmacc_vv<BFloat16>(vd, vs1, vs2, group, start, elems, masked); break;
+    default:         postVecFail(di); return;
+    }
+  postVecSuccess();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execVfwmaccbf16_vf(const DecodedInst* di)
+{
+  if (not checkVecFpInst(di, true, &Hart::isZvfbfwmaLegal))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
+  if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Half: vfwmacc_vf<BFloat16>(vd, fs1, vs2, group, start, elems, masked); break;
+    default:       postVecFail(di); return;
+    }
   postVecSuccess();
 }
 

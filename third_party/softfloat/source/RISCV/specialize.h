@@ -111,6 +111,26 @@ uint_fast16_t
  softfloat_propagateNaNF16UI( uint_fast16_t uiA, uint_fast16_t uiB );
 
 /*----------------------------------------------------------------------------
+| The bit pattern for a default generated 16-bit brain floating-point NaN.
+*----------------------------------------------------------------------------*/
+#define defaultNaNBF16UI 0x7FC0
+
+/*----------------------------------------------------------------------------
+| Assuming 'uiA' has the bit pattern of a 16-bit brain floating-point NaN,
+| converts this NaN to the common NaN form, and stores the resulting common
+| NaN at the location pointed to by 'zPtr'.  If the NaN is a signaling NaN,
+| the invalid exception is raised.
+*----------------------------------------------------------------------------*/
+#define softfloat_bf16UIToCommonNaN( uiA, zPtr ) if ( ! ((uiA) & 0x0040) ) softfloat_raiseFlags( softfloat_flag_invalid )
+
+/*----------------------------------------------------------------------------
+| Converts the common NaN pointed to by 'aPtr' into a 16-bit brain
+| floating-point NaN, and returns the bit pattern of this value as an unsigned
+| integer.
+*----------------------------------------------------------------------------*/
+#define softfloat_commonNaNToBF16UI( aPtr ) ((uint_fast16_t) defaultNaNBF16UI)
+
+/*----------------------------------------------------------------------------
 | The bit pattern for a default generated 32-bit floating-point NaN.
 *----------------------------------------------------------------------------*/
 #define defaultNaNF32UI 0x7FC00000

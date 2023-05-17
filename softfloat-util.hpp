@@ -16,6 +16,12 @@ namespace WdRiscv
     return std::bit_cast<Float16>(f16.v);
   }
 
+  /// Convert softfloat bfloat16_t type to BFloat16.
+  constexpr BFloat16 softToNative(bfloat16_t f16)
+  {
+    return std::bit_cast<BFloat16>(f16.v);
+  }
+
 
   /// Convert softfloat float32_t type to float.
   constexpr float softToNative(float32_t f32)
@@ -36,6 +42,14 @@ namespace WdRiscv
   nativeToSoft(Float16 x)
   {
     return float16_t{std::bit_cast<uint16_t>(x)};
+  }
+
+
+  /// Convert BFloat16 to a softfloat bfloat16_t
+  constexpr bfloat16_t
+  nativeToSoft(BFloat16 x)
+  {
+    return bfloat16_t{std::bit_cast<uint16_t>(x)};
   }
 
 

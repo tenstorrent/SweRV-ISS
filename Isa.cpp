@@ -60,6 +60,9 @@ static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS
   { "zicond", RvExtension::Zicond },
   { "zcb", RvExtension::Zcb },
   { "zfa", RvExtension::Zfa },
+  { "zfbfmin", RvExtension::Zfbfmin },
+  { "zvfbfmin", RvExtension::Zvfbfmin },
+  { "zvfbfwma", RvExtension::Zvfbfwma },
 };
 static_assert(std::size(STRING_EXT_PAIRS) == static_cast<unsigned>(RvExtension::None));
 
@@ -117,6 +120,9 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zmmul)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zvfh)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,1}}, {0,1} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }
