@@ -287,18 +287,9 @@ Server<URV>::Server(System<URV>& system)
 
 template <typename URV>
 bool
-Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply)
+Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart)
 {
   reply = req;
-
-  if (not checkHartId(req, reply))
-    return false;
-
-  uint32_t hartId = req.hart;
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    return false;
-  auto& hart = *hartPtr;
 
   switch (req.resource)
     {
@@ -391,18 +382,9 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply)
 
 template <typename URV>
 bool
-Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply)
+Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart)
 {
   reply = req;
-
-  if (not checkHartId(req, reply))
-    return false;
-
-  uint32_t hartId = req.hart;
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    return false;
-  auto& hart = *hartPtr;
 
   URV value;
 
@@ -623,8 +605,9 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   // Add disassembly of instruction to reply.
   DecodedInst di;
   hart.decode(0 /*addr: fake*/, 0 /*physAddr: fake*/, inst, di);
-  std::string text;
-  disassembleAnnotateInst(hart, di, interrupted, hasPre, hasPost, text);
+  std::string text = "";
+  if (disassemble_)
+    disassembleAnnotateInst(hart, di, interrupted, hasPre, hasPost, text);
 
   strncpy(reply.buffer, text.c_str(), sizeof(reply.buffer) - 1);
   reply.buffer[sizeof(reply.buffer) -1] = 0;
@@ -834,15 +817,7 @@ bool
 Server<URV>::checkHart(const WhisperMessage& req, const std::string& /*command*/,
                        WhisperMessage& reply)
 {
-  if (not checkHartId(req, reply))
-    return false;
-
-  uint32_t hartId = req.hart;
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    return false;
-
-  return true;
+  return checkHartId(req, reply);
 }
 
 
@@ -852,23 +827,10 @@ bool
 Server<URV>::stepCommand(const WhisperMessage& req, 
 			 std::vector<WhisperMessage>& pendingChanges,
 			 WhisperMessage& reply,
+                         Hart<URV>& hart,
 			 FILE* traceFile)
 {
   reply = req;
-
-  // Hart id must be valid. Hart must be started.
-  if (not checkHart(req, "step", reply))
-    return false;
-
-  uint32_t hartId = req.hart;
-  auto hartPtr = system_.findHartByHartId(hartId);
-  if (not hartPtr)
-    return false;
-  auto& hart = *hartPtr;
-
-  // Get instruction before execution (in case code is self-modifying).
-  uint32_t inst = 0;
-  hart.readInst(hart.peekPc(), inst);
 
   unsigned pm = unsigned(hart.privilegeMode());
 
@@ -880,19 +842,21 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   if (wasInDebug)
     hart.exitDebugMode();
 
+  DecodedInst di;
   // Memory consistency model support. No-op if mcm is off.
   if (system_.isMcmEnabled())
     {
       system_.mcmSetCurrentInstruction(hart, req.instrTag);
       hart.setInstructionCount(req.instrTag - 1);
-      DecodedInst di;
       hart.singleStep(di, traceFile);
       if (not di.isValid())
 	assert(hart.lastInstructionTrapped());
       system_.mcmRetire(hart, req.time, req.instrTag, di);
     }
   else
-    hart.singleStep(traceFile);
+    hart.singleStep(di, traceFile);
+
+  uint32_t inst = di.inst();
 
   bool interrupted = hart.getInterruptCount() != interruptCount;
 
@@ -1094,7 +1058,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         return true;
 
       case Poke:
-        pokeCommand(msg, reply);
+        pokeCommand(msg, reply, hart);
         if (commandLog)
           {
             if (msg.resource == 'p')
@@ -1108,7 +1072,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case Peek:
-        peekCommand(msg, reply);
+        peekCommand(msg, reply, hart);
         if (commandLog)
           {
             if (msg.resource == 'p')
@@ -1126,7 +1090,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case Step:
-        stepCommand(msg, pendingChanges_, reply, traceFile);
+        stepCommand(msg, pendingChanges_, reply, hart, traceFile);
         if (commandLog)
           {
             if (system_.isMcmEnabled())
