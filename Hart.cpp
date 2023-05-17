@@ -4677,9 +4677,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 	  if (not delegated)
 	    continue;
 	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (virtMode_)
-	    if (hDelegated)
-	      continue;
+	  if (hDelegated)
+	    continue;
 	  if (mie & mask & mip)
 	    {
 	      cause = ic;
@@ -4690,18 +4689,21 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (privMode_ == PM::Supervisor and not virtMode_)
     return false;
 
-  // Check for interrupts destined to VS privilege.
-  for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+  if (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User))
     {
-      URV mask = URV(1) << unsigned(ic);
-      bool delegated = (mask & delegVal) != 0;
-      bool hDelegated = (mask & hDelegVal) != 0;
-      if (not delegated or not hDelegated)
-	continue;
-      if (mie & mask & mip)
+      // Check for interrupts destined to VS privilege.
+      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
 	{
-	  cause = ic;
-	  return true;
+	  URV mask = URV(1) << unsigned(ic);
+	  bool delegated = (mask & delegVal) != 0;
+	  bool hDelegated = (mask & hDelegVal) != 0;
+	  if (not delegated or not hDelegated)
+	    continue;
+	  if (mie & mask & mip)
+	    {
+	      cause = ic;
+	      return true;
+	    }
 	}
     }
 
