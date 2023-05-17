@@ -8,7 +8,7 @@ using namespace WdRiscv;
 
 // Use this constant list to allow a compile-time check to ensure each extension has a
 // value.
-static constexpr std::initializer_list<std::pair<const std::string_view, RvExtension>> STRING_EXT_PAIRS = {
+static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS[] = {
   { "a", RvExtension::A },
   { "b", RvExtension::B },
   { "c", RvExtension::C },
@@ -64,9 +64,10 @@ static constexpr std::initializer_list<std::pair<const std::string_view, RvExten
   { "zvfbfmin", RvExtension::Zvfbfmin },
   { "zvfbfwma", RvExtension::Zvfbfwma },
 };
-static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
+static_assert(std::size(STRING_EXT_PAIRS) == static_cast<unsigned>(RvExtension::None));
 
-const std::unordered_map<std::string_view, RvExtension> Isa::stringToExt_(STRING_EXT_PAIRS);
+const std::unordered_map<std::string_view, RvExtension> Isa::stringToExt_(std::begin(STRING_EXT_PAIRS),
+                                                                          std::end(STRING_EXT_PAIRS));
 
 // Use this function to do the constant initialization to allow use of indices
 template <size_t N, unsigned (*TO_INDEX)(RvExtension)>
