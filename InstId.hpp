@@ -240,6 +240,10 @@ namespace WdRiscv
      fcvt_h_l,
      fcvt_h_lu,
 
+     // Scalar BF16 converts (Zfbfmin)
+     fcvt_bf16_s,
+     fcvt_s_bf16,
+
      // Privileged
      mret,
      sret,
@@ -944,6 +948,14 @@ namespace WdRiscv
      vwsll_vv,
      vwsll_vx,
      vwsll_vi,
+
+     // Vector bfloat conversions (Zvfbfmin)
+     vfncvtbf16_f_f_w,
+     vfwcvtbf16_f_f_v,
+
+     // Vector BF16 widening mul-add (Zvfbfwma)
+     vfwmaccbf16_vv,
+     vfwmaccbf16_vf,
 
      // Vector crypto (Zvbc)
      vclmul_vv,

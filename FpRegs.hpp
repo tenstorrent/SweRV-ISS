@@ -127,7 +127,7 @@ namespace WdRiscv
 
     /// Return true if given bit pattern represents a nan-boxed
     /// single precision value.
-    bool isBoxedSingle(uint64_t value) const
+    static bool isBoxedSingle(uint64_t value)
     {
       FpUnion u{value};
       return u.isBoxedSingle();
@@ -135,7 +135,7 @@ namespace WdRiscv
 
     /// Return true if given bite pattern represents a nan-boxed
     /// half precision value.
-    bool isBoxedHalf(uint64_t value) const
+    static bool isBoxedHalf(uint64_t value)
     {
       FpUnion u{value};
       return u.isBoxedHalf();
@@ -189,13 +189,20 @@ namespace WdRiscv
     /// Similar to writeSingle but for for half precision.
     void writeHalf(unsigned i, Float16 x);
 
+    /// Similar to readSingle but for bfloat16.
+    BFloat16 readBFloat16(unsigned i) const;
+
+    /// Similar to writeSingle but for bfloat16.
+    void writeBFloat16(unsigned i, BFloat16 x);
+
     /// Read from register i a value of type FT (Float16, float, or double).
     template <typename FT>
     FT read(unsigned i) const
     {
-      if constexpr (std::is_same<FT, Float16>::value) return readHalf(i);
-      if constexpr (std::is_same<FT, float>::value)   return readSingle(i);
-      if constexpr (std::is_same<FT, double>::value)  return readDouble(i);
+      if constexpr (std::is_same<FT, Float16>::value)  return readHalf(i);
+      if constexpr (std::is_same<FT, float>::value)    return readSingle(i);
+      if constexpr (std::is_same<FT, double>::value)   return readDouble(i);
+      if constexpr (std::is_same<FT, BFloat16>::value) return readBFloat16(i);
       assert(0);
       return FT{};
     }
@@ -276,19 +283,19 @@ namespace WdRiscv
     // NAN boxing.
     union FpUnion
     {
-      FpUnion(double x)   : dp(x)  { }
-      FpUnion(uint64_t x) : i64(x) { }
-      FpUnion(float x)    : sp(x)  { i64 |= ~uint64_t(0) << 32; }
-      FpUnion(Float16 x)  : hp(x)  { i64 |= ~uint64_t(0) << 16; }
+      constexpr FpUnion(double x)   : dp(x)  { }
+      constexpr FpUnion(uint64_t x) : i64(x) { }
+      constexpr FpUnion(float x)    : sp(x)  { i64 |= ~uint64_t(0) << 32; }
+      constexpr FpUnion(Float16 x)  : hp(x)  { i64 |= ~uint64_t(0) << 16; }
 
       /// Return true if bit pattern corresponds to a nan-boxed single
       /// precision float.
-      bool isBoxedSingle() const
+      constexpr bool isBoxedSingle() const
       { return (i64 >> 32) == ~uint32_t(0); }
 
       /// Return true if bit pattern corresponds to a nan-boxed half
       /// precision (16-bit) float.
-      bool isBoxedHalf() const
+      constexpr bool isBoxedHalf() const
       { return (i64 >> 16) == (~uint64_t(0) >> 16); }
 
       float    sp;
@@ -363,6 +370,28 @@ namespace WdRiscv
     FpUnion u{x};
     regs_.at(i) = u.dp;
     lastWrittenReg_ = i;
+  }
+
+
+  inline
+  BFloat16
+  FpRegs::readBFloat16(unsigned i) const
+  {
+    assert(flen_ >= 16);
+
+    FpUnion u{regs_.at(i)};
+    if (flen_ == 16 or u.isBoxedHalf())
+      return std::bit_cast<BFloat16>(u.hp);
+
+    return std::numeric_limits<BFloat16>::quiet_NaN();
+  }
+
+
+  inline
+  void
+  FpRegs::writeBFloat16(unsigned i, BFloat16 x)
+  {
+    writeHalf(i, std::bit_cast<Float16>(x));
   }
 
 

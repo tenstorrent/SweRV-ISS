@@ -702,9 +702,10 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	    buffer.printChar('j');
 	}
     }
-  else if (type == RvExtension::F or type == RvExtension::D or type == RvExtension::Zfh)
+  else if (type == RvExtension::F or type == RvExtension::D or type == RvExtension::Zfh or
+           type == RvExtension::Zfbfmin)
     buffer.printChar('f');
-  else if (type == RvExtension::V)
+  else if (type == RvExtension::V or type == RvExtension::Zvfbfmin or type == RvExtension::Zvfbfwma)
     buffer.printChar('v');
 
   // Privilege mode.

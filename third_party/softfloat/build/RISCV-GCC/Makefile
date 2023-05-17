@@ -42,7 +42,7 @@ SOFTFLOAT_OPTS ?= -DSOFTFLOAT_ROUND_ODD -DINLINE_LEVEL=5
 DELETE = rm -f
 C_INCLUDES = -I. -I$(SOURCE_DIR)/$(SPECIALIZE_TYPE) -I$(SOURCE_DIR)/include
 COMPILE_C = \
-  gcc -c -DSOFTFLOAT_FAST_INT64 $(SOFTFLOAT_OPTS) $(C_INCLUDES) -g -O2 -o $@
+  $(CC) -c -DSOFTFLOAT_FAST_INT64 $(SOFTFLOAT_OPTS) $(C_INCLUDES) -g -O2 -o $@
 MAKELIB = ar crs $@
 
 OBJ = .o
@@ -117,6 +117,7 @@ OBJS_OTHERS = \
   s_addMagsF16$(OBJ) \
   s_subMagsF16$(OBJ) \
   s_mulAddF16$(OBJ) \
+  s_roundPackToBF16$(OBJ) \
   s_normSubnormalF32Sig$(OBJ) \
   s_roundPackToF32$(OBJ) \
   s_normRoundPackToF32$(OBJ) \
@@ -194,6 +195,7 @@ OBJS_OTHERS = \
   f16_eq$(OBJ) \
   f16_le$(OBJ) \
   f16_lt$(OBJ) \
+  bf16_to_f32$(OBJ) \
   f16_eq_signaling$(OBJ) \
   f16_le_quiet$(OBJ) \
   f16_lt_quiet$(OBJ) \
@@ -207,6 +209,7 @@ OBJS_OTHERS = \
   f32_to_i32_r_minMag$(OBJ) \
   f32_to_i64_r_minMag$(OBJ) \
   f32_to_f16$(OBJ) \
+  f32_to_bf16$(OBJ) \
   f32_to_f64$(OBJ) \
   f32_to_extF80$(OBJ) \
   f32_to_extF80M$(OBJ) \

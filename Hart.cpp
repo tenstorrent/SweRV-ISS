@@ -328,6 +328,8 @@ Hart<URV>::processExtensions(bool verbose)
   enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
   enableRvzbs(isa_.isEnabled(RvExtension::Zbs));
 
+  if (isa_.isEnabled(RvExtension::Zfbfmin))
+    enableRvzfbfmin(true);
   if (isa_.isEnabled(RvExtension::Zfh))
     enableRvzfh(true);
   if (isa_.isEnabled(RvExtension::Zfhmin))
@@ -356,14 +358,18 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzawrs(true);
   if (extensionIsEnabled(RvExtension::M) or isa_.isEnabled(RvExtension::Zmmul))
     enableRvzmmul(true);
-  if (isa_.isEnabled(RvExtension::Zvfh))
-    enableRvzvfh(true);
-  if (isa_.isEnabled(RvExtension::Zvfhmin))
-    enableRvzvfhmin(true);
   if (isa_.isEnabled(RvExtension::Zvbb))
     enableRvzvbb(true);
   if (isa_.isEnabled(RvExtension::Zvbc))
     enableRvzvbc(true);
+  if (isa_.isEnabled(RvExtension::Zvfbfmin))
+    enableRvzvfbfmin(true);
+  if (isa_.isEnabled(RvExtension::Zvfbfwma))
+    enableRvzvfbfwma(true);
+  if (isa_.isEnabled(RvExtension::Zvfh))
+    enableRvzvfh(true);
+  if (isa_.isEnabled(RvExtension::Zvfhmin))
+    enableRvzvfhmin(true);
   if (isa_.isEnabled(RvExtension::Zvkg))
     enableRvzvkg(true);
   if (isa_.isEnabled(RvExtension::Zvkned))
@@ -5946,6 +5952,14 @@ Hart<URV>::execute(const DecodedInst* di)
       execFcvt_h_lu(di);
       return;
 
+    case InstId::fcvt_bf16_s:
+      execFcvt_bf16_s(di);
+      return;
+
+    case InstId::fcvt_s_bf16:
+      execFcvt_s_bf16(di);
+      return;
+
     case InstId::mret:
       execMret(di);
       return;
@@ -8388,6 +8402,22 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::vwsll_vi:
       execVwsll_vi(di);
+      return;
+
+    case InstId::vfncvtbf16_f_f_w:
+      execVfncvtbf16_f_f_w(di);
+      return;
+
+    case InstId::vfwcvtbf16_f_f_v:
+      execVfwcvtbf16_f_f_v(di);
+      return;
+
+    case InstId::vfwmaccbf16_vv:
+      execVfwmaccbf16_vv(di);
+      return;
+
+    case InstId::vfwmaccbf16_vf:
+      execVfwmaccbf16_vf(di);
       return;
 
     case InstId::vclmul_vv:

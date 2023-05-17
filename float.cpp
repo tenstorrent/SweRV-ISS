@@ -343,14 +343,8 @@ clearSimulatorFpFlags()
 template <typename URV>
 inline
 bool
-Hart<URV>::checkRoundingModeHp(const DecodedInst* di)
+Hart<URV>::checkRoundingModeCommon(const DecodedInst* di)
 {
-  if (not isZfhLegal())
-    {
-      illegalInst(di);
-      return false;
-    }
-
   RoundingMode riscvMode = effectiveRoundingMode(di->roundingMode());
   if (riscvMode >= RoundingMode::Invalid1)
     {
@@ -361,6 +355,21 @@ Hart<URV>::checkRoundingModeHp(const DecodedInst* di)
   clearSimulatorFpFlags();
   setSimulatorRoundingMode(riscvMode);
   return true;
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkRoundingModeHp(const DecodedInst* di)
+{
+  if (not isZfhLegal())
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  return checkRoundingModeCommon(di);
 }
 
 
@@ -375,16 +384,7 @@ Hart<URV>::checkRoundingModeSp(const DecodedInst* di)
       return false;
     }
 
-  RoundingMode riscvMode = effectiveRoundingMode(di->roundingMode());
-  if (riscvMode >= RoundingMode::Invalid1)
-    {
-      illegalInst(di);
-      return false;
-    }
-
-  clearSimulatorFpFlags();
-  setSimulatorRoundingMode(riscvMode);
-  return true;
+  return checkRoundingModeCommon(di);
 }
 
 
@@ -399,16 +399,22 @@ Hart<URV>::checkRoundingModeDp(const DecodedInst* di)
       return false;
     }
 
-  RoundingMode riscvMode = effectiveRoundingMode(di->roundingMode());
-  if (riscvMode >= RoundingMode::Invalid1)
+  return checkRoundingModeCommon(di);
+}
+
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkRoundingModeBf16(const DecodedInst* di)
+{
+  if (not isZfbfminLegal())
     {
       illegalInst(di);
       return false;
     }
 
-  clearSimulatorFpFlags();
-  setSimulatorRoundingMode(riscvMode);
-  return true;
+  return checkRoundingModeCommon(di);
 }
 
 
@@ -2051,7 +2057,7 @@ template<typename URV>
 void
 Hart<URV>::execFlh(const DecodedInst* di)
 {
-  if (not isZfhLegal() and not isZfhminLegal())
+  if (not isZfhLegal() and not isZfhminLegal() and not isZfbfminLegal())
     {
       illegalInst(di);
       return;
@@ -2077,7 +2083,7 @@ template<typename URV>
 void
 Hart<URV>::execFsh(const DecodedInst* di)
 {
-  if (not isZfhLegal() and not isZfhminLegal())
+  if (not isZfhLegal() and not isZfhminLegal() and not isZfbfminLegal())
     {
       illegalInst(di);
       return;
@@ -2585,7 +2591,7 @@ template<typename URV>
 void
 Hart<URV>::execFmv_x_h(const DecodedInst* di)
 {
-  if (not isZfhLegal() and not isZfhminLegal())
+  if (not isZfhLegal() and not isZfhminLegal() and not isZfbfminLegal())
     {
       illegalInst(di);
       return;
@@ -2740,7 +2746,7 @@ Hart<URV>::execFmv_h_x(const DecodedInst* di)
 {
   // move bits of integer register to half fp
 
-  if (not isZfhLegal() and not isZfhminLegal())
+  if (not isZfhLegal() and not isZfhminLegal() and not isZfbfminLegal())
     {
       illegalInst(di);
       return;
@@ -3649,6 +3655,46 @@ Hart<URV>::execFroundnx_d(const DecodedInst* di)
     }
 
   fpRegs_.writeDouble(di->op0(), d0);
+  markFsDirty();
+}
+
+
+template<typename URV>
+void
+Hart<URV>::execFcvt_bf16_s(const DecodedInst* di)
+{
+  // Single to bfloat16.
+
+  if (not checkRoundingModeBf16(di))
+    return;
+
+  float f1 = fpRegs_.readSingle(di->op1());
+
+  BFloat16 res = fpConvertTo<BFloat16, true>(f1);
+
+  fpRegs_.writeBFloat16(di->op0(), res);
+
+  updateAccruedFpBits(res);
+
+  markFsDirty();
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execFcvt_s_bf16(const DecodedInst* di)
+{
+  if (not checkRoundingModeBf16(di))
+    return;
+
+  BFloat16 bf1 = fpRegs_.readBFloat16(di->op1());
+
+  float res = fpConvertTo<float, true>(bf1);
+
+  fpRegs_.writeSingle(di->op0(), res);
+
+  updateAccruedFpBits(res);
+
   markFsDirty();
 }
 

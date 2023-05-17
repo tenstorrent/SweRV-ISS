@@ -265,11 +265,24 @@ auto fpConvertTo(From x)
         static_assert(!sizeof(To), "Unknown destination float type");
       return result;
     }
+  else if constexpr (std::is_same<To, BFloat16>::value)
+    {
+      To result;
+      if constexpr (std::is_same<From, BFloat16>::value)
+        result = x;
+      else if constexpr (std::is_same<From, float>::value)
+        result = softToNative(f32_to_bf16(nativeToSoft(x)));
+      else
+        static_assert(!sizeof(To), "Unknown destination float type");
+      return result;
+    }
   else if constexpr (std::is_same<To, float>::value)
     {
       To result;
       if constexpr (std::is_same<From, Float16>::value)
         result = softToNative(f16_to_f32(nativeToSoft(x)));
+      else if constexpr (std::is_same<From, BFloat16>::value)
+        result = softToNative(bf16_to_f32(nativeToSoft(x)));
       else if constexpr (std::is_same<From, float>::value)
         result = x;
       else if constexpr (std::is_same<From, double>::value)
