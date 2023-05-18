@@ -355,8 +355,17 @@ namespace WdRiscv
     void configEventNumber(URV userNumber, EventNumber eventId)
     { csRegs_.mPerfRegs_.configEventNumber(userNumber, eventId); }
 
+    /// Configure the address translation modes supported by this hart.
     void configAddressTranslationModes(const std::vector<VirtMem::Mode>& modes)
     { virtMem_.setSupportedModes(modes); }
+
+    /// Enable page based memory types.
+    void enableTranslationPbmt(bool flag)
+    { virtMem_.enablePbmt(flag); }
+
+    /// Enable page translation naturally aligned power of 2 page sizes.
+    void enableTranslationNapot(bool flag)
+    { virtMem_.enableNapot(flag); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
@@ -2236,8 +2245,10 @@ namespace WdRiscv
 
     /// Helper to CSR instructions: Read csr register returning true
     /// on success and false on failure (csr does not exist or is not
-    /// accessible).  is writeable.
-    bool doCsrRead(const DecodedInst* di, CsrNumber csr, URV& csrVal);
+    /// accessible). The isWrite flags should be set to true if the
+    /// CSR instruction writes the CSR register when the read is
+    /// successful.
+    bool doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& csrVal);
 
     /// This is called after a csr is written/poked to update the
     /// procerssor state as a side effect to the csr change.

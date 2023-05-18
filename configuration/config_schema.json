@@ -177,6 +177,9 @@
         "enable_misaligned_data": {
             "$ref": "#/definitions/bool_or_bool_string"
         },
+        "enable_pbmt": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
         "enable_per_mode_counter_control": {
             "$ref": "#/definitions/bool_or_bool_string"
         },

@@ -1547,6 +1547,20 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	errors += atmErrors;
     }
 
+  tag = "enable_translation_pbmt";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableTranslationPbmt(flag);
+    }
+
+  tag = "enable_translation_napot";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableTranslationNapot(flag);
+    }
+
   return errors == 0;
 }
 

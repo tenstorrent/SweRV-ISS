@@ -9808,12 +9808,14 @@ Hart<URV>::execDret(const DecodedInst* di)
 
 template <typename URV>
 bool
-Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, URV& value)
+Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& value)
 {
   typedef PrivilegeMode PM;
 
   // Check if HS qualified (section 9.6.1 of privileged spec).
   bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor);
+  if (isWrite)
+    hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor);
   if (virtMode_)
     {
       if (csRegs_.isHypervisor(csr) or
@@ -10015,7 +10017,7 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
 
   URV prev = 0;
   if (di->op0() != 0)
-    if (not doCsrRead(di, csr, prev))
+    if (not doCsrRead(di, csr, true /*isWrite*/, prev))
       {
 	if (postCsrInst_)
 	  postCsrInst_(hartIx_, csr);
@@ -10048,7 +10050,8 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
     preCsrInst_(hartIx_, csr);
 
   URV prev = 0;
-  if (not doCsrRead(di, csr, prev))
+  bool isWrite = di->op1() != 0;
+  if (not doCsrRead(di, csr, isWrite, prev))
     {
       if (postCsrInst_)
         postCsrInst_(hartIx_, csr);
@@ -10090,7 +10093,8 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
     preCsrInst_(hartIx_, csr);
 
   URV prev = 0;
-  if (not doCsrRead(di, csr, prev))
+  bool isWrite = di->op1() != 0;
+  if (not doCsrRead(di, csr, isWrite, prev))
     {
       if (postCsrInst_)
         postCsrInst_(hartIx_, csr);
@@ -10133,7 +10137,7 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
 
   URV prev = 0;
   if (di->op0() != 0)
-    if (not doCsrRead(di, csr, prev))
+    if (not doCsrRead(di, csr, true /*isWrite*/, prev))
       {
         if (postCsrInst_)
           postCsrInst_(hartIx_, csr);
@@ -10166,7 +10170,8 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   URV imm = di->op1();
 
   URV prev = 0;
-  if (not doCsrRead(di, csr, prev))
+  bool isWrite = imm != 0;
+  if (not doCsrRead(di, csr, isWrite, prev))
     {
       if (postCsrInst_)
         postCsrInst_(hartIx_, csr);
@@ -10210,7 +10215,8 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   URV imm = di->op1();
 
   URV prev = 0;
-  if (not doCsrRead(di, csr, prev))
+  bool isWrite = imm != 0;
+  if (not doCsrRead(di, csr, isWrite, prev))
     {
       if (postCsrInst_)
         postCsrInst_(hartIx_, csr);
@@ -10406,7 +10412,7 @@ template<typename URV>
 void
 Hart<URV>::execMul(const DecodedInst* di)
 {
-  if (not isRvzmmul())
+  if (not isRvzmmul() and not isRvm())
     {
       illegalInst(di);
       return;
@@ -10427,7 +10433,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10446,7 +10452,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10465,7 +10471,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10484,7 +10490,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10503,7 +10509,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10522,7 +10528,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
