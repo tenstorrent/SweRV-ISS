@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,11 +30,15 @@ namespace WdRiscv
     /// Constructor.
     Server(System<URV>& system);
 
+    /// Set to true if if disassembly of executed instructions is enabled.
+    void disassemble(bool flag)
+    { disassemble_ = flag; }
+
     /// Server mode poke command.
-    bool pokeCommand(const WhisperMessage& req, WhisperMessage& reply);
+    bool pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart);
 
     /// Server mode peek command.
-    bool peekCommand(const WhisperMessage& req, WhisperMessage& reply);
+    bool peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<URV>& hart);
 
     // Server mode disassemble command.
     void disassembleAnnotateInst(Hart<URV>& hart,
@@ -43,13 +47,14 @@ namespace WdRiscv
 				 std::string& text);
 
     /// Server mode step command.
-    bool stepCommand(const WhisperMessage& req, 
+    bool stepCommand(const WhisperMessage& req,
 		     std::vector<WhisperMessage>& pendingChanges,
 		     WhisperMessage& reply,
+                     Hart<URV>& hart,
 		     FILE* traceFile);
 
     /// Virtual address translation command.
-    bool translateCommand(const WhisperMessage& req, 
+    bool translateCommand(const WhisperMessage& req,
 			  WhisperMessage& reply);
 
     /// Server mode loop: Receive command and send reply till a quit
@@ -88,6 +93,7 @@ namespace WdRiscv
     bool checkHart(const WhisperMessage& reg, const std::string& command,
                    WhisperMessage& reply);
 
+    bool disassemble_ = true;
     std::vector<WhisperMessage> pendingChanges_;
     System<URV>& system_;
   };
