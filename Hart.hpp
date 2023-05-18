@@ -360,8 +360,12 @@ namespace WdRiscv
     { virtMem_.setSupportedModes(modes); }
 
     /// Enable page based memory types.
-    void enablePbmt(bool flag)
+    void enableTranslationPbmt(bool flag)
     { virtMem_.enablePbmt(flag); }
+
+    /// Enable page translation naturally aligned power of 2 page sizes.
+    void enableTranslationNapot(bool flag)
+    { virtMem_.enableNapot(flag); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when

@@ -89,6 +89,9 @@ namespace WdRiscv
     /// privileged spec.)
     uint32_t ppn1() const   { return bits_.ppn1_; }
 
+    /// Set physical page number field 0 in this PTE to v.
+    void setPpn0(unsigned v) { bits_.ppn0_ = v; }
+
     /// Return reserved bits value. NA for Sv32.
     uint64_t res() const    { return 0; }
 
@@ -208,6 +211,9 @@ namespace WdRiscv
     /// Physical page number field 2 in this PTE (see Sv39 PTE in the
     /// privileged spec.)
     uint64_t ppn2() const   { return bits_.ppn2_; }
+
+    /// Set physical page number field 0 in this PTE to v.
+    void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value
     uint64_t res() const    { return bits_.res_; }
@@ -341,6 +347,9 @@ namespace WdRiscv
     /// Physical page number field 3 in this PTE (see Sv48 PTE in the
     /// privileged spec.)
     uint64_t ppn3() const   { return bits_.ppn3_; }
+
+    /// Set physical page number field 0 in this PTE to v.
+    void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value
     uint64_t res() const    { return bits_.res_; }
@@ -482,6 +491,9 @@ namespace WdRiscv
     /// Physical page number field 4 in this PTE (see Sv57 PTE in the
     /// privileged spec.)
     uint64_t ppn4() const   { return bits_.ppn4_; }
+
+    /// Set physical page number field 0 in this PTE to v.
+    void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value
     uint64_t res() const    { return bits_.res_; }

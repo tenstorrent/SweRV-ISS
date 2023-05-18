@@ -412,9 +412,13 @@ namespace WdRiscv
     FILE* enableAddrTransLog(FILE* file)
     { FILE* prev = attFile_; attFile_ = file; return prev; }
 
-    /// Enable/disable pave-based-memory types.
+    /// Enable/disable page-based-memory types.
     void enablePbmt(bool flag)
-    { hasPbmt_ = flag; }
+    { pbmtEnabled_ = flag; }
+
+    /// Enable/disable NAPOT page size (naturally aligned power of 2).
+    void enableNapot(bool flag)
+    { napotEnabled_ = flag; }
 
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
@@ -498,7 +502,8 @@ namespace WdRiscv
 
     bool trace_ = true;
     bool bigEnd_ = false;
-    bool hasPbmt_ = false;
+    bool pbmtEnabled_ = false;
+    bool napotEnabled_ = false;
 
     std::vector<UpdatedPte> updatedPtes_;
 

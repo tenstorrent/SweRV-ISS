@@ -567,6 +567,17 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage1PageFaultType(read, write, exec);
+      if (napotEnabled_)
+	{
+	  if (pte.hasNapot())
+	    {
+	      if ((pte.ppn0() & 0xf) != 0x8)
+		return stage1PageFaultType(read, write, exec);
+	      pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
+	    }
+	}
+      else if (pte.hasNapot())
+        return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
         {
@@ -599,7 +610,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (hasPbmt_)
+      if (pbmtEnabled_)
 	{
 	  if (pte.pbmt() == 3)
 	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
@@ -728,6 +739,17 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage2PageFaultType(read, write, exec);
+      if (napotEnabled_)
+	{
+	  if (pte.hasNapot())
+	    {
+	      if ((pte.ppn0() & 0xf) != 0x8)
+		return stage2PageFaultType(read, write, exec);
+	      pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
+	    }
+	}
+      else if (pte.hasNapot())
+        return stage2PageFaultType(read, write, exec);
 
       if (attFile_)
         {
@@ -760,7 +782,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (hasPbmt_)
+      if (pbmtEnabled_)
 	{
 	  if (pte.pbmt() == 3)
 	    return stage2PageFaultType(read, write, exec);  // pbmt=3 is reserved.
@@ -902,6 +924,17 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage1PageFaultType(read, write, exec);
+      if (napotEnabled_)
+	{
+	  if (pte.hasNapot())
+	    {
+	      if ((pte.ppn0() & 0xf) != 0x8)
+		return stage1PageFaultType(read, write, exec);
+	      pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
+	    }
+	}
+      else if (pte.hasNapot())
+        return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
         {
@@ -934,7 +967,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (hasPbmt_)
+      if (pbmtEnabled_)
 	{
 	  if (pte.pbmt() == 3)
 	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
