@@ -10406,7 +10406,7 @@ template<typename URV>
 void
 Hart<URV>::execMul(const DecodedInst* di)
 {
-  if (not isRvzmmul())
+  if (not isRvzmmul() and not isRvm())
     {
       illegalInst(di);
       return;
@@ -10427,7 +10427,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10446,7 +10446,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10465,7 +10465,7 @@ namespace WdRiscv
   void
   Hart<uint32_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10484,7 +10484,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulh(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10503,7 +10503,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhsu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
@@ -10522,7 +10522,7 @@ namespace WdRiscv
   void
   Hart<uint64_t>::execMulhu(const DecodedInst* di)
   {
-    if (not isRvzmmul())
+    if (not isRvzmmul() and not isRvm())
       {
 	illegalInst(di);
 	return;
