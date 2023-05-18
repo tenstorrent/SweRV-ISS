@@ -599,8 +599,13 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (pte.pbmt() != 0)
-        return stage1PageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+      if (hasPbmt_)
+	{
+	  if (pte.pbmt() == 3)
+	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
+	}
+      else if (pte.pbmt() != 0)
+        return stage1PageFaultType(read, write, exec);  // Reserved pbmt bits must be 0.
       if (privMode == PrivilegeMode::User and not pte.user())
         return stage1PageFaultType(read, write, exec);
       if (privMode == PrivilegeMode::Supervisor and pte.user() and
@@ -755,8 +760,13 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (pte.pbmt() != 0)
-        return stage2PageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+      if (hasPbmt_)
+	{
+	  if (pte.pbmt() == 3)
+	    return stage2PageFaultType(read, write, exec);  // pbmt=3 is reserved.
+	}
+      else if (pte.pbmt() != 0)
+        return stage2PageFaultType(read, write, exec);  // Reserved pbmt bits must be 0.
       if (not pte.user())
         return stage2PageFaultType(read, write, exec);  // All access as though in User mode.
 
@@ -924,8 +934,13 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         }
 
       // 5.  pte.read_ or pte.exec_ : leaf pte
-      if (pte.pbmt() != 0)
-        return stage1PageFaultType(read, write, exec);  // Leaf page must bave pbmt=0.
+      if (hasPbmt_)
+	{
+	  if (pte.pbmt() == 3)
+	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
+	}
+      else if (pte.pbmt() != 0)
+        return stage1PageFaultType(read, write, exec);  // Reserved pbmt bits must be 0.
       if (privMode == PrivilegeMode::User and not pte.user())
         return stage1PageFaultType(read, write, exec);
       if (privMode == PrivilegeMode::Supervisor and pte.user() and

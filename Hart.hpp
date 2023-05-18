@@ -355,8 +355,13 @@ namespace WdRiscv
     void configEventNumber(URV userNumber, EventNumber eventId)
     { csRegs_.mPerfRegs_.configEventNumber(userNumber, eventId); }
 
+    /// Configure the address translation modes supported by this hart.
     void configAddressTranslationModes(const std::vector<VirtMem::Mode>& modes)
     { virtMem_.setSupportedModes(modes); }
+
+    /// Enable page based memory types.
+    void enablePbmt(bool flag)
+    { virtMem_.enablePbmt(flag); }
 
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
