@@ -287,7 +287,7 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
     return pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
   ExceptionCause (VirtMem::*pageTableWalk1p12)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
-  unsigned lowerMaskBitIndex;
+  unsigned lowerMaskBitIndex = 0;
 
   if (mode_ == Sv39)
     {
@@ -303,13 +303,13 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
     }
   else if (mode_ == Sv57)
     {
-      // Part 1 of address translation: Bits 63-57 muse equal bit 56
+      // Part 1 of address translation: Bits 63-57 must equal bit 56
       lowerMaskBitIndex = 57;
       pageTableWalk1p12 = &VirtMem::pageTableWalk1p12<Pte57, Va57>;
     }
   else
     {
-      assert(0 and "Unspupported virtual memory mode.");
+      assert(0 and "Unsupported virtual memory mode.");
       return ExceptionCause::LOAD_PAGE_FAULT;
     }
 
@@ -329,7 +329,7 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 {
   // Perform a page table walk.
   ExceptionCause (VirtMem::*stage2PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
-  unsigned lowerMaskBitIndex;
+  unsigned lowerMaskBitIndex = 0;
 
   if (modeStage2_ == Sv32)
     {
@@ -357,7 +357,7 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
     }
   else
     {
-      assert(0 and "Unspupported virtual memory mode.");
+      assert(0 and "Unsupported virtual memory mode.");
       return ExceptionCause::LOAD_PAGE_FAULT;
     }
 
@@ -488,7 +488,7 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
     return stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
   ExceptionCause (VirtMem::*stage1PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
-  unsigned lowerMaskBitIndex;
+  unsigned lowerMaskBitIndex = 0;
 
   if (vsMode_ == Sv39)
     {
@@ -506,14 +506,13 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
 
   else if (vsMode_ == Sv57)
     {
-      // Part 1 of address translation: Bits 63-57 muse equal bit 56
+      // Part 1 of address translation: Bits 63-57 must equal bit 56
       lowerMaskBitIndex   = 57;
       stage1PageTableWalk = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
     }
-
   else
     {
-      assert(0 and "Unspupported virtual memory mode.");
+      assert(0 and "Unsupported virtual memory mode.");
       return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
     }
 
