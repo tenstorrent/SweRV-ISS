@@ -10918,7 +10918,7 @@ template <typename URV>
 void
 Hart<URV>::execDivw(const DecodedInst* di)
 {
-  if (not isRv64())
+  if (not isRv64() or not isRvm())
     {
       illegalInst(di);
       return;
@@ -10948,7 +10948,7 @@ template <typename URV>
 void
 Hart<URV>::execDivuw(const DecodedInst* di)
 {
-  if (not isRv64())
+  if (not isRv64() or not isRvm())
     {
       illegalInst(di);
       return;
@@ -10972,7 +10972,7 @@ template <typename URV>
 void
 Hart<URV>::execRemw(const DecodedInst* di)
 {
-  if (not isRv64())
+  if (not isRv64() or not isRvm())
     {
       illegalInst(di);
       return;
@@ -11002,7 +11002,7 @@ template <typename URV>
 void
 Hart<URV>::execRemuw(const DecodedInst* di)
 {
-  if (not isRv64())
+  if (not isRv64() or not isRvm())
     {
       illegalInst(di);
       return;
