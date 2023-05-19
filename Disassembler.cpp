@@ -783,6 +783,30 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
 	  << std::hex << di.op2As<int32_t>() << std::dec;
       break;
 
+    case InstId::c_lbu:
+      out << "c.lbu    " << intRegName(di.op0()) << ", 0x"
+	  << std::hex << di.op2As<int32_t>() << std::dec
+	  << "(" << intRegName(di.op1()) << ")";
+      break;
+
+    case InstId::c_lhu:
+      out << "c.lhu    " << intRegName(di.op0()) << ", 0x"
+	  << std::hex << di.op2As<int32_t>() << std::dec
+	  << "(" << intRegName(di.op1()) << ")";
+      break;
+
+    case InstId::c_lh:
+      out << "c.lh     " << intRegName(di.op0()) << ", 0x"
+	  << std::hex << di.op2As<int32_t>() << std::dec
+	  << "(" << intRegName(di.op1()) << ")";
+      break;
+
+    case InstId::c_sb:
+      out << "c.sb     " << intRegName(di.op0()) << ", 0x"
+	  << std::hex << di.op2As<int32_t>() << std::dec
+	  << "(" << intRegName(di.op1()) << ")";
+      break;
+
     case InstId::cmov:
       printRdRs2Rs1Rs3(*this, out, "cmov", di);
       break;
