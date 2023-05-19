@@ -286,26 +286,27 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
   if (mode_ == Sv32)
     return pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
-  ExceptionCause (VirtMem::*pageTableWalk1p12)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
-  unsigned lowerMaskBitIndex = 0;
+  ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
+  unsigned vaMsb = 0;  // Most significant bit of va
+  unsigned pmb = 0;  // Pointer masking bits (J extension).
 
   if (mode_ == Sv39)
     {
-      // Part 1 of address translation: Bits 63-39 must equal bit 38
-      lowerMaskBitIndex = 39;
-      pageTableWalk1p12 = &VirtMem::pageTableWalk1p12<Pte39, Va39>;
+      vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
+      pmb = 16;
+      walkFn = &VirtMem::pageTableWalk1p12<Pte39, Va39>;
     }
   else if (mode_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-48 must equal bit 47
-      lowerMaskBitIndex = 48;
-      pageTableWalk1p12 = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
+      vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
+      pmb = 16; 
+      walkFn = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
     }
   else if (mode_ == Sv57)
     {
-      // Part 1 of address translation: Bits 63-57 must equal bit 56
-      lowerMaskBitIndex = 57;
-      pageTableWalk1p12 = &VirtMem::pageTableWalk1p12<Pte57, Va57>;
+      vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
+      pmb = 7;
+      walkFn = &VirtMem::pageTableWalk1p12<Pte57, Va57>;
     }
   else
     {
@@ -313,13 +314,18 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
       return ExceptionCause::LOAD_PAGE_FAULT;
     }
 
-  uint64_t mask = (va >> (lowerMaskBitIndex - 1)) & 1;
-  if (mask)
-    mask = (1U << (64 - lowerMaskBitIndex)) - 1;
-  if ((va >> lowerMaskBitIndex) != mask)
+  // Bits higher than bit vaMsb must be identical to bit vaMsb.
+  uint64_t va1 = va;
+  uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
+  if (pmEnabled_ and priv == PrivilegeMode::User)
+    {
+      va1 = (va1 << pmb) >> pmb;
+      va2 = (va2 << pmb) >> pmb;
+    }
+  if (va1 != va2)
     return pageFaultType(twoStage, read, write, exec);
 
-  return (this->*pageTableWalk1p12)(va, priv, read, write, exec, pa, entry);
+  return (this->*walkFn)(va, priv, read, write, exec, pa, entry);
 }
 
 
@@ -487,28 +493,27 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   if (vsMode_ == Sv32)
     return stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
-  ExceptionCause (VirtMem::*stage1PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
-  unsigned lowerMaskBitIndex = 0;
+  ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
+  unsigned vaMsb = 0;  // Most significant bit of va
+  unsigned pmb = 0;  // Pointer masking bits (J extension).
 
   if (vsMode_ == Sv39)
     {
-      // Part 1 of address translation: Bits 63-39 must equal bit 38
-      lowerMaskBitIndex   = 39;
-      stage1PageTableWalk = &VirtMem::stage1PageTableWalk<Pte39, Va39>;
+      vaMsb = 40; // Bits 63 to 41 of va must equal bit 40
+      pmb = 16;
+      walkFn = &VirtMem::stage1PageTableWalk<Pte39, Va39>;
     }
-
   else if (vsMode_ == Sv48)
     {
-      // Part 1 of address translation: Bits 63-48 must equal bit 47
-      lowerMaskBitIndex   = 48;
-      stage1PageTableWalk = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
+      vaMsb = 49; // Bits 63 to 50 of va must equal bit 49
+      pmb = 16; 
+      walkFn = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
     }
-
   else if (vsMode_ == Sv57)
     {
-      // Part 1 of address translation: Bits 63-57 must equal bit 56
-      lowerMaskBitIndex   = 57;
-      stage1PageTableWalk = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
+      vaMsb = 58; // Bits 63 to 59 of va must equal bit 58
+      pmb = 16; 
+      walkFn = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
     }
   else
     {
@@ -516,12 +521,18 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
       return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
     }
 
-  uint64_t mask = (va >> (lowerMaskBitIndex - 1)) & 1;
-  if (mask)
-    mask = (1U << (64 - lowerMaskBitIndex)) - 1;
-  if ((va >> lowerMaskBitIndex) != mask)
+  // Bits higher than bit vaMsb must be identical to bit vaMsb.
+  uint64_t va1 = va;
+  uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
+  if (pmEnabled_ and priv == PrivilegeMode::User)
+    {
+      va1 = (va1 << pmb) >> pmb;
+      va2 = (va2 << pmb) >> pmb;
+    }
+  if (va1 != va2)
     return stage1PageFaultType(read, write, exec);
-  return (this->*stage1PageTableWalk)(va, priv, read, write, exec, pa, entry);
+
+  return (this->*walkFn)(va, priv, read, write, exec, pa, entry);
 }
 
 

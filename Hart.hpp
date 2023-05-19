@@ -367,6 +367,10 @@ namespace WdRiscv
     void enableTranslationNapot(bool flag)
     { virtMem_.enableNapot(flag); }
 
+    /// Enable page pointer masking for user privilege (Zjpm).
+    void enableUserPointerMasking(bool flag)
+    { virtMem_.enablePointerMasking(flag); }
+
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
     /// flag is true.

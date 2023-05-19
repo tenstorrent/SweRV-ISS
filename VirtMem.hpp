@@ -420,6 +420,10 @@ namespace WdRiscv
     void enableNapot(bool flag)
     { napotEnabled_ = flag; }
 
+    /// Enable/disable pointer masking for user mode.
+    void enablePointerMasking(bool flag)
+    { pmEnabled_ = flag; }
+
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
 
@@ -504,6 +508,7 @@ namespace WdRiscv
     bool bigEnd_ = false;
     bool pbmtEnabled_ = false;
     bool napotEnabled_ = false;
+    bool pmEnabled_ = false;  // Pointer masking
 
     std::vector<UpdatedPte> updatedPtes_;
 
