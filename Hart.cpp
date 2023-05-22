@@ -1515,7 +1515,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 
   if (misal)
     {
-      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      Pma pma = getPma(addr1);
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
@@ -10351,7 +10351,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 
   if (misal)
     {
-      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      Pma pma = getPma(addr1);
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
     }
