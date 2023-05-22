@@ -22,7 +22,7 @@
 #include "float-convert-helpers.hpp"
 #include "Hart.hpp"
 #include "instforms.hpp"
-#include "softfloat-util.hpp"
+#include "float-util.hpp"
 
 #ifdef __x86_64__
 #include <emmintrin.h>
@@ -664,15 +664,7 @@ Hart<URV>::execFadd_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
-
-#ifdef SOFT_FLOAT
-  float res = softToNative(f32_add(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  float res = f1 + f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<float>::quiet_NaN();
-#endif
-
+  float res = doFadd(f1, f2);
   fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -689,15 +681,7 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
-
-#ifdef SOFT_FLOAT
-  float res = softToNative(f32_sub(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  float res = f1 - f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<float>::quiet_NaN();
-#endif
-
+  float res = doFadd(f1, -f2);
   fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -714,15 +698,7 @@ Hart<URV>::execFmul_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
-
-#ifdef SOFT_FLOAT
-  float res = softToNative(f32_mul(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  float res = f1 * f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<float>::quiet_NaN();
-#endif
-
+  float res = doFmul(f1, f2);
   fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -739,15 +715,7 @@ Hart<URV>::execFdiv_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
-
-#ifdef SOFT_FLOAT
-  float res = softToNative(f32_div(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  float res = f1 / f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<float>::quiet_NaN();
-#endif
-
+  float res = doFdiv(f1, f2);
   fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -1437,15 +1405,7 @@ Hart<URV>::execFadd_d(const DecodedInst* di)
 
   double d1 = fpRegs_.readDouble(di->op1());
   double d2 = fpRegs_.readDouble(di->op2());
-
-#ifdef SOFT_FLOAT
-  double res = softToNative(f64_add(nativeToSoft(d1), nativeToSoft(d2)));
-#else
-  double res = d1 + d2;
-  if (std::isnan(res))
-    res = std::numeric_limits<double>::quiet_NaN();
-#endif
-
+  double res = doFadd(d1, d2);
   fpRegs_.writeDouble(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -1463,15 +1423,7 @@ Hart<URV>::execFsub_d(const DecodedInst* di)
 
   double d1 = fpRegs_.readDouble(di->op1());
   double d2 = fpRegs_.readDouble(di->op2());
-
-#ifdef SOFT_FLOAT
-  double res = softToNative(f64_sub(nativeToSoft(d1), nativeToSoft(d2)));
-#else
-  double res = d1 - d2;
-  if (std::isnan(res))
-    res = std::numeric_limits<double>::quiet_NaN();
-#endif
-
+  double res = doFadd(d1, -d2);
   fpRegs_.writeDouble(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -1489,15 +1441,7 @@ Hart<URV>::execFmul_d(const DecodedInst* di)
 
   double d1 = fpRegs_.readDouble(di->op1());
   double d2 = fpRegs_.readDouble(di->op2());
-
-#ifdef SOFT_FLOAT
-  double res = softToNative(f64_mul(nativeToSoft(d1), nativeToSoft(d2)));
-#else
-  double res = d1 * d2;
-  if (std::isnan(res))
-    res = std::numeric_limits<double>::quiet_NaN();
-#endif
-
+  double res = doFmul(d1, d2);
   fpRegs_.writeDouble(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -1515,19 +1459,10 @@ Hart<URV>::execFdiv_d(const DecodedInst* di)
 
   double d1 = fpRegs_.readDouble(di->op1());
   double d2 = fpRegs_.readDouble(di->op2());
-
-#ifdef SOFT_FLOAT
-  double res = softToNative(f64_div(nativeToSoft(d1), nativeToSoft(d2)));
-#else
-  double res = d1 / d2;
-  if (std::isnan(res))
-    res = std::numeric_limits<double>::quiet_NaN();
-#endif
-
+  double res = doFdiv(d1, d2);
   fpRegs_.writeDouble(di->op0(), res);
 
   updateAccruedFpBits(res);
-
   markFsDirty();
 }
 
@@ -2193,15 +2128,7 @@ Hart<URV>::execFadd_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-
-#ifdef SOFT_FLOAT
-  Float16 res = softToNative(f16_add(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  Float16 res = f1 + f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<Float16>::quiet_NaN();
-#endif
-
+  Float16 res = doFadd(f1, f2);
   fpRegs_.writeHalf(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -2218,15 +2145,7 @@ Hart<URV>::execFsub_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-
-#ifdef SOFT_FLOAT
-  Float16 res = softToNative(f16_sub(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  Float16 res = f1 - f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<Float16>::quiet_NaN();
-#endif
-
+  Float16 res = doFadd(f1, -f2);
   fpRegs_.writeHalf(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -2243,15 +2162,7 @@ Hart<URV>::execFmul_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-
-#ifdef SOFT_FLOAT
-  Float16 res = softToNative(f16_mul(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  Float16 res = f1 * f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<Float16>::quiet_NaN();
-#endif
-
+  Float16 res = doFmul(f1, f2);
   fpRegs_.writeHalf(di->op0(), res);
 
   updateAccruedFpBits(res);
@@ -2268,15 +2179,7 @@ Hart<URV>::execFdiv_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-
-#ifdef SOFT_FLOAT
-  Float16 res = softToNative(f16_div(nativeToSoft(f1), nativeToSoft(f2)));
-#else
-  Float16 res = f1 / f2;
-  if (std::isnan(res))
-    res = std::numeric_limits<Float16>::quiet_NaN();
-#endif
-
+  Float16 res = doFdiv(f1, f2);
   fpRegs_.writeHalf(di->op0(), res);
 
   updateAccruedFpBits(res);

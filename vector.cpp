@@ -24,7 +24,7 @@
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
-#include "softfloat-util.hpp"
+#include "float-util.hpp"
 
 
 // make_unsigned/make_signed do not work on our types -- compensate.
@@ -15739,32 +15739,6 @@ Hart<URV>::execVlsege1024ff_v(const DecodedInst* di)
 }
 
 
-// Quiet NAN for Float16, float and double.
-template <typename T>
-static
-T
-getQuietNan()
-{
-  return std::numeric_limits<T>::quiet_NaN();
-}
-
-
-template <typename FT>
-static FT
-doFadd(FT f1, FT f2)
-{
-#ifdef SOFT_FLOAT
-  FT res = softAdd(f1, f2);
-#else
-  FT res = f1 + f2;
-#endif
-
-  if (std::isnan(res))
-    res = getQuietNan<FT>();
-  return res;
-}
-
-
 static
 float minfp(float a, float b)
 {
@@ -15875,38 +15849,6 @@ doFsqrt(FT f1)
   res = softSqrt(f1);
 #else
     res = std::sqrt(f1);
-#endif
-
-  if (std::isnan(res))
-    res = getQuietNan<FT>();
-  return res;
-}
-
-
-template <typename FT>
-static FT
-doFmul(FT f1, FT f2)
-{
-#ifdef SOFT_FLOAT
-  FT res = softMul(f1, f2);
-#else
-  FT res = f1 * f2;
-#endif
-
-  if (std::isnan(res))
-    res = getQuietNan<FT>();
-  return res;
-}
-
-
-template <typename FT>
-static FT
-doFdiv(FT f1, FT f2)
-{
-#ifdef SOFT_FLOAT
-  FT res = softDiv(f1, f2);
-#else
-  FT res = f1 / f2;
 #endif
 
   if (std::isnan(res))
