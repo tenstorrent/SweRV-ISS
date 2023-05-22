@@ -2298,22 +2298,18 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           {
             IFormInst iform(inst);
             unsigned funct3 = iform.fields.funct3;
-            unsigned imm = iform.uimmed(), rd = iform.fields.rd, rs1 = iform.fields.rs1;
+            unsigned imm = iform.uimmed(), rd = iform.fields.rd;
 
             if (funct3 == 0)
               {
-                if (rd == 0 and rs1 == 0)
-                  {
-                    if (iform.top4() == 0)
-                      return instTable_.getEntry(InstId::fence);
-                    if (iform.top4() == 8)
-                      return instTable_.getEntry(InstId::fence_tso);
-                  }
+		if (iform.top4() == 0)
+		  return instTable_.getEntry(InstId::fence);
+		if (iform.top4() == 8)
+		  return instTable_.getEntry(InstId::fence_tso);
               }
             else if (funct3 == 1)
               {
-                if (rd == 0 and rs1 == 0 and imm == 0)
-                  return instTable_.getEntry(InstId::fence_i);
+		return instTable_.getEntry(InstId::fence_i);
               }
             else if (funct3 == 2)
               {
