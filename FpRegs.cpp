@@ -19,7 +19,7 @@ using namespace WdRiscv;
 
 
 FpRegs::FpRegs(unsigned regCount)
-  : regs_(regCount, 0)
+  : regs_(regCount, UINT64_C(0))
 {
 }
 
@@ -49,7 +49,7 @@ FpRegs::reset(bool hasHalf, bool hasSingle, bool hasDouble)
   if (hasDouble)
     {
       for (auto& reg : regs_)
-	reg = 0;
+	reg = UINT64_C(0);
     }
   else if (hasSingle)
     {

@@ -108,14 +108,14 @@ namespace WdRiscv
     
     /// Return value of ith register.
     double readDouble(unsigned i) const
-    { assert(flen_ >= 64); return regs_[i]; }
+    { assert(flen_ >= 64); return regs_[i].dp; }
 
     /// Return the bit pattern of the ith register as an unsigned
     /// integer. If the register contains a nan-boxed value, return
     /// that value without the box.
     uint64_t readBitsUnboxed(unsigned i) const
     {
-      FpUnion u{regs_.at(i)};
+      const FpUnion& u = regs_.at(i);
       if (hasHalf_ and u.isBoxedHalf())
 	return (u.i64 << 48) >> 48;
 
@@ -146,15 +146,14 @@ namespace WdRiscv
     /// unbox it (return the 64-bit NaN).
     uint64_t readBitsRaw(unsigned i) const
     {
-      FpUnion u {regs_.at(i)};
+      const FpUnion& u  = regs_.at(i);
       return u.i64 & mask_;
     }
 
     /// Set FP register i to the given value.
     void pokeBits(unsigned i, uint64_t val)
     {
-      FpUnion fpu(val);
-      regs_.at(i) = fpu.dp;
+      regs_.at(i) = val;
     }
 
     /// Set value of ith register to the given value.
@@ -218,7 +217,7 @@ namespace WdRiscv
     bool findReg(std::string_view name, unsigned& ix) const;
 
     /// Return the name of the given register.
-    std::string_view regName(unsigned i, bool abiNames = false) const
+    static constexpr std::string_view regName(unsigned i, bool abiNames = false)
     { return FpRegNames::regName(i, abiNames); }
 
   protected:
@@ -241,13 +240,7 @@ namespace WdRiscv
       if (lastWrittenReg_ < 0) return -1;
 
       // Copy bits of last written value inot regValue
-      union
-      {
-        double d;
-        uint64_t u;
-      } tmp;
-      tmp.d = originalValue_;
-      regValue = tmp.u;
+      regValue = originalValue_.i64;
 
       return lastWrittenReg_;
     }
@@ -306,14 +299,14 @@ namespace WdRiscv
 	
   private:
 
-    std::vector<double> regs_;
-    bool hasHalf_ = false;         // True if half (16-bit) precision enabled.
-    bool hasSingle_ = false;       // True if F extension enabled.
-    bool hasDouble_ = false;       // True if D extension enabled.
-    int lastWrittenReg_ = -1;      // Register accessed in most recent write.
+    std::vector<FpUnion> regs_;
+    bool hasHalf_ = false;                 // True if half (16-bit) precision enabled.
+    bool hasSingle_ = false;               // True if F extension enabled.
+    bool hasDouble_ = false;               // True if D extension enabled.
+    int lastWrittenReg_ = -1;              // Register accessed in most recent write.
     unsigned lastFpFlags_ = 0;
-    double originalValue_ = 0;     // Original value of last written reg.
-    unsigned flen_ = 64;           // Floating point register width.
+    FpUnion originalValue_ = UINT64_C(0);  // Original value of last written reg.
+    unsigned flen_ = 64;                   // Floating point register width.
     uint64_t mask_ = ~uint64_t(0);
   };
 
@@ -324,7 +317,7 @@ namespace WdRiscv
   {
     assert(flen_ >= 32);
 
-    FpUnion u{regs_.at(i)};
+    const FpUnion& u = regs_.at(i);
     if (flen_ == 32 or u.isBoxedSingle())
       return u.sp;
 
@@ -340,8 +333,7 @@ namespace WdRiscv
     assert(flen_ >= 32);
     originalValue_ = regs_.at(i);
 
-    FpUnion u{x};
-    regs_.at(i) = u.dp;
+    regs_.at(i) = x;
     lastWrittenReg_ = i;
   }
 
@@ -352,7 +344,7 @@ namespace WdRiscv
   {
     assert(flen_ >= 16);
 
-    FpUnion u{regs_.at(i)};
+    const FpUnion& u = regs_.at(i);
     if (flen_ == 16 or u.isBoxedHalf())
       return u.hp;
 
@@ -367,8 +359,7 @@ namespace WdRiscv
     assert(flen_ >= 16);
     originalValue_ = regs_.at(i);
 
-    FpUnion u{x};
-    regs_.at(i) = u.dp;
+    regs_.at(i) = x;
     lastWrittenReg_ = i;
   }
 
@@ -379,7 +370,7 @@ namespace WdRiscv
   {
     assert(flen_ >= 16);
 
-    FpUnion u{regs_.at(i)};
+    const FpUnion& u = regs_.at(i);
     if (flen_ == 16 or u.isBoxedHalf())
       return std::bit_cast<BFloat16>(u.hp);
 
