@@ -280,13 +280,13 @@ namespace WdRiscv
     bool encodeFld(unsigned rd, unsigned rs1, int offset);
 
     /// Encode "slli rd, rs1, shamt" into this object.
-    bool encodeSlli(unsigned rd, unsigned rs1, unsigned shamt);
+    bool encodeSlli(unsigned rd, unsigned rs1, unsigned shamt, bool rv64);
 
     /// Encode "srli rd, rs1, shamt" into this object.
-    bool encodeSrli(unsigned rd, unsigned rs1, unsigned shamt);
+    bool encodeSrli(unsigned rd, unsigned rs1, unsigned shamt, bool rv64);
 
     /// Encode "srai rd, rs1, shamt" into this object.
-    bool encodeSrai(unsigned rd, unsigned rs1, unsigned shamt);
+    bool encodeSrai(unsigned rd, unsigned rs1, unsigned shamt, bool rv64);
 
     /// Encode "slti rd, rs1, imm" into this object.
     bool encodeSlti(unsigned rd, unsigned rs1, int imm);
@@ -1003,17 +1003,17 @@ namespace WdRiscv
   /// Encode "slli rd, rs1, shamt" into inst: encodeSlli(rd, rs1, shamt, inst).
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
-  bool encodeSlli(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst);
+  bool encodeSlli(uint32_t rd, uint32_t rs1, uint32_t shamt, bool rv64, uint32_t& inst);
 
   /// Encode "srli rd, rs1, shamt" into inst: encodeSrli(rd, rs1, shamt, inst).
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
-  bool encodeSrli(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst);
+  bool encodeSrli(uint32_t rd, uint32_t rs1, uint32_t shamt, bool rv64, uint32_t& inst);
 
   /// Encode "srai rd, rs1, shamt" into inst: encodeSrai(rd, rs1, shamt, inst).
   /// Return true on success and false if any of the arguments
   /// are out of bounds.
-  bool encodeSrai(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst);
+  bool encodeSrai(uint32_t rd, uint32_t rs1, uint32_t shamt, bool rv64, uint32_t& inst);
 
   /// Encode "add rd, rs1, rs2" into inst: encodeAdd(rd, rs1, rs2,
   /// inst). Return true on success and false if any of the arguments

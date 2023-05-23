@@ -1907,7 +1907,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	      if (caf.bits.ic5 != 0 and not isRv64())
 		return expanded; // Illegal
 	      op0 = rd; op1 = rd; op2 = caf.shiftImmed();
-	      encodeSrli(op0, op1, op2, expanded);
+	      encodeSrli(op0, op1, op2, isRv64(), expanded);
               return expanded;
 	    }
 	  if (f2 == 1)  // srai64, srai
@@ -1915,7 +1915,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	      if (caf.bits.ic5 != 0 and not isRv64())
 		return expanded; // Illegal
 	      op0 = rd; op1 = rd; op2 = caf.shiftImmed();
-	      encodeSrai(op0, op1, op2, expanded);
+	      encodeSrai(op0, op1, op2, isRv64(), expanded);
               return expanded;
 	    }
 	  if (f2 == 2)  // c.andi
@@ -2001,7 +2001,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  if (cif.bits.ic5 != 0 and not isRv64())
 	    return expanded; // Illegal
 	  op0 = cif.bits.rd; op1 = cif.bits.rd; op2 = immed;
-	  encodeSlli(op0, op1, op2, expanded);
+	  encodeSlli(op0, op1, op2, isRv64(), expanded);
           return expanded;
 	}
 
