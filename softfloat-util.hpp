@@ -150,6 +150,36 @@ namespace WdRiscv
   }
 
 
+  /// Perform a fused multiply-add using the softfloat library.
+  inline float
+  softFma(float a, float b, float c)
+  {
+    float32_t tmp = f32_mulAdd(nativeToSoft(a), nativeToSoft(b), nativeToSoft(c));
+    float res = softToNative(tmp);
+    return res;
+  }
+
+
+  /// Perform a fused multiply-add using the softfloat library.
+  inline double
+  softFma(double a, double b, double c)
+  {
+    float64_t tmp = f64_mulAdd(nativeToSoft(a), nativeToSoft(b), nativeToSoft(c));
+    double res = softToNative(tmp);
+    return res;
+  }
+
+
+  /// Perform a fused multiply-add using the softfloat library.
+  inline Float16
+  softFma(Float16 a, Float16 b, Float16 c)
+  {
+    float16_t tmp = f16_mulAdd(nativeToSoft(a), nativeToSoft(b), nativeToSoft(c));
+    Float16 res = softToNative(tmp);
+    return res;
+  }
+
+
   /// Perform a floating point sqrt using the softfloat library.
   inline float
   softSqrt(float a)

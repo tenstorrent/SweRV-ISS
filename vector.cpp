@@ -17379,16 +17379,6 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
 }
 
 
-extern Float16
-fusedMultiplyAdd(Float16 x, Float16 y, Float16 z);
-
-extern float
-fusedMultiplyAdd(float x, float y, float z);
-
-extern double
-fusedMultiplyAdd(double x, double y, double z);
-
-
 template <typename URV>
 template <typename ELEM_TYPE>
 void
