@@ -16,9 +16,37 @@ namespace WdRiscv
   }
 
 
+  /// The system's C library may be configured to handle tininess before
+  /// rounding.  In that case, an underflow exception may have been
+  /// unnecessarily triggered on a subnormal value that was rounded to a
+  /// normal value, and if so, that exception should be masked.
+  /// Also, if the result is a NaN, ensure the value is converted to a
+  /// quiet NaN.
+  template <typename T>
+  inline T
+  maybeAdjustForTininessBeforeRoundingAndQuietNaN(T res)
+  {
+    // SoftFloat handles tininess after rounding and handles quiet NaN
+    // conversions automatically, so below only applies when not using
+    // SoftFloat.
+#ifndef SOFT_FLOAT
+    decltype(FP_SUBNORMAL) classification = std::fpclassify(res);
+    if (classification != FP_SUBNORMAL and classification != FP_ZERO)
+      {
+        if (std::fetestexcept(FE_UNDERFLOW))
+          std::feclearexcept(FE_UNDERFLOW);
+        if (classification == FP_NAN)
+          res = std::numeric_limits<T>::quiet_NaN();
+      }
+#endif
+    return res;
+  }
+
+
   /// Floating point add. Return sum of two fp numbers. Return a
   /// canonical NAN if either is a NAN.
   template <typename FT>
+  inline
   FT
   doFadd(FT f1, FT f2)
   {
@@ -27,8 +55,8 @@ namespace WdRiscv
 #else
     FT res = f1 + f2;
 #endif
-    if (std::isnan(res))
-      res = getQuietNan<FT>();
+
+    res = maybeAdjustForTininessBeforeRoundingAndQuietNaN(res);
     return res;
   }
 
@@ -36,6 +64,7 @@ namespace WdRiscv
   /// Floating point multiply. Return product of two fp
   /// numbers. Return a canonical NAN if either is a NAN.
   template <typename FT>
+  inline
   FT
   doFmul(FT f1, FT f2)
   {
@@ -44,8 +73,8 @@ namespace WdRiscv
 #else
     FT res = f1 * f2;
 #endif
-    if (std::isnan(res))
-      res = getQuietNan<FT>();
+
+    res = maybeAdjustForTininessBeforeRoundingAndQuietNaN(res);
     return res;
   }
 
@@ -53,6 +82,7 @@ namespace WdRiscv
   /// Floating point divide. Return quotient of two fp numbers. Return
   /// a canonical NAN if either is a NAN.
   template <typename FT>
+  inline
   FT
   doFdiv(FT f1, FT f2)
   {
@@ -61,8 +91,8 @@ namespace WdRiscv
 #else
     FT res = f1 / f2;
 #endif
-    if (std::isnan(res))
-      res = getQuietNan<FT>();
+
+    res = maybeAdjustForTininessBeforeRoundingAndQuietNaN(res);
     return res;
   }
 
@@ -118,45 +148,36 @@ namespace WdRiscv
 
   /// Floating point fused multiply and add.
   template <typename FT>
+  inline
   FT
-  doFma(FT a, FT b, FT c)
+  fusedMultiplyAdd(FT a, FT b, FT c)
   {
-    FT res{};
 #ifndef SOFT_FLOAT
-    res = cppFma(a, b, c);
-    if ((std::isinf(x) and y == FT{}) or (x == FT{} and std::isinf(y)))
+    FT res = cppFma(a, b, c);
+    if ((std::isinf(a) and b == FT{}) or (a == FT{} and std::isinf(b)))
       std::feraiseexcept(FE_INVALID);
-    if (std::isnan(res))
-      res = std::numeric_limits<FT>::quiet_NaN();
 #else
-    res = softFma(a, b, c);
+    FT res = softFma(a, b, c);
 #endif
 
+    res = maybeAdjustForTininessBeforeRoundingAndQuietNaN(res);
     return res;
   }
 
 
+  template <typename FT>
   inline
-  Float16
-  fusedMultiplyAdd(Float16 a, Float16 b, Float16 c)
+  FT
+  doFsqrt(FT f1)
   {
-    return doFma(a, b, c);
-  }
+#ifdef SOFT_FLOAT
+    FT res = softSqrt(f1);
+#else
+    FT res = std::sqrt(f1);
+#endif
 
-
-  inline
-  float
-  fusedMultiplyAdd(float a, float b, float c)
-  {
-    return doFma(a, b, c);
-  }
-
-
-  inline
-  double
-  fusedMultiplyAdd(double a, double b, double c)
-  {
-    return doFma(a, b, c);
+    res = maybeAdjustForTininessBeforeRoundingAndQuietNaN(res);
+    return res;
   }
 
 }

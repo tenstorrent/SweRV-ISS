@@ -56,7 +56,9 @@ inline auto fmin(Float16 a, Float16 b)
 
 inline decltype(FP_NORMAL) fpclassify(Float16 v)
 {
-  return std::fpclassify(static_cast<float>(v));
+  // Can't static cast to float here because a subnormal number
+  // may become normal upon promotion to float.
+  return __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, v);
 }
 
 inline auto frexp(Float16 v, int* p)
@@ -66,17 +68,17 @@ inline auto frexp(Float16 v, int* p)
 
 inline bool isinf(Float16 v)
 {
-  return std::isinf(static_cast<float>(v));
+  return __builtin_isinf(v);
 }
 
 inline bool isnan(Float16 v)
 {
-  return std::isnan(static_cast<float>(v));
+  return __builtin_isnan(v);
 }
 
 inline bool signbit(Float16 v)
 {
-  return std::signbit(static_cast<float>(v));
+  return __builtin_signbit(v);
 }
 
 inline auto fma(Float16 a, Float16 b, Float16 c)
@@ -144,7 +146,9 @@ inline auto fmin(BFloat16 a, BFloat16 b)
 
 inline decltype(FP_NORMAL) fpclassify(BFloat16 v)
 {
-  return std::fpclassify(static_cast<float>(v));
+  // Can't static cast to float here because a subnormal number
+  // may become normal upon promotion to float.
+  return __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, v);
 }
 
 inline auto frexp(BFloat16 v, int* p)
@@ -154,17 +158,17 @@ inline auto frexp(BFloat16 v, int* p)
 
 inline bool isinf(BFloat16 v)
 {
-  return std::isinf(static_cast<float>(v));
+  return __builtin_isinf(v);
 }
 
 inline bool isnan(BFloat16 v)
 {
-  return std::isnan(static_cast<float>(v));
+  return __builtin_isnan(v);
 }
 
 inline bool signbit(BFloat16 v)
 {
-  return std::signbit(static_cast<float>(v));
+  return __builtin_signbit(v);
 }
 
 inline auto fma(BFloat16 a, BFloat16 b, BFloat16 c)
