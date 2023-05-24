@@ -21646,8 +21646,8 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 
   clearSimulatorFpFlags();
 
-  raiseSimulatorFpFlags(FpFlags::Invalid);
-  raiseSimulatorFpFlags(FpFlags::DivByZero);
+  if (inv) raiseSimulatorFpFlags(FpFlags::Invalid);
+  if (dbz) raiseSimulatorFpFlags(FpFlags::DivByZero);
 
   updateAccruedFpBits();
 
