@@ -612,8 +612,8 @@ IFormInst::encodeSrai(unsigned rd, unsigned rs1, unsigned shamt, bool rv64)
 {
   if (not encodeSlli(rd, rs1, shamt, rv64))
     return false;
-  fields2.funct3 = 5;
-  fields2.top7 = 0x20;
+  fields3.funct3 = 5;
+  fields3.top6 = 0x10;
   return true;
 }
 
