@@ -572,6 +572,13 @@ doFsqrt(FT f1)
 inline int
 setSimulatorRoundingMode(RoundingMode mode)
 {
+  // Arbitrarily use nearest-even for modes with no equivalent in
+  // simulator.  The right mode will later be selected by an FP
+  // instruction (if dynamic) or an exception will be trigerred (if
+  // invalid).
+  if (mode == RoundingMode::Dynamic or mode == RoundingMode::Invalid1 or mode == RoundingMode::Invalid2)
+    mode = RoundingMode::NearestEven;
+
 #ifdef SOFT_FLOAT
   static constexpr auto riscvToSoftFloat = std::array
     {
