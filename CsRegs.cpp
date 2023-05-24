@@ -565,16 +565,21 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       return true;
     }
 
-  // Write mask of SIP/SIE is a combined with that of MIP/MIE.
+  // Write mask of SIP/SIE is a combined with that of MIP/MIE and
   // delgation register.
   if (num == CsrNumber::SIP or num == CsrNumber::SIE)
     {
       // Get MIP/MIE
       auto mcsr = getImplementedCsr(CsrNumber(unsigned(num) + 0x200));
+      auto mideleg = getImplementedCsr(CsrNumber(CsrNumber::MIDELEG));
       if (mcsr)
         {
           URV prevMask = csr->getWriteMask();
 	  URV tmpMask = prevMask & mcsr->getWriteMask();
+	  if (mideleg)
+	    tmpMask &= mideleg->read();
+	  else
+	    tmpMask = 0;
           csr->setWriteMask(tmpMask);
           csr->write(value);
           csr->setWriteMask(prevMask);
@@ -587,6 +592,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
   if (num == CsrNumber::MSTATUS or num == CsrNumber::SSTATUS or num == CsrNumber::VSSTATUS)
     {
+      value &= csr->getWriteMask();
       value = legalizeMstatusValue(value);
       csr->poke(value);       // Write cannot modify SD bit of msatus: poke it.
       recordWrite(num);

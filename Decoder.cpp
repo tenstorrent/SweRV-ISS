@@ -1907,7 +1907,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	      if (caf.bits.ic5 != 0 and not isRv64())
 		return expanded; // Illegal
 	      op0 = rd; op1 = rd; op2 = caf.shiftImmed();
-	      encodeSrli(op0, op1, op2, expanded);
+	      encodeSrli(op0, op1, op2, isRv64(), expanded);
               return expanded;
 	    }
 	  if (f2 == 1)  // srai64, srai
@@ -1915,7 +1915,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	      if (caf.bits.ic5 != 0 and not isRv64())
 		return expanded; // Illegal
 	      op0 = rd; op1 = rd; op2 = caf.shiftImmed();
-	      encodeSrai(op0, op1, op2, expanded);
+	      encodeSrai(op0, op1, op2, isRv64(), expanded);
               return expanded;
 	    }
 	  if (f2 == 2)  // c.andi
@@ -2001,7 +2001,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  if (cif.bits.ic5 != 0 and not isRv64())
 	    return expanded; // Illegal
 	  op0 = cif.bits.rd; op1 = cif.bits.rd; op2 = immed;
-	  encodeSlli(op0, op1, op2, expanded);
+	  encodeSlli(op0, op1, op2, isRv64(), expanded);
           return expanded;
 	}
 
@@ -2298,22 +2298,18 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           {
             IFormInst iform(inst);
             unsigned funct3 = iform.fields.funct3;
-            unsigned imm = iform.uimmed(), rd = iform.fields.rd, rs1 = iform.fields.rs1;
+            unsigned imm = iform.uimmed(), rd = iform.fields.rd;
 
             if (funct3 == 0)
               {
-                if (rd == 0 and rs1 == 0)
-                  {
-                    if (iform.top4() == 0)
-                      return instTable_.getEntry(InstId::fence);
-                    if (iform.top4() == 8)
-                      return instTable_.getEntry(InstId::fence_tso);
-                  }
+		if (iform.top4() == 0)
+		  return instTable_.getEntry(InstId::fence);
+		if (iform.top4() == 8)
+		  return instTable_.getEntry(InstId::fence_tso);
               }
             else if (funct3 == 1)
               {
-                if (rd == 0 and rs1 == 0 and imm == 0)
-                  return instTable_.getEntry(InstId::fence_i);
+		return instTable_.getEntry(InstId::fence_i);
               }
             else if (funct3 == 2)
               {

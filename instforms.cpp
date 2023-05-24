@@ -574,28 +574,33 @@ IFormInst::encodeFld(unsigned rd, unsigned rs1, int offset)
 
 
 bool
-IFormInst::encodeSlli(unsigned rd, unsigned rs1, unsigned shamt)
+IFormInst::encodeSlli(unsigned rd, unsigned rs1, unsigned shamt, bool rv64)
 {
   if (rd > 31 or rs1 > 31)
     return false;  // Register(s) out of bounds.
 
-  if (shamt > 63)
-    return false;  // Shift amount out ofbounds.
+  if (rv64)
+    {
+      if (shamt > 63)
+	return false;  // Shift amount out of bounds.
+    }
+  else if (shamt > 31)
+    return false;  // Shift amount out of bounds.
 
-  fields2.opcode = 0x13;
-  fields2.rd = rd & 0x1f;
-  fields2.funct3 = 1;
-  fields2.rs1 = rs1 & 0x1f;
-  fields2.shamt = shamt & 0x1f;
-  fields2.top7 = 0;
+  fields3.opcode = 0x13;
+  fields3.rd = rd & 0x1f;
+  fields3.funct3 = 1;
+  fields3.rs1 = rs1 & 0x1f;
+  fields3.shamt = shamt;
+  fields3.top6 = 0;
   return true;
 }
 
 
 bool
-IFormInst::encodeSrli(unsigned rd, unsigned rs1, unsigned shamt)
+IFormInst::encodeSrli(unsigned rd, unsigned rs1, unsigned shamt, bool rv64)
 {
-  if (not encodeSlli(rd, rs1, shamt))
+  if (not encodeSlli(rd, rs1, shamt, rv64))
     return false;
   fields2.funct3 = 5;
   return true;
@@ -603,12 +608,12 @@ IFormInst::encodeSrli(unsigned rd, unsigned rs1, unsigned shamt)
 
 
 bool
-IFormInst::encodeSrai(unsigned rd, unsigned rs1, unsigned shamt)
+IFormInst::encodeSrai(unsigned rd, unsigned rs1, unsigned shamt, bool rv64)
 {
-  if (not encodeSlli(rd, rs1, shamt))
+  if (not encodeSlli(rd, rs1, shamt, rv64))
     return false;
-  fields2.funct3 = 5;
-  fields2.top7 = 0x20;
+  fields3.funct3 = 5;
+  fields3.top6 = 0x10;
   return true;
 }
 
@@ -670,7 +675,7 @@ IFormInst::encodeSlliw(unsigned rd, unsigned rs1, unsigned shamt)
   if (rd > 31 or rs1 > 31)
     return false;  // Register(s) out of bounds.
 
-  if (shamt > 63)
+  if (shamt > 31)
     return false;  // Shift amount out ofbounds.
 
   fields2.opcode = 0x033;
@@ -1664,10 +1669,10 @@ WdRiscv::encodeAndi(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 
 
 bool
-WdRiscv::encodeSlli(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst)
+WdRiscv::encodeSlli(uint32_t rd, uint32_t rs1, uint32_t shamt, bool rv64, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeSlli(rd, rs1, shamt))
+  if (not ifi.encodeSlli(rd, rs1, shamt, rv64))
     return false;
   inst = ifi.code;
   return true;
@@ -1675,10 +1680,10 @@ WdRiscv::encodeSlli(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst)
 
 
 bool
-WdRiscv::encodeSrli(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst)
+WdRiscv::encodeSrli(uint32_t rd, uint32_t rs1, uint32_t shamt, bool rv64, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeSrli(rd, rs1, shamt))
+  if (not ifi.encodeSrli(rd, rs1, shamt, rv64))
     return false;
   inst = ifi.code;
   return true;
@@ -1686,10 +1691,10 @@ WdRiscv::encodeSrli(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst)
 
 
 bool
-WdRiscv::encodeSrai(uint32_t rd, uint32_t rs1, uint32_t shamt, uint32_t& inst)
+WdRiscv::encodeSrai(uint32_t rd, uint32_t rs1, uint32_t shamt, bool rv64, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeSrai(rd, rs1, shamt))
+  if (not ifi.encodeSrai(rd, rs1, shamt, rv64))
     return false;
   inst = ifi.code;
   return true;

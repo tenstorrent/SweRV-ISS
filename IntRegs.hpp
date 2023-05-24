@@ -80,7 +80,7 @@ namespace WdRiscv
     bool findReg(std::string_view name, unsigned& ix) const;
 
     /// Return the name of the given register.
-    std::string_view regName(unsigned i, bool abiNames = false) const
+    static constexpr std::string_view regName(unsigned i, bool abiNames = false)
     { return IntRegNames::regName(i, abiNames); }
 
   protected:

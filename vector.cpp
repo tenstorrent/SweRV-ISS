@@ -24,7 +24,7 @@
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
-#include "softfloat-util.hpp"
+#include "float-util.hpp"
 
 
 // make_unsigned/make_signed do not work on our types -- compensate.
@@ -15739,32 +15739,6 @@ Hart<URV>::execVlsege1024ff_v(const DecodedInst* di)
 }
 
 
-// Quiet NAN for Float16, float and double.
-template <typename T>
-static
-T
-getQuietNan()
-{
-  return std::numeric_limits<T>::quiet_NaN();
-}
-
-
-template <typename FT>
-static FT
-doFadd(FT f1, FT f2)
-{
-#ifdef SOFT_FLOAT
-  FT res = softAdd(f1, f2);
-#else
-  FT res = f1 + f2;
-#endif
-
-  if (std::isnan(res))
-    res = getQuietNan<FT>();
-  return res;
-}
-
-
 static
 float minfp(float a, float b)
 {
@@ -15861,56 +15835,6 @@ doFmax(FT f1, FT f2)
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
     res = std::copysign(res, FT{});  // Make sure max(-0, +0) is +0.
 
-  return res;
-}
-
-
-template <typename FT>
-static FT
-doFsqrt(FT f1)
-{
-  FT res{};
-
-#ifdef SOFT_FLOAT
-  res = softSqrt(f1);
-#else
-    res = std::sqrt(f1);
-#endif
-
-  if (std::isnan(res))
-    res = getQuietNan<FT>();
-  return res;
-}
-
-
-template <typename FT>
-static FT
-doFmul(FT f1, FT f2)
-{
-#ifdef SOFT_FLOAT
-  FT res = softMul(f1, f2);
-#else
-  FT res = f1 * f2;
-#endif
-
-  if (std::isnan(res))
-    res = getQuietNan<FT>();
-  return res;
-}
-
-
-template <typename FT>
-static FT
-doFdiv(FT f1, FT f2)
-{
-#ifdef SOFT_FLOAT
-  FT res = softDiv(f1, f2);
-#else
-  FT res = f1 / f2;
-#endif
-
-  if (std::isnan(res))
-    res = getQuietNan<FT>();
   return res;
 }
 
@@ -16128,7 +16052,7 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16190,7 +16114,7 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
     default:        postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16251,7 +16175,7 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16313,7 +16237,7 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
     default:        postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16375,7 +16299,7 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
     default:        postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16451,7 +16375,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16483,7 +16407,7 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
+          dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -16527,7 +16451,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16603,7 +16527,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16635,7 +16559,7 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(negE2dw));
+          dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -16679,7 +16603,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16754,7 +16678,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16784,7 +16708,7 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw))
         {
-          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
+          dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -16828,7 +16752,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16902,7 +16826,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -16932,7 +16856,7 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group2x, e1dw))
         {
-          dest = doFadd(e1dw, static_cast<ELEM_TYPE2X>(negE2dw));
+          dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -16976,7 +16900,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -17037,7 +16961,7 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -17099,7 +17023,7 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
     default:        postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -17160,7 +17084,7 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -17222,7 +17146,7 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
     default:        postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -17284,7 +17208,7 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
     default:        postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -17357,7 +17281,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -17389,7 +17313,7 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
       if (vecRegs_.read(vs1, ix, group, e1))
         {
 	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-          dest = doFmul(e1dw, static_cast<ELEM_TYPE2X>(e2dw));
+          dest = doFmul<ELEM_TYPE2X>(e1dw, e2dw);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -17432,19 +17356,9 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
-
-
-extern Float16
-fusedMultiplyAdd(Float16 x, Float16 y, Float16 z);
-
-extern float
-fusedMultiplyAdd(float x, float y, float z);
-
-extern double
-fusedMultiplyAdd(double x, double y, double z);
 
 
 template <typename URV>
@@ -17477,7 +17391,7 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17538,7 +17452,7 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17602,7 +17516,7 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17663,7 +17577,7 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17727,7 +17641,7 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17788,7 +17702,7 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17852,7 +17766,7 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17913,7 +17827,7 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -17977,7 +17891,7 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18038,7 +17952,7 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18117,7 +18031,7 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18178,7 +18092,7 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18242,7 +18156,7 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18303,7 +18217,7 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18367,7 +18281,7 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18428,7 +18342,7 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18499,7 +18413,7 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18564,7 +18478,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd(e1dw, e2dw, dest);
+          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -18572,7 +18486,7 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18648,7 +18562,7 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18698,7 +18612,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{e1};
+  WidenedFpScalar e1dw{-e1};
 
   unsigned group2x = group*2;
 
@@ -18713,7 +18627,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
+          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -18721,7 +18635,7 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18797,7 +18711,7 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18862,7 +18776,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
+          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, -dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -18870,7 +18784,7 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18946,7 +18860,7 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     }
 
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -18997,7 +18911,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
-  WidenedFpScalar e1dw{e1};
+  WidenedFpScalar e1dw{-e1};
 
   unsigned group2x = group*2;
 
@@ -19012,7 +18926,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
       if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
         {
 	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
+          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, dest);
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
         }
@@ -19020,7 +18934,7 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -19086,7 +19000,7 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -19970,7 +19884,7 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20035,7 +19949,7 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20168,7 +20082,7 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20235,7 +20149,7 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20303,7 +20217,7 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20374,7 +20288,7 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20517,7 +20431,7 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20603,7 +20517,7 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20697,7 +20611,7 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20769,7 +20683,7 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -20853,7 +20767,7 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -21037,7 +20951,7 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -21074,7 +20988,7 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21111,7 +21025,7 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -21148,7 +21062,7 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21184,7 +21098,7 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   assert(errors == 0);
 }
 
@@ -21221,7 +21135,7 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21264,7 +21178,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
     default:       postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21343,7 +21257,7 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
     case EW::Word32: postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21413,7 +21327,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
     case EW::Word32: postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21448,7 +21362,7 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     errors++;
 
   assert(errors == 0);
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 }
 
 
@@ -21518,7 +21432,7 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     errors++;
 
   assert(errors == 0);
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 }
 
 
@@ -21636,7 +21550,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
     case EW::Word32: postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21711,7 +21625,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
     case EW::Word32: postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 
@@ -21758,7 +21672,7 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
   if (dbz) feraiseexcept(FE_DIVBYZERO);
 #endif
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -21885,7 +21799,7 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -21953,7 +21867,7 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -22014,7 +21928,7 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -22079,7 +21993,7 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
         errors++;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
 
   assert(errors == 0);
 }
@@ -22530,7 +22444,7 @@ Hart<URV>::execVfncvtbf16_f_f_w(const DecodedInst* di)
     default:         postVecFail(di); return;
     }
 
-  updateAccruedFpBits(0.0f);
+  updateAccruedFpBits();
   postVecSuccess();
 }
 

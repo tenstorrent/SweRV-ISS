@@ -367,6 +367,10 @@ namespace WdRiscv
     void enableTranslationNapot(bool flag)
     { virtMem_.enableNapot(flag); }
 
+    /// Enable page pointer masking for user privilege (Zjpm).
+    void enableUserPointerMasking(bool flag)
+    { virtMem_.enablePointerMasking(flag); }
+
     /// Do not consider lr and sc instructions as load/store events for
     /// performance counter when flag is false. Do consider them when
     /// flag is true.
@@ -2068,9 +2072,7 @@ namespace WdRiscv
 
     /// Update the accrued floating point bits in the FCSR
     /// register. No-op if a trigger has tripped.
-    template <typename float_type>
-    auto updateAccruedFpBits(float_type res)
-      -> typename std::enable_if<is_fp<float_type>::value, void>::type;
+    void updateAccruedFpBits();
 
     /// Set the flags field in FCSR to the least sig 5 bits of the
     /// given value

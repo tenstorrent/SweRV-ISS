@@ -1561,6 +1561,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableTranslationNapot(flag);
     }
 
+  tag = "enable_user_pointer_masking";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableUserPointerMasking(flag);
+    }
+
   return errors == 0;
 }
 
