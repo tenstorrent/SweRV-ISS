@@ -10907,7 +10907,7 @@ template <typename URV>
 void
 Hart<URV>::execMulw(const DecodedInst* di)
 {
-  if (not isRv64())
+  if (not isRv64() or (not isRvm() and not isRvzmmul()))
     {
       illegalInst(di);
       return;
