@@ -592,6 +592,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
   if (num == CsrNumber::MSTATUS or num == CsrNumber::SSTATUS or num == CsrNumber::VSSTATUS)
     {
+      value &= csr->getWriteMask();
       value = legalizeMstatusValue(value);
       csr->poke(value);       // Write cannot modify SD bit of msatus: poke it.
       recordWrite(num);
