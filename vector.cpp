@@ -19,7 +19,6 @@
 #include <cassert>
 #include <optional>
 #include <boost/multiprecision/cpp_int.hpp>
-#include "float-convert-helpers.hpp"
 #include "wideint.hpp"
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
@@ -388,11 +387,6 @@ Hart<URV>::checkVecIntInst(const DecodedInst* di, GroupMultiplier /*gm*/,
 
   return true;
 }
-
-
-// From float.cpp
-extern void clearSimulatorFpFlags();
-extern int  setSimulatorRoundingMode(RoundingMode mode);
 
 
 template <typename URV>
@@ -15768,7 +15762,7 @@ doFmin(FT f1, FT f2)
 
   bool isNan1 = std::isnan(f1), isNan2 = std::isnan(f2);
   if (isNan1 and isNan2)
-    res = getQuietNan<FT>();
+    res = std::numeric_limits<FT>::quiet_NaN();
   else if (isNan1)
     res = f2;
   else if (isNan2)
@@ -15777,11 +15771,7 @@ doFmin(FT f1, FT f2)
     res = minfp(f1, f2);  // std::fminf or std::fmin
 
   if (isSnan(f1) or isSnan(f2))
-#ifdef SOFT_FLOAT
-    softfloat_exceptionFlags |= softfloat_flag_invalid;
-#else
-    feraiseexcept(FE_INVALID);
-#endif
+    raiseSimulatorFpFlags(FpFlags::Invalid);
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
     res = std::copysign(res, -FT{});  // Make sure min(-0, +0) is -0.
 
@@ -15818,7 +15808,7 @@ doFmax(FT f1, FT f2)
 
   bool isNan1 = std::isnan(f1), isNan2 = std::isnan(f2);
   if (isNan1 and isNan2)
-    res = getQuietNan<FT>();
+    res = std::numeric_limits<FT>::quiet_NaN();
   else if (isNan1)
     res = f2;
   else if (isNan2)
@@ -15827,11 +15817,7 @@ doFmax(FT f1, FT f2)
     res = maxfp(f1, f2);  // std::fmaxf or std::fmax
 
   if (isSnan(f1) or isSnan(f2))
-#ifdef SOFT_FLOAT
-    softfloat_exceptionFlags |= softfloat_flag_invalid;
-#else
-    feraiseexcept(FE_INVALID);
-#endif
+    raiseSimulatorFpFlags(FpFlags::Invalid);
   else if (std::signbit(f1) != std::signbit(f2) and f1 == f2)
     res = std::copysign(res, FT{});  // Make sure max(-0, +0) is +0.
 
@@ -20597,12 +20583,8 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
           dest = fpConvertTo<ELEM_TYPE2X, false>(e1);
           if (isSnan(dest))
             {
-              dest = getQuietNan<ELEM_TYPE2X>();
-#ifdef SOFT_FLOAT
-              softfloat_exceptionFlags |= softfloat_flag_invalid;
-#else
-              feraiseexcept(FE_INVALID);
-#endif
+              dest = std::numeric_limits<ELEM_TYPE2X>::quiet_NaN();
+              raiseSimulatorFpFlags(FpFlags::Invalid);
             }
           if (not vecRegs_.write(vd, ix, group2x, dest))
             errors++;
@@ -21216,7 +21198,7 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   // is only allowed for vfredusum.vs and NOT for vfredosum.vs,
   // vfredmin.vs, and vfredmax.vs.
   if (not anyActive and std::isnan(result))
-    result = getQuietNan<decltype(result)>();
+    result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -21509,7 +21491,7 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   // Note: NaN canonicalization when there are no active elements
   // is only allowed for vfwredusum.vs and NOT for vfwredosum.vs.
   if (not anyActive and std::isnan(result))
-    result = getQuietNan<decltype(result)>();
+    result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
   if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
     errors++;
@@ -21664,13 +21646,8 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 
   clearSimulatorFpFlags();
 
-#ifdef SOFT_FLOAT
-  if (inv) softfloat_exceptionFlags |= softfloat_flag_invalid;
-  if (dbz) softfloat_exceptionFlags |= softfloat_flag_infinite;
-#else
-  if (inv) feraiseexcept(FE_INVALID);
-  if (dbz) feraiseexcept(FE_DIVBYZERO);
-#endif
+  raiseSimulatorFpFlags(FpFlags::Invalid);
+  raiseSimulatorFpFlags(FpFlags::DivByZero);
 
   updateAccruedFpBits();
 

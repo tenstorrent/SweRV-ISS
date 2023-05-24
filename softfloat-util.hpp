@@ -1,11 +1,10 @@
 #pragma once
 
-#ifdef SOFT_FLOAT
 #include <bit>
 extern "C" {
 #include <softfloat.h>
 }
-
+#include "float16-compat.hpp"
 
 namespace WdRiscv
 {
@@ -206,6 +205,3 @@ namespace WdRiscv
     return res;
   }
 }
-
-#endif
-

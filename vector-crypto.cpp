@@ -17,13 +17,10 @@
 #include <cmath>
 #include <climits>
 #include <cassert>
-#include <boost/multiprecision/cpp_int.hpp>
-#include "float-convert-helpers.hpp"
 #include "wideint.hpp"
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
-#include "softfloat-util.hpp"
 
 
 using namespace WdRiscv;
