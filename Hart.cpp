@@ -9737,19 +9737,26 @@ template <typename URV>
 void
 Hart<URV>::execWfi(const DecodedInst* di)
 {
-  if (privilegeMode() == PrivilegeMode::User and isRvs())
+  typedef PrivilegeMode PM;
+  auto pm = privilegeMode();
+
+  if (pm == PM::User and isRvs())
+    {
+      if (virtMode_ and not mstatus_.bits_.TW)
+	virtualInst(di);   // VU mode and TW=0.
+      else
+	illegalInst(di);
+      return;
+    }
+
+  if (mstatus_.bits_.TW and pm != PM::Machine)
     {
       illegalInst(di);
       return;
     }
 
-  if (mstatus_.bits_.TW and privilegeMode() != PrivilegeMode::Machine)
-    {
-      illegalInst(di);
-      return;
-    }
-
-  if (virtMode_ and mstatus_.bits_.TW and hstatus_.bits_.VTW)
+  // VS mode, VTW=1 and mstatus.TW=0
+  if (virtMode_ and pm == PM::Supervisor and not mstatus_.bits_.TW and hstatus_.bits_.VTW)
     {
       virtualInst(di);
       return;
