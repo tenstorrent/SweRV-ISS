@@ -356,7 +356,7 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicboz(true);
   if (isa_.isEnabled(RvExtension::Zawrs))
     enableRvzawrs(true);
-  if (extensionIsEnabled(RvExtension::M) or isa_.isEnabled(RvExtension::Zmmul))
+  if (isa_.isEnabled(RvExtension::Zmmul))
     enableRvzmmul(true);
   if (isa_.isEnabled(RvExtension::Zvbb))
     enableRvzvbb(true);

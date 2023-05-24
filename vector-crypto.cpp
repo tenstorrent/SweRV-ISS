@@ -2085,7 +2085,7 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 	      not (vs2 + group <= vd or vd + group <= vs2));
   if (isRvzvknha() and sew != EW::Word)
     bad = true;
-  else if (isRvzvknha() and sew != EW::Word and sew != EW::Word2)
+  else if (isRvzvknhb() and sew != EW::Word and sew != EW::Word2)
     bad = true;
 
   if (bad)
@@ -2261,7 +2261,7 @@ Hart<URV>::execVsha2ch_vv(const DecodedInst* di)
 	      not (vs2 + group <= vd or vd + group <= vs2));
   if (isRvzvknha() and sew != EW::Word)
     bad = true;
-  else if (isRvzvknha() and sew != EW::Word and sew != EW::Word2)
+  else if (isRvzvknhb() and sew != EW::Word and sew != EW::Word2)
     bad = true;
 
   if (bad)
@@ -2330,7 +2330,7 @@ Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
 	      not (vs2 + group <= vd or vd + group <= vs2));
   if (isRvzvknha() and sew != EW::Word)
     bad = true;
-  else if (isRvzvknha() and sew != EW::Word and sew != EW::Word2)
+  else if (isRvzvknhb() and sew != EW::Word and sew != EW::Word2)
     bad = true;
 
   if (bad)
