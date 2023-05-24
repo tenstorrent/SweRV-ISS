@@ -854,47 +854,6 @@ CsRegs<URV>::configUserModePerfCounters(unsigned numCounters)
 }
 
 
-/// Map a RISCV rounding mode to an fetsetround constant.
-static std::array<int, 5> riscvRoundingModeToFe =
-  {
-   FE_TONEAREST,  // NearsetEven
-   FE_TOWARDZERO, // Zero
-   FE_DOWNWARD,   // Down
-   FE_UPWARD,     // Up
-   FE_TONEAREST   // NearestMax
-  };
-
-
-static
-inline
-int
-mapRiscvRoundingModeToFe(RoundingMode mode)
-{
-  uint32_t ix = uint32_t(mode);
-  if (ix < riscvRoundingModeToFe.size())
-    return riscvRoundingModeToFe.at(ix);
-
-  // For dynamic mode, it does not matter to what we set the host machine
-  // fp mode since it will be changed by the floating point instructions.
-  return FE_TONEAREST;
-}
-  
-
-static
-inline
-int
-setSimulatorRoundingMode(RoundingMode mode)
-{
-  int previous = std::fegetround();
-  int next = mapRiscvRoundingModeToFe(mode);
-
-  if (next != previous)
-    std::fesetround(next);
-
-  return previous;
-}
-
-
 template <typename URV>
 void
 CsRegs<URV>::updateFcsrGroupForWrite(CsrNumber number, URV value)
