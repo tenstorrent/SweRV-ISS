@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "FpRegs.hpp"
-#include "softfloat-util.hpp"
 
 using namespace WdRiscv;
 

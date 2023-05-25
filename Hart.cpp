@@ -9416,9 +9416,18 @@ template <typename URV>
 void
 Hart<URV>::execSfence_vma(const DecodedInst* di)
 {
-  if (not isRvs() or privMode_ < PrivilegeMode::Supervisor)
+  if (not isRvs())
     {
       illegalInst(di);
+      return;
+    }
+      
+  if (privMode_ == PrivilegeMode::User)
+    {
+      if (virtMode_)
+	virtualInst(di);  // VU mode.
+      else
+	illegalInst(di);
       return;
     }
 
@@ -9484,7 +9493,10 @@ Hart<URV>::execSfence_w_inval(const DecodedInst* di)
 {
   if (not isRvs() or not isRvsvinval() or privMode_ < PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_ and privMode_ == PrivilegeMode::User)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 }
@@ -9496,7 +9508,10 @@ Hart<URV>::execSfence_inval_ir(const DecodedInst* di)
 {
   if (not isRvs() or not isRvsvinval() or privMode_ < PrivilegeMode::Supervisor)
     {
-      illegalInst(di);
+      if (virtMode_ and privMode_ == PrivilegeMode::User)
+	virtualInst(di);
+      else
+	illegalInst(di);
       return;
     }
 }
@@ -10907,7 +10922,7 @@ template <typename URV>
 void
 Hart<URV>::execMulw(const DecodedInst* di)
 {
-  if (not isRv64())
+  if (not isRv64() or (not isRvm() and not isRvzmmul()))
     {
       illegalInst(di);
       return;
