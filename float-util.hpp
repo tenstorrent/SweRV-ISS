@@ -640,9 +640,10 @@ clearSimulatorFpFlags()
   uint32_t val = _mm_getcsr();
   val &= ~uint32_t(0x3f);
   _mm_setcsr(val);
-#endif
+#else
   if (fetestexcept(FE_ALL_EXCEPT) != 0)
     std::feclearexcept(FE_ALL_EXCEPT);
+#endif
 #endif
 }
 
@@ -664,7 +665,11 @@ activeSimulatorFpFlags()
       if (flags & softfloat_flag_invalid)   incFlags |= uint32_t(FpFlags::Invalid);
     }
 #else
+#ifdef __x86_64__
+  int flags = _mm_getcsr() & 0x3f;
+#else
   int flags = fetestexcept(FE_ALL_EXCEPT);
+#endif
   if (flags)
     {
       if (flags & FE_INEXACT)    incFlags |= uint32_t(FpFlags::Inexact);
