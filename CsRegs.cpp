@@ -226,15 +226,27 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
   typedef CsrNumber CN;
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     {
+      constexpr bool rv32 = sizeof(URV) == 4;
+      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
+      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
+      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // SSTATEN not accessible because MSB of MSTATEEN0 is 0.
+
+      unsigned ix = unsigned(num) - unsigned(CN::SSTATEEN0);
+
       // If a bit is zero in MSTATEEN, it becomes zero in SSTATEEN
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + unsigned(num) - unsigned(CN::SSTATEEN0));
+      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
-	value &= mcsr->read();
+	  value &= mcsr->read();
 
       if (virtMode_)
 	{
-	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + unsigned(num) - unsigned(CN::SSTATEEN0));
+	  auto hcsr0 = getImplementedCsr(rv32? CN::HSTATEEN0H : CN::HSTATEEN0);
+	  if (hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
+	    return false;  // SSTATEN not accessible because bit 63 of HSTATEEN0 is 0.
+
+	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + ix);
 	  auto hcsr = getImplementedCsr(hnum);
 	  if (hcsr)
 	    value &= hcsr->read();
@@ -251,8 +263,16 @@ CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
   typedef CsrNumber CN;
   if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
     {
+      constexpr bool rv32 = sizeof(URV) == 4;
+      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
+      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
+      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // SSTATEN not accessible because MSB of MSTATEEN0 is 0.
+
+      unsigned ix = unsigned(num) - unsigned(CN::SSTATEEN0);
+
       // If a bit is zero in MSTATEEN, it becomes zero in HSTATEEN
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + unsigned(num) - unsigned(CN::HSTATEEN0));
+      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	value &= mcsr->read();
@@ -635,17 +655,28 @@ CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
       if (not csr)
 	return false;
 
+      constexpr bool rv32 = sizeof(URV) == 4;
+      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
+      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
+      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // SSTATEN not accessible because MSB of MSTATEEN0 is 0.
+
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
+      unsigned ix = unsigned(num) - unsigned(CN::SSTATEEN0);
 
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + unsigned(num) - unsigned(CN::SSTATEEN0));
+      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	mask &= mcsr->read();
 
       if (virtMode_)
 	{
-	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + unsigned(num) - unsigned(CN::SSTATEEN0));
+	  auto hcsr0 = getImplementedCsr(rv32? CN::HSTATEEN0H : CN::HSTATEEN0);
+	  if (hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
+	    return false;  // SSTATEN not accessible because bit 63 of HSTATEEN0 is 0.
+
+	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + ix);
 	  auto hcsr = getImplementedCsr(hnum);
 	  if (hcsr)
 	    mask &= hcsr->read();
@@ -673,6 +704,12 @@ CsRegs<URV>::writeHstateen(CsrNumber num, URV value)
       Csr<URV>* csr = getImplementedCsr(num, virtMode_);
       if (not csr)
 	return false;
+
+      constexpr bool rv32 = sizeof(URV) == 4;
+      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
+      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
+      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // HSSTATEN not accessible because MSB of MSTATEEN0 is 0.
 
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
@@ -1932,6 +1969,19 @@ CsRegs<URV>::defineStateEnableRegs()
   defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, wam, wam);
   defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, wam, wam);
   defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, wam, wam);
+
+  if (sizeof(URV) == 4)
+    {
+      defineCsr("sstateen0h", CsrNumber::MSTATEEN0H,  !mand, !imp, 0, wam, wam);
+      defineCsr("sstateen1h", CsrNumber::MSTATEEN1H,  !mand, !imp, 0, wam, wam);
+      defineCsr("sstateen2h", CsrNumber::MSTATEEN2H,  !mand, !imp, 0, wam, wam);
+      defineCsr("sstateen3h", CsrNumber::MSTATEEN3H,  !mand, !imp, 0, wam, wam);
+
+      defineCsr("hstateen0h", CsrNumber::HSTATEEN0H,  !mand, !imp, 0, wam, wam);
+      defineCsr("hstateen1h", CsrNumber::HSTATEEN1H,  !mand, !imp, 0, wam, wam);
+      defineCsr("hstateen2h", CsrNumber::HSTATEEN2H,  !mand, !imp, 0, wam, wam);
+      defineCsr("hstateen3h", CsrNumber::HSTATEEN3H,  !mand, !imp, 0, wam, wam);
+    }
 }
 
 
