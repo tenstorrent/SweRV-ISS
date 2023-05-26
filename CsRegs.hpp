@@ -1340,6 +1340,29 @@ namespace WdRiscv
     /// Return adjusted value.
     URV adjustPmpValue(CsrNumber csrn, URV value) const;
 
+    /// Adjust the value of SIP/SIE by masking with MIDELEG (and if
+    /// hyerpervisor also by HIDELEG).
+    URV adjustSipSieValue(URV value) const;
+
+    /// Adjust the value of TIME/TIMEH by adding the time delta in
+    /// virtual mode.
+    URV adjustTimeValue(CsrNumber csrn, URV value) const;
+
+    /// Adjust the value of SSTATEEN by masking with MSTATEEN and HSTATEEN.
+    URV adjustSstateenValue(CsrNumber csrn, URV value) const;
+
+    /// Adjust the value of HSTATEEN by masking with MSTATEEN.
+    URV adjustHstateenValue(CsrNumber csrn, URV value) const;
+
+    /// Helper to write method: Mask with MIP/MIE/MIDELEG.
+    bool writeSipSie(CsrNumber num, URV value);
+
+    /// Helper to write method: Mask with MSTATEEN/HSTATEEN.
+    bool writeSstateen(CsrNumber num, URV value);
+
+    /// Helper to write method: Mask with MSTATEEN.
+    bool writeHstateen(CsrNumber num, URV value);
+
     /// Legalize the PMPCFG value before updating such a register: If
     /// the grain factor G is greater than or equal to 1, then the NA4
     /// mode is not selectable in the A field. If a field is locked it
