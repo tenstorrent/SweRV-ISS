@@ -1554,6 +1554,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableTranslationPbmt(flag);
     }
 
+  tag = "enable_pbmt";
+  if (config_ -> contains(tag))
+    {
+      std::cerr << "Config file tag enable_pbmt has been deprecated. Use enable_translation_pbmt.\n";
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableTranslationPbmt(flag);
+      errors++;
+    }      
+
   tag = "enable_translation_napot";
   if (config_ -> contains(tag))
     {
