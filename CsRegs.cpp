@@ -39,6 +39,7 @@ CsRegs<URV>::CsRegs()
   defineVectorRegs();
   defineFpRegs();
   defineAiaRegs();
+  defineStateEnableRegs();
 }
 
 
@@ -1767,6 +1768,31 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("hviprio3h",  CsrNumber::HVIPRIO3H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("vsieh",      CsrNumber::VSIEH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("vsiph",      CsrNumber::VSIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::defineStateEnableRegs()
+{
+  bool mand = true;  // Mndatory
+  bool imp = true;   // Implemented
+  URV wam = ~URV(0);  // Write-all mask: all bits writeable.
+
+  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, wam, wam);
+  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, wam, wam);
+  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, wam, wam);
+  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, wam, wam);
+
+  defineCsr("mstateen0", CsrNumber::MSTATEEN0,  !mand, !imp, 0, wam, wam);
+  defineCsr("mstateen1", CsrNumber::MSTATEEN1,  !mand, !imp, 0, wam, wam);
+  defineCsr("mstateen2", CsrNumber::MSTATEEN2,  !mand, !imp, 0, wam, wam);
+  defineCsr("mstateen3", CsrNumber::MSTATEEN3,  !mand, !imp, 0, wam, wam);
+
+  defineCsr("hstateen0", CsrNumber::HSTATEEN0,  !mand, !imp, 0, wam, wam);
+  defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, wam, wam);
+  defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, wam, wam);
+  defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, wam, wam);
 }
 
 

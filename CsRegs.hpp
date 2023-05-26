@@ -425,6 +425,20 @@ namespace WdRiscv
       VSIEH      = 0x214,
       VSIPH      = 0x254,
 
+      // Stateen CSR
+      SSTATEEN0  = 0x10c,
+      SSTATEEN1  = 0x10d,
+      SSTATEEN2  = 0x10e,
+      SSTATEEN3  = 0x10f,
+      MSTATEEN0  = 0x30c,
+      MSTATEEN1  = 0x30d,
+      MSTATEEN2  = 0x30e,
+      MSTATEEN3  = 0x30f,
+      HSTATEEN0  = 0x60c,
+      HSTATEEN1  = 0x60d,
+      HSTATEEN2  = 0x60e,
+      HSTATEEN3  = 0x60f,
+
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
     };
@@ -1121,6 +1135,9 @@ namespace WdRiscv
 
     /// Helper to construtor. Define advanced interrupt architecture CSRs
     void defineAiaRegs();
+
+    /// Helper to construtor. Define Mstateen extension CSRs
+    void defineStateEnableRegs();
 
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.
