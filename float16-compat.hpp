@@ -242,6 +242,21 @@ template <unsigned NUM_SIGNIFICAND_BITS_,
           int MIN_EXPONENT_>
 class Float16Template
 {
+
+// Softfloat provides its own versions of these functions/operators
+// so only allow their use if not using SoftFloat.  This guard
+// prevents accidentally not using a SoftFloat when required.
+// Note that we still want literals/constants to be allowed, so
+// mark the functionality as consteval to only allow them to be
+// used at compile time.
+#ifdef SOFT_FLOAT
+#define CONSTEXPR_OR_CONSTEVAL consteval
+#define IS_CONSTANT_EVALUATED (MAX_EXPONENT_ > 0) // Avoids warning when using std::is_constant_evaluated in consteval context
+#else
+#define CONSTEXPR_OR_CONSTEVAL constexpr
+#define IS_CONSTANT_EVALUATED std::is_constant_evaluated()
+#endif
+
 private:
 
   static constexpr unsigned NUM_SIGNIFICAND_BITS = NUM_SIGNIFICAND_BITS_;
@@ -252,15 +267,13 @@ private:
   static constexpr unsigned EXP_MASK = ((1 << NUM_EXPONENT_BITS) - 1);
   static constexpr unsigned SIG_MASK = ((1 << (NUM_SIGNIFICAND_BITS - 1)) - 1);
 
-  /// Convert a float to a Float16's internal representation.
-  static constexpr uint16_t bitsFromFloat(float val)
-  {
-    // TODO: this function does not set FP exceptions or handle rounding modes
-    // correctly in all cases. This function should only be necessary when not
-    // using SoftFloat, when using C++20 or previous, and when _Float is not
-    // defined (GCC 11 and previous and Clang 14 and previous), so one of the
-    // above options can be used to mitigate the issue.
+  static constexpr unsigned FLOAT_THIS_EXP_DIFF = std::numeric_limits<float>::max_exponent - MAX_EXPONENT;
+  static constexpr unsigned FLOAT_THIS_SIG_DIFF = std::numeric_limits<float>::digits - NUM_SIGNIFICAND_BITS;
 
+
+  /// Convert a float to a Float16's internal representation.
+  static CONSTEXPR_OR_CONSTEVAL uint16_t bitsFromFloat(float val)
+  {
     uint32_t ui32 = std::bit_cast<uint32_t>(val);
     bool     sign = ui32 >> 31;
     int      exp  = static_cast<int>((ui32 >> 23) & 0xFF);
@@ -271,39 +284,69 @@ private:
         if (sig)
           {
             // Is SNaN, mark as invalid and convert to QNaN
-            if ((sig >> 22) == 0)
+            if (not IS_CONSTANT_EVALUATED and (sig >> 22) == 0)
               std::feraiseexcept(FE_INVALID);
 
             return ((sign << 15)                              |
                     ((EXP_MASK << (NUM_SIGNIFICAND_BITS - 1)) | // Exponent should be all 1s
                     (1 << (NUM_SIGNIFICAND_BITS - 2)))        | // Upper-most bits of mantissa should be 1
-                    (sig >> (std::numeric_limits<float>::digits - NUM_SIGNIFICAND_BITS)));
+                    (sig >> FLOAT_THIS_SIG_DIFF));
           }
 
         return (uint16_t{sign} << 15) | (uint16_t{EXP_MASK} << (NUM_SIGNIFICAND_BITS - 1));
       }
 
-    exp = exp - (std::numeric_limits<float>::max_exponent - MAX_EXPONENT);
-    if (exp < MIN_EXPONENT)
+    if (exp == 0 and sig == 0)
       return uint16_t{sign} << 15;
 
-    if constexpr (std::numeric_limits<float>::max_exponent != MAX_EXPONENT)
-      {
-        if (exp < 1)
-          {
-            // In Float16 number would be subnormal. Adjust.
-            int shift = -exp;
-            sig       = sig | (1 << 23);  // Put back implied most sig digit.
-            sig       = sig >> (shift + 1);
-            exp       = 0;
-          }
-      }
-    else if (exp >= static_cast<int>(EXP_MASK))
-      return (uint16_t{sign} << 15) | (uint16_t{EXP_MASK} << (NUM_SIGNIFICAND_BITS - 1));
+    sig |= static_cast<uint32_t>(exp > 0 or FLOAT_THIS_EXP_DIFF != 0) << (std::numeric_limits<float>::digits - 1);
+    exp -= FLOAT_THIS_EXP_DIFF + 1;
 
-    return (uint16_t{sign} << 15)                       |
-            uint16_t(exp << (NUM_SIGNIFICAND_BITS - 1)) |
-            uint16_t(sig >> (std::numeric_limits<float>::digits - NUM_SIGNIFICAND_BITS));
+    int      roundingMode = IS_CONSTANT_EVALUATED ? FE_TOWARDZERO : std::fegetround();
+    bool     roundNearest;
+    uint32_t roundIncrement;
+    if (roundingMode == FE_DOWNWARD or roundingMode == FE_UPWARD or roundingMode == FE_TOWARDZERO)
+      {
+        roundIncrement = ((1U << FLOAT_THIS_SIG_DIFF) - 1) *
+                         ((roundingMode != FE_TOWARDZERO) && (sign == (roundingMode == FE_DOWNWARD)));
+        roundNearest   = false;
+      }
+    else
+      {
+        roundIncrement = (1U << (FLOAT_THIS_SIG_DIFF - 1));
+        roundNearest   = (roundingMode == FE_TONEAREST);
+      }
+    uint32_t roundBits = sig & ((1U << FLOAT_THIS_SIG_DIFF) - 1);
+
+    if (exp < 0)
+      {
+        bool isTiny = (exp < -1) or (sig + roundIncrement < (1U << (std::numeric_limits<float>::digits + 1)));
+        if (sig & (1U << (std::numeric_limits<float>::digits - 1)))
+          sig = (exp >= -31) ? (sig >> -exp) | ((sig << (exp & 31)) != 0) : (sig != 0);
+        exp       = 0;
+        roundBits = sig & ((1U << FLOAT_THIS_SIG_DIFF) - 1);
+        if (not IS_CONSTANT_EVALUATED and isTiny and roundBits)
+          std::feraiseexcept(FE_UNDERFLOW);
+      }
+    else if (exp > static_cast<int>(EXP_MASK - 2) or
+             (exp == static_cast<int>(EXP_MASK - 2) and
+              (sig + roundIncrement >= (1U << std::numeric_limits<float>::digits))))
+      {
+        if (not IS_CONSTANT_EVALUATED)
+        std::feraiseexcept(FE_OVERFLOW | FE_INEXACT);
+        return ((uint16_t{sign} << 15) | (uint16_t{EXP_MASK} << (NUM_SIGNIFICAND_BITS - 1))) - (not roundIncrement);
+      }
+
+    sig = (sig + roundIncrement) >> FLOAT_THIS_SIG_DIFF;
+    if (not IS_CONSTANT_EVALUATED and roundBits)
+      std::feraiseexcept(FE_INEXACT);
+    sig &= ~static_cast<uint32_t>(not(roundBits ^ (1U << (FLOAT_THIS_SIG_DIFF - 1))) and roundNearest);
+    if (not sig)
+      exp = 0;
+
+    return (static_cast<uint16_t>(sign) << 15)                       +
+            static_cast<uint16_t>(exp << (NUM_SIGNIFICAND_BITS - 1)) +
+            static_cast<uint16_t>(sig);
   }
 
   /// Convert this Float16 to a float.
@@ -320,7 +363,7 @@ private:
       {
         if (isSnan())
           std::feraiseexcept(FE_INVALID);
-        float x = std::bit_cast<float>(0x7FC00000U | (sigBits() << (std::numeric_limits<float>::digits - NUM_SIGNIFICAND_BITS)));
+        float x = std::bit_cast<float>(0x7FC00000U | (sigBits() << FLOAT_THIS_SIG_DIFF));
         return sign ? -x : x;
       }
 
@@ -335,7 +378,7 @@ private:
 
         // Subnormal in half precision would be normal in float.
         // Renormalize.
-        if constexpr (std::numeric_limits<float>::max_exponent != MAX_EXPONENT)
+        if constexpr (FLOAT_THIS_EXP_DIFF != 0)
           {
             unsigned shift = std::countl_zero(sig) - (std::numeric_limits<decltype(sig)>::digits - NUM_SIGNIFICAND_BITS);
             sig            = sig << shift;
@@ -344,15 +387,15 @@ private:
       }
 
     // Update exponent for float bias.
-    exp = exp + (std::numeric_limits<float>::max_exponent - MAX_EXPONENT);
-    sig = sig << (std::numeric_limits<float>::digits - NUM_SIGNIFICAND_BITS);
+    exp +=  FLOAT_THIS_EXP_DIFF;
+    sig <<= FLOAT_THIS_SIG_DIFF;
     return std::bit_cast<float>((uint32_t{sign} << 31) + (exp << 23) + sig);
   }
 
   // Helper to avoid duplicating for each binary operation.
   // Needs to be defined above the uses.
   template <template <typename Operand> typename Op>
-  static constexpr Float16Template binaryOp(const Float16Template& a, const Float16Template& b)
+  static CONSTEXPR_OR_CONSTEVAL Float16Template binaryOp(const Float16Template& a, const Float16Template& b)
   {
     Float16Template result;
     result.u16 = bitsFromFloat(Op<float>{}(a.toFloat(),
@@ -391,40 +434,37 @@ public:
     return ret;
   }
 
-  // Softfloat provides its own versions of these functions/operators
-  // so only allow their use if not using SoftFloat.  This guard
-  // prevents accidentally not using a SoftFloat when required.
-#ifndef SOFT_FLOAT
-
   /// Construct a Float16 from an arithmetic type
   template <typename T>
   requires std::is_arithmetic<T>::value
-  explicit constexpr Float16Template(T v) : u16(bitsFromFloat(static_cast<float>(v))) {}
+  explicit CONSTEXPR_OR_CONSTEVAL Float16Template(T v) : u16(bitsFromFloat(static_cast<float>(v))) {}
 
   /// Binary addition operator.
-  constexpr Float16Template operator+(const Float16Template& other)
+  CONSTEXPR_OR_CONSTEVAL Float16Template operator+(const Float16Template& other)
   {
     return binaryOp<std::plus>(*this, other);
   }
 
   /// Binary subtraction operator.
-  constexpr Float16Template operator-(const Float16Template& other)
+  CONSTEXPR_OR_CONSTEVAL Float16Template operator-(const Float16Template& other)
   {
     return binaryOp<std::minus>(*this, other);
   }
 
   /// Binary multiplication operator.
-  constexpr Float16Template operator*(const Float16Template& other)
+  CONSTEXPR_OR_CONSTEVAL Float16Template operator*(const Float16Template& other)
   {
     return binaryOp<std::multiplies>(*this, other);
   }
 
   /// Binary division operator.
-  constexpr Float16Template operator/(const Float16Template& other)
+  CONSTEXPR_OR_CONSTEVAL Float16Template operator/(const Float16Template& other)
   {
     return binaryOp<std::divides>(*this, other);
   }
-#endif
+
+#undef CONSTEXPR_OR_CONSTEVAL
+#undef IS_CONSTANT_EVALUATED
 
 protected:
   friend struct _fphelpers;
@@ -517,7 +557,7 @@ constexpr decltype(FP_NORMAL) fpclassify(fp16compat::Float16Template<x, y, z> f)
 template <unsigned x, unsigned y, int z>
 inline fp16compat::Float16Template<x, y, z> frexp(fp16compat::Float16Template<x, y, z> v, int* p)
 {
-  if ((v.expBits() == 0 && v.sigBits() == 0) or std::isnan(v) or std::isinf(v))
+  if ((v.expBits() == 0 and v.sigBits() == 0) or std::isnan(v) or std::isinf(v))
     {
       *p = 0;
       return v;

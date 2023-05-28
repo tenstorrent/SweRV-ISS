@@ -20,14 +20,15 @@
 #include "VecRegs.hpp"
 #include "Decoder.hpp"
 #include "Disassembler.hpp"
+#include "float-util.hpp"
 #include "instforms.hpp"
 
 
 using namespace WdRiscv;
 
 
-static
-std::string
+static constexpr
+std::string_view
 roundingModeString(RoundingMode mode)
 {
   switch (mode)
@@ -40,7 +41,7 @@ roundingModeString(RoundingMode mode)
     case RoundingMode::Invalid1:    return "inv1";
     case RoundingMode::Invalid2:    return "inv2";
     case RoundingMode::Dynamic:     return "dyn";
-    default:                        return "inv";
+    case RoundingMode::FcsrMask:    return "inv";
     }
   return "inv";
 }

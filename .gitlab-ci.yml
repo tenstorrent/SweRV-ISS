@@ -2,7 +2,7 @@
 
 
 image:
-  name: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/risc-p-cores/risc-p-cores/dev:27700ba4afaf78ea2e5e432a0032234db5b0837d4da1fdb906e9dbdcc5fe661b
+  name: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/risc-p-cores/risc-p-cores/dev:373a7f5389b6c129b98173c916cc55e39767e73d5c774473eac607c06c84d1b1
   entrypoint: [""]
 
 
