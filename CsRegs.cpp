@@ -224,15 +224,19 @@ URV
 CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
 {
   typedef CsrNumber CN;
+
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     {
+      CN base = CN::SSTATEEN0;
+      unsigned ix = unsigned(num) - unsigned(base);
+
       constexpr bool rv32 = sizeof(URV) == 4;
+
       constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
       auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // SSTATEN not accessible because MSB of MSTATEEN0 is 0.
+      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // SSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
 
-      unsigned ix = unsigned(num) - unsigned(CN::SSTATEEN0);
 
       // If a bit is zero in MSTATEEN, it becomes zero in SSTATEEN
       CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
@@ -243,8 +247,8 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
       if (virtMode_)
 	{
 	  auto hcsr0 = getImplementedCsr(rv32? CN::HSTATEEN0H : CN::HSTATEEN0);
-	  if (hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
-	    return false;  // SSTATEN not accessible because bit 63 of HSTATEEN0 is 0.
+	  if (ix == 0 and hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
+	    return false;  // SSTATEN0 not accessible because bit 63 of HSTATEEN0 is 0.
 
 	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + ix);
 	  auto hcsr = getImplementedCsr(hnum);
@@ -261,15 +265,21 @@ URV
 CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
 {
   typedef CsrNumber CN;
-  if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
+
+  if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
+      (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
+
     {
+      CN base = CN::HSTATEEN0;
+      if (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H)
+	base = CN::HSTATEEN0H;
+      unsigned ix = unsigned(num) - unsigned(base);
+
       constexpr bool rv32 = sizeof(URV) == 4;
       constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
       auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // SSTATEN not accessible because MSB of MSTATEEN0 is 0.
-
-      unsigned ix = unsigned(num) - unsigned(CN::SSTATEEN0);
+      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // SSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
 
       // If a bit is zero in MSTATEEN, it becomes zero in HSTATEEN
       CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
@@ -651,6 +661,9 @@ CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     {
+      CN base = CN::SSTATEEN0;
+      unsigned ix = unsigned(num) - unsigned(base);
+
       Csr<URV>* csr = getImplementedCsr(num, virtMode_);
       if (not csr)
 	return false;
@@ -658,12 +671,11 @@ CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
       constexpr bool rv32 = sizeof(URV) == 4;
       constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
       auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // SSTATEN not accessible because MSB of MSTATEEN0 is 0.
+      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // SSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
 
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
-      unsigned ix = unsigned(num) - unsigned(CN::SSTATEEN0);
 
       CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
       auto mcsr = getImplementedCsr(mnum);
@@ -673,8 +685,8 @@ CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
       if (virtMode_)
 	{
 	  auto hcsr0 = getImplementedCsr(rv32? CN::HSTATEEN0H : CN::HSTATEEN0);
-	  if (hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
-	    return false;  // SSTATEN not accessible because bit 63 of HSTATEEN0 is 0.
+	  if (ix == 0 and hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
+	    return false;  // SSTATEN0 not accessible because bit 63 of HSTATEEN0 is 0.
 
 	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + ix);
 	  auto hcsr = getImplementedCsr(hnum);
@@ -699,8 +711,15 @@ CsRegs<URV>::writeHstateen(CsrNumber num, URV value)
 {
   typedef CsrNumber CN;
 
-  if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
+  if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
+      (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
+
     {
+      CN base = CN::HSTATEEN0;
+      if (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H)
+	base = CN::HSTATEEN0H;
+      unsigned ix = unsigned(num) - unsigned(base);
+
       Csr<URV>* csr = getImplementedCsr(num, virtMode_);
       if (not csr)
 	return false;
@@ -708,13 +727,13 @@ CsRegs<URV>::writeHstateen(CsrNumber num, URV value)
       constexpr bool rv32 = sizeof(URV) == 4;
       constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
       auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // HSSTATEN not accessible because MSB of MSTATEEN0 is 0.
+      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
+	return false;  // HSSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
 
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
 
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + unsigned(num) - unsigned(CN::HSTATEEN0));
+      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	mask &= mcsr->read();
