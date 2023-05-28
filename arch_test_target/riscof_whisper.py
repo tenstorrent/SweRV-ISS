@@ -73,7 +73,7 @@ class whisper(pluginTemplate):
        # test. Similarly the output elf name and compile macros will be assigned later in the
        # runTests function
        self.compile_cmd = 'riscv64-unknown-elf-gcc -march={0} \
-         -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -g\
+         -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -g \
          -T '+self.pluginpath+'/link.ld\
          -I '+self.pluginpath+'/\
          -I ' + archtest_env + ' {2} -o {3} {4}'
@@ -95,7 +95,7 @@ class whisper(pluginTemplate):
       for ext in ["I", "M", "F", "D", "C"]:
           if ext in ispec["ISA"]:
             self.isa += ext.lower()
-      for ext in ["Zfh", "Zba", "Zbb", "Zbc", "Zbkb", "Zbkx", "Zbs", "Zknd", "Zkne", "Zknh", "Zksed", "Zksh"]:
+      for ext in ["Zfa", "Zfh", "Zba", "Zbb", "Zbc", "Zbkb", "Zbkx", "Zbs", "Zknd", "Zkne", "Zknh", "Zksed", "Zksh"]:
           if ext in ispec["ISA"]:
             self.isa += '_' + ext.lower()
 
@@ -128,7 +128,7 @@ class whisper(pluginTemplate):
           test_dir = testentry['work_dir']
 
           # name of the elf file after compilation of the test
-          elf = 'my.elf'
+          elf = os.path.join(test_dir, 'my.elf')
 
           # name of the signature file as per requirement of RISCOF. RISCOF expects the signature to
           # be named as DUT-<dut-name>.signature. The below variable creates an absolute path of

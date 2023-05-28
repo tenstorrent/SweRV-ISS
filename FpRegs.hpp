@@ -23,7 +23,7 @@
 #include <limits>
 #include <type_traits>
 #include <vector>
-#include "float-util.hpp"
+#include "float16-compat.hpp"
 #include "FpRegNames.hpp"
 
 namespace WdRiscv
@@ -353,23 +353,6 @@ namespace WdRiscv
   FpRegs::writeBFloat16(unsigned i, BFloat16 x)
   {
     writeHalf(i, std::bit_cast<Float16>(x));
-  }
-
-
-  /// Return true if given float is a signaling not-a-number.
-  template <typename T>
-  inline auto
-  isSnan(T f)
-    -> typename std::enable_if<is_fp<T>::value, bool>::type
-  {
-    using uint_fsize_t = typename getSameWidthUintType<T>::type;
-
-    if (std::isnan(f))
-      {
-        uint_fsize_t u = std::bit_cast<uint_fsize_t>(f);
-        return ((u >> (std::numeric_limits<T>::digits - 2)) & 1) == 0; // Most sig bit of significand must be zero.
-      }
-    return false;
   }
 
 

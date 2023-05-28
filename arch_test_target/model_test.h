@@ -11,11 +11,19 @@
         .align 8; .global end_regstate; end_regstate:                   \
         .word 4;
 
+#if XLEN == 64
+#define S_TOHOST sd
+#elif XLEN == 32
+#define S_TOHOST sw
+#else
+#error Unknown XLEN
+#endif
+
 //RV_COMPLIANCE_HALT
 #define RVMODEL_HALT                                                    \
   li x1, 1;                                                             \
   write_tohost:                                                         \
-    sw x1, tohost, t5;                                                  \
+    S_TOHOST x1, tohost, t5;                                            \
     j write_tohost;
 
 #define RVMODEL_BOOT

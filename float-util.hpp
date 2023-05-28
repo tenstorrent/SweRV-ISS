@@ -65,6 +65,156 @@ enum class FpFlags : uint32_t
   };
 
 
+/// Sets the floating point rounding mode in the machine
+/// running this simulator. Do nothing in the simulated
+/// RISCV machine.
+inline int
+setSimulatorRoundingMode(RoundingMode mode)
+{
+  // Arbitrarily use nearest-even for modes with no equivalent in
+  // simulator.  The right mode will later be selected by an FP
+  // instruction (if dynamic) or an exception will be trigerred (if
+  // invalid).
+  if (mode == RoundingMode::Dynamic or mode == RoundingMode::Invalid1 or mode == RoundingMode::Invalid2)
+    mode = RoundingMode::NearestEven;
+
+#ifdef SOFT_FLOAT
+  static constexpr auto riscvToSoftFloat = std::array
+    {
+      softfloat_round_near_even,    // NearsetEven
+      softfloat_round_minMag,       // Zero
+      softfloat_round_min,          // Down
+      softfloat_round_max,          // Up
+      softfloat_round_near_maxMag,  // NearestMax
+    };
+
+  int      previous      = softfloat_roundingMode;
+  uint32_t ix            = uint32_t(mode);
+  softfloat_roundingMode = riscvToSoftFloat.at(ix);
+#else
+  static constexpr auto riscvToFe = std::array
+    {
+      FE_TONEAREST,  // NearsetEven
+      FE_TOWARDZERO, // Zero
+      FE_DOWNWARD,   // Down
+      FE_UPWARD,     // Up
+      FE_TONEAREST   // NearestMax; TODO: need a more accurate method here
+    };
+
+  int      previous = std::fegetround();
+  uint32_t ix       = uint32_t(mode);
+  int      next     = riscvToFe.at(ix);
+  if (next != previous)
+    std::fesetround(next);
+#endif
+  return previous;
+}
+
+
+/// Resets the floating point rounding mode in the machine
+/// running this simulator to the value prior to the previous
+/// set value (should be provided as the parameter).  Do
+/// nothing in the simulated RISCV machine.
+inline void undoSetSimulatorRoundingMode(int orig)
+{
+#ifdef SOFT_FLOAT
+  softfloat_roundingMode = orig;
+#else
+  int previous = std::fegetround();
+  if (orig != previous)
+    std::fesetround(orig);
+#endif
+}
+
+
+/// Clear the floating point flags in the machine running this
+/// simulator. Do nothing in the simulated RISCV machine.
+inline void
+clearSimulatorFpFlags()
+{
+#ifdef SOFT_FLOAT
+  softfloat_exceptionFlags = 0;
+#elif defined(__x86_64__)
+  uint32_t val = _mm_getcsr();
+  val &= ~uint32_t(0x3f);
+  _mm_setcsr(val);
+#else
+  if (fetestexcept(FE_ALL_EXCEPT) != 0)
+    std::feclearexcept(FE_ALL_EXCEPT);
+#endif
+}
+
+
+/// Gets the active floating point flags in the machine running this
+/// simulator. Do nothing in the simulated RISCV machine.
+inline uint32_t
+activeSimulatorFpFlags()
+{
+  uint32_t incFlags = 0;
+#ifdef SOFT_FLOAT
+  int flags = softfloat_exceptionFlags;
+  if (flags)
+    {
+      if (flags & softfloat_flag_inexact)   incFlags |= uint32_t(FpFlags::Inexact);
+      if (flags & softfloat_flag_underflow) incFlags |= uint32_t(FpFlags::Underflow);
+      if (flags & softfloat_flag_overflow)  incFlags |= uint32_t(FpFlags::Overflow);
+      if (flags & softfloat_flag_infinite)  incFlags |= uint32_t(FpFlags::DivByZero);
+      if (flags & softfloat_flag_invalid)   incFlags |= uint32_t(FpFlags::Invalid);
+    }
+#else
+#ifdef __x86_64__
+  int flags = _mm_getcsr() & 0x3f;
+#else
+  int flags = fetestexcept(FE_ALL_EXCEPT);
+#endif
+  if (flags)
+    {
+      if (flags & FE_INEXACT)    incFlags |= uint32_t(FpFlags::Inexact);
+      if (flags & FE_UNDERFLOW)  incFlags |= uint32_t(FpFlags::Underflow);
+      if (flags & FE_OVERFLOW)   incFlags |= uint32_t(FpFlags::Overflow);
+      if (flags & FE_DIVBYZERO)  incFlags |= uint32_t(FpFlags::DivByZero);
+      if (flags & FE_INVALID)    incFlags |= uint32_t(FpFlags::Invalid);
+    }
+#endif
+  return incFlags;
+}
+
+
+/// "Raises" the provided floating point flags in the machine running
+/// this simulator by or-ing them with the currently active flags. Do
+/// nothing in the simulated RISCV machine.
+inline void
+raiseSimulatorFpFlags(FpFlags flags)
+{
+  using underlying_t = typename std::underlying_type<FpFlags>::type;
+#ifdef SOFT_FLOAT
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Inexact))
+    softfloat_exceptionFlags |= softfloat_flag_inexact;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Underflow))
+    softfloat_exceptionFlags |= softfloat_flag_underflow;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Overflow))
+    softfloat_exceptionFlags |= softfloat_flag_overflow;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::DivByZero))
+    softfloat_exceptionFlags |= softfloat_flag_infinite;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Invalid))
+    softfloat_exceptionFlags |= softfloat_flag_invalid;
+#else
+  decltype(FE_INEXACT) flagsToRaise = 0;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Inexact))
+    flagsToRaise |= FE_INEXACT;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Underflow))
+    flagsToRaise |= FE_UNDERFLOW;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Overflow))
+    flagsToRaise |= FE_OVERFLOW;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::DivByZero))
+    flagsToRaise |= FE_DIVBYZERO;
+  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Invalid))
+    flagsToRaise |= FE_INVALID;
+  std::feraiseexcept(flagsToRaise);
+#endif
+}
+
+
 /// Converts an integer value to a floating point value.  The
 /// destination floating point type must be specified in the
 /// call, but the source integer type is inferred from the
@@ -401,6 +551,23 @@ template <> struct getSameWidthFloatType<uint32_t>  { using type = float; };
 template <> struct getSameWidthFloatType<uint64_t>  { using type = double; };
 
 
+/// Return true if given float is a signaling not-a-number.
+template <typename T>
+inline auto
+isSnan(T f)
+  -> typename std::enable_if<is_fp<T>::value, bool>::type
+{
+  using uint_fsize_t = typename getSameWidthUintType<T>::type;
+
+  if (std::isnan(f))
+    {
+      uint_fsize_t u = std::bit_cast<uint_fsize_t>(f);
+      return ((u >> (std::numeric_limits<T>::digits - 2)) & 1) == 0; // Most sig bit of significand must be zero.
+    }
+  return false;
+}
+
+
 /// The system's C library may be configured to handle tininess before
 /// rounding.  In that case, an underflow exception may have been
 /// unnecessarily triggered on a subnormal value that was rounded to a
@@ -566,155 +733,48 @@ doFsqrt(FT f1)
 }
 
 
-/// Sets the floating point rounding mode in the machine
-/// running this simulator. Do nothing in the simulated
-/// RISCV machine.
-inline int
-setSimulatorRoundingMode(RoundingMode mode)
+template <bool EXACT, typename FT>
+inline
+FT
+doFround(FT f1)
 {
-  // Arbitrarily use nearest-even for modes with no equivalent in
-  // simulator.  The right mode will later be selected by an FP
-  // instruction (if dynamic) or an exception will be trigerred (if
-  // invalid).
-  if (mode == RoundingMode::Dynamic or mode == RoundingMode::Invalid1 or mode == RoundingMode::Invalid2)
-    mode = RoundingMode::NearestEven;
-
 #ifdef SOFT_FLOAT
-  static constexpr auto riscvToSoftFloat = std::array
+  FT res = softRound(f1, EXACT);
+#else
+  using int_fsize_t = typename getSameWidthIntType<FT>::type;
+
+  FT res = f1;
+  if (std::isnan(f1))
     {
-      softfloat_round_near_even,    // NearsetEven
-      softfloat_round_minMag,       // Zero
-      softfloat_round_min,          // Down
-      softfloat_round_max,          // Up
-      softfloat_round_near_maxMag,  // NearestMax
-    };
-
-  int      previous      = softfloat_roundingMode;
-  uint32_t ix            = uint32_t(mode);
-  softfloat_roundingMode = riscvToSoftFloat.at(ix);
-#else
-  static constexpr auto riscvToFe = std::array
-    {
-      FE_TONEAREST,  // NearsetEven
-      FE_TOWARDZERO, // Zero
-      FE_DOWNWARD,   // Down
-      FE_UPWARD,     // Up
-      FE_TONEAREST   // NearestMax; TODO: need a more accurate method here
-    };
-
-  int      previous = std::fegetround();
-  uint32_t ix       = uint32_t(mode);
-  int      next     = riscvToFe.at(ix);
-  if (next != previous)
-    std::fesetround(next);
-#endif
-  return previous;
-}
-
-
-/// Resets the floating point rounding mode in the machine
-/// running this simulator to the value prior to the previous
-/// set value (should be provided as the parameter).  Do
-/// nothing in the simulated RISCV machine.
-inline void undoSetSimulatorRoundingMode(int orig)
-{
-#ifdef SOFT_FLOAT
-  softfloat_roundingMode = orig;
-#else
-  int previous = std::fegetround();
-  if (orig != previous)
-    std::fesetround(orig);
-#endif
-}
-
-
-/// Clear the floating point flags in the machine running this
-/// simulator. Do nothing in the simulated RISCV machine.
-inline void
-clearSimulatorFpFlags()
-{
-#ifdef SOFT_FLOAT
-  softfloat_exceptionFlags = 0;
-#else
-#ifdef __x86_64__
-  uint32_t val = _mm_getcsr();
-  val &= ~uint32_t(0x3f);
-  _mm_setcsr(val);
-#else
-  if (fetestexcept(FE_ALL_EXCEPT) != 0)
-    std::feclearexcept(FE_ALL_EXCEPT);
-#endif
-#endif
-}
-
-
-/// Gets the active floating point flags in the machine running this
-/// simulator. Do nothing in the simulated RISCV machine.
-inline uint32_t
-activeSimulatorFpFlags()
-{
-  uint32_t incFlags = 0;
-#ifdef SOFT_FLOAT
-  int flags = softfloat_exceptionFlags;
-  if (flags)
-    {
-      if (flags & softfloat_flag_inexact)   incFlags |= uint32_t(FpFlags::Inexact);
-      if (flags & softfloat_flag_underflow) incFlags |= uint32_t(FpFlags::Underflow);
-      if (flags & softfloat_flag_overflow)  incFlags |= uint32_t(FpFlags::Overflow);
-      if (flags & softfloat_flag_infinite)  incFlags |= uint32_t(FpFlags::DivByZero);
-      if (flags & softfloat_flag_invalid)   incFlags |= uint32_t(FpFlags::Invalid);
+      res = std::numeric_limits<FT>::quiet_NaN();
+      if (isSnan(f1))
+        raiseSimulatorFpFlags(FpFlags::Invalid);
     }
-#else
-#ifdef __x86_64__
-  int flags = _mm_getcsr() & 0x3f;
-#else
-  int flags = fetestexcept(FE_ALL_EXCEPT);
-#endif
-  if (flags)
+  else if (f1 == FT{} or std::isinf(f1))  // zero or infinity
+    ;
+  else
     {
-      if (flags & FE_INEXACT)    incFlags |= uint32_t(FpFlags::Inexact);
-      if (flags & FE_UNDERFLOW)  incFlags |= uint32_t(FpFlags::Underflow);
-      if (flags & FE_OVERFLOW)   incFlags |= uint32_t(FpFlags::Overflow);
-      if (flags & FE_DIVBYZERO)  incFlags |= uint32_t(FpFlags::DivByZero);
-      if (flags & FE_INVALID)    incFlags |= uint32_t(FpFlags::Invalid);
+      int exp = 0;
+      std::frexp(f1, &exp);
+      if (exp < std::numeric_limits<FT>::digits - 1)
+        {
+          // These conversions may raise FP exceptions, but we don't want
+          // to raise them in this instruction, so just clear them afterwards.
+          int_fsize_t intVal = fpConvertTo<int_fsize_t>(f1);
+          res                = fpConvertTo<FT>(intVal);
+
+          clearSimulatorFpFlags();
+
+          if (intVal == 0 and std::signbit(f1))
+            res = std::copysign(res, f1);
+
+          if constexpr (EXACT)
+            if (res != f1)
+              raiseSimulatorFpFlags(FpFlags::Inexact);
+        }
     }
 #endif
-  return incFlags;
-}
-
-
-/// "Raises" the provided floating point flags in the machine running
-/// this simulator by or-ing them with the currently active flags. Do
-/// nothing in the simulated RISCV machine.
-inline void
-raiseSimulatorFpFlags(FpFlags flags)
-{
-  using underlying_t = typename std::underlying_type<FpFlags>::type;
-#ifdef SOFT_FLOAT
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Inexact))
-    softfloat_exceptionFlags |= softfloat_flag_inexact;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Underflow))
-    softfloat_exceptionFlags |= softfloat_flag_underflow;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Overflow))
-    softfloat_exceptionFlags |= softfloat_flag_overflow;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::DivByZero))
-    softfloat_exceptionFlags |= softfloat_flag_infinite;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Invalid))
-    softfloat_exceptionFlags |= softfloat_flag_invalid;
-#else
-  decltype(FE_INEXACT) flagsToRaise = 0;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Inexact))
-    flagsToRaise |= FE_INEXACT;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Underflow))
-    flagsToRaise |= FE_UNDERFLOW;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Overflow))
-    flagsToRaise |= FE_OVERFLOW;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::DivByZero))
-    flagsToRaise |= FE_DIVBYZERO;
-  if (static_cast<underlying_t>(flags) & static_cast<underlying_t>(FpFlags::Invalid))
-    flagsToRaise |= FE_INVALID;
-  std::feraiseexcept(flagsToRaise);
-#endif
+  return res;
 }
 
 }
