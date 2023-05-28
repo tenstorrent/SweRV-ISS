@@ -22,6 +22,7 @@
 #include "CsRegs.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
+#include "float-util.hpp"
 
 using namespace WdRiscv;
 

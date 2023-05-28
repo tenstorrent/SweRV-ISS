@@ -29,7 +29,7 @@
 #include "InstEntry.hpp"
 #include "IntRegs.hpp"
 #include "CsRegs.hpp"
-#include "float16-compat.hpp"
+#include "float-util.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
 #include "Memory.hpp"
@@ -1389,7 +1389,7 @@ namespace WdRiscv
 
     /// Return true if the zcb extension is enabled.
     bool isRvzfa() const
-    { return extensionIsEnabled(RvExtension::Zcb); }
+    { return extensionIsEnabled(RvExtension::Zfa); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
