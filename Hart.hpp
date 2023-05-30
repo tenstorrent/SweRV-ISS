@@ -1133,28 +1133,37 @@ namespace WdRiscv
     /// area required is writable).
     bool setTargetProgramArgs(const std::vector<std::string>& args);
 
+    /// Return physical memory attribute region of a given address.
+    Pma getPma(uint64_t addr) const
+    { return memory_.pmaMgr_.getPma(addr); }
+
     /// Return true if given address is in the data closed coupled
     /// memory of this hart.
     bool isAddrInDccm(uint64_t addr) const
     { return memory_.pmaMgr_.isAddrInDccm(addr); }
-
-    /// Return true if given address is cacheable.
-    bool isAddrCacheable(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isCacheable(); }
 
     /// Return true if given address is in the memory mapped registers
     /// area of this hart.
     bool isAddrMemMapped(uint64_t addr) const
     { return memory_.pmaMgr_.isAddrMemMapped(addr); }
 
+    /// Return true if given address is cacheable.
+    bool isAddrCacheable(uint64_t addr) const
+    { return getPma(addr).isCacheable(); }
+
     /// Return true if given address is in a readable page.
     bool isAddrReadable(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isRead(); }
+    { return getPma(addr).isRead(); }
 
     /// Return true if page of given address is in instruction closed
     /// coupled memory.
     bool isAddrInIccm(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isIccm(); }
+    { return getPma(addr).isIccm(); }
+
+    /// Return true if given address is an idempotent region of
+    /// memory.
+    bool isAddrIdempotent(uint64_t addr) const
+    { return getPma(addr).isIdempotent(); }
 
     /// Return true if given data (ld/st) address is external to the hart.
     bool isDataAddressExternal(uint64_t addr) const
@@ -2417,11 +2426,6 @@ namespace WdRiscv
     /// Place holder for not-yet implemented instructions. Calls
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
-
-    /// Return true if given address is an idempotent region of
-    /// memory.
-    bool isAddrIdempotent(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isIdempotent(); }
 
     /// Check address associated with an atomic memory operation (AMO)
     /// instruction. Return true if AMO access is allowed. Return
