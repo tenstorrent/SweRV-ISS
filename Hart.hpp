@@ -3814,9 +3814,6 @@ namespace WdRiscv
     void execVlsege512ff_v(const DecodedInst*);
     void execVlsege1024ff_v(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVfadd_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -3824,9 +3821,6 @@ namespace WdRiscv
 		  unsigned start, unsigned elems, bool masked);
     void execVfadd_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVfsub_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -3919,9 +3913,6 @@ namespace WdRiscv
 		    unsigned start, unsigned elems, bool masked);
     void execVfnmsub_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		  unsigned start, unsigned elems, bool masked);
     void execVfmul_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -3929,9 +3920,6 @@ namespace WdRiscv
 		  unsigned start, unsigned elems, bool masked);
     void execVfmul_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfdiv_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		   unsigned start, unsigned elems, bool masked);
     void execVfdiv_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>

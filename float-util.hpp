@@ -613,6 +613,17 @@ doFadd(FT f1, FT f2)
 }
 
 
+/// Floating point subtracr. Return difference of two fp
+/// numbers. Return a canonical NAN if either is a NAN.
+template <typename FT>
+inline
+FT
+doFsub(FT f1, FT f2)
+{
+  return doFadd(f1, -f2);
+}
+
+
 /// Floating point multiply. Return product of two fp
 /// numbers. Return a canonical NAN if either is a NAN.
 template <typename FT>

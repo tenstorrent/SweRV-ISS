@@ -429,7 +429,7 @@ Hart<URV>::execFsub_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
-  float res = doFadd(f1, -f2);
+  float res = doFsub(f1, f2);
   fpRegs_.writeSingle(di->op0(), res);
 
   updateAccruedFpBits();

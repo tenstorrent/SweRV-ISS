@@ -1088,7 +1088,7 @@ Hart<URV>::vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		  std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op)
 {
   unsigned errors = 0;
-  ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
+  ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -15983,37 +15983,6 @@ doFrec7(T val, RoundingMode mode, FpFlags& flags)
 
 
 template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  dest = doFadd(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execVfadd_vv(const DecodedInst* di)
 {
@@ -16032,10 +16001,18 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfadd_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         postVecFail(di); return;
+    case EW::Half:
+      vop_vv<Float16>(vd, vs1, vs2, group, start, elems, masked, doFadd<Float16>);
+      break;
+    case EW::Word:
+      vop_vv<float>  (vd, vs1, vs2, group, start, elems, masked, doFadd<float>);
+      break;
+    case EW::Word2:
+      vop_vv<double> (vd, vs1, vs2, group, start, elems, masked, doFadd<double>);
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
 
   updateAccruedFpBits();
@@ -16106,37 +16083,6 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
 
 
 template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vfsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		    unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  dest = doFadd(e1, -e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execVfsub_vv(const DecodedInst* di)
 {
@@ -16155,10 +16101,18 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfsub_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         postVecFail(di); return;
+    case EW::Half:
+      vop_vv<Float16>(vd, vs1, vs2, group, start, elems, masked, doFsub<Float16>);
+      break;
+    case EW::Word:
+      vop_vv<float>  (vd, vs1, vs2, group, start, elems, masked, doFsub<float>);
+      break;
+    case EW::Word2:
+      vop_vv<double> (vd, vs1, vs2, group, start, elems, masked, doFsub<double>);
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
 
   updateAccruedFpBits();
@@ -16892,37 +16846,6 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
 
 
 template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vfmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  dest = doFmul(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execVfmul_vv(const DecodedInst* di)
 {
@@ -16941,10 +16864,18 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfmul_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfmul_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfmul_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         postVecFail(di); return;
+    case EW::Half:
+      vop_vv<Float16>(vd, vs1, vs2, group, start, elems, masked, doFmul<Float16>);
+      break;
+    case EW::Word:
+      vop_vv<float>  (vd, vs1, vs2, group, start, elems, masked, doFmul<float>);
+      break;
+    case EW::Word2:
+      vop_vv<double> (vd, vs1, vs2, group, start, elems, masked, doFmul<double>);
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
 
   updateAccruedFpBits();
@@ -17015,37 +16946,6 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
 
 
 template <typename URV>
-template <typename ELEM_TYPE>
-void
-Hart<URV>::vfdiv_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
-
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  dest = doFdiv(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
-
-  assert(errors == 0);
-}
-
-
-template <typename URV>
 void
 Hart<URV>::execVfdiv_vv(const DecodedInst* di)
 {
@@ -17064,10 +16964,18 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
   typedef ElementWidth EW;
   switch (sew)
     {
-    case EW::Half:   vfdiv_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:   vfdiv_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  vfdiv_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:         postVecFail(di); return;
+    case EW::Half:
+      vop_vv<Float16>(vd, vs1, vs2, group, start, elems, masked, doFdiv<Float16>);
+      break;
+    case EW::Word:
+      vop_vv<float>  (vd, vs1, vs2, group, start, elems, masked, doFdiv<float>);
+      break;
+    case EW::Word2:
+      vop_vv<double> (vd, vs1, vs2, group, start, elems, masked, doFdiv<double>);
+      break;
+    default:
+      postVecFail(di);
+      return;
     }
 
   updateAccruedFpBits();
