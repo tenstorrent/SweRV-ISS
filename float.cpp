@@ -2529,7 +2529,6 @@ Hart<uint64_t>::execFcvt_h_lu(const DecodedInst* di)
 }
 
 
-
 template <typename URV>
 void
 Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
@@ -2541,7 +2540,6 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
     }
 
   clearSimulatorFpFlags();
-  setSimulatorRoundingMode(RoundingMode::Zero);
 
   double d1 = fpRegs_.readDouble(di->op1());
 
@@ -2552,7 +2550,41 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
       raiseSimulatorFpFlags(FpFlags::Invalid);
     }
   else
-    result = fpConvertTo<int32_t>(d1);
+    {
+      int    exp;
+      double frac  = std::frexp(d1, &exp);
+      if (exp < 1)
+        {
+          result = 0;
+          if (frac)
+            raiseSimulatorFpFlags(FpFlags::Inexact);
+        }
+      else
+        {
+          if (exp >= (64 + std::numeric_limits<double>::digits))
+            result = 0;
+          else
+            {
+              // Clear the sign bit and exponent bits
+              frac = std::ldexp(std::fabs(frac),
+                                std::numeric_limits<double>::min_exponent);
+
+              int      shift    = exp - std::numeric_limits<double>::digits;
+              uint64_t result64 = std::bit_cast<uint64_t>(frac);
+              if (shift > 0)
+                result64 <<= shift;
+              else
+                result64 >>= -shift;
+              result = static_cast<int32_t>(static_cast<uint32_t>(result64));
+              if (std::signbit(d1))
+                result = -result;
+            }
+          if (exp > std::numeric_limits<int32_t>::digits)
+            raiseSimulatorFpFlags(FpFlags::Invalid);
+          else if (result != d1)
+            raiseSimulatorFpFlags(FpFlags::Inexact);
+        }
+    }
 
   intRegs_.write(di->op0(), result);
 
