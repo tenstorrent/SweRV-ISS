@@ -241,7 +241,7 @@ namespace WdRiscv
 
       cvps.reserve(csrs.size() + triggers.size());
 
-      // Collect non-trigger CSRs and their values.
+      /// Collect non-trigger CSRs and their values.
       for (CsrNumber csr : csrs)
         {
           if (not hart_->peekCsr(csr, value))
@@ -251,8 +251,8 @@ namespace WdRiscv
           cvps.push_back(CVP(URV(csr), value));
         }
 
-      // Collect trigger CSRs and their values. A synthetic CSR number
-      // is used encoding the trigger number and the trigger component.
+      /// Collect trigger CSRs and their values. A synthetic CSR number
+      /// is used encoding the trigger number and the trigger component.
       for (unsigned trigger : triggers)
         {
           uint64_t data1(0), data2(0), data3(0);
@@ -283,11 +283,25 @@ namespace WdRiscv
         }
     }
 
+    /// TODO: add support for vector ld/st
     bool lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
     { return hart_->lastLdStAddress(virtAddr, physAddr); }
 
     bool misalignedLdSt(bool& misal) const
     { return hart_->misalignedLdSt(misal); }
+
+    /// TODO: add support for vector ld/st (multiple PMAs accessed)
+    /// Collect PMAs accessed for previous load stores
+    bool getPmas(Pma& pma) const
+    {
+      uint64_t virtAddr, physAddr;
+      if (hart_->lastLdStAddress(virtAddr, physAddr))
+        {
+          pma = hart_->getPma(physAddr);
+          return true;
+        }
+      return false;
+    }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;

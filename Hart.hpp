@@ -29,7 +29,7 @@
 #include "InstEntry.hpp"
 #include "IntRegs.hpp"
 #include "CsRegs.hpp"
-#include "float16-compat.hpp"
+#include "float-util.hpp"
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
 #include "Memory.hpp"
@@ -1133,28 +1133,37 @@ namespace WdRiscv
     /// area required is writable).
     bool setTargetProgramArgs(const std::vector<std::string>& args);
 
+    /// Return physical memory attribute region of a given address.
+    Pma getPma(uint64_t addr) const
+    { return memory_.pmaMgr_.getPma(addr); }
+
     /// Return true if given address is in the data closed coupled
     /// memory of this hart.
     bool isAddrInDccm(uint64_t addr) const
     { return memory_.pmaMgr_.isAddrInDccm(addr); }
-
-    /// Return true if given address is cacheable.
-    bool isAddrCacheable(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isCacheable(); }
 
     /// Return true if given address is in the memory mapped registers
     /// area of this hart.
     bool isAddrMemMapped(uint64_t addr) const
     { return memory_.pmaMgr_.isAddrMemMapped(addr); }
 
+    /// Return true if given address is cacheable.
+    bool isAddrCacheable(uint64_t addr) const
+    { return getPma(addr).isCacheable(); }
+
     /// Return true if given address is in a readable page.
     bool isAddrReadable(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isRead(); }
+    { return getPma(addr).isRead(); }
 
     /// Return true if page of given address is in instruction closed
     /// coupled memory.
     bool isAddrInIccm(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isIccm(); }
+    { return getPma(addr).isIccm(); }
+
+    /// Return true if given address is an idempotent region of
+    /// memory.
+    bool isAddrIdempotent(uint64_t addr) const
+    { return getPma(addr).isIdempotent(); }
 
     /// Return true if given data (ld/st) address is external to the hart.
     bool isDataAddressExternal(uint64_t addr) const
@@ -1389,7 +1398,7 @@ namespace WdRiscv
 
     /// Return true if the zcb extension is enabled.
     bool isRvzfa() const
-    { return extensionIsEnabled(RvExtension::Zcb); }
+    { return extensionIsEnabled(RvExtension::Zfa); }
 
     /// Return true if current program is considered finihsed (either
     /// reached stop address or executed exit limit).
@@ -1502,11 +1511,12 @@ namespace WdRiscv
     void enableSupervisorMode(bool flag)
     { enableExtension(RvExtension::S, flag); csRegs_.enableSupervisorMode(flag); }
 
+    /// Enable hypervisor mode.
     void enableHypervisorMode(bool flag)
     { enableExtension(RvExtension::H, flag); csRegs_.enableHypervisorMode(flag); }
 
-    /// Enable supervisor mode.
-    void enableVectorMode(bool flag);
+    /// Enable vector extension.
+    void enableVectorExtension(bool flag);
 
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.
@@ -2418,11 +2428,6 @@ namespace WdRiscv
     /// illegal instruction.
     void unimplemented(const DecodedInst*);
 
-    /// Return true if given address is an idempotent region of
-    /// memory.
-    bool isAddrIdempotent(uint64_t addr) const
-    { Pma pma = memory_.pmaMgr_.getPma(addr); return pma.isIdempotent(); }
-
     /// Check address associated with an atomic memory operation (AMO)
     /// instruction. Return true if AMO access is allowed. Return
     /// false triggering an exception if address is misaligned or if
@@ -2952,6 +2957,20 @@ namespace WdRiscv
 		unsigned start, unsigned elems, bool masked,
 		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
 
+    /// Helper to vector mask vv instructions (eg vmseq.vv). Operation
+    /// to be performed (eg. equal_to) passed in op.
+    template<typename ELEM_TYPE>
+    void vmop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		 unsigned start, unsigned elems, bool masked,
+		 std::function<bool(ELEM_TYPE, ELEM_TYPE)> op);
+
+    /// Helper to vector mask vv instructions (eg vmseq.vx). Operation
+    /// to be performed (eg. equal_to) passed in op.
+    template<typename ELEM_TYPE>
+    void vmop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
+		 unsigned start, unsigned elems, bool masked,
+		 std::function<bool(ELEM_TYPE, ELEM_TYPE)> op);
+
     void execVadd_vv(const DecodedInst*);
     void execVadd_vx(const DecodedInst*);
     void execVadd_vi(const DecodedInst*);
@@ -3003,48 +3022,21 @@ namespace WdRiscv
     void execVwsubu_wv(const DecodedInst*);
     void execVwsub_wv(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmseq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmseq_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmseq_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmseq_vx(const DecodedInst*);
     void execVmseq_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmsne_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmsne_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmsne_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmsne_vx(const DecodedInst*);
     void execVmsne_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmslt_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmsltu_vv(const DecodedInst*);
     void execVmslt_vv(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmslt_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmsltu_vx(const DecodedInst*);
     void execVmslt_vx(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmsle_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmsleu_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vmsle_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmsleu_vx(const DecodedInst*);
     void execVmsleu_vi(const DecodedInst*);
 
@@ -3052,9 +3044,6 @@ namespace WdRiscv
     void execVmsle_vx(const DecodedInst*);
     void execVmsle_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vmsgt_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
-                  unsigned start, unsigned elems, bool masked);
     void execVmsgtu_vx(const DecodedInst*);
     void execVmsgtu_vi(const DecodedInst*);
     void execVmsgt_vx(const DecodedInst*);
@@ -3083,28 +3072,15 @@ namespace WdRiscv
     void execVxor_vx(const DecodedInst*);
     void execVxor_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVsll_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vsll_vx(unsigned vd, unsigned vs1, URV e2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVsll_vx(const DecodedInst*);
     void execVsll_vi(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vsr_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		unsigned start, unsigned elems, bool masked);
     void execVsrl_vv(const DecodedInst*);
-    void execVsra_vv(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vsr_vx(unsigned vd, unsigned vs1, URV e2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVsrl_vx(const DecodedInst*);
     void execVsrl_vi(const DecodedInst*);
+
+    void execVsra_vv(const DecodedInst*);
     void execVsra_vx(const DecodedInst*);
     void execVsra_vi(const DecodedInst*);
 
@@ -3810,9 +3786,6 @@ namespace WdRiscv
     void execVlsege512ff_v(const DecodedInst*);
     void execVlsege1024ff_v(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVfadd_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -3820,9 +3793,6 @@ namespace WdRiscv
 		  unsigned start, unsigned elems, bool masked);
     void execVfadd_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                 unsigned start, unsigned elems, bool masked);
     void execVfsub_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -3915,9 +3885,6 @@ namespace WdRiscv
 		    unsigned start, unsigned elems, bool masked);
     void execVfnmsub_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		  unsigned start, unsigned elems, bool masked);
     void execVfmul_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>
@@ -3925,9 +3892,6 @@ namespace WdRiscv
 		  unsigned start, unsigned elems, bool masked);
     void execVfmul_vf(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vfdiv_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-		   unsigned start, unsigned elems, bool masked);
     void execVfdiv_vv(const DecodedInst*);
 
     template<typename ELEM_TYPE>

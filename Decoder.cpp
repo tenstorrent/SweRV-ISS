@@ -2306,6 +2306,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		  return instTable_.getEntry(InstId::fence);
 		if (iform.top4() == 8)
 		  return instTable_.getEntry(InstId::fence_tso);
+		// Spec says that reserved sfence.fm field values should be treated as zero.
+		return instTable_.getEntry(InstId::fence);
               }
             else if (funct3 == 1)
               {

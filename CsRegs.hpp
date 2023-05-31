@@ -425,6 +425,28 @@ namespace WdRiscv
       VSIEH      = 0x214,
       VSIPH      = 0x254,
 
+      // Stateen CSR
+      SSTATEEN0   = 0x10c,
+      SSTATEEN1   = 0x10d,
+      SSTATEEN2   = 0x10e,
+      SSTATEEN3   = 0x10f,
+      MSTATEEN0   = 0x30c,
+      MSTATEEN1   = 0x30d,
+      MSTATEEN2   = 0x30e,
+      MSTATEEN3   = 0x30f,
+      MSTATEEN0H  = 0x31c,
+      MSTATEEN1H  = 0x31d,
+      MSTATEEN2H  = 0x31e,
+      MSTATEEN3H  = 0x31f,
+      HSTATEEN0   = 0x60c,
+      HSTATEEN1   = 0x60d,
+      HSTATEEN2   = 0x60e,
+      HSTATEEN3   = 0x60f,
+      HSTATEEN0H  = 0x61c,
+      HSTATEEN1H  = 0x61d,
+      HSTATEEN2H  = 0x61e,
+      HSTATEEN3H  = 0x61f,
+
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
     };
@@ -1122,6 +1144,9 @@ namespace WdRiscv
     /// Helper to construtor. Define advanced interrupt architecture CSRs
     void defineAiaRegs();
 
+    /// Helper to construtor. Define Mstateen extension CSRs
+    void defineStateEnableRegs();
+
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.
     bool setStoreErrorAddrCapture(URV value);
@@ -1323,6 +1348,29 @@ namespace WdRiscv
     /// Return adjusted value.
     URV adjustPmpValue(CsrNumber csrn, URV value) const;
 
+    /// Adjust the value of SIP/SIE by masking with MIDELEG (and if
+    /// hyerpervisor also by HIDELEG).
+    URV adjustSipSieValue(URV value) const;
+
+    /// Adjust the value of TIME/TIMEH by adding the time delta in
+    /// virtual mode.
+    URV adjustTimeValue(CsrNumber csrn, URV value) const;
+
+    /// Adjust the value of SSTATEEN by masking with MSTATEEN and HSTATEEN.
+    URV adjustSstateenValue(CsrNumber csrn, URV value) const;
+
+    /// Adjust the value of HSTATEEN by masking with MSTATEEN.
+    URV adjustHstateenValue(CsrNumber csrn, URV value) const;
+
+    /// Helper to write method: Mask with MIP/MIE/MIDELEG.
+    bool writeSipSie(CsrNumber num, URV value);
+
+    /// Helper to write method: Mask with MSTATEEN/HSTATEEN.
+    bool writeSstateen(CsrNumber num, URV value);
+
+    /// Helper to write method: Mask with MSTATEEN.
+    bool writeHstateen(CsrNumber num, URV value);
+
     /// Legalize the PMPCFG value before updating such a register: If
     /// the grain factor G is greater than or equal to 1, then the NA4
     /// mode is not selectable in the A field. If a field is locked it
@@ -1361,8 +1409,8 @@ namespace WdRiscv
     /// Enable hypervisor mode.
     void enableHypervisorMode(bool flag);
 
-    /// Enable supervisor mode.
-    void enableVectorMode(bool flag);
+    /// Enable vector extension.
+    void enableVectorExtension(bool flag);
 
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will

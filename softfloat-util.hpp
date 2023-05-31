@@ -204,4 +204,32 @@ namespace WdRiscv
     Float16 res = softToNative(f16_sqrt(nativeToSoft(a)));
     return res;
   }
+
+
+  /// Perform a floating point sqrt using the softfloat library.
+  inline float
+  softRound(float a, bool exact)
+  {
+    float res = softToNative(f32_roundToInt(nativeToSoft(a), softfloat_roundingMode, exact));
+    return res;
+  }
+
+
+  /// Perform a floating point sqrt using the softfloat library.
+  inline double
+  softRound(double a, bool exact)
+  {
+    double res = softToNative(f64_roundToInt(nativeToSoft(a), softfloat_roundingMode, exact));
+    return res;
+  }
+
+
+  /// Perform a floating point sqrt using the softfloat library.
+  inline Float16
+  softRound(Float16 a, bool exact)
+  {
+    Float16 res = softToNative(f16_roundToInt(nativeToSoft(a), softfloat_roundingMode, exact));
+    return res;
+  }
+
 }

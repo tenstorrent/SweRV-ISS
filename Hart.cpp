@@ -302,7 +302,7 @@ Hart<URV>::processExtensions(bool verbose)
 		  << "extensions are not enabled -- ignored\n";
     }
   flag = flag and isa_.isEnabled(RvExtension::V);
-  enableVectorMode(flag);
+  enableVectorExtension(flag);
 
   URV epcMask = extensionIsEnabled(RvExtension::C)? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
   auto epc = csRegs_.findCsr(CsrNumber::MEPC);
@@ -1515,7 +1515,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 
   if (misal)
     {
-      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      Pma pma = getPma(addr1);
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
     }
@@ -10351,7 +10351,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 
   if (misal)
     {
-      Pma pma = memory_.pmaMgr_.getPma(addr1);
+      Pma pma = getPma(addr1);
       if (not pma.isMisalignedOk())
 	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
     }
