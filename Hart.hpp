@@ -1511,11 +1511,12 @@ namespace WdRiscv
     void enableSupervisorMode(bool flag)
     { enableExtension(RvExtension::S, flag); csRegs_.enableSupervisorMode(flag); }
 
+    /// Enable hypervisor mode.
     void enableHypervisorMode(bool flag)
     { enableExtension(RvExtension::H, flag); csRegs_.enableHypervisorMode(flag); }
 
-    /// Enable supervisor mode.
-    void enableVectorMode(bool flag);
+    /// Enable vector extension.
+    void enableVectorExtension(bool flag);
 
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.

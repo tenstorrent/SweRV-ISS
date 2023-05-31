@@ -543,7 +543,7 @@ CsRegs<URV>::enableRvf(bool flag)
 
 template <typename URV>
 void
-CsRegs<URV>::enableVectorMode(bool flag)
+CsRegs<URV>::enableVectorExtension(bool flag)
 {
   for (auto csrn : { CsrNumber::VSTART, CsrNumber::VXSAT, CsrNumber::VXRM,
 		     CsrNumber::VCSR, CsrNumber::VL, CsrNumber::VTYPE,
@@ -552,7 +552,7 @@ CsRegs<URV>::enableVectorMode(bool flag)
       auto csr = findCsr(csrn);
       if (not csr)
         {
-          std::cerr << "Error: enableVectorMode: CSR number 0x"
+          std::cerr << "Error: enableVectorExtension: CSR number 0x"
                     << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }

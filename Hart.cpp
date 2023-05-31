@@ -302,7 +302,7 @@ Hart<URV>::processExtensions(bool verbose)
 		  << "extensions are not enabled -- ignored\n";
     }
   flag = flag and isa_.isEnabled(RvExtension::V);
-  enableVectorMode(flag);
+  enableVectorExtension(flag);
 
   URV epcMask = extensionIsEnabled(RvExtension::C)? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
   auto epc = csRegs_.findCsr(CsrNumber::MEPC);

@@ -1409,8 +1409,8 @@ namespace WdRiscv
     /// Enable hypervisor mode.
     void enableHypervisorMode(bool flag);
 
-    /// Enable supervisor mode.
-    void enableVectorMode(bool flag);
+    /// Enable vector extension.
+    void enableVectorExtension(bool flag);
 
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will

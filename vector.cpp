@@ -323,10 +323,10 @@ class WidenedFpScalar
 
 template <typename URV>
 void
-Hart<URV>::enableVectorMode(bool flag)
+Hart<URV>::enableVectorExtension(bool flag)
 {
   enableExtension(RvExtension::V, flag);
-  csRegs_.enableVectorMode(flag);
+  csRegs_.enableVectorExtension(flag);
 
   if (not flag)
     setVecStatus(VecStatus::Off);
