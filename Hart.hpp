@@ -2971,6 +2971,39 @@ namespace WdRiscv
 		 unsigned start, unsigned elems, bool masked,
 		 std::function<bool(ELEM_TYPE, ELEM_TYPE)> op);
 
+    /// Helper to vector vv integer instructions. Operation to be
+    /// performed (e.g. std::plus for vadd.vv) is passed in op.
+    template<typename OP>
+    void execVop_vv(const DecodedInst*, OP op);
+
+    /// Helper to vector vv instructions and unsigned integer element
+    /// types. Operation to be performed (e.g. std::plus for vadd.vv)
+    /// is passed in op.
+    template<typename OP>
+    void execVopu_vv(const DecodedInst*, OP op);
+
+    /// Helper to vector vx integer instructions. Operation to be
+    /// performed (e.g. std::plus for vadd.vv) is passed in op.
+    template<typename OP>
+    void execVop_vx(const DecodedInst*, OP op);
+
+    /// Helper to vector vx instructions and unsigned integer element
+    /// types. Operation to be performed (e.g. std::plus for vadd.vv)
+    /// is passed in op.
+    template<typename OP>
+    void execVopu_vx(const DecodedInst*, OP op);
+
+    /// Helper to vector vi integer instructions. Operation to be
+    /// performed (e.g. std::plus for vadd.vv) is passed in op.
+    template<typename OP>
+    void execVop_vi(const DecodedInst*, OP op);
+
+    /// Helper to vector vi instructions and unsigned integer element
+    /// types. Operation to be performed (e.g. std::plus for vadd.vv)
+    /// is passed in op.
+    template<typename OP>
+    void execVopu_vi(const DecodedInst*, OP op);
+
     void execVadd_vv(const DecodedInst*);
     void execVadd_vx(const DecodedInst*);
     void execVadd_vi(const DecodedInst*);
