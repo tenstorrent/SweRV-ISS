@@ -4314,8 +4314,9 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
 
 
 template <typename URV>
+template <typename OP>
 void
-Hart<URV>::execVmand_mm(const DecodedInst* di)
+Hart<URV>::execVmop_mm(const DecodedInst* di, OP op)
 {
   if (not checkSewLmulVstart(di))
     return;
@@ -4337,7 +4338,7 @@ Hart<URV>::execVmand_mm(const DecodedInst* di)
       start = start >> 3;
       elems = elems >> 3;
       for (unsigned i = start; i < elems; ++i)
-        vdData[i] = vs1Data[i] & vs2Data[i];
+        vdData[i] = op(vs1Data[i], vs2Data[i]);
     }
   else     // Bit indices are not byte aligned.
     for (unsigned i = start; i < elems; ++i)
@@ -4346,93 +4347,53 @@ Hart<URV>::execVmand_mm(const DecodedInst* di)
         unsigned bitIx = i & 7; // Bit index in byte
         uint8_t mask = 1 << bitIx;
         vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           (vs1Data[byteIx] & vs2Data[byteIx] & mask) );
+                           (op(vs1Data[byteIx] , vs2Data[byteIx]) & mask) );
       }
 
   vecRegs_.touchMask(di->op0());
   postVecSuccess();
 }
+
+
+template <typename URV>
+void
+Hart<URV>::execVmand_mm(const DecodedInst* di)
+{
+  execVmop_mm(di, std::bit_and());
+}
+
+
+struct
+MyBitNand
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return ~ (a & b); }
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVmnand_mm(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
-
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
-
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
-    {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = ~ (vs1Data[i] & vs2Data[i]);
-    }
-  else    // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           (~(vs1Data[byteIx] & vs2Data[byteIx]) & mask) );
-      }
-
-  vecRegs_.touchMask(di->op0());
-  postVecSuccess();
+  execVmop_mm(di, MyBitNand());
 }
+
+
+struct
+MyBitAndNot
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return a & ~b; }
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVmandnot_mm(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
-
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
-
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
-    {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = vs1Data[i] & ~vs2Data[i];
-    }
-  else    // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           ((vs1Data[byteIx] & ~vs2Data[byteIx]) & mask) );
-      }
-
-  vecRegs_.touchMask(di->op0());
-  postVecSuccess();
+  execVmop_mm(di, MyBitAndNot());
 }
 
 
@@ -4440,40 +4401,7 @@ template <typename URV>
 void
 Hart<URV>::execVmxor_mm(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
-
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
-
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
-    {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = vs1Data[i] ^ vs2Data[i];
-    }
-  else    // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           ((vs1Data[byteIx] ^ vs2Data[byteIx]) & mask) );
-      }
-
-  vecRegs_.touchMask(di->op0());
-  postVecSuccess();
+  execVmop_mm(di, std::bit_xor());
 }
 
 
@@ -4481,163 +4409,58 @@ template <typename URV>
 void
 Hart<URV>::execVmor_mm(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
-
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
-
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
-    {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = vs1Data[i] | vs2Data[i];
-    }
-  else    // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           ((vs1Data[byteIx] | vs2Data[byteIx]) & mask) );
-      }
-
-  vecRegs_.touchMask(di->op0());
-  postVecSuccess();
+  execVmop_mm(di, std::bit_or());
 }
+
+
+struct
+MyBitNor
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return ~ (a | b); }
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVmnor_mm(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
-
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
-
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
-    {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = ~(vs1Data[i] | vs2Data[i]);
-    }
-  else    // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           ( ~(vs1Data[byteIx] | vs2Data[byteIx]) & mask) );
-      }
-
-  vecRegs_.touchMask(di->op0());
-  postVecSuccess();
+  execVmop_mm(di, MyBitNor());
 }
+
+
+struct
+MyBitOrNot
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return a | ~b; }
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVmornot_mm(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
-
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
-
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
-    {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = vs1Data[i] | ~vs2Data[i];
-    }
-  else     // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           ((vs1Data[byteIx] | ~vs2Data[byteIx]) & mask) );
-      }
-
-  vecRegs_.touchMask(di->op0());
-  postVecSuccess();
+  execVmop_mm(di, MyBitOrNot());
 }
+
+
+struct
+MyBitXnor
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  { return ~ (a ^ b); }
+};
 
 
 template <typename URV>
 void
 Hart<URV>::execVmxnor_mm(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
-
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
-
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
-    {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = vs1Data[i] ^ ~vs2Data[i];
-    }
-  else     // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           ((vs1Data[byteIx] ^ ~vs2Data[byteIx]) & mask) );
-      }
-
-  vecRegs_.touchMask(di->op0());
-  postVecSuccess();
+  execVmop_mm(di, MyBitXnor());
 }
 
 

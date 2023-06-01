@@ -3023,6 +3023,12 @@ namespace WdRiscv
     template<typename OP>
     void execVredopu_vs(const DecodedInst*, OP op);
 
+    /// Helper to vector mm mask bitwise instructions
+    /// (eg vmand.mm). Operation to be performed (eg. std::max) is
+    /// passed in op.
+    template <typename OP>
+    void execVmop_mm(const DecodedInst* di, OP op);
+
     void execVadd_vv(const DecodedInst*);
     void execVadd_vx(const DecodedInst*);
     void execVadd_vi(const DecodedInst*);
