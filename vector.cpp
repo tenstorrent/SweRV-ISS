@@ -1195,6 +1195,92 @@ Hart<URV>::execVopu_vv(const DecodedInst* di, OP op)
 
 
 template <typename URV>
+template <typename OP>
+void
+Hart<URV>::execVop_vx(const DecodedInst* di, OP op)
+{
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  SRV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    case EW::Half:
+      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    case EW::Word:
+      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    case EW::Word2:
+      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
+}
+
+
+template <typename URV>
+template <typename OP>
+void
+Hart<URV>::execVopu_vx(const DecodedInst* di, OP op)
+{
+  if (not checkVecIntInst(di))
+    return;
+
+  bool masked = di->isMasked();
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+
+  if (not checkVecOpsVsEmul(di, vd, vs1, group))
+    return;
+
+  SRV e2 = SRV(intRegs_.read(rs2));
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    case EW::Half:
+      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    case EW::Word:
+      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    case EW::Word2:
+      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, op);
+      break;
+    default:
+      postVecFail(di);
+      return;
+    }
+
+  postVecSuccess();
+}
+
+
+template <typename URV>
 void
 Hart<URV>::execVadd_vv(const DecodedInst* di)
 {
@@ -1238,41 +1324,7 @@ template <typename URV>
 void
 Hart<URV>::execVadd_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::plus());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::plus());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::plus());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::plus());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, std::plus());
 }
 
 
@@ -1329,41 +1381,7 @@ template <typename URV>
 void
 Hart<URV>::execVsub_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::minus());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, std::minus());
 }
 
 
@@ -1379,41 +1397,7 @@ template <typename URV>
 void
 Hart<URV>::execVrsub_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyRsub());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyRsub());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, MyRsub());
 }
 
 
@@ -3125,41 +3109,7 @@ template <typename URV>
 void
 Hart<URV>::execVminu_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  URV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVopu_vx(di, MyMin());
 }
 
 
@@ -3175,41 +3125,7 @@ template <typename URV>
 void
 Hart<URV>::execVmin_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMin());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, MyMin());
 }
 
 
@@ -3233,41 +3149,7 @@ template <typename URV>
 void
 Hart<URV>::execVmaxu_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  URV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVopu_vx(di, MyMax());
 }
 
 
@@ -3283,41 +3165,7 @@ template <typename URV>
 void
 Hart<URV>::execVmax_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MyMax());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, MyMax());
 }
 
 
@@ -3333,41 +3181,7 @@ template <typename URV>
 void
 Hart<URV>::execVand_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::bit_and());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::bit_and());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::bit_and());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::bit_and());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, std::bit_and());
 }
 
 
@@ -3424,41 +3238,7 @@ template <typename URV>
 void
 Hart<URV>::execVor_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::bit_or());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::bit_or());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::bit_or());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::bit_or());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, std::bit_or());
 }
 
 
@@ -3515,41 +3295,7 @@ template <typename URV>
 void
 Hart<URV>::execVxor_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, std::bit_xor());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::bit_xor());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::bit_xor());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::bit_xor());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, std::bit_xor());
 }
 
 
@@ -3619,41 +3365,7 @@ template <typename URV>
 void
 Hart<URV>::execVsll_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  URV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MySll());
-      break;
-    case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MySll());
-      break;
-    case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MySll());
-      break;
-    case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MySll());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVopu_vx(di, MySll());
 }
 
 
@@ -3723,41 +3435,7 @@ template <typename URV>
 void
 Hart<URV>::execVsrl_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  URV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    case EW::Half:
-      vop_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    case EW::Word:
-      vop_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    case EW::Word2:
-      vop_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVopu_vx(di, MySr());
 }
 
 
@@ -3814,42 +3492,7 @@ template <typename URV>
 void
 Hart<URV>::execVsra_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  // Spec says sign extend scalar register. We comply.
-  URV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t> (vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, MySr());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-
-  postVecSuccess();
+  execVop_vx(di, MySr());
 }
 
 
@@ -6285,41 +5928,7 @@ template <typename URV>
 void
 Hart<URV>::execVmul_vx(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
-  bool masked = di->isMasked();
-  unsigned vd = di->op0(), vs1 = di->op1(), rs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-
-  if (not checkVecOpsVsEmul(di, vd, vs1, group))
-    return;
-
-  SRV e2 = SRV(intRegs_.read(rs2));
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:
-      vop_vx<int8_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
-      break;
-    case EW::Half:
-      vop_vx<int16_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
-      break;
-    case EW::Word:
-      vop_vx<int32_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
-      break;
-    case EW::Word2:
-      vop_vx<int64_t>(vd, vs1, e2, group, start, elems, masked, std::multiplies());
-      break;
-    default:
-      postVecFail(di);
-      return;
-    }
-  postVecSuccess();
+  execVop_vx(di, std::multiplies());
 }
 
 
