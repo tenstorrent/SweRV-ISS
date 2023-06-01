@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -203,11 +203,19 @@ VecRegs::findReg(std::string_view name, unsigned& ix) const
     return false;
 
   std::string_view numStr = name;
-  if (numStr.at(0) == 'v')
-    numStr = numStr.substr(1);
+  if (name.at(0) == 'v')
+     numStr = numStr.substr(1);
+
+  int base = 10;
+  if (numStr.starts_with("0x"))
+    {
+      numStr = numStr.substr(2);
+      base = 16;
+    }
+  std::string byteStr = std::string(numStr);
 
   char* end = nullptr;
-  unsigned n = strtoul(numStr.data(), &end, 10);
+  unsigned n = strtoul(byteStr.c_str(), &end, base);
   if (end and *end)
     return false;
 
