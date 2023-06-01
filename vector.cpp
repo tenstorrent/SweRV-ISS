@@ -4038,8 +4038,9 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
 template <typename URV>
 template<typename ELEM_TYPE>
 void
-Hart<URV>::vredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                      unsigned start, unsigned elems, bool masked)
+Hart<URV>::vredop_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		     unsigned start, unsigned elems, bool masked,
+		     std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op)
 {
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, result = 0;
@@ -4054,7 +4055,7 @@ Hart<URV>::vredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	continue;
 
       if (vecRegs_.read(vs1, ix, group, e1))
-	result += e1;
+	result = op(result, e1);
       else
 	errors++;
     }
@@ -4063,6 +4064,88 @@ Hart<URV>::vredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
     errors++;
 
   assert(errors == 0);
+}
+
+
+template <typename URV>
+template <typename OP>
+void
+Hart<URV>::execVredop_vs(const DecodedInst* di, OP op)
+{
+  if (not checkSewLmulVstart(di))
+    return;
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+
+  if (not checkRedOpVsEmul(di, vs1, group, start))
+    return;
+  if (elems == 0)
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vredop_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    case EW::Half:
+      vredop_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    case EW::Word:
+      vredop_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    case EW::Word2:
+      vredop_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    default:  postVecFail(di); return;
+    }
+  postVecSuccess();
+}
+
+
+template <typename URV>
+template <typename OP>
+void
+Hart<URV>::execVredopu_vs(const DecodedInst* di, OP op)
+{
+  if (not checkSewLmulVstart(di))
+    return;
+
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemCount();
+  ElementWidth sew = vecRegs_.elemWidth();
+  bool masked = di->isMasked();
+
+  if (not checkRedOpVsEmul(di, vs1, group, start))
+    return;
+  if (elems == 0)
+    return;
+
+  typedef ElementWidth EW;
+  switch (sew)
+    {
+    case EW::Byte:
+      vredop_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    case EW::Half:
+      vredop_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    case EW::Word:
+      vredop_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    case EW::Word2:
+      vredop_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked, op);
+      break;
+    default:  postVecFail(di); return;
+    }
+  postVecSuccess();
 }
 
 
@@ -4070,62 +4153,7 @@ template <typename URV>
 void
 Hart<URV>::execVredsum_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredsum_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredsum_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredsum_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredsum_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
-}
-
-
-template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vredand_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                      unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, result = 0;
-  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
-
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-  
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-      
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = result & e1;
-      else
-	errors++;
-    }
-
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  execVredop_vs(di, std::plus());
 }
 
 
@@ -4133,62 +4161,7 @@ template <typename URV>
 void
 Hart<URV>::execVredand_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredand_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredand_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredand_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredand_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
-}
-
-
-template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vredor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                     unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, result = 0;
-  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
-
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-  
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = result | e1;
-      else
-	errors++;
-    }
-
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  execVredopu_vs(di, std::bit_and());
 }
 
 
@@ -4196,62 +4169,7 @@ template <typename URV>
 void
 Hart<URV>::execVredor_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredor_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredor_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredor_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredor_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
-}
-
-
-template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vredxor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                      unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, result = 0;
-  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
-
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-  
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = result ^ e1;
-      else
-	errors++;
-    }
-
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  execVredopu_vs(di, std::bit_or());
 }
 
 
@@ -4259,62 +4177,7 @@ template <typename URV>
 void
 Hart<URV>::execVredxor_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredxor_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredxor_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredxor_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredxor_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
-}
-
-
-template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vredminu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                       unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, result = 0;
-  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
-
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = result < e1 ? result : e1;
-      else
-	errors++;
-    }
-
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  execVredopu_vs(di, std::bit_xor());
 }
 
 
@@ -4322,62 +4185,7 @@ template <typename URV>
 void
 Hart<URV>::execVredminu_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredminu_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredminu_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredminu_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredminu_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
-}
-
-
-template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                      unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, result = 0;
-  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
-
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-      
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = result < e1 ? result : e1;
-      else
-	errors++;
-    }
-
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  execVredopu_vs(di, MyMin());
 }
 
 
@@ -4385,62 +4193,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmin_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredmin_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredmin_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredmin_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredmin_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
-}
-
-
-template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vredmaxu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                       unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, result = 0;
-  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
-
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-      
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = result > e1 ? result : e1;
-      else
-	errors++;
-    }
-
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  execVredop_vs(di, MyMin());
 }
 
 
@@ -4448,62 +4201,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmaxu_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredmaxu_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredmaxu_vs<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredmaxu_vs<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredmaxu_vs<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
-}
-
-
-template <typename URV>
-template<typename ELEM_TYPE>
-void
-Hart<URV>::vredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                      unsigned start, unsigned elems, bool masked)
-{
-  unsigned errors = 0;
-  ELEM_TYPE e1 = 0, result = 0;
-  unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
-
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  for (unsigned ix = start; ix < elems; ++ix)
-    {
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-      
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = result > e1 ? result : e1;
-      else
-	errors++;
-    }
-
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  execVredopu_vs(di, MyMax());
 }
 
 
@@ -4511,31 +4209,7 @@ template <typename URV>
 void
 Hart<URV>::execVredmax_vs(const DecodedInst* di)
 {
-  if (not checkSewLmulVstart(di))
-    return;
-
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-
-  unsigned group = vecRegs_.groupMultiplierX8(), start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
-  bool masked = di->isMasked();
-
-  if (not checkRedOpVsEmul(di, vs1, group, start))
-    return;
-  if (elems == 0)
-    return;
-
-  typedef ElementWidth EW;
-  switch (sew)
-    {
-    case EW::Byte:  vredmax_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half:  vredmax_vs<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vredmax_vs<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vredmax_vs<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
-    }
-  postVecSuccess();
+  execVredop_vs(di, MyMax());
 }
 
 
