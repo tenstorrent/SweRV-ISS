@@ -3004,6 +3004,25 @@ namespace WdRiscv
     template<typename OP>
     void execVopu_vi(const DecodedInst*, OP op);
 
+    /// Helper to vector vs integer reduction instructions (eg
+    /// vredsum.vs). Operation to be performed (eg. std::plus) is
+    /// passed in op.
+    template<typename ELEM_TYPE>
+    void vredop_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+		   unsigned start, unsigned elems, bool masked,
+		   std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+
+    /// Helper to vector vs integer reduction instructions (eg vredsum.vs). Operation
+    /// to be performed (eg. std::plus) is passed in op.
+    template<typename OP>
+    void execVredop_vs(const DecodedInst*, OP op);
+
+    /// Helper to vector vs unsigned integer reduction instructions
+    /// (eg vredmaxu.vs). Operation to be performed (eg. std::max) is
+    /// passed in op.
+    template<typename OP>
+    void execVredopu_vs(const DecodedInst*, OP op);
+
     void execVadd_vv(const DecodedInst*);
     void execVadd_vx(const DecodedInst*);
     void execVadd_vi(const DecodedInst*);
@@ -3156,44 +3175,13 @@ namespace WdRiscv
                       unsigned start, unsigned elems);
     void execVcompress_vm(const DecodedInst*);
 
-    template<typename ELEM_TYPE>
-    void vredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked);
     void execVredsum_vs(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vredand_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked);
     void execVredand_vs(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vredor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                   unsigned start, unsigned elems, bool masked);
     void execVredor_vs(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vredxor_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked);
     void execVredxor_vs(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vredminu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                     unsigned start, unsigned elems, bool masked);
     void execVredminu_vs(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked);
     void execVredmin_vs(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vredmaxu_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                     unsigned start, unsigned elems, bool masked);
     void execVredmaxu_vs(const DecodedInst*);
-
-    template<typename ELEM_TYPE>
-    void vredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
-                    unsigned start, unsigned elems, bool masked);
     void execVredmax_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
