@@ -23,6 +23,7 @@
 #include <elfio/elfio.hpp>
 #include <zlib.h>
 #include "Memory.hpp"
+#include "wideint.hpp"
 
 using namespace WdRiscv;
 
@@ -346,7 +347,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
 /// See: https://en.wikipedia.org/wiki/LEB128
 static
 bool
-extractUleb128(std::istream& in, __uint128_t& value)
+extractUleb128(std::istream& in, Uint128& value)
 {
   value = 0;
   uint8_t byte = 0;
@@ -357,7 +358,7 @@ extractUleb128(std::istream& in, __uint128_t& value)
     {
       uint8_t msb = byte >> 7;  // Most sig bit
       byte = (byte << 1) >> 1;  // Clear most sig bit
-      value = value | (__uint128_t(byte) << shift);
+      value = value | (Uint128(byte) << shift);
       shift += 8;
       count++;
       if (not msb)
@@ -447,7 +448,7 @@ Memory::collectElfRiscvTags(const std::string& fileName,
       while (iss and (iss.tellg() - attribsStart < attribsSize))
         {
           // Next is a unsigned lengh-encoded binary 128 tag.
-          __uint128_t tag = 0;
+          Uint128 tag = 0;
           if (not extractUleb128(iss, tag))
             {
               std::cerr << "Empty/corrupted ELF RISCV file attributes subsection: Invalid tag\n";
@@ -458,7 +459,7 @@ Memory::collectElfRiscvTags(const std::string& fileName,
           // is a null-terminated string.
           if ((tag & 1) == 0)
             {
-              __uint128_t value = 0;
+              Uint128 value = 0;
               if (not extractUleb128(iss, value))
                 {
                   std::cerr << "Empty/corrupted ELF RISCV file attributes subsection: Invalid tag value\n";

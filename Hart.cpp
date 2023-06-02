@@ -27,17 +27,6 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 
-#include <boost/multiprecision/cpp_int.hpp>
-
-// On pure 32-bit machines, use boost for 128-bit integer type.
-#if __x86_64__
-  typedef __int128_t  Int128;
-  typedef __uint128_t Uint128;
-#else
-  typedef boost::multiprecision::int128_t  Int128;
-  typedef boost::multiprecision::uint128_t Uint128;
-#endif
-
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -54,6 +43,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
+#include "wideint.hpp"
 
 
 #ifndef SO_REUSEPORT

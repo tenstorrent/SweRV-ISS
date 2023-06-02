@@ -1,14 +1,14 @@
-#include <cassert>
-#include <iostream>
 #include "wideint.hpp"
 
 using namespace WdRiscv;
 
 
+#ifndef __SIZEOF_INT128__
+
 Uint128&
 Uint128::operator *= (const Uint128& x)
 {
-  unsigned qw = width() / 4;
+  static constexpr unsigned qw = width() / 4;
 
   QuarterType a0 = (low_ << qw) >> qw, a1 = low_ >> qw;
   QuarterType a2 = (high_ << qw) >> qw, a3 = high_ >> qw;
@@ -45,7 +45,7 @@ Uint128::operator *= (const Uint128& x)
 Uint128&
 Uint128::operator /= (const Uint128& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -76,7 +76,7 @@ Uint128::operator /= (const Uint128& x)
 Uint128&
 Uint128::operator %= (const Uint128& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -110,7 +110,7 @@ Uint128::operator >>= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -137,7 +137,7 @@ Uint128::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -304,7 +304,7 @@ Int128::operator >>= (int n)
 
   bool neg = high_ < HalfType(0);
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     {
@@ -339,7 +339,7 @@ Int128::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -359,6 +359,7 @@ Int128::operator <<= (int n)
   return *this;
 }
 
+#endif
 
 
 // 256
@@ -368,7 +369,7 @@ Int128::operator <<= (int n)
 Uint256&
 Uint256::operator *= (const Uint256& x)
 {
-  unsigned qw = width() / 4;
+  static constexpr unsigned qw = width() / 4;
 
   QuarterType a0 = QuarterType((low_ << qw) >> qw), a1 = QuarterType(low_ >> qw);
   QuarterType a2 = QuarterType((high_ << qw) >> qw), a3 = QuarterType(high_ >> qw);
@@ -405,7 +406,7 @@ Uint256::operator *= (const Uint256& x)
 Uint256&
 Uint256::operator /= (const Uint256& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -436,7 +437,7 @@ Uint256::operator /= (const Uint256& x)
 Uint256&
 Uint256::operator %= (const Uint256& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -470,7 +471,7 @@ Uint256::operator >>= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -497,7 +498,7 @@ Uint256::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -664,7 +665,7 @@ Int256::operator >>= (int n)
 
   bool neg = high_ < HalfType(0);
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     {
@@ -685,8 +686,8 @@ Int256::operator >>= (int n)
     {
       HalfUnsigned temp = high_ << (halfw - n);
       high_ >>= n;
-      low_ = HalfUnsigned(low_) >> n;
-      low_ |= temp;
+      low_ = static_cast<HalfType>(HalfUnsigned(low_) >> n);
+      low_ |= static_cast<HalfType>(temp);
     }
 
   return *this;
@@ -699,7 +700,7 @@ Int256::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -714,7 +715,7 @@ Int256::operator <<= (int n)
       HalfUnsigned temp = low_ >> (halfw - n);
       high_ <<= n;
       low_ <<= n;
-      high_ |= temp;
+      high_ |= static_cast<HalfType>(temp);
     }
   return *this;
 }
@@ -728,12 +729,12 @@ Int256::operator <<= (int n)
 Uint512&
 Uint512::operator *= (const Uint512& x)
 {
-  unsigned qw = width() / 4;
+  static constexpr unsigned qw = width() / 4;
 
-  QuarterType a0 = (low_ << qw) >> qw, a1 = low_ >> qw;
-  QuarterType a2 = (high_ << qw) >> qw, a3 = high_ >> qw;
-  QuarterType b0 = (x.low_ << qw) >> qw, b1 = x.low_ >> qw;
-  QuarterType b2 = (x.high_ << qw) >> qw, b3 = x.high_ >> qw;
+  QuarterType a0 = QuarterType((low_ << qw) >> qw), a1 = QuarterType(low_ >> qw);
+  QuarterType a2 = QuarterType((high_ << qw) >> qw), a3 = QuarterType(high_ >> qw);
+  QuarterType b0 = QuarterType((x.low_ << qw) >> qw), b1 = QuarterType(x.low_ >> qw);
+  QuarterType b2 = QuarterType((x.high_ << qw) >> qw), b3 = QuarterType(x.high_ >> qw);
 
   *this = 0;
   SelfType shifted = 0;
@@ -765,7 +766,7 @@ Uint512::operator *= (const Uint512& x)
 Uint512&
 Uint512::operator /= (const Uint512& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -796,7 +797,7 @@ Uint512::operator /= (const Uint512& x)
 Uint512&
 Uint512::operator %= (const Uint512& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -830,7 +831,7 @@ Uint512::operator >>= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -857,7 +858,7 @@ Uint512::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -1024,7 +1025,7 @@ Int512::operator >>= (int n)
 
   bool neg = high_ < HalfType(0);
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     {
@@ -1059,7 +1060,7 @@ Int512::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -1088,7 +1089,7 @@ Int512::operator <<= (int n)
 Uint1024&
 Uint1024::operator *= (const Uint1024& x)
 {
-  unsigned qw = width() / 4;
+  static constexpr unsigned qw = width() / 4;
 
   QuarterType a0 = (low_ << qw) >> qw, a1 = low_ >> qw;
   QuarterType a2 = (high_ << qw) >> qw, a3 = high_ >> qw;
@@ -1125,7 +1126,7 @@ Uint1024::operator *= (const Uint1024& x)
 Uint1024&
 Uint1024::operator /= (const Uint1024& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -1156,7 +1157,7 @@ Uint1024::operator /= (const Uint1024& x)
 Uint1024&
 Uint1024::operator %= (const Uint1024& x)
 {
-  unsigned n = width();
+  static constexpr unsigned n = width();
   SelfType rem(0), result(0);
 
   SelfType y = *this;  // Dividend
@@ -1190,7 +1191,7 @@ Uint1024::operator >>= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -1217,7 +1218,7 @@ Uint1024::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -1384,7 +1385,7 @@ Int1024::operator >>= (int n)
 
   bool neg = high_ < HalfType(0);
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     {
@@ -1419,7 +1420,7 @@ Int1024::operator <<= (int n)
   if (n == 0)
     return *this;
 
-  int halfw = halfWidth();
+  static constexpr int halfw = halfWidth();
 
   if (n >= width())
     low_ = high_ = HalfType(0);
@@ -1442,6 +1443,8 @@ Int1024::operator <<= (int n)
 
 # if 0
 
+#include <cassert>
+#include <iostream>
 #include <random>
 
 int
