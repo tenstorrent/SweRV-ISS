@@ -4692,14 +4692,13 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User))
     {
       // Check for interrupts destined to VS privilege.
+      // Possible if pending (mie), enabled (mip), delegated, and h-delegated.
+      URV possible = mie & mip & delegVal & hDelegVal;
+
       for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = (mask & delegVal) != 0;
-	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (not delegated or not hDelegated)
-	    continue;
-	  if (mie & mask & mip)
+	  if (mask & possible)
 	    {
 	      cause = ic;
 	      return true;
