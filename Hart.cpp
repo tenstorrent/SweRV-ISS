@@ -4622,7 +4622,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
     return false;
 
   URV mie = csRegs_.peekMie();
-  if ((mie & mip & ~deferredInterrupts_) == 0)
+  URV possible = mie & mip & ~deferredInterrupts_;
+  if (possible == 0)
     return false;  // Nothing enabled that is also pending.
 
   typedef InterruptCause IC;
@@ -4631,9 +4632,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV delegVal = csRegs_.peekMideleg();
   URV hDelegVal = csRegs_.peekHideleg();
 
-  if (mstatus_.bits_.MIE or privMode_ != PM::Machine)
+  // Interrupts destined for machine mode must not be delegated.
+  URV machine = possible & ~delegVal;  // Machine interrupts.
+  if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and machine != 0)
     {
-      // Check for interrupts destined for machine-level (not-delegated).
+      // Check for interrupts destined for machine-mode (not-delegated).
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
@@ -4641,9 +4644,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = (mask & delegVal) != 0;
-	  bool enabled = (mie & mask & mip) != 0;
-	  if (enabled and not delegated)
+	  if ((machine & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
@@ -4653,9 +4654,10 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (privMode_ == PM::Machine)
     return false;
 
-  if (mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User)
+  // Interrupts destined for supervisor mode (S/HS): must be delegated but not h-delegated.
+  URV super = possible & delegVal & ~hDelegVal;  // Interrupts targeting S/HS.
+  if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and super != 0)
     {
-      // Check for interrupts destined for S or HS privilege.
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
@@ -4663,13 +4665,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = (mask & delegVal) != 0;
-	  if (not delegated)
-	    continue;
-	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (hDelegated)
-	    continue;
-	  if (mie & mask & mip)
+	  if ((super & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
@@ -4679,16 +4675,15 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (privMode_ == PM::Supervisor and not virtMode_)
     return false;
 
-  if (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User))
+  // Check for interrupts destined to VS privilege.
+  // Possible if pending (mie), enabled (mip), delegated, and h-delegated.
+  URV vs = possible & delegVal & hDelegVal;
+  if ((vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)) and vs != 0)
     {
-      // Check for interrupts destined to VS privilege.
-      // Possible if pending (mie), enabled (mip), delegated, and h-delegated.
-      URV possible = mie & mip & delegVal & hDelegVal;
-
       for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  if (mask & possible)
+	  if ((vs & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
