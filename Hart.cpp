@@ -9974,6 +9974,9 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	return;  // Cannot turn-off C-extension if PC is not word aligned.
     }
 
+  // Update integer register.
+  intRegs_.write(intReg, intRegVal);
+
   if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
     {
       unsigned modeBits = 0;
@@ -9983,14 +9986,11 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	modeBits = (val >> 60) & 0xf;
       VirtMem::Mode mode = VirtMem::Mode(modeBits);
       if (not virtMem_.isModeSupported(mode))
-	return;
+	return;  // Unsupported mode: Write has no effect.
     }
 
   // Update CSR.
   csRegs_.write(csr, privMode_, val);
-
-  // Update integer register.
-  intRegs_.write(intReg, intRegVal);
 
   postCsrUpdate(csr, val, intRegVal);
 
