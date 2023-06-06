@@ -18,6 +18,7 @@
 #include <cstring>
 #include "FpRegs.hpp"
 #include "VecRegs.hpp"
+#include "DecodedInst.hpp"
 #include "Decoder.hpp"
 #include "Disassembler.hpp"
 #include "float-util.hpp"
@@ -86,7 +87,7 @@ printInst(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
   std::string name = di.name();
   unsigned width = std::max(size_t(9), name.size() + 1);
 
-  out << std::left << std::setw(width) << name;
+  out << std::left << std::setw(static_cast<int>(width)) << name;
   unsigned opCount = di.operandCount();
 
   const char* sep = "";
@@ -446,7 +447,7 @@ printCbo(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
   std::string name = di.name();
   unsigned width = std::max(size_t(9), name.size() + 1);
-  out << std::left << std::setw(width) << name;
+  out << std::left << std::setw(static_cast<int>(width)) << name;
   out << "0(" << disas.intRegName(di.op0()) << ")";
 }
 
@@ -650,7 +651,7 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::c_lui:
-      printRegImm(*this, out, "c.lui", di.op0(), di.op1() >> 12);
+      printRegImm(*this, out, "c.lui", di.op0(), static_cast<int32_t>(di.op1() >> 12));
       break;
 
     case InstId::c_srli:

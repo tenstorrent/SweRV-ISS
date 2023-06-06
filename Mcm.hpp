@@ -13,10 +13,8 @@ namespace WdRiscv
   template <typename URV>
   class Hart;
 
-  class DecodedInst;
-
-  typedef uint32_t McmInstrIx;
-  typedef uint32_t MemoryOpIx;
+  using McmInstrIx = uint32_t;
+  using MemoryOpIx = uint32_t;
 
   struct MemoryOp
   {
@@ -238,7 +236,7 @@ namespace WdRiscv
 
   protected:
 
-    typedef std::vector<MemoryOp> MemoryOpVec;
+    using MemoryOpVec = std::vector<MemoryOp>;
 
     void cancelReplayedReads(McmInstr*);
 
@@ -320,12 +318,12 @@ namespace WdRiscv
     const unsigned fpRegOffset_ = 32;
     const unsigned csRegOffset_ = 64;
     const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
-      
 
-    typedef std::vector<McmInstr> McmInstrVec;
 
-    typedef std::vector<uint64_t> RegTimeVec; // Map reg index to time.
-    typedef std::vector<uint64_t> RegProducer; // Map reg index to instr tag.
+    using McmInstrVec = std::vector<McmInstr>;
+
+    using RegTimeVec = std::vector<uint64_t>; // Map reg index to time.
+    using RegProducer = std::vector<uint64_t>; // Map reg index to instr tag.
 
     MemoryOpVec sysMemOps_;  // Memory ops of all cores.
     std::vector<McmInstrVec> hartInstrVecs_; // One vector per hart.

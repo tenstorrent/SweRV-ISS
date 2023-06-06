@@ -25,7 +25,7 @@ cc_library(
     srcs          = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
     hdrs          = hdrs,
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
-    deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat"],
+    deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat", "//third_party:linenoise"],
     linkopts      = ["-lstdc++fs", "-lpthread", "-lz", "-ldl", "-lrt"],
     visibility    = ["//visibility:public"],
 )

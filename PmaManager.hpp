@@ -160,7 +160,7 @@ namespace WdRiscv
       addr = (addr >> 2) << 2; // Make word aligned.
 
       // Search regions in order. Return first matching.
-      for (auto& region : regions_)
+      for (const auto& region : regions_)
 	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pma_;
 

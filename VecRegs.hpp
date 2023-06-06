@@ -17,6 +17,7 @@
 #include <array>
 #include <cstdint>
 #include <cstddef>
+#include <optional>
 #include <vector>
 #include <unordered_map>
 #include <string_view>
@@ -27,7 +28,7 @@ namespace WdRiscv
 {
 
   /// Values of VS field in mstatus.
-  typedef FpStatus VecStatus;
+  using VecStatus = FpStatus;
 
   enum class GroupMultiplier : uint32_t
     {
@@ -156,9 +157,10 @@ namespace WdRiscv
 	return false;
       if (elemIx*sizeof(T) > ((bytesPerReg_*groupX8) >> 3) - sizeof(T))
         return false;
-      if (regNum*bytesPerReg_ + elemIx*sizeof(T) > bytesInRegFile_ - sizeof(T))
+      std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
+      if (regOffset + elemIx*sizeof(T) > bytesInRegFile_ - sizeof(T))
         return false;
-      const T* data = reinterpret_cast<const T*>(data_.data() + regNum*bytesPerReg_);
+      const T* data = reinterpret_cast<const T*>(data_.data() + regOffset);
       value = data[elemIx];
       return true;
     }
@@ -176,9 +178,10 @@ namespace WdRiscv
 	return false;
       if ((elemIx + 1) * sizeof(T) > ((bytesPerReg_*groupX8) >> 3))
         return false;
-      if (regNum*bytesPerReg_ + (elemIx + 1)*sizeof(T) > bytesInRegFile_)
+      std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
+      if (regOffset + (elemIx + 1)*sizeof(T) > bytesInRegFile_)
         return false;
-      T* data = reinterpret_cast<T*>(data_.data() + regNum*bytesPerReg_);
+      T* data = reinterpret_cast<T*>(data_.data() + regOffset);
       data[elemIx] = value;
       lastWrittenReg_ = regNum;
       lastGroupX8_ = groupX8;
@@ -334,7 +337,7 @@ namespace WdRiscv
     static
     bool doubleSew(ElementWidth sew, ElementWidth& dsew)
     {
-      typedef ElementWidth EW;
+      using EW = ElementWidth;
       if (sew == EW::Byte   ) { dsew = EW:: Half;   return true; }
       if (sew == EW::Half   ) { dsew = EW:: Word;   return true; }
       if (sew == EW::Word   ) { dsew = EW:: Word2;  return true; }
@@ -444,16 +447,16 @@ namespace WdRiscv
 
     /// Clear the number denoting the last written register.
     void clearLastWrittenReg()
-    { lastWrittenReg_ = -1; }
-    
+    { lastWrittenReg_.reset(); }
+
     /// Return the number of the last written vector regsiter or -1 if no
     /// no register has been written since the last clearLastWrittenReg.
     int getLastWrittenReg(uint32_t& groupX8) const
     {
-      if (lastWrittenReg_ >= 0)
+      if (lastWrittenReg_.has_value())
         {
           groupX8 = lastGroupX8_;
-          return lastWrittenReg_;
+          return static_cast<int>(*lastWrittenReg_);
         }
       return -1;
     }
@@ -461,7 +464,7 @@ namespace WdRiscv
     /// Return the number of the last written vector regsiter or -1 if no
     /// no register has been written since the last clearLastWrittenReg.
     int getLastWrittenReg() const
-    { return lastWrittenReg_; }
+    { return lastWrittenReg_.has_value() ? static_cast<int>(*lastWrittenReg_) : -1; }
 
     /// Set effective group multipliers of the operands of a vector
     /// instruction (this is used to record logging information).
@@ -490,7 +493,7 @@ namespace WdRiscv
       if (byteIx >= bytesPerReg_)
         return false;
 
-      const uint8_t* data = data_.data() + maskReg*bytesPerReg_;
+      const uint8_t* data = data_.data() + static_cast<std::size_t>(maskReg)*bytesPerReg_;
       return (data[byteIx] >> bitIx) & 1;
     }
 
@@ -507,7 +510,7 @@ namespace WdRiscv
       if (byteIx >= bytesPerReg_)
         return false;
 
-      uint8_t* data = data_.data() + maskReg*bytesPerReg_;
+      uint8_t* data = data_.data() + static_cast<std::size_t>(maskReg)*bytesPerReg_;
       uint8_t mask = uint8_t(1) << bitIx;
       if (value)
         data[byteIx] |= mask;
@@ -525,14 +528,14 @@ namespace WdRiscv
     {
       if (vecIx >= regCount_)
         return nullptr;
-      return data_.data() + vecIx*bytesPerReg_;
+      return data_.data() + static_cast<std::size_t>(vecIx)*bytesPerReg_;
     }
 
     const uint8_t* getVecData(uint32_t vecIx) const
     {
       if (vecIx >= regCount_)
         return nullptr;
-      return data_.data() + vecIx*bytesPerReg_;
+      return data_.data() + static_cast<std::size_t>(vecIx)*bytesPerReg_;
     }
 
     /// It is convenient to contruct an empty regiter file (bytesPerReg = 0)
@@ -585,10 +588,10 @@ namespace WdRiscv
 
     /// Map an vector group multiplier to a flag indicating whether given
     /// group is supported.
-    typedef std::vector<bool> GroupFlags;
+    using GroupFlags = std::vector<bool>;
 
     /// Map an element width to a vector of flags indicating supported groups.
-    typedef std::vector<GroupFlags> GroupsForWidth;
+    using GroupsForWidth = std::vector<GroupFlags>;
 
     uint32_t regCount_ = 0;
     uint32_t bytesPerReg_ = 0;
@@ -609,7 +612,7 @@ namespace WdRiscv
 
     GroupsForWidth legalConfigs_;
 
-    int lastWrittenReg_ = -1;
+    std::optional<unsigned> lastWrittenReg_;
     uint32_t lastGroupX8_ = 8;   // 8 times last grouping factor
 
     // Following used for logging/tracing. Cleared before each instruction.

@@ -489,6 +489,8 @@ namespace WdRiscv
     /// Copy constructor is not available.
     Csr(const Csr<URV>& other) = delete;
 
+    void operator=(const Csr<URV>& other) = delete;
+
     /// Return lowest privilege mode that can access the register.
     /// Bits 9 and 8 of the register number encode the privilege mode.
     /// Privilege of user level performance counter is modified by
@@ -620,8 +622,6 @@ namespace WdRiscv
 
     friend class CsRegs<URV>;
     friend class Hart<URV>;
-
-    void operator=(const Csr<URV>& other) = delete;
 
     /// Define the privilege mode of this CSR.
     void definePrivilegeMode(PrivilegeMode mode)
@@ -1197,8 +1197,6 @@ namespace WdRiscv
       csr->setFields(fields);
       return true;
     }
-
-  protected:
 
     /// Clear VSTART CSR. Record write if value changes.
     void clearVstart()

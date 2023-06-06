@@ -14,6 +14,7 @@
 
 #include "Hart.hpp"
 #include "Core.hpp"
+#include "Memory.hpp"
 
 using namespace WdRiscv;
 
@@ -33,9 +34,7 @@ Core<URV>::Core(URV hartIdBase, unsigned coreIx, unsigned hartsPerCore, Memory& 
 
 
 template <typename URV>
-Core<URV>::~Core()
-{
-}
+Core<URV>::~Core() = default;
 
 
 template class WdRiscv::Core<uint32_t>;

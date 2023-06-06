@@ -164,8 +164,8 @@ namespace WdRiscv
     HalfType high_ = 0;
   };
 
-  constexpr Uint128 operator + (Uint128 a, Uint128 b);
-  constexpr Uint128 operator - (Uint128 a, Uint128 b);
+  constexpr Uint128 operator + (Uint128 a, const Uint128& b);
+  constexpr Uint128 operator - (Uint128 a, const Uint128& b);
 
 
   /// Signed 128-bit integer.
@@ -453,8 +453,8 @@ namespace WdRiscv
     HalfType high_ = 0;
   };
 
-  constexpr Uint256 operator + (Uint256 a, Uint256 b);
-  constexpr Uint256 operator - (Uint256 a, Uint256 b);
+  constexpr Uint256 operator + (Uint256 a, const Uint256& b);
+  constexpr Uint256 operator - (Uint256 a, const Uint256& b);
 
 
   /// Signed 256-bit integer.
@@ -752,8 +752,8 @@ namespace WdRiscv
     HalfType high_ = 0;
   };
 
-  constexpr Uint512 operator + (Uint512 a, Uint512 b);
-  constexpr Uint512 operator - (Uint512 a, Uint512 b);
+  constexpr Uint512 operator + (Uint512 a, const Uint512& b);
+  constexpr Uint512 operator - (Uint512 a, const Uint512& b);
 
 
   /// Signed 512-bit integer.
@@ -1058,8 +1058,8 @@ namespace WdRiscv
     HalfType high_ = 0;
   };
 
-  constexpr Uint1024 operator + (Uint1024 a, Uint1024 b);
-  constexpr Uint1024 operator - (Uint1024 a, Uint1024 b);
+  constexpr Uint1024 operator + (Uint1024 a, const Uint1024& b);
+  constexpr Uint1024 operator - (Uint1024 a, const Uint1024& b);
 
 
   /// Signed 1024-bit integer.
@@ -1233,22 +1233,22 @@ namespace WdRiscv
     : low_(x.low()), high_(x.high())
   { }
 
-  constexpr Uint128 operator + (Uint128 a, Uint128 b)
+  constexpr Uint128 operator + (Uint128 a, const Uint128& b)
   { a += b; return a; }
 
-  constexpr Uint128 operator - (Uint128 a, Uint128 b)
+  constexpr Uint128 operator - (Uint128 a, const Uint128& b)
   { a -= b; return a; }
 
-  inline Uint128 operator * (Uint128 a, Uint128 b)
+  inline Uint128 operator * (Uint128 a, const Uint128& b)
   { a *= b; return a; }
 
-  inline Uint128 operator / (Uint128 a, Uint128 b)
+  inline Uint128 operator / (Uint128 a, const Uint128& b)
   { a /= b; return a; }
 
-  inline Uint128 operator % (Uint128 a, Uint128 b)
+  inline Uint128 operator % (Uint128 a, const Uint128& b)
   { a %= b; return a; }
 
-  constexpr Uint128 operator - (Uint128 a)
+  constexpr Uint128 operator - (const Uint128& a)
   { Uint128 c = 0; c -= a; return c; }
 
   inline Uint128 operator >> (Uint128 x, int n)
@@ -1257,32 +1257,32 @@ namespace WdRiscv
   inline Uint128 operator << (Uint128 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint128 operator | (Uint128 a, Uint128 b)
+  constexpr Uint128 operator | (Uint128 a, const Uint128& b)
   { a |= b; return a; }
 
-  constexpr Uint128 operator & (Uint128 a, Uint128 b)
+  constexpr Uint128 operator & (Uint128 a, const Uint128& b)
   { a &= b; return a; }
 
-  constexpr Uint128 operator ^ (Uint128 a, Uint128 b)
+  constexpr Uint128 operator ^ (Uint128 a, const Uint128& b)
   { a ^= b; return a; }
 
 
-  constexpr Int128 operator + (Int128 a, Int128 b)
+  constexpr Int128 operator + (Int128 a, const Int128& b)
   { a += b; return a; }
 
-  constexpr Int128 operator - (Int128 a, Int128 b)
+  constexpr Int128 operator - (Int128 a, const Int128& b)
   { a -= b; return a; }
 
-  inline Int128 operator * (Int128 a, Int128 b)
+  inline Int128 operator * (Int128 a, const Int128& b)
   { a *= b; return a; }
 
-  inline Int128 operator / (Int128 a, Int128 b)
+  inline Int128 operator / (Int128 a, const Int128& b)
   { a /= b; return a; }
 
-  inline Int128 operator % (Int128 a, Int128 b)
+  inline Int128 operator % (Int128 a, const Int128& b)
   { a %= b; return a; }
 
-  constexpr Int128 operator - (Int128 a)
+  constexpr Int128 operator - (const Int128& a)
   { Int128 c = 0; c -= a; return c; }
 
   inline Int128 operator >> (Int128 x, int n)
@@ -1291,13 +1291,13 @@ namespace WdRiscv
   inline Int128 operator << (Int128 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int128 operator | (Int128 a, Int128 b)
+  constexpr Int128 operator | (Int128 a, const Int128& b)
   { a |= b; return a; }
 
-  constexpr Int128 operator & (Int128 a, Int128 b)
+  constexpr Int128 operator & (Int128 a, const Int128& b)
   { a &= b; return a; }
 
-  constexpr Int128 operator ^ (Int128 a, Int128 b)
+  constexpr Int128 operator ^ (Int128 a, const Int128& b)
   { a ^= b; return a; }
 
 #endif
@@ -1308,22 +1308,22 @@ namespace WdRiscv
     : low_(x.low()), high_(x.high())
   { }
 
-  constexpr Uint256 operator + (Uint256 a, Uint256 b)
+  constexpr Uint256 operator + (Uint256 a, const Uint256& b)
   { a += b; return a; }
 
-  constexpr Uint256 operator - (Uint256 a, Uint256 b)
+  constexpr Uint256 operator - (Uint256 a, const Uint256& b)
   { a -= b; return a; }
 
-  inline Uint256 operator * (Uint256 a, Uint256 b)
+  inline Uint256 operator * (Uint256 a, const Uint256& b)
   { a *= b; return a; }
 
-  inline Uint256 operator / (Uint256 a, Uint256 b)
+  inline Uint256 operator / (Uint256 a, const Uint256& b)
   { a /= b; return a; }
 
-  inline Uint256 operator % (Uint256 a, Uint256 b)
+  inline Uint256 operator % (Uint256 a, const Uint256& b)
   { a %= b; return a; }
 
-  constexpr Uint256 operator - (Uint256 a)
+  constexpr Uint256 operator - (const Uint256& a)
   { Uint256 c = 0UL; c -= a; return c; }
 
   inline Uint256 operator >> (Uint256 x, int n)
@@ -1332,32 +1332,32 @@ namespace WdRiscv
   inline Uint256 operator << (Uint256 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint256 operator | (Uint256 a, Uint256 b)
+  constexpr Uint256 operator | (Uint256 a, const Uint256& b)
   { a |= b; return a; }
 
-  constexpr Uint256 operator & (Uint256 a, Uint256 b)
+  constexpr Uint256 operator & (Uint256 a, const Uint256& b)
   { a &= b; return a; }
 
-  constexpr Uint256 operator ^ (Uint256 a, Uint256 b)
+  constexpr Uint256 operator ^ (Uint256 a, const Uint256& b)
   { a ^= b; return a; }
 
 
-  constexpr Int256 operator + (Int256 a, Int256 b)
+  constexpr Int256 operator + (Int256 a, const Int256& b)
   { a += b; return a; }
 
-  constexpr Int256 operator - (Int256 a, Int256 b)
+  constexpr Int256 operator - (Int256 a, const Int256& b)
   { a -= b; return a; }
 
-  inline Int256 operator * (Int256 a, Int256 b)
+  inline Int256 operator * (Int256 a, const Int256& b)
   { a *= b; return a; }
 
-  inline Int256 operator / (Int256 a, Int256 b)
+  inline Int256 operator / (Int256 a, const Int256& b)
   { a /= b; return a; }
 
-  inline Int256 operator % (Int256 a, Int256 b)
+  inline Int256 operator % (Int256 a, const Int256& b)
   { a %= b; return a; }
 
-  constexpr Int256 operator - (Int256 a)
+  constexpr Int256 operator - (const Int256& a)
   { Int256 c = 0L; c -= a; return c; }
 
   inline Int256 operator >> (Int256 x, int n)
@@ -1366,13 +1366,13 @@ namespace WdRiscv
   inline Int256 operator << (Int256 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int256 operator | (Int256 a, Int256 b)
+  constexpr Int256 operator | (Int256 a, const Int256& b)
   { a |= b; return a; }
 
-  constexpr Int256 operator & (Int256 a, Int256 b)
+  constexpr Int256 operator & (Int256 a, const Int256& b)
   { a &= b; return a; }
 
-  constexpr Int256 operator ^ (Int256 a, Int256 b)
+  constexpr Int256 operator ^ (Int256 a, const Int256& b)
   { a ^= b; return a; }
 
 
@@ -1381,22 +1381,22 @@ namespace WdRiscv
     : low_(x.low()), high_(x.high())
   { }
 
-  constexpr Uint512 operator + (Uint512 a, Uint512 b)
+  constexpr Uint512 operator + (Uint512 a, const Uint512& b)
   { a += b; return a; }
 
-  constexpr Uint512 operator - (Uint512 a, Uint512 b)
+  constexpr Uint512 operator - (Uint512 a, const Uint512& b)
   { a -= b; return a; }
 
-  inline Uint512 operator * (Uint512 a, Uint512 b)
+  inline Uint512 operator * (Uint512 a, const Uint512& b)
   { a *= b; return a; }
 
-  inline Uint512 operator / (Uint512 a, Uint512 b)
+  inline Uint512 operator / (Uint512 a, const Uint512& b)
   { a /= b; return a; }
 
-  inline Uint512 operator % (Uint512 a, Uint512 b)
+  inline Uint512 operator % (Uint512 a, const Uint512& b)
   { a %= b; return a; }
 
-  constexpr Uint512 operator - (Uint512 a)
+  constexpr Uint512 operator - (const Uint512& a)
   { Uint512 c = 0UL; c -= a; return c; }
 
   inline Uint512 operator >> (Uint512 x, int n)
@@ -1405,32 +1405,32 @@ namespace WdRiscv
   inline Uint512 operator << (Uint512 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint512 operator | (Uint512 a, Uint512 b)
+  constexpr Uint512 operator | (Uint512 a, const Uint512& b)
   { a |= b; return a; }
 
-  constexpr Uint512 operator & (Uint512 a, Uint512 b)
+  constexpr Uint512 operator & (Uint512 a, const Uint512& b)
   { a &= b; return a; }
 
-  constexpr Uint512 operator ^ (Uint512 a, Uint512 b)
+  constexpr Uint512 operator ^ (Uint512 a, const Uint512& b)
   { a ^= b; return a; }
 
 
-  constexpr Int512 operator + (Int512 a, Int512 b)
+  constexpr Int512 operator + (Int512 a, const Int512& b)
   { a += b; return a; }
 
-  constexpr Int512 operator - (Int512 a, Int512 b)
+  constexpr Int512 operator - (Int512 a, const Int512& b)
   { a -= b; return a; }
 
-  inline Int512 operator * (Int512 a, Int512 b)
+  inline Int512 operator * (Int512 a, const Int512& b)
   { a *= b; return a; }
 
-  inline Int512 operator / (Int512 a, Int512 b)
+  inline Int512 operator / (Int512 a, const Int512& b)
   { a /= b; return a; }
 
-  inline Int512 operator % (Int512 a, Int512 b)
+  inline Int512 operator % (Int512 a, const Int512& b)
   { a %= b; return a; }
 
-  constexpr Int512 operator - (Int512 a)
+  constexpr Int512 operator - (const Int512& a)
   { Int512 c = 0L; c -= a; return c; }
 
   inline Int512 operator >> (Int512 x, int n)
@@ -1439,13 +1439,13 @@ namespace WdRiscv
   inline Int512 operator << (Int512 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int512 operator | (Int512 a, Int512 b)
+  constexpr Int512 operator | (Int512 a, const Int512& b)
   { a |= b; return a; }
 
-  constexpr Int512 operator & (Int512 a, Int512 b)
+  constexpr Int512 operator & (Int512 a, const Int512& b)
   { a &= b; return a; }
 
-  constexpr Int512 operator ^ (Int512 a, Int512 b)
+  constexpr Int512 operator ^ (Int512 a, const Int512& b)
   { a ^= b; return a; }
 
 
@@ -1454,22 +1454,22 @@ namespace WdRiscv
     : low_(x.low()), high_(x.high())
   { }
 
-  constexpr Uint1024 operator + (Uint1024 a, Uint1024 b)
+  constexpr Uint1024 operator + (Uint1024 a, const Uint1024& b)
   { a += b; return a; }
 
-  constexpr Uint1024 operator - (Uint1024 a, Uint1024 b)
+  constexpr Uint1024 operator - (Uint1024 a, const Uint1024& b)
   { a -= b; return a; }
 
-  inline Uint1024 operator * (Uint1024 a, Uint1024 b)
+  inline Uint1024 operator * (Uint1024 a, const Uint1024& b)
   { a *= b; return a; }
 
-  inline Uint1024 operator / (Uint1024 a, Uint1024 b)
+  inline Uint1024 operator / (Uint1024 a, const Uint1024& b)
   { a /= b; return a; }
 
-  inline Uint1024 operator % (Uint1024 a, Uint1024 b)
+  inline Uint1024 operator % (Uint1024 a, const Uint1024& b)
   { a %= b; return a; }
 
-  constexpr Uint1024 operator - (Uint1024 a)
+  constexpr Uint1024 operator - (const Uint1024& a)
   { Uint1024 c = 0UL; c -= a; return c; }
 
   inline Uint1024 operator >> (Uint1024 x, int n)
@@ -1478,32 +1478,32 @@ namespace WdRiscv
   inline Uint1024 operator << (Uint1024 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint1024 operator | (Uint1024 a, Uint1024 b)
+  constexpr Uint1024 operator | (Uint1024 a, const Uint1024& b)
   { a |= b; return a; }
 
-  constexpr Uint1024 operator & (Uint1024 a, Uint1024 b)
+  constexpr Uint1024 operator & (Uint1024 a, const Uint1024& b)
   { a &= b; return a; }
 
-  constexpr Uint1024 operator ^ (Uint1024 a, Uint1024 b)
+  constexpr Uint1024 operator ^ (Uint1024 a, const Uint1024& b)
   { a ^= b; return a; }
 
 
-  constexpr Int1024 operator + (Int1024 a, Int1024 b)
+  constexpr Int1024 operator + (Int1024 a, const Int1024& b)
   { a += b; return a; }
 
-  constexpr Int1024 operator - (Int1024 a, Int1024 b)
+  constexpr Int1024 operator - (Int1024 a, const Int1024& b)
   { a -= b; return a; }
 
-  inline Int1024 operator * (Int1024 a, Int1024 b)
+  inline Int1024 operator * (Int1024 a, const Int1024& b)
   { a *= b; return a; }
 
-  inline Int1024 operator / (Int1024 a, Int1024 b)
+  inline Int1024 operator / (Int1024 a, const Int1024& b)
   { a /= b; return a; }
 
-  inline Int1024 operator % (Int1024 a, Int1024 b)
+  inline Int1024 operator % (Int1024 a, const Int1024& b)
   { a %= b; return a; }
 
-  constexpr Int1024 operator - (Int1024 a)
+  constexpr Int1024 operator - (const Int1024& a)
   { Int1024 c = 0L; c -= a; return c; }
 
   inline Int1024 operator >> (Int1024 x, int n)
@@ -1512,13 +1512,13 @@ namespace WdRiscv
   inline Int1024 operator << (Int1024 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int1024 operator | (Int1024 a, Int1024 b)
+  constexpr Int1024 operator | (Int1024 a, const Int1024& b)
   { a |= b; return a; }
 
-  constexpr Int1024 operator & (Int1024 a, Int1024 b)
+  constexpr Int1024 operator & (Int1024 a, const Int1024& b)
   { a &= b; return a; }
 
-  constexpr Int1024 operator ^ (Int1024 a, Int1024 b)
+  constexpr Int1024 operator ^ (Int1024 a, const Int1024& b)
   { a ^= b; return a; }
 
 

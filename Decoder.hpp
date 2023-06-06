@@ -17,10 +17,11 @@
 #include <cstdint>
 #include "InstId.hpp"
 #include "InstEntry.hpp"
-#include "DecodedInst.hpp"
 
 namespace WdRiscv
 {
+
+  class DecodedInst;
 
   class Decoder
   {
@@ -84,7 +85,7 @@ namespace WdRiscv
     /// Return the instruction table entry associated with the given
     /// instruction id. Return illegal instruction entry id is out of
     /// bounds.
-    const InstEntry& getInstructionEntry(const std::string& name) const
+    const InstEntry& getInstructionEntry(std::string_view name) const
     { return instTable_.getEntry(name); }
 
   protected:

@@ -14,9 +14,11 @@
 
 #pragma once
 
+#include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
 #include <map>
+#include <vector>
 #include <string>
 #include "util.hpp"
 
@@ -34,7 +36,7 @@ namespace WdRiscv
     
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
-    typedef typename std::make_signed_t<URV> SRV;
+    using SRV = typename std::make_signed_t<URV>;
 
     Syscall(Hart<URV>& hart)
       : hart_(hart)
@@ -81,7 +83,7 @@ namespace WdRiscv
 
     uint64_t mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size, bool maymove);
 
-    typedef std::pair<uint64_t, uint64_t> AddrLen;  // Address/length pair
+    using AddrLen = std::pair<uint64_t, uint64_t>;  // Address/length pair
 
     /// Clear memory changes recorded by last emulate call.
     void clearMemoryChanges()

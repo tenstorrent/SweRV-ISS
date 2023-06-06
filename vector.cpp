@@ -18,7 +18,6 @@
 #include <climits>
 #include <cassert>
 #include <optional>
-#include <boost/multiprecision/cpp_int.hpp>
 #include "wideint.hpp"
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
@@ -33,128 +32,128 @@ namespace std
   struct
   make_unsigned<WdRiscv::Int128>
   {
-    typedef WdRiscv::Uint128 type;
+    using type = WdRiscv::Uint128;
   };
 
   template <>
   struct
   make_unsigned<WdRiscv::Int256>
   {
-    typedef WdRiscv::Uint256 type;
+    using type = WdRiscv::Uint256;
   };
 
   template <>
   struct
   make_unsigned<WdRiscv::Int512>
   {
-    typedef WdRiscv::Uint512 type;
+    using type = WdRiscv::Uint512;
   };
 
   template <>
   struct
   make_unsigned<WdRiscv::Int1024>
   {
-    typedef WdRiscv::Uint1024 type;
+    using type = WdRiscv::Uint1024;
   };
 
   template <>
   struct
   make_unsigned<WdRiscv::Uint128>
   {
-    typedef WdRiscv::Uint128 type;
+    using type = WdRiscv::Uint128;
   };
 
   template <>
   struct
   make_unsigned<WdRiscv::Uint256>
   {
-    typedef WdRiscv::Uint256 type;
+    using type = WdRiscv::Uint256;
   };
 
   template <>
   struct
   make_unsigned<WdRiscv::Uint512>
   {
-    typedef WdRiscv::Uint512 type;
+    using type = WdRiscv::Uint512;
   };
 
   template <>
   struct
   make_unsigned<WdRiscv::Uint1024>
   {
-    typedef WdRiscv::Uint1024 type;
+    using type = WdRiscv::Uint1024;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Uint128>
   {
-    typedef WdRiscv::Int128 type;
+    using type = WdRiscv::Int128;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Uint256>
   {
-    typedef WdRiscv::Int256 type;
+    using type = WdRiscv::Int256;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Uint512>
   {
-    typedef WdRiscv::Int512 type;
+    using type = WdRiscv::Int512;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Uint1024>
   {
-    typedef WdRiscv::Int1024 type;
+    using type = WdRiscv::Int1024;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Int128>
   {
-    typedef WdRiscv::Int128 type;
+    using type = WdRiscv::Int128;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Int256>
   {
-    typedef WdRiscv::Int256 type;
+    using type = WdRiscv::Int256;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Int512>
   {
-    typedef WdRiscv::Int512 type;
+    using type = WdRiscv::Int512;
   };
 
   template <>
   struct
   make_signed<WdRiscv::Int1024>
   {
-    typedef WdRiscv::Int1024 type;
+    using type = WdRiscv::Int1024;
   };
 }
 
 
 namespace WdRiscv
 {
-  template <> struct makeDoubleWide<Float16>    { typedef float   type; };
-  template <> struct makeDoubleWide<BFloat16>   { typedef float   type; };
-  template <> struct makeDoubleWide<float>      { typedef double  type; };
+  template <> struct makeDoubleWide<Float16>    { using type = float; };
+  template <> struct makeDoubleWide<BFloat16>   { using type = float; };
+  template <> struct makeDoubleWide<float>      { using type = double; };
 
   /// Set result to the upper half of a*b computed in double width
   /// intermediate.
   template <typename T>
   void mulh(const T& a, const T& b, T& result)
   {
-    typedef typename makeDoubleWide<T>::type T2; // Double wide type
+    using T2 = typename makeDoubleWide<T>::type; // Double wide type
 
     unsigned tbits = integerWidth<T> (); // Number of bits in T
 
@@ -233,7 +232,7 @@ namespace WdRiscv
   template <typename TS, typename TU>
   void mulhsu(const TS& a, const TU& b, TS& result)
   {
-    typedef typename makeDoubleWide<TS>::type TS2; // Double wide signed type
+    using TS2 = typename makeDoubleWide<TS>::type; // Double wide signed type
 
     unsigned bits = integerWidth<TS> (); // Number of bits in TS and TU
 
@@ -410,7 +409,7 @@ Hart<URV>::checkFpSewLmulVstart(const DecodedInst* di, bool wide,
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = false;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   ok = (this->*fp16LegalFn)(); break;
@@ -828,7 +827,7 @@ Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
   if (not checkVecMaskInst(di, dest, src, groupX8))
     return false;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   EW sew = vecRegs_.elemWidth();
   bool ok = false;
   switch (sew)
@@ -858,7 +857,7 @@ Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
   if (not checkVecMaskInst(di, dest, src1, src2, groupX8))
     return false;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   EW sew = vecRegs_.elemWidth();
   bool ok = false;
   switch (sew)
@@ -1161,7 +1160,7 @@ Hart<URV>::execVop_vv(const DecodedInst* di, OP op)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1202,7 +1201,7 @@ Hart<URV>::execVopu_vv(const DecodedInst* di, OP op)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1245,7 +1244,7 @@ Hart<URV>::execVop_vx(const DecodedInst* di, OP op)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1288,7 +1287,7 @@ Hart<URV>::execVopu_vx(const DecodedInst* di, OP op)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1330,7 +1329,7 @@ Hart<URV>::execVop_vi(const DecodedInst* di, OP op)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1372,7 +1371,7 @@ Hart<URV>::execVopu_vi(const DecodedInst* di, OP op)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1466,7 +1465,7 @@ void
 Hart<URV>::vwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
@@ -1518,7 +1517,7 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwadd_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -1554,7 +1553,7 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwadd_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -1573,7 +1572,7 @@ void
 Hart<URV>::vwadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0;
@@ -1627,7 +1626,7 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
 
   URV e2 = intRegs_.read(di->op2());
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwadd_vx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
@@ -1665,7 +1664,7 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwadd_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
@@ -1684,7 +1683,7 @@ void
 Hart<URV>::vwsub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0;
@@ -1738,7 +1737,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
 
   URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwsub_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked); break;
@@ -1776,7 +1775,7 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vwsub_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
@@ -1795,7 +1794,7 @@ void
 Hart<URV>::vwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
@@ -1847,7 +1846,7 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwsub_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -1883,7 +1882,7 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwsub_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -1902,7 +1901,7 @@ void
 Hart<URV>::vwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
@@ -1954,7 +1953,7 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwadd_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -1990,7 +1989,7 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwadd_wv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -2028,7 +2027,7 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
 
   URV e2 = intRegs_.read(di->op2());
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2073,7 +2072,7 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2119,7 +2118,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
 
   URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2165,7 +2164,7 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2192,7 +2191,7 @@ void
 Hart<URV>::vwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
@@ -2244,7 +2243,7 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwsub_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -2280,7 +2279,7 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwsub_wv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -2370,7 +2369,7 @@ Hart<URV>::execVmseq_vv(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2408,7 +2407,7 @@ Hart<URV>::execVmseq_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2446,7 +2445,7 @@ Hart<URV>::execVmseq_vi(const DecodedInst* di)
 
   int32_t imm = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2482,7 +2481,7 @@ Hart<URV>::execVmsne_vv(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2520,7 +2519,7 @@ Hart<URV>::execVmsne_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2558,7 +2557,7 @@ Hart<URV>::execVmsne_vi(const DecodedInst* di)
 
   int32_t imm = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2594,7 +2593,7 @@ Hart<URV>::execVmsltu_vv(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2632,7 +2631,7 @@ Hart<URV>::execVmsltu_vx(const DecodedInst* di)
 
   URV e2 = intRegs_.read(rs2);
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2668,7 +2667,7 @@ Hart<URV>::execVmslt_vv(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2706,7 +2705,7 @@ Hart<URV>::execVmslt_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2742,7 +2741,7 @@ Hart<URV>::execVmsleu_vv(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2780,7 +2779,7 @@ Hart<URV>::execVmsleu_vx(const DecodedInst* di)
 
   URV e2 = intRegs_.read(rs2);
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2819,7 +2818,7 @@ Hart<URV>::execVmsleu_vi(const DecodedInst* di)
   // Immediate is sign exended and then treated as unsigned.
   int64_t imm = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2855,7 +2854,7 @@ Hart<URV>::execVmsle_vv(const DecodedInst* di)
   if (not checkVecMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2893,7 +2892,7 @@ Hart<URV>::execVmsle_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2931,7 +2930,7 @@ Hart<URV>::execVmsle_vi(const DecodedInst* di)
 
   int32_t imm = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -2969,7 +2968,7 @@ Hart<URV>::execVmsgtu_vx(const DecodedInst* di)
 
   URV e2 = intRegs_.read(rs2);
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -3008,7 +3007,7 @@ Hart<URV>::execVmsgtu_vi(const DecodedInst* di)
   // Immediate is sign exended and then treated as unsigned.
   int64_t imm = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -3046,7 +3045,7 @@ Hart<URV>::execVmsgt_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -3084,7 +3083,7 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
 
   int32_t imm = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -3363,7 +3362,7 @@ void
 Hart<URV>::vnsr_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		  unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE2X e1 = 0;
@@ -3417,7 +3416,7 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vnsr_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -3436,7 +3435,7 @@ void
 Hart<URV>::vnsr_wx(unsigned vd, unsigned vs1, URV e2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
 
@@ -3496,7 +3495,7 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
   // Spec says sign extend scalar register. We comply.
   URV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vnsr_wx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
@@ -3533,7 +3532,7 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, gp))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vnsr_wx<uint8_t> (vd, vs1, imm, gp, start, elems, msk); break;
@@ -3569,7 +3568,7 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vnsr_wv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -3608,7 +3607,7 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
   // Spec says sign extend scalar register. We comply.
   URV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vnsr_wx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
@@ -3645,7 +3644,7 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, gp))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vnsr_wx<int8_t> (vd, vs1, imm, gp, start, elems, msk); break;
@@ -3720,7 +3719,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vrgather_vv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -3791,7 +3790,7 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vrgather_vx<uint8_t> (vd, vs1, rs2, group, start, elems, masked); break;
@@ -3857,7 +3856,7 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vrgather_vi<uint8_t> (vd, vs1, imm, group, start, elems, masked); break;
@@ -3881,7 +3880,7 @@ Hart<URV>::vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
   uint16_t e2 = 0;
-  unsigned e2Group = (16*group)/(8*sizeof(ELEM_TYPE));
+  unsigned e2Group = (16UL*group)/(8*sizeof(ELEM_TYPE));
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -3953,7 +3952,7 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
 
   vecRegs_.setOpEmul(eg, eg, v2g);  // Track operand group for logging
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vrgatherei16_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -4022,7 +4021,7 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
       return;
     }
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vcompress_vm<uint8_t>(vd, vs1, vs2, group, start, elems); break;
@@ -4087,7 +4086,7 @@ Hart<URV>::execVredop_vs(const DecodedInst* di, OP op)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -4128,7 +4127,7 @@ Hart<URV>::execVredopu_vs(const DecodedInst* di, OP op)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -4219,7 +4218,7 @@ void
 Hart<URV>::vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   ELEM_TYPE2X result = 0;
@@ -4270,7 +4269,7 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vwredsum_vs<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -4301,7 +4300,7 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vwredsum_vs<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -4831,7 +4830,7 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
 
   URV amount = intRegs_.read(rs2);
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
@@ -4869,7 +4868,7 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
@@ -4993,7 +4992,7 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vslidedown<uint8_t> (vd, vs1, amount, group, start, elems, masked); break;
@@ -5025,7 +5024,7 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vslidedown<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
@@ -5297,7 +5296,7 @@ Hart<URV>::execVmulh_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmulh_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -5358,7 +5357,7 @@ Hart<URV>::execVmulh_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmulh_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -5388,7 +5387,7 @@ Hart<URV>::execVmulhu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmulh_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -5449,7 +5448,7 @@ Hart<URV>::execVmulhu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmulhu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -5468,7 +5467,7 @@ void
 Hart<URV>::vmulhsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename std::make_unsigned<ELEM_TYPE>::type  U_ELEM_TYPE;
+  using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
@@ -5513,7 +5512,7 @@ Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmulhsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -5532,7 +5531,7 @@ void
 Hart<URV>::vmulhsu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename std::make_unsigned<ELEM_TYPE>::type  U_ELEM_TYPE;
+  using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
@@ -5577,7 +5576,7 @@ Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmulhsu_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -5640,7 +5639,7 @@ Hart<URV>::execVmadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmadd_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -5702,7 +5701,7 @@ Hart<URV>::execVmadd_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vmadd_vx<int8_t> (vd, rs1, vs2, group, start, elems, masked); break;
@@ -5764,7 +5763,7 @@ Hart<URV>::execVnmsub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vnmsub_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -5826,7 +5825,7 @@ Hart<URV>::execVnmsub_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vnmsub_vx<int8_t> (vd, rs1, vs2, group, start, elems, masked); break;
@@ -5889,7 +5888,7 @@ Hart<URV>::execVmacc_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmacc_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -5951,7 +5950,7 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vmacc_vx<int8_t> (vd, rs1, vs2, group, start, elems, masked); break;
@@ -6014,7 +6013,7 @@ Hart<URV>::execVnmsac_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vnmsac_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -6076,7 +6075,7 @@ Hart<URV>::execVnmsac_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vnmsac_vx<int8_t> (vd, rs1, vs2, group, start, elems, masked); break;
@@ -6095,7 +6094,7 @@ void
 Hart<URV>::vwmulu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type  ELEM_TYPE_X2;
+  using ELEM_TYPE_X2 = typename makeDoubleWide<ELEM_TYPE>::type;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   ELEM_TYPE_X2 dest = 0;
@@ -6149,7 +6148,7 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmulu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -6168,7 +6167,7 @@ void
 Hart<URV>::vwmulu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type  ELEM_TYPE_X2;
+  using ELEM_TYPE_X2 = typename makeDoubleWide<ELEM_TYPE>::type;
 
   ELEM_TYPE e1 = 0;
   ELEM_TYPE_X2 dest = 0;
@@ -6222,7 +6221,7 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));  // Spec says sign extend.
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmulu_vx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
@@ -6241,7 +6240,7 @@ void
 Hart<URV>::vwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type  ELEM_TYPE_X2;
+  using ELEM_TYPE_X2 = typename makeDoubleWide<ELEM_TYPE>::type;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   ELEM_TYPE_X2 dest = 0;
@@ -6294,7 +6293,7 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmul_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -6313,7 +6312,7 @@ void
 Hart<URV>::vwmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type  ELEM_TYPE_X2;
+  using ELEM_TYPE_X2 = typename makeDoubleWide<ELEM_TYPE>::type;
 
   ELEM_TYPE e1 = 0;
   ELEM_TYPE_X2 dest = 0;
@@ -6369,7 +6368,7 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmul_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
@@ -6388,8 +6387,8 @@ void
 Hart<URV>::vwmulsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type  ELEM_TYPE_X2;
-  typedef typename std::make_unsigned<ELEM_TYPE>::type ELEM_TYPE_U;
+  using ELEM_TYPE_X2 = typename makeDoubleWide<ELEM_TYPE>::type;
+  using ELEM_TYPE_U  = typename std::make_unsigned<ELEM_TYPE>::type;
 
   ELEM_TYPE e1 = 0;
   ELEM_TYPE_U e2u = 0;
@@ -6443,7 +6442,7 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmulsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -6462,8 +6461,8 @@ void
 Hart<URV>::vwmulsu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type  ELEM_TYPE_X2;
-  typedef typename std::make_unsigned<ELEM_TYPE>::type ELEM_TYPE_U;
+  using ELEM_TYPE_X2 = typename makeDoubleWide<ELEM_TYPE>::type;
+  using ELEM_TYPE_U  = typename std::make_unsigned<ELEM_TYPE>::type;
 
   ELEM_TYPE e1 = 0;
   ELEM_TYPE_X2 dest = 0;
@@ -6520,7 +6519,7 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));   // Spec says sign extend.
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmulsu_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
@@ -6539,7 +6538,7 @@ void
 Hart<URV>::vwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
@@ -6591,7 +6590,7 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmacc_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -6610,8 +6609,8 @@ void
 Hart<URV>::vwmaccu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  typedef typename std::make_signed<DWT>::type SDWT; // Signed double wide type
+  using DWT  = typename makeDoubleWide<ELEM_TYPE>::type;  // Double wide type
+  using SDWT = typename std::make_signed<DWT>::type;      // Signed double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
@@ -6666,7 +6665,7 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Spec says sign extend.
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmaccu_vx<uint8_t>(vd, e1, vs2, group, start, elems, masked); break;
@@ -6703,7 +6702,7 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmacc_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -6722,7 +6721,7 @@ void
 Hart<URV>::vwmacc_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
@@ -6776,7 +6775,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vwmacc_vx<int8_t> (vd, e1, vs2, group, start, elems, masked); break;
@@ -6795,9 +6794,9 @@ void
 Hart<URV>::vwmaccsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  typedef typename std::make_unsigned<DWT>::type DWTU; // Double wide type unsigned
-  typedef typename std::make_unsigned<ELEM_TYPE>::type SWTU; // Single wide type unsigned
+  using DWT  = typename makeDoubleWide<ELEM_TYPE>::type;      // Double wide type
+  using DWTU = typename std::make_unsigned<DWT>::type;        // Double wide type unsigned
+  using SWTU = typename std::make_unsigned<ELEM_TYPE>::type;  // Single wide type unsigned
 
   unsigned errors = 0, wideGroup = group*2;
 
@@ -6851,7 +6850,7 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmaccsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -6870,9 +6869,9 @@ void
 Hart<URV>::vwmaccsu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  typedef typename std::make_unsigned<DWT>::type DWTU; // Double wide type unsigned
-  typedef typename std::make_unsigned<ELEM_TYPE>::type SWTU; // Single wide type unsigned
+  using DWT  = typename makeDoubleWide<ELEM_TYPE>::type;      // Double wide type
+  using DWTU = typename std::make_unsigned<DWT>::type;        // Double wide type unsigned
+  using SWTU = typename std::make_unsigned<ELEM_TYPE>::type;  // Single wide type unsigned
 
   unsigned errors = 0, wideGroup = group*2;
 
@@ -6928,7 +6927,7 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
 
   SRV e1 = SRV(intRegs_.read(rs1));  // Sign extend.
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmaccsu_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
@@ -6947,9 +6946,9 @@ void
 Hart<URV>::vwmaccus_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
-  typedef typename std::make_unsigned<DWT>::type DWTU; // Double wide type unsigned
-  typedef typename std::make_unsigned<ELEM_TYPE>::type SWTU; // Single wide type unsigned
+  using DWT  = typename makeDoubleWide<ELEM_TYPE>::type;      // Double wide type
+  using DWTU = typename std::make_unsigned<DWT>::type;        // Double wide type unsigned
+  using SWTU = typename std::make_unsigned<ELEM_TYPE>::type;  // Single wide type unsigned
 
   unsigned errors = 0, wideGroup = group*2;
 
@@ -7005,7 +7004,7 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
 
   URV e1 = intRegs_.read(rs1);
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vwmaccus_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
@@ -7068,7 +7067,7 @@ Hart<URV>::execVdivu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vdivu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -7134,7 +7133,7 @@ Hart<URV>::execVdivu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vdivu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -7205,7 +7204,7 @@ Hart<URV>::execVdiv_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vdiv_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -7276,7 +7275,7 @@ Hart<URV>::execVdiv_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vdiv_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -7339,7 +7338,7 @@ Hart<URV>::execVremu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vremu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -7405,7 +7404,7 @@ Hart<URV>::execVremu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  vremu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -7476,7 +7475,7 @@ Hart<URV>::execVrem_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vrem_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -7546,7 +7545,7 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vrem_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -7634,7 +7633,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
 
   vecRegs_.setOpEmul(eg, eg > 2? eg/2 : 1);  // Track operand group for logging
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   EW sew = vecRegs_.elemWidth();
   EW eew = sew;  // Effective elem width of source.
@@ -7713,7 +7712,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
 
   vecRegs_.setOpEmul(eg, eg > 4? eg/4 : 1);  // Track operand group for logging
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   EW sew = vecRegs_.elemWidth();
   EW eew = sew;  // Effective elem width of source.
@@ -7792,7 +7791,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
 
   vecRegs_.setOpEmul(eg, eg > 8? eg/8 : 1);  // Track operand group for logging
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   EW sew = vecRegs_.elemWidth();
   EW eew = sew;  // Effective elem width of source.
@@ -7903,7 +7902,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
 
   vecRegs_.setOpEmul(eg, eg > 2? eg/2 : 1);  // Track operand group for logging
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   EW sew = vecRegs_.elemWidth();
   EW eew = sew;  // Effective elem width of source.
@@ -7982,7 +7981,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
 
   vecRegs_.setOpEmul(eg, eg > 4? eg/4 : 1);  // Track operand group for logging
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   EW sew = vecRegs_.elemWidth();
   EW eew = sew;  // Effective elem width of source.
@@ -8061,7 +8060,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
 
   vecRegs_.setOpEmul(eg, eg > 8? eg/8 : 1);  // Track operand group for logging
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   EW sew = vecRegs_.elemWidth();
   EW eew = sew;  // Effective elem width of source.
@@ -8353,7 +8352,7 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vadc_vvm<uint8_t>(vd, vs1, vs2, vcin, group, start, elems); break;
@@ -8390,7 +8389,7 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vadc_vxm<uint8_t>(vd, vs1, e2, vcin, group, start, elems); break;
@@ -8427,7 +8426,7 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
 
   SRV e2 = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vadc_vxm<uint8_t>(vd, vs1, e2, vcin, group, start, elems); break;
@@ -8462,7 +8461,7 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vsbc_vvm<uint8_t>(vd, vs1, vs2, vbin, group, start, elems); break;
@@ -8499,7 +8498,7 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vsbc_vxm<uint8_t>(vd, vs1, e2, vbin, group, start, elems); break;
@@ -8526,7 +8525,7 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   if (not checkVecMaskInst(di, vcout, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmadc_vvm<uint8_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
@@ -8554,7 +8553,7 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmadc_vxm<uint8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
@@ -8586,7 +8585,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
 
   SRV e2 = di->op2As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmadc_vxm<uint8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
@@ -8613,7 +8612,7 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   if (not checkVecMaskInst(di, vbout, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmsbc_vvm<uint8_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
@@ -8642,7 +8641,7 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmsbc_vxm<uint8_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
@@ -8702,7 +8701,7 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmerge_vvm<int8_t>(vd, vs1, vs2, group, start, elems); break;
@@ -8764,7 +8763,7 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmerge_vxm<int8_t>(vd, vs1, e2, group, start, elems); break;
@@ -8799,7 +8798,7 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmerge_vxm<int8_t>(vd, vs1, imm, group, start, elems); break;
@@ -8890,7 +8889,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   SRV val = intRegs_.read(rs1);
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -9005,7 +9004,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
   unsigned vd = di->op0(), rs1 = di->op1(), groupX8 = 8, start = csRegs_.peekVstart();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -9094,7 +9093,7 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmv_v_v<int8_t>(vd, vs1, group, start, elems); break;
@@ -9148,7 +9147,7 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
 
   SRV e1 = intRegs_.read(rs1);
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmv_v_x<int8_t>(vd, e1, group, start, elems); break;
@@ -9185,7 +9184,7 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
 
   int32_t e1 = di->op1As<int32_t>();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: vmv_v_x<int8_t>(vd, e1, group, start, elems); break;
@@ -9394,7 +9393,7 @@ Hart<URV>::execVsaddu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsaddu_vv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -9463,7 +9462,7 @@ Hart<URV>::execVsaddu_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsaddu_vx<uint8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -9493,7 +9492,7 @@ Hart<URV>::execVsaddu_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsaddu_vx<uint8_t> (vd, vs1, imm,          group, start, elems, masked); break;
@@ -9566,7 +9565,7 @@ Hart<URV>::execVsadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsadd_vv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -9641,7 +9640,7 @@ Hart<URV>::execVsadd_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsadd_vx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -9671,7 +9670,7 @@ Hart<URV>::execVsadd_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsadd_vx<int8_t> (vd, vs1, imm,          group, start, elems, masked); break;
@@ -9738,7 +9737,7 @@ Hart<URV>::execVssubu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssubu_vv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -9807,7 +9806,7 @@ Hart<URV>::execVssubu_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssubu_vx<uint8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -9880,7 +9879,7 @@ Hart<URV>::execVssub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssub_vv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -9955,7 +9954,7 @@ Hart<URV>::execVssub_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssub_vx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -10017,7 +10016,7 @@ Hart<URV>::vaadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, e2 = 0;
 
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2; // Double wide
+  using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   URV rmVal = 0;
   peekCsr(CsrNumber::VXRM, rmVal);
@@ -10064,7 +10063,7 @@ Hart<URV>::execVaadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vaadd_vv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10093,7 +10092,7 @@ Hart<URV>::execVaaddu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vaadd_vv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10115,7 +10114,7 @@ Hart<URV>::vaadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0;
 
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2; // Double wide
+  using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   URV rmVal = 0;
   peekCsr(CsrNumber::VXRM, rmVal);
@@ -10164,7 +10163,7 @@ Hart<URV>::execVaadd_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vaadd_vx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -10195,7 +10194,7 @@ Hart<URV>::execVaaddu_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vaadd_vx<uint8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -10217,7 +10216,7 @@ Hart<URV>::vasub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, e2 = 0;
 
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2; // Double wide
+  using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   URV rmVal = 0;
   peekCsr(CsrNumber::VXRM, rmVal);
@@ -10264,7 +10263,7 @@ Hart<URV>::execVasub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vasub_vv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10293,7 +10292,7 @@ Hart<URV>::execVasubu_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vasub_vv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10315,7 +10314,7 @@ Hart<URV>::vasub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0;
 
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2; // Double wide
+  using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   URV rmVal = 0;
   peekCsr(CsrNumber::VXRM, rmVal);
@@ -10364,7 +10363,7 @@ Hart<URV>::execVasub_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vasub_vx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -10395,7 +10394,7 @@ Hart<URV>::execVasubu_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vasub_vx<uint8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -10417,7 +10416,7 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, e2 = 0;
 
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2; // Double wide
+  using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   URV rmVal = 0;
   peekCsr(CsrNumber::VXRM, rmVal);
@@ -10478,7 +10477,7 @@ Hart<URV>::execVsmul_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsmul_vv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10500,7 +10499,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0;
 
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2; // Double wide
+  using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   URV rmVal = 0;
   peekCsr(CsrNumber::VXRM, rmVal);
@@ -10563,7 +10562,7 @@ Hart<URV>::execVsmul_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vsmul_vx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -10633,7 +10632,7 @@ Hart<URV>::execVssrl_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssr_vv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10704,7 +10703,7 @@ Hart<URV>::execVssrl_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssr_vx<uint8_t> (vd, vs1, e2,           group, start, elems, masked); break;
@@ -10733,7 +10732,7 @@ Hart<URV>::execVssrl_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssr_vx<uint8_t> (vd, vs1, imm,           group, start, elems, masked); break;
@@ -10762,7 +10761,7 @@ Hart<URV>::execVssra_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssr_vv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10793,7 +10792,7 @@ Hart<URV>::execVssra_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssr_vx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -10822,7 +10821,7 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vssr_vx<int8_t> (vd, vs1, imm,          group, start, elems, masked); break;
@@ -10841,8 +10840,8 @@ void
 Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename std::make_unsigned<ELEM_TYPE>::type  U_ELEM_TYPE;
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE2X e1 = 0;
@@ -10916,7 +10915,7 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vnclip_wv<uint8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -10935,8 +10934,8 @@ void
 Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename std::make_unsigned<ELEM_TYPE>::type  U_ELEM_TYPE;
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE2X e1 = 0;
@@ -11011,7 +11010,7 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vnclip_wx<uint8_t> (vd, vs1, e2,           group, start, elems, masked); break;
@@ -11046,7 +11045,7 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vnclip_wx<uint8_t> (vd, vs1, imm,           group, start, elems, masked); break;
@@ -11081,7 +11080,7 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vnclip_wv<int8_t> (vd, vs1, vs2, group, start, elems, masked); break;
@@ -11118,7 +11117,7 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vnclip_wx<int8_t> (vd, vs1, e2,          group, start, elems, masked); break;
@@ -11153,7 +11152,7 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   vnclip_wx<int8_t> (vd, vs1, imm,           group, start, elems, masked); break;
@@ -12232,7 +12231,7 @@ Hart<URV>::execVloxei8_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Byte); break;
@@ -12257,7 +12256,7 @@ Hart<URV>::execVloxei16_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Half); break;
@@ -12282,7 +12281,7 @@ Hart<URV>::execVloxei32_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Word); break;
@@ -12307,7 +12306,7 @@ Hart<URV>::execVloxei64_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadIndexed<uint8_t>(di,  EW::Word2); break;
@@ -12476,7 +12475,7 @@ Hart<URV>::execVsoxei8_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Byte); break;
@@ -12501,7 +12500,7 @@ Hart<URV>::execVsoxei16_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Half); break;
@@ -12526,7 +12525,7 @@ Hart<URV>::execVsoxei32_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Word); break;
@@ -12551,7 +12550,7 @@ Hart<URV>::execVsoxei64_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreIndexed<uint8_t>(di,  EW::Word2); break;
@@ -13477,7 +13476,7 @@ Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Byte); break;
@@ -13502,7 +13501,7 @@ Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Half); break;
@@ -13527,7 +13526,7 @@ Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word); break;
@@ -13552,7 +13551,7 @@ Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorLoadSegIndexed<uint8_t>(di,  EW::Word2); break;
@@ -13609,7 +13608,7 @@ Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Byte); break;
@@ -13634,7 +13633,7 @@ Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Half); break;
@@ -13659,7 +13658,7 @@ Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word); break;
@@ -13684,7 +13683,7 @@ Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   ok = vectorStoreSegIndexed<uint8_t>(di,  EW::Word2); break;
@@ -14076,7 +14075,7 @@ Hart<URV>::execVfadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:
@@ -14146,7 +14145,7 @@ Hart<URV>::execVfadd_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -14176,7 +14175,7 @@ Hart<URV>::execVfsub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:
@@ -14246,7 +14245,7 @@ Hart<URV>::execVfsub_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -14308,7 +14307,7 @@ Hart<URV>::execVfrsub_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfrsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -14328,7 +14327,7 @@ void
 Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
@@ -14384,7 +14383,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -14404,7 +14403,7 @@ void
 Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1{};
@@ -14461,7 +14460,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwadd_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -14480,7 +14479,7 @@ void
 Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
@@ -14536,7 +14535,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -14556,7 +14555,7 @@ void
 Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1{};
@@ -14613,7 +14612,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwsub_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -14632,7 +14631,7 @@ void
 Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e2 = ELEM_TYPE();
@@ -14687,7 +14686,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwadd_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -14707,7 +14706,7 @@ void
 Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
@@ -14762,7 +14761,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwadd_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -14781,7 +14780,7 @@ void
 Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE  e2 = ELEM_TYPE();
@@ -14836,7 +14835,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwsub_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -14855,7 +14854,7 @@ void
 Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
@@ -14910,7 +14909,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
   unsigned start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwsub_wf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -14939,7 +14938,7 @@ Hart<URV>::execVfmul_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:
@@ -15009,7 +15008,7 @@ Hart<URV>::execVfmul_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -15039,7 +15038,7 @@ Hart<URV>::execVfdiv_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:
@@ -15109,7 +15108,7 @@ Hart<URV>::execVfdiv_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -15171,7 +15170,7 @@ Hart<URV>::execVfrdiv_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfrdiv_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -15191,7 +15190,7 @@ void
 Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
@@ -15245,7 +15244,7 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwmul_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -15264,7 +15263,7 @@ void
 Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1{};
@@ -15320,7 +15319,7 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwmul_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -15385,7 +15384,7 @@ Hart<URV>::execVfmadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfmadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -15446,7 +15445,7 @@ Hart<URV>::execVfmadd_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
@@ -15510,7 +15509,7 @@ Hart<URV>::execVfnmadd_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfnmadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -15571,7 +15570,7 @@ Hart<URV>::execVfnmadd_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfnmadd_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
@@ -15635,7 +15634,7 @@ Hart<URV>::execVfmsub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfmsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -15696,7 +15695,7 @@ Hart<URV>::execVfmsub_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
@@ -15760,7 +15759,7 @@ Hart<URV>::execVfnmsub_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfnmsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -15821,7 +15820,7 @@ Hart<URV>::execVfnmsub_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfnmsub_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
@@ -15885,7 +15884,7 @@ Hart<URV>::execVfmacc_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -15949,7 +15948,7 @@ Hart<URV>::execVfmacc_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:
@@ -16025,7 +16024,7 @@ Hart<URV>::execVfnmacc_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfnmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -16086,7 +16085,7 @@ Hart<URV>::execVfnmacc_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, v2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfnmacc_vf<Float16>(vd, f1, v2, group, start, elems, masked); break;
@@ -16150,7 +16149,7 @@ Hart<URV>::execVfmsac_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -16211,7 +16210,7 @@ Hart<URV>::execVfmsac_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
@@ -16275,7 +16274,7 @@ Hart<URV>::execVfnmsac_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfnmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -16336,7 +16335,7 @@ Hart<URV>::execVfnmsac_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vd, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfnmsac_vf<Float16>(vd, f1, vs2, group, start, elems, masked); break;
@@ -16354,7 +16353,7 @@ void
 Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
@@ -16413,7 +16412,7 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -16429,7 +16428,7 @@ void
 Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e2{};
@@ -16486,7 +16485,7 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
@@ -16503,7 +16502,7 @@ void
 Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
@@ -16562,7 +16561,7 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwnmacc_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -16578,7 +16577,7 @@ void
 Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e2{};
@@ -16635,7 +16634,7 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwnmacc_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
@@ -16652,7 +16651,7 @@ void
 Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
@@ -16711,7 +16710,7 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -16727,7 +16726,7 @@ void
 Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e2{};
@@ -16784,7 +16783,7 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
@@ -16801,7 +16800,7 @@ void
 Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
@@ -16860,7 +16859,7 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwnmsac_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -16877,7 +16876,7 @@ void
 Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X; // Double wide
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
   unsigned errors = 0;
   ELEM_TYPE e2{};
@@ -16934,7 +16933,7 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwnmsac_vf<Float16>(vd, fs1, vs2, group, start, elems, masked); break;
@@ -16994,7 +16993,7 @@ Hart<URV>::execVfsqrt_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfsqrt_v<Float16>(vd, vs1, group, start, elems, masked); break;
@@ -17055,7 +17054,7 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:
@@ -17121,7 +17120,7 @@ Hart<URV>::execVfmv_v_f(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:
@@ -17196,7 +17195,7 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -17261,7 +17260,7 @@ Hart<URV>::execVmfeq_vf(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vmfeq_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -17324,7 +17323,7 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -17389,7 +17388,7 @@ Hart<URV>::execVmfne_vf(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vmfne_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -17449,7 +17448,7 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -17511,7 +17510,7 @@ Hart<URV>::execVmflt_vf(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vmflt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -17571,7 +17570,7 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -17633,7 +17632,7 @@ Hart<URV>::execVmfle_vf(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vmfle_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -17694,7 +17693,7 @@ Hart<URV>::execVmfgt_vf(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vmfgt_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -17755,7 +17754,7 @@ Hart<URV>::execVmfge_vf(const DecodedInst* di)
   if (not checkVecFpMaskInst(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vmfge_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -17786,7 +17785,7 @@ Hart<URV>::vfclass_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
+	  using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
 	  INT_TYPE dest = fpClassifyRiscv(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -17815,7 +17814,7 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -17847,7 +17846,7 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
+	  using UINT_TYPE = typename getSameWidthUintType<ELEM_TYPE>::type;
 	  UINT_TYPE dest = fpConvertTo<UINT_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -17877,7 +17876,7 @@ Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -17909,7 +17908,7 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
+	  using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
 	  INT_TYPE dest = fpConvertTo<INT_TYPE>(e1);
           if (not vecRegs_.write(vd, ix, group, dest))
             errors++;
@@ -17939,7 +17938,7 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -17969,7 +17968,7 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -17999,7 +17998,7 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -18018,7 +18017,7 @@ void
 Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
+  using UINT_TYPE = typename getSameWidthUintType<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   UINT_TYPE e1{0};
@@ -18063,7 +18062,7 @@ Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -18082,7 +18081,7 @@ void
 Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
+  using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   INT_TYPE e1{0};
@@ -18127,7 +18126,7 @@ Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -18160,8 +18159,8 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  typedef typename getSameWidthUintType<ELEM_TYPE>::type UINT_TYPE;
-	  typedef typename makeDoubleWide<UINT_TYPE>::type UINT_TYPE2X;
+          using UINT_TYPE   = typename getSameWidthUintType<ELEM_TYPE>::type;
+          using UINT_TYPE2X = typename makeDoubleWide<UINT_TYPE>::type;
 	  UINT_TYPE2X dest = fpConvertTo<UINT_TYPE2X>(e1);
 
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -18199,7 +18198,7 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -18231,8 +18230,8 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 
       if (vecRegs_.read(vs1, ix, group, e1))
         {
-	  typedef typename getSameWidthIntType<ELEM_TYPE>::type INT_TYPE;
-	  typedef typename makeDoubleWide<INT_TYPE>::type INT_TYPE2X;
+          using INT_TYPE   = typename getSameWidthIntType<ELEM_TYPE>::type;
+          using INT_TYPE2X = typename makeDoubleWide<INT_TYPE>::type;
 	  INT_TYPE2X dest = fpConvertTo<INT_TYPE2X>(e1);
 
           if (not vecRegs_.write(vd, ix, group2x, dest))
@@ -18270,7 +18269,7 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -18306,7 +18305,7 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -18341,7 +18340,7 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -18359,8 +18358,8 @@ void
 Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 			 unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
-  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FP_TYPE2X;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
+  using FP_TYPE2X   = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
   unsigned errors = 0;
   ELEM_TYPE e1{};
@@ -18416,7 +18415,7 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -18445,8 +18444,8 @@ void
 Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
-  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FP_TYPE2X;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
+  using FP_TYPE2X   = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
   unsigned errors = 0;
   ELEM_TYPE e1{};
@@ -18502,7 +18501,7 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -18531,7 +18530,7 @@ void
 Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   ELEM_TYPE e1{};
@@ -18589,7 +18588,7 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -18607,8 +18606,8 @@ void
 Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
 			 unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
-  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FLOAT_TYPE2X;
+  using ELEM_TYPE2X  = typename makeDoubleWide<ELEM_TYPE>::type;
+  using FLOAT_TYPE2X = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
   unsigned errors = 0;
   FLOAT_TYPE2X e1{};
@@ -18664,7 +18663,7 @@ Hart<URV>::execVfncvt_xu_f_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -18691,8 +18690,8 @@ void
 Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
-  typedef typename getSameWidthFloatType<ELEM_TYPE2X>::type FLOAT_TYPE2X;
+  using ELEM_TYPE2X  = typename makeDoubleWide<ELEM_TYPE>::type;
+  using FLOAT_TYPE2X = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
   unsigned errors = 0;
   FLOAT_TYPE2X e1{};
@@ -18748,7 +18747,7 @@ Hart<URV>::execVfncvt_x_f_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -18797,7 +18796,7 @@ Hart<URV>::execVfncvt_rtz_xu_f_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -18846,7 +18845,7 @@ Hart<URV>::execVfncvt_rtz_x_f_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -18875,8 +18874,8 @@ void
 Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
 			 unsigned start, unsigned elems, bool masked)
 {
-  typedef typename getSameWidthFloatType<ELEM_TYPE>::type FLOAT_TYPE;
-  typedef typename makeDoubleWide<ELEM_TYPE>::type UINT_TYPE2X;
+  using FLOAT_TYPE  = typename getSameWidthFloatType<ELEM_TYPE>::type;
+  using UINT_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   UINT_TYPE2X e1{0};
@@ -18929,7 +18928,7 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -18949,8 +18948,8 @@ void
 Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  typedef typename getSameWidthFloatType<ELEM_TYPE>::type FLOAT_TYPE;
-  typedef typename makeDoubleWide<ELEM_TYPE>::type INT_TYPE2X;
+  using FLOAT_TYPE = typename getSameWidthFloatType<ELEM_TYPE>::type;
+  using INT_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   INT_TYPE2X e1{0};
@@ -19003,7 +19002,7 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -19023,7 +19022,7 @@ void
 Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   ELEM_TYPE2X e1{};
@@ -19076,7 +19075,7 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -19119,7 +19118,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -19194,7 +19193,7 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -19261,7 +19260,7 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -19329,7 +19328,7 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -19396,7 +19395,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -19416,7 +19415,7 @@ void
 Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   ELEM_TYPE2X result{};
@@ -19475,7 +19474,7 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -19496,7 +19495,7 @@ void
 Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 			 unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type ELEM_TYPE2X;
+  using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   unsigned errors = 0;
   ELEM_TYPE2X result{};
@@ -19547,7 +19546,7 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
   if (elems == 0)
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -19621,7 +19620,7 @@ Hart<URV>::execVfrsqrt7_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfrsqrt7_v<Float16>(vd, vs1, group, start, elems, masked); break;
@@ -19687,7 +19686,7 @@ Hart<URV>::execVfrec7_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfrec7_v<Float16>(vd, vs1, group, start, elems, masked); break;
@@ -19749,7 +19748,7 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -19813,7 +19812,7 @@ Hart<URV>::execVfmin_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfmin_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -19875,7 +19874,7 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -19939,7 +19938,7 @@ Hart<URV>::execVfmax_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfmax_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -20000,7 +19999,7 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -20062,7 +20061,7 @@ Hart<URV>::execVfsgnj_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfsgnj_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -20124,7 +20123,7 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -20187,7 +20186,7 @@ Hart<URV>::execVfsgnjn_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfsgnjn_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -20254,7 +20253,7 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:  postVecFail(di); return;
@@ -20323,7 +20322,7 @@ Hart<URV>::execVfsgnjx_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:  vfsgnjx_vf<Float16>(vd, vs1, rs2, group, start, elems, masked); break;
@@ -20359,7 +20358,7 @@ Hart<URV>::execVfncvtbf16_f_f_w(const DecodedInst* di)
   if (not checkVecOpsVsEmulW1(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:   postVecFail(di); return;
@@ -20396,7 +20395,7 @@ Hart<URV>::execVfwcvtbf16_f_f_v(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte: postVecFail(di); return;
@@ -20430,7 +20429,7 @@ Hart<URV>::execVfwmaccbf16_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half:   vfwmacc_vv<BFloat16>(vd, vs1, vs2, group, start, elems, masked); break;
@@ -20462,7 +20461,7 @@ Hart<URV>::execVfwmaccbf16_vf(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Half: vfwmacc_vf<BFloat16>(vd, fs1, vs2, group, start, elems, masked); break;

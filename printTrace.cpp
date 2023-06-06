@@ -1,5 +1,6 @@
 #include <cinttypes>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include "Hart.hpp"
 #include "Trace.hpp"
@@ -355,7 +356,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   std::vector<unsigned> triggers;
   csRegs_.getLastWrittenRegs(csrs, triggers);
 
-  typedef std::pair<URV, URV> CVP;  // CSR-value pair
+  using CVP = std::pair<URV, URV>;  // CSR-value pair
   std::vector< CVP > cvps; // CSR-value pairs
   cvps.reserve(csrs.size() + triggers.size());
 
@@ -442,9 +443,7 @@ namespace Whisper
   {
   public:
 
-    PrintBuffer()
-      : pos_(0)
-    { }
+    PrintBuffer() = default;
 
     // Append to buffer hexadecimal string representing given number.
     inline
@@ -476,8 +475,10 @@ namespace Whisper
     inline
     PrintBuffer& print(std::string_view str)
     {
-      std::copy(str.begin(), str.end(), std::next(buff_.begin(), pos_));
-      pos_ += str.size();
+      std::size_t amountToCopy = std::min(buff_.size() - pos_, str.size());
+
+      std::copy_n(str.begin(), amountToCopy, std::next(buff_.begin(), static_cast<std::ptrdiff_t>(pos_)));
+      pos_ += amountToCopy;
       return *this;
     }
 
@@ -503,7 +504,7 @@ namespace Whisper
     { pos_ = 0; }
 
   private:
-    typedef std::array<char, 12*1024> Buff;
+    using Buff = std::array<char, UINT64_C(12)*1024>;
 
     Buff buff_;
     size_t pos_ = 0;
@@ -604,7 +605,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     }
 
   // Non sequential PC change.
-  auto instEntry = di.instEntry();
+  const auto* instEntry = di.instEntry();
   bool hasTrap = hasInterrupt_ or hasException_;
   if (not hasTrap and instEntry->isBranch() and lastBranchTaken_)
     {
@@ -729,8 +730,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   // Disassembly.
   std::string tmp;
   disassembleInst(di, tmp);
-  for (size_t i = 0; i < tmp.size(); ++i)
-    if (tmp[i] == ',') tmp[i] = ';';
+  std::ranges::replace(tmp, ',', ';');
   buffer.print(tmp);
 
   // Hart Id.

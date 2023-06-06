@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <boost/algorithm/string.hpp>
 #include <nlohmann/json.hpp>
 #include <charconv>
 #include <fstream>
@@ -558,7 +557,7 @@ applyPerfEventMap(Hart<URV>& hart, const nlohmann::json& config)
   if (not config.contains(tag))
     return true;
 
-  auto& perfMap = config.at(tag);
+  const auto& perfMap = config.at(tag);
   if (not perfMap.is_object())
     {
       std::cerr << "Invalid " << tag << " entry in config file (expecting an object)\n";
@@ -918,7 +917,7 @@ getConfigPma(std::string_view path, const nlohmann::json& attribs, Pma& pma)
 
   unsigned errors = 0;
 
-  for (auto& attrib : attribs)
+  for (const auto& attrib : attribs)
     {
       if (not attrib.is_string())
 	{
@@ -1517,7 +1516,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       unsigned atmErrors = 0;
       std::vector<VirtMem::Mode> modes;
       const auto& atm = config_ -> at(tag);
-      for (auto& item : atm)
+      for (const auto& item : atm)
 	{
 	  if (not item.is_string())
 	    {
@@ -1620,12 +1619,10 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
 			    << addr << std::dec << ") is not a multiple of 8\n";
 		  return false;
 		}
-	      else
-		{
-		  uint64_t clintStart = addr, clintEnd = addr + 0xc000 -1;
-		  if (not configClint(system, hart, clintStart, clintEnd, siOnReset))
-		    return false;
-		}
+
+              uint64_t clintStart = addr, clintEnd = addr + 0xc000 - 1;
+              if (not configClint(system, hart, clintStart, clintEnd, siOnReset))
+                return false;
 	    }
 	  else
 	    return false;

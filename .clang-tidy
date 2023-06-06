@@ -1,0 +1,35 @@
+# TODO - enable this once other warnings are removed
+# -readability-inconsistent-declaration-parameter-name,
+#
+# TODO - these checks are flagged in a bunch of places.  May be nice to enable eventually but not necessary
+# -readability-implicit-bool-conversion,
+# -readability-named-parameter,
+# -readability-uppercase-literal-suffix
+
+Checks: >
+    -*,
+    boost-use-to-string,
+    bugprone-*,
+    cppcoreguidelines-avoid-non-const-global-variables,
+    cppcoreguidelines-misleading-capture-default-by-value,
+    cppcoreguidelines-narrowing-conversions,
+    cppcoreguidelines-rvalue-reference-param-not-moved,
+    misc-redundant-expression,
+    modernize-*,
+    performance-*,
+    readability-*,
+    -bugprone-easily-swappable-parameters,
+    -modernize-use-auto,
+    -modernize-use-nodiscard,
+    -modernize-use-trailing-return-type,
+    -readability-braces-around-statements,
+    -readability-function-cognitive-complexity,
+    -readability-identifier-length,
+    -readability-isolate-declaration,
+    -readability-magic-numbers,
+
+    -readability-inconsistent-declaration-parameter-name,
+
+    -readability-implicit-bool-conversion,
+    -readability-named-parameter,
+    -readability-uppercase-literal-suffix

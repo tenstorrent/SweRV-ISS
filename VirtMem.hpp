@@ -43,8 +43,7 @@ namespace WdRiscv
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
             PmpManager& pmpMgr, unsigned tlbSize);
 
-    ~VirtMem()
-    { }
+    ~VirtMem() = default;
 
     /// Perform virtual to physical memory address translation and
     /// check for read/write/fetch access (one and only one of the
@@ -132,7 +131,7 @@ namespace WdRiscv
     /// page rooted at the given address. This is a helper to
     /// printPageTable.
     template <typename PTE, typename VA>
-    void printEntries(std::ostream& os, uint64_t addr, std::string path) const;
+    void printEntries(std::ostream& os, uint64_t addr, const std::string& path) const;
 
     /// Return the number of instruction page table walks used by the
     /// last instruction address translation (this may be 0, 1, or 2
@@ -192,7 +191,7 @@ namespace WdRiscv
       clearUpdatedPtes();
     }
 
-    static const char* pageSize(Mode m, uint32_t level)
+    static constexpr const char* pageSize(Mode m, uint32_t level)
     {
       if (m == Mode::Bare)
         return "";
@@ -200,8 +199,7 @@ namespace WdRiscv
         {
           if (level == 0)
             return "4K";
-          else
-            return "4M";
+          return "4M";
         }
 
       switch (level)
@@ -527,7 +525,7 @@ namespace WdRiscv
     std::vector<bool> supportedModes_; // Indexed by Mode.
 
     // Addresses of PTEs used in most recent insruction an data translations.
-    typedef std::vector<uint64_t> Walk;
+    using Walk = std::vector<uint64_t>;
     std::vector<Walk> fetchWalks_;       // Instruction fetch walks of last instruction.
     std::vector<Walk> dataWalks_;    // Data access walks of last instruction.
     const Walk emptyWalk_;

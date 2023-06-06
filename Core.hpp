@@ -15,8 +15,9 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>               // For shared_ptr
-#include "Memory.hpp"
+#include <vector>
 
 
 namespace WdRiscv
@@ -25,12 +26,14 @@ namespace WdRiscv
   template <typename URV>
   class Hart;
 
+  class Memory;
+
   template <typename URV>
   class Core
   {
   public:
 
-    typedef Hart<URV> HartClass;
+    using HartClass = Hart<URV>;
 
     /// Constructor: construct a core with n (hartsPerCore) harts
     /// assigning to them hart-ids (value in mhartid CSR) idBase to

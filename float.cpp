@@ -19,6 +19,7 @@
 #include <cfenv>
 #include <cmath>
 #include <array>
+#include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "instforms.hpp"
 #include "float-util.hpp"
@@ -671,7 +672,7 @@ Hart<URV>::execFmv_x_w(const DecodedInst* di)
 
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint64_t v1 = fpRegs_.readBitsRaw(di->op1());
-  int32_t s1 = v1;  // Keep lower 32 bits
+  int32_t  s1 = static_cast<int32_t>(v1);  // Keep lower 32 bits
 
   SRV value = SRV(s1); // Sign extend.
 
@@ -959,7 +960,7 @@ Hart<uint64_t>::execFcvt_s_l(const DecodedInst* di)
   if (not checkRoundingModeSp(di))
     return;
 
-  SRV i1 = intRegs_.read(di->op1());
+  SRV i1 = static_cast<SRV>(intRegs_.read(di->op1()));
 
   float res = fpConvertTo<float>(i1);
 
@@ -2235,7 +2236,7 @@ Hart<URV>::execFmv_x_h(const DecodedInst* di)
 
   // This operation does not check for proper NAN boxing. We read raw bits.
   uint64_t v1 = fpRegs_.readBitsRaw(di->op1());
-  int16_t s1 = v1;  // Keep lower 32 bits
+  int16_t  s1 = static_cast<int16_t>(v1);  // Keep lower 16 bits
 
   SRV value = SRV(s1); // Sign extend.
 
@@ -2482,7 +2483,7 @@ Hart<uint64_t>::execFcvt_h_l(const DecodedInst* di)
   if (not checkRoundingModeHp(di))
     return;
 
-  SRV i1 = intRegs_.read(di->op1());
+  SRV i1 = static_cast<SRV>(intRegs_.read(di->op1()));
 
   Float16 res = fpConvertTo<Float16>(i1);
 
@@ -2556,7 +2557,7 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
       if (exp < 1)
         {
           result = 0;
-          if (frac)
+          if (std::fpclassify(frac) != FP_ZERO)
             raiseSimulatorFpFlags(FpFlags::Inexact);
         }
       else

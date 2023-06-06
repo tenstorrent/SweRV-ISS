@@ -15,7 +15,6 @@
 #pragma once
 
 #include <string_view>
-#include <vector>
 #include "InstEntry.hpp"
 #include "InstId.hpp"
 

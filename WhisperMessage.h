@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 
 
@@ -50,10 +51,8 @@ struct WhisperMessage
     : hart(hart), type(type), resource(resource), size(size), flags(0),
       instrTag(instrTag), time(time), address(address), value(value)
   {
-    for (size_t i = 0; i < sizeof(buffer); ++i)
-      buffer[i] = 0;
-    for (size_t i = 0; i < sizeof(tag); ++i)
-      tag[i] = 0;
+    std::ranges::fill(buffer, 0);
+    std::ranges::fill(tag,    0);
   }
 
   uint32_t hart;

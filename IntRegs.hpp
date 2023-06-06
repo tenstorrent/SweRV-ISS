@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <type_traits>
 #include <cassert>
+#include <optional>
 #include <vector>
 #include "IntRegNames.hpp"
 
@@ -95,26 +96,26 @@ namespace WdRiscv
 
     /// Clear the number denoting the last written register.
     void clearLastWrittenReg()
-    { lastWrittenReg_ = -1; }
+    { lastWrittenReg_.reset(); }
 
     /// Return the number of the last written register or -1 if no register has
     /// been written since the last clearLastWrittenReg.
     int getLastWrittenReg() const
-    { return lastWrittenReg_; }
+    { return lastWrittenReg_.has_value() ? static_cast<int>(*lastWrittenReg_) : -1; }
 
     /// Similar to getLastWrittenReg but if successful set regValue to
     /// the prevous value of the last written register.
     int getLastWrittenReg(uint64_t& regValue) const
     {
-      if (lastWrittenReg_ < 0) return -1;
+      if (not lastWrittenReg_.has_value()) return -1;
       regValue = originalValue_;
-      return lastWrittenReg_;
+      return static_cast<int>(*lastWrittenReg_);
     }
 
   private:
 
     std::vector<URV> regs_;
-    int lastWrittenReg_ = -1;  // Register accessed in most recent write.
-    URV originalValue_ = 0;    // Original value of last written reg.
+    std::optional<unsigned> lastWrittenReg_;  // Register accessed in most recent write.
+    URV originalValue_ = 0;                   // Original value of last written reg.
   };
 }

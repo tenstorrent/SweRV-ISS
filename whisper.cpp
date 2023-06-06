@@ -20,7 +20,6 @@
 #include <atomic>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/format.hpp>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -90,11 +89,11 @@ parseCmdLineNumber(const std::string& option,
     {
       char suffix = str.back();
       if (suffix == 'k')
-        scale = 1024;
+        scale = UINT64_C(1024);
       else if (suffix == 'm')
-        scale = 1024*1024;
+        scale = UINT64_C(1024)*1024U;
       else if (suffix == 'g')
-        scale = 1024*1024*1024;
+        scale = UINT64_C(1024)*1024U*1024U;
       if (scale != 1)
         {
           str = str.substr(0, str.length() - 1);
@@ -105,7 +104,7 @@ parseCmdLineNumber(const std::string& option,
 
   if (good)
     {
-      typedef typename std::make_signed_t<TYPE> STYPE;
+      using STYPE = typename std::make_signed_t<TYPE>;
 
       char* end = nullptr;
       
@@ -113,7 +112,7 @@ parseCmdLineNumber(const std::string& option,
 
       if (std::is_same<TYPE, STYPE>::value)
         {
-          int64_t val = strtoll(str.c_str(), &end, 0) * scale;
+          int64_t val = strtoll(str.c_str(), &end, 0) * static_cast<int64_t>(scale);
           number = static_cast<TYPE>(val);
           bad = val != number;
         }
@@ -157,8 +156,8 @@ parseCmdLineNumber(const std::string& option,
 }
 
 
-typedef std::vector<std::string> StringVec;
-typedef std::vector<uint64_t> Uint64Vec;
+using StringVec = std::vector<std::string>;
+using Uint64Vec = std::vector<uint64_t>;
 
 
 /// Hold values provided on the command line.
@@ -220,7 +219,7 @@ struct Args
   unsigned regWidth = 32;
   unsigned harts = 1;
   unsigned cores = 1;
-  unsigned pageSize = 4*1024;
+  unsigned pageSize = 4U*1024;
   uint64_t bblockInsts = ~uint64_t(0);
 
   bool help = false;
@@ -1675,7 +1674,7 @@ loadTracerLibrary(const std::string& tracerLib)
   boost::split(result, tracerLib, boost::is_any_of(":"));
   assert(result.size() >= 1);
 
-  auto soPtr = dlopen(result[0].c_str(), RTLD_NOW);
+  auto* soPtr = dlopen(result[0].c_str(), RTLD_NOW);
   if (not soPtr)
     {
       std::cerr << "Error: Failed to load shared libarary " << dlerror() << '\n';
@@ -1863,7 +1862,7 @@ session(const Args& args, const HartConfig& config)
   // Collect primary configuration paramters.
   unsigned hartsPerCore = 1;
   unsigned coreCount = 1;
-  size_t pageSize = 4*1024;
+  size_t pageSize = UINT64_C(4)*1024;
   size_t memorySize = size_t(1) << 32;  // 4 gigs
 
   if (not getPrimaryConfigParameters(args, config, hartsPerCore, coreCount,
@@ -1981,7 +1980,7 @@ getXlenFromElfFile(const Args& args, unsigned& xlen)
     return false;
 
   // Get the length from the first target.
-  auto& elfPath = args.expandedTargets.front().front();
+  const auto& elfPath = args.expandedTargets.front().front();
   bool is32 = false, is64 = false, isRiscv = false;
   if (not Memory::checkElfFile(elfPath, is32, is64, isRiscv))
     return false;  // ELF does not exist.

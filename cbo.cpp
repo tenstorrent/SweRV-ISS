@@ -55,7 +55,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
       assert((cacheLineSize_ % 8) == 0);
       if (isRead)
 	{
-	  for (unsigned i = 0; i < cacheLineSize_; i += 8)
+	  for (uint64_t i = 0; i < cacheLineSize_; i += 8)
 	    {
 	      uint64_t dwa = addr + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
@@ -65,7 +65,7 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
 	}
       else
 	{
-	  for (unsigned i = 0; i < cacheLineSize_; i += 8)
+	  for (uint64_t i = 0; i < cacheLineSize_; i += 8)
 	    {
 	      uint64_t dwa = addr + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
@@ -89,7 +89,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
       return;
     }
 
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
   URV menv = 0, senv = 0;
@@ -126,7 +126,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
       return;
     }
 
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
   URV menv = 0, senv = 0;
@@ -163,7 +163,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
       return;
     }
 
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
   URV menv = 0, senv = 0;
@@ -205,7 +205,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
       return;
     }
 
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
   URV menv = 0, senv = 0;
