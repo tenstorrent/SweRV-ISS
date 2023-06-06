@@ -2469,6 +2469,10 @@ namespace WdRiscv
     /// the stop.
     bool logStop(const CoreException& ce, uint64_t instCount, FILE* traceFile);
 
+    /// Return true if mcycle is enabled (not inhibited by mcountinhibit).
+    bool mcycleEnabled() const
+    { return prevPerfControl_ & 1; }
+
     /// Return true if minstret is enabled (not inhibited by mcountinhibit).
     bool minstretEnabled() const
     { return prevPerfControl_ & 0x4; }

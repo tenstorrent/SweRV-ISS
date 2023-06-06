@@ -4067,7 +4067,8 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
     {
       if (not fetchInstPostTrigger(addr, physAddr, inst, file))
         {
-          ++cycleCount_;
+	  if (mcycleEnabled())
+	    ++cycleCount_;
           return false;  // Next instruction in trap handler.
         }
     }
@@ -4077,7 +4078,8 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
     }
   if (not fetchOk)
     {
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
 
       std::string instStr;
       printInstTrace(inst, instCounter_, instStr, file);
@@ -4175,7 +4177,8 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  pc_ += di->instSize();
 	  execute(di);
 
-	  ++cycleCount_;
+	  if (mcycleEnabled())
+	    ++cycleCount_;
 
 	  if (initStateFile_)
 	    {
@@ -4401,7 +4404,8 @@ Hart<URV>::simpleRunWithLimit()
       hasException_ = hasInterrupt_ = lastBranchTaken_ = false;
       currPc_ = pc_;
       ++instCounter_;
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
 
       if (checkInterrupt and processExternalInterrupt(nullptr, instStr))
 	continue;
@@ -4764,6 +4768,8 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
       printInstTrace(inst, instCounter_, instStr, traceFile);
+      if (mcycleEnabled())
+	++cycleCount_;
       return true;
     }
 
@@ -4776,7 +4782,8 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       readInst(currPc_, inst);
       initiateInterrupt(cause, pc_);
       printInstTrace(inst, instCounter_, instStr, traceFile);
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
       return true;
     }
   return false;
@@ -4857,7 +4864,8 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       pc_ += di.instSize();
       execute(&di);
 
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
 
       if (hasException_ or hasInterrupt_)
 	{
