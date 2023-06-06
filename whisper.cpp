@@ -276,7 +276,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 805;
+  unsigned subversion = 806;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
