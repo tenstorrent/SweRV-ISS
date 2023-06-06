@@ -18,15 +18,11 @@
 #include <cstdint>
 #include <bitset>
 #include <vector>
-#include <iosfwd>
 #include <unordered_map>
 #include <unordered_set>
 #include <type_traits>
 #include <functional>
-#include <atomic>
 #include <boost/circular_buffer.hpp>
-#include "InstId.hpp"
-#include "InstEntry.hpp"
 #include "IntRegs.hpp"
 #include "CsRegs.hpp"
 #include "float-util.hpp"
@@ -34,7 +30,6 @@
 #include "VecRegs.hpp"
 #include "Memory.hpp"
 #include "InstProfile.hpp"
-#include "DecodedInst.hpp"
 #include "Syscall.hpp"
 #include "PmpManager.hpp"
 #include "VirtMem.hpp"
@@ -49,6 +44,11 @@ namespace WdRiscv
 
   template <typename URV>
   class Mcm;
+
+  class DecodedInst;
+  class InstEntry;
+
+  enum class InstId : uint32_t;
 
   /// Thrown by the simulator when a stop (store to to-host) is seen
   /// or when the target program reaches the exit system call.
@@ -124,7 +124,7 @@ namespace WdRiscv
 
     /// Signed register type corresponding to URV. For example, if URV
     /// is uint32_t, then SRV will be int32_t.
-    typedef typename std::make_signed_t<URV> SRV;
+    using SRV = typename std::make_signed_t<URV>;
 
     /// Constructor: Define a hart with the given index (unique index
     /// within a system of cores -- see sysHartIndex method) and
@@ -1638,7 +1638,7 @@ namespace WdRiscv
     /// executed instruction (see getPageTableAlkAddresses).
     void getPageTableWalkEntries(bool isInstr, unsigned ix, std::vector<uint64_t>& ptes) const
     {
-      auto& addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix);
+      const auto& addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix);
       ptes.clear();
       for (auto addr : addrs)
 	{
@@ -1651,13 +1651,12 @@ namespace WdRiscv
     /// Get the PMP registers accessed by last executed instruction
     void getPmpsAccessed(std::vector<std::pair<uint32_t, Pmp>>& pmps) const
     {
-      auto& pmpIxs = pmpManager_.getPmpTrace();
+      const auto& pmpIxs = pmpManager_.getPmpTrace();
       pmps.clear();
-      for (auto& ix : pmpIxs)
+      for (const auto& ix : pmpIxs)
         {
           auto pmp = pmpManager_.peekPmp(ix);
-          auto traced = std::make_pair(ix, pmp);
-          pmps.push_back(traced);
+          pmps.emplace_back(ix, pmp);
         }
     }
 
@@ -1673,7 +1672,7 @@ namespace WdRiscv
     /// hart-index (hart index in sytstem) and csr number. This is for
     /// the SOC (system on chip) model.
     void registerPreCsrInst(std::function<void(unsigned, CsrNumber)> callback)
-    { preCsrInst_ = callback; }
+    { preCsrInst_ = std::move(callback); }
 
     /// Register a callback to be invoked after a CSR accesses its
     /// target CSR, or in the case of an exception, after the CSR
@@ -1681,11 +1680,11 @@ namespace WdRiscv
     /// hart-index (hart index in sytstem) and csr number. This is for
     /// the SOC model.
     void registerPostCsrInst(std::function<void(unsigned, CsrNumber)> callback)
-    { postCsrInst_ = callback; }
+    { postCsrInst_ = std::move(callback); }
 
     /// Callback to invoke before the execution of an instruction.
     void registerPreInst(std::function<void(Hart<URV>&, bool&, bool&)> callback)
-    { preInst_ = callback; }
+    { preInst_ = std::move(callback); }
 
     /// Define physical memory attribute region. Region addresses are between
     /// low and high inclusive. To define a 1024-byte region at address zero
@@ -4463,10 +4462,7 @@ namespace WdRiscv
     // effects after an imprecise load exception.
     struct LoadInfo
     {
-      LoadInfo()
-	: size_(0), addr_(0), regIx_(0), prevData_(0), valid_(false),
-	  wide_(false), fp_(false)
-      { }
+      LoadInfo() = default;
 
       LoadInfo(unsigned size, uint64_t addr, unsigned regIx, uint64_t prev,
 	       bool isWide, unsigned tag, bool fp)
@@ -4510,8 +4506,6 @@ namespace WdRiscv
     void countBasicBlocks(const DecodedInst* di);
     void dumpBasicBlocks();
     void dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr);
-
-  private:
 
     constexpr bool extensionIsEnabled(RvExtension ext) const
     {

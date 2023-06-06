@@ -122,7 +122,7 @@ namespace WdRiscv
 
     /// Constructor. Mark all memory as no access to user/supervisor
     /// (machine mode does access since it is not checked).
-    PmpManager(uint64_t memorySize, uint64_t sectionSize = 32*1024);
+    PmpManager(uint64_t memorySize, uint64_t sectionSize = UINT64_C(32)*1024);
 
     /// Destructor.
     ~PmpManager();
@@ -138,7 +138,7 @@ namespace WdRiscv
     Pmp getPmp(uint64_t addr) const
     {
       addr = (addr >> 2) << 2;
-      for (auto& region : regions_)
+      for (const auto& region : regions_)
 	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pmp_;
       return Pmp();
@@ -149,7 +149,7 @@ namespace WdRiscv
     /// is out of range.
     Pmp peekPmp(size_t ix) const
     {
-      for (auto& region : regions_)
+      for (const auto& region : regions_)
         {
           auto pmp = region.pmp_;
           if (pmp.pmpIndex() == ix)
@@ -163,7 +163,7 @@ namespace WdRiscv
     inline Pmp accessPmp(uint64_t addr) const
     {
       addr = (addr >> 2) << 2;
-      for (auto& region : regions_)
+      for (const auto& region : regions_)
 	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  {
 	    auto pmp = region.pmp_;

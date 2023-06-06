@@ -15,6 +15,8 @@
 #pragma once
 
 #include <cstdint>
+#include <ostream>
+#include <vector>
 
 namespace WdRiscv
 {
@@ -77,7 +79,7 @@ namespace WdRiscv
     /// no such entry.
     TlbEntry* findEntryUpdateTime(uint64_t pageNum, uint32_t asid)
     {
-      auto entry = findEntry(pageNum, asid);
+      auto* entry = findEntry(pageNum, asid);
       if (entry)
 	entry->time_ = time_++;
       return entry;
@@ -89,7 +91,7 @@ namespace WdRiscv
     /// no such entry.
     TlbEntry* findEntryUpdateTime(uint64_t pageNum, uint32_t asid, uint32_t vmid)
     {
-      auto entry = findEntry(pageNum, asid, vmid);
+      auto* entry = findEntry(pageNum, asid, vmid);
       if (entry)
 	entry->time_ = time_++;
       return entry;

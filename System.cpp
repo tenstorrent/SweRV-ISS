@@ -19,6 +19,7 @@
 #include "Filesystem.hpp"
 #include "Hart.hpp"
 #include "Core.hpp"
+#include "SparseMem.hpp"
 #include "System.hpp"
 #include "Mcm.hpp"
 #include "Uart8250.hpp"
@@ -149,7 +150,7 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
 	}
     }
 
-  for (auto hart : sysHarts_)
+  for (const auto& hart : sysHarts_)
     {
       if (not toHostSym_.empty() and memory_->findElfSymbol(toHostSym_, sym))
 	hart->setToHostAddress(sym.addr_);
@@ -325,8 +326,6 @@ loadUsedMemBlocks(const std::string& filename,
       return false;
     }
 
-  typedef std::pair<uint64_t, uint64_t> Pair;
-
   std::string line;
   while (std::getline(ifs, line))
     {
@@ -334,7 +333,7 @@ loadUsedMemBlocks(const std::string& filename,
       uint64_t addr, length;
       iss >> addr;
       iss >> length;
-      blocks.push_back(Pair{addr, length});
+      blocks.emplace_back(addr, length);
     }
 
   return true;

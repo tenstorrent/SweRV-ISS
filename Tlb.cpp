@@ -16,9 +16,8 @@ Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
                  bool global, bool isUser, bool read, bool write, bool exec)
 {
   TlbEntry* best = nullptr;
-  for (size_t i = 0; i < entries_.size(); ++i)
+  for (auto& entry : entries_)
     {
-      auto& entry = entries_[i];
       if (not entry.valid_ or (best and entry.time_ < best->time_))
         best = &entry;
     }
@@ -43,7 +42,7 @@ Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
 void
 Tlb::printTlb(std::ostream& ost) const
 {
-  for (auto&te: entries_)
+  for (const auto&te: entries_)
     printEntry(ost, te);
 }
 
@@ -68,9 +67,8 @@ bool
 Tlb::insertEntry(const TlbEntry& te)
 {
   TlbEntry* best = nullptr;
-  for (size_t i = 0; i < entries_.size(); ++i)
+  for (auto& entry : entries_)
     {
-      auto& entry = entries_[i];
       if (not entry.valid_)
         {
           best = &entry;

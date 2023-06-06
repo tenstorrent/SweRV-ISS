@@ -439,8 +439,6 @@ namespace WdRiscv
     // Helper to the constructor.
     void setupInstVec();
 
-  private:
-
     std::vector<InstEntry> instVec_;
     std::unordered_map<std::string_view, InstId> instMap_;
   };

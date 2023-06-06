@@ -56,7 +56,7 @@ Uartsf::write(uint64_t addr, uint32_t value)
 
   if (ix ==  TX_FIFO)
     {
-      unsigned c = value & 0xff;
+      int c = static_cast<int>(value & 0xff);
       if (c)
 	{
 	  putchar(c);

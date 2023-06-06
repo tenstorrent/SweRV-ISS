@@ -26,9 +26,7 @@ PmpManager::PmpManager(uint64_t /*memSize*/, uint64_t /*sectionSize*/)
 }
 
 
-PmpManager::~PmpManager()
-{
-}
+PmpManager::~PmpManager() = default;
 
 
 void

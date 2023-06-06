@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cassert>
 
 
 namespace WdRiscv
@@ -18,8 +17,7 @@ namespace WdRiscv
     {
     }
 
-    virtual ~IoDevice()
-    { }
+    virtual ~IoDevice() = default;
 
     /// Read a word from the device. Return 0 if address is outside
     /// the device range.

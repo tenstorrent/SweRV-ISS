@@ -59,7 +59,7 @@ Hart<URV>::execVandn_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -107,7 +107,7 @@ Hart<URV>::execVandn_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -196,7 +196,7 @@ Hart<URV>::execVbrev_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -288,7 +288,7 @@ Hart<URV>::execVbrev8_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -365,7 +365,7 @@ Hart<URV>::execVrev8_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -442,7 +442,7 @@ Hart<URV>::execVclz_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -519,7 +519,7 @@ Hart<URV>::execVctz_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -596,7 +596,7 @@ Hart<URV>::execVcpop_v(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -660,7 +660,7 @@ Hart<URV>::execVrol_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -708,7 +708,7 @@ Hart<URV>::execVrol_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -771,7 +771,7 @@ Hart<URV>::execVror_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -819,7 +819,7 @@ Hart<URV>::execVror_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -868,7 +868,7 @@ Hart<URV>::execVror_vi(const DecodedInst* di)
 
   URV e2 = imm;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -914,7 +914,7 @@ void
 Hart<URV>::vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
@@ -973,7 +973,7 @@ Hart<URV>::execVwsll_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1003,7 +1003,7 @@ void
 Hart<URV>::vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  typedef typename makeDoubleWide<ELEM_TYPE>::type DWT; // Double wide type
+  using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
 
   ELEM_TYPE e1 = 0;
@@ -1057,7 +1057,7 @@ Hart<URV>::execVwsll_vx(const DecodedInst* di)
 
   URV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1106,7 +1106,7 @@ Hart<URV>::execVwsll_vi(const DecodedInst* di)
 
   URV e2 = imm;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Byte:
@@ -1169,7 +1169,7 @@ Hart<URV>::execVclmul_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Word2:
@@ -1208,7 +1208,7 @@ Hart<URV>::execVclmul_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Word2:
@@ -1263,7 +1263,7 @@ Hart<URV>::execVclmulh_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, group))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Word2:
@@ -1302,7 +1302,7 @@ Hart<URV>::execVclmulh_vx(const DecodedInst* di)
 
   SRV e2 = SRV(intRegs_.read(rs2));
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
   switch (sew)
     {
     case EW::Word2:
@@ -1330,7 +1330,7 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1388,7 +1388,7 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1466,7 +1466,7 @@ Hart<URV>::execVaesdf_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1513,7 +1513,7 @@ Hart<URV>::execVaesdf_vs(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1560,7 +1560,7 @@ Hart<URV>::execVaesef_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1607,7 +1607,7 @@ Hart<URV>::execVaesef_vs(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1654,7 +1654,7 @@ Hart<URV>::execVaesem_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1702,7 +1702,7 @@ Hart<URV>::execVaesem_vs(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1750,7 +1750,7 @@ Hart<URV>::execVaesdm_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1798,7 +1798,7 @@ Hart<URV>::execVaesdm_vs(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1854,7 +1854,7 @@ Hart<URV>::execVaeskf1_vi(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1910,7 +1910,7 @@ Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -1971,7 +1971,7 @@ Hart<URV>::execVaesz_vs(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2073,7 +2073,7 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2249,7 +2249,7 @@ Hart<URV>::execVsha2ch_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2318,7 +2318,7 @@ Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2409,7 +2409,7 @@ Hart<URV>::execVsm4k_vi(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2481,7 +2481,7 @@ Hart<URV>::execVsm4r_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2547,7 +2547,7 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2630,7 +2630,7 @@ Hart<URV>::execVsm3me_vv(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2706,7 +2706,7 @@ Hart<URV>::execVsm3me_vv(const DecodedInst* di)
       w22 = util::byteswap(w22);
       w23 = util::byteswap(w23);
 
-      typedef Uint256 U256;
+      using U256 = Uint256;
       U256 dd = ( U256{w16} | (U256{w17} << 32) | (U256{w18} << 32*2) |
 		  (U256{w19} << 32*3) | (U256{w20} << 32*4) | (U256{w21} << 32*5) |
 		  (U256{w22} << 32*6) | (U256{w23} << 32*7) );
@@ -2791,7 +2791,7 @@ Hart<URV>::execVsm3c_vi(const DecodedInst* di)
   if (not checkVecIntInst(di))
     return;
 
-  typedef ElementWidth EW;
+  using EW = ElementWidth;
 
   unsigned groupx8 = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned group = groupx8 > 8 ? groupx8/8 : 1;
@@ -2885,8 +2885,8 @@ Hart<URV>::execVsm3c_vi(const DecodedInst* di)
       c2 = util::byteswap(c2);
       a1 = util::byteswap(a1);
       a2 = util::byteswap(a2);
-      
-      typedef Uint256 U256;
+
+      using U256 = Uint256;
       dd = ( U256{a2} | (U256{a1} << 32) | (U256{c2} << 32*2) | (U256{c1} << 32*3) |
 	     (U256{e2} << 32*4) | (U256{e1} << 32*5) | (U256{g2} << 32*6) |
 	     (U256{g1} << 32*7) );

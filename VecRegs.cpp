@@ -14,7 +14,7 @@
 
 #include <iostream>
 #include <cmath>
-#include <string.h>
+#include <cstring>
 #include "VecRegs.hpp"
 
 
@@ -71,7 +71,7 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
       bytesPerReg = 4;
     }
 
-  unsigned l2BytesPerReg = std::log2(bytesPerReg);
+  unsigned l2BytesPerReg = std::bit_width(bytesPerReg) - 1;
   unsigned p2BytesPerReg = uint32_t(1) << l2BytesPerReg;
   if (p2BytesPerReg != bytesPerReg)
     {
@@ -98,7 +98,7 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
       minBytesPerElem = maxBytesPerElem;
     }
 
-  unsigned l2BytesPerElem = std::log2(maxBytesPerElem);
+  unsigned l2BytesPerElem = std::bit_width(maxBytesPerElem) - 1;
   unsigned p2BytesPerElem = uint32_t(1) << l2BytesPerElem;
   if (p2BytesPerElem != maxBytesPerElem)
     {
@@ -115,7 +115,7 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
       maxBytesPerElem = bytesPerReg;
     }
 
-  l2BytesPerElem = std::log2(minBytesPerElem);
+  l2BytesPerElem = std::bit_width(minBytesPerElem) - 1;
   p2BytesPerElem = uint32_t(1) << l2BytesPerElem;
   if (p2BytesPerElem != minBytesPerElem)
     {

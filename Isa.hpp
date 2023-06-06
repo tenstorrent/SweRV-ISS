@@ -99,17 +99,15 @@ namespace WdRiscv
 
   private:
 
-    typedef std::pair<unsigned, unsigned> VersionPair;
+    using VersionPair = std::pair<unsigned, unsigned>;
 
     struct Info
     {
-      Info()
-	: supported(false), enabled(false)
-      { }
+      Info() = default;
 
-      Info(const std::vector<VersionPair>& versions, VersionPair dflt)
-	: supported(not versions.empty()), enabled(false), dflt(dflt),
-	  selected(dflt), versions(versions)
+      Info(std::vector<VersionPair>&& versions, VersionPair dflt)
+	: supported(not versions.empty()), dflt(dflt),
+	  selected(dflt), versions(std::move(versions))
       { }
 
       bool supported = false;

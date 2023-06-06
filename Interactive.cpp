@@ -16,11 +16,14 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <boost/lexical_cast.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
+#include "CsRegs.hpp"
+#include "DecodedInst.hpp"
 #include "Interactive.hpp"
+#include "Hart.hpp"
 #include "linenoise.hpp"
+#include "System.hpp"
 
 using namespace WdRiscv;
 
@@ -898,7 +901,7 @@ Interactive<URV>::disassCommand(Hart<URV>& hart, const std::string& line,
   if (tokens.size() == 3 and (tokens.at(1) == "func" or
 			      tokens.at(1) == "function"))
     {
-      std::string item = tokens.at(2);
+      const std::string& item = tokens.at(2);
       std::string name;  // item (if a symbol) or function name containing item
       ElfSymbol symbol;
       if (system_.findElfSymbol(item, symbol))
@@ -1006,7 +1009,7 @@ Interactive<URV>::elfCommand(Hart<URV>& hart, const std::string& line,
       return false;
     }
 
-  std::string filePath = tokens.at(1);
+  const std::string& filePath = tokens.at(1);
 
   uint64_t entryPoint = 0;
 
@@ -1077,7 +1080,7 @@ Interactive<URV>::replayFileCommand(const std::string& line,
       return false;
     }
 
-  std::string fileName = tokens.at(1);
+  const std::string& fileName = tokens.at(1);
 
   stream.close();
   stream.open(fileName.c_str());
@@ -1228,7 +1231,7 @@ Interactive<URV>::helpCommand(const std::vector<std::string>& tokens)
       return;
     }
 
-  auto& tag = tokens.at(1);
+  const auto& tag = tokens.at(1);
   if (tag == "help")
     {
       cout << "help [<command>]\n"

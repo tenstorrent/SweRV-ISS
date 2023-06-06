@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <type_traits>
 #include <vector>
 #include "float16-compat.hpp"
@@ -196,23 +197,23 @@ namespace WdRiscv
 
     /// Clear the number denoting the last written register.
     void clearLastWrittenReg()
-    { lastWrittenReg_ = -1; lastFpFlags_ = 0; }
+    { lastWrittenReg_.reset(); lastFpFlags_ = 0; }
 
     /// Return the number of the last written register or -1 if no register has
     /// been written since the last clearLastWrittenReg.
     int getLastWrittenReg() const
-    { return lastWrittenReg_; }
+    { return lastWrittenReg_.has_value() ? static_cast<int>(*lastWrittenReg_) : -1; }
 
     /// Similar to getLastWrittenReg but if successful set regValue to
     /// the prevous value of the last written register.
     int getLastWrittenReg(uint64_t& regValue) const
     {
-      if (lastWrittenReg_ < 0) return -1;
+      if (not lastWrittenReg_.has_value()) return -1;
 
       // Copy bits of last written value inot regValue
       regValue = originalValue_.i64;
 
-      return lastWrittenReg_;
+      return static_cast<int>(*lastWrittenReg_);
     }
 
     /// Return the incremental floating point flag values resulting from
@@ -266,17 +267,15 @@ namespace WdRiscv
       double   dp;
       uint64_t i64;
     };
-	
-  private:
 
     std::vector<FpUnion> regs_;
-    bool hasHalf_ = false;                 // True if half (16-bit) precision enabled.
-    bool hasSingle_ = false;               // True if F extension enabled.
-    bool hasDouble_ = false;               // True if D extension enabled.
-    int lastWrittenReg_ = -1;              // Register accessed in most recent write.
+    bool hasHalf_ = false;                    // True if half (16-bit) precision enabled.
+    bool hasSingle_ = false;                  // True if F extension enabled.
+    bool hasDouble_ = false;                  // True if D extension enabled.
+    std::optional<unsigned> lastWrittenReg_;  // Register accessed in most recent write.
     unsigned lastFpFlags_ = 0;
-    FpUnion originalValue_ = UINT64_C(0);  // Original value of last written reg.
-    unsigned flen_ = 64;                   // Floating point register width.
+    FpUnion originalValue_ = UINT64_C(0);     // Original value of last written reg.
+    unsigned flen_ = 64;                      // Floating point register width.
     uint64_t mask_ = ~uint64_t(0);
   };
 

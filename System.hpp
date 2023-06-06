@@ -20,7 +20,6 @@
 #include <string_view>
 #include <unordered_map>
 #include "Memory.hpp"
-#include "SparseMem.hpp"
 
 namespace WdRiscv
 {
@@ -36,6 +35,7 @@ namespace WdRiscv
 
   class DecodedInst;
   class IoDevice;
+  class SparseMem;
 
   /// Model a system consisting of n cores with m-harts per core and a
   /// memory. The harts in the system are indexed from 0 to n*m -
@@ -46,8 +46,8 @@ namespace WdRiscv
   {
   public:
 
-    typedef Hart<URV> HartClass;
-    typedef Core<URV> CoreClass;
+    using HartClass = Hart<URV>;
+    using CoreClass = Core<URV>;
 
     /// Constructor: Construct a system with n (coreCount) cores each
     /// consisting of m (hartsPerCore) harts. The harts in this system
@@ -130,7 +130,7 @@ namespace WdRiscv
     void defineReadMemoryCallback(
          std::function<bool(uint64_t, unsigned, uint64_t&)> callback )
     {
-      memory_->defineReadMemoryCallback(callback);
+      memory_->defineReadMemoryCallback(std::move(callback));
     }
 
     /// Define write memory callback. This (along with
@@ -139,7 +139,7 @@ namespace WdRiscv
     void defineWriteMemoryCallback(
          std::function<bool(uint64_t, unsigned, uint64_t)> callback )
     {
-      memory_->defineWriteMemoryCallback(callback);
+      memory_->defineWriteMemoryCallback(std::move(callback));
     }
 
     /// Break a hart-index-in-system into a core-index and a

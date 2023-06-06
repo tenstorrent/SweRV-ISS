@@ -27,7 +27,7 @@ template <typename URV>
 void
 Hart<URV>::execHfence_vvma(const DecodedInst* di)
 {
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
 
   if (not isRvh())
     {
@@ -79,7 +79,7 @@ template <typename URV>
 void
 Hart<URV>::execHfence_gvma(const DecodedInst* di)
 {
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
 
   if (not isRvh())
     {

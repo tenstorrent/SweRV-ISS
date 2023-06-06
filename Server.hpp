@@ -14,12 +14,22 @@
 
 #pragma once
 
-#include "System.hpp"
+#include <cstdio>
+#include <string>
+#include <vector>
 #include "WhisperMessage.h"
 
 
 namespace WdRiscv
 {
+
+  class DecodedInst;
+
+  template <typename URV>
+  class Hart;
+
+  template <typename URV>
+  class System;
 
   /// Manage server mode.
   template <typename URV>

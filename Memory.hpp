@@ -62,7 +62,7 @@ namespace WdRiscv
     /// Constructor: define a memory of the given size initialized to
     /// zero. Given memory size (byte count) must be a multiple of 4
     /// otherwise, it is truncated to a multiple of 4.
-    Memory(uint64_t size, uint64_t pageSize = 4*1024);
+    Memory(uint64_t size, uint64_t pageSize = UINT64_C(4)*1024);
 
     /// Destructor.
     ~Memory();
@@ -280,7 +280,7 @@ namespace WdRiscv
     template<typename T>
     bool readIo(uint64_t addr, T& val) const
     {
-      for (auto& dev : ioDevs_)
+      for (const auto& dev : ioDevs_)
 	if (dev->isAddressInRange(addr))
 	  {
 	    val = dev->read(addr);
@@ -465,14 +465,14 @@ namespace WdRiscv
     void defineReadMemoryCallback(
          std::function<bool(uint64_t, unsigned, uint64_t&)> callback )
     {
-      readCallback_ = callback;
+      readCallback_ = std::move(callback);
     }
 
     /// Define write memory callback. This (along with
     /// defineReadMemoryCallback) allows the caller to bypass the
     /// memory model with their own.
     void defineWriteMemoryCallback(std::function<bool(uint64_t, unsigned, uint64_t)> callback)
-    { writeCallback_ = callback; }
+    { writeCallback_ = std::move(callback); }
 
     /// Enable tracing of memory data lines referenced by current
     /// run. A memory data line is typically 64-bytes long and corresponds to
@@ -678,9 +678,8 @@ namespace WdRiscv
     /// local hart ids.
     void invalidateLrs(uint64_t addr, unsigned storeSize)
     {
-      for (uint64_t i = 0; i < reservations_.size(); ++i)
+      for (auto & res : reservations_)
         {
-          auto& res = reservations_[i];
           if (addr >= res.addr_ and (addr - res.addr_) < res.size_)
             res.valid_ = false;
           else if (addr < res.addr_ and (res.addr_ - addr) < storeSize)
@@ -705,7 +704,7 @@ namespace WdRiscv
     /// contains the range defined by the given address and size.
     bool hasLr(unsigned sysHartIx, uint64_t addr, unsigned size) const
     {
-      auto& res = reservations_.at(sysHartIx);
+      const auto& res = reservations_.at(sysHartIx);
       return (res.valid_ and res.addr_ <= addr and
 	      addr + size <= res.addr_ + res.size_);
     }
@@ -720,7 +719,7 @@ namespace WdRiscv
     /// Helper to loadElfFile: Collet ELF sections.
     void collectElfSections(ELFIO::elfio& reader);
 
-    bool saveAddressTrace(const std::string& tag,
+    bool saveAddressTrace(std::string_view tag,
 			  const std::unordered_map<uint64_t, uint64_t>& lineMap,
 			  const std::string& path) const;
 
@@ -745,10 +744,10 @@ namespace WdRiscv
     uint64_t size_;        // Size of memory in bytes.
     uint8_t* data_;      // Pointer to memory data.
 
-    uint64_t pageSize_    = 4*1024;    // Must be a power of 2.
-    unsigned pageShift_   = 12;        // Shift address by this to get page no.
-    unsigned regionShift_ = 28;        // Shift address by this to get region no.
-    unsigned regionMask_  = 0xf;       // This should depend on mem size.
+    uint64_t pageSize_    = UINT64_C(4)*1024;   // Must be a power of 2.
+    unsigned pageShift_   = 12;                 // Shift address by this to get page no.
+    unsigned regionShift_ = 28;                 // Shift address by this to get region no.
+    unsigned regionMask_  = 0xf;                // This should depend on mem size.
 
     std::mutex amoMutex_;
     std::mutex lrMutex_;

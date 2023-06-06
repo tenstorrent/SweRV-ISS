@@ -3,7 +3,6 @@
 #include <ios>
 #include "PmpManager.hpp"
 #include "VirtMem.hpp"
-#include "inttypes.h"
 
 using namespace WdRiscv;
 
@@ -58,7 +57,7 @@ static constexpr
 ExceptionCause
 stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
 {
-  typedef ExceptionCause EC;
+  using EC = ExceptionCause;
   if (ec2 == EC::INST_GUEST_PAGE_FAULT or ec2 == EC::LOAD_GUEST_PAGE_FAULT or
       ec2 == EC::STORE_GUEST_PAGE_FAULT)
     return stage1PageFaultType(read, write, exec);
@@ -129,7 +128,7 @@ VirtMem::transAddrNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 			   bool read, bool write, bool exec, uint64_t& pa)
 {
   auto prevTrace = trace_; trace_ = false;
-  auto prevFile  = attFile_; attFile_ = nullptr;
+  auto* prevFile = attFile_; attFile_ = nullptr;
   accessDirtyCheck_ = false;
 
   auto cause = transNoUpdate(va, priv, twoStage, read, write, exec, pa);
@@ -1135,7 +1134,7 @@ VirtMem::printPageTable(std::ostream& os) const
 
 template<typename PTE, typename VA>
 void
-VirtMem::printEntries(std::ostream& os, uint64_t addr, std::string path) const
+VirtMem::printEntries(std::ostream& os, uint64_t addr, const std::string& path) const
 {
   os << "\n";
   os << "Page table page addr: 0x" << std::hex << addr << std::dec << '\n';

@@ -381,11 +381,8 @@ Memory::collectElfRiscvTags(const std::string& fileName,
       return false;
     }
 
-  auto secCount = reader.sections.size();
-
-  for (int secIx = 0; secIx < secCount; ++secIx)
+  for (const auto* sec : reader.sections)
     {
-      auto sec = reader.sections[secIx];
       if (sec->get_type() != 0x70000003)
         continue;
 
@@ -489,11 +486,8 @@ Memory::collectElfRiscvTags(const std::string& fileName,
 void
 Memory::collectElfSymbols(ELFIO::elfio& reader)
 {
-  auto secCount = reader.sections.size();
-
-  for (int secIx = 0; secIx < secCount; ++secIx)
+  for (const auto& sec : reader.sections)
     {
-      auto sec = reader.sections[secIx];
       if (sec->get_type() != SHT_SYMTAB)
 	continue;
 
@@ -529,7 +523,7 @@ Memory::collectElfSections(ELFIO::elfio& reader)
 
   for (int secIx = 0; secIx < secCount; ++secIx)
     {
-      auto sec = reader.sections[secIx];
+      auto* sec = reader.sections[secIx];
       sections_[sec->get_name()] = ElfSymbol(sec->get_address(), sec->get_size());
     }
 }
@@ -654,7 +648,7 @@ Memory::findElfFunction(uint64_t addr, std::string& name, ElfSymbol& value) cons
 {
   for (const auto& kv : symbols_)
     {
-      auto& sym = kv.second;
+      const auto& sym = kv.second;
       size_t start = sym.addr_, end = sym.addr_ + sym.size_;
       if (addr >= start and addr < end)
 	{
@@ -694,9 +688,8 @@ Memory::getElfFileAddressBounds(const std::string& fileName, uint64_t& minAddr,
   size_t minBound = ~ size_t(0);
   size_t maxBound = 0;
   unsigned validSegs = 0;
-  for (int segIx = 0; segIx < reader.segments.size(); ++segIx)
+  for (const ELFIO::segment* seg : reader.segments)
     {
-      const ELFIO::segment* seg = reader.segments[segIx];
       if (seg->get_type() != PT_LOAD)
 	continue;
 
@@ -748,7 +741,7 @@ Memory::isSymbolInElfFile(const std::string& path, const std::string& target)
   auto secCount = reader.sections.size();
   for (int secIx = 0; secIx < secCount; ++secIx)
     {
-      auto sec = reader.sections[secIx];
+      auto* sec = reader.sections[secIx];
       if (sec->get_type() != SHT_SYMTAB)
 	continue;
 
@@ -799,7 +792,7 @@ Memory::saveSnapshot(const std::string& filename,
   // write the simulated memory into the file and check success
   uint64_t prevAddr = 0;
   bool success = true;
-  for (auto& blk: usedBlocks)
+  for (const auto& blk: usedBlocks)
     {
       if (blk.first >= size_)
 	{
@@ -884,7 +877,7 @@ Memory::loadSnapshot(const std::string & filename,
   bool success = true;
   uint64_t prevAddr = 0;
   size_t remainingSize = 0;
-  for (auto& blk: usedBlocks)
+  for (const auto& blk: usedBlocks)
     {
       if (blk.first >= size_)
 	{
@@ -950,7 +943,7 @@ Memory::loadSnapshot(const std::string & filename,
 
 
 bool
-Memory::saveAddressTrace(const std::string& tag,
+Memory::saveAddressTrace(std::string_view tag,
 			 const std::unordered_map<uint64_t, uint64_t>& lineMap,
 			 const std::string& path) const
 {
@@ -968,7 +961,7 @@ Memory::saveAddressTrace(const std::string& tag,
   std::vector<uint64_t> addrVec;
   addrVec.reserve(lineMap.size());
 
-  for (auto& kv : lineMap)
+  for (const auto& kv : lineMap)
     addrVec.push_back(kv.first);
 
   std::sort(addrVec.begin(), addrVec.end(),
@@ -1047,7 +1040,7 @@ Memory::checkCcmConfig(const std::string& tag, uint64_t addr, uint64_t size) con
 
   // CCM area must be aligned to the nearest power of 2 larger than or
   // equal to its size.
-  size_t log2Size = static_cast<size_t>(log2(size));
+  size_t log2Size = static_cast<size_t>(std::bit_width(size) - 1);
   size_t powerOf2 = size_t(1) << log2Size;
   if (powerOf2 != size)
     powerOf2 *= 2;

@@ -19,7 +19,7 @@ DecodedInst::ithOperand(unsigned i) const
 int32_t
 DecodedInst::ithOperandAsInt(unsigned i) const
 {
-  return ithOperand(i);
+  return static_cast<int32_t>(ithOperand(i));
 }
 
 
@@ -60,7 +60,7 @@ DecodedInst::name() const
 {
   if (entry_)
     {
-      auto id = entry_->instId();
+      auto id   = entry_->instId();
       auto name = std::string(entry_->name());
       if (id >= InstId::vlre8_v and id <= InstId::vlre1024_v)
         name = insertFieldCountInName(name, vecFieldCount(), 2);
@@ -73,6 +73,6 @@ DecodedInst::name() const
         name = insertFieldCountInName(name, vecFieldCount(), 7);
       return name;
     }
-  else
-    return "illegal";
+
+  return "illegal";
 }

@@ -41,6 +41,9 @@ namespace WdRiscv
     /// Destructor.
     ~HartConfig();
 
+    HartConfig(const HartConfig&) = delete;
+    void operator= (const HartConfig&) = delete;
+
     /// Load given configuration file (JSON file) into this object.
     /// Return true on success and false if file cannot be opened or if the file
     /// does not contain a valid JSON object.
@@ -151,9 +154,6 @@ namespace WdRiscv
     bool getMisaReset(uint64_t& val) const;
 
   private:
-
-    HartConfig(const HartConfig&) = delete;
-    void operator= (const HartConfig&) = delete;
 
     std::unique_ptr<nlohmann::json> config_;
   };

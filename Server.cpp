@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <atomic>
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -21,9 +22,11 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include "DecodedInst.hpp"
 #include "WhisperMessage.h"
 #include "Hart.hpp"
 #include "Server.hpp"
+#include "System.hpp"
 #include "Interactive.hpp"
 
 
@@ -370,8 +373,7 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
           ok = false;
         if (ok)
           return true;
-        else
-          break;
+        break;
       }
     }
 
@@ -462,8 +464,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  ok = false;
         if (ok)
           return true;
-        else
-          break;
+        break;
       }
     case 'i':
       {
@@ -555,13 +556,13 @@ collectSyscallMemChanges(Hart<URV>& hart,
           bool ok = hart.pokeMemory(slamAddr, addr, true);
           if (ok)
             {
-              changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, addr, 8});
+              changes.emplace_back(0, Change, 'm', slamAddr, addr, 8);
 
               slamAddr += 8;
               ok = hart.pokeMemory(slamAddr, val, true);
               if (ok)
                 {
-                  changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, val, 8});
+                  changes.emplace_back(0, Change, 'm', slamAddr, val, 8);
                   slamAddr += 8;
                 }
             }
@@ -579,9 +580,9 @@ collectSyscallMemChanges(Hart<URV>& hart,
   if (slamAddr)
     {
       if (hart.pokeMemory(slamAddr, uint64_t(0), true))
-        changes.push_back(WhisperMessage{0, Change, 'm', slamAddr, 0});
+        changes.emplace_back(0, Change, 'm', slamAddr, 0);
       if (hart.pokeMemory(slamAddr + 8, uint64_t(0), true))
-        changes.push_back(WhisperMessage{0, Change, 'm', slamAddr+8, 0});
+        changes.emplace_back(0, Change, 'm', slamAddr+8, 0);
     }
 }
 

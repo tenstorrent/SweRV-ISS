@@ -379,7 +379,7 @@ Isa::applyIsaString(std::string_view isaStr)
 	    return false;
 	  continue;
 	}
-      else if (c == 'z')
+      if (c == 'z')
 	{
 	  // First extension cannot be a z. Z exts must be separated with _.
 	  if (i == 0 or ((hasZ and isa.at(i-1) != '_')))
