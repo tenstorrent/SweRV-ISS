@@ -1049,6 +1049,10 @@ namespace WdRiscv
     void enableRvzvfbfwma(bool flag)
     { enableExtension(RvExtension::Zvfbfwma, flag); }
 
+    /// Enable/disable the supervisor timer compare extension (sstc).
+    void enableRvsstc(bool flag)
+    { enableExtension(RvExtension::Sstc, flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1355,6 +1359,10 @@ namespace WdRiscv
     /// extension is enabled.
     bool isRvzvfbfwma() const
     { return extensionIsEnabled(RvExtension::Zvfbfwma); }
+
+    /// Return true if the supervisor timer compare extension is enabled.
+    bool isRvzvsstc() const
+    { return extensionIsEnabled(RvExtension::Sstc); }
 
     /// Return true if the bit-manip vector extension is enabled.
     bool isRvzvbb() const

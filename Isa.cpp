@@ -63,6 +63,7 @@ static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS
   { "zfbfmin", RvExtension::Zfbfmin },
   { "zvfbfmin", RvExtension::Zvfbfmin },
   { "zvfbfwma", RvExtension::Zvfbfwma },
+  { "sstc", RvExtension::Sstc },
 };
 static_assert(std::size(STRING_EXT_PAIRS) == static_cast<unsigned>(RvExtension::None));
 
@@ -123,6 +124,7 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Sstc)) = Info{ {{0,5}}, {0,5} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }

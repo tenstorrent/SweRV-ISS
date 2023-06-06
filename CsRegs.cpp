@@ -401,6 +401,10 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
+  auto stimecmp = findCsr(CN::STIMECMP);
+  if (sstcEnabled_ and stimecmp)
+    stimecmp->setImplemented(flag);
+
   if (not flag)
     return;
 
@@ -408,29 +412,34 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   // In MIP, make writable/pokable bits corresponding to SEIP/STIP/SSIP
   // (supervisor external/timer/software interrupt pending).
-  URV extra = URV(1) << unsigned(IC::S_EXTERNAL);
-  extra |= URV(1) << unsigned(IC::S_TIMER);
-  extra |= URV(1) << unsigned(IC::S_SOFTWARE);
+  // STIP is writeable only if the supervisor time compare register is not
+  // implemented.
+  URV maskExtra = URV(1) << unsigned(IC::S_EXTERNAL);
+  if (not stimecmp or not stimecmp->isImplemented())
+    maskExtra |= URV(1) << unsigned(IC::S_TIMER);
+  maskExtra |= URV(1) << unsigned(IC::S_SOFTWARE);
+
+  URV pokeExtra = maskExtra | URV(1) << unsigned(IC::S_TIMER);
 
   auto csr = findCsr(CsrNumber::MIP);
   if (csr)
     {
       URV mask = csr->getWriteMask();
-      csr->setWriteMask(mask | extra);
+      csr->setWriteMask(mask | maskExtra);
 
       mask = csr->getPokeMask();
-      csr->setPokeMask(mask | extra);
+      csr->setPokeMask(mask | pokeExtra);
     }
 
-  // Same for MIE.
+  // For MIE bits corresponding to SEUP/STIP/SSIP become pokeable/writeable.
   csr = findCsr(CsrNumber::MIE);
   if (csr)
     {
       URV mask = csr->getWriteMask();
-      csr->setWriteMask(mask | extra);
+      csr->setWriteMask(mask | pokeExtra);
 
       mask = csr->getPokeMask();
-      csr->setPokeMask(mask | extra);
+      csr->setPokeMask(mask | pokeExtra);
     }
 }
 
@@ -1606,6 +1615,16 @@ CsRegs<URV>::defineSupervisorRegs()
   // Supervisor Protection and Translation 
   defineCsr("satp",       Csrn::SATP,       !mand, !imp, 0, wam, wam);
 
+  // Supervisor time compare.
+  defineCsr("stimecmp",   Csrn::STIMECMP,   !mand, !imp, 0, wam, wam);
+  if (rv32_)
+    {
+      auto csr = defineCsr("stimecmph",  Csrn::STIMECMPH,  !mand, !imp, 0, wam, wam);
+      if (csr)
+	csr->setHypervisor(true);
+    }
+
+
   // Mark supervisor CSR that maps to virtual supervisor counterpart
   for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
 		     CsrNumber::SSCRATCH, CsrNumber::SEPC,
@@ -1766,10 +1785,22 @@ CsRegs<URV>::defineHypervisorRegs()
 
   mask = pokeMask = 0x222;
   csr = defineCsr("vsip",        Csrn::VSIP,        !mand, !imp, 0, mask, pokeMask);
-
   csr->setHypervisor(true);
+
   csr = defineCsr("vsatp",       Csrn::VSATP,       !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
+  csr = defineCsr("vsstimecmp",  Csrn::VSTIMECMP,   !mand, !imp, 0, wam, wam);
+  csr->setHypervisor(true);
+  if (rv32_)
+    {
+      csr = defineCsr("vsstimecmph",  Csrn::VSTIMECMPH,   !mand, !imp, 0, wam, wam);
+      if (csr)
+	{
+	  csr->setHypervisor(true);
+	  csr->markAsHighHalf(true);
+	}
+    }
+  
 
   // additional machine CSRs
   csr = defineCsr("mtval2",      Csrn::MTVAL2,      !mand, !imp, 0, wam, wam);
@@ -2400,6 +2431,16 @@ CsRegs<URV>::updateCounterPrivilege()
       csr = getImplementedCsr(csrn);
       if (csr)
         csr->setPrivilegeMode(nextMode);
+    }
+
+  auto stimecmp = findCsr(CsrNumber::STIMECMP);
+  auto stimecmph = findCsr(CsrNumber::STIMECMP);
+  for (auto csr : {stimecmp, stimecmph})
+    {
+      if ((mMask & 2) == 0)  // TM bit set in mcounteren.
+	csr->setPrivilegeMode(PrivilegeMode::Machine);
+      else if (superEnabled_)
+	csr->setPrivilegeMode(PrivilegeMode::Supervisor);
     }
 }
 

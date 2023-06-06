@@ -378,6 +378,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzcb(true);
   if (isa_.isEnabled(RvExtension::Zfa))
     enableRvzfa(true);
+  if (isa_.isEnabled(RvExtension::Sstc))
+    enableRvsstc(true);
 }
 
 

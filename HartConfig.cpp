@@ -1577,6 +1577,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableUserPointerMasking(flag);
     }
 
+  tag = "enable_supervisor_time_compare";
+  if (config_ ->contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableRvsstc(flag);
+    }
+
   return errors == 0;
 }
 
