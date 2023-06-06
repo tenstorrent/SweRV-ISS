@@ -259,6 +259,8 @@ namespace WdRiscv
       SCAUSE = 0x142,
       STVAL = 0x143,
       SIP = 0x144,
+      STIMECMP = 0x14d,
+      STIMECMPH = 0x15d,
       // Supervisor Protection and Translation 
       SATP = 0x180,
 
@@ -290,6 +292,8 @@ namespace WdRiscv
       VSCAUSE = 0x242,
       VSTVAL = 0x243,
       VSIP = 0x244,
+      VSTIMECMP = 0x24d,
+      VSTIMECMPH = 0x25d,
       VSATP = 0x280,
 
       // User mode registers.
@@ -1400,6 +1404,10 @@ namespace WdRiscv
     void enableUserMode(bool flag)
     { userEnabled_ = flag; }
 
+    /// Enable supervisor time compare.
+    void enableSstc(bool flag)
+    { sstcEnabled_ = flag; }
+
     /// Enable/disable F extension.
     void enableRvf(bool flag);
 
@@ -1486,6 +1494,7 @@ namespace WdRiscv
     bool userEnabled_ = false;    // User mode enabled
     bool superEnabled_ = false;   // Supervisor
     bool hyperEnabled_ = false;   // Hypervisor
+    bool sstcEnabled_ = false;    // Supervisor time compare
 
     bool perModeCounterControl_ = false;
     bool recordWrite_ = true;

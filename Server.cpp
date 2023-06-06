@@ -1064,6 +1064,13 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
             if (msg.resource == 'p')
               fprintf(commandLog, "hart=%" PRIu32 " poke pc 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
                       uintmax_t(msg.value), timeStamp.c_str(), msg.tag);
+            else if (msg.resource == 'v')
+              {
+                fprintf(commandLog, "hart=%" PRIu32 " poke v 0x%" PRIxMAX " 0x", hartId, uintmax_t(msg.address));
+                for (uint32_t i = 0; i < msg.size; ++i)
+                  fprintf(commandLog, "%02x", uint8_t(msg.buffer[msg.size - 1 - i]));
+                fprintf(commandLog, " # ts=%s tag=%s\n", timeStamp.c_str(), msg.tag);
+              }
             else
               fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
                       msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),

@@ -27,17 +27,6 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 
-#include <boost/multiprecision/cpp_int.hpp>
-
-// On pure 32-bit machines, use boost for 128-bit integer type.
-#if __x86_64__
-  typedef __int128_t  Int128;
-  typedef __uint128_t Uint128;
-#else
-  typedef boost::multiprecision::int128_t  Int128;
-  typedef boost::multiprecision::uint128_t Uint128;
-#endif
-
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -54,6 +43,7 @@
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 #include "Mcm.hpp"
+#include "wideint.hpp"
 
 
 #ifndef SO_REUSEPORT
@@ -388,6 +378,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzcb(true);
   if (isa_.isEnabled(RvExtension::Zfa))
     enableRvzfa(true);
+  if (isa_.isEnabled(RvExtension::Sstc))
+    enableRvsstc(true);
 }
 
 
@@ -4077,7 +4069,8 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
     {
       if (not fetchInstPostTrigger(addr, physAddr, inst, file))
         {
-          ++cycleCount_;
+	  if (mcycleEnabled())
+	    ++cycleCount_;
           return false;  // Next instruction in trap handler.
         }
     }
@@ -4087,7 +4080,8 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
     }
   if (not fetchOk)
     {
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
 
       std::string instStr;
       printInstTrace(inst, instCounter_, instStr, file);
@@ -4185,7 +4179,8 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  pc_ += di->instSize();
 	  execute(di);
 
-	  ++cycleCount_;
+	  if (mcycleEnabled())
+	    ++cycleCount_;
 
 	  if (initStateFile_)
 	    {
@@ -4411,7 +4406,8 @@ Hart<URV>::simpleRunWithLimit()
       hasException_ = hasInterrupt_ = lastBranchTaken_ = false;
       currPc_ = pc_;
       ++instCounter_;
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
 
       if (checkInterrupt and processExternalInterrupt(nullptr, instStr))
 	continue;
@@ -4632,7 +4628,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
     return false;
 
   URV mie = csRegs_.peekMie();
-  if ((mie & mip & ~deferredInterrupts_) == 0)
+  URV possible = mie & mip & ~deferredInterrupts_;
+  if (possible == 0)
     return false;  // Nothing enabled that is also pending.
 
   typedef InterruptCause IC;
@@ -4641,9 +4638,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV delegVal = csRegs_.peekMideleg();
   URV hDelegVal = csRegs_.peekHideleg();
 
-  if (mstatus_.bits_.MIE or privMode_ != PM::Machine)
+  // Interrupts destined for machine mode must not be delegated.
+  URV machine = possible & ~delegVal;  // Machine interrupts.
+  if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and machine != 0)
     {
-      // Check for interrupts destined for machine-level (not-delegated).
+      // Check for interrupts destined for machine-mode (not-delegated).
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
@@ -4651,9 +4650,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = (mask & delegVal) != 0;
-	  bool enabled = (mie & mask & mip) != 0;
-	  if (enabled and not delegated)
+	  if ((machine & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
@@ -4663,9 +4660,10 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (privMode_ == PM::Machine)
     return false;
 
-  if (mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User)
+  // Interrupts destined for supervisor mode (S/HS): must be delegated but not h-delegated.
+  URV super = possible & delegVal & ~hDelegVal;  // Interrupts targeting S/HS.
+  if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and super != 0)
     {
-      // Check for interrupts destined for S or HS privilege.
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
@@ -4673,13 +4671,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = (mask & delegVal) != 0;
-	  if (not delegated)
-	    continue;
-	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (hDelegated)
-	    continue;
-	  if (mie & mask & mip)
+	  if ((super & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
@@ -4689,17 +4681,15 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (privMode_ == PM::Supervisor and not virtMode_)
     return false;
 
-  if (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User))
+  // Check for interrupts destined to VS privilege.
+  // Possible if pending (mie), enabled (mip), delegated, and h-delegated.
+  URV vs = possible & delegVal & hDelegVal;
+  if ((vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)) and vs != 0)
     {
-      // Check for interrupts destined to VS privilege.
       for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  bool delegated = (mask & delegVal) != 0;
-	  bool hDelegated = (mask & hDelegVal) != 0;
-	  if (not delegated or not hDelegated)
-	    continue;
-	  if (mie & mask & mip)
+	  if ((vs & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
@@ -4780,6 +4770,8 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       uint32_t inst = 0; // Load interrupted inst.
       readInst(currPc_, inst);
       printInstTrace(inst, instCounter_, instStr, traceFile);
+      if (mcycleEnabled())
+	++cycleCount_;
       return true;
     }
 
@@ -4792,7 +4784,8 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       readInst(currPc_, inst);
       initiateInterrupt(cause, pc_);
       printInstTrace(inst, instCounter_, instStr, traceFile);
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
       return true;
     }
   return false;
@@ -4873,7 +4866,8 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       pc_ += di.instSize();
       execute(&di);
 
-      ++cycleCount_;
+      if (mcycleEnabled())
+	++cycleCount_;
 
       if (hasException_ or hasInterrupt_)
 	{
@@ -9990,6 +9984,9 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	return;  // Cannot turn-off C-extension if PC is not word aligned.
     }
 
+  // Update integer register.
+  intRegs_.write(intReg, intRegVal);
+
   if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
     {
       unsigned modeBits = 0;
@@ -9999,14 +9996,11 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	modeBits = (val >> 60) & 0xf;
       VirtMem::Mode mode = VirtMem::Mode(modeBits);
       if (not virtMem_.isModeSupported(mode))
-	return;
+	return;  // Unsupported mode: Write has no effect.
     }
 
   // Update CSR.
   csRegs_.write(csr, privMode_, val);
-
-  // Update integer register.
-  intRegs_.write(intReg, intRegVal);
 
   postCsrUpdate(csr, val, intRegVal);
 

@@ -111,9 +111,9 @@ parseCmdLineVecData(std::string_view option,
 
   for (size_t i = 0; i < trimmed.size(); i += 2)
     {
-      std::string_view byteStr = trimmed.substr(i, 2);
+      std::string byteStr(trimmed.substr(i, 2));
       char* end = nullptr;
-      unsigned value = strtoul(byteStr.data(), &end, 16);
+      unsigned value = strtoul(byteStr.c_str(), &end, 16);
       if (end and *end)
 	{
 	  std::cerr << "Invalid hex digit(s) in vector " << option << ": "

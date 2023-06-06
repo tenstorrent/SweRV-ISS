@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdint>
 #include "Hart.hpp"
+#include "wideint.hpp"
 
 using namespace WdRiscv;
 
@@ -12,7 +13,7 @@ xt2(uint8_t x)
   uint8_t res = (x << 1) ^ ((x >> 7) ? 0x1b : 0);
   return res;
 }
-    
+
 
 static inline
 uint8_t
@@ -264,9 +265,9 @@ aes_subword_inv(uint32_t x)
 
 static inline
 uint32_t
-aes_get_column(__uint128_t state, uint8_t c)
+aes_get_column(Uint128 state, uint8_t c)
 {
-  uint32_t res = state >> (32*c & 0x7f);
+  uint32_t res = static_cast<uint32_t>(state >> (32*c & 0x7f));
   return res;
 }
 
@@ -343,8 +344,8 @@ aes_rv64_shiftrows_inv(uint64_t rs2, uint64_t rs1)
 }
 
 
-__uint128_t
-aes_shift_rows_fwd(__uint128_t x)
+Uint128
+aes_shift_rows_fwd(Uint128 x)
 {
   uint32_t ic3 = aes_get_column(x, 3);
   uint32_t ic2 = aes_get_column(x, 2);
@@ -363,22 +364,22 @@ aes_shift_rows_fwd(__uint128_t x)
   uint32_t oc3 = ( ((ic3 >> 24) << 24) | (ic0 & uint32_t(0xff0000)) |
 		   (ic1 & uint32_t(0xff00)) | (ic2 & uint32_t(0xff)) );
 
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  Uint128 res = ( (Uint128(oc3) << 96) | (Uint128(oc2) << 64) |
+                  (Uint128(oc1) << 32) | Uint128(oc0) );
   return res;
 }
 
 
-__uint128_t
-aes_mixcolumns_fwd(__uint128_t x)
+Uint128
+aes_mixcolumns_fwd(Uint128 x)
 {
   uint32_t oc0 = aes_mixcolumn_fwd(aes_get_column(x, 0));
   uint32_t oc1 = aes_mixcolumn_fwd(aes_get_column(x, 1));
   uint32_t oc2 = aes_mixcolumn_fwd(aes_get_column(x, 2));
   uint32_t oc3 = aes_mixcolumn_fwd(aes_get_column(x, 3));
 
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  Uint128 res = ( (Uint128(oc3) << 96) | (Uint128(oc2) << 64) |
+                  (Uint128(oc1) << 32) | Uint128(oc0) );
   return res;
 }
 
@@ -386,51 +387,51 @@ aes_mixcolumns_fwd(__uint128_t x)
 #if 0
 
 static
-__uint128_t
-aes_mixcolumns_inv(__uint128_t x)
+Uint128
+aes_mixcolumns_inv(Uint128 x)
 {
   uint32_t oc0 = aes_mixcolumn_inv(aes_get_column(x, 0));
   uint32_t oc1 = aes_mixcolumn_inv(aes_get_column(x, 1));
   uint32_t oc2 = aes_mixcolumn_inv(aes_get_column(x, 2));
   uint32_t oc3 = aes_mixcolumn_inv(aes_get_column(x, 3));
 
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  Uint128 res = ( (Uint128(oc3) << 96) | (Uint128(oc2) << 64) |
+                  (Uint128(oc1) << 32) | Uint128(oc0) );
   return res;
 }
 #endif
 
 
-__uint128_t
-aes_subbytes_fwd(__uint128_t x)
+Uint128
+aes_subbytes_fwd(Uint128 x)
 {
   uint32_t oc0 = aes_subword_fwd(aes_get_column(x, 0));
   uint32_t oc1 = aes_subword_fwd(aes_get_column(x, 1));
   uint32_t oc2 = aes_subword_fwd(aes_get_column(x, 2));
   uint32_t oc3 = aes_subword_fwd(aes_get_column(x, 3));
 
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  Uint128 res = ( (Uint128(oc3) << 96) | (Uint128(oc2) << 64) |
+                  (Uint128(oc1) << 32) | Uint128(oc0) );
   return res;
 }
 
 
-__uint128_t
-aes_subbytes_inv(__uint128_t x)
+Uint128
+aes_subbytes_inv(Uint128 x)
 {
   uint32_t oc0 = aes_subword_inv(aes_get_column(x, 0));
   uint32_t oc1 = aes_subword_inv(aes_get_column(x, 1));
   uint32_t oc2 = aes_subword_inv(aes_get_column(x, 2));
   uint32_t oc3 = aes_subword_inv(aes_get_column(x, 3));
 
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  Uint128 res = ( (Uint128(oc3) << 96) | (Uint128(oc2) << 64) |
+                  (Uint128(oc1) << 32) | Uint128(oc0) );
   return res;
 }
 
 
-__uint128_t
-aes_shift_rows_inv(__uint128_t x)
+Uint128
+aes_shift_rows_inv(Uint128 x)
 {
   uint32_t ic3 = aes_get_column(x, 3);
   uint32_t ic2 = aes_get_column(x, 2);
@@ -449,8 +450,8 @@ aes_shift_rows_inv(__uint128_t x)
   uint32_t oc3 = ( ((ic3 >> 24) << 24) | (ic2 & uint32_t(0xff0000)) |
 		   (ic1 & uint32_t(0xff00)) | (ic0 & uint32_t(0xff)) );
 
-  __uint128_t res = ( (__uint128_t(oc3) << 96) | (__uint128_t(oc2) << 64) |
-		      (__uint128_t(oc1) << 32) | __uint128_t(oc0) );
+  Uint128 res = ( (Uint128(oc3) << 96) | (Uint128(oc2) << 64) |
+                  (Uint128(oc1) << 32) | Uint128(oc0) );
   return res;
 }
 
