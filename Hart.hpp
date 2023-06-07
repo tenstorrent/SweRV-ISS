@@ -4593,6 +4593,8 @@ namespace WdRiscv
     uint64_t instCounter_ = 0;   // Absolute retired instruction count.
     uint64_t instCountLim_ = ~uint64_t(0);
     uint64_t stimecmp_ = 0;      // Value of STIMECMP CSR.
+    uint64_t vstimecmp_ = 0;     // Value of VSTIMECMP CSR.
+    uint64_t htimedelta_ = 0;    // Value of HTIMEDELTA CSR.
     uint64_t exceptionCount_ = 0;
     uint64_t interruptCount_ = 0;   // Including non-maskable interrupts.
     uint64_t nmiCount_ = 0;
@@ -4688,8 +4690,9 @@ namespace WdRiscv
     bool misalDataOk_ = true;
     bool misalHasPriority_ = true;
     bool trapNonZeroVstart_ = true;  // Trap if vstart > 0 in arithmetic vec instructions
-    bool bigEnd_ = false;   // True if big endian
-    bool stimecmpActive_ = false;
+    bool bigEnd_ = false;            // True if big endian
+    bool stimecmpActive_ = false;    // True if STIMECMP CSR is implemented.
+    bool vstimecmpActive_ = false;   // True if VSTIMECMP CSR is implemented.
 
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.

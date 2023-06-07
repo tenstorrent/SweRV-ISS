@@ -1408,6 +1408,8 @@ namespace WdRiscv
       sstcEnabled_ = flag;
       flag = flag and superEnabled_;
       findCsr(CsrNumber::STIMECMP)->setImplemented(flag);
+      flag = flag and hyperEnabled_;
+      findCsr(CsrNumber::VSTIMECMP)->setImplemented(flag);
     }
 
     /// Enable/disable F extension.

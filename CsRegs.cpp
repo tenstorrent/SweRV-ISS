@@ -527,6 +527,8 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
             (csr->*setValueFn)(newValue);
         }
     }
+
+  enableSstc(sstcEnabled_);  // To activate/deactivate VSTIMECMP.
 }
 
 
@@ -1628,7 +1630,7 @@ CsRegs<URV>::defineSupervisorRegs()
   for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
 		     CsrNumber::SSCRATCH, CsrNumber::SEPC,
 		     CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
-		     CsrNumber::SATP })
+		     CsrNumber::SATP, CsrNumber::STIMECMP })
     {
       auto csr = findCsr(csrn);
       if (csr)
