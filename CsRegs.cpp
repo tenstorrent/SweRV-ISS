@@ -401,9 +401,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
-  auto stimecmp = findCsr(CN::STIMECMP);
-  if (sstcEnabled_ and stimecmp)
-    stimecmp->setImplemented(flag);
+  enableSstc(sstcEnabled_);  // To activate/deactivate STIMECMP.
 
   if (not flag)
     return;
@@ -415,6 +413,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
   // STIP is writeable only if the supervisor time compare register is not
   // implemented.
   URV maskExtra = URV(1) << unsigned(IC::S_EXTERNAL);
+  auto stimecmp = getImplementedCsr(CN::STIMECMP);
   if (not stimecmp or not stimecmp->isImplemented())
     maskExtra |= URV(1) << unsigned(IC::S_TIMER);
   maskExtra |= URV(1) << unsigned(IC::S_SOFTWARE);

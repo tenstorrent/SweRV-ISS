@@ -310,6 +310,12 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
+  bool sstc = false;
+  if (isRvs())
+    sstc = isRvsstc();
+  csRegs_.enableSstc(sstc);
+  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != NULL;
+
   enableRvzba(isa_.isEnabled(RvExtension::Zba));
   enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
   enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
@@ -4714,6 +4720,8 @@ template <typename URV>
 bool
 Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 {
+  using IC = InterruptCause;
+
   // If mip poked exernally we avoid over-writing it for 1 instruction.
   if (not mipPoked_)
     {
@@ -4723,30 +4731,41 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       for (const auto& dev : memory_.ioDevs_)
 	if (dev->isInterruptPending())
 	  {
-	    mipVal |=  (URV(1) << URV(InterruptCause::M_EXTERNAL)) | (URV(1) << URV(InterruptCause::S_EXTERNAL));
+	    mipVal |=  (URV(1) << URV(IC::M_EXTERNAL)) | (URV(1) << URV(IC::S_EXTERNAL));
 	    dev->setInterruptPending(false);
 	  }
 
       if (hasClint())
 	{
-	  // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
+	  // Deliver/clear machine timer interrupt from clint.
 	  if ((instCounter_ >> counterToTimeShift_) >= clintAlarm_)
-	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER))
-                            | (URV(1) << URV(InterruptCause::S_TIMER));
+	    mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
 	  else
-	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
+	    mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
+	}
+      else
+	{
+	  // Deliver/clear machine timer interrupt from periodic alarm.
+	  bool hasAlarm = alarmLimit_ != ~uint64_t(0);
+	  if (hasAlarm)
+	    {
+	      if (instCounter_ >= alarmLimit_)
+		{
+		  alarmLimit_ += alarmInterval_;
+		  mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
+		}
+	      else
+		mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
+	    }
 	}
 
-      bool hasAlarm = alarmLimit_ != ~uint64_t(0);
-      if (hasAlarm)
+      // Deliver/clear supervisor timer from stimecmp CSR.
+      if (stimecmpActive_)
 	{
-	  if (instCounter_ >= alarmLimit_)
-	    {
-	      alarmLimit_ += alarmInterval_;
-	      mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
-	    }
+	  if ((instCounter_ >> counterToTimeShift_) >= stimecmp_)
+	    mipVal = mipVal | (URV(1) << URV(IC::S_TIMER));
 	  else
-	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+	    mipVal = mipVal & ~(URV(1) << URV(IC::S_TIMER));
 	}
 
       if (mipVal != prev)

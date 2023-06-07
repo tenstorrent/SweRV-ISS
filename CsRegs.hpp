@@ -1404,7 +1404,11 @@ namespace WdRiscv
 
     /// Enable supervisor time compare.
     void enableSstc(bool flag)
-    { sstcEnabled_ = flag; }
+    {
+      sstcEnabled_ = flag;
+      flag = flag and superEnabled_;
+      findCsr(CsrNumber::STIMECMP)->setImplemented(flag);
+    }
 
     /// Enable/disable F extension.
     void enableRvf(bool flag);
