@@ -1617,7 +1617,8 @@ CsRegs<URV>::defineSupervisorRegs()
   defineCsr("satp",       Csrn::SATP,       !mand, !imp, 0, wam, wam);
 
   // Supervisor time compare.
-  defineCsr("stimecmp",   Csrn::STIMECMP,   !mand, !imp, 0, wam, wam);
+  auto stc = defineCsr("stimecmp",   Csrn::STIMECMP,   !mand, !imp, 0, wam, wam);
+  stc->setHypervisor(true);
   if (rv32_)
     {
       auto csr = defineCsr("stimecmph",  Csrn::STIMECMPH,  !mand, !imp, 0, wam, wam);
@@ -1627,12 +1628,19 @@ CsRegs<URV>::defineSupervisorRegs()
 
 
   // Mark supervisor CSR that maps to virtual supervisor counterpart
-  for (auto csrn : { CsrNumber::SSTATUS, CsrNumber::SIE, CsrNumber::STVEC,
-		     CsrNumber::SSCRATCH, CsrNumber::SEPC,
-		     CsrNumber::SCAUSE, CsrNumber::STVAL, CsrNumber::SIP,
-		     CsrNumber::SATP, CsrNumber::STIMECMP })
+  for (auto csrn : { Csrn::SSTATUS, Csrn::SIE, Csrn::STVEC,
+		     Csrn::SSCRATCH, Csrn::SEPC,
+		     Csrn::SCAUSE, Csrn::STVAL, Csrn::SIP,
+		     Csrn::SATP, Csrn::STIMECMP })
     {
       auto csr = findCsr(csrn);
+      if (csr)
+	csr->setMapsToVirtual(true);
+    }
+
+  if (rv32_)
+    {
+      auto csr = findCsr(Csrn::STIMECMPH);
       if (csr)
 	csr->setMapsToVirtual(true);
     }
