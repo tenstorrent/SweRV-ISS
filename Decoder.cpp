@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "DecodedInst.hpp"
 #include "IntRegs.hpp"
 #include "Decoder.hpp"
 #include "instforms.hpp"
@@ -20,14 +21,10 @@
 using namespace WdRiscv;
 
 
-Decoder::Decoder()
-{
-}
+Decoder::Decoder() = default;
 
 
-Decoder::~Decoder()
-{
-}
+Decoder::~Decoder() = default;
 
 
 void
@@ -1415,19 +1412,19 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
 	      return instTable_.getEntry(InstId::c_lbu);
 	    }
-	  else if (f6 == 0x21)
+	  if (f6 == 0x21)
 	    {
 	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
 	      if (cl.funct1() == 0)
 		return instTable_.getEntry(InstId::c_lhu);
 	      return instTable_.getEntry(InstId::c_lh);
 	    }
-	  else if (f6 == 0x22)
+	  if (f6 == 0x22)
 	    {
 	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
 	      return instTable_.getEntry(InstId::c_sb);
 	    }
-	  else if (f6 == 0x23)
+	  if (f6 == 0x23)
 	    {
 	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
 	      if (cl.funct1() == 0)
@@ -1476,20 +1473,18 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  
       if (funct3 == 1)  // c.jal,  in rv64 and rv128 this is c.addiw
 	{
-	  if (isRv64())
-	    {
-	      CiFormInst cif(inst);
-	      op0 = cif.bits.rd; op1 = cif.bits.rd; op2 = cif.addiImmed();
-	      if (op0 == 0)
-		return instTable_.getEntry(InstId::illegal);
-	      return instTable_.getEntry(InstId::c_addiw);
-	    }
-	  else
-	    {
-	      CjFormInst cjf(inst);
-	      op0 = RegRa; op1 = cjf.immed(); op2 = 0;
-	      return instTable_.getEntry(InstId::c_jal);
-	    }
+          if (isRv64())
+            {
+              CiFormInst cif(inst);
+              op0 = cif.bits.rd; op1 = cif.bits.rd; op2 = cif.addiImmed();
+              if (op0 == 0)
+                return instTable_.getEntry(InstId::illegal);
+              return instTable_.getEntry(InstId::c_addiw);
+            }
+
+          CjFormInst cjf(inst);
+          op0 = RegRa; op1 = cjf.immed(); op2 = 0;
+          return instTable_.getEntry(InstId::c_jal);
 	}
 
       if (funct3 == 2)  // c.li
@@ -1566,17 +1561,17 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 		}
 	      if (imm012 == 1)
 		return instTable_.getEntry(InstId::c_sext_b);
-	      else if (imm012 == 2)
-		return instTable_.getEntry(InstId::c_zext_h);
-	      else if (imm012 == 3)
-		return instTable_.getEntry(InstId::c_sext_h);
-	      else if (imm012 == 4)
-		return instTable_.getEntry(InstId::c_zext_w);
-	      else if (imm012 == 5)
-		{
-		  op2 = -1;
-		  return instTable_.getEntry(InstId::c_not);
-		}
+              if (imm012 == 2)
+                return instTable_.getEntry(InstId::c_zext_h);
+              if (imm012 == 3)
+                return instTable_.getEntry(InstId::c_sext_h);
+              if (imm012 == 4)
+                return instTable_.getEntry(InstId::c_zext_w);
+              if (imm012 == 5)
+                {
+                  op2 = -1;
+                  return instTable_.getEntry(InstId::c_not);
+                }
 	    }
 	  if (imm34 == 2) return instTable_.getEntry(InstId::c_mul);
 	  if (not isRv64())
@@ -1592,14 +1587,14 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  op0 = RegX0; op1 = cjf.immed(); op2 = 0;
 	  return instTable_.getEntry(InstId::c_j);
 	}
-	  
+
       if (funct3 == 6) // c.beqz
 	{
 	  CbFormInst cbf(inst);
 	  op0=8+cbf.bits.rs1p; op1=RegX0; op2=cbf.immed();
 	  return instTable_.getEntry(InstId::c_beqz);
 	}
-      
+
       // funct3 == 7: c.bnez
       CbFormInst cbf(inst);
       op0 = 8+cbf.bits.rs1p; op1=RegX0; op2=cbf.immed();
@@ -1635,7 +1630,7 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  return instTable_.getEntry(InstId::c_lwsp);
 	}
 
-      else if (funct3 == 3)  // c.ldsp  c.flwsp
+      if (funct3 == 3)  // c.ldsp  c.flwsp
 	{
 	  CiFormInst cif(inst);
 	  unsigned rd = cif.bits.rd;
@@ -1668,19 +1663,18 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	      op0 = rd; op1 = RegX0; op2 = rs2;
 	      return instTable_.getEntry(InstId::c_mv);
 	    }
-	  else  // c.ebreak, c.jalr or c.add 
-	    {
-	      if (rs2 == RegX0)
-		{
-		  if (rd == RegX0)
-		    return instTable_.getEntry(InstId::c_ebreak);
-		  op0 = RegRa; op1 = rd; op2 = 0;
-		  return instTable_.getEntry(InstId::c_jalr);
-		}
-	      op0 = rd; op1 = rd; op2 = rs2;
-	      return instTable_.getEntry(InstId::c_add);
-	    }
-	}
+
+          // c.ebreak, c.jalr or c.add
+          if (rs2 == RegX0)
+            {
+              if (rd == RegX0)
+                return instTable_.getEntry(InstId::c_ebreak);
+              op0 = RegRa; op1 = rd; op2 = 0;
+              return instTable_.getEntry(InstId::c_jalr);
+            }
+          op0 = rd; op1 = rd; op2 = rs2;
+          return instTable_.getEntry(InstId::c_add);
+        }
 
       if (funct3 == 5)  // c.fsdsp c.sqsp
 	{
@@ -1860,14 +1854,12 @@ Decoder::expandCompressedInst(uint16_t inst) const
               encodeAddiw(op0, op1, op2, expanded);
               return expanded;
 	    }
-	  else
-	    {
-	      CjFormInst cjf(inst);
-	      op0 = RegRa; op1 = cjf.immed(); op2 = 0;
-              encodeJal(op0, op1, op2, expanded);
-              return expanded;
-	    }
-	}
+
+          CjFormInst cjf(inst);
+          op0 = RegRa; op1 = cjf.immed(); op2 = 0;
+          encodeJal(op0, op1, op2, expanded);
+          return expanded;
+        }
 
       if (funct3 == 2)  // c.li
 	{
@@ -1932,9 +1924,9 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  op0 = rd; op1 = rd; op2 = rs2;
 	  if ((immed & 0x20) == 0)  // Bit 5 of immed
 	    {
-	      if      (imm34 == 0)   encodeSub(op0, op1, op2, expanded);
-	      else if (imm34 == 1)   encodeXor(op0, op1, op2, expanded);
-	      else if (imm34 == 2)   encodeOr(op0, op1, op2, expanded);
+              if      (imm34 == 0)   encodeSub(op0, op1, op2, expanded);
+              else if (imm34 == 1)   encodeXor(op0, op1, op2, expanded);
+              else if (imm34 == 2)   encodeOr(op0, op1, op2, expanded);
               else if (imm34 == 3)   encodeAnd(op0, op1, op2, expanded);
               return expanded;
 	    }
@@ -1976,7 +1968,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  encodeJal(op0, op1, op2, expanded);
           return expanded;
 	}
-	  
+
       if (funct3 == 6) // c.beqz
 	{
 	  CbFormInst cbf(inst);
@@ -1984,7 +1976,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  encodeBeq(op0, op1, op2, expanded);
           return expanded;
 	}
-      
+
       // funct3 == 7: c.bnez
       CbFormInst cbf(inst);
       op0 = 8+cbf.bits.rs1p; op1=RegX0; op2=cbf.immed();
@@ -2024,7 +2016,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
           return expanded;
 	}
 
-      else  if (funct3 == 3)  // c.ldsp  c.flwsp
+      if (funct3 == 3)  // c.ldsp  c.flwsp
 	{
 	  CiFormInst cif(inst);
 	  unsigned rd = cif.bits.rd;
@@ -2061,24 +2053,22 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	      encodeAdd(op0, op1, op2, expanded);
               return expanded;
 	    }
-	  else  // c.ebreak, c.jalr or c.add 
-	    {
-	      if (rs2 == RegX0)
-		{
-		  if (rd == RegX0)
-                    {
-                      encodeEbreak(op0, op1, op2, expanded);
-                      return expanded;
-                    }
-		  op0 = RegRa; op1 = rd; op2 = 0;
-		  encodeJalr(op0, op1, op2, expanded);
+	  // c.ebreak, c.jalr or c.add
+          if (rs2 == RegX0)
+            {
+              if (rd == RegX0)
+                {
+                  encodeEbreak(op0, op1, op2, expanded);
                   return expanded;
-		}
-	      op0 = rd; op1 = rd; op2 = rs2;
-	      encodeAdd(op0, op1, op2, expanded);
+                }
+              op0 = RegRa; op1 = rd; op2 = 0;
+              encodeJalr(op0, op1, op2, expanded);
               return expanded;
-	    }
-	}
+            }
+          op0 = rd; op1 = rd; op2 = rs2;
+          encodeAdd(op0, op1, op2, expanded);
+          return expanded;
+        }
 
       if (funct3 == 5)  // c.fsdsp c.sqsp
 	{
@@ -2309,11 +2299,11 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		// Spec says that reserved sfence.fm field values should be treated as zero.
 		return instTable_.getEntry(InstId::fence);
               }
-            else if (funct3 == 1)
+            if (funct3 == 1)
               {
 		return instTable_.getEntry(InstId::fence_i);
               }
-            else if (funct3 == 2)
+            if (funct3 == 2)
               {
                 if (imm == 0 and rd == 0)
                   return instTable_.getEntry(InstId::cbo_inval);
@@ -2335,8 +2325,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             op2 = iform.immed();
             unsigned funct3 = iform.fields.funct3;
 
-            if      (funct3 == 0)  return instTable_.getEntry(InstId::addi);
-            else if (funct3 == 1)
+            if (funct3 == 0)  return instTable_.getEntry(InstId::addi);
+            if (funct3 == 1)
               {
                 if (op2 == 0x100)
                   return instTable_.getEntry(InstId::sha256sum0);
@@ -2366,7 +2356,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     op2 = amt;
                     return instTable_.getEntry(InstId::slli);
                   }
-                else if (top5 == 1)
+                if (top5 == 1)
                   {
                     unsigned top6 = iform.uimmed() >> 6;
                     if (top6 == 2)
@@ -2483,7 +2473,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
             unsigned funct3 = iform.fields.funct3;
             if (funct3 == 0)
               return instTable_.getEntry(InstId::addiw);
-            else if (funct3 == 1)
+            if (funct3 == 1)
               {
                 if (iform.top7() == 0)
                   {
@@ -2500,9 +2490,9 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     unsigned amt = iform.uimmed() & 0x7f;
                     if (amt == 0)
                       return instTable_.getEntry(InstId::clzw);
-                    else if (amt == 1)
+                    if (amt == 1)
                       return instTable_.getEntry(InstId::ctzw);
-                    else if (amt == 2)
+                    if (amt == 2)
                       return instTable_.getEntry(InstId::cpopw);
                   }
               }
@@ -2627,7 +2617,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (funct3 == 5) return instTable_.getEntry(InstId::minu);
                 if (funct3 == 7) return instTable_.getEntry(InstId::maxu);
               }
-	    else if (funct7 == 7)
+            else if (funct7 == 7)
 	      {
 		if (funct3 == 5) return instTable_.getEntry(InstId::czero_eqz);
 		if (funct3 == 7) return instTable_.getEntry(InstId::czero_nez);
@@ -2909,25 +2899,23 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     {
                       if (op1 != 0 or op0 != 0)
                         return instTable_.getEntry(InstId::illegal);
-                      else if (op2 == 0)
+                      if (op2 == 0)
                         return instTable_.getEntry(InstId::ecall);
-                      else if (op2 == 1)
+                      if (op2 == 1)
                         return instTable_.getEntry(InstId::ebreak);
-                      else if (op2 == 0x0d and op0 == 0 and op1 == 0)
+                      if (op2 == 0x0d and op0 == 0 and op1 == 0)
                         return instTable_.getEntry(InstId::wrs_nto);
-                      else if (op2 == 0x1d and op0 == 0 and op1 == 0)
+                      if (op2 == 0x1d and op0 == 0 and op1 == 0)
                         return instTable_.getEntry(InstId::wrs_sto);
                     }
                   else if (funct7 == 9)
                     {
                       if (op0 != 0)
                         return instTable_.getEntry(InstId::illegal);
-                      else // sfence.vma
-                        {
-                          op0 = iform.fields.rs1;
-                          op1 = iform.rs2();
-                          return instTable_.getEntry(InstId::sfence_vma);
-                        }
+                      // sfence.vma
+                      op0 = iform.fields.rs1;
+                      op1 = iform.rs2();
+                      return instTable_.getEntry(InstId::sfence_vma);
                     }
                   else if (funct7 == 0xb and op0 == 0)
                     {

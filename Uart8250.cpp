@@ -1,3 +1,4 @@
+#include <cassert>
 #include <iostream>
 #include <unistd.h>
 #include <poll.h>
@@ -84,10 +85,10 @@ Uart8250::write(uint64_t addr, uint32_t value)
 	{
 	case 0:
 	    {
-	      value &= 0xff;
-	      if (value)
+	      int c = static_cast<int>(value & 0xff);
+	      if (c)
 		{
-		  putchar(value);
+		  putchar(c);
 		  fflush(stdout);
 		}
 	    }

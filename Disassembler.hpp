@@ -20,12 +20,12 @@
 #include <unordered_map>
 #include "IntRegNames.hpp"
 #include "FpRegNames.hpp"
-#include "DecodedInst.hpp"
 
 
 namespace WdRiscv
 {
 
+  class DecodedInst;
   class Decoder;
 
   /// Disassemble a decoded instruction.
@@ -33,11 +33,9 @@ namespace WdRiscv
   {
   public:
 
-    Disassembler()
-    { }
+    Disassembler() = default;
 
-    ~Disassembler()
-    { }
+    ~Disassembler() = default;
 
     /// Enable/disable use of abi-names when priting register names.
     /// For example: We print "x2" when abi names are disabled and
@@ -79,7 +77,7 @@ namespace WdRiscv
 
     /// Set a callback to obtain the abi CSR name.
     void setCsrNameCallback(std::function<std::string_view(unsigned)> callback)
-    { csrNameCallback_ = callback; }
+    { csrNameCallback_ = std::move(callback); }
 
   protected:
 

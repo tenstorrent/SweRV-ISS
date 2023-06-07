@@ -21,7 +21,7 @@ using namespace WdRiscv;
 void
 InstProfiles::configure()
 {
-  unsigned instCount = unsigned(InstId::maxId) + 1;
+  std::size_t instCount = unsigned(InstId::maxId) + 1;
 
   // For vector instructions, we track each combination of
   // instruction id and vector element size (for size = 8, 16, 32,
@@ -29,7 +29,7 @@ InstProfiles::configure()
   // each size). First copy is used for regular instructions and
   // for vector element size 8. Remaining are for vec elem sizes
   // 16, 32, and 64.
-  unsigned sizeCount = unsigned(ElementWidth::Word2) + 1;
+  std::size_t sizeCount = unsigned(ElementWidth::Word2) + 1;
   vec_.resize(instCount*sizeCount);
 
   unsigned regCount = 32;

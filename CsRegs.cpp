@@ -79,7 +79,7 @@ CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
       return nullptr;
     }
 
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
   PrivilegeMode priv = PrivilegeMode((ix & 0x300) >> 8);
   if (priv != PrivilegeMode::Reserved)
     csr.definePrivilegeMode(priv);
@@ -224,7 +224,7 @@ template <typename URV>
 URV
 CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     {
@@ -265,7 +265,7 @@ template <typename URV>
 URV
 CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
       (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
@@ -296,7 +296,7 @@ template <typename URV>
 bool
 CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   auto csr = getImplementedCsr(num, virtMode_);
   if (not csr)
@@ -354,7 +354,7 @@ CsRegs<URV>::readSignExtend(CsrNumber number, PrivilegeMode mode, URV& value) co
   URV mask = csr->getWriteMask();
   unsigned lz = std::countl_zero(mask);
 
-  typedef typename std::make_signed_t<URV> SRV;
+  using SRV = typename std::make_signed_t<URV>;
   SRV svalue = value;
   svalue = (svalue << lz) >> lz;
   value = svalue;
@@ -368,7 +368,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 {
   superEnabled_ = flag;
 
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
 		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
@@ -401,20 +401,19 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
-  auto stimecmp = findCsr(CN::STIMECMP);
-  if (sstcEnabled_ and stimecmp)
-    stimecmp->setImplemented(flag);
+  enableSstc(sstcEnabled_);  // To activate/deactivate STIMECMP.
 
   if (not flag)
     return;
 
-  typedef InterruptCause IC;
+  using IC = InterruptCause;
 
   // In MIP, make writable/pokable bits corresponding to SEIP/STIP/SSIP
   // (supervisor external/timer/software interrupt pending).
   // STIP is writeable only if the supervisor time compare register is not
   // implemented.
   URV maskExtra = URV(1) << unsigned(IC::S_EXTERNAL);
+  auto stimecmp = getImplementedCsr(CN::STIMECMP);
   if (not stimecmp or not stimecmp->isImplemented())
     maskExtra |= URV(1) << unsigned(IC::S_TIMER);
   maskExtra |= URV(1) << unsigned(IC::S_SOFTWARE);
@@ -450,7 +449,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 {
   hyperEnabled_ = flag;
 
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
   for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
 	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
 	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH,
@@ -632,7 +631,7 @@ template <typename URV>
 bool
 CsRegs<URV>::writeSipSie(CsrNumber num, URV value)
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   if (num == CN::SIP or num == CN::SIE)
     {
@@ -667,7 +666,7 @@ template <typename URV>
 bool
 CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     {
@@ -719,7 +718,7 @@ template <typename URV>
 bool
 CsRegs<URV>::writeHstateen(CsrNumber num, URV value)
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
       (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
@@ -763,7 +762,7 @@ template <typename URV>
 bool
 CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   Csr<URV>* csr = getImplementedCsr(num, virtMode_);
   if (not csr or mode < csr->privilegeMode() or csr->isReadOnly())
@@ -1698,7 +1697,7 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
 
-  typedef ExceptionCause EC;
+  using EC = ExceptionCause;
   URV zero = ((1 << unsigned(EC::S_ENV_CALL))               |
               (1 << unsigned(EC::VS_ENV_CALL))              |
               (1 << unsigned(EC::M_ENV_CALL))               |
@@ -1712,7 +1711,7 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 
-  typedef InterruptCause IC;
+  using IC = InterruptCause;
   zero = ((1 << unsigned(IC::S_SOFTWARE))  |
           (1 << unsigned(IC::S_TIMER))     |
           (1 << unsigned(IC::S_EXTERNAL))  |
@@ -2103,7 +2102,7 @@ template <typename URV>
 bool
 CsRegs<URV>::poke(CsrNumber num, URV value)
 {
-  typedef CsrNumber CN;
+  using CN = CsrNumber;
 
   Csr<URV>* csr = getImplementedCsr(num, virtMode_);
   if (not csr)

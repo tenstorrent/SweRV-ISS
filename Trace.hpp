@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "DecodedInst.hpp"
 #include "Hart.hpp"
 
 namespace WdRiscv
@@ -229,7 +230,7 @@ namespace WdRiscv
 
     /// TODO: modified regs
     /// Return the list of CSR address-value pairs modified after last executed instruction.
-    typedef std::pair<URV, URV> CVP;  // CSR-value pair
+    using CVP = std::pair<URV, URV>;  // CSR-value pair
     void getModifiedCsrs(std::vector<CVP>& cvps) const
     {
       URV value;

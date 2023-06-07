@@ -22,9 +22,7 @@
 using namespace WdRiscv;
 
 
-SparseMem::SparseMem()
-{
-}
+SparseMem::SparseMem() = default;
 
 
 SparseMem::~SparseMem() = default;
@@ -180,10 +178,10 @@ SparseMem::getUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& vec) const
   vec.clear();
   vec.reserve(pageMap_.size());
 
-  typedef std::pair<uint64_t, uint64_t> Pair;
+  using Pair = std::pair<uint64_t, uint64_t>;
 
-  for (auto kv : pageMap_)
-    vec.push_back(Pair{kv.first*pageSize_, pageSize_});
+  for (const auto& kv : pageMap_)
+    vec.emplace_back(kv.first*pageSize_, pageSize_);
 
   std::sort(vec.begin(), vec.end(), [] (const Pair& a, const Pair& b) {
     return a.first < b.first;

@@ -22,8 +22,6 @@
 #include <atomic>
 #include <cstring>
 #include <ctime>
-#include <boost/format.hpp>
-#include <sys/time.h>
 #include <poll.h>
 #include <sys/ioctl.h>
 
@@ -83,10 +81,9 @@ parseNumber(std::string_view numberStr, TYPE& number)
 template <typename URV>
 Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
-    fpRegs_(32), vecRegs_(), syscall_(*this),
-    pmpManager_(memory.size(), 1024*1024),
-    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16),
-    isa_()
+    fpRegs_(32), syscall_(*this),
+    pmpManager_(memory.size(), UINT64_C(1024)*1024),
+    virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16)
 {
   // Enable default extensions
   for (RvExtension ext : { RvExtension::C,
@@ -312,6 +309,12 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "register but extension is not supported "
 		    << "-- ignored\n";
       }
+
+  bool sstc = false;
+  if (isRvs())
+    sstc = isRvsstc();
+  csRegs_.enableSstc(sstc);
+  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != NULL;
 
   enableRvzba(isa_.isEnabled(RvExtension::Zba));
   enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
@@ -1476,7 +1479,8 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
-  typedef PrivilegeMode PM; typedef ExceptionCause EC;
+  using EC = ExceptionCause;
+  using PM = PrivilegeMode;
 
   // If misaligned exception has priority take exception.
   if (misal)
@@ -1569,7 +1573,7 @@ bool
 Hart<URV>::fastLoad(uint64_t addr, uint64_t& value)
 {
   // Unsigned version of LOAD_TYPE
-  typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
+  using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   ULT uval = 0;
   if (memory_.read(addr, uval))
@@ -1636,7 +1640,7 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
     }
 
   // Unsigned version of LOAD_TYPE
-  typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
+  using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   uint64_t addr1 = virtAddr;
   uint64_t addr2 = addr1;
@@ -1813,7 +1817,7 @@ readCharNonBlocking(int fd)
     return 0;
 
   char c = 0;
-  int code = ::read(fd, &c, sizeof(c));
+  std::ptrdiff_t code = ::read(fd, &c, sizeof(c));
   if (code == 1)
     return c;
 
@@ -2401,7 +2405,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2)
 bool
 isGvaTrap(unsigned causeCode)
 {
-  typedef ExceptionCause EC;
+  using EC = ExceptionCause;
 
   EC cause = EC{causeCode};
   switch (cause)
@@ -2440,7 +2444,7 @@ isGvaTrap(unsigned causeCode)
 bool
 isGpaTrap(unsigned causeCode)
 {
-  typedef ExceptionCause EC;
+  using EC = ExceptionCause;
 
   EC cause = EC{causeCode};
   switch (cause)
@@ -2463,7 +2467,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 
   bool origVirtMode = virtMode_;
 
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
   PM origMode = privMode_;
 
   // Traps are taken in machine mode.
@@ -2471,7 +2475,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   PM nextMode = PM::Machine;
   virtMode_ = false;
 
-  typedef InterruptCause IC;
+  using IC = InterruptCause;
 
   // But they can be delegated to supervisor.
   if (isRvs() and origMode != PM::Machine)
@@ -3258,22 +3262,22 @@ addToSignedHistogram(std::vector<uintmax_t>& histo, int64_t val)
 
   if (val < 0)
     {
-      if      (val <= -64*1024) histo.at(0)++;
-      else if (val <= -1024)    histo.at(1)++;
-      else if (val <= -16)      histo.at(2)++;
-      else if (val < -2)        histo.at(3)++;
-      else if (val == -2)       histo.at(4)++;
-      else if (val == -1)       histo.at(5)++;
+      if      (val <= INT64_C(-64)*1024) histo.at(0)++;
+      else if (val <= -1024)             histo.at(1)++;
+      else if (val <= -16)               histo.at(2)++;
+      else if (val < -2)                 histo.at(3)++;
+      else if (val == -2)                histo.at(4)++;
+      else if (val == -1)                histo.at(5)++;
     }
   else
     {
-      if      (val == 0)       histo.at(6)++;
-      else if (val == 1)       histo.at(7)++;
-      else if (val == 2)       histo.at(8)++;
-      else if (val <= 16)      histo.at(9)++;
-      else if (val <= 1024)    histo.at(10)++;
-      else if (val <= 64*1024) histo.at(11)++;
-      else                     histo.at(12)++;
+      if      (val == 0)                histo.at(6)++;
+      else if (val == 1)                histo.at(7)++;
+      else if (val == 2)                histo.at(8)++;
+      else if (val <= 16)               histo.at(9)++;
+      else if (val <= 1024)             histo.at(10)++;
+      else if (val <= INT64_C(64)*1024) histo.at(11)++;
+      else                              histo.at(12)++;
     }
 }
 
@@ -3284,13 +3288,11 @@ addToUnsignedHistogram(std::vector<uintmax_t>& histo, uint64_t val)
   if (histo.size() < 13)
     histo.resize(13);
 
-  if      (val == 0)       histo.at(0)++;
-  else if (val == 1)       histo.at(1)++;
-  else if (val == 2)       histo.at(2)++;
-  else if (val <= 16)      histo.at(3)++;
-  else if (val <= 1024)    histo.at(4)++;
-  else if (val <= 64*1024) histo.at(5)++;
-  else                     histo.at(6)++;
+  if      (val <= 2)                 histo.at(val)++;
+  else if (val <= 16)                histo.at(3)++;
+  else if (val <= 1024)              histo.at(4)++;
+  else if (val <= UINT64_C(64)*1024) histo.at(5)++;
+  else                               histo.at(6)++;
 }
 
 
@@ -3598,7 +3600,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
       else if (rdType == OperandType::VecReg)
 	{
 	  prof.destRegFreq_.at(di.op0())++; opIx++;
-	  rd = di.op0();
+	  rd = static_cast<int>(di.op0());
 	  // unsigned groupX8 = 8;
 	  // rd = vecRegs_.getLastWrittenReg(groupX8); 
 	  // assert(rd == di.op0());    // Does not work for load seg.
@@ -3736,7 +3738,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	}
       else if (info.ithOperandType(i) == OperandType::Imm)
         {
-          int32_t imm = di.ithOperand(i);
+          int32_t imm = static_cast<int32_t>(di.ithOperand(i));
           prof.hasImm_ = true;
           if (prof.freq_ == 1)
             {
@@ -3935,7 +3937,7 @@ Hart<URV>::lastVecReg(const DecodedInst& di, unsigned& group) const
 
   // We want to report all the registers in the group.
   group  = (groupX8 >= 8) ? groupX8/8 : 1;
-  vecReg = di.op0();  // Make sure we have 1st reg in group.
+  vecReg = static_cast<int>(di.op0());  // Make sure we have 1st reg in group.
   if ((instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v) or
       (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v))
     group = group*di.vecFieldCount();  // Scale by field count
@@ -4632,8 +4634,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (possible == 0)
     return false;  // Nothing enabled that is also pending.
 
-  typedef InterruptCause IC;
-  typedef PrivilegeMode PM;
+  using IC = InterruptCause;
+  using PM = PrivilegeMode;
 
   URV delegVal = csRegs_.peekMideleg();
   URV hDelegVal = csRegs_.peekHideleg();
@@ -4718,39 +4720,52 @@ template <typename URV>
 bool
 Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 {
+  using IC = InterruptCause;
+
   // If mip poked exernally we avoid over-writing it for 1 instruction.
   if (not mipPoked_)
     {
       URV mipVal = csRegs_.peekMip();
       URV prev = mipVal;
 
-      for (auto dev : memory_.ioDevs_)
+      for (const auto& dev : memory_.ioDevs_)
 	if (dev->isInterruptPending())
 	  {
-	    mipVal |=  (URV(1) << URV(InterruptCause::M_EXTERNAL)) | (URV(1) << URV(InterruptCause::S_EXTERNAL));
+	    mipVal |=  (URV(1) << URV(IC::M_EXTERNAL)) | (URV(1) << URV(IC::S_EXTERNAL));
 	    dev->setInterruptPending(false);
 	  }
 
       if (hasClint())
 	{
-	  // TODO: We should issue S_TIMER, M_TIMER or both based on configuration.
+	  // Deliver/clear machine timer interrupt from clint.
 	  if ((instCounter_ >> counterToTimeShift_) >= clintAlarm_)
-	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER))
-                            | (URV(1) << URV(InterruptCause::S_TIMER));
+	    mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
 	  else
-	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER)) & ~(URV(1) << URV(InterruptCause::S_TIMER));
+	    mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
+	}
+      else
+	{
+	  // Deliver/clear machine timer interrupt from periodic alarm.
+	  bool hasAlarm = alarmLimit_ != ~uint64_t(0);
+	  if (hasAlarm)
+	    {
+	      if (instCounter_ >= alarmLimit_)
+		{
+		  alarmLimit_ += alarmInterval_;
+		  mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
+		}
+	      else
+		mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
+	    }
 	}
 
-      bool hasAlarm = alarmLimit_ != ~uint64_t(0);
-      if (hasAlarm)
+      // Deliver/clear supervisor timer from stimecmp CSR.
+      if (stimecmpActive_)
 	{
-	  if (instCounter_ >= alarmLimit_)
-	    {
-	      alarmLimit_ += alarmInterval_;
-	      mipVal = mipVal | (URV(1) << URV(InterruptCause::M_TIMER));
-	    }
+	  if ((instCounter_ >> counterToTimeShift_) >= stimecmp_)
+	    mipVal = mipVal | (URV(1) << URV(IC::S_TIMER));
 	  else
-	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_TIMER));
+	    mipVal = mipVal & ~(URV(1) << URV(IC::S_TIMER));
 	}
 
       if (mipVal != prev)
@@ -9746,7 +9761,7 @@ template <typename URV>
 void
 Hart<URV>::execWfi(const DecodedInst* di)
 {
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
   auto pm = privilegeMode();
 
   if (pm == PM::User and isRvs())
@@ -9826,7 +9841,7 @@ template <typename URV>
 bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& value)
 {
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
 
   // Check if HS qualified (section 9.6.1 of privileged spec).
   bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor);
@@ -9842,16 +9857,11 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	      if (hsq) virtualInst(di); else illegalInst(di);
 	      return false;
 	    }
-	  else
-	    {
-	      if (sizeof(URV) == 4)
-		{
-		  if (hsq) virtualInst(di); else illegalInst(di);
-		}
-	      else
-		illegalInst(di);
-	    }
-	}
+          if (sizeof(URV) == 4 and hsq)
+            virtualInst(di);
+          else
+            illegalInst(di);
+        }
     }
 
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
@@ -9900,7 +9910,7 @@ template <typename URV>
 bool
 Hart<URV>::isCsrWriteable(CsrNumber csr) const
 {
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
 
   if (virtMode_)
     {
@@ -9940,7 +9950,7 @@ void
 Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
                       unsigned intReg, URV intRegVal)
 {
-  typedef PrivilegeMode PM;
+  using PM = PrivilegeMode;
 
   if (not isCsrWriteable(csr))
     {
@@ -10314,7 +10324,8 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   bool misal = addr1 & alignMask;
   misalignedLdSt_ = misal;
 
-  typedef PrivilegeMode PM; typedef ExceptionCause EC;
+  using EC = ExceptionCause;
+  using PM = PrivilegeMode;
 
   // If misaligned exception has priority take exception.
   if (misal)
@@ -10475,7 +10486,7 @@ namespace WdRiscv
       }
 
     int64_t a = int32_t(intRegs_.read(di->op1()));
-    uint64_t b = uint32_t(intRegs_.read(di->op2()));
+    int64_t b = uint32_t(intRegs_.read(di->op2()));
     int64_t c = a * b;
     int32_t high = static_cast<int32_t>(c >> 32);
 
@@ -10747,7 +10758,7 @@ Hart<URV>::execSlliw(const DecodedInst* di)
     }
 
   int32_t word = int32_t(intRegs_.read(di->op1()));
-  word <<= amount;
+  word <<= static_cast<int>(amount);
 
   SRV value = word; // Sign extend to 64-bit.
   intRegs_.write(di->op0(), value);
@@ -10799,7 +10810,7 @@ Hart<URV>::execSraiw(const DecodedInst* di)
     }
 
   int32_t word = int32_t(intRegs_.read(di->op1()));
-  word >>= amount;
+  word >>= static_cast<int>(amount);
 
   SRV value = word; // Sign extend to 64-bit.
   intRegs_.write(di->op0(), value);
@@ -10905,7 +10916,7 @@ Hart<URV>::execSraw(const DecodedInst* di)
     }
 
   int32_t word = int32_t(intRegs_.read(di->op1()));
-  uint32_t shift = uint32_t(intRegs_.read(di->op2()) & 0x1f);
+  int32_t shift = int32_t(intRegs_.read(di->op2()) & 0x1f);
   word >>= shift;
   SRV value = word;  // sign extend to 64-bits
   intRegs_.write(di->op0(), value);

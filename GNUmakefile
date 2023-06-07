@@ -78,7 +78,7 @@ RM := rm -rf
 OFLAGS := -O3
 
 # Include paths.
-IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -I. -Ithird_party
+IFLAGS := $(addprefix -isystem ,$(BOOST_INC)) -isystem third_party -I.
 
 # Command to compile .cpp files.
 override CXXFLAGS += -MMD -MP $(ARCH_FLAGS) -std=c++20 $(OFLAGS) $(IFLAGS) -fPIC -pedantic -Wall -Wextra -Wformat -Wwrite-strings

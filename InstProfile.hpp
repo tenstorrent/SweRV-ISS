@@ -54,8 +54,7 @@ namespace WdRiscv
   {
   public:
 
-    InstProfiles()
-    { }
+    InstProfiles() = default;
 
     void configure();
 
@@ -64,8 +63,8 @@ namespace WdRiscv
 
     InstProfile* find(InstId id, ElementWidth width)
     {
-      unsigned base = unsigned(InstId::maxId) + 1;
-      unsigned multiplier = unsigned(width);
+      size_t base = unsigned(InstId::maxId) + 1;
+      size_t multiplier = unsigned(width);
       size_t ix = base*multiplier + size_t(id);
       return ix < vec_.size()? &vec_.at(ix) : nullptr;
     }

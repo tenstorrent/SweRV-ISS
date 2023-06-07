@@ -23,7 +23,7 @@
 
 
 static
-int
+std::ptrdiff_t
 putDebugChar(char c, int fd)
 {
   return write(fd, &c, sizeof(uint8_t));

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string_view>
 #include "Mcm.hpp"
 #include "System.hpp"
 #include "Hart.hpp"
@@ -37,9 +38,7 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned mergeBufferSize)
 
 
 template <typename URV>
-Mcm<URV>::~Mcm()
-{
-}
+Mcm<URV>::~Mcm() = default;
 
 
 template <typename URV>
@@ -204,7 +203,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
   if (di.operandCount() == 0)
     return;
 
-  const auto instEntry = di.instEntry();
+  const auto* instEntry = di.instEntry();
 
   //if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
   //return; // Destination is x0.
@@ -446,7 +445,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
 
 static void
-reportMismatch(uint64_t hartId, uint64_t time, std::string tag, uint64_t addr,
+reportMismatch(uint64_t hartId, uint64_t time, std::string_view tag, uint64_t addr,
 	       uint64_t rtlData, uint64_t whisperData)
 {
   cerr << "Error: Mismatch on " << tag << " time=" << time
@@ -824,7 +823,7 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
     {
       if (opIx >= sysMemOps_.size())
 	continue;
-      auto& op = sysMemOps_.at(opIx);
+      const auto& op = sysMemOps_.at(opIx);
       if (op.isRead_)
 	continue;
 
@@ -902,7 +901,7 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
     {
       if (opIx >= sysMemOps_.size())
 	continue;
-      auto& op = sysMemOps_.at(opIx);
+      const auto& op = sysMemOps_.at(opIx);
       if (op.isRead_)
 	continue;
 
@@ -946,7 +945,7 @@ Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
     {
       if (opIx >= sysMemOps_.size())
 	continue;
-      auto& op = sysMemOps_.at(opIx);
+      const auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
 
@@ -1232,7 +1231,7 @@ Mcm<URV>::identifyRegisters(const DecodedInst& di,
   if (not di.isValid())
     return;
 
-  const auto entry = di.instEntry();
+  const auto* entry = di.instEntry();
   if (not entry)
     {
       cerr << "Mcm::identifyRegisters: Error invalid instr entry\n";
@@ -1282,7 +1281,7 @@ Mcm<URV>::instrHasRead(const McmInstr& instr) const
     {
       if (opIx >= sysMemOps_.size())
 	continue;
-      auto& op = sysMemOps_.at(opIx);
+      const auto& op = sysMemOps_.at(opIx);
       if (op.isRead_)
 	return true;
     }
@@ -1298,7 +1297,7 @@ Mcm<URV>::instrHasWrite(const McmInstr& instr) const
     {
       if (opIx >= sysMemOps_.size())
 	continue;
-      auto& op = sysMemOps_.at(opIx);
+      const auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	return true;
     }

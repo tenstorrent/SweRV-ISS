@@ -175,7 +175,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
     }
 
   // Unsigned version of LOAD_TYPE
-  typedef typename std::make_unsigned<LOAD_TYPE>::type ULT;
+  using ULT = typename std::make_unsigned<LOAD_TYPE>::type;
 
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
   uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;

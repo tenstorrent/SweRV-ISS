@@ -17,11 +17,10 @@
 #include <cstdint>
 #include <cstddef>
 #include <vector>
-#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <type_traits>
 #include <cassert>
-#include <string>
 #include "trapEnums.hpp"
 
 

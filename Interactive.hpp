@@ -14,15 +14,21 @@
 
 #pragma once
 
+#include <cstdint>
 #include <iosfwd>
 #include <unordered_map>
-#include "System.hpp"
-#include "Hart.hpp"
+#include <vector>
 #include "util.hpp"
 
 
 namespace WdRiscv
 {
+
+  template <typename URV>
+  class Hart;
+
+  template <typename URV>
+  class System;
 
   /// Manage an interactive session. To use: Construct an instance
   /// with one or more harts then invoke the interact method which
@@ -144,7 +150,7 @@ namespace WdRiscv
 		     FILE* commandLog,
 		     std::ifstream& replayStream, bool& done);
 
-    typedef std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>> StringMap;
+    using StringMap = std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>>;
 
     /// Process time=<number>, and/or hart=<number>
     /// tokens present in an interactive command. Update time_,

@@ -31,6 +31,8 @@ namespace WdRiscv
   class RegNamesTemplate
   {
   public:
+    RegNamesTemplate() = delete;
+
     /// Set ix to the number of the register corresponding to the
     /// given name returning true on success and false if no such
     /// register.  For example, if name is "x2" then ix will be set to
@@ -84,8 +86,6 @@ namespace WdRiscv
 
       return result;
     }
-
-    RegNamesTemplate() = delete;
 
     static inline constexpr const char unknown_[]       = {PREFIX_CHAR, '?', 0};
     static inline constexpr auto       numberToName_    = util::make_reg_name_array<NUM_REGS, PREFIX_CHAR>::value;

@@ -311,15 +311,12 @@ auto fpConvertTo(From x)
           softfloat_exceptionFlags = old_flags | softfloat_flag_invalid;
           return std::numeric_limits<To>::max();
         }
-      else if (std::is_signed<To>::value && result < std::numeric_limits<To>::min())
+      if (std::is_signed<To>::value && result < std::numeric_limits<To>::min())
         {
           softfloat_exceptionFlags = old_flags | softfloat_flag_invalid;
           return std::numeric_limits<To>::min();
         }
-      else
-        {
-          return result;
-        }
+      return result;
     }
   else if constexpr (std::is_same<To, int32_t>::value)
     {

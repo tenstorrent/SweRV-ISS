@@ -14,6 +14,7 @@
 
 
 #include <algorithm>
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -22,21 +23,15 @@
 
 using namespace WdRiscv;
 
-inline bool
-isPowerOf2(uint64_t x)
-{
-  return x != 0 and (x & (x-1)) == 0;
-}
-
 
 Cache::Cache(uint64_t totalSize, unsigned lineSize, unsigned setSize)
   : size_(totalSize), lineSize_(lineSize), setSize_(setSize)
 {
-  assert(isPowerOf2(totalSize));
-  assert(isPowerOf2(setSize));
-  assert(isPowerOf2(lineSize));
+  assert(std::has_single_bit(totalSize));
+  assert(std::has_single_bit(setSize));
+  assert(std::has_single_bit(lineSize));
 
-  lineNumberShift_ = std::log2(lineSize);
+  lineNumberShift_ = std::bit_width(lineSize) - 1;
 
   assert(totalSize >= lineSize);
 
@@ -44,7 +39,7 @@ Cache::Cache(uint64_t totalSize, unsigned lineSize, unsigned setSize)
   assert(lineCount >= setSize);
 
   uint64_t count = lineCount / setSize;
-  assert(isPowerOf2(count));
+  assert(std::has_single_bit(count));
 
   setIndexMask_ = count - 1;
 

@@ -1,3 +1,4 @@
+#include "DecodedInst.hpp"
 #include "Hart.hpp"
 
 using namespace WdRiscv;

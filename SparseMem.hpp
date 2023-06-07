@@ -112,7 +112,7 @@ namespace WdRiscv
 
   private:
 
-    size_t pageSize_ = 4*1024;
+    size_t pageSize_ = UINT64_C(4)*1024;
     unsigned pageShift_ = 12;
     unsigned pageMask_ = 0xfff;
 

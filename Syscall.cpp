@@ -334,14 +334,14 @@ Syscall<URV>::reportOpenedFiles(std::ostream& out)
   if (not readPaths_.empty())
     {
       out << "Files opened for read:\n";
-      for (auto path : readPaths_)
+      for (const auto& path : readPaths_)
         out << "  " << path << '\n';
     }
 
   if (not writePaths_.empty())
     {
       out << "Files opened for write/read-write:\n";
-      for (auto path : writePaths_)
+      for (const auto& path : writePaths_)
         out << "  " << path << '\n';
     }
 }
@@ -760,7 +760,7 @@ Syscall<URV>::emulate()
 
 	// Linux getcwd system call returns count of bytes placed in buffer
 	// unlike the C-library interface which returns pointer to buffer.
-        memChanges_.push_back(AddrLen{rvBuff, len});
+        memChanges_.emplace_back(rvBuff, len);
         return len;
       }
 
@@ -790,7 +790,7 @@ Syscall<URV>::emulate()
 
               uint64_t written = writeHartMemory(hart_, ptr, a2, sizeof(fl));
               if (written)
-                memChanges_.push_back(AddrLen{a2, written});
+                memChanges_.emplace_back(a2, written);
               return written == sizeof(fl)? rc : SRV(-EINVAL);
 	    }
 
@@ -871,7 +871,7 @@ Syscall<URV>::emulate()
         if (not copyRvString(hart_, rvPath, path, sizeof(path)))
           return SRV(-EINVAL);
 
-        mode_t mode = a2;
+        int mode = a2;
         int flags = 0; // Should be a3
         int rc = faccessat(dirfd, path, mode, flags);
         return rc < 0 ? SRV(-errno) : rc;
@@ -959,7 +959,7 @@ Syscall<URV>::emulate()
           {
             ssize_t written = writeHartMemory(hart_, buff.data(), rvBuff, rc);
             if (written)
-              memChanges_.push_back(AddrLen{rvBuff, written});
+              memChanges_.emplace_back(rvBuff, written);
             return written == rc? rc : SRV(-EINVAL);
           }
 	return SRV(-errno);
@@ -969,11 +969,11 @@ Syscall<URV>::emulate()
     case 62:       // lseek
       {
 	int fd = effectiveFd(a0);
-	size_t offset = a1;
+	off_t offset = a1;
 	int whence = a2;
 
 	errno = 0;
-	int rc = lseek(fd, offset, whence);
+	ssize_t rc = lseek(fd, offset, whence);
 	return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -1029,7 +1029,7 @@ Syscall<URV>::emulate()
 
         ssize_t written = writeHartMemory(hart_, buff.data(), rvBuff, rc);
         if (written)
-          memChanges_.push_back(AddrLen{rvBuff, written});
+          memChanges_.emplace_back(rvBuff, written);
 	return  written == rc ? written : SRV(-EINVAL);
       }
 
@@ -1065,7 +1065,7 @@ Syscall<URV>::emulate()
 
         bool copyOk = true;
         size_t len = copyStatBufferToRiscv(hart_, buff, rvBuff, copyOk);
-        memChanges_.push_back(AddrLen{rvBuff, len});
+        memChanges_.emplace_back(rvBuff, len);
 	return copyOk? rc : SRV(-1);
       }
 
@@ -1083,7 +1083,7 @@ Syscall<URV>::emulate()
         bool copyOk  = true;
         size_t len = copyStatBufferToRiscv(hart_, buff, rvBuff, copyOk);
 
-        memChanges_.push_back(AddrLen{rvBuff, len});
+        memChanges_.emplace_back(rvBuff, len);
 	return copyOk? rc : SRV(-1);
       }
 
@@ -1140,7 +1140,7 @@ Syscall<URV>::emulate()
 
         ssize_t written = writeHartMemory(hart_, temp.data(), buffAddr, rc);
         if (written)
-          memChanges_.push_back(AddrLen{buffAddr, written});
+          memChanges_.emplace_back(buffAddr, written);
 	return written == rc? written : SRV(-EINVAL);
       }
 
@@ -1178,7 +1178,7 @@ Syscall<URV>::emulate()
         int flags = a3;
         int rc = utimensat(dirfd, path, spec, flags);
         if (rc >= 0)
-          memChanges_.push_back(AddrLen{rvTimeAddr, sizeof(spec)});
+          memChanges_.emplace_back(rvTimeAddr, sizeof(spec));
         return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -1208,7 +1208,7 @@ Syscall<URV>::emulate()
         size_t expected = 4*sizeof(URV);
 
         if (len)
-          memChanges_.push_back(AddrLen{a0, len});
+          memChanges_.emplace_back(a0, len);
 	
 	return (len == expected)? ticks : SRV(-EINVAL);
       }
@@ -1228,7 +1228,7 @@ Syscall<URV>::emulate()
             size_t len = writeHartMemory(hart_, reinterpret_cast<char*>(&uts),
                                          rvBuff, sizeof(uts));
             if (len)
-              memChanges_.push_back(AddrLen{rvBuff, len});
+              memChanges_.emplace_back(rvBuff, len);
             return len == sizeof(uts)? rc : SRV(-EINVAL);
           }
 	return SRV(-errno);
@@ -1264,7 +1264,7 @@ Syscall<URV>::emulate()
                 expected = 16; // uint64_t & unit64_t
               }
             if (len)
-              memChanges_.push_back(AddrLen{a0, len});
+              memChanges_.emplace_back(a0, len);
             if (len != expected)
               return SRV(-EINVAL);
 	  }
@@ -1273,7 +1273,7 @@ Syscall<URV>::emulate()
           {
             size_t len = copyTimezoneToRiscv(hart_, tz0, tzAddr);
             if (len)
-              memChanges_.push_back(AddrLen{a1, len});
+              memChanges_.emplace_back(a1, len);
             if (len != 2*sizeof(URV))
               return SRV(-EINVAL);
           }
@@ -1423,7 +1423,7 @@ Syscall<URV>::emulate()
         bool copyOk  = true;
         size_t len = copyStatBufferToRiscv(hart_, buff, rvBuff, copyOk);
 
-        memChanges_.push_back(AddrLen{rvBuff, len});
+        memChanges_.emplace_back(rvBuff, len);
 	return copyOk? rc : SRV(-1);
       }
     }
@@ -1645,7 +1645,7 @@ Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
       //print_mmap("remap2");
       return addr;
     }
-  else if(maymove)
+  if (maymove)
     {
       auto new_addr = mmap_alloc(new_size);
       for (uint64_t index=0; index<old_size; index+=uint64_t(sizeof(uint64_t)))
@@ -1659,9 +1659,7 @@ Syscall<URV>::mmap_remap(uint64_t addr, uint64_t old_size, uint64_t new_size,
       //print_mmap("remap3");
       return new_addr;
     }
-  else
-    return -1;
-
+  return -1;
 }
 
 
@@ -1676,18 +1674,18 @@ Syscall<URV>::getUsedMemBlocks(std::vector<AddrLen>& usedBlocks)
   uint64_t memSize = hart_.getMemorySize();
   if (memSize <= 0x400000000L)
     {
-      usedBlocks.push_back(AddrLen{0, memSize});
+      usedBlocks.emplace_back(0, memSize);
       return;
     }
 
   // This does not work for raw mode. This does not work if
   // stack size exeeds 8 Mb.
-  const uint64_t maxStackSize = 1024*1024*8;
-  usedBlocks.push_back(AddrLen{0, progBreak_});
+  const uint64_t maxStackSize = UINT64_C(1024)*1024*8;
+  usedBlocks.emplace_back(0, progBreak_);
   for(auto& it:mmap_blocks_)
     if(not it.second.free)
-      usedBlocks.push_back(AddrLen{it.first, it.second.length});
-  usedBlocks.push_back(AddrLen{memSize - maxStackSize, maxStackSize});
+      usedBlocks.emplace_back(it.first, it.second.length);
+  usedBlocks.emplace_back(memSize - maxStackSize, maxStackSize);
 }
 
 

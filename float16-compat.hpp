@@ -333,7 +333,7 @@ private:
               (sig + roundIncrement >= (1U << std::numeric_limits<float>::digits))))
       {
         if (not IS_CONSTANT_EVALUATED)
-        std::feraiseexcept(FE_OVERFLOW | FE_INEXACT);
+          std::feraiseexcept(FE_OVERFLOW | FE_INEXACT);
         return ((uint16_t{sign} << 15) | (uint16_t{EXP_MASK} << (NUM_SIGNIFICAND_BITS - 1))) - (not roundIncrement);
       }
 

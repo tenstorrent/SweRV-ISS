@@ -732,7 +732,7 @@ IFormInst::encodeFence(uint32_t pred, uint32_t succ)
   fields.funct3 = 0;
   fields.rs1 = 0;
 
-  fields.imm = ((pred << 4) | succ) & 0xff;
+  fields.imm = static_cast<int>(((pred << 4) | succ) & 0xff);
 
   return true;
 }
@@ -752,11 +752,7 @@ IFormInst::encodeCsrrw(uint32_t rd, uint32_t rs1, uint32_t csr)
   fields.funct3 = 1;
   fields.rs1 = rs1 & 0x1f;
 
-  // Csr value checked in preceding code.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wconversion"
-  fields.imm = csr & 0xfff;
-#pragma GCC diagnostic pop
+  fields.imm = static_cast<int>(csr & 0xfff);
 
   return true;
 }
@@ -1410,7 +1406,7 @@ bool
 WdRiscv::encodeLui(uint32_t rd, uint32_t immed, uint32_t, uint32_t& inst)
 {
   UFormInst uf(0);
-  if (not uf.encodeLui(rd, immed))
+  if (not uf.encodeLui(rd, static_cast<int>(immed)))
     return false;
   inst = uf.code;
   return true;
@@ -1421,7 +1417,7 @@ bool
 WdRiscv::encodeAuipc(uint32_t rd, uint32_t immed, uint32_t, uint32_t& inst)
 {
   UFormInst uf(0);
-  if (not uf.encodeAuipc(rd, immed))
+  if (not uf.encodeAuipc(rd, static_cast<int>(immed)))
     return false;
   inst = uf.code;
   return true;
@@ -1432,7 +1428,7 @@ bool
 WdRiscv::encodeJal(uint32_t rd, uint32_t offset, uint32_t, uint32_t& inst)
 {
   JFormInst jf(0);
-  if (not jf.encodeJal(rd, offset))
+  if (not jf.encodeJal(rd, static_cast<int>(offset)))
     return false;
   inst = jf.code;
   return true;
@@ -1443,7 +1439,7 @@ bool
 WdRiscv::encodeJalr(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifs(0);
-  if (not ifs.encodeJalr(rd, rs1, offset))
+  if (not ifs.encodeJalr(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifs.code;
   return true;
@@ -1454,7 +1450,7 @@ bool
 WdRiscv::encodeBeq(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   BFormInst bf(0);
-  if (not bf.encodeBeq(rs1, rs2, imm))
+  if (not bf.encodeBeq(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = bf.code;
   return true;
@@ -1465,7 +1461,7 @@ bool
 WdRiscv::encodeBne(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   BFormInst bf(0);
-  if (not bf.encodeBne(rs1, rs2, imm))
+  if (not bf.encodeBne(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = bf.code;
   return true;
@@ -1476,7 +1472,7 @@ bool
 WdRiscv::encodeBlt(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   BFormInst bf(0);
-  if (not bf.encodeBlt(rs1, rs2, imm))
+  if (not bf.encodeBlt(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = bf.code;
   return true;
@@ -1486,7 +1482,7 @@ bool
 WdRiscv::encodeBge(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   BFormInst bf(0);
-  if (not bf.encodeBge(rs1, rs2, imm))
+  if (not bf.encodeBge(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = bf.code;
   return true;
@@ -1497,7 +1493,7 @@ bool
 WdRiscv::encodeBltu(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   BFormInst bf(0);
-  if (not bf.encodeBltu(rs1, rs2, imm))
+  if (not bf.encodeBltu(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = bf.code;
   return true;
@@ -1507,7 +1503,7 @@ bool
 WdRiscv::encodeBgeu(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   BFormInst bf(0);
-  if (not bf.encodeBgeu(rs1, rs2, imm))
+  if (not bf.encodeBgeu(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = bf.code;
   return true;
@@ -1518,7 +1514,7 @@ bool
 WdRiscv::encodeLb(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeLb(rd, rs1, offset))
+  if (not ifi.encodeLb(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1529,7 +1525,7 @@ bool
 WdRiscv::encodeLh(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeLh(rd, rs1, offset))
+  if (not ifi.encodeLh(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1540,7 +1536,7 @@ bool
 WdRiscv::encodeLw(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeLw(rd, rs1, offset))
+  if (not ifi.encodeLw(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1551,7 +1547,7 @@ bool
 WdRiscv::encodeLbu(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeLbu(rd, rs1, offset))
+  if (not ifi.encodeLbu(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1562,7 +1558,7 @@ bool
 WdRiscv::encodeLhu(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeLhu(rd, rs1, offset))
+  if (not ifi.encodeLhu(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1573,7 +1569,7 @@ bool
 WdRiscv::encodeSb(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   SFormInst sfi(0);
-  if (not sfi.encodeSb(rs1, rs2, imm))
+  if (not sfi.encodeSb(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = sfi.code;
   return true;
@@ -1584,7 +1580,7 @@ bool
 WdRiscv::encodeSh(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   SFormInst sfi(0);
-  if (not sfi.encodeSh(rs1, rs2, imm))
+  if (not sfi.encodeSh(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = sfi.code;
   return true;
@@ -1595,7 +1591,7 @@ bool
 WdRiscv::encodeSw(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   SFormInst sfi(0);
-  if (not sfi.encodeSw(rs1, rs2, imm))
+  if (not sfi.encodeSw(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = sfi.code;
   return true;
@@ -1606,7 +1602,7 @@ bool
 WdRiscv::encodeAddi(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 {
   IFormInst ifs(0);
-  if (not ifs.encodeAddi(rd, rs1,imm))
+  if (not ifs.encodeAddi(rd, rs1, static_cast<int>(imm)))
     return false;
   inst = ifs.code;
   return true;
@@ -1617,7 +1613,7 @@ bool
 WdRiscv::encodeSlti(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeSlti(rd, rs1, imm))
+  if (not ifi.encodeSlti(rd, rs1, static_cast<int>(imm)))
     return false;
   inst = ifi.code;
   return true;
@@ -1628,7 +1624,7 @@ bool
 WdRiscv::encodeSltiu(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeSltiu(rd, rs1, imm))
+  if (not ifi.encodeSltiu(rd, rs1, static_cast<int>(imm)))
     return false;
   inst = ifi.code;
   return true;
@@ -1639,7 +1635,7 @@ bool
 WdRiscv::encodeXori(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeXori(rd, rs1, imm))
+  if (not ifi.encodeXori(rd, rs1, static_cast<int>(imm)))
     return false;
   inst = ifi.code;
   return true;
@@ -1650,7 +1646,7 @@ bool
 WdRiscv::encodeOri(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeOri(rd, rs1, imm))
+  if (not ifi.encodeOri(rd, rs1, static_cast<int>(imm)))
     return false;
   inst = ifi.code;
   return true;
@@ -1661,7 +1657,7 @@ bool
 WdRiscv::encodeAndi(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 {
   IFormInst ifs(0);
-  if (not ifs.encodeAndi(rd, rs1, imm))
+  if (not ifs.encodeAndi(rd, rs1, static_cast<int>(imm)))
     return false;
   inst = ifs.code;
   return true;
@@ -1914,7 +1910,7 @@ bool
 WdRiscv::encodeLwu(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeLwu(rd, rs1, offset))
+  if (not ifi.encodeLwu(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1925,7 +1921,7 @@ bool
 WdRiscv::encodeLd(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeLd(rd, rs1, offset))
+  if (not ifi.encodeLd(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1936,7 +1932,7 @@ bool
 WdRiscv::encodeFlw(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeFlw(rd, rs1, offset))
+  if (not ifi.encodeFlw(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1947,7 +1943,7 @@ bool
 WdRiscv::encodeFld(uint32_t rd, uint32_t rs1, uint32_t offset, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeFld(rd, rs1, offset))
+  if (not ifi.encodeFld(rd, rs1, static_cast<int>(offset)))
     return false;
   inst = ifi.code;
   return true;
@@ -1958,7 +1954,7 @@ bool
 WdRiscv::encodeSd(uint32_t rs1, uint32_t rs2, uint32_t imm, uint32_t& inst)
 {
   SFormInst sfi(0);
-  if (not sfi.encodeSd(rs1, rs2, imm))
+  if (not sfi.encodeSd(rs1, rs2, static_cast<int>(imm)))
     return false;
   inst = sfi.code;
   return true;
@@ -1969,7 +1965,7 @@ bool
 WdRiscv::encodeFsw(uint32_t rs1, uint32_t rs2, uint32_t offset, uint32_t& inst)
 {
   SFormInst sfi(0);
-  if (not sfi.encodeFsw(rs1, rs2, offset))
+  if (not sfi.encodeFsw(rs1, rs2, static_cast<int>(offset)))
     return false;
   inst = sfi.code;
   return true;
@@ -1980,7 +1976,7 @@ bool
 WdRiscv::encodeFsd(uint32_t rs1, uint32_t rs2, uint32_t offset, uint32_t& inst)
 {
   SFormInst sfi(0);
-  if (not sfi.encodeFsd(rs1, rs2, offset))
+  if (not sfi.encodeFsd(rs1, rs2, static_cast<int>(offset)))
     return false;
   inst = sfi.code;
   return true;
@@ -1991,7 +1987,7 @@ bool
 WdRiscv::encodeAddiw(uint32_t rd, uint32_t rs1, uint32_t imm, uint32_t& inst)
 {
   IFormInst ifi(0);
-  if (not ifi.encodeAddiw(rd, rs1, imm))
+  if (not ifi.encodeAddiw(rd, rs1, static_cast<int>(imm)))
     return false;
   inst = ifi.code;
   return true;
@@ -2233,7 +2229,7 @@ bool
 WdRiscv::encodeCbeqz(uint32_t rs1p, uint32_t imm, uint32_t, uint32_t& inst)
 {
   CbFormInst cb(0);
-  if (not cb.encodeCbeqz(rs1p, imm))
+  if (not cb.encodeCbeqz(rs1p, static_cast<int>(imm)))
     return false;
   inst = cb.code;
   return false;
@@ -2244,7 +2240,7 @@ bool
 WdRiscv::encodeCbnez(uint32_t rs1p, uint32_t imm, uint32_t, uint32_t& inst)
 {
   CbFormInst cb(0);
-  if (not cb.encodeCbnez(rs1p, imm))
+  if (not cb.encodeCbnez(rs1p, static_cast<int>(imm)))
     return false;
   inst = cb.code;
   return false;

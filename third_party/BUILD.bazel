@@ -18,7 +18,6 @@ cc_library(
 cc_library(
     name = "softfloat",
     hdrs = glob(["softfloat/build/RISCV-GCC/*.h", "softfloat/source/RISCV/*.h", "softfloat/source/include/*.h"]),
-
     srcs = glob(include = ["softfloat/source/*.c",
                            "softfloat/source/RISCV/*.c",
                           ],
@@ -44,5 +43,13 @@ cc_library(
 
     includes = ["softfloat/build/RISCV-GCC/", "softfloat/source/RISCV/", "softfloat/source/include"],
     visibility = ['//:__pkg__'],
-    copts = ["-DSOFTFLOAT_ROUND_ODD", "-DINLINE_LEVEL=5", "-DSOFTFLOAT_FAST_INT64", "-O2"],
+    copts = ["-O2"],
+    local_defines = ["SOFTFLOAT_ROUND_ODD", "INLINE_LEVEL=5", "SOFTFLOAT_FAST_INT64"],
+)
+
+cc_library(
+  name = "linenoise",
+  hdrs = ["linenoise.hpp"],
+  includes = ['.'],
+  visibility = ['//:__pkg__'],
 )
