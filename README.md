@@ -12,7 +12,7 @@ Whisper
 
 [Running Whisper](#Running)
 
-[Debugging RISCV Programs Using Gdb and Whisper](#Debugging RISCV)
+[Debugging RISCV Programs Using Gdb and Whisper](#Debugging)
 
 [Configuring Whisper](#Configuring)
 
