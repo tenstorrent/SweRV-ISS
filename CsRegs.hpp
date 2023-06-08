@@ -1403,14 +1403,7 @@ namespace WdRiscv
     { userEnabled_ = flag; }
 
     /// Enable supervisor time compare.
-    void enableSstc(bool flag)
-    {
-      sstcEnabled_ = flag;
-      flag = flag and superEnabled_;
-      findCsr(CsrNumber::STIMECMP)->setImplemented(flag);
-      flag = flag and hyperEnabled_;
-      findCsr(CsrNumber::VSTIMECMP)->setImplemented(flag);
-    }
+    void enableSstc(bool flag);
 
     /// Enable/disable F extension.
     void enableRvf(bool flag);
@@ -1464,6 +1457,40 @@ namespace WdRiscv
     /// Return true if given CSR is a hypervisor CSR.
     bool isHypervisor(CsrNumber csrn) const
     { auto csr = getImplementedCsr(csrn); return csr and csr->isHypervisor(); }
+
+    /// Return the value of the STCE bit of the MENVCFG CSR. Return
+    /// false if CSR is not implemented.
+    bool menvcfgStce()
+    {
+      auto csr = getImplementedCsr(rv32_? CsrNumber::MENVCFGH : CsrNumber::MENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      if (rv32_)
+	{
+	  MenvcfghFields<uint32_t> fields(value);
+	  return fields.bits_.STCE;
+	}
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.STCE;
+    }
+
+    /// Return the value of the PBMTE bit of the MENVCFG CSR. Return
+    /// false if CSR is not implemented.
+    bool menvcfgPbmte()
+    {
+      auto csr = getImplementedCsr(rv32_? CsrNumber::MENVCFGH : CsrNumber::MENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      if (rv32_)
+	{
+	  MenvcfghFields<uint32_t> fields(value);
+	  return fields.bits_.PBMTE;
+	}
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.PBMTE;
+    }
 
   private:
 
