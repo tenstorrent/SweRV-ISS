@@ -124,6 +124,16 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       // TIME is a read-only shadow of MCYCLE.
       csRegs_.findCsr(CsrNumber::TIME)->tie(low);
       csRegs_.findCsr(CsrNumber::TIMEH)->tie(high);
+
+      low = reinterpret_cast<URV*>(&stimecmp_);
+      high = low + 1;
+      csRegs_.findCsr(CsrNumber::STIMECMP)->tie(low);
+      csRegs_.findCsr(CsrNumber::STIMECMPH)->tie(high);
+
+      low = reinterpret_cast<URV*>(&htimedelta_);
+      high = low + 1;
+      csRegs_.findCsr(CsrNumber::HTIMEDELTA)->tie(low);
+      csRegs_.findCsr(CsrNumber::HTIMEDELTAH)->tie(high);
     }
   else
     {
@@ -139,6 +149,9 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
 
       // TIME is a read-only shadow of MCYCLE.
       csRegs_.findCsr(CsrNumber::TIME)->tie(&cycleCount_);
+
+      csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
+      csRegs_.findCsr(CsrNumber::HTIMEDELTA)->tie(&htimedelta_);
     }
 
   // Tie the FCSR register to variable held in the hart.
@@ -4766,6 +4779,15 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    mipVal = mipVal | (URV(1) << URV(IC::S_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::S_TIMER));
+	}
+
+      // Deliver/clear virtual supervisor timer from vstimecmp CSR.
+      if (vstimecmpActive_)
+	{
+	  if ((instCounter_ >> counterToTimeShift_) >= vstimecmp_ - htimedelta_)
+	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
 	}
 
       if (mipVal != prev)

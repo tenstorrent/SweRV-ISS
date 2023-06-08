@@ -1,8 +1,30 @@
 Whisper
 =================================================================
 
-[[_TOC_]]
+# Table of Contents
+[Introduction](#Introduction)
 
+[Requirements](#Requirements)
+
+[Compiling Whisper](#Compiling)
+
+[Preparing Target Programs](#Preparing)
+
+[Running Whisper](#Running)
+
+[Debugging RISCV Programs Using Gdb and Whisper](#Debugging)
+
+[Configuring Whisper](#Configuring)
+
+[Memory Consistency Checks](#Consistency)
+
+[Limitations](#Limitations)
+
+
+[Running riscv-arch-test Tests with RISCOF](#RISCOF)
+
+
+<a name="Introduction"/>
 
 # Introduction
 
@@ -14,6 +36,8 @@ RISCV registers or the simulated system memory. It can also run in
 lock step with a Verilog simulator serving as a "golden model" against
 which an implementation is checked after each instruction of a test
 program.
+
+<a name="Requirements"/>
 
 # Requirements
 
@@ -52,6 +76,8 @@ simulator. In particular you would need:
    [boost.org.](https://www.boost.org)
 
 
+<a name="Compiling"/>
+
 # Compiling Whisper
 
 On a Unix system, in the whisper directory, do the following:
@@ -60,6 +86,8 @@ On a Unix system, in the whisper directory, do the following:
 ```
 where x is the path to your boost library installation.
 
+
+<a name="Preparing"/>
 
 # Preparing Target Programs
 
@@ -158,6 +186,8 @@ was compiled with newlib):
 Note that in this case the simulator will intercept the exit system
 call invoked by the C library code and terminate the program
 accordingly. There is no need for the "tohost" mechanism.
+
+<a name="Running"/>
 
 # Running Whisper
 
@@ -416,6 +446,9 @@ that requires them:
     $ whisper --newlib "test4 -opt1 val1 -opt2"
     $ whisper --newlib --target "test4 -opt1 val1 -opt2"
 ```
+
+<a name="Debugging"/>
+
 # Debugging RISCV Programs Using Gdb and Whisper
 
 With the --gdb option, whisper will follow the gdb remote debugging
@@ -431,6 +464,8 @@ gdb command as follows:
 ```
     target remote | whisper --gdb xyz
 ```
+
+<a name="Configuring"/>
 
 # Configuring Whisper
 
@@ -658,6 +693,8 @@ by the performance counters.
 When true, the floating point load/store instructions will be counted
 as load/store by the performance counters.
 
+<a name="Consistency"/>
+
 # Memory Consistency Checks
 
 When run in server or interactive modes, Whisper will check the RISCV
@@ -704,6 +741,8 @@ data of read/write operations associated with load/store/amo
 instructions. We use such information to check the preserved program
 order (ppo) rules of RISCV.
 
+<a name="Limitations"/>
+
 # Limitations
 
 It is not possible to change XLEN at run time by writing to the MISA
@@ -720,6 +759,8 @@ significantly.
 
 Suppprted extensions: A, B, C, D, F, H, I, M, S, U, V, ZFH, ZFHMIN, ZBA, ZBB,
 ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ, ZWARS, ZMMUL.
+
+<a name="RISCOF"/>
 
 # Running riscv-arch-test Tests with RISCOF
 
