@@ -1,8 +1,11 @@
 Whisper
 =================================================================
 
-[[_TOC_]]
-
+# Table of Contents
+[Introduction](#Introduction)
+[Requirements](#Requirements)
+[Compiling Whisper](#Compiling Whisper)
+[Preparing Target Programs](#Preparing Target Programs)
 
 # Introduction
 
