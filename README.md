@@ -25,6 +25,7 @@ Whisper
 
 
 <a name="Introduction"/>
+
 # Introduction
 
 Whisper is a RISCV instruction set simulator (ISS) developed for the
@@ -37,6 +38,7 @@ which an implementation is checked after each instruction of a test
 program.
 
 <a name="Requirements"/>
+
 # Requirements
 
 To use Whisper, you would need to download its source code, compile
@@ -75,6 +77,7 @@ simulator. In particular you would need:
 
 
 <a name="Compiling"/>
+
 # Compiling Whisper
 
 On a Unix system, in the whisper directory, do the following:
@@ -85,6 +88,7 @@ where x is the path to your boost library installation.
 
 
 <a name="Preparing"/>
+
 # Preparing Target Programs
 
 Standalone C/assembly programs not requiring operating system support (such programs
@@ -184,6 +188,7 @@ call invoked by the C library code and terminate the program
 accordingly. There is no need for the "tohost" mechanism.
 
 <a name="Running"/>
+
 # Running Whisper
 
 Running whisper with -h or --help will print a brief description of all the
@@ -443,6 +448,7 @@ that requires them:
 ```
 
 <a name="Debugging"/>
+
 # Debugging RISCV Programs Using Gdb and Whisper
 
 With the --gdb option, whisper will follow the gdb remote debugging
@@ -460,6 +466,7 @@ gdb command as follows:
 ```
 
 <a name="Configuring"/>
+
 # Configuring Whisper
 
 A JSON configuration file may be specified on the command line using the
@@ -687,6 +694,7 @@ When true, the floating point load/store instructions will be counted
 as load/store by the performance counters.
 
 <a name="Consistency"/>
+
 # Memory Consistency Checks
 
 When run in server or interactive modes, Whisper will check the RISCV
@@ -734,6 +742,7 @@ instructions. We use such information to check the preserved program
 order (ppo) rules of RISCV.
 
 <a name="Limitations"/>
+
 # Limitations
 
 It is not possible to change XLEN at run time by writing to the MISA
@@ -752,6 +761,7 @@ Suppprted extensions: A, B, C, D, F, H, I, M, S, U, V, ZFH, ZFHMIN, ZBA, ZBB,
 ZBS, ZKND, ZKNE, ZKNH, ZBKB, ZKSED, ZKSH, SVINVAL, ZICBOM, ZICBOZ, ZWARS, ZMMUL.
 
 <a name="RISCOF"/>
+
 # Running riscv-arch-test Tests with RISCOF
 
 [riscv-arch-test](https://github.com/riscv-non-isa/riscv-arch-test) is a repository containing RISC-V compliance tests, and [RISCOF](https://github.com/riscv-software-src/riscof) is a tool that simplifies building and running these tests against a known reference model (Sail and/or Spike).
