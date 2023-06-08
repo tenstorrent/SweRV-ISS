@@ -361,7 +361,18 @@ namespace WdRiscv
 
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
-    { virtMem_.enablePbmt(flag); }
+    { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
+
+    /// Called when Svpbmt configuration changes. Enable/disable pbmt in
+    /// virtual memory class.
+    void updateTranslationPbmt()
+    {
+      bool flag = extensionIsEnabled(RvExtension::Svpbmt);
+      auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
+      if (menv)
+	flag = flag and csRegs_.menvcfgPbmte();
+      virtMem_.enablePbmt(flag);
+    }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
     void enableTranslationNapot(bool flag)

@@ -396,6 +396,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzfa(true);
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
+  if (isa_.isEnabled(RvExtension::Svpbmt))
+    enableTranslationPbmt(true);
 }
 
 
@@ -671,6 +673,10 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   clearTraceData();
 
   decoder_.enableRv64(isRv64());
+
+  // Refect initial state of menvcfg CSR on pbmt and sstc.
+  updateTranslationPbmt();
+  csRegs_.updateSstc();
 }
 
 
@@ -2850,45 +2856,47 @@ template <typename URV>
 void
 Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 {
+  using CN = CsrNumber;
+
   // This makes sure that counters stop counting after corresponding
   // event reg is written.
   if (enableCounters_)
-    if (csr >= CsrNumber::MHPMEVENT3 and csr <= CsrNumber::MHPMEVENT31)
+    if (csr >= CN::MHPMEVENT3 and csr <= CN::MHPMEVENT31)
       if (not csRegs_.applyPerfEventAssign())
         std::cerr << "Unexpected applyPerfAssign fail\n";
 
-  if (csr == CsrNumber::DCSR)
+  if (csr == CN::DCSR)
     {
       DcsrFields<URV> dcsr(val);
       dcsrStep_ = dcsr.bits_.STEP;
       dcsrStepIe_ = dcsr.bits_.STEPIE;
     }
-  else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG15)
+  else if (csr >= CN::PMPCFG0 and csr <= CN::PMPCFG15)
     updateMemoryProtection();
-  else if (csr >= CsrNumber::PMPADDR0 and csr <= CsrNumber::PMPADDR63)
+  else if (csr >= CN::PMPADDR0 and csr <= CN::PMPADDR63)
     {
       unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csr);
       auto type = Pmp::Type((config >> 3) & 3);
       if (type != Pmp::Type::Off)
         updateMemoryProtection();
     }
-  else if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
+  else if (csr == CN::SATP or csr == CN::VSATP or csr == CN::HGATP)
     updateAddressTranslation();
-  else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
+  else if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
   // Update cached values of MSTATUS,
-  if (csr == CsrNumber::MSTATUS)
+  if (csr == CN::MSTATUS)
     updateCachedMstatus();
-  else if (csr == CsrNumber::SSTATUS)
+  else if (csr == CN::SSTATUS)
     updateCachedSstatus();
-  else if (csr == CsrNumber::VSSTATUS)
+  else if (csr == CN::VSSTATUS)
     updateCachedVsstatus();
-  else if (csr == CsrNumber::HSTATUS)
+  else if (csr == CN::HSTATUS)
     updateCachedHstatus();
 
   // Update cached value of VTYPE
-  if (csr == CsrNumber::VTYPE)
+  if (csr == CN::VTYPE)
     {
       VtypeFields<URV> vtype(val);
       bool vill = vtype.bits_.VILL;
@@ -2899,16 +2907,22 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
-  if (csr == CsrNumber::VL)
+  if (csr == CN::VL)
     vecRegs_.elemCount(val);
 
-  if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
-      csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
-      csr == CsrNumber::VLENB)
+  if (csr == CN::VSTART or csr == CN::VXSAT or csr == CN::VXRM or
+	    csr == CN::VCSR or csr == CN::VL or csr == CN::VTYPE or
+	    csr == CN::VLENB)
     markVsDirty();
 
-  if (csr == CsrNumber::MISA and lastVal != val)
+  if (csr == CN::MISA and lastVal != val)
     processExtensions(false);
+
+  if (csr == CN::MENVCFG)
+    {
+      updateTranslationPbmt();
+      csRegs_.updateSstc();
+    }
 }
 
 
