@@ -426,15 +426,15 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
-  enableSstc(sstcEnabled_);  // To activate/deactivate STIMECMP.
+  updateSstc();  // To activate/deactivate STIMECMP.
 }
 
 
 template <typename URV>
 void
-CsRegs<URV>::enableSstc(bool flag)
+CsRegs<URV>::updateSstc()
 {
-  sstcEnabled_ = flag;
+  bool flag = sstcEnabled_;
 
   flag = flag and superEnabled_;
   auto menv = getImplementedCsr(CsrNumber::MENVCFG);
@@ -547,7 +547,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
         }
     }
 
-  enableSstc(sstcEnabled_);  // To activate/deactivate VSTIMECMP.
+  updateSstc();  // To activate/deactivate VSTIMECMP.
 }
 
 

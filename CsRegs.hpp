@@ -1403,7 +1403,13 @@ namespace WdRiscv
     { userEnabled_ = flag; }
 
     /// Enable supervisor time compare.
-    void enableSstc(bool flag);
+    void enableSstc(bool flag)
+    { sstcEnabled_ = flag; updateSstc(); }
+
+    /// Update implementation status of Sstc (supervisor timer)
+    /// related CSRs.  This is called when Sstc related configuration
+    /// changes.
+    void updateSstc();
 
     /// Enable/disable F extension.
     void enableRvf(bool flag);
