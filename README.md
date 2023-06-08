@@ -3,11 +3,14 @@ Whisper
 
 # Table of Contents
 [Introduction](#Introduction)
+
 [Requirements](#Requirements)
+
 [Compiling Whisper](#Compiling Whisper)
+
 [Preparing Target Programs](#Preparing Target Programs)
 
-# Introduction
+#Introduction
 
 Whisper is a RISCV instruction set simulator (ISS) developed for the
 verification of the Swerv micro-controller. It allows the user to run
@@ -18,7 +21,7 @@ lock step with a Verilog simulator serving as a "golden model" against
 which an implementation is checked after each instruction of a test
 program.
 
-# Requirements
+#Requirements
 
 To use Whisper, you would need to download its source code, compile
 it, prepare some target test program, compile the test program to
@@ -55,7 +58,7 @@ simulator. In particular you would need:
    [boost.org.](https://www.boost.org)
 
 
-# Compiling Whisper
+#Compiling Whisper
 
 On a Unix system, in the whisper directory, do the following:
 ```
