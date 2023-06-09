@@ -495,6 +495,7 @@ namespace Whisper
     void write(FILE* out)
     {
       size_t n = fwrite(buff_.data(), pos_, 1, out);
+      (void)n;
       assert(n == 1);
     }
 

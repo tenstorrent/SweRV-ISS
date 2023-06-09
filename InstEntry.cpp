@@ -49,6 +49,7 @@ InstTable::InstTable()
   for (unsigned i = 0; InstId(i) <= InstId::maxId; ++i)
     {
       InstId id = InstId(i);
+      (void)id;
       assert(instVec_.at(i).instId() == id);
     }
 

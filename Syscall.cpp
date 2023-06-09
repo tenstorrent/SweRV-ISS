@@ -1584,6 +1584,7 @@ template <typename URV>
 int
 Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
 {
+  (void)size;
   auto curr = mmap_blocks_.find(addr);
   if (curr == mmap_blocks_.end())
     {
