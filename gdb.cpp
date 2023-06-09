@@ -207,7 +207,7 @@ sendPacketToGdb(const std::string& data, int fd)
 
   while (true)
     {
-      write(fd, packet.data(), packet.size());
+      (void)write(fd, packet.data(), packet.size());
       char c = getDebugChar(fd);
       if (c == '+')
 	return;

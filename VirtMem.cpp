@@ -17,7 +17,7 @@ VirtMem::VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
 
   pageBits_ = static_cast<unsigned>(std::log2(pageSize_));
   unsigned p2PageSize =  unsigned(1) << pageBits_;
-
+  (void)p2PageSize;
   assert(p2PageSize == pageSize);
   assert(pageSize >= 64);
 

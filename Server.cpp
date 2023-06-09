@@ -41,6 +41,7 @@ deserializeMessage(const char buffer[], size_t bufferLen,
 		   WhisperMessage& msg)
 
 {
+  (void)bufferLen;
   assert (bufferLen >= sizeof(msg));
 
   const char* p = buffer;
@@ -114,6 +115,7 @@ size_t
 serializeMessage(const WhisperMessage& msg, char buffer[],
 		 size_t bufferLen)
 {
+  (void)bufferLen;
   assert (bufferLen >= sizeof(msg));
 
   char* p = buffer;

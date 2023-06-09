@@ -791,6 +791,7 @@ Memory::saveSnapshot(const std::string& filename,
 
   // write the simulated memory into the file and check success
   uint64_t prevAddr = 0;
+  (void)prevAddr;
   bool success = true;
   for (const auto& blk: usedBlocks)
     {
@@ -876,6 +877,7 @@ Memory::loadSnapshot(const std::string & filename,
   // read (decompress) file into simulated memory and check success
   bool success = true;
   uint64_t prevAddr = 0;
+  (void)prevAddr;
   size_t remainingSize = 0;
   for (const auto& blk: usedBlocks)
     {

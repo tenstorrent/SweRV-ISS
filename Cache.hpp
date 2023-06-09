@@ -174,9 +174,7 @@ namespace WdRiscv
     /// the corresponding set of lines,
     std::vector<LinesInSet> linesPerSet_;
 
-    uint64_t size_ = 0;
     uint64_t time_ = 0;
-    unsigned lineSize_ = 0;
     unsigned setSize_ = 0;
     unsigned lineNumberShift_ = 0;
     unsigned setIndexMask_ = 0;
