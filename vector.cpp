@@ -142,6 +142,17 @@ namespace std
 }
 
 
+// Checking for conversions of signed char to int is a useful check,
+// but in many cases, a signed char is used as a signed byte, and as
+// such, conversion to int is allowed.  These conversions are handled
+// frequently in templated code below, and clang-tidy isn't able to
+// properly ignore these warnings in templates, so just disable them
+// entirely in the majority of this file.  The checks can still occur
+// in other files, and an incorrect use of a signed char to int
+// conversion is unlikely in this file.
+//NOLINTBEGIN(bugprone-signed-char-misuse)
+
+
 namespace WdRiscv
 {
   template <> struct makeDoubleWide<Float16>    { using type = float; };
@@ -897,8 +908,8 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
     vill = true;
   else
     {
-      uint32_t gm8 = vecRegs_.groupMultiplierX8(gm);
-      unsigned bitsPerElem = vecRegs_.elemWidthInBits(ew);
+      uint32_t gm8 = VecRegs::groupMultiplierX8(gm);
+      unsigned bitsPerElem = VecRegs::elemWidthInBits(ew);
       unsigned vlmax = (gm8*vecRegs_.bitsPerRegister()/bitsPerElem) / 8;
       if (vlmax == 0)
         vill = true;
@@ -1025,8 +1036,8 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
     vill = true;
   else
     {
-      uint32_t gm8 = vecRegs_.groupMultiplierX8(gm);
-      unsigned bitsPerElem = vecRegs_.elemWidthInBits(ew);
+      uint32_t gm8 = VecRegs::groupMultiplierX8(gm);
+      unsigned bitsPerElem = VecRegs::elemWidthInBits(ew);
       unsigned vlmax = (gm8*vecRegs_.bitsPerRegister()/bitsPerElem) / 8;
       if (vlmax == 0)
         vill = true;
@@ -1520,11 +1531,11 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwadd_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwadd_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1556,11 +1567,11 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwadd_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwadd_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1629,11 +1640,11 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwadd_vx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwadd_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwadd_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Byte:  vwadd_vx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:  vwadd_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:  vwadd_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1667,11 +1678,11 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwadd_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Byte:  vwadd_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:  vwadd_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:  vwadd_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwadd_vx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1740,11 +1751,11 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwsub_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwsub_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwsub_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    default:  postVecFail(di); return;
+    case EW::Byte:  vwsub_vx<uint8_t> (vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:  vwsub_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:  vwsub_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1781,8 +1792,8 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
     case EW::Byte:  vwsub_vx<int8_t> (vd, vs1, e2, group, start, elems, masked); break;
     case EW::Half:  vwsub_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vwsub_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    default:  postVecFail(di); return;
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1849,11 +1860,11 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwsub_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwsub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwsub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwsub_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwsub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwsub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1885,11 +1896,11 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwsub_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwsub_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1956,11 +1967,11 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwadd_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwadd_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwadd_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwadd_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwadd_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwadd_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -1992,11 +2003,11 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwadd_wv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwadd_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwadd_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwadd_wv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwadd_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwadd_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwadd_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -2246,11 +2257,11 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwsub_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwsub_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwsub_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwsub_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwsub_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwsub_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -2282,11 +2293,11 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwsub_wv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwsub_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwsub_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwsub_wv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwsub_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwsub_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwsub_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3419,11 +3430,11 @@ Hart<URV>::execVnsrl_wv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vnsr_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vnsr_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vnsr_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vnsr_wv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vnsr_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vnsr_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3502,7 +3513,7 @@ Hart<URV>::execVnsrl_wx(const DecodedInst* di)
     case EW::Half:  vnsr_wx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wx<uint64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3539,7 +3550,7 @@ Hart<URV>::execVnsrl_wi(const DecodedInst* di)
     case EW::Half:  vnsr_wx<uint16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vnsr_wx<uint32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vnsr_wx<uint64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3575,7 +3586,7 @@ Hart<URV>::execVnsra_wv(const DecodedInst* di)
     case EW::Half:  vnsr_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3614,7 +3625,7 @@ Hart<URV>::execVnsra_wx(const DecodedInst* di)
     case EW::Half:  vnsr_wx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word:  vnsr_wx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vnsr_wx<int64_t>(vd, vs1, e2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3651,7 +3662,7 @@ Hart<URV>::execVnsra_wi(const DecodedInst* di)
     case EW::Half:  vnsr_wx<int16_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word:  vnsr_wx<int32_t>(vd, vs1, imm, gp, start, elems, msk); break;
     case EW::Word2: vnsr_wx<int64_t>(vd, vs1, imm, gp, start, elems, msk); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3726,7 +3737,7 @@ Hart<URV>::execVrgather_vv(const DecodedInst* di)
     case EW::Half:  vrgather_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vrgather_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrgather_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3797,7 +3808,7 @@ Hart<URV>::execVrgather_vx(const DecodedInst* di)
     case EW::Half:  vrgather_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word:  vrgather_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrgather_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -3863,12 +3874,10 @@ Hart<URV>::execVrgather_vi(const DecodedInst* di)
     case EW::Half:  vrgather_vi<uint16_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word:  vrgather_vi<uint32_t>(vd, vs1, imm, group, start, elems, masked); break;
     case EW::Word2: vrgather_vi<uint64_t>(vd, vs1, imm, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
-
-
 
 
 template <typename URV>
@@ -3920,13 +3929,13 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
   ElementWidth sew = vecRegs_.elemWidth();
-  unsigned widthInBytes = vecRegs_.elemWidthInBytes(sew);
+  unsigned widthInBytes = VecRegs::elemWidthInBytes(sew);
   bool masked = di->isMasked();
 
   unsigned v2Group = (2*group) / widthInBytes;
 
   GroupMultiplier v2gm = GroupMultiplier::One;
-  if (not vecRegs_.groupNumberX8ToSymbol(v2Group, v2gm) or
+  if (not VecRegs::groupNumberX8ToSymbol(v2Group, v2gm) or
       not vecRegs_.legalConfig(ElementWidth::Half, v2gm) or
       (masked and vd == 0))
     {
@@ -3955,11 +3964,11 @@ Hart<URV>::execVrgatherei16_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vrgatherei16_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vrgatherei16_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vrgatherei16_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vrgatherei16_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vrgatherei16_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vrgatherei16_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrgatherei16_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -4024,11 +4033,11 @@ Hart<URV>::execVcompress_vm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vcompress_vm<uint8_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Half: vcompress_vm<uint16_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word: vcompress_vm<uint32_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Byte:  vcompress_vm<uint8_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Half:  vcompress_vm<uint16_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word:  vcompress_vm<uint32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vcompress_vm<uint64_t>(vd, vs1, vs2, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -4833,11 +4842,11 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Byte:  vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Half:  vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word:  vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -4871,11 +4880,11 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Half: vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word: vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Byte:  vslideup<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Half:  vslideup<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word:  vslideup<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslideup<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -4999,7 +5008,7 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
     case EW::Half:   vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word:   vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2:  vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5027,11 +5036,11 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vslidedown<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Half: vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
-    case EW::Word: vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Byte:  vslidedown<uint8_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Half:  vslidedown<uint16_t>(vd, vs1, amount, group, start, elems, masked); break;
+    case EW::Word:  vslidedown<uint32_t>(vd, vs1, amount, group, start, elems, masked); break;
     case EW::Word2: vslidedown<uint64_t>(vd, vs1, amount, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5299,11 +5308,11 @@ Hart<URV>::execVmulh_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmulh_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmulh_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmulh_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vmulh_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vmulh_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vmulh_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5360,11 +5369,11 @@ Hart<URV>::execVmulh_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmulh_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmulh_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmulh_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:  vmulh_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vmulh_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmulh_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5390,11 +5399,11 @@ Hart<URV>::execVmulhu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmulh_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmulh_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmulh_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vmulh_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vmulh_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vmulh_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulh_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5451,11 +5460,11 @@ Hart<URV>::execVmulhu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmulhu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmulhu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmulhu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:  vmulhu_vx<uint8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vmulhu_vx<uint16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmulhu_vx<uint32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhu_vx<uint64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5515,11 +5524,11 @@ Hart<URV>::execVmulhsu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmulhsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmulhsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmulhsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vmulhsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vmulhsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vmulhsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5579,11 +5588,11 @@ Hart<URV>::execVmulhsu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmulhsu_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vmulhsu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vmulhsu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:  vmulhsu_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vmulhsu_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vmulhsu_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vmulhsu_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5642,11 +5651,11 @@ Hart<URV>::execVmadd_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmadd_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vmadd_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vmadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vmadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5708,7 +5717,7 @@ Hart<URV>::execVmadd_vx(const DecodedInst* di)
     case EW::Half:  vmadd_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmadd_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmadd_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5766,11 +5775,11 @@ Hart<URV>::execVnmsub_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vnmsub_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vnmsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vnmsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vnmsub_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vnmsub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vnmsub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5832,7 +5841,7 @@ Hart<URV>::execVnmsub_vx(const DecodedInst* di)
     case EW::Half:  vnmsub_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnmsub_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsub_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5891,11 +5900,11 @@ Hart<URV>::execVmacc_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmacc_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vmacc_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmacc_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -5957,7 +5966,7 @@ Hart<URV>::execVmacc_vx(const DecodedInst* di)
     case EW::Half:  vmacc_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmacc_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmacc_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6016,11 +6025,11 @@ Hart<URV>::execVnmsac_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vnmsac_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vnmsac_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vnmsac_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vnmsac_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vnmsac_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vnmsac_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsac_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6082,7 +6091,7 @@ Hart<URV>::execVnmsac_vx(const DecodedInst* di)
     case EW::Half:  vnmsac_vx<int16_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vnmsac_vx<int32_t>(vd, rs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vnmsac_vx<int64_t>(vd, rs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6151,11 +6160,11 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmulu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmulu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmulu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmulu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmulu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmulu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmulu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6224,11 +6233,11 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmulu_vx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwmulu_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwmulu_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Byte:  vwmulu_vx<uint8_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:  vwmulu_vx<uint16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:  vwmulu_vx<uint32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulu_vx<uint64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6296,11 +6305,11 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmul_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmul_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6371,11 +6380,11 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmul_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwmul_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwmul_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Byte:  vwmul_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:  vwmul_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:  vwmul_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmul_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6445,11 +6454,11 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmulsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmulsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmulsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmulsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmulsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmulsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6522,11 +6531,11 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmulsu_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Half: vwmulsu_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
-    case EW::Word: vwmulsu_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Byte:  vwmulsu_vx<int8_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Half:  vwmulsu_vx<int16_t>(vd, vs1, e2, group, start, elems, masked); break;
+    case EW::Word:  vwmulsu_vx<int32_t>(vd, vs1, e2, group, start, elems, masked); break;
     case EW::Word2: vwmulsu_vx<int64_t>(vd, vs1, int64_t(e2), group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6593,11 +6602,11 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmacc_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmacc_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmacc_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmacc_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmacc_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmacc_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6668,11 +6677,11 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmaccu_vx<uint8_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmaccu_vx<uint16_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmaccu_vx<uint32_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmaccu_vx<uint8_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmaccu_vx<uint16_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmaccu_vx<uint32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccu_vx<uint64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6705,11 +6714,11 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmacc_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmacc_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmacc_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmacc_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6782,7 +6791,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
     case EW::Half:  vwmacc_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word:  vwmacc_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmacc_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6853,11 +6862,11 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmaccsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmaccsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmaccsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmaccsu_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmaccsu_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmaccsu_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -6930,11 +6939,11 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmaccsu_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmaccsu_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmaccsu_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmaccsu_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmaccsu_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmaccsu_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccsu_vx<int64_t>(vd, int64_t(e1), vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7007,11 +7016,11 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vwmaccus_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Half: vwmaccus_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
-    case EW::Word: vwmaccus_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vwmaccus_vx<int8_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vwmaccus_vx<int16_t>(vd, e1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vwmaccus_vx<int32_t>(vd, e1, vs2, group, start, elems, masked); break;
     case EW::Word2: vwmaccus_vx<int64_t>(vd, e1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7070,11 +7079,11 @@ Hart<URV>::execVdivu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vdivu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vdivu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vdivu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vdivu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vdivu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vdivu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdivu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7207,11 +7216,11 @@ Hart<URV>::execVdiv_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vdiv_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vdiv_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vdiv_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vdiv_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vdiv_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vdiv_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7278,11 +7287,11 @@ Hart<URV>::execVdiv_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vdiv_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vdiv_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vdiv_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:  vdiv_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vdiv_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vdiv_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vdiv_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7341,11 +7350,11 @@ Hart<URV>::execVremu_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vremu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vremu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vremu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vremu_vv<uint8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vremu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vremu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vremu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7478,11 +7487,11 @@ Hart<URV>::execVrem_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vrem_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Half: vrem_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word: vrem_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  vrem_vv<int8_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vrem_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vrem_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vrem_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7548,11 +7557,11 @@ Hart<URV>::execVrem_vx(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vrem_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Half: vrem_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    case EW::Word: vrem_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Byte:  vrem_vx<int8_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Half:  vrem_vx<int16_t>(vd, vs1, rs2, group, start, elems, masked); break;
+    case EW::Word:  vrem_vx<int32_t>(vd, vs1, rs2, group, start, elems, masked); break;
     case EW::Word2: vrem_vx<int64_t>(vd, vs1, rs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7605,7 +7614,7 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
-  if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
+  if (not VecRegs::groupNumberX8ToSymbol(fromGroup, emul))
     {
       postVecFail(di);
       return;
@@ -7659,11 +7668,11 @@ Hart<URV>::execVsext_vf2(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vsext<int16_t,int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word: vsext<int32_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Half:  vsext<int16_t,int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word:  vsext<int32_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7684,7 +7693,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
-  if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
+  if (not VecRegs::groupNumberX8ToSymbol(fromGroup, emul))
     {
       postVecFail(di);
       return;
@@ -7718,7 +7727,7 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
+    case EW::Byte: // Fallthrough to invalid case
     case EW::Half: postVecFail(di); return;
     case EW::Word: eew = EW::Byte; break;
     case EW::Word2: eew = EW::Half; break;
@@ -7738,11 +7747,11 @@ Hart<URV>::execVsext_vf4(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: postVecFail(di); return;
-    case EW::Word: vsext<int32_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word:  vsext<int32_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vsext<int64_t, int16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Half:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7763,7 +7772,7 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
-  if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
+  if (not VecRegs::groupNumberX8ToSymbol(fromGroup, emul))
     {
       postVecFail(di);
       return;
@@ -7797,8 +7806,8 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Half:  // Fallthrough to invalid case
     case EW::Word: postVecFail(di); return;
     case EW::Word2: eew = EW::Byte; break;
     case EW::Word4: eew = EW::Half; break;
@@ -7817,11 +7826,11 @@ Hart<URV>::execVsext_vf8(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: postVecFail(di); return;
-    case EW::Word: postVecFail(di); return;
     case EW::Word2: vsext<int64_t, int8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Half:  // Fallthrough to invalid case
+    case EW::Word:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7874,7 +7883,7 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
-  if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
+  if (not VecRegs::groupNumberX8ToSymbol(fromGroup, emul))
     {
       postVecFail(di);
       return;
@@ -7928,11 +7937,11 @@ Hart<URV>::execVzext_vf2(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vzext<uint16_t,uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    case EW::Word: vzext<uint32_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Half:  vzext<uint16_t,uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word:  vzext<uint32_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint32_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -7953,7 +7962,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
-  if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
+  if (not VecRegs::groupNumberX8ToSymbol(fromGroup, emul))
     {
       postVecFail(di);
       return;
@@ -7987,7 +7996,7 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
+    case EW::Byte: // Fallthrough to invalid case
     case EW::Half: postVecFail(di); return;
     case EW::Word: eew = EW::Byte; break;
     case EW::Word2: eew = EW::Half; break;
@@ -8007,11 +8016,11 @@ Hart<URV>::execVzext_vf4(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: postVecFail(di); return;
-    case EW::Word: vzext<uint32_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
+    case EW::Word:  vzext<uint32_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
     case EW::Word2: vzext<uint64_t, uint16_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Half:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8032,7 +8041,7 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
       return;
     }
   GroupMultiplier emul = GroupMultiplier::One;
-  if (not vecRegs_.groupNumberX8ToSymbol(fromGroup, emul))
+  if (not VecRegs::groupNumberX8ToSymbol(fromGroup, emul))
     {
       postVecFail(di);
       return;
@@ -8066,8 +8075,8 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
   EW eew = sew;  // Effective elem width of source.
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: postVecFail(di); return;
+    case EW::Byte: // Fallthrough to invalid case
+    case EW::Half: // Fallthrough to invalid case
     case EW::Word: postVecFail(di); return;
     case EW::Word2: eew = EW::Byte; break;
     case EW::Word4: eew = EW::Half; break;
@@ -8086,11 +8095,11 @@ Hart<URV>::execVzext_vf8(const DecodedInst* di)
 
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: postVecFail(di); return;
-    case EW::Word: postVecFail(di); return;
     case EW::Word2: vzext<uint64_t, uint8_t>(vd, vs1, group, fromGroup, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Half:  // Fallthrough to invalid case
+    case EW::Word:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8355,11 +8364,11 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vadc_vvm<uint8_t>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Half: vadc_vvm<uint16_t>(vd, vs1, vs2, vcin, group, start, elems); break;
-    case EW::Word: vadc_vvm<uint32_t>(vd, vs1, vs2, vcin, group, start, elems); break;
+    case EW::Byte:  vadc_vvm<uint8_t>(vd, vs1, vs2, vcin, group, start, elems); break;
+    case EW::Half:  vadc_vvm<uint16_t>(vd, vs1, vs2, vcin, group, start, elems); break;
+    case EW::Word:  vadc_vvm<uint32_t>(vd, vs1, vs2, vcin, group, start, elems); break;
     case EW::Word2: vadc_vvm<uint64_t>(vd, vs1, vs2, vcin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8392,11 +8401,11 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vadc_vxm<uint8_t>(vd, vs1, e2, vcin, group, start, elems); break;
-    case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
-    case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
+    case EW::Byte:  vadc_vxm<uint8_t>(vd, vs1, e2, vcin, group, start, elems); break;
+    case EW::Half:  vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
+    case EW::Word:  vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8429,11 +8438,11 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vadc_vxm<uint8_t>(vd, vs1, e2, vcin, group, start, elems); break;
-    case EW::Half: vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
-    case EW::Word: vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
+    case EW::Byte:  vadc_vxm<uint8_t>(vd, vs1, e2, vcin, group, start, elems); break;
+    case EW::Half:  vadc_vxm<uint16_t>(vd, vs1, e2, vcin, group, start, elems); break;
+    case EW::Word:  vadc_vxm<uint32_t>(vd, vs1, int32_t(e2), vcin, group, start, elems); break;
     case EW::Word2: vadc_vxm<uint64_t>(vd, vs1, int64_t(e2), vcin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8464,11 +8473,11 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vsbc_vvm<uint8_t>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Half: vsbc_vvm<uint16_t>(vd, vs1, vs2, vbin, group, start, elems); break;
-    case EW::Word: vsbc_vvm<uint32_t>(vd, vs1, vs2, vbin, group, start, elems); break;
+    case EW::Byte:  vsbc_vvm<uint8_t>(vd, vs1, vs2, vbin, group, start, elems); break;
+    case EW::Half:  vsbc_vvm<uint16_t>(vd, vs1, vs2, vbin, group, start, elems); break;
+    case EW::Word:  vsbc_vvm<uint32_t>(vd, vs1, vs2, vbin, group, start, elems); break;
     case EW::Word2: vsbc_vvm<uint64_t>(vd, vs1, vs2, vbin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8501,11 +8510,11 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vsbc_vxm<uint8_t>(vd, vs1, e2, vbin, group, start, elems); break;
-    case EW::Half: vsbc_vxm<uint16_t>(vd, vs1, e2, vbin, group, start, elems); break;
-    case EW::Word: vsbc_vxm<uint32_t>(vd, vs1, int32_t(e2), vbin, group, start, elems); break;
+    case EW::Byte:  vsbc_vxm<uint8_t>(vd, vs1, e2, vbin, group, start, elems); break;
+    case EW::Half:  vsbc_vxm<uint16_t>(vd, vs1, e2, vbin, group, start, elems); break;
+    case EW::Word:  vsbc_vxm<uint32_t>(vd, vs1, int32_t(e2), vbin, group, start, elems); break;
     case EW::Word2: vsbc_vxm<uint64_t>(vd, vs1, int64_t(e2), vbin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8528,11 +8537,11 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmadc_vvm<uint8_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    case EW::Half: vmadc_vvm<uint16_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    case EW::Word: vmadc_vvm<uint32_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
+    case EW::Byte:  vmadc_vvm<uint8_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
+    case EW::Half:  vmadc_vvm<uint16_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
+    case EW::Word:  vmadc_vvm<uint32_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vvm<uint64_t>(vcout, vs1, vs2, carry, vcin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8556,11 +8565,11 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmadc_vxm<uint8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
-    case EW::Half: vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
-    case EW::Word: vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
+    case EW::Byte:  vmadc_vxm<uint8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
+    case EW::Half:  vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
+    case EW::Word:  vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vxm<uint64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8588,11 +8597,11 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmadc_vxm<uint8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
-    case EW::Half: vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
-    case EW::Word: vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
+    case EW::Byte:  vmadc_vxm<uint8_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
+    case EW::Half:  vmadc_vxm<uint16_t>(vcout, vs1, e2, carry, vcin, group, start, elems); break;
+    case EW::Word:  vmadc_vxm<uint32_t>(vcout, vs1, int32_t(e2), carry, vcin, group, start, elems); break;
     case EW::Word2: vmadc_vxm<uint64_t>(vcout, vs1, int64_t(e2), carry, vcin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8615,11 +8624,11 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmsbc_vvm<uint8_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Half: vmsbc_vvm<uint16_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    case EW::Word: vmsbc_vvm<uint32_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
+    case EW::Byte:  vmsbc_vvm<uint8_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
+    case EW::Half:  vmsbc_vvm<uint16_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
+    case EW::Word:  vmsbc_vvm<uint32_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vvm<uint64_t>(vbout, vs1, vs2, borrow, vbin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8644,11 +8653,11 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmsbc_vxm<uint8_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
-    case EW::Half: vmsbc_vxm<uint16_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
-    case EW::Word: vmsbc_vxm<uint32_t>(vbout, vs1, int32_t(e2), borrow, vbin, group, start, elems); break;
+    case EW::Byte:  vmsbc_vxm<uint8_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
+    case EW::Half:  vmsbc_vxm<uint16_t>(vbout, vs1, e2, borrow, vbin, group, start, elems); break;
+    case EW::Word:  vmsbc_vxm<uint32_t>(vbout, vs1, int32_t(e2), borrow, vbin, group, start, elems); break;
     case EW::Word2: vmsbc_vxm<uint64_t>(vbout, vs1, int64_t(e2), borrow, vbin, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8704,11 +8713,11 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmerge_vvm<int8_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Half: vmerge_vvm<int16_t>(vd, vs1, vs2, group, start, elems); break;
-    case EW::Word: vmerge_vvm<int32_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Byte:  vmerge_vvm<int8_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Half:  vmerge_vvm<int16_t>(vd, vs1, vs2, group, start, elems); break;
+    case EW::Word:  vmerge_vvm<int32_t>(vd, vs1, vs2, group, start, elems); break;
     case EW::Word2: vmerge_vvm<int64_t>(vd, vs1, vs2, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8766,11 +8775,11 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmerge_vxm<int8_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Half: vmerge_vxm<int16_t>(vd, vs1, e2, group, start, elems); break;
-    case EW::Word: vmerge_vxm<int32_t>(vd, vs1, e2, group, start, elems); break;
+    case EW::Byte:  vmerge_vxm<int8_t>(vd, vs1, e2, group, start, elems); break;
+    case EW::Half:  vmerge_vxm<int16_t>(vd, vs1, e2, group, start, elems); break;
+    case EW::Word:  vmerge_vxm<int32_t>(vd, vs1, e2, group, start, elems); break;
     case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, e2, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -8801,11 +8810,11 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmerge_vxm<int8_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Half: vmerge_vxm<int16_t>(vd, vs1, imm, group, start, elems); break;
-    case EW::Word: vmerge_vxm<int32_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Byte:  vmerge_vxm<int8_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Half:  vmerge_vxm<int16_t>(vd, vs1, imm, group, start, elems); break;
+    case EW::Word:  vmerge_vxm<int32_t>(vd, vs1, imm, group, start, elems); break;
     case EW::Word2: vmerge_vxm<int64_t>(vd, vs1, imm, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9096,11 +9105,11 @@ Hart<URV>::execVmv_v_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmv_v_v<int8_t>(vd, vs1, group, start, elems); break;
-    case EW::Half: vmv_v_v<int16_t>(vd, vs1, group, start, elems); break;
-    case EW::Word: vmv_v_v<int32_t>(vd, vs1, group, start, elems); break;
+    case EW::Byte:  vmv_v_v<int8_t>(vd, vs1, group, start, elems); break;
+    case EW::Half:  vmv_v_v<int16_t>(vd, vs1, group, start, elems); break;
+    case EW::Word:  vmv_v_v<int32_t>(vd, vs1, group, start, elems); break;
     case EW::Word2: vmv_v_v<int64_t>(vd, vs1, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9150,11 +9159,11 @@ Hart<URV>::execVmv_v_x(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmv_v_x<int8_t>(vd, e1, group, start, elems); break;
-    case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
-    case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
+    case EW::Byte:  vmv_v_x<int8_t>(vd, e1, group, start, elems); break;
+    case EW::Half:  vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
+    case EW::Word:  vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9187,11 +9196,11 @@ Hart<URV>::execVmv_v_i(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: vmv_v_x<int8_t>(vd, e1, group, start, elems); break;
-    case EW::Half: vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
-    case EW::Word: vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
+    case EW::Byte:  vmv_v_x<int8_t>(vd, e1, group, start, elems); break;
+    case EW::Half:  vmv_v_x<int16_t>(vd, e1, group, start, elems); break;
+    case EW::Word:  vmv_v_x<int32_t>(vd, e1, group, start, elems); break;
     case EW::Word2: vmv_v_x<int64_t>(vd, e1, group, start, elems); break;
-    default:  postVecFail(di); return;
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9400,7 +9409,7 @@ Hart<URV>::execVsaddu_vv(const DecodedInst* di)
     case EW::Half:   vsaddu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsaddu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9469,7 +9478,7 @@ Hart<URV>::execVsaddu_vx(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9499,7 +9508,7 @@ Hart<URV>::execVsaddu_vi(const DecodedInst* di)
     case EW::Half:   vsaddu_vx<uint16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsaddu_vx<uint32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsaddu_vx<uint64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9514,9 +9523,8 @@ Hart<URV>::vsadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
-  uint32_t bitCount = sizeof(ELEM_TYPE)*8;
-  ELEM_TYPE minVal = ELEM_TYPE(1) << (bitCount - 1);
-  ELEM_TYPE maxVal = minVal - 1;
+  static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
+  static constexpr ELEM_TYPE maxVal = std::numeric_limits<ELEM_TYPE>::max();
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -9572,7 +9580,7 @@ Hart<URV>::execVsadd_vv(const DecodedInst* di)
     case EW::Half:   vsadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9587,9 +9595,8 @@ Hart<URV>::vsadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
 
-  uint32_t bitCount = sizeof(ELEM_TYPE)*8;
-  ELEM_TYPE minVal = ELEM_TYPE(1) << (bitCount - 1);
-  ELEM_TYPE maxVal = minVal - 1;
+  static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
+  static constexpr ELEM_TYPE maxVal = std::numeric_limits<ELEM_TYPE>::max();
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -9647,7 +9654,7 @@ Hart<URV>::execVsadd_vx(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9677,7 +9684,7 @@ Hart<URV>::execVsadd_vi(const DecodedInst* di)
     case EW::Half:   vsadd_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vsadd_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vsadd_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9744,7 +9751,7 @@ Hart<URV>::execVssubu_vv(const DecodedInst* di)
     case EW::Half:   vssubu_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssubu_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssubu_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9813,7 +9820,7 @@ Hart<URV>::execVssubu_vx(const DecodedInst* di)
     case EW::Half:   vssubu_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssubu_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssubu_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9828,9 +9835,8 @@ Hart<URV>::vssub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
-  uint32_t bitCount = sizeof(ELEM_TYPE)*8;
-  ELEM_TYPE minVal = ELEM_TYPE(1) << (bitCount - 1);
-  ELEM_TYPE maxVal = minVal - 1;
+  static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
+  static constexpr ELEM_TYPE maxVal = std::numeric_limits<ELEM_TYPE>::max();
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -9886,7 +9892,7 @@ Hart<URV>::execVssub_vv(const DecodedInst* di)
     case EW::Half:   vssub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -9901,9 +9907,8 @@ Hart<URV>::vssub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   unsigned errors = 0;
   ELEM_TYPE e1 = 0, dest = 0;
 
-  uint32_t bitCount = sizeof(ELEM_TYPE)*8;
-  ELEM_TYPE minVal = ELEM_TYPE(1) << (bitCount - 1);
-  ELEM_TYPE maxVal = minVal - 1;
+  static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
+  static constexpr ELEM_TYPE maxVal = std::numeric_limits<ELEM_TYPE>::max();
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -9961,7 +9966,7 @@ Hart<URV>::execVssub_vx(const DecodedInst* di)
     case EW::Half:   vssub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10070,7 +10075,7 @@ Hart<URV>::execVaadd_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10099,7 +10104,7 @@ Hart<URV>::execVaaddu_vv(const DecodedInst* di)
     case EW::Half:   vaadd_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vaadd_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vaadd_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10170,7 +10175,7 @@ Hart<URV>::execVaadd_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10201,7 +10206,7 @@ Hart<URV>::execVaaddu_vx(const DecodedInst* di)
     case EW::Half:   vaadd_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vaadd_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vaadd_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10270,7 +10275,7 @@ Hart<URV>::execVasub_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10299,7 +10304,7 @@ Hart<URV>::execVasubu_vv(const DecodedInst* di)
     case EW::Half:   vasub_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vasub_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vasub_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10370,7 +10375,7 @@ Hart<URV>::execVasub_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10401,7 +10406,7 @@ Hart<URV>::execVasubu_vx(const DecodedInst* di)
     case EW::Half:   vasub_vx<uint16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vasub_vx<uint32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vasub_vx<uint64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10422,8 +10427,7 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   peekCsr(CsrNumber::VXRM, rmVal);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
-  int elemBits = integerWidth<ELEM_TYPE> ();
-  ELEM_TYPE minVal = ELEM_TYPE(1) << (elemBits - 1);
+  static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -10439,7 +10443,7 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
           if (e1 == minVal and e2 == minVal)
             {
               // Result saturates at max positive value.
-              dest = minVal - 1;
+              dest = std::numeric_limits<ELEM_TYPE>::max();
               csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
             }
           else
@@ -10484,7 +10488,7 @@ Hart<URV>::execVsmul_vv(const DecodedInst* di)
     case EW::Half:   vsmul_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vsmul_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vsmul_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10505,8 +10509,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   peekCsr(CsrNumber::VXRM, rmVal);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
-  int elemBits = integerWidth<ELEM_TYPE> ();
-  ELEM_TYPE minVal = ELEM_TYPE(1) << (elemBits - 1);
+  static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -10522,7 +10525,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
           if (e1 == minVal and e2 == minVal)
             {
               // Result saturates at max positive value.
-              dest = minVal - 1;
+              dest = std::numeric_limits<ELEM_TYPE>::max();
               csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
             }
           else
@@ -10569,7 +10572,7 @@ Hart<URV>::execVsmul_vx(const DecodedInst* di)
     case EW::Half:   vsmul_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vsmul_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vsmul_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10639,7 +10642,7 @@ Hart<URV>::execVssrl_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10710,7 +10713,7 @@ Hart<URV>::execVssrl_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10739,7 +10742,7 @@ Hart<URV>::execVssrl_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vssr_vx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10768,7 +10771,7 @@ Hart<URV>::execVssra_vv(const DecodedInst* di)
     case EW::Half:   vssr_vv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vssr_vv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vssr_vv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10799,7 +10802,7 @@ Hart<URV>::execVssra_vx(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10828,7 +10831,7 @@ Hart<URV>::execVssra_vi(const DecodedInst* di)
     case EW::Half:   vssr_vx<int16_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word:   vssr_vx<int32_t>(vd, vs1, imm,          group, start, elems, masked); break;
     case EW::Word2:  vssr_vx<int64_t>(vd, vs1, imm,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -10922,7 +10925,7 @@ Hart<URV>::execVnclipu_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<uint16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<uint32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<uint64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -11017,7 +11020,7 @@ Hart<URV>::execVnclipu_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, e2,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, e2,           group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -11052,7 +11055,7 @@ Hart<URV>::execVnclipu_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<uint16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<uint32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<uint64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -11087,7 +11090,7 @@ Hart<URV>::execVnclip_wv(const DecodedInst* di)
     case EW::Half:   vnclip_wv<int16_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vnclip_wv<int32_t>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vnclip_wv<int64_t>(vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -11124,7 +11127,7 @@ Hart<URV>::execVnclip_wx(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, e2,          group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, e2,          group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -11159,7 +11162,7 @@ Hart<URV>::execVnclip_wi(const DecodedInst* di)
     case EW::Half:   vnclip_wx<int16_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word:   vnclip_wx<int32_t>(vd, vs1, imm,           group, start, elems, masked); break;
     case EW::Word2:  vnclip_wx<int64_t>(vd, vs1, imm,           group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -11176,9 +11179,9 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
+  groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
 
   unsigned start = csRegs_.peekVstart();
@@ -11317,10 +11320,10 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
+  groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
-  if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
+  if (not VecRegs::groupNumberX8ToSymbol(groupX8, lmul))
     badConfig = true;
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
@@ -11533,7 +11536,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
   unsigned start = csRegs_.peekVstart();
   unsigned groupX8 = di->vecFieldCount() * 8;
   GroupMultiplier gm = GroupMultiplier::One;
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, gm);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, gm);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, gm);
   if ((not isVecLegal()) or badConfig or di->isMasked())
     {
@@ -11543,7 +11546,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 
   unsigned vd = di->op0(), rs1 = di->op1();
 
-  unsigned elemBytes = vecRegs_.elemWidthInBytes(eew);
+  unsigned elemBytes = VecRegs::elemWidthInBytes(eew);
   unsigned elemCount = (groupX8*vecRegs_.bytesPerRegister()) / elemBytes / 8;
   URV addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
@@ -11663,7 +11666,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
   vecRegs_.stData_.clear();
 
   unsigned start = csRegs_.peekVstart();
-  unsigned groupX8 = vecRegs_.groupMultiplierX8(gm);
+  unsigned groupX8 = VecRegs::groupMultiplierX8(gm);
   ElementWidth eew = ElementWidth::Byte;
   if (not isVecLegal()  or  not vecRegs_.legalConfig(eew, gm)  or  di->isMasked())
     {
@@ -11834,10 +11837,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
+  groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
-  if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
+  if (not VecRegs::groupNumberX8ToSymbol(groupX8, lmul))
     badConfig = true;
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
@@ -11982,10 +11985,10 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
+  groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
   bool badConfig = false;
-  if (not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul))
+  if (not VecRegs::groupNumberX8ToSymbol(groupX8, lmul))
     badConfig = true;
   else
     badConfig = not vecRegs_.legalConfig(eew, lmul);
@@ -12132,13 +12135,13 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.stData_.clear();
 
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
+  uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
@@ -12363,13 +12366,13 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.stData_.clear();
 
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
+  uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
@@ -12609,9 +12612,9 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
+  groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
@@ -12776,9 +12779,9 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
-  groupX8 = groupX8 * vecRegs_.elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
+  groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
   GroupMultiplier lmul = GroupMultiplier::One;
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(groupX8, lmul);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(groupX8, lmul);
   badConfig = badConfig or not vecRegs_.legalConfig(eew, lmul);
   badConfig = badConfig or (groupX8*fieldCount > 64);
 
@@ -13113,13 +13116,13 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.stData_.clear();
 
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
+  uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
@@ -13287,13 +13290,13 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
   vecRegs_.stData_.clear();
 
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
-  uint32_t offsetWidth = vecRegs_.elemWidthInBits(offsetEew);
+  uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 
   uint32_t groupX8 = vecRegs_.groupMultiplierX8();
   uint32_t offsetGroupX8 = (offsetWidth*groupX8)/elemWidth;
 
   GroupMultiplier offsetGroup{GroupMultiplier::One};
-  bool badConfig = not vecRegs_.groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
+  bool badConfig = not VecRegs::groupNumberX8ToSymbol(offsetGroupX8, offsetGroup);
   badConfig = badConfig or not vecRegs_.legalConfig(offsetEew, offsetGroup);
   if (not isVecLegal() or badConfig or not vecRegs_.legalConfig())
     {
@@ -14388,7 +14391,8 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwadd_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwadd_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Word2:  // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -14540,7 +14544,8 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     {
     case EW::Half:   vfwsub_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwsub_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Word2:  // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -14691,7 +14696,8 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     {
     case EW::Half:   vfwadd_wv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfwadd_wv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Word2:  // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -17198,10 +17204,10 @@ Hart<URV>::execVmfeq_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vmfeq_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfeq_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfeq_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:   // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17326,10 +17332,10 @@ Hart<URV>::execVmfne_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vmfne_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vmfne_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vmfne_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:   // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17451,10 +17457,10 @@ Hart<URV>::execVmflt_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vmflt_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmflt_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmflt_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -17573,10 +17579,10 @@ Hart<URV>::execVmfle_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vmfle_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vmfle_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vmfle_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
     default:        postVecFail(di); return;
     }
   postVecSuccess();
@@ -17817,10 +17823,10 @@ Hart<URV>::execVfclass_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfclass_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfclass_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfclass_v<double> (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:   // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
   postVecSuccess();
@@ -17879,11 +17885,11 @@ Hart<URV>::execVfcvt_xu_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -17941,11 +17947,11 @@ Hart<URV>::execVfcvt_x_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -17971,11 +17977,11 @@ Hart<URV>::execVfcvt_rtz_xu_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_xu_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18001,11 +18007,11 @@ Hart<URV>::execVfcvt_rtz_x_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_x_f_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18065,11 +18071,11 @@ Hart<URV>::execVfcvt_f_xu_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_f_xu_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_xu_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_xu_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18129,11 +18135,11 @@ Hart<URV>::execVfcvt_f_x_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfcvt_f_x_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfcvt_f_x_v<float>  (vd, vs1, group, start, elems, masked); break;
     case EW::Word2:  vfcvt_f_x_v<double> (vd, vs1, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    default:         postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18201,10 +18207,11 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18272,10 +18279,11 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18308,10 +18316,11 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfwcvt_xu_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfwcvt_xu_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18343,10 +18352,11 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfwcvt_x_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfwcvt_x_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -18591,9 +18601,9 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
     case EW::Half: vfwcvt_f_f_v<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word: vfwcvt_f_f_v<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte: // Fallthrough
     default:       postVecFail(di); return;
     }
   postVecSuccess();
@@ -18931,10 +18941,11 @@ Hart<URV>::execVfncvt_f_xu_w(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfncvt_f_xu_w<uint16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfncvt_f_xu_w<uint32_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits();
@@ -19005,10 +19016,11 @@ Hart<URV>::execVfncvt_f_x_w(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfncvt_f_x_w<int16_t>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfncvt_f_x_w<int32_t> (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits();
@@ -19078,9 +19090,10 @@ Hart<URV>::execVfncvt_f_f_w(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
     case EW::Word:   vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Word2:  // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -19121,10 +19134,11 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfncvt_f_f_w<Float16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Word:  vfncvt_f_f_w<float>  (vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits();
@@ -19196,11 +19210,11 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredsum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits();
@@ -19263,11 +19277,11 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredosum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits();
@@ -19331,11 +19345,11 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredmin_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmin_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmin_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   postVecSuccess();
@@ -19398,11 +19412,11 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfredmax_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfredmax_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfredmax_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   postVecSuccess();
@@ -19477,11 +19491,11 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfwredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits();
@@ -19549,11 +19563,11 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfwredosum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfwredosum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2:  postVecFail(di); return;
-    default:  postVecFail(di); return;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
 
   updateAccruedFpBits();
@@ -19751,11 +19765,11 @@ Hart<URV>::execVfmin_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfmin_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:   vfmin_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2:  vfmin_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
-    default:  postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    default:         postVecFail(di); return;
     }
 
   postVecSuccess();
@@ -19877,10 +19891,10 @@ Hart<URV>::execVfmax_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfmax_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfmax_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfmax_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20002,10 +20016,10 @@ Hart<URV>::execVfsgnj_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfsgnj_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnj_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnj_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20126,10 +20140,10 @@ Hart<URV>::execVfsgnjn_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfsgnjn_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjn_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjn_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20256,10 +20270,10 @@ Hart<URV>::execVfsgnjx_vv(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:  postVecFail(di); return;
     case EW::Half:  vfsgnjx_vv<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word:  vfsgnjx_vv<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Word2: vfsgnjx_vv<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
     default:        postVecFail(di); return;
     }
 
@@ -20361,9 +20375,10 @@ Hart<URV>::execVfncvtbf16_f_f_w(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte:   postVecFail(di); return;
     case EW::Half:   vfncvt_f_f_w<BFloat16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word:   postVecFail(di); return;
+    case EW::Byte:   // Fallthrough to invalid case
+    case EW::Word:   // Fallthrough to invalid case
+    case EW::Word2:  // Fallthrough to invalid case
     default:         postVecFail(di); return;
     }
 
@@ -20398,10 +20413,11 @@ Hart<URV>::execVfwcvtbf16_f_f_v(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Byte: postVecFail(di); return;
-    case EW::Half: vfwcvt_f_f_v<BFloat16>(vd, vs1, group, start, elems, masked); break;
-    case EW::Word: postVecFail(di); return;
-    default:       postVecFail(di); return;
+    case EW::Half:  vfwcvt_f_f_v<BFloat16>(vd, vs1, group, start, elems, masked); break;
+    case EW::Byte:  // Fallthrough to invalid case
+    case EW::Word:  // Fallthrough to invalid case
+    case EW::Word2: // Fallthrough to invalid case
+    default:        postVecFail(di); return;
     }
   postVecSuccess();
 }
@@ -20469,6 +20485,8 @@ Hart<URV>::execVfwmaccbf16_vf(const DecodedInst* di)
     }
   postVecSuccess();
 }
+
+//NOLINTEND(bugprone-signed-char-misuse)
 
 
 template class WdRiscv::Hart<uint32_t>;

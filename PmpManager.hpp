@@ -141,7 +141,7 @@ namespace WdRiscv
       for (const auto& region : regions_)
 	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pmp_;
-      return Pmp();
+      return {};
     }
 
     /// Return the physical memory protection object (pmp) associated
@@ -155,7 +155,7 @@ namespace WdRiscv
           if (pmp.pmpIndex() == ix)
             return pmp;
         }
-      return Pmp();
+      return {};
     }
 
     /// Similar to getPmp but it also updates the access count associated with
@@ -176,7 +176,7 @@ namespace WdRiscv
 	      }
 	    return pmp;
 	  }
-      return Pmp();
+      return {};
     }
 
     /// Enable/disable physical memory protection.

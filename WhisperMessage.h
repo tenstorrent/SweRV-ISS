@@ -45,10 +45,10 @@ enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap, DeferredInt
 struct WhisperMessage
 {
   WhisperMessage(uint32_t hart = 0, WhisperMessageType type = Invalid,
-		 uint32_t resource = 0, uint64_t address = 0, 
+		 uint32_t resource = 0, uint64_t address = 0,
 		 uint64_t value = 0, uint32_t size = 0, uint64_t instrTag = 0,
 		 uint64_t time = 0)
-    : hart(hart), type(type), resource(resource), size(size), flags(0),
+    : hart(hart), type(type), resource(resource), size(size),
       instrTag(instrTag), time(time), address(address), value(value)
   {
     std::ranges::fill(buffer, 0);
@@ -59,7 +59,7 @@ struct WhisperMessage
   uint32_t type;
   uint32_t resource;
   uint32_t size;
-  uint32_t flags;
+  uint32_t flags = 0;
   uint64_t instrTag; // Instruction tag.
   uint64_t time;     // Time stamp.
   uint64_t address;

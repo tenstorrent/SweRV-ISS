@@ -277,7 +277,7 @@ template <typename URV>
 bool
 Syscall<URV>::redirectOutputDescriptor(int fd, const std::string& path)
 {
-  if (fdMap_.count(fd))
+  if (fdMap_.contains(fd))
     {
       std::cerr << "Hart::redirectOutputDecritpor: Error: File decriptor " << fd
                 << " alrady used.\n";
@@ -306,7 +306,7 @@ template <typename URV>
 bool
 Syscall<URV>::redirectInputDescriptor(int fd, const std::string& path)
 {
-  if (fdMap_.count(fd))
+  if (fdMap_.contains(fd))
     {
       std::cerr << "Hart::redirectOutputDecritpor: Error: File decriptor " << fd
                 << " already used.\n";

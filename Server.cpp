@@ -452,18 +452,18 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
     case 's':
       {
 	bool ok = true;
-	if (req.address == WhisperSpecialResource::PrivMode)
-	  reply.value = unsigned(hart.privilegeMode());
-	else if (req.address == WhisperSpecialResource::PrevPrivMode)
-	  reply.value = unsigned(hart.lastPrivMode());
-	else if (req.address == WhisperSpecialResource::FpFlags)
-	  reply.value = hart.lastFpFlags();
-	else if (req.address == WhisperSpecialResource::Trap)
-	  reply.value = hart.lastInstructionTrapped()? 1 : 0;
+        if (req.address == WhisperSpecialResource::PrivMode)
+          reply.value = unsigned(hart.privilegeMode());
+        else if (req.address == WhisperSpecialResource::PrevPrivMode)
+          reply.value = unsigned(hart.lastPrivMode());
+        else if (req.address == WhisperSpecialResource::FpFlags)
+          reply.value = hart.lastFpFlags();
+        else if (req.address == WhisperSpecialResource::Trap)
+          reply.value = hart.lastInstructionTrapped()? 1 : 0;
         else if (req.address == WhisperSpecialResource::DeferredInterrupts)
           reply.value = hart.deferredInterrupts();
-	else
-	  ok = false;
+        else
+          ok = false;
         if (ok)
           return true;
         break;
@@ -608,7 +608,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   // Add disassembly of instruction to reply.
   DecodedInst di;
   hart.decode(0 /*addr: fake*/, 0 /*physAddr: fake*/, inst, di);
-  std::string text = "";
+  std::string text;
   if (disassemble_)
     disassembleAnnotateInst(hart, di, interrupted, hasPre, hasPost, text);
 
@@ -784,7 +784,7 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
     {
       std::vector<std::pair<uint64_t, uint64_t>> scVec;
       hart.lastSyscallChanges(scVec);
-      if (scVec.size())
+      if (not scVec.empty())
         collectSyscallMemChanges(hart, scVec, pendingChanges, slamAddr);
     }
 
@@ -978,7 +978,7 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
     }
 
   reply.size = items.size();
-  if (items.size())
+  if (not items.empty())
     memcpy(reply.buffer, items.data(), items.size()*sizeof(uint64_t));
 }
 

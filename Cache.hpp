@@ -78,7 +78,7 @@ namespace WdRiscv
             }
           if (not entry.valid())
 	    bestIx = ix;
-	  else if (lines[bestIx].valid() and entry.time_ < lines[bestIx].time_)
+          else if (lines[bestIx].valid() and entry.time_ < lines[bestIx].time_)
 	    bestIx = ix;
         }
 

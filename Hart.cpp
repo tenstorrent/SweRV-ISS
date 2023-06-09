@@ -327,7 +327,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (isRvs())
     sstc = isRvsstc();
   csRegs_.enableSstc(sstc);
-  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != NULL;
+  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
 
   enableRvzba(isa_.isEnabled(RvExtension::Zba));
   enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
@@ -2374,22 +2374,21 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2)
 {
   // Check if stuck because of lack of exception handler. Disable if
   // you do want the stuck behavior.
-  if (true)
+#if 1
+  if (instCounter_ == counterAtLastIllegal_ + 1)
+    consecutiveIllegalCount_++;
+  else
+    consecutiveIllegalCount_ = 0;
+
+  if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
     {
-      if (instCounter_ == counterAtLastIllegal_ + 1)
-	consecutiveIllegalCount_++;
-      else
-	consecutiveIllegalCount_ = 0;
-
-      if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
-	{
-	  throw CoreException(CoreException::Stop,
-			      "64 consecutive illegal instructions",
-			      0, 3);
-	}
-
-      counterAtLastIllegal_ = instCounter_;
+      throw CoreException(CoreException::Stop, 
+                          "64 consecutive illegal instructions", 
+                          0, 3);
     }
+
+  counterAtLastIllegal_ = instCounter_;
+#endif
 
   // In debug mode no exception is taken. If an ebreak exception and
   // debug park loop is defined, we jump to it. If not an ebreak and
@@ -3670,7 +3669,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 
 	  FpRegs::FpUnion u{val};
 	  bool done = false;
-	  if (isRvzfh() and fpRegs_.isBoxedHalf(val))
+          if (isRvzfh() and FpRegs::isBoxedHalf(val))
 	    {
 	      Float16 hpVal = u.hp;
 	      addToFpHistogram(prof.srcHisto_.at(srcIx), hpVal);
@@ -3678,7 +3677,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	    }
           else if (isRvf())
             {
-	      if (not isRvd() or fpRegs_.isBoxedSingle(val))
+	      if (not isRvd() or FpRegs::isBoxedSingle(val))
 		{
 		  FpRegs::FpUnion u{val};
 		  float spVal = u.sp;

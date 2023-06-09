@@ -22,7 +22,7 @@ BOOST_LIB_DIR := $(wildcard $(BOOST_DIR)/stage/lib $(BOOST_DIR)/lib)
 BOOST_LIBS := boost_program_options
 
 # Add extra dependency libraries here
-EXTRA_LIBS := -lpthread -lm -lz -ldl -lstdc++fs -static-libstdc++ -lrt
+EXTRA_LIBS := -lpthread -lm -lz -ldl -static-libstdc++ -lrt
 
 ifdef SOFT_FLOAT
   override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include

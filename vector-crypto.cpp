@@ -1364,7 +1364,7 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
       Uint128 s = brev8(y ^ x);
 
       for (unsigned bit = 0; bit < 128; bit++) {
-        if ((s >> i) & 1)
+        if ((s >> static_cast<int>(i)) & 1U)
 	  z ^= h;
 
 	bool reduce = ((h >> 127) & 1) != 0;
@@ -1419,7 +1419,7 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
 	assert(0);
       for (unsigned bit = 0; bit < 128; bit++)
 	{
-	  if ((y >> bit) & 1)
+	  if ((y >> static_cast<int>(bit)) & 1U)
 	    z ^= h;
 	  bool reduce = ((h >> 127) & 1) != 0;
 	  h <<= 1;
@@ -2439,19 +2439,19 @@ Hart<URV>::execVsm4k_vi(const DecodedInst* di)
       uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
 	rk3 = uint32_t(e1 >> 96);
 
-      uint32_t b = rk1 ^ rk2 ^ rk3 ^ ck[4 * rnd];
+      uint32_t b = rk1 ^ rk2 ^ rk3 ^ ck[std::size_t{4} * rnd];
       uint32_t s = sm4_subword(b);
       uint32_t rk4 = round_key(rk0, s);
 
-      b = rk2 ^ rk3 ^ rk4 ^ ck[4 * rnd + 1];
+      b = rk2 ^ rk3 ^ rk4 ^ ck[std::size_t{4} * rnd + 1];
       s = sm4_subword(b);
       uint32_t rk5 = round_key(rk1, s);
 
-      b = rk3 ^ rk4 ^ rk5 ^ ck[4 * rnd + 2];
+      b = rk3 ^ rk4 ^ rk5 ^ ck[std::size_t{4} * rnd + 2];
       s = sm4_subword(b);
       uint32_t rk6 = round_key(rk2, s);
 
-      b = rk4 ^ rk5 ^ rk6 ^ ck[4 * rnd + 3];
+      b = rk4 ^ rk5 ^ rk6 ^ ck[std::size_t{4} * rnd + 3];
       s = sm4_subword(b);
       uint32_t rk7 = round_key(rk3, s);
 

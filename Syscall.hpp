@@ -122,8 +122,9 @@ namespace WdRiscv
     /// corresponding to the target program file descriptor.
     int effectiveFd(int fd)
     {
-      if (fdMap_.count(fd))
-        return fdMap_.at(fd);
+      auto it = fdMap_.find(fd);
+      if (it != fdMap_.end())
+        return it->second;
       return fd;
     }
 

@@ -1309,7 +1309,7 @@ runServerShm(System<URV>& system, const std::string& serverFile,
       return false;
     }
 
-  char* shm = (char*) mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  char* shm = (char*) mmap(nullptr, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (shm == MAP_FAILED)
     {
       perror("Failed mmap");
@@ -1659,7 +1659,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 extern void (*__tracerExtension)(void*);
 void (*__tracerExtensionInit)() = nullptr;
 extern "C" {
-  std::string tracerExtensionArgs = "";
+  std::string tracerExtensionArgs;
 }
 
 template <typename URV>
@@ -1672,7 +1672,7 @@ loadTracerLibrary(const std::string& tracerLib)
 
   std::vector<std::string> result;
   boost::split(result, tracerLib, boost::is_any_of(":"));
-  assert(result.size() >= 1);
+  assert(not result.empty());
 
   auto* soPtr = dlopen(result[0].c_str(), RTLD_NOW);
   if (not soPtr)

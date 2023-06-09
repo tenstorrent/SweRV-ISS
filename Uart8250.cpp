@@ -130,7 +130,7 @@ Uart8250::monitorStdin()
   inPollfd.fd = fd;
   inPollfd.events = POLLIN;
 
-  while (1)
+  while (true)
     {
       if (terminate_)
 	return;

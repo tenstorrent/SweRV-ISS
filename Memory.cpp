@@ -624,10 +624,11 @@ Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
 bool
 Memory::findElfSymbol(const std::string& name, ElfSymbol& symbol) const
 {
-  if (not symbols_.count(name))
+  auto symbol_it = symbols_.find(name);
+  if (symbol_it == symbols_.end())
     return false;
 
-  symbol = symbols_.at(name);
+  symbol = symbol_it->second;
   return true;
 }
 
@@ -635,10 +636,11 @@ Memory::findElfSymbol(const std::string& name, ElfSymbol& symbol) const
 bool
 Memory::findElfSection(const std::string& name, ElfSymbol& symbol) const
 {
-  if (not sections_.count(name))
+  auto section_it = sections_.find(name);
+  if (section_it == sections_.end())
     return false;
 
-  symbol = sections_.at(name);
+  symbol = section_it->second;
   return true;
 }
 
