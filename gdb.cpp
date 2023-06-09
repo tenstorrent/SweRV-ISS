@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -91,7 +91,7 @@ byteToHexChars(uint8_t& byte, uint8_t& highDigit, uint8_t& lowDigit)
   highDigit = hexDigits[(byte >> 4)];
   lowDigit = hexDigits[byte & 0xf];
 }
-  
+
 
 static
 bool
@@ -148,7 +148,7 @@ receivePacketFromGdb(int fd, std::string& packet)
   ssize_t ix = 0;
   while (ix < count and buffer[ix] != '$')
     ++ix;
-      
+
   ++ix; // Skip '$'
 
   while (ix < count and buffer[ix] != '#')
@@ -367,7 +367,7 @@ getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
     }
 
   std::string pcNum = std::to_string(pcOffset);
-  xml += "    <reg name=\"pc\" bitsize=\"" + width + "\" regnum=\"";
+  xml += R"(    <reg name="pc" bitsize=")" + width + "\" regnum=\"";
   xml += pcNum + "\" save-restore=\"yes\" type=\"int\" group=\"general\"/>\n";
 
   xml += "  </feature>\n";
@@ -381,7 +381,7 @@ getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
         {
           std::string_view name = hart.fpRegName(ix);
           std::string num = std::to_string(ix + fpRegOffset);
-          xml += "    <reg name=\"" + std::string(name) + "\" bitsize=\"64\" regnum=\"";
+          xml += "    <reg name=\"" + std::string(name) + R"(" bitsize="64" regnum=")";
           xml += num + "\" save-restore=\"yes\" type=\"float\" group=\"fp\"/>\n";
         }
 
@@ -411,7 +411,7 @@ getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
   // CSR 0x1000 is used by gdb to obtain privilege mode.
   std::string num = std::to_string(0x1000 + csrOffset);
   xml += "  <feature name=\"org.gnu.gdb.riscv.virtual\">\n";
-  xml += "    <reg name=\"priv\" bitsize=\"" + width + "\" regnum=\"";
+  xml += R"(    <reg name="priv" bitsize=")" + width + "\" regnum=\"";
   xml += num + "\" save-restore=\"no\" type=\"int\" group=\"general\"/>\n";
   xml += "  </feature>\n";
 
@@ -512,7 +512,7 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd)
   std::string packet;
   packet.reserve(128);
 
-  while (1)
+  while (true)
     {
       reply.str("");
       reply.clear();
@@ -577,7 +577,7 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd)
 	    else
 	      {
 		unsigned threadId = 0;
-		if (packet[1] != 'c' or packet[1] != 'g')
+		if (packet[1] != 'c' and packet[1] != 'g')
 		  reply << "E01";
 		else if (not hexToInt(packet.substr(2), threadId))
 		  reply << "E01";
@@ -694,15 +694,15 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd)
 		else
 		  {
                     bool ok = true;
-		    if (regNum < pcOffset)
-		      ok = hart.pokeIntReg(regNum, value);
-		    else if (regNum == pcOffset)
-		      hart.pokePc(value);
-		    else if (regNum >= fpRegOffset and regNum < csrOffset)
-		      ok = hart.pokeFpReg(regNum - fpRegOffset, value);
+                    if (regNum < pcOffset)
+                      ok = hart.pokeIntReg(regNum, value);
+                    else if (regNum == pcOffset)
+                      hart.pokePc(value);
+                    else if (regNum >= fpRegOffset and regNum < csrOffset)
+                      ok = hart.pokeFpReg(regNum - fpRegOffset, value);
                     else if (regNum >= csrOffset)
                       ok = hart.pokeCsr(WdRiscv::CsrNumber(regNum - csrOffset), value);
-		    reply << (ok? "OK" : "E04");
+                    reply << (ok? "OK" : "E04");
 		  }
 	      }
 	  }
@@ -720,30 +720,30 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd)
 	  break;
 
 	case 'q':
-	  if (packet == "qC")
-	    reply << "QC 0";
-	  else if (packet == "qAttached")
-	    reply << "0";
-	  else if (packet == "qOffsets")
-	    reply << "Text=0;Data=0;Bss=0";
-	  else if (packet == "qSymbol::")
-	    reply << "OK";
-	  else if (packet == "qfThreadInfo")
-	    reply << "m0";
-	  else if (packet == "qsThreadInfo")
-	    reply << "l";
-	  else if (packet == "qTStatus")
-	    reply << "T0;tnotrun:0";
+          if (packet == "qC")
+            reply << "QC 0";
+          else if (packet == "qAttached")
+            reply << "0";
+          else if (packet == "qOffsets")
+            reply << "Text=0;Data=0;Bss=0";
+          else if (packet == "qSymbol::")
+            reply << "OK";
+          else if (packet == "qfThreadInfo")
+            reply << "m0";
+          else if (packet == "qsThreadInfo")
+            reply << "l";
+          else if (packet == "qTStatus")
+            reply << "T0;tnotrun:0";
           else if (packet.starts_with("qSupported"))
             reply << "qXfer:features:read+";
           else if (packet.starts_with("qXfer"))
             processXferQuery(packet, hart, reply);
-	  else
-	    {
-	      std::cerr << "Unhandled gdb request: " << packet << '\n';
-	      reply << ""; // Unsupported: Empty response.
-	    }
-	  break;
+          else
+            {
+              std::cerr << "Unhandled gdb request: " << packet << '\n';
+              reply << ""; // Unsupported: Empty response.
+            }
+          break;
 
 	case 'v':
 	  if (packet == "vMustReplyEmpty")

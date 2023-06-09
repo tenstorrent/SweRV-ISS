@@ -217,7 +217,7 @@ System<URV>::loadBinaryFiles(const std::vector<std::string>& files,
     {
       std::string filename = binaryFile;
       uint64_t offset = defOffset;
-      auto end = binaryFile.find(":");
+      auto end = binaryFile.find(':');
       if (end != std::string::npos)
         {
           filename = binaryFile.substr(0, end);

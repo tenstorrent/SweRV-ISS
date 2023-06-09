@@ -16,7 +16,7 @@ namespace WdRiscv
 
     Uartsf(uint64_t addr, uint64_t size);
 
-    ~Uartsf();
+    ~Uartsf() override;
 
     uint32_t read(uint64_t addr) override;
 

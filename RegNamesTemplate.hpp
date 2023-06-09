@@ -62,7 +62,7 @@ namespace WdRiscv
 
   private:
 
-    static const std::unordered_map<std::string_view, RegNumberEnum> buildNameToNumberMap()
+    static std::unordered_map<std::string_view, RegNumberEnum> buildNameToNumberMap()
     {
       std::unordered_map<std::string_view, RegNumberEnum> result;
 

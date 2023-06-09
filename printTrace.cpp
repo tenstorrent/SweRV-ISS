@@ -552,7 +552,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (reg > 0)
     {
       val64 = peekIntReg(reg);
-      buffer.print(intRegs_.regName(reg)).printChar('=').print(val64);
+      buffer.print(IntRegs<URV>::regName(reg)).printChar('=').print(val64);
       regCount++;
     }
 
@@ -564,7 +564,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       if (not isRvd())
 	val64 = uint32_t(val64);  // Clear top 32 bits if only F extension.
       if (regCount) buffer.printChar(';');
-      buffer.print(fpRegs_.regName(reg)).printChar('=').print(val64);
+      buffer.print(FpRegs::regName(reg)).printChar('=').print(val64);
       // Print incremental flags since FRM is sticky.
       unsigned fpFlags = lastFpFlags();
       if (fpFlags != 0)
@@ -626,9 +626,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 	{
 	  unsigned operand = di.ithOperand(i);
 	  if (type ==  OperandType::IntReg)
-	    buffer.print(sep).print(intRegs_.regName(operand));
+	    buffer.print(sep).print(IntRegs<URV>::regName(operand));
 	  else if (type ==  OperandType::FpReg)
-	    buffer.print(sep).print(fpRegs_.regName(operand));
+	    buffer.print(sep).print(FpRegs::regName(operand));
 	  else if (type == OperandType::CsReg)
 	    buffer.print(sep).printChar('c').print(std::to_string(operand));
 	  else if (type == OperandType::VecReg)

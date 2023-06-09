@@ -1758,7 +1758,7 @@ Interactive<URV>::replayCommand(const std::string& line,
 	  std::vector<std::string> tokens;
 	  boost::split(tokens, replayLine, boost::is_any_of(" \t"),
 		       boost::token_compress_on);
-	  if (tokens.size() > 0 and tokens.at(0) == "step")
+	  if (not tokens.empty() and tokens.at(0) == "step")
 	    count++;
 	  else if (tokens.size() > 1 and tokens.at(1) == "step")
 	    count++;

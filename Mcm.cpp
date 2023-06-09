@@ -217,7 +217,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
       hart.peekIntReg(di.op0(), val);
       if (val == 1)
 	return;  // store-conditional failed.
-      if (instr.memOps_.size() == 0)
+      if (instr.memOps_.empty())
 	{
 	  tag = instr.tag_;
 	  time = ~uint64_t(0); // Will be updated when SC drains to memory.
@@ -1154,8 +1154,10 @@ template <typename URV>
 bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
-  if (false and not op.internal_)
+#if 0
+  if (not op.internal_)
     return false;
+#endif
 
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
@@ -1176,7 +1178,8 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       // return false;
     }
 
-  if (false and mask != 0)
+#if 0
+  if (mask != 0)
     {
       cerr << "Error: Read op does not forward from preceeding stores"
 	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
@@ -1184,6 +1187,8 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	   << op.physAddr_ << std::dec << '\n';
       return false;
     }
+#endif
+
   return true;
 }
 
@@ -1382,7 +1387,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 
       // Is there a remote write between A and B memory time that
       // covers a byte of B.
-      if (instrA.memOps_.size() == 0 or instrB.memOps_.size() == 0)
+      if (instrA.memOps_.empty() or instrB.memOps_.empty())
 	{
 	  cerr << "Error: PPO Rule 2: Instruction with no memory operation: "
 	       << "hart-id=" << hart.hartId() << " tag1=" << instrA.tag_

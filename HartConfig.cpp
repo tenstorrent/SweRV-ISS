@@ -586,8 +586,8 @@ applyPerfEventMap(Hart<URV>& hart, const nlohmann::json& config)
 	  errors++;
 	  continue;
 	}
-      
-      if (eventNumbers.count(value))
+
+      if (eventNumbers.contains(value))
 	{
 	  std::cerr << "Event number " << value << " associaged with more than one event in mmode_perf_event_map in config file.\n";
 	  errors++;
@@ -847,7 +847,7 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
                         << bytes << ") is not a power of 2\n";
               errors++;
             }
-	  else
+          else
 	    bytesPerElem.at(ix) = bytes;
         }
     }
@@ -1292,7 +1292,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       if (memmap.contains(tag))
 	{
           URV io = 0;
-	  if (getJsonUnsigned("memmap.consoleio", memmap.at(tag), io))
+          if (getJsonUnsigned("memmap.consoleio", memmap.at(tag), io))
             hart.setConsoleIo(io);
           else
             errors++;

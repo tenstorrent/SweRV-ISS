@@ -24,7 +24,7 @@ LINK_LIBS := $(addprefix $(BOOST_LIB_DIR)/lib, $(addsuffix .a, $(BOOST_LIBS))) \
           -lpthread -lm -lz -ldl
 
 ifeq ($(shell uname -s),Linux)
-  LINK_LIBS += -lstdc++fs -Wl,-rpath=$$LD_LIBRARY_PATH
+  LINK_LIBS += -Wl,-rpath=$$LD_LIBRARY_PATH
 endif
 
 # For out of dbg/opt build
