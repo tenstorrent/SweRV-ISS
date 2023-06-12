@@ -84,15 +84,15 @@ notify-risc-p-cores:
   trigger:
     project: riscv/risc-p-cores
 
-notify-archcov:
-  <<: *notify-template
-  trigger:
-    project: riscv/dv/corearchcoverage
+# notify-archcov:
+#   <<: *notify-template
+#   trigger:
+#     project: riscv/dv/corearchcoverage
 
-notify-rv-tester:
-  <<: *notify-template
-  trigger:
-    project: riscv/dv/rv_tester
+# notify-rv-tester:
+#   <<: *notify-template
+#   trigger:
+#     project: riscv/dv/rv_tester
 
 .post-commit-test: # Maybe re-enable this at some point in the future
   stage: test
