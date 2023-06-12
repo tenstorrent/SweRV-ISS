@@ -14,7 +14,8 @@
 
 #pragma once
 
-#include <algorithm>
+#include <array>
+#include <span>
 #include <cstdint>
 
 
@@ -51,9 +52,16 @@ struct WhisperMessage
     : hart(hart), type(type), resource(resource), size(size),
       instrTag(instrTag), time(time), address(address), value(value)
   {
-    std::ranges::fill(buffer, 0);
-    std::ranges::fill(tag,    0);
+    buffer.fill(0);
+    tag.fill(0);
   }
+
+  /// Unpack socket message into the returned WhisperMessage object.
+  static WhisperMessage deserializeFrom(std::span<char> buffer);
+
+  /// Serialize the current WhisperMessage into the given buffer.
+  /// Return the number of bytes written into buffer.
+  size_t serializeTo(std::span<char> buffer) const;
 
   uint32_t hart;
   uint32_t type;
@@ -64,6 +72,6 @@ struct WhisperMessage
   uint64_t time;     // Time stamp.
   uint64_t address;
   uint64_t value;
-  char buffer[128];
-  char tag[20];
+  std::array<char, 128> buffer;
+  std::array<char, 20>  tag;
 };
