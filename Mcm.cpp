@@ -225,9 +225,7 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
     }
   else if (instEntry->isStore())
     return;   // No destination register.
-  else if (di.isLoad() or di.isAmo())
-    hasDep = false;
-  else if (di.isBranch())
+  else if (di.isLoad() or di.isAmo() or di.isBranch())
     hasDep = false;
 
   for (const auto& opIx : instr.memOps_)
@@ -1282,15 +1280,9 @@ template <typename URV>
 bool
 Mcm<URV>::instrHasRead(const McmInstr& instr) const
 {
-  for (auto opIx : instr.memOps_)
-    {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      const auto& op = sysMemOps_.at(opIx);
-      if (op.isRead_)
-	return true;
-    }
-  return false;
+  return std::ranges::any_of(instr.memOps_,
+                             [this](auto opIx) { return opIx < sysMemOps_.size() &&
+                                                        sysMemOps_.at(opIx).isRead_; });
 }
 
 
@@ -1298,15 +1290,9 @@ template <typename URV>
 bool
 Mcm<URV>::instrHasWrite(const McmInstr& instr) const
 {
-  for (auto opIx : instr.memOps_)
-    {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      const auto& op = sysMemOps_.at(opIx);
-      if (not op.isRead_)
-	return true;
-    }
-  return false;
+  return std::ranges::any_of(instr.memOps_,
+                             [this](auto opIx) { return opIx < sysMemOps_.size() &&
+                                                        not sysMemOps_.at(opIx).isRead_; });
 }
 
 
@@ -1588,11 +1574,10 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
       bool fail = false;
       if (instrA.di_.isAmo())
 	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
-      else if (not instrA.complete_)
-	fail = true; // Incomplete store might finish after B
-      else if (not instrB.memOps_.empty() and
-	       earliestOpTime(instrB) <= latestOpTime(instrA))
-	fail = true;  // A finishes after B
+      else
+        fail = (not instrA.complete_ or     // Incomplete store might finish after B
+	        (not instrB.memOps_.empty() and
+	         earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
 
       if (fail)
 	{
@@ -1636,11 +1621,10 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       bool fail = false;
       if (instrA.di_.isAmo())
 	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
-      else if (not instrA.complete_)
-	fail = true; // Incomplete store might finish after B
-      else if (not instrB.memOps_.empty() and
-	       earliestOpTime(instrB) <= latestOpTime(instrA))
-	fail = true;  // A finishes after B
+      else
+        fail = (not instrA.complete_ or     // Incomplete store might finish after B
+	        (not instrB.memOps_.empty() and
+	         earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
 
       if (fail)
 	{
@@ -1695,14 +1679,9 @@ Mcm<URV>::ppoRule8(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.di_.isLr())
 	continue;
 
-      bool fail = false;
-      if (not instrA.complete_)
-	fail = true;
-      else if (not instrB.memOps_.empty() and
-	       earliestOpTime(instrB) <= latestOpTime(instrA))
-	fail = true;  // A finishes after B
-
-      if (fail)
+      if (not instrA.complete_ or
+          (not instrB.memOps_.empty() and
+           earliestOpTime(instrB) <= latestOpTime(instrA)))
 	{
 	  cerr << "Error: PPO rule 8 failed: hart-id=" << hart.hartId()
 	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';

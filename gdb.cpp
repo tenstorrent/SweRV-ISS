@@ -41,7 +41,7 @@ getDebugChar(int fd)
 }
 
 
-static
+static constexpr
 int
 hexCharToInt(unsigned char c)
 {
@@ -83,11 +83,11 @@ hexCharToInt(char c, unsigned& value)
 
 /// Convert an 8-bit value to 2 headecimal characters.
 static
-inline
+constexpr
 void
-byteToHexChars(uint8_t& byte, uint8_t& highDigit, uint8_t& lowDigit)
+byteToHexChars(uint8_t byte, uint8_t& highDigit, uint8_t& lowDigit)
 {
-  static char hexDigits[] = "0123456789abcdef";
+  constexpr std::string_view hexDigits = "0123456789abcdef";
   highDigit = hexDigits[(byte >> 4)];
   lowDigit = hexDigits[byte & 0xf];
 }
@@ -137,10 +137,10 @@ receivePacketFromGdb(int fd, std::string& packet)
 {
   unsigned char ch = ' '; // Anything besides $ will do.
 
-  char buffer[1024];
+  std::array<char, 1024> buffer;
   uint8_t sum = 0;  // checksum
 
-  ssize_t count = read(fd, buffer, sizeof(buffer));
+  ssize_t count = read(fd, buffer.data(), buffer.size());
   if (count < 0)
     return;
 
@@ -190,8 +190,6 @@ receivePacketFromGdb(int fd, std::string& packet)
 static void
 sendPacketToGdb(const std::string& data, int fd)
 {
-  const char hexDigit[] = "0123456789abcdef";
-
   unsigned char checksum = 0;
   for (unsigned char c : data)
     checksum = static_cast<uint8_t>(checksum + c);
@@ -199,11 +197,14 @@ sendPacketToGdb(const std::string& data, int fd)
   std::string packet;
   packet.reserve(8 + data.size());
 
+  unsigned char lowerDigit, highDigit;
+  byteToHexChars(checksum, highDigit, lowerDigit);
+
   packet.push_back('$');
   packet += data;
   packet.push_back('#');
-  packet.push_back(hexDigit[checksum >> 4]);
-  packet.push_back(hexDigit[checksum & 0xf]);
+  packet.push_back(highDigit);
+  packet.push_back(lowerDigit);
 
   while (true)
     {
@@ -288,10 +289,7 @@ hexToInt(const std::string& str, T& value)
     return false;
 
   value = static_cast<T>(v);
-  if (v != value)
-    return false; // Overflow
-
-  return true;
+  return v == value;
 }
 
 
@@ -344,12 +342,10 @@ handlePeekRegisterForGdb(WdRiscv::Hart<URV>& hart, unsigned regNum,
 
 
 template <typename URV>
-void
-getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
+std::string
+getGdbTargetXml(WdRiscv::Hart<URV>& hart)
 {
-  xml.clear();
-
-  xml += R"zzz(<?xml version="1.0"?>
+  std::string xml = R"zzz(<?xml version="1.0"?>
 <!DOCTYPE target SYSTEM "gdb-target.dtd">
 <target version="1.0">
   <feature name="org.gnu.gdb.riscv.cpu">
@@ -416,12 +412,10 @@ getGdbTargetXml(WdRiscv::Hart<URV>& hart, std::string& xml)
   xml += "  </feature>\n";
 
   xml += "</target>";
+
+  return xml;
 }
 
-
-// XML describing this RISCV processor to gdb.
-static std::string targetXml;
-static std::mutex xmlMutex;
 
 template <typename URV>
 void
@@ -446,13 +440,9 @@ processXferQuery(const std::string& packet, WdRiscv::Hart<URV>& hart,
       return;
     }
 
-  {
-    std::lock_guard<std::mutex> lock(xmlMutex);
-
-    // Fill xml string on first call to this function.
-    if (targetXml.empty())
-      getGdbTargetXml(hart, targetXml);
-  }
+  // XML describing this RISCV processor to gdb.
+  // This initialization is thread-safe in C++11 or later.
+  static const std::string targetXml = getGdbTargetXml(hart);
 
   auto part = targetXml.substr(offset, length);
   if (offset + length < targetXml.size())
@@ -577,13 +567,11 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd)
 	    else
 	      {
 		unsigned threadId = 0;
-		if (packet[1] != 'c' and packet[1] != 'g')
+                if ((packet[1] != 'c' and packet[1] != 'g') or
+                    not hexToInt(packet.substr(2), threadId) or
+                    threadId != 0) // Multi-thread not supported yet.
 		  reply << "E01";
-		else if (not hexToInt(packet.substr(2), threadId))
-		  reply << "E01";
-		else if (threadId != 0)
-		  reply << "E01";  // Multi-thread not supported yet.
-		else
+                else
 		  reply << "OK";
 	      }
 	  }
@@ -746,16 +734,12 @@ handleExceptionForGdb(WdRiscv::Hart<URV>& hart, int fd)
           break;
 
 	case 'v':
-	  if (packet == "vMustReplyEmpty")
+	  if (packet == "vMustReplyEmpty" or packet == "vCont?")
 	    reply << "";
 	  else if (packet.find("vKill;") == 0)
 	    {
 	      reply << "OK";
 	      gotQuit = true;
-	    }
-	  else if (packet == "vCont?")
-	    {
-	      reply << "";
 	    }
 	  else
 	    {

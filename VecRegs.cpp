@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <iostream>
+#include <charconv>
 #include <cmath>
 #include <cstring>
 #include "VecRegs.hpp"
@@ -197,7 +198,7 @@ VecRegs::reset()
 
 
 bool
-VecRegs::findReg(std::string_view name, unsigned& ix) const
+VecRegs::findReg(std::string_view name, unsigned& ix)
 {
   if (name.empty())
     return false;
@@ -212,11 +213,10 @@ VecRegs::findReg(std::string_view name, unsigned& ix) const
       numStr = numStr.substr(2);
       base = 16;
     }
-  std::string byteStr = std::string(numStr);
 
-  char* end = nullptr;
-  unsigned n = strtoul(byteStr.c_str(), &end, base);
-  if (end and *end)
+  unsigned n;
+  if (auto result = std::from_chars(numStr.cbegin(), numStr.cend(), n, base);
+      result.ec != std::errc{} or result.ptr != numStr.cend())
     return false;
 
   ix = n;

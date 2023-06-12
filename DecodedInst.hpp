@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <array>
 #include <string_view>
 #include "InstEntry.hpp"
 #include "InstId.hpp"
@@ -372,7 +373,7 @@ namespace WdRiscv
     uint32_t op2_;    // 3rd operand (register number or immediate value)
     uint32_t op3_;    // 4th operand (typically a register number)
 
-    uint64_t values_[4];  // Values of operands.
+    std::array<uint64_t, 4> values_;  // Values of operands.
     bool valid_;
     bool masked_;     // For vector instructions.
     uint8_t vecFields_;   // For vector ld/st instructions.

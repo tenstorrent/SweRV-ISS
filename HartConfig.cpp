@@ -1677,10 +1677,7 @@ HartConfig::configMemory(System<URV>& system, bool unmappedElfOk) const
   system.checkUnmappedElf(not unmappedElfOk);
 
   auto& hart0 = *system.ithHart(0);
-  if (not applyMemoryConfig(hart0))
-    return false;
-
-  return true;
+  return applyMemoryConfig(hart0);
 }
 
 

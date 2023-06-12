@@ -305,10 +305,7 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
     return false;
 
   Filesystem::path branchPath = dirPath / "branch-trace";
-  if (not hart.saveBranchTrace(branchPath))
-    return false;
-
-  return true;
+  return hart.saveBranchTrace(branchPath);
 }
 
 
@@ -365,10 +362,7 @@ System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
     return false;
 
   Filesystem::path fdPath = dirPath / "fd";
-  if (not syscall.loadFileDescriptors(fdPath.string()))
-    return false;
-
-  return true;
+  return syscall.loadFileDescriptors(fdPath.string());
 }
 
 

@@ -82,9 +82,7 @@ loadSnapshotValue(std::istream& stream, uint64_t& val)
     return false;
   char* extra = nullptr;
   val = strtoull(str.c_str(), &extra, 0);
-  if (extra and *extra)
-    return false;
-  return true;
+  return not extra or not *extra;
 }
 
 

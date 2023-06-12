@@ -294,12 +294,17 @@ namespace WdRiscv
     template<typename T>
     bool writeIo(uint64_t addr, T val)
     {
-      for (auto& dev : ioDevs_)
-	if (dev->isAddressInRange(addr))
-	  {
-	    dev->write(addr, val);
-	    return true;
-	  }
+      auto firstInRangeDevIt = std::find_if(ioDevs_.begin(),
+                                            ioDevs_.end(),
+                                            [addr](const auto& dev) {
+                                              return dev->isAddressInRange(addr);
+                                            });
+
+      if (firstInRangeDevIt != ioDevs_.end())
+        {
+          (*firstInRangeDevIt)->write(addr, val);
+          return true;
+        }
       return false;
     }
 
@@ -492,7 +497,7 @@ namespace WdRiscv
     /// Take a snapshot of the entire simulated memory into binary
     /// file. Return true on success or false on failure
     bool saveSnapshot(const std::string& filename,
-                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
+                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks) const;
 
     /// Load the simulated memory from snapshot binary file. Return
     /// true on success or false on failure
@@ -666,9 +671,8 @@ namespace WdRiscv
         {
           if (i == sysHartIx) continue;
           auto& res = reservations_[i];
-          if (addr >= res.addr_ and (addr - res.addr_) < res.size_)
-            res.valid_ = false;
-          else if (addr < res.addr_ and (res.addr_ - addr) < storeSize)
+          if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
+              (addr < res.addr_ and (res.addr_ - addr) < storeSize))
             res.valid_ = false;
         }
     }
@@ -680,9 +684,8 @@ namespace WdRiscv
     {
       for (auto & res : reservations_)
         {
-          if (addr >= res.addr_ and (addr - res.addr_) < res.size_)
-            res.valid_ = false;
-          else if (addr < res.addr_ and (res.addr_ - addr) < storeSize)
+          if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
+              (addr < res.addr_ and (res.addr_ - addr) < storeSize))
             res.valid_ = false;
         }
     }
@@ -719,9 +722,9 @@ namespace WdRiscv
     /// Helper to loadElfFile: Collet ELF sections.
     void collectElfSections(ELFIO::elfio& reader);
 
-    bool saveAddressTrace(std::string_view tag,
-			  const std::unordered_map<uint64_t, uint64_t>& lineMap,
-			  const std::string& path) const;
+    static bool saveAddressTrace(std::string_view tag,
+                                 const std::unordered_map<uint64_t, uint64_t>& lineMap,
+                                 const std::string& path);
 
     /// Add line of given address to the data line address trace.
     void traceDataLine(uint64_t addr) const

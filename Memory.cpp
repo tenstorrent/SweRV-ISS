@@ -775,7 +775,7 @@ Memory::isSymbolInElfFile(const std::string& path, const std::string& target)
 
 bool
 Memory::saveSnapshot(const std::string& filename,
-                     const std::vector<std::pair<uint64_t,uint64_t>>& usedBlocks)
+                     const std::vector<std::pair<uint64_t,uint64_t>>& usedBlocks) const
 {
   constexpr size_t maxChunk = size_t(1) << 28;
 
@@ -949,7 +949,7 @@ Memory::loadSnapshot(const std::string & filename,
 bool
 Memory::saveAddressTrace(std::string_view tag,
 			 const std::unordered_map<uint64_t, uint64_t>& lineMap,
-			 const std::string& path) const
+			 const std::string& path)
 {
   std::ofstream out(path, std::ios::trunc);
 

@@ -289,7 +289,7 @@ namespace WdRiscv
     /// given name returning true on success and false if no such
     /// register.  For example, if name is "v2" then ix will be set to
     /// 2.
-    bool findReg(std::string_view name, unsigned& ix) const;
+    static bool findReg(std::string_view name, unsigned& ix);
 
     /// Get the addresses, data, and element size of the memory
     /// locations accessed by the most recent instruction. Return true
@@ -318,7 +318,7 @@ namespace WdRiscv
     /// Set symbol to the symbolic value of the given numeric group
     /// multiplier (premultiplied by 8). Return true on success and
     /// false if groupX8 is out of bounds.
-    static inline
+    static constexpr
     bool groupNumberX8ToSymbol(uint32_t groupX8, GroupMultiplier& symbol)
     {
       if (groupX8 == 1)  { symbol = GroupMultiplier::Eighth;   return true; }
@@ -334,7 +334,7 @@ namespace WdRiscv
     /// Set dsew to the double of the given sew returning true on
     /// succes and false if given sew cannot be doubled.  false if
     /// groupX8 is out of bounds.
-    static
+    static constexpr
     bool doubleSew(ElementWidth sew, ElementWidth& dsew)
     {
       using EW = ElementWidth;
@@ -349,13 +349,13 @@ namespace WdRiscv
     }
 
     /// Convert the given symbolic element width to a byte count.
-    static uint32_t elemWidthInBytes(ElementWidth sew)
+    static constexpr uint32_t elemWidthInBytes(ElementWidth sew)
     { return uint32_t(1) << uint32_t(sew); }
 
     /// Convert the given symbolic group multiplier to a number scaled by
     /// eight (e.g. One is converted to 8, and Eigth to 1). Return 0 if
     /// given symbolic multiplier is not valid.
-    static uint32_t groupMultiplierX8(GroupMultiplier gm)
+    static constexpr uint32_t groupMultiplierX8(GroupMultiplier gm)
     {
       if (gm < GroupMultiplier::Reserved)
         return 8*(uint32_t(1) << uint32_t(gm));
@@ -372,7 +372,7 @@ namespace WdRiscv
 
     /// Return the maximum lement count for the given group multiplier
     /// element width.
-    uint32_t vlmax(GroupMultiplier gm, ElementWidth eew)
+    uint32_t vlmax(GroupMultiplier gm, ElementWidth eew) const
     {
       uint32_t gm8 = groupMultiplierX8(gm);
       uint32_t eewInBits = elemWidthInBits(eew);

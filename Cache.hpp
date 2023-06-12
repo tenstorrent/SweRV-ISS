@@ -76,9 +76,8 @@ namespace WdRiscv
 	      hit = true;
               break;
             }
-          if (not entry.valid())
-	    bestIx = ix;
-          else if (lines[bestIx].valid() and entry.time_ < lines[bestIx].time_)
+          if (not entry.valid() or
+              (lines[bestIx].valid() and entry.time_ < lines[bestIx].time_))
 	    bestIx = ix;
         }
 
@@ -134,7 +133,7 @@ namespace WdRiscv
 
     /// Take a snapshot of the cache tags into the given file. Return
     /// true on success or false on failure
-    bool saveSnapshot(const std::string& path);
+    bool saveSnapshot(const std::string& path) const;
 
     /// Load the cache tags from the snapshot file. Return true on
     /// success and fase on failure.

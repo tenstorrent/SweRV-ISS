@@ -7,13 +7,17 @@
 
 using namespace WdRiscv;
 
-static std::mutex printInstTraceMutex;
-
+//NOLINTNEXTLINE(bugprone-reserved-identifier, cppcoreguidelines-avoid-non-const-global-variables)
 void (*__tracerExtension)(void*) = nullptr;
 
+static std::mutex& printInstTraceMutex()
+{
+  static std::mutex value;
+  return value;
+}
 
-static
-const char*
+static constexpr
+std::string_view
 privilegeModeToStr(bool vm, PrivilegeMode pm)
 {
   if (not vm)
@@ -35,24 +39,24 @@ template <typename URV>
 void
 formatVecInstTrace(FILE* out, uint64_t tag, unsigned hartId,
                    bool vm, PrivilegeMode pm,
-		   URV currPc, const char* opcode, unsigned vecReg,
-		   const uint8_t* data, unsigned byteCount, const char* assembly);
+		   URV currPc, std::string_view opcode, unsigned vecReg,
+		   const uint8_t* data, unsigned byteCount, std::string_view assembly);
 
 
 template <>
 void
 formatVecInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId,
 			     bool vm, PrivilegeMode pm,
-			     uint32_t currPc, const char* opcode,
+			     uint32_t currPc, std::string_view opcode,
 			     unsigned vecReg, const uint8_t* data,
-			     unsigned byteCount, const char* assembly)
+			     unsigned byteCount, std::string_view assembly)
 {
-  const char* pmStr = privilegeModeToStr(vm, pm);
+  std::string_view pmStr = privilegeModeToStr(vm, pm);
   fprintf(out, "#%jd %d %2s %08x %8s v %02x ",
-	  uintmax_t(tag), hartId, pmStr, currPc, opcode, vecReg);
+	  uintmax_t(tag), hartId, pmStr.data(), currPc, opcode.data(), vecReg);
   for (unsigned i = 0; i < byteCount; ++i)
     fprintf(out, "%02x", data[byteCount - 1 - i]);
-  fprintf(out, " %s", assembly);
+  fprintf(out, " %s", assembly.data());
 }
 
 
@@ -60,16 +64,16 @@ template <>
 void
 formatVecInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
 			     bool vm, PrivilegeMode pm,
-			     uint64_t currPc, const char* opcode,
+			     uint64_t currPc, std::string_view opcode,
 			     unsigned vecReg, const uint8_t* data,
-			     unsigned byteCount, const char* assembly)
+			     unsigned byteCount, std::string_view assembly)
 {
-  const char* pmStr = privilegeModeToStr(vm, pm);
+  std::string_view pmStr = privilegeModeToStr(vm, pm);
   fprintf(out, "#%jd %d %2s %016jx %8s v %02x ",
-          uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, vecReg);
+          uintmax_t(tag), hartId, pmStr.data(), uintmax_t(currPc), opcode.data(), vecReg);
   for (unsigned i = 0; i < byteCount; ++i)
     fprintf(out, "%02x", data[byteCount - 1 - i]);
-  fprintf(out, " %s", assembly);
+  fprintf(out, " %s", assembly.data());
 }
 
 
@@ -77,36 +81,36 @@ template <typename URV>
 void
 formatInstTrace(FILE* out, uint64_t tag, unsigned hartId,
                 bool vm, PrivilegeMode pm,
-		URV currPc, const char* opcode, char resource, URV addr,
-		URV value, const char* assembly);
+		URV currPc, std::string_view opcode, char resource, URV addr,
+		URV value, std::string_view assembly);
 
 template <>
 void
 formatInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId,
 			  bool vm, PrivilegeMode pm,
-                          uint32_t currPc, const char* opcode, char resource, uint32_t addr,
-                          uint32_t value, const char* assembly)
+                          uint32_t currPc, std::string_view opcode, char resource, uint32_t addr,
+                          uint32_t value, std::string_view assembly)
 {
-  const char* pmStr = privilegeModeToStr(vm, pm);
+  std::string_view pmStr = privilegeModeToStr(vm, pm);
 
   if (resource == 'r')
     {
       fprintf(out, "#%jd %d %2s %08x %8s r %02x         %08x  %s",
-              uintmax_t(tag), hartId, pmStr, currPc, opcode, addr, value, assembly);
+              uintmax_t(tag), hartId, pmStr.data(), currPc, opcode.data(), addr, value, assembly.data());
     }
   else if (resource == 'c')
     {
       if ((addr >> 16) == 0)
         fprintf(out, "#%jd %d %2s %08x %8s c %04x       %08x  %s",
-                uintmax_t(tag), hartId, pmStr, currPc, opcode, addr, value, assembly);
+                uintmax_t(tag), hartId, pmStr.data(), currPc, opcode.data(), addr, value, assembly.data());
       else
         fprintf(out, "#%jd %d %2s %08x %8s c %08x   %08x  %s",
-                uintmax_t(tag), hartId, pmStr, currPc, opcode, addr, value, assembly);
+                uintmax_t(tag), hartId, pmStr.data(), currPc, opcode.data(), addr, value, assembly.data());
     }
   else
     {
       fprintf(out, "#%jd %d %2s %08x %8s %c %08x   %08x  %s", uintmax_t(tag), hartId,
-              pmStr, currPc, opcode, resource, addr, value, assembly);
+              pmStr.data(), currPc, opcode.data(), resource, addr, value, assembly.data());
     }
 }
 
@@ -115,63 +119,63 @@ template <>
 void
 formatInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId,
                           bool vm, PrivilegeMode pm,
-                          uint64_t currPc, const char* opcode, char resource, uint64_t addr,
-                          uint64_t value, const char* assembly)
+                          uint64_t currPc, std::string_view opcode, char resource, uint64_t addr,
+                          uint64_t value, std::string_view assembly)
 {
-  const char* pmStr = privilegeModeToStr(vm, pm);
+  std::string_view pmStr = privilegeModeToStr(vm, pm);
   fprintf(out, "#%jd %d %2s %016jx %8s %c %016jx %016jx %s",
-          uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, resource,
-	  uintmax_t(addr), uintmax_t(value), assembly);
+          uintmax_t(tag), hartId, pmStr.data(), uintmax_t(currPc), opcode.data(), resource,
+	  uintmax_t(addr), uintmax_t(value), assembly.data());
 }
 
 
 template <typename URV>
 void
 formatFpInstTrace(FILE* out, uint64_t tag, unsigned hartId, bool vm, PrivilegeMode pm,
-		  URV currPc, const char* opcode, unsigned fpReg,
-		  uint64_t fpVal, unsigned width, const char* assembly);
+		  URV currPc, std::string_view opcode, unsigned fpReg,
+		  uint64_t fpVal, unsigned width, std::string_view assembly);
 
 template <>
 void
 formatFpInstTrace<uint32_t>(FILE* out, uint64_t tag, unsigned hartId, bool vm, PrivilegeMode pm,
-			    uint32_t currPc, const char* opcode, unsigned fpReg,
+			    uint32_t currPc, std::string_view opcode, unsigned fpReg,
 			    uint64_t fpVal, unsigned width,
-			    const char* assembly)
+			    std::string_view assembly)
 {
-  const char* pmStr = privilegeModeToStr(vm, pm);
+  std::string_view pmStr = privilegeModeToStr(vm, pm);
   if (width == 64)
     {
       fprintf(out, "#%jd %d %2s %08x %8s f %02x %016jx  %s", uintmax_t(tag), hartId,
-	      pmStr, currPc, opcode, fpReg, uintmax_t(fpVal), assembly);
+	      pmStr.data(), currPc, opcode.data(), fpReg, uintmax_t(fpVal), assembly.data());
     }
   else
     {
       uint32_t val32 = fpVal;
       fprintf(out, "#%jd %d %2s %08x %8s f %02x         %08x  %s",
-	      uintmax_t(tag), hartId, pmStr, currPc, opcode, fpReg, val32, assembly);
+	      uintmax_t(tag), hartId, pmStr.data(), currPc, opcode.data(), fpReg, val32, assembly.data());
     }
 }
 
 template <>
 void
 formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, unsigned hartId, bool vm, PrivilegeMode pm,
-			    uint64_t currPc, const char* opcode, unsigned fpReg,
+			    uint64_t currPc, std::string_view opcode, unsigned fpReg,
 			    uint64_t fpVal, unsigned width,
-			    const char* assembly)
+			    std::string_view assembly)
 {
-  const char* pmStr = privilegeModeToStr(vm, pm);
+  std::string_view pmStr = privilegeModeToStr(vm, pm);
   if (width == 64)
     {
       fprintf(out, "#%jd %d %2s %016jx %8s f %016jx %016jx %s",
-	      uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, uintmax_t(fpReg),
-	      uintmax_t(fpVal), assembly);
+	      uintmax_t(tag), hartId, pmStr.data(), uintmax_t(currPc), opcode.data(), uintmax_t(fpReg),
+	      uintmax_t(fpVal), assembly.data());
     }
   else
     {
       uint32_t val32 = fpVal;
       fprintf(out, "#%jd %d %2s %016jx %8s f %016jx         %08x %s",
-	      uintmax_t(tag), hartId, pmStr, uintmax_t(currPc), opcode, uintmax_t(fpReg),
-	      val32, assembly);
+	      uintmax_t(tag), hartId, pmStr.data(), uintmax_t(currPc), opcode.data(), uintmax_t(fpReg),
+	      val32, assembly.data());
     }
 }
 
@@ -243,7 +247,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Serialize to avoid jumbled output.
-  std::lock_guard<std::mutex> guard(printInstTraceMutex);
+  std::lock_guard<std::mutex> guard(printInstTraceMutex());
 
   disassembleInst(di, tmp);
   if (hasInterrupt_)
@@ -269,11 +273,13 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       tmp += " [" + oss.str() + "]";
     }
 
-  char instBuff[128];
+  std::array<char, 128> instBuff;
+  int                   instLen;
   if (di.instSize() == 4)
-    snprintf(instBuff, sizeof(instBuff), "%08x", di.inst());
+    instLen = snprintf(instBuff.data(), instBuff.size(), "%08x", di.inst());
   else
-    snprintf(instBuff, sizeof(instBuff), "%04x", di.inst() & 0xffff);
+    instLen = snprintf(instBuff.data(), instBuff.size(), "%04x", di.inst() & 0xffff);
+  std::string_view instSV = std::string_view(instBuff.begin(), instLen);
 
   bool pending = false;  // True if a printed line need to be terminated.
 
@@ -285,8 +291,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   if (reg > 0)
     {
       value = intRegs_.read(reg);
-      formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, 'r',
-			   reg, value, tmp.c_str());
+      formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instSV, 'r',
+			   reg, value, tmp);
       pending = true;
     }
 
@@ -297,8 +303,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
       uint64_t val = fpRegs_.readBitsRaw(fpReg);
       if (pending) fprintf(out, "  +\n");
       unsigned width = isRvd() ? 64 : 32;
-      formatFpInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, fpReg,
-			     val, width, tmp.c_str());
+      formatFpInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instSV, fpReg,
+			     val, width, tmp);
       pending = true;
     }
 
@@ -311,10 +317,10 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 	{
 	  if (pending)
 	    fprintf(out, " +\n");
-	  formatVecInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff,
+	  formatVecInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instSV,
 				  vecReg, vecRegs_.getVecData(vecReg),
 				  vecRegs_.bytesPerRegister(),
-				  tmp.c_str());
+				  tmp);
 	  pending = true;
 	}
     }
@@ -324,8 +330,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     {
       if (pending)
 	fprintf(out, "  +\n");
-      formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, 'm',
-			   URV(ldStAddr_), URV(ldStData_), tmp.c_str());
+      formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instSV, 'm',
+			   URV(ldStAddr_), URV(ldStData_), tmp);
       pending = true;
     }
 
@@ -344,8 +350,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 
               if (pending)
                 fprintf(out, "  +\n");
-              formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, 'm',
-                                   addr, val, tmp.c_str());
+              formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instSV, 'm',
+                                   addr, val, tmp);
               pending = true;
             }
         }
@@ -408,14 +414,14 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   for (const auto& cvp : cvps)
     {
       if (pending) fprintf(out, "  +\n");
-      formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, 'c',
-			   cvp.first, cvp.second, tmp.c_str());
+      formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instSV, 'c',
+			   cvp.first, cvp.second, tmp);
       pending = true;
     }
 
   if (not pending)
-    formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instBuff, 'r', 0, 0,
-			 tmp.c_str());  // No change: emit X0 as modified reg.
+    formatInstTrace<URV>(out, tag, hartIx_, lastVirt_, lastPriv_, currPc_, instSV, 'r', 0, 0,
+			 tmp);  // No change: emit X0 as modified reg.
 
   if (tracePtw_)
     {
@@ -513,15 +519,12 @@ namespace Whisper
 }
 
 
-Whisper::PrintBuffer buffer;
-
-
 template <typename URV>
 void
 Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 {
   // Serialize to avoid jumbled output.
-  std::lock_guard<std::mutex> guard(printInstTraceMutex);
+  std::lock_guard<std::mutex> guard(printInstTraceMutex());
 
   if (not traceHeaderPrinted_)
     {
@@ -534,6 +537,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       fprintf(out, "\n");
     }
 
+  static Whisper::PrintBuffer buffer;
   buffer.clear();
 
   // Program counter.
@@ -792,12 +796,13 @@ template <typename URV>
 void
 Hart<URV>::reportInstsPerSec(uint64_t instCount, double elapsed, bool userStop)
 {
-  std::lock_guard<std::mutex> guard(printInstTraceMutex);
+  std::lock_guard<std::mutex> guard(printInstTraceMutex());
 
   std::cout.flush();
 
-  char secStr[20];
-  snprintf(secStr, sizeof(secStr), "%.2fs", elapsed);
+  std::array<char, 20> secBuf;
+  int                  secLen = snprintf(secBuf.data(), secBuf.size(), "%.2fs", elapsed);
+  std::string_view     secStr = std::string_view(secBuf.begin(), secLen);
 
   if (userStop)
     std::cerr << "User stop\n";
@@ -844,7 +849,7 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
   using std::cerr;
 
   {
-    std::lock_guard<std::mutex> guard(printInstTraceMutex);
+    std::lock_guard<std::mutex> guard(printInstTraceMutex());
 
     cerr << std::dec;
     if (ce.type() == CoreException::Stop)

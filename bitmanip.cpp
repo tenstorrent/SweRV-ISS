@@ -151,21 +151,17 @@ Hart<URV>::execOrc_b(const DecodedInst* di)
       return;
     }
 
-  union converter_t
-  {
-    URV     urv;
-    uint8_t bytes[sizeof(URV)];
-  } u;
-
   // GCC 12 optimizes the following down to couple of vector instructions
   // on Arm and x86_64.
-  u.urv = intRegs_.read(di->op1());
-  for (size_t i = 0; i < sizeof(u.bytes); i++)
+  URV  urv   = intRegs_.read(di->op1());
+  auto bytes = std::bit_cast<std::array<uint8_t, sizeof(URV)>>(urv);
+  for (size_t i = 0; i < bytes.size(); i++)
     {
-      u.bytes[i] = (u.bytes[i] == 0 ? 0 : UINT8_MAX);
+      bytes[i] = (bytes[i] == 0 ? 0 : UINT8_MAX);
     }
+  urv = std::bit_cast<URV>(bytes);
 
-  intRegs_.write(di->op0(), u.urv);
+  intRegs_.write(di->op0(), urv);
 }
 
 
@@ -2004,8 +2000,8 @@ Hart<URV>::execBmator(const DecodedInst* di)
       return;
     }
 
-  uint8_t u[8]; // rows of rs1
-  uint8_t v[8]; // cols of rs2
+  std::array<uint8_t, 8> u; // rows of rs1
+  std::array<uint8_t, 8> v; // cols of rs2
 
   uint64_t rs1 = intRegs_.read(di->op1());
   uint64_t rs2 = intRegs_.read(di->op2());
@@ -2042,8 +2038,8 @@ Hart<URV>::execBmatxor(const DecodedInst* di)
       return;
     }
 
-  uint8_t u[8]; // rows of rs1
-  uint8_t v[8]; // cols of rs2
+  std::array<uint8_t, 8> u; // rows of rs1
+  std::array<uint8_t, 8> v; // cols of rs2
 
   uint64_t rs1 = intRegs_.read(di->op1());
   uint64_t rs2 = intRegs_.read(di->op2());

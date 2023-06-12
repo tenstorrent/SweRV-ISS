@@ -37,5 +37,7 @@ Checks: >
     -readability-uppercase-literal-suffix
 
 CheckOptions:
+  - key:   bugprone-reserved-identifier.AllowedIdentifiers
+    value: '_Count;_End'
   - key:   bugprone-signed-char-misuse.CharTypdefsToIgnore
     value: 'int8_t'

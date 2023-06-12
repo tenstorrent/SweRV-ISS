@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <charconv>
 #include <iostream>
@@ -8,7 +9,7 @@ using namespace WdRiscv;
 
 // Use this constant list to allow a compile-time check to ensure each extension has a
 // value.
-static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS[] = {
+static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_view, RvExtension>>({
   { "a", RvExtension::A },
   { "b", RvExtension::B },
   { "c", RvExtension::C },
@@ -65,11 +66,11 @@ static constexpr std::pair<const std::string_view, RvExtension> STRING_EXT_PAIRS
   { "zvfbfwma", RvExtension::Zvfbfwma },
   { "sstc", RvExtension::Sstc },
   { "svpbmt", RvExtension::Svpbmt },
-};
-static_assert(std::size(STRING_EXT_PAIRS) == static_cast<unsigned>(RvExtension::None));
+});
+static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
-const std::unordered_map<std::string_view, RvExtension> Isa::stringToExt_(std::begin(STRING_EXT_PAIRS),
-                                                                          std::end(STRING_EXT_PAIRS));
+const std::unordered_map<std::string_view, RvExtension> Isa::stringToExt_(STRING_EXT_PAIRS.cbegin(),
+                                                                          STRING_EXT_PAIRS.cend());
 
 // Use this function to do the constant initialization to allow use of indices
 template <size_t N, unsigned (*TO_INDEX)(RvExtension)>
@@ -179,11 +180,10 @@ Isa::isSupported(RvExtension ext, unsigned version, unsigned subversion) const
   if (not info.supported)
     return false;
 
-  for (const auto& vp : info.versions)
-    if (vp.first == version and vp.second == subversion)
-      return true;
-
-  return false;
+  return std::ranges::any_of(info.versions,
+                             [version, subversion](const auto& vp) {
+                               return vp.first == version and vp.second == subversion;
+                             });
 }
 
 
@@ -333,7 +333,7 @@ extractVersion(std::string_view isa, size_t& i, std::string_view& version,
   if (i >= len or isa.at(i) != 'p')
     return false;
   i++;
-  
+
   j = i;
   for ( ; i < len and  std::isdigit(isa.at(i)); i++)
     ;
@@ -352,8 +352,8 @@ Isa::configIsa(std::string_view isa)
   std::cerr << "Invalid ISA: " << isa << '\n';
   return false;
 }
-  
-    
+
+
 bool
 Isa::applyIsaString(std::string_view isaStr)
 {
@@ -369,7 +369,7 @@ Isa::applyIsaString(std::string_view isaStr)
     }
 
   bool hasZ = false;
-  
+
   for (size_t i = 0; i < isa.size(); ++i)
     {
       std::string_view extension, version, subversion;
@@ -395,7 +395,7 @@ Isa::applyIsaString(std::string_view isaStr)
 	}
       else
 	return false;  // Bad character
-      
+
       if (not extractExtension(isa, i, extension))
 	return false;
 
