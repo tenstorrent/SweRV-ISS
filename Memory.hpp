@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -280,13 +281,13 @@ namespace WdRiscv
     template<typename T>
     bool readIo(uint64_t addr, T& val) const
     {
-      for (const auto& dev : ioDevs_)
-	if (dev->isAddressInRange(addr))
-	  {
-	    val = dev->read(addr);
-	    return true;
-	  }
-      return false;
+      return std::ranges::any_of(ioDevs_,
+                                 [addr, &val](const auto& dev) {
+                                   bool found = dev->isAddressInRange(addr);
+                                   if (found)
+                                     val = dev->read(addr);
+                                   return found;
+                                 });
     }
 
     /// Perfrom write from IO devices. Return true if we hit in any IO
@@ -294,18 +295,13 @@ namespace WdRiscv
     template<typename T>
     bool writeIo(uint64_t addr, T val)
     {
-      auto firstInRangeDevIt = std::find_if(ioDevs_.begin(),
-                                            ioDevs_.end(),
-                                            [addr](const auto& dev) {
-                                              return dev->isAddressInRange(addr);
-                                            });
-
-      if (firstInRangeDevIt != ioDevs_.end())
-        {
-          (*firstInRangeDevIt)->write(addr, val);
-          return true;
-        }
-      return false;
+      return std::ranges::any_of(ioDevs_,
+                                 [addr, val](auto& dev) {
+                                   bool found = dev->isAddressInRange(addr);
+                                   if (found)
+                                     dev->write(addr, val);
+                                   return found;
+                                 });
     }
 
     /// Write half-word (2 bytes) to given address. Return true on

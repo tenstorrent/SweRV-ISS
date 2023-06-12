@@ -14,13 +14,13 @@
 
 #include <atomic>
 #include <iostream>
+#include <span>
 #include <sstream>
 #include <fstream>
 #include <map>
 #include <algorithm>
 #include <cinttypes>
 #include <cstring>
-#include <arpa/inet.h>
 #include <sys/socket.h>
 #include "DecodedInst.hpp"
 #include "WhisperMessage.h"
@@ -33,175 +33,13 @@
 using namespace WdRiscv;
 
 
-/// Unpack socket message (received in server mode) into the given
-/// WhisperMessage object.
-static
-void
-deserializeMessage(const char buffer[], size_t bufferLen,
-		   WhisperMessage& msg)
-
-{
-  (void)bufferLen;
-  assert (bufferLen >= sizeof(msg));
-
-  const char* p = buffer;
-  uint32_t x = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.hart = x;
-  p += sizeof(x);
-
-  x = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.type = x;
-  p += sizeof(x);
-
-  x = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.resource = x;
-  p += sizeof(x);
-
-  x = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.size = x;
-  p += sizeof(x);
-
-  x = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.flags = x;
-  p += sizeof(x);
-
-  uint32_t part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.instrTag = uint64_t(part) << 32;
-  p += sizeof(part);
-
-  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.instrTag |= part;
-  p += sizeof(part);
-
-  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.time = uint64_t(part) << 32;
-  p += sizeof(part);
-
-  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.time |= part;
-  p += sizeof(part);
-
-  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.address = uint64_t(part) << 32;
-  p += sizeof(part);
-
-  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.address |= part;
-  p += sizeof(part);
-
-  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.value = uint64_t(part) << 32;
-  p += sizeof(part);
-
-  part = ntohl(* reinterpret_cast<const uint32_t*> (p));
-  msg.value |= part;
-  p += sizeof(part);
-
-  memcpy(msg.buffer, p, sizeof(msg.buffer));
-  p += sizeof(msg.buffer);
-
-  memcpy(msg.tag, p, sizeof(msg.tag));
-  p += sizeof(msg.tag);
-
-  assert(size_t(p - buffer) <= bufferLen);
-}
-
-
-/// Serialize the given WhisperMessage into the given buffer in
-/// preparation for socket send. Return the number of bytes written
-/// into buffer.
-static
-size_t
-serializeMessage(const WhisperMessage& msg, char buffer[],
-		 size_t bufferLen)
-{
-  (void)bufferLen;
-  assert (bufferLen >= sizeof(msg));
-
-  char* p = buffer;
-  uint32_t x = htonl(msg.hart);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  x = htonl(msg.type);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  x = htonl(msg.resource);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  x = htonl(msg.size);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  x = htonl(msg.flags);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  uint32_t part = static_cast<uint32_t>(msg.instrTag >> 32);
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  part = (msg.instrTag) & 0xffffffff;
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  part = static_cast<uint32_t>(msg.time >> 32);
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  part = (msg.time) & 0xffffffff;
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  part = static_cast<uint32_t>(msg.address >> 32);
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  part = (msg.address) & 0xffffffff;
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  part = static_cast<uint32_t>(msg.value >> 32);
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  part = msg.value & 0xffffffff;
-  x = htonl(part);
-  memcpy(p, &x, sizeof(x));
-  p += sizeof(x);
-
-  memcpy(p, msg.buffer, sizeof(msg.buffer));
-  p += sizeof(msg.buffer);
-
-  memcpy(p, msg.tag, sizeof(msg.tag));
-  p += sizeof(msg.tag);
-
-  size_t len = p - buffer;
-  assert(len <= bufferLen);
-  assert(len <= sizeof(msg));
-  for (size_t i = len; i < sizeof(msg); ++i)
-    buffer[i] = 0;
-
-  return sizeof(msg);
-}
-
-
 static bool
 receiveMessage(int soc, WhisperMessage& msg)
 {
   std::array<char, sizeof(msg)> buffer;
   char* p = buffer.data();
 
-  size_t remain = sizeof(msg);
+  size_t remain = buffer.size();
 
   while (remain > 0)
     {
@@ -222,21 +60,21 @@ receiveMessage(int soc, WhisperMessage& msg)
       p += l;
     }
 
-  deserializeMessage(buffer.data(), buffer.size(), msg);
+  msg = WhisperMessage::deserializeFrom(buffer);
 
   return true;
 }
 
 
 static bool
-sendMessage(int soc, WhisperMessage& msg)
+sendMessage(int soc, const WhisperMessage& msg)
 {
   std::array<char, sizeof(msg)> buffer;
 
-  serializeMessage(msg, buffer.data(), buffer.size());
+  msg.serializeTo(buffer);
 
   // Send command.
-  ssize_t remain = sizeof(msg);
+  ssize_t remain = buffer.size();
   char* p = buffer.data();
   while (remain > 0)
     {
@@ -264,20 +102,20 @@ receiveMessage(std::span<char> shm, WhisperMessage& msg)
   while (std::atomic_load(guard) != 's');
   // Byte alignment for WhisperMessage - get next address after guard aligned on 4-byte boundary.
   std::span<char> buffer = shm.subspan(sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm.data()) % sizeof(uint32_t)));
-  deserializeMessage(buffer.data(), buffer.size(), msg);
+  msg = WhisperMessage::deserializeFrom(buffer);
   return true;
 }
 
 
 static bool
-sendMessage(std::span<char> shm, WhisperMessage& msg)
+sendMessage(std::span<char> shm, const WhisperMessage& msg)
 {
   // reserve first byte for locking
   std::atomic_char* guard = (std::atomic_char*) shm.data();
   while (std::atomic_load(guard) != 's'); // redundant
   // Byte alignment for WhisperMessage - get next address after guard aligned on 4-byte boundary.
   std::span<char> buffer = shm.subspan(sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm.data()) % sizeof(uint32_t)));
-  serializeMessage(msg, buffer.data(), buffer.size());
+  msg.serializeTo(buffer);
   std::atomic_store(guard, 'c');
   return true;
 }
@@ -330,7 +168,7 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       {
         unsigned reg = static_cast<unsigned>(req.address);
         // vector reg poke uses the buffer instead
-        if (reg == req.address and req.size <= sizeof(req.buffer))
+        if (reg == req.address and req.size <= req.buffer.size())
           {
             std::vector<uint8_t> vecVal;
             for (uint32_t i = 0; i < req.size; ++i)
@@ -346,7 +184,7 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       {
         bool usePma = false; // Ignore phsical memory attributes.
 
-        if (sizeof(URV) == 4)
+        if constexpr (sizeof(URV) == 4)
           {
             // Poke a word in 32-bit harts.
             if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
@@ -430,7 +268,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
         if (reg == req.address)
           {
             std::vector<uint8_t> vecVal;
-            if (hart.peekVecReg(reg, vecVal) and sizeof(reply.buffer) >= vecVal.size())
+            if (hart.peekVecReg(reg, vecVal) and reply.buffer.size() >= vecVal.size())
               {
                 for (unsigned i = 0; i < vecVal.size(); ++i)
                   reply.buffer[i] = vecVal.at(i);
@@ -612,8 +450,8 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   if (disassemble_)
     disassembleAnnotateInst(hart, di, interrupted, hasPre, hasPost, text);
 
-  strncpy(reply.buffer, text.c_str(), sizeof(reply.buffer) - 1);
-  reply.buffer[sizeof(reply.buffer) -1] = 0;
+  strncpy(reply.buffer.data(), text.c_str(), reply.buffer.size() - 1);
+  reply.buffer.back() = 0;
 
   // Order of changes: rfcvm (int reg, fp reg, csr, vec reg, memory, csr)
 
@@ -978,9 +816,15 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
     }
 
   reply.size = items.size();
-  assert(items.size()*sizeof(uint64_t) <= sizeof(reply.buffer));
   if (not items.empty())
-    memcpy(reply.buffer, items.data(), items.size()*sizeof(uint64_t));
+    {
+      auto itemsBytes = std::as_bytes(std::span(items));
+      auto replyBytes = std::as_writable_bytes(std::span(reply.buffer));
+
+      assert(itemsBytes.size() <= replyBytes.size());
+
+      std::copy(itemsBytes.begin(), itemsBytes.end(), replyBytes.begin());
+    }
 }
 
 
@@ -1067,18 +911,18 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           {
             if (msg.resource == 'p')
               fprintf(commandLog, "hart=%" PRIu32 " poke pc 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
-                      uintmax_t(msg.value), timeStamp.c_str(), msg.tag);
+                      uintmax_t(msg.value), timeStamp.c_str(), msg.tag.data());
             else if (msg.resource == 'v')
               {
                 fprintf(commandLog, "hart=%" PRIu32 " poke v 0x%" PRIxMAX " 0x", hartId, uintmax_t(msg.address));
                 for (uint32_t i = 0; i < msg.size; ++i)
                   fprintf(commandLog, "%02x", uint8_t(msg.buffer[msg.size - 1 - i]));
-                fprintf(commandLog, " # ts=%s tag=%s\n", timeStamp.c_str(), msg.tag);
+                fprintf(commandLog, " # ts=%s tag=%s\n", timeStamp.c_str(), msg.tag.data());
               }
             else
               fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
                       msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),
-                      timeStamp.c_str(), msg.tag);
+                      timeStamp.c_str(), msg.tag.data());
           }
         break;
 
@@ -1088,15 +932,15 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           {
             if (msg.resource == 'p')
               fprintf(commandLog, "hart=%" PRIu32 " peek pc # ts=%s tag=%s\n",
-                      hartId, timeStamp.c_str(), msg.tag);
+                      hartId, timeStamp.c_str(), msg.tag.data());
             else if (msg.resource == 's')
               fprintf(commandLog, "hart=%" PRIu32 " peek s %s # ts=%s tag=%s\n",
                       hartId, specialResourceToStr(msg.address),
-                      timeStamp.c_str(), msg.tag);
+                      timeStamp.c_str(), msg.tag.data());
             else
               fprintf(commandLog, "hart=%" PRIu32 " peek %c 0x%" PRIxMAX " # ts=%s tag=%s\n",
                       hartId, msg.resource, uintmax_t(msg.address),
-                      timeStamp.c_str(), msg.tag);
+                      timeStamp.c_str(), msg.tag.data());
           }
         break;
 
@@ -1133,8 +977,8 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
               else
                 text += " (NT)";
             }
-          strncpy(reply.buffer, text.c_str(), sizeof(reply.buffer) - 1);
-          reply.buffer[sizeof(reply.buffer) -1] = 0;
+          strncpy(reply.buffer.data(), text.c_str(), reply.buffer.size() - 1);
+          reply.buffer.back() = 0;
         }
         break;
 
@@ -1206,11 +1050,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case DumpMemory:
-        if (not system_.writeAccessedMemory(msg.buffer))
+        if (not system_.writeAccessedMemory(msg.buffer.data()))
           reply.type = Invalid;
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " dump_memory %s # ts=%s\n",
-                  hartId, msg.buffer, timeStamp.c_str());
+                  hartId, msg.buffer.data(), timeStamp.c_str());
         break;
 
       case McmRead:
@@ -1234,7 +1078,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case McmWrite:
-        if (msg.size > sizeof(msg.buffer))
+        if (msg.size > msg.buffer.size())
           {
             std::cerr << "Error: Server command: McmWrite data size too large: " << msg.size << '\n';
             reply.type = Invalid;
