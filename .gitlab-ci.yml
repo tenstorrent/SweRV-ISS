@@ -84,10 +84,10 @@ notify-risc-p-cores:
   trigger:
     project: riscv/risc-p-cores
 
-notify-archcov:
-  <<: *notify-template
-  trigger:
-    project: riscv/dv/corearchcoverage
+# notify-archcov:
+#   <<: *notify-template
+#   trigger:
+#     project: riscv/dv/corearchcoverage
 
 # notify-rv-tester:
 #   <<: *notify-template
