@@ -198,8 +198,8 @@ serializeMessage(const WhisperMessage& msg, char buffer[],
 static bool
 receiveMessage(int soc, WhisperMessage& msg)
 {
-  char buffer[sizeof(msg)];
-  char* p = buffer;
+  std::array<char, sizeof(msg)> buffer;
+  char* p = buffer.data();
 
   size_t remain = sizeof(msg);
 
@@ -222,7 +222,7 @@ receiveMessage(int soc, WhisperMessage& msg)
       p += l;
     }
 
-  deserializeMessage(buffer, sizeof(buffer), msg);
+  deserializeMessage(buffer.data(), buffer.size(), msg);
 
   return true;
 }
@@ -231,13 +231,13 @@ receiveMessage(int soc, WhisperMessage& msg)
 static bool
 sendMessage(int soc, WhisperMessage& msg)
 {
-  char buffer[sizeof(msg)];
+  std::array<char, sizeof(msg)> buffer;
 
-  serializeMessage(msg, buffer, sizeof(buffer));
+  serializeMessage(msg, buffer.data(), buffer.size());
 
   // Send command.
   ssize_t remain = sizeof(msg);
-  char* p = buffer;
+  char* p = buffer.data();
   while (remain > 0)
     {
       ssize_t l = send(soc, p, remain , MSG_NOSIGNAL);
@@ -257,27 +257,27 @@ sendMessage(int soc, WhisperMessage& msg)
 
 
 static bool
-receiveMessage(char* shm, WhisperMessage& msg)
+receiveMessage(std::span<char> shm, WhisperMessage& msg)
 {
   // reserve first byte for locking
-  std::atomic_char* guard = (std::atomic_char*) shm;
+  std::atomic_char* guard = (std::atomic_char*) shm.data();
   while (std::atomic_load(guard) != 's');
   // Byte alignment for WhisperMessage - get next address after guard aligned on 4-byte boundary.
-  char* buffer = shm + (sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm) % sizeof(uint32_t)));
-  deserializeMessage(buffer, sizeof(msg), msg);
+  std::span<char> buffer = shm.subspan(sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm.data()) % sizeof(uint32_t)));
+  deserializeMessage(buffer.data(), buffer.size(), msg);
   return true;
 }
 
 
 static bool
-sendMessage(char* shm, WhisperMessage& msg)
+sendMessage(std::span<char> shm, WhisperMessage& msg)
 {
   // reserve first byte for locking
-  std::atomic_char* guard = (std::atomic_char*) shm;
+  std::atomic_char* guard = (std::atomic_char*) shm.data();
   while (std::atomic_load(guard) != 's'); // redundant
   // Byte alignment for WhisperMessage - get next address after guard aligned on 4-byte boundary.
-  char* buffer = shm + (sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm) % sizeof(uint32_t)));
-  serializeMessage(msg, buffer, sizeof(msg));
+  std::span<char> buffer = shm.subspan(sizeof(uint32_t) - (reinterpret_cast<uintptr_t>(shm.data()) % sizeof(uint32_t)));
+  serializeMessage(msg, buffer.data(), buffer.size());
   std::atomic_store(guard, 'c');
   return true;
 }
@@ -978,6 +978,7 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
     }
 
   reply.size = items.size();
+  assert(items.size()*sizeof(uint64_t) <= sizeof(reply.buffer));
   if (not items.empty())
     memcpy(reply.buffer, items.data(), items.size()*sizeof(uint64_t));
 }
@@ -1012,7 +1013,7 @@ Server<URV>::interact(int soc, FILE* traceFile, FILE* commandLog)
 
 template <typename URV>
 bool
-Server<URV>::interact(char* shm, FILE* traceFile, FILE* commandLog)
+Server<URV>::interact(std::span<char> shm, FILE* traceFile, FILE* commandLog)
 {
   while (true)
     {

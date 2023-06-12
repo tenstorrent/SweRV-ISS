@@ -84,7 +84,7 @@ Cache::getLineAddresses(std::vector<uint64_t>& result) const
 
 
 bool
-Cache::saveSnapshot(const std::string& path)
+Cache::saveSnapshot(const std::string& path) const
 {
   std::ofstream ofs(path, std::ios::trunc);
 

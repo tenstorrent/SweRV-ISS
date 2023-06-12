@@ -587,7 +587,7 @@ checkDestSourceOverlap(unsigned dest, unsigned destWidth, unsigned destGroupX8,
 
 
 /// Return true if destination and source groups do overlap.
-static
+static constexpr
 bool
 hasDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
 		     unsigned srcGroupX8)
@@ -595,9 +595,7 @@ hasDestSourceOverlap(unsigned dest, unsigned destGroupX8, unsigned src,
   unsigned srcGroup = srcGroupX8 >= 8 ? srcGroupX8/8 : 1;
   unsigned destGroup = destGroupX8 >= 8 ? destGroupX8/8 : 1;
 
-  if (src >= dest + destGroup or dest >= src + srcGroup)
-    return false;  // No overlap.
-  return true;
+  return (src < dest + destGroup and dest < src + srcGroup);
 }
 
 
@@ -925,10 +923,11 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
               if (avl <= vlmax)
                 elems = avl;
               else if (avl >= 2*vlmax)
-                elems = vlmax;
+                elems = vlmax; // NOLINT(bugprone-branch-clone)
               else
 		// avl > vlmax and < 2*vlmax, spec allows anything between
 		// ceil(avl/2) and vlmax inclusive. We choose vlmax.
+                // NOLINTNEXTLINE(bugprone-branch-clone)
                 elems = vlmax;
             }
         }

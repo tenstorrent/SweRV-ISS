@@ -65,11 +65,9 @@ namespace WdRiscv
     read(uint64_t addr, uint64_t& value)
     {
       uint64_t pageRank = getPageRank(addr);
-      std::shared_ptr<uint8_t[]> page = findOrCreatePage(pageRank);
-      if (not page)
-        return false;
+      std::vector<uint8_t>& page = findOrCreatePage(pageRank);
       unsigned offset = addr & pageMask_;
-      value = *( reinterpret_cast<U*>(page.get() + offset) );
+      value = *( reinterpret_cast<U*>(page.data() + offset) );
       return true;
     }
 
@@ -82,32 +80,29 @@ namespace WdRiscv
     write(uint64_t addr, uint64_t value)
     {
       uint64_t pageRank = getPageRank(addr);
-      std::shared_ptr<uint8_t[]> page = findOrCreatePage(pageRank);
-      if (not page)
-        return false;
+      std::vector<uint8_t>& page = findOrCreatePage(pageRank);
       unsigned offset = addr & pageMask_;
-      *( reinterpret_cast<U*>(page.get() + offset) ) = value;
+      *( reinterpret_cast<U*>(page.data() + offset) ) = value;
       return true;
     }
 
     /// Return the page number of the page containing the byte at the
     /// given address.
-    uint64_t getPageRank(uint64_t addr)
+    uint64_t getPageRank(uint64_t addr) const
     { return addr >> pageShift_; }
 
     /// Return host-machine address of the target-machine page with
     /// the given page number creating such a page (and zeroing it) if
     /// it has never been accessed before.
-    std::shared_ptr<uint8_t[]> findOrCreatePage(uint64_t pageRank)
+    std::vector<uint8_t>& findOrCreatePage(uint64_t pageRank)
     {
       std::lock_guard<std::mutex> lock(mutex_);
       auto iter = pageMap_.find(pageRank);
-      if (iter != pageMap_.end())
-        return iter->second;
-      std::shared_ptr<uint8_t[]> page = std::make_unique<uint8_t[]>(pageSize_);
-      memset(page.get(), 0, pageSize_);
-      pageMap_[pageRank] = page;
-      return page;
+      if (iter == pageMap_.end())
+        {
+          iter = pageMap_.try_emplace(pageRank, pageSize_, 0).first;
+        }
+      return iter->second;
     }
 
   private:
@@ -116,7 +111,7 @@ namespace WdRiscv
     unsigned pageShift_ = 12;
     unsigned pageMask_ = 0xfff;
 
-    std::unordered_map<uint64_t, std::shared_ptr<uint8_t[]>> pageMap_;  // Map address to page
+    std::unordered_map<uint64_t, std::vector<uint8_t>> pageMap_;  // Map address to page
     std::mutex mutex_;
   };
 }

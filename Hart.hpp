@@ -2714,6 +2714,10 @@ namespace WdRiscv
     void execSrlw(const DecodedInst*);
     void execSraw(const DecodedInst*);
 
+    // rv128i
+    void execLq(const DecodedInst*);
+    void execSq(const DecodedInst*);
+
     // rv64m
     void execMulw(const DecodedInst*);
     void execDivw(const DecodedInst*);

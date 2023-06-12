@@ -101,7 +101,7 @@ namespace WdRiscv
     void printTlb(std::ostream& ost) const;
 
     /// print TLB entry
-    void printEntry(std::ostream& ost, const TlbEntry& te) const;
+    static void printEntry(std::ostream& ost, const TlbEntry& te);
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)

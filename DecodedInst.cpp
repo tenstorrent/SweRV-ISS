@@ -38,8 +38,6 @@ DecodedInst::setIthOperandValue(unsigned i, uint64_t value)
       break;
 
     case OperandType::Imm:
-      break;
-
     case OperandType::None:
       break;
     }

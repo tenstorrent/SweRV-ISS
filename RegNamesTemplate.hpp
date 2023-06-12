@@ -87,10 +87,11 @@ namespace WdRiscv
       return result;
     }
 
-    static inline constexpr const char unknown_[]       = {PREFIX_CHAR, '?', 0};
-    static inline constexpr auto       numberToName_    = util::make_reg_name_array<NUM_REGS, PREFIX_CHAR>::value;
-    static inline const     auto       nameToNumber_    = buildNameToNumberMap();
-    static inline constexpr auto       numberToAbiName_ = GET_NUMBER_TO_ABI_NAME();
+    static inline constexpr auto unknown_arr_     = std::to_array<char>({PREFIX_CHAR, '?', 0});
+    static inline constexpr auto unknown_         = std::string_view(unknown_arr_.begin(), std::prev(unknown_arr_.end()));
+    static inline constexpr auto numberToName_    = util::make_reg_name_array<NUM_REGS, PREFIX_CHAR>::value;
+    static inline const     auto nameToNumber_    = buildNameToNumberMap();
+    static inline constexpr auto numberToAbiName_ = GET_NUMBER_TO_ABI_NAME();
   };
 
 }

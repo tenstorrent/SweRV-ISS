@@ -520,7 +520,7 @@ Disassembler::disassembleInst(const DecodedInst& di, std::string& str)
 
 
 void
-Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
+Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out) const
 {
   InstId id = di.instId();
   switch(id)
@@ -579,12 +579,6 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::pack:
-      if (di.op2() == 0)
-	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
-      else
-	printInst(*this, out, di);
-      break;
-
     case InstId::packw:
       if (di.op2() == 0)
 	out << "zext.h   " << intRegName(di.ithOperand(0)) << ", " << intRegName(di.ithOperand(1));
@@ -613,9 +607,6 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out)
       break;
 
     case InstId::c_lq:
-      out << "illegal";
-      break;
-
     case InstId::c_sq:
       out << "illegal";
       break;

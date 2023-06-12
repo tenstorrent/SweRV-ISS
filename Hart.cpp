@@ -32,7 +32,6 @@
 #include <cassert>
 #include <csignal>
 
-#define __STDC_FORMAT_MACROS
 #include <cinttypes>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -2382,8 +2381,8 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2)
 
   if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
     {
-      throw CoreException(CoreException::Stop, 
-                          "64 consecutive illegal instructions", 
+      throw CoreException(CoreException::Stop,
+                          "64 consecutive illegal instructions",
                           0, 3);
     }
 
@@ -2428,30 +2427,40 @@ isGvaTrap(unsigned causeCode)
   EC cause = EC{causeCode};
   switch (cause)
     {
-    case EC::INST_ADDR_MISAL:        return true;
-    case EC::INST_ACC_FAULT:         return true;
-    case EC::ILLEGAL_INST:           return false;
-    case EC::BREAKP:                 return true;
-    case EC::LOAD_ADDR_MISAL:        return true;
-    case EC::LOAD_ACC_FAULT:         return true;
-    case EC::STORE_ADDR_MISAL:       return true;
-    case EC::STORE_ACC_FAULT:        return true;
-    case EC::U_ENV_CALL:             return false;
-    case EC::S_ENV_CALL:             return false;
-    case EC::VS_ENV_CALL:            return false;
-    case EC::M_ENV_CALL:             return false;
-    case EC::INST_PAGE_FAULT:        return true;
-    case EC::LOAD_PAGE_FAULT:        return true;
-    case EC::STORE_PAGE_FAULT:       return true;
-    case EC::RESERVED0:              return false;
-    case EC::RESERVED1:              return false;
-    case EC::RESERVED2:              return false;
-    case EC::RESERVED3:              return false;
-    case EC::INST_GUEST_PAGE_FAULT:  return true;
-    case EC::LOAD_GUEST_PAGE_FAULT:  return true;
-    case EC::VIRT_INST:              return false;
-    case EC::STORE_GUEST_PAGE_FAULT: return true;
-    case EC::NONE:                   return false;
+    case EC::INST_ADDR_MISAL:
+    case EC::INST_ACC_FAULT:
+      return true;
+    case EC::ILLEGAL_INST:
+      return false;
+    case EC::BREAKP:
+    case EC::LOAD_ADDR_MISAL:
+    case EC::LOAD_ACC_FAULT:
+    case EC::STORE_ADDR_MISAL:
+    case EC::STORE_ACC_FAULT:
+      return true;
+    case EC::U_ENV_CALL:
+    case EC::S_ENV_CALL:
+    case EC::VS_ENV_CALL:
+    case EC::M_ENV_CALL:
+      return false;
+    case EC::INST_PAGE_FAULT:
+    case EC::LOAD_PAGE_FAULT:
+    case EC::STORE_PAGE_FAULT:
+      return true;
+    case EC::RESERVED0:
+    case EC::RESERVED1:
+    case EC::RESERVED2:
+    case EC::RESERVED3:
+      return false;
+    case EC::INST_GUEST_PAGE_FAULT:
+    case EC::LOAD_GUEST_PAGE_FAULT:
+      return true;
+    case EC::VIRT_INST:
+      return false;
+    case EC::STORE_GUEST_PAGE_FAULT:
+      return true;
+    case EC::NONE:
+      return false;
     }
   return false;
 }
@@ -2467,10 +2476,12 @@ isGpaTrap(unsigned causeCode)
   EC cause = EC{causeCode};
   switch (cause)
     {
-    case EC::INST_GUEST_PAGE_FAULT:  return true;
-    case EC::LOAD_GUEST_PAGE_FAULT:  return true;
-    case EC::STORE_GUEST_PAGE_FAULT: return true;
-    default:                         return false;
+    case EC::INST_GUEST_PAGE_FAULT:
+    case EC::LOAD_GUEST_PAGE_FAULT:
+    case EC::STORE_GUEST_PAGE_FAULT:
+      return true;
+    default:
+      return false;
     }
   return false;
 }
@@ -3064,7 +3075,7 @@ Hart<URV>::findVecReg(std::string_view name, unsigned& num) const
   if (not isRvv())
     return false;
 
-  return vecRegs_.findReg(name, num);
+  return VecRegs::findReg(name, num);
 }
 
 
@@ -3881,7 +3892,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   argvAddrs.push_back(0);  // Null pointer at end of argv.
 
   // Setup envp on the stack (LANG is needed for clang compiled code).
-  static constexpr std::string_view envs[] = { "LANG=C", "LC_ALL=C" };
+  static constexpr auto envs = std::to_array<std::string_view>({ "LANG=C", "LC_ALL=C" });
   std::vector<URV> envpAddrs;  // Addresses of the envp strings.
   for (const auto& env : envs)
     {
@@ -3965,11 +3976,9 @@ Hart<URV>::lastVecReg(const DecodedInst& di, unsigned& group) const
   group  = (groupX8 >= 8) ? groupX8/8 : 1;
   vecReg = static_cast<int>(di.op0());  // Make sure we have 1st reg in group.
   if ((instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v) or
-      (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v))
-    group = group*di.vecFieldCount();  // Scale by field count
-  else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
-    group = group*di.vecFieldCount();  // Scale by field count
-  else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
+      (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v) or
+      (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v) or
+      (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v))
     group = group*di.vecFieldCount();  // Scale by field count
 
   return vecReg;
@@ -4029,12 +4038,14 @@ Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
 }
 
 
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 // True if keyboard interrupt (user hit control-c) pending.
 static std::atomic<bool> userStop = false;
 
 // Negation of the preceding variable. Exists for speed (obsessive
 // compulsive engineering).
 static std::atomic<bool> noUserStop = true;
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 void
 forceUserStop(int)
@@ -4128,10 +4139,6 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
 }
 
 
-// We want amo instructions to print in the same order as executed.
-static std::mutex execMutex;
-
-
 template <typename URV>
 bool
 Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
@@ -4183,9 +4190,11 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
       try
 	{
+          // We want amo instructions to print in the same order as executed.
 	  // This avoid interleaving of amo execution and tracing.
+          static std::mutex execMutex;
 	  std::lock_guard<std::mutex> lock(execMutex);
-      
+
           uint32_t inst = 0;
 	  currPc_ = pc_;
 
@@ -4602,6 +4611,7 @@ Hart<URV>::openTcpForGdb()
 }
 
 
+//NOLINTNEXTLINE(bugprone-reserved-identifier, cppcoreguidelines-avoid-non-const-global-variables)
 extern void (*__tracerExtension)(void*);
 
 
@@ -5046,8 +5056,8 @@ Hart<URV>::whatIfSingStep(const DecodedInst& di, ChangeRecord& record)
   triggerTripped_ = false;
 
   // Save current value of operands.
-  uint64_t prevRegValues[4];
-  for (unsigned i = 0; i < 4; ++i)
+  std::array<uint64_t, 4> prevRegValues;
+  for (unsigned i = 0; i < prevRegValues.size(); ++i)
     {
       URV prev = 0;
       prevRegValues[i] = 0;
@@ -6035,7 +6045,7 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_lq:
-      if (not isRvc()) illegalInst(di); else illegalInst(di);
+      if (not isRvc()) illegalInst(di); else execLq(di);
       return;
 
     case InstId::c_lw:
@@ -6055,7 +6065,7 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_sq:
-      if (not isRvc()) illegalInst(di); else illegalInst(di);
+      if (not isRvc()) illegalInst(di); else execSq(di);
       return;
 
     case InstId::c_sw:
@@ -6079,9 +6089,6 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_li:
-      if (not isRvc()) illegalInst(di); else execAddi(di);
-      return;
-
     case InstId::c_addi16sp:
       if (not isRvc()) illegalInst(di); else execAddi(di);
       return;
@@ -6147,9 +6154,6 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_slli:
-      if (not isRvc()) illegalInst(di); else execSlli(di);
-      return;
-
     case InstId::c_slli64:
       if (not isRvc()) illegalInst(di); else execSlli(di);
       return;
@@ -9821,7 +9825,7 @@ Hart<URV>::execWfi(const DecodedInst* di)
       return;
     }
 
-  return;   // No-op.
+  // No-op.
 }
 
 
@@ -10755,6 +10759,16 @@ Hart<uint64_t>::execLd(const DecodedInst* di)
 
 
 template <typename URV>
+inline
+void
+Hart<URV>::execLq(const DecodedInst* di)
+{
+  // TODO: implement once RV128 is supported
+  illegalInst(di);
+}
+
+
+template <typename URV>
 void
 Hart<URV>::execSd(const DecodedInst* di)
 {
@@ -10771,6 +10785,15 @@ Hart<URV>::execSd(const DecodedInst* di)
   URV value = intRegs_.read(di->op0());
 
   store<uint64_t>(addr, false /*hyper*/, value);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSq(const DecodedInst* di)
+{
+  // TODO: implement once RV128 is supported
+  illegalInst(di);
 }
 
 

@@ -49,7 +49,8 @@ namespace util
     template <std::size_t... Digits, char... PREFIX_CHARS>
     struct _value_to_string_helper<std::index_sequence<Digits...>, PREFIX_CHARS...>
     {
-      static constexpr const char value[] = {PREFIX_CHARS..., ('0' + Digits)..., 0};
+      static constexpr auto value_arr = std::to_array<char>({PREFIX_CHARS..., ('0' + Digits)..., 0});
+      static constexpr auto value     = std::string_view(value_arr.begin(), std::prev(value_arr.end()));
     };
     template <std::size_t V, char... PREFIX_CHARS>
     using value_to_string = _helpers::_value_to_string_helper<_helpers::digit_sequence<V>, PREFIX_CHARS...>;
@@ -60,7 +61,7 @@ namespace util
     template <std::size_t... Vs, char... PREFIX_CHARS>
     struct _reg_name_array_helper<std::index_sequence<Vs...>, PREFIX_CHARS...>
     {
-      static constexpr auto value = std::array{std::string_view(value_to_string<Vs, PREFIX_CHARS...>::value)...};
+      static constexpr auto value = std::array{value_to_string<Vs, PREFIX_CHARS...>::value...};
     };
     template <std::size_t V, char... PREFIX_CHARS>
     using make_reg_name_array = _helpers::_reg_name_array_helper<std::make_index_sequence<V>, PREFIX_CHARS...>;
