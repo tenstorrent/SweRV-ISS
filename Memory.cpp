@@ -624,10 +624,11 @@ Memory::loadElfFile(const std::string& fileName, unsigned regWidth,
 bool
 Memory::findElfSymbol(const std::string& name, ElfSymbol& symbol) const
 {
-  if (not symbols_.count(name))
+  auto symbol_it = symbols_.find(name);
+  if (symbol_it == symbols_.end())
     return false;
 
-  symbol = symbols_.at(name);
+  symbol = symbol_it->second;
   return true;
 }
 
@@ -635,10 +636,11 @@ Memory::findElfSymbol(const std::string& name, ElfSymbol& symbol) const
 bool
 Memory::findElfSection(const std::string& name, ElfSymbol& symbol) const
 {
-  if (not sections_.count(name))
+  auto section_it = sections_.find(name);
+  if (section_it == sections_.end())
     return false;
 
-  symbol = sections_.at(name);
+  symbol = section_it->second;
   return true;
 }
 
@@ -773,7 +775,7 @@ Memory::isSymbolInElfFile(const std::string& path, const std::string& target)
 
 bool
 Memory::saveSnapshot(const std::string& filename,
-                     const std::vector<std::pair<uint64_t,uint64_t>>& usedBlocks)
+                     const std::vector<std::pair<uint64_t,uint64_t>>& usedBlocks) const
 {
   constexpr size_t maxChunk = size_t(1) << 28;
 
@@ -791,6 +793,7 @@ Memory::saveSnapshot(const std::string& filename,
 
   // write the simulated memory into the file and check success
   uint64_t prevAddr = 0;
+  (void)prevAddr;
   bool success = true;
   for (const auto& blk: usedBlocks)
     {
@@ -876,6 +879,7 @@ Memory::loadSnapshot(const std::string & filename,
   // read (decompress) file into simulated memory and check success
   bool success = true;
   uint64_t prevAddr = 0;
+  (void)prevAddr;
   size_t remainingSize = 0;
   for (const auto& blk: usedBlocks)
     {
@@ -945,7 +949,7 @@ Memory::loadSnapshot(const std::string & filename,
 bool
 Memory::saveAddressTrace(std::string_view tag,
 			 const std::unordered_map<uint64_t, uint64_t>& lineMap,
-			 const std::string& path) const
+			 const std::string& path)
 {
   std::ofstream out(path, std::ios::trunc);
 

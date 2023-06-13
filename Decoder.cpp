@@ -327,7 +327,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x11: return instTable_.getEntry(InstId::vmadc_vvm);
         case 0x12: return instTable_.getEntry(InstId::vsbc_vvm);
         case 0x13: return instTable_.getEntry(InstId::vmsbc_vvm);
-	case 0x14: return instTable_.getEntry(InstId::vrol_vv);
+	case 0x14: return instTable_.getEntry(InstId::vror_vv);
 	case 0x15: return instTable_.getEntry(InstId::vrol_vv);
         case 0x17:
           if (vm == 0) return instTable_.getEntry(InstId::vmerge_vvm);
@@ -2201,8 +2201,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           return instTable_.getEntry(InstId::illegal);
 
         case 0b01010:      //  S-form
-          return instTable_.getEntry(InstId::illegal);
-
         case 0b01111:
           return instTable_.getEntry(InstId::illegal);
 
@@ -2949,7 +2947,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   else if (funct7 == 0x33 and op0 == 0)
                     {
                       op2 = iform.rs2();
-                      return instTable_.getEntry(InstId::hinval_vvma);
+                      return instTable_.getEntry(InstId::hinval_gvma);
                     }
                   else if (op2 == 0x102 and op0 == 0 and op1 == 0)
                     return instTable_.getEntry(InstId::sret);

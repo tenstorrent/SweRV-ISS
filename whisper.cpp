@@ -17,6 +17,7 @@
 #include <sstream>
 #include <thread>
 #include <optional>
+#include <span>
 #include <atomic>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
@@ -365,7 +366,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       auto numStr = varMap["alarm"].as<std::string>();
       if (not parseCmdLineNumber("alarm", numStr, args.alarmInterval))
         ok = false;
-      else if (*args.alarmInterval == 0)
+      else if (args.alarmInterval.has_value() and *args.alarmInterval == 0)
         std::cerr << "Warning: Zero alarm period ignored.\n";
     }
 
@@ -381,7 +382,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       auto numStr = varMap["clint"].as<std::string>();
       if (not parseCmdLineNumber("clint", numStr, args.clint))
         ok = false;
-      else if ((*args.clint & 7) != 0)
+      else if (args.clint.has_value() and (*args.clint & 7) != 0)
         {
           std::cerr << "Error: clint address must be a multiple of 8\n";
           ok = false;
@@ -393,7 +394,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       auto numStr = varMap["interruptor"].as<std::string>();
       if (not parseCmdLineNumber("interruptor", numStr, args.interruptor))
         ok = false;
-      else if ((*args.interruptor & 7) != 0)
+      else if (args.interruptor.has_value() and (*args.interruptor & 7) != 0)
         {
           std::cerr << "Error: interruptor address must be a multiple of 8\n";
           ok = false;
@@ -440,7 +441,7 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
 /// if --help is used.
 static
 bool
-parseCmdLineArgs(int argc, char* argv[], Args& args)
+parseCmdLineArgs(std::span<char*> argv, Args& args)
 {
   try
     {
@@ -666,7 +667,7 @@ parseCmdLineArgs(int argc, char* argv[], Args& args)
 
       // Parse command line options.
       po::variables_map varMap;
-      po::command_line_parser parser(argc, argv);
+      po::command_line_parser parser(static_cast<int>(argv.size()), argv.data());
       auto parsed = parser.options(desc).positional(pdesc).run();
       po::store(parsed, varMap);
       po::notify(varMap);
@@ -1196,8 +1197,8 @@ bool
 runServer(System<URV>& system, const std::string& serverFile,
 	  FILE* traceFile, FILE* commandLog)
 {
-  char hostName[1024];
-  if (gethostname(hostName, sizeof(hostName)) != 0)
+  std::array<char, 1024> hostName;
+  if (gethostname(hostName.data(), hostName.size()) != 0)
     {
       std::cerr << "Failed to obtain name of this computer\n";
       return false;
@@ -1206,12 +1207,12 @@ runServer(System<URV>& system, const std::string& serverFile,
   int soc = socket(AF_INET, SOCK_STREAM, 0);
   if (soc < 0)
     {
-      char buffer[512];
-      char* p = buffer;
+      std::array<char, 512> buffer;
+      char* p = buffer.data();
 #ifdef __APPLE__
-      strerror_r(errno, buffer, 512);
+      strerror_r(errno, buffer.data(), buffer.size());
 #else
-      p = strerror_r(errno, buffer, 512);
+      p = strerror_r(errno, buffer.data(), buffer.size());
 #endif
       std::cerr << "Failed to create socket: " << p << '\n';
       return -1;
@@ -1255,7 +1256,7 @@ runServer(System<URV>& system, const std::string& serverFile,
 	std::cerr << "Failed to open file '" << serverFile << "' for output\n";
 	return false;
       }
-    out << hostName << ' ' << ntohs(socAddr.sin_port) << std::endl;
+    out << hostName.data() << ' ' << ntohs(socAddr.sin_port) << std::endl;
   }
 
   sockaddr_in clientAddr;
@@ -1309,7 +1310,7 @@ runServerShm(System<URV>& system, const std::string& serverFile,
       return false;
     }
 
-  char* shm = (char*) mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  char* shm = (char*) mmap(nullptr, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (shm == MAP_FAILED)
     {
       perror("Failed mmap");
@@ -1321,7 +1322,7 @@ runServerShm(System<URV>& system, const std::string& serverFile,
   try
     {
       Server<URV> server(system);
-      ok = server.interact(shm, traceFile, commandLog);
+      ok = server.interact(std::span<char>(shm, 4096), traceFile, commandLog);
     }
   catch(...)
     {
@@ -1656,11 +1657,13 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
 }
 
 
+//NOLINTBEGIN(bugprone-reserved-identifier, cppcoreguidelines-avoid-non-const-global-variables)
 extern void (*__tracerExtension)(void*);
 void (*__tracerExtensionInit)() = nullptr;
 extern "C" {
-  std::string tracerExtensionArgs = "";
+  std::string tracerExtensionArgs;
 }
+//NOLINTEND(bugprone-reserved-identifier, cppcoreguidelines-avoid-non-const-global-variables)
 
 template <typename URV>
 static
@@ -1672,7 +1675,7 @@ loadTracerLibrary(const std::string& tracerLib)
 
   std::vector<std::string> result;
   boost::split(result, tracerLib, boost::is_any_of(":"));
-  assert(result.size() >= 1);
+  assert(not result.empty());
 
   auto* soPtr = dlopen(result[0].c_str(), RTLD_NOW);
   if (not soPtr)
@@ -2073,46 +2076,58 @@ determineRegisterWidth(const Args& args, const HartConfig& config)
 int
 main(int argc, char* argv[])
 {
-  Args args;
-  if (not parseCmdLineArgs(argc, argv, args))
-    return 1;
-  if (args.help)
-    return 0;
+  // Used to restore terminal state via RAII
+  class TerminalStateRAII
+  {
+  public:
+    TerminalStateRAII()
+    { tcgetattr(STDIN_FILENO, &term); }
 
-  // Expand each target program string into program name and args.
-  args.expandTargets();
+    ~TerminalStateRAII()
+    { tcsetattr(STDIN_FILENO, 0, &term); }  // Restore terminal state.
 
-  // Load configuration file.
-  HartConfig config;
-  if (not args.configFile.empty())
-    if (not config.loadConfigFile(args.configFile))
-      return 1;
+  private:
+    struct termios term;
+  };
 
-  struct termios term;
-  tcgetattr(STDIN_FILENO, &term);  // Save terminal state.
-
-  unsigned regWidth = determineRegisterWidth(args, config);
   bool ok = true;
-
   try
     {
+      Args args;
+      if (not parseCmdLineArgs(std::span(argv, argc), args))
+        return 1;
+      if (args.help)
+        return 0;
+
+      // Expand each target program string into program name and args.
+      args.expandTargets();
+
+      // Load configuration file.
+      HartConfig config;
+      if (not args.configFile.empty())
+        if (not config.loadConfigFile(args.configFile))
+          return 1;
+
+      TerminalStateRAII term;  // Save/restore terminal state.
+
+      unsigned regWidth = determineRegisterWidth(args, config);
+
       if (regWidth == 32)
-	ok = session<uint32_t>(args, config);
+        ok = session<uint32_t>(args, config);
       else if (regWidth == 64)
-	ok = session<uint64_t>(args, config);
+        ok = session<uint64_t>(args, config);
       else
-	{
-	  std::cerr << "Invalid register width: " << regWidth;
-	  std::cerr << " -- expecting 32 or 64\n";
-	  ok = false;
-	}
+        {
+          std::cerr << "Invalid register width: " << regWidth;
+          std::cerr << " -- expecting 32 or 64\n";
+          ok = false;
+        }
     }
   catch (std::exception& e)
     {
       std::cerr << e.what() << '\n';
       ok = false;
     }
-	
-  tcsetattr(STDIN_FILENO, 0, &term);  // Restore terminal state.
+
   return ok? 0 : 1;
 }

@@ -101,7 +101,7 @@ namespace WdRiscv
     void printTlb(std::ostream& ost) const;
 
     /// print TLB entry
-    void printEntry(std::ostream& ost, const TlbEntry& te) const;
+    static void printEntry(std::ostream& ost, const TlbEntry& te);
 
     /// Set number of TLB entries.
     void setTlbSize(unsigned size)
@@ -110,7 +110,7 @@ namespace WdRiscv
     /// Insert a TLB entry for the given translation parameters. If TLB is full
     /// the contents of the  least recently accessed slot are replaced by the
     /// given parameters. Return true on success and false otherwise.
-    bool insertEntry(uint64_t virtPageNum, uint64_t phyPageNum,
+    bool insertEntry(uint64_t virtPageNum, uint64_t physPageNum,
                      uint32_t asid, bool global, bool isUser, bool read,
                      bool write, bool exec);
 

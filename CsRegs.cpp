@@ -63,7 +63,7 @@ CsRegs<URV>::defineCsr(std::string name, CsrNumber csrn, bool mandatory,
   if (ix >= regs_.size())
     return nullptr;
 
-  if (nameToNumber_.count(name))
+  if (nameToNumber_.contains(name))
     {
       if (not quiet)
 	std::cerr << "Error: CSR " << name << " already defined\n";
@@ -426,15 +426,15 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
-  enableSstc(sstcEnabled_);  // To activate/deactivate STIMECMP.
+  updateSstc();  // To activate/deactivate STIMECMP.
 }
 
 
 template <typename URV>
 void
-CsRegs<URV>::enableSstc(bool flag)
+CsRegs<URV>::updateSstc()
 {
-  sstcEnabled_ = flag;
+  bool flag = sstcEnabled_;
 
   flag = flag and superEnabled_;
   auto menv = getImplementedCsr(CsrNumber::MENVCFG);
@@ -547,7 +547,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
         }
     }
 
-  enableSstc(sstcEnabled_);  // To activate/deactivate VSTIMECMP.
+  updateSstc();  // To activate/deactivate VSTIMECMP.
 }
 
 
@@ -1496,7 +1496,7 @@ CsRegs<URV>::tieSharedCsrsTo(CsRegs<URV>& target)
       CsrNumber csrn = CsrNumber(i);
       auto csr = getImplementedCsr(csrn);
       auto targetCsr = target.getImplementedCsr(csrn);
-       if (csr)
+      if (csr)
         {
           assert(targetCsr);
           if (csr->isShared())
@@ -1791,7 +1791,7 @@ CsRegs<URV>::defineHypervisorRegs()
   csr->setHypervisor(true); csr->markAsHighHalf(true);
 
   // This may be already defined with trigger CSRs.
-  if (not nameToNumber_.count("hcontext"))
+  if (not nameToNumber_.contains("hcontext"))
     csr = defineCsr("hcontext",    Csrn::HCONTEXT,    !mand, !imp, 0, wam, wam);
   else
     csr = findCsr(Csrn::HCONTEXT);
@@ -1873,7 +1873,7 @@ CsRegs<URV>::defineDebugRegs()
   defineCsr("tinfo",    Csrn::TINFO,    !mand, !imp, 0, wam, wam);
   defineCsr("tcontrol", Csrn::TCONTROL, !mand, !imp, 0, wam, wam);
   defineCsr("mcontext", Csrn::MCONTEXT, !mand, !imp, 0, wam, wam);
-  if (not nameToNumber_.count("hcontext"))
+  if (not nameToNumber_.contains("hcontext"))
     defineCsr("hcontext", Csrn::HCONTEXT, !mand, !imp, 0, wam, wam);
 
   // Define triggers.
@@ -2495,7 +2495,7 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
 
   if (hasPerfEventSet_)
     {
-      if (not perfEventSet_.count(event))
+      if (not perfEventSet_.contains(event))
         event = 0;
     }
   else

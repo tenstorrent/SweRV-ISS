@@ -47,7 +47,7 @@ Tlb::printTlb(std::ostream& ost) const
 }
 
 void
-Tlb::printEntry(std::ostream& ost, const TlbEntry& te) const
+Tlb::printEntry(std::ostream& ost, const TlbEntry& te)
 {
   if (not te.valid_)
     return;

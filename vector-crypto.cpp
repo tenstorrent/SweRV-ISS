@@ -132,7 +132,7 @@ Hart<URV>::execVandn_vx(const DecodedInst* di)
 
 
 template<typename T>
-T
+constexpr T
 bitReverse(T x)
 {
   T result{0};
@@ -221,7 +221,7 @@ Hart<URV>::execVbrev_v(const DecodedInst* di)
 
 
 template <typename T>
-T brev8(const T& x)
+constexpr T brev8(const T& x)
 {
   T res{0};
   for (unsigned byteIx = 0; byteIx < sizeof(x); ++byteIx)
@@ -1364,7 +1364,7 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
       Uint128 s = brev8(y ^ x);
 
       for (unsigned bit = 0; bit < 128; bit++) {
-        if ((s >> i) & 1)
+        if ((s >> static_cast<int>(i)) & 1U)
 	  z ^= h;
 
 	bool reduce = ((h >> 127) & 1) != 0;
@@ -1419,7 +1419,7 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
 	assert(0);
       for (unsigned bit = 0; bit < 128; bit++)
 	{
-	  if ((y >> bit) & 1)
+	  if ((y >> static_cast<int>(bit)) & 1U)
 	    z ^= h;
 	  bool reduce = ((h >> 127) & 1) != 0;
 	  h <<= 1;
@@ -2011,7 +2011,7 @@ Hart<URV>::execVaesz_vs(const DecodedInst* di)
 
 
 template <typename T>
-T
+constexpr T
 rotateRight(T x, unsigned n)
 {
   unsigned width = sizeof(x) * 8;
@@ -2022,28 +2022,28 @@ rotateRight(T x, unsigned n)
 }
 
 
-uint32_t
+constexpr uint32_t
 sig0(uint32_t x)
 {
   return rotateRight(x, 7) ^ rotateRight(x, 18) ^ (x >> 3);
 }
 
 
-uint64_t
+constexpr uint64_t
 sig0(uint64_t x)
 {
   return rotateRight(x, 1) ^ rotateRight(x, 8) ^ (x >> 7);
 }
 
 
-uint32_t
+constexpr uint32_t
 sig1(uint32_t x)
 {
   return rotateRight(x, 17) ^ rotateRight(x, 19) ^ (x >> 10);
 }
 
 
-uint64_t
+constexpr uint64_t
 sig1(uint64_t x)
 {
   return rotateRight(x, 19) ^ rotateRight(x, 61) ^ (x >> 6);
@@ -2082,16 +2082,12 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
   EW sew = vecRegs_.elemWidth();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  bool bad = (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs)
-	      or (not isRvzvknha() and not isRvzvknhb()) or
-	      not (vs1 + group <= vd or vd + group <= vs1) or
-	      not (vs2 + group <= vd or vd + group <= vs2));
-  if (isRvzvknha() and sew != EW::Word)
-    bad = true;
-  else if (isRvzvknhb() and sew != EW::Word and sew != EW::Word2)
-    bad = true;
-
-  if (bad)
+  if (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs) or
+      (not isRvzvknha() and not isRvzvknhb()) or
+	      (vs1 + group > vd and vd + group > vs1) or
+      (vs2 + group > vd and vd + group > vs2) or
+      (isRvzvknha() and sew != EW::Word) or
+      (isRvzvknhb() and sew != EW::Word and sew != EW::Word2))
     {
       illegalInst(di);
       return;
@@ -2131,7 +2127,7 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
 }
 
 
-static
+static constexpr
 uint32_t
 sum0(uint32_t x)
 {
@@ -2139,7 +2135,7 @@ sum0(uint32_t x)
   return ror(x, 2) ^ ror(x, 13) ^ ror(x, 22);
 }
 
-static
+static constexpr
 uint64_t
 sum0(uint64_t x)
 {
@@ -2148,7 +2144,7 @@ sum0(uint64_t x)
 }
 
 
-static
+static constexpr
 uint32_t
 sum1(uint32_t x)
 {
@@ -2157,7 +2153,7 @@ sum1(uint32_t x)
 }
 
 
-static
+static constexpr
 uint64_t
 sum1(uint64_t x)
 {
@@ -2166,7 +2162,7 @@ sum1(uint64_t x)
 }
 
 
-static
+static constexpr
 uint32_t
 ch(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -2174,7 +2170,7 @@ ch(uint32_t x, uint32_t y, uint32_t z)
 }
 
 
-static
+static constexpr
 uint64_t
 ch(uint64_t x, uint64_t y, uint64_t z)
 {
@@ -2182,7 +2178,7 @@ ch(uint64_t x, uint64_t y, uint64_t z)
 }
 
 
-static
+static constexpr
 uint32_t
 maj(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -2190,7 +2186,7 @@ maj(uint32_t x, uint32_t y, uint32_t z)
 }
 
 
-static
+static constexpr
 uint64_t
 maj(uint64_t x, uint64_t y, uint64_t z)
 {
@@ -2258,16 +2254,12 @@ Hart<URV>::execVsha2ch_vv(const DecodedInst* di)
   EW sew = vecRegs_.elemWidth();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  bool bad = (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs)
-	      or (not isRvzvknha() and not isRvzvknhb()) or
-	      not (vs1 + group <= vd or vd + group <= vs1) or
-	      not (vs2 + group <= vd or vd + group <= vs2));
-  if (isRvzvknha() and sew != EW::Word)
-    bad = true;
-  else if (isRvzvknhb() and sew != EW::Word and sew != EW::Word2)
-    bad = true;
-
-  if (bad)
+  if (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs) or
+      (not isRvzvknha() and not isRvzvknhb()) or
+      (vs1 + group > vd and vd + group > vs1) or
+      (vs2 + group > vd and vd + group > vs2) or
+      (isRvzvknha() and sew != EW::Word) or
+      (isRvzvknhb() and sew != EW::Word and sew != EW::Word2))
     {
       illegalInst(di);
       return;
@@ -2327,16 +2319,12 @@ Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
   EW sew = vecRegs_.elemWidth();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  bool bad = (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs)
-	      or (not isRvzvknha() and not isRvzvknhb()) or
-	      not (vs1 + group <= vd or vd + group <= vs1) or
-	      not (vs2 + group <= vd or vd + group <= vs2));
-  if (isRvzvknha() and sew != EW::Word)
-    bad = true;
-  else if (isRvzvknhb() and sew != EW::Word and sew != EW::Word2)
-    bad = true;
-
-  if (bad)
+  if (group*vecRegs_.bitsPerRegister() < egw or (elems % egs) or (start % egs) or
+      (not isRvzvknha() and not isRvzvknhb()) or
+      (vs1 + group > vd and vd + group > vs1) or
+      (vs2 + group > vd and vd + group > vs2) or
+      (isRvzvknha() and sew != EW::Word) or
+      (isRvzvknhb() and sew != EW::Word and sew != EW::Word2))
     {
       illegalInst(di);
       return;
@@ -2380,7 +2368,7 @@ Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
 }
 
 
-static
+static constexpr
 uint32_t
 round_key(uint32_t x, uint32_t s)
 {
@@ -2389,8 +2377,8 @@ round_key(uint32_t x, uint32_t s)
 }
 	  
 
-static
-uint32_t ck[] = {
+static constexpr
+auto ck = std::to_array<uint32_t>({
   0x00070E15, 0x1C232A31, 0x383F464D, 0x545B6269,
   0x70777E85, 0x8C939AA1, 0xA8AFB6BD, 0xC4CBD2D9,
   0xE0E7EEF5, 0xFC030A11, 0x181F262D, 0x343B4249,
@@ -2399,7 +2387,8 @@ uint32_t ck[] = {
   0x30373E45, 0x4C535A61, 0x686F767D, 0x848B9299,
   0xA0A7AEB5, 0xBCC3CAD1, 0xD8DFE6ED, 0xF4FB0209,
   0x10171E25, 0x2C333A41, 0x484F565D, 0x646B7279
-};
+});
+static_assert(ck.size() == 32);
 
 
 template <typename URV>
@@ -2439,19 +2428,19 @@ Hart<URV>::execVsm4k_vi(const DecodedInst* di)
       uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
 	rk3 = uint32_t(e1 >> 96);
 
-      uint32_t b = rk1 ^ rk2 ^ rk3 ^ ck[4 * rnd];
+      uint32_t b = rk1 ^ rk2 ^ rk3 ^ ck[std::size_t{4} * rnd];
       uint32_t s = sm4_subword(b);
       uint32_t rk4 = round_key(rk0, s);
 
-      b = rk2 ^ rk3 ^ rk4 ^ ck[4 * rnd + 1];
+      b = rk2 ^ rk3 ^ rk4 ^ ck[std::size_t{4} * rnd + 1];
       s = sm4_subword(b);
       uint32_t rk5 = round_key(rk1, s);
 
-      b = rk3 ^ rk4 ^ rk5 ^ ck[4 * rnd + 2];
+      b = rk3 ^ rk4 ^ rk5 ^ ck[std::size_t{4} * rnd + 2];
       s = sm4_subword(b);
       uint32_t rk6 = round_key(rk2, s);
 
-      b = rk4 ^ rk5 ^ rk6 ^ ck[4 * rnd + 3];
+      b = rk4 ^ rk5 ^ rk6 ^ ck[std::size_t{4} * rnd + 3];
       s = sm4_subword(b);
       uint32_t rk7 = round_key(rk3, s);
 
@@ -2465,7 +2454,7 @@ Hart<URV>::execVsm4k_vi(const DecodedInst* di)
 }
 
 
-static
+static constexpr
 uint32_t
 sm4_round(uint32_t x, uint32_t s)
 {
@@ -2606,7 +2595,7 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
 }
 
 
-static
+static constexpr
 uint32_t p1(uint32_t x)
 {
   MyRol rol;
@@ -2614,7 +2603,7 @@ uint32_t p1(uint32_t x)
 }
 
 
-static
+static constexpr
 uint32_t
 zvksh_w(uint32_t m16, uint32_t m9, uint32_t m3, uint32_t m13, uint32_t m6)
 {
@@ -2639,11 +2628,10 @@ Hart<URV>::execVsm3me_vv(const DecodedInst* di)
   EW sew = vecRegs_.elemWidth();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  bool bad = (not isRvzvksh() or group*vecRegs_.bitsPerRegister() < egw or
+  if (not isRvzvksh() or group*vecRegs_.bitsPerRegister() < egw or
 	      sew != EW::Word or (elems % egs) or (start % egs) or
-	      not (vs1 + group <= vd or vd + group <= vs1) or
-	      not (vs2 + group <= vd or vd + group <= vs2));
-  if (bad)
+	      (vs1 + group > vd and vd + group > vs1) or
+      (vs2 + group > vd and vd + group > vs2))
     {
       illegalInst(di);
       return;
@@ -2719,7 +2707,7 @@ Hart<URV>::execVsm3me_vv(const DecodedInst* di)
 }
 
 
-static
+static constexpr
 uint32_t
 FF1(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -2727,7 +2715,7 @@ FF1(uint32_t x, uint32_t y, uint32_t z)
 }
 
 
-static
+static constexpr
 uint32_t
 FF2(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -2735,7 +2723,7 @@ FF2(uint32_t x, uint32_t y, uint32_t z)
 }
 
 
-static
+static constexpr
 uint32_t
 FF_j(uint32_t x, uint32_t y, uint32_t z, uint32_t j)
 {
@@ -2743,7 +2731,7 @@ FF_j(uint32_t x, uint32_t y, uint32_t z, uint32_t j)
 }
 
 
-static
+static constexpr
 uint32_t
 GG1(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -2751,7 +2739,7 @@ GG1(uint32_t x, uint32_t y, uint32_t z)
 }
 
 
-static
+static constexpr
 uint32_t
 GG2(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -2759,7 +2747,7 @@ GG2(uint32_t x, uint32_t y, uint32_t z)
 }
 
 
-static
+static constexpr
 uint32_t
 GG_j(uint32_t x, uint32_t y, uint32_t z, uint32_t j)
 {
@@ -2767,7 +2755,7 @@ GG_j(uint32_t x, uint32_t y, uint32_t z, uint32_t j)
 }
 
 
-static
+static constexpr
 uint32_t
 T_j(uint32_t j)
 {
@@ -2775,7 +2763,7 @@ T_j(uint32_t j)
 }
     
 
-static
+static constexpr
 uint32_t
 P_0(uint32_t x)
 {
@@ -2800,10 +2788,9 @@ Hart<URV>::execVsm3c_vi(const DecodedInst* di)
   EW sew = vecRegs_.elemWidth();
   unsigned vd = di->op0(),  vs1 = di->op1(),  imm = di->op2();
 
-  bool bad = (not isRvzvksh() or group*vecRegs_.bitsPerRegister() < egw or
+  if (not isRvzvksh() or group*vecRegs_.bitsPerRegister() < egw or
 	      sew != EW::Word or (elems % egs) or (start % egs) or
-	      not (vs1 + group <= vd or vd + group <= vs1));
-  if (bad)
+      (vs1 + group > vd and vd + group > vs1))
     {
       illegalInst(di);
       return;

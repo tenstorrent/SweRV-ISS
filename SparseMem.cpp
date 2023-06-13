@@ -141,8 +141,8 @@ SparseMem::writeHexFile(const std::string& path) const
   for (const auto& kv : pageMap_)
     {
       uint64_t addr = kv.first * pageSize_;             // Page address
-      std::shared_ptr<uint8_t[]> data_sp = kv.second;   // Page data
-      uint8_t* data = data_sp.get();
+      const std::vector<uint8_t>& data_sp = kv.second;  // Page data
+      const uint8_t* data = data_sp.data();
       if (fprintf(out, "@%0" PRIx64 "\n", addr) < 0)
         {
           ok = false;

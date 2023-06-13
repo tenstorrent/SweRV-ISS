@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdio>
+#include <span>
 #include <string>
 #include <vector>
 #include "WhisperMessage.h"
@@ -72,7 +73,7 @@ namespace WdRiscv
     /// received). Return false otherwise.
     bool interact(int soc, FILE* traceFile, FILE* commandLog);
 
-    bool interact(char* shm, FILE* traceFile, FILE* commandLog);
+    bool interact(std::span<char> shm, FILE* traceFile, FILE* commandLog);
 
     bool interact(const WhisperMessage& msg, WhisperMessage& reply,
                   FILE* traceFile, FILE* commandLog);

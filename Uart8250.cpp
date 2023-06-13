@@ -98,7 +98,7 @@ Uart8250::write(uint64_t addr, uint32_t value)
 	case 2: fcr_ = value; break;
 	case 3: lcr_ = value; break;
 	case 4: mcr_ = value; break;
-	case 5: break;
+	case 5:
 	case 6: break;
 	case 7: scr_ = value; break;
 	default:
@@ -130,7 +130,7 @@ Uart8250::monitorStdin()
   inPollfd.fd = fd;
   inPollfd.events = POLLIN;
 
-  while (1)
+  while (true)
     {
       if (terminate_)
 	return;

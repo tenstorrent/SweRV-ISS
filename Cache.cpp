@@ -25,7 +25,7 @@ using namespace WdRiscv;
 
 
 Cache::Cache(uint64_t totalSize, unsigned lineSize, unsigned setSize)
-  : size_(totalSize), lineSize_(lineSize), setSize_(setSize)
+  : setSize_(setSize)
 {
   assert(std::has_single_bit(totalSize));
   assert(std::has_single_bit(setSize));
@@ -84,7 +84,7 @@ Cache::getLineAddresses(std::vector<uint64_t>& result) const
 
 
 bool
-Cache::saveSnapshot(const std::string& path)
+Cache::saveSnapshot(const std::string& path) const
 {
   std::ofstream ofs(path, std::ios::trunc);
 

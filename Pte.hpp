@@ -93,19 +93,19 @@ namespace WdRiscv
     void setPpn0(unsigned v) { bits_.ppn0_ = v; }
 
     /// Return reserved bits value. NA for Sv32.
-    uint64_t res() const    { return 0; }
+    static constexpr uint64_t res()   { return 0; }
 
     /// Number of levels of an Sv32 PTE.
-    static uint32_t levels() { return 2; }
+    static constexpr uint32_t levels() { return 2; }
 
     /// Size in bytes of this object.
-    static uint32_t size()  { return sizeof(data_); }
+    static constexpr uint32_t size()  { return sizeof(data_); }
 
     /// Page based memory type. NA for Sv32.
-    uint32_t pbmt() const   { return 0; }
+    static constexpr uint32_t pbmt()  { return 0; }
 
     /// Naturally aligned power of 2 translation. NA for Sv32.
-    bool hasNapot() const  { return false; }
+    static constexpr bool hasNapot()  { return false; }
 
     /// Return the ith physical page number (PPN) field encoded in
     /// this PTE. The index i must be smaller than the number of
@@ -126,7 +126,7 @@ namespace WdRiscv
     /// physical page number (ppn) in a physical address for Sv32. The
     /// index i must be smaller than the number of levels of Sv32. See
     /// the Sv32 physical address in the privileged spec.
-    uint32_t paPpnShift(int i) const
+    static constexpr uint32_t paPpnShift(int i)
     {
       if (i == 0) return 12;
       if (i == 1) return 22;
@@ -255,7 +255,7 @@ namespace WdRiscv
     /// physical page number (ppn) in a physical address for Sv39. The
     /// index i must be smaller than the number of levels of Sv39. See
     /// the Sv39 physical address in the privileged spec.
-    uint32_t paPpnShift(int i) const
+    static constexpr uint32_t paPpnShift(int i)
     {
       if (i == 0) { return 12; }
       if (i == 1) { return 21; }
@@ -393,7 +393,7 @@ namespace WdRiscv
     /// physical page number (ppn) in a physical address for Sv48. The
     /// index i must be smaller than the number of levels of Sv48. See
     /// the Sv48 physical address in the privileged spec.
-    uint32_t paPpnShift(int i) const
+    static constexpr uint32_t paPpnShift(int i)
     {
       if (i == 0) { return 12; }
       if (i == 1) { return 21; }
@@ -539,7 +539,7 @@ namespace WdRiscv
     /// physical page number (ppn) in a physical address for Sv57. The
     /// index i must be smaller than the number of levels of Sv57. See
     /// the Sv57 physical address in the privileged spec.
-    uint32_t paPpnShift(int i) const
+    static constexpr uint32_t paPpnShift(int i)
     {
       if (i == 0) { return 12; }
       if (i == 1) { return 21; }

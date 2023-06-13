@@ -49,6 +49,7 @@ InstTable::InstTable()
   for (unsigned i = 0; InstId(i) <= InstId::maxId; ++i)
     {
       InstId id = InstId(i);
+      (void)id;
       assert(instVec_.at(i).instId() == id);
     }
 
@@ -1676,25 +1677,25 @@ InstTable::setupInstVec()
       { "c.fldsp", InstId::c_fldsp, 0x2002, 0xe003,
 	RvExtension::D, RvFormat::None,
 	OperandType::FpReg, OperandMode::Write, 0xf80,
-	OperandType::IntReg, OperandMode::Read, 0xf80,
+	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0x107c },
 
       { "c.lwsp", InstId::c_lwsp, 0x4002, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Write, 0xf80,
-	OperandType::IntReg, OperandMode::Read, 0xf80,
+	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0x107c },
 
       { "c.flwsp", InstId::c_flwsp, 0x6002, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::FpReg, OperandMode::Write, 0xf80,
-	OperandType::IntReg, OperandMode::Read, 0xf80,
+	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0x107c },
 
       { "c.ldsp", InstId::c_ldsp, 0x6002, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Write, 0xf80,
-	OperandType::IntReg, OperandMode::Read, 0xf80,
+	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0x107c },
 
       { "c.jr", InstId::c_jr, 0x8002, 0xf07f,

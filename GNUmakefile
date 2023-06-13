@@ -22,7 +22,7 @@ BOOST_LIB_DIR := $(wildcard $(BOOST_DIR)/stage/lib $(BOOST_DIR)/lib)
 BOOST_LIBS := boost_program_options
 
 # Add extra dependency libraries here
-EXTRA_LIBS := -lpthread -lm -lz -ldl -lstdc++fs -static-libstdc++ -lrt
+EXTRA_LIBS := -lpthread -lm -lz -ldl -static-libstdc++ -lrt
 
 ifdef SOFT_FLOAT
   override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include
@@ -110,7 +110,7 @@ RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
 	    Tlb.cpp VecRegs.cpp vector.cpp wideint.cpp float.cpp bitmanip.cpp \
 	    amo.cpp SparseMem.cpp InstProfile.cpp Isa.cpp Mcm.cpp \
 	    crypto.cpp Decoder.cpp Trace.cpp cbo.cpp Uart8250.cpp \
-	    Uartsf.cpp hypervisor.cpp vector-crypto.cpp
+	    Uartsf.cpp hypervisor.cpp vector-crypto.cpp WhisperMessage.cpp
 
 # List of All CPP Sources for the project
 SRCS_CXX += $(RVCORE_SRCS) whisper.cpp

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <version>
+
 #if defined(__cpp_lib_filesystem)
   #include <filesystem>
   namespace Filesystem = std::filesystem;

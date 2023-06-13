@@ -16,7 +16,7 @@ namespace WdRiscv
 
     Uartsf(uint64_t addr, uint64_t size);
 
-    ~Uartsf();
+    ~Uartsf() override;
 
     uint32_t read(uint64_t addr) override;
 
@@ -30,7 +30,6 @@ namespace WdRiscv
     void monitorStdin();
 
     enum RegId { TX_FIFO, RX_FIFO, TX_CTRL, RX_CTRL, IE, IP, DIV, N };
-    const uint32_t TX_FULL = 0x80000000;
     const uint32_t RX_EMPTY = 0x80000000;
     const uint32_t TX_EN = 1;
     const uint32_t RX_EN = 1;

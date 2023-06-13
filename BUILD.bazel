@@ -26,7 +26,7 @@ cc_library(
     hdrs          = hdrs,
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
     deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat", "//third_party:linenoise"],
-    linkopts      = ["-lstdc++fs", "-lpthread", "-lz", "-ldl", "-lrt"],
+    linkopts      = ["-lpthread", "-lz", "-ldl", "-lrt"],
     visibility    = ["//visibility:public"],
 )
 
@@ -35,6 +35,6 @@ cc_binary(
     srcs          = ["whisper.cpp"],
     deps          = [":rvcore"],
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
-    linkopts      = ["-lboost_program_options", "-lstdc++fs", "-rdynamic"],
+    linkopts      = ["-lboost_program_options", "-rdynamic"],
     visibility    = ["//visibility:public"],
 )

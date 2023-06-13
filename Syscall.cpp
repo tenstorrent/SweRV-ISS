@@ -15,6 +15,8 @@
 #include <iomanip>
 #include <iostream>
 #include <fstream>
+#include <optional>
+#include <span>
 #include <sstream>
 #include <cstring>
 #include <ctime>
@@ -44,12 +46,13 @@ using namespace WdRiscv;
 #endif
 
 
-template <typename URV>
+template <typename URV, typename T>
+requires requires (T& t) { std::span<char>(std::begin(t), std::end(t)); }
 static bool
 copyRvString(Hart<URV>& hart, uint64_t rvAddr,
-             char dest[], size_t destSize)
+             T& dest)
 {
-  for (size_t i = 0; i < destSize; ++i)
+  for (size_t i = 0; i < std::size(dest); ++i)
     {
       uint8_t byte = 0;
       if (not hart.peekMemory(rvAddr + i, byte, true))
@@ -68,33 +71,53 @@ copyRvString(Hart<URV>& hart, uint64_t rvAddr,
 /// read. Reading of elements is done sequentially and stopped at the
 /// first failure.
 template <typename URV, typename T>
+requires requires(T t) { std::span(t); }
 static uint64_t
-readHartMemory(Hart<URV>& hart, uint64_t readAddr, uint64_t size, T* dest)
+readHartMemory(Hart<URV>& hart, uint64_t readAddr, T&& dest, std::optional<std::size_t> size = std::nullopt)
 {
-  for (uint64_t i = 0; i < size; ++i)
+  std::span<std::byte> destBytes = std::as_writable_bytes(std::span(std::forward<T>(dest)));
+
+  for (uint64_t i = 0; i < size.value_or(destBytes.size()); ++i)
     {
       uint8_t byte = 0;
       if (not hart.peekMemory(readAddr + i, byte, true))
         return i;
-      dest[i] = byte;
+      destBytes[i] = static_cast<std::byte>(byte);
     }
 
-  return size;
+  return dest.size();
+}
+
+template <typename URV, typename T>
+static inline uint64_t
+readHartMemory(Hart<URV>& hart, uint64_t readAddr, T& dest)
+{
+  return readHartMemory(hart, readAddr, std::span<T, 1>(&dest, 1));
 }
 
 
 
 template <typename URV, typename T>
+requires requires(T t) { std::span(t); }
 static uint64_t
-writeHartMemory(Hart<URV>& hart, T* data, uint64_t writeAddr, uint64_t size)
+writeHartMemory(Hart<URV>& hart, T&& data, uint64_t writeAddr, std::optional<std::size_t> size = std::nullopt)
 {
-  for (uint64_t i = 0; i < size; ++i)
+  std::span<const std::byte> dataBytes = std::as_bytes(std::span(std::forward<T>(data)));
+
+  for (uint64_t i = 0; i < size.value_or(dataBytes.size()); ++i)
     {
-      uint8_t byte = data[i];
+      uint8_t byte = static_cast<uint8_t>(dataBytes[i]);
       if (not hart.pokeMemory(writeAddr + i, byte, true))
         return i;
     }
-  return size;
+  return dataBytes.size();
+}
+
+template <typename URV, typename T>
+static uint64_t
+writeHartMemory(Hart<URV>& hart, const T& data, uint64_t writeAddr)
+{
+  return writeHartMemory(hart, std::span<const T, 1>(&data, 1), writeAddr);
 }
 
 
@@ -269,15 +292,11 @@ copyTimezoneToRiscv(Hart<URV>& hart, const struct timezone& tz, URV dest)
 }
 
 
-/// Syscall numbers about which we have already complained.
-static std::vector<bool> reportedCalls(4096);
-
-
 template <typename URV>
 bool
 Syscall<URV>::redirectOutputDescriptor(int fd, const std::string& path)
 {
-  if (fdMap_.count(fd))
+  if (fdMap_.contains(fd))
     {
       std::cerr << "Hart::redirectOutputDecritpor: Error: File decriptor " << fd
                 << " alrady used.\n";
@@ -306,7 +325,7 @@ template <typename URV>
 bool
 Syscall<URV>::redirectInputDescriptor(int fd, const std::string& path)
 {
-  if (fdMap_.count(fd))
+  if (fdMap_.contains(fd))
     {
       std::cerr << "Hart::redirectOutputDecritpor: Error: File decriptor " << fd
                 << " already used.\n";
@@ -745,12 +764,12 @@ Syscall<URV>::emulate()
         size_t rvBuff = a0;
 
 	errno = 0;
-        char buffer[1024];
+        std::array<char, 1024> buffer;
         
-        if (not getcwd(buffer, sizeof(buffer)))
+        if (not getcwd(buffer.data(), buffer.size()))
 	  return SRV(-errno);
 
-        size_t len = strlen(buffer) + 1;
+        size_t len = strlen(buffer.data()) + 1;
         if (len > size)
           return SRV(-EINVAL);
 
@@ -768,7 +787,7 @@ Syscall<URV>::emulate()
       {
 	int fd = effectiveFd(SRV(a0));
 	int cmd = SRV(a1);
-	void* arg = reinterpret_cast<void*> (size_t(a2));
+	void* arg = std::bit_cast<void*>(static_cast<uintptr_t>(a2));
         int rc = 0;
 	switch (cmd)
 	  {
@@ -779,16 +798,15 @@ Syscall<URV>::emulate()
               // Assume linux and riscv have same flock structure.
               // Copy riscv flock struct into fl.
               struct flock fl;
-              uint8_t* ptr = reinterpret_cast<uint8_t*>(&fl);
 
-              if (readHartMemory(hart_, a2, sizeof(fl), ptr) != sizeof(fl))
+              if (readHartMemory(hart_, a2, fl) != sizeof(fl))
                 return SRV(-EINVAL);
 
               rc = fcntl(fd, cmd, &fl);
               if (rc < 0)
                 return rc;
 
-              uint64_t written = writeHartMemory(hart_, ptr, a2, sizeof(fl));
+              uint64_t written = writeHartMemory(hart_, fl, a2);
               if (written)
                 memChanges_.emplace_back(a2, written);
               return written == sizeof(fl)? rc : SRV(-EINVAL);
@@ -814,7 +832,7 @@ Syscall<URV>::emulate()
           {
             size_t size = _IOC_SIZE(req);
             tmp.resize(size);
-            if (readHartMemory(hart_, rvArg, size, tmp.data()) != size)
+            if (readHartMemory(hart_, rvArg, tmp, size) != size)
               return SRV(-EINVAL);
             arg = tmp.data();
           }
@@ -830,12 +848,12 @@ Syscall<URV>::emulate()
 	int fd = effectiveFd(SRV(a0));
 	uint64_t rvPath = a1;
 	mode_t mode = a2;
-	char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+	std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
-	int rc = mkdirat(fd, path, mode);
+	int rc = mkdirat(fd, path.data(), mode);
 	return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -844,14 +862,14 @@ Syscall<URV>::emulate()
 	int fd = effectiveFd(SRV(a0));
 
         uint64_t rvPath = a1;
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	int flags = SRV(a2);
 
 	errno = 0;
-	int rc = unlinkat(fd, path, flags);
+	int rc = unlinkat(fd, path.data(), flags);
 	return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -867,25 +885,25 @@ Syscall<URV>::emulate()
         int dirfd = effectiveFd(SRV(a0));
 
         uint64_t rvPath = a1;
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
         int mode = a2;
         int flags = 0; // Should be a3
-        int rc = faccessat(dirfd, path, mode, flags);
+        int rc = faccessat(dirfd, path.data(), mode, flags);
         return rc < 0 ? SRV(-errno) : rc;
       }
 
     case 49:       // chdir
       {
         uint64_t rvPath = a0;
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
-	int rc = chdir(path);
+	int rc = chdir(path.data());
 	return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -894,13 +912,13 @@ Syscall<URV>::emulate()
         int dirfd = effectiveFd(SRV(a0));
 
         uint64_t rvPath = a1;
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
         mode_t mode = a2;
         int flags = 0; // Should be a3 -- non-zero not working on rhat6
-        int rc = fchmodat(dirfd, path, mode, flags);
+        int rc = fchmodat(dirfd, path.data(), mode, flags);
         return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -909,8 +927,8 @@ Syscall<URV>::emulate()
 	int dirfd = effectiveFd(SRV(a0));
 
 	uint64_t rvPath = a1;
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	int flags = a2;
@@ -928,11 +946,11 @@ Syscall<URV>::emulate()
 	mode_t mode = a3;
 
 	errno  = 0;
-	int rc = openat(dirfd, path, x86Flags, mode);
+	int rc = openat(dirfd, path.data(), x86Flags, mode);
         if (rc >= 0)
           {
             bool isRead = not (x86Flags & (O_WRONLY | O_RDWR));
-            rc = registerLinuxFd(rc, path, isRead);
+            rc = registerLinuxFd(rc, path.data(), isRead);
             if (rc < 0)
               return SRV(-EINVAL);
           }
@@ -957,7 +975,7 @@ Syscall<URV>::emulate()
 	ssize_t rc = getdirentries64(fd, buff.data(), count, &base);
         if (rc >= 0)
           {
-            ssize_t written = writeHartMemory(hart_, buff.data(), rvBuff, rc);
+            ssize_t written = writeHartMemory(hart_, buff, rvBuff, rc);
             if (written)
               memChanges_.emplace_back(rvBuff, written);
             return written == rc? rc : SRV(-EINVAL);
@@ -999,7 +1017,7 @@ Syscall<URV>::emulate()
 
             auto& buffer = buffers.at(i);
             buffer.resize(len);
-            if (readHartMemory(hart_, base, len, buffer.data()) != len)
+            if (readHartMemory(hart_, base, buffer, len) != len)
               return SRV(-EINVAL);
 
             iov.at(i).iov_base = buffer.data();
@@ -1016,18 +1034,18 @@ Syscall<URV>::emulate()
 	int dirfd = effectiveFd(SRV(a0));
 	URV rvPath = a1, rvBuff = a2, buffSize = a3;
 
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
         std::vector<char> buff(buffSize);
 
 	errno = 0;
-	ssize_t rc = readlinkat(dirfd, path, buff.data(), buffSize);
+	ssize_t rc = readlinkat(dirfd, path.data(), buff.data(), buffSize);
         if (rc < 0)
           return SRV(-errno);
 
-        ssize_t written = writeHartMemory(hart_, buff.data(), rvBuff, rc);
+        ssize_t written = writeHartMemory(hart_, buff, rvBuff, rc);
         if (written)
           memChanges_.emplace_back(rvBuff, written);
 	return  written == rc ? written : SRV(-EINVAL);
@@ -1039,8 +1057,8 @@ Syscall<URV>::emulate()
 
         // Copy rv path into path.
         uint64_t rvPath = a1;
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	uint64_t rvBuff = a2;
@@ -1055,7 +1073,7 @@ Syscall<URV>::emulate()
         if ((flags & 0x1000) != 0 and path[0] == 0)
           rc = fstat(dirFd, &buff);
         else
-          rc = fstatat(dirFd, path, &buff, flags);
+          rc = fstatat(dirFd, path.data(), &buff, flags);
 
 	if (rc < 0)
           {
@@ -1138,7 +1156,7 @@ Syscall<URV>::emulate()
         if (rc < 0)
           return SRV(-errno);
 
-        ssize_t written = writeHartMemory(hart_, temp.data(), buffAddr, rc);
+        ssize_t written = writeHartMemory(hart_, temp, buffAddr, rc);
         if (written)
           memChanges_.emplace_back(buffAddr, written);
 	return written == rc? written : SRV(-EINVAL);
@@ -1152,7 +1170,7 @@ Syscall<URV>::emulate()
 	size_t count = a2;
 
         std::vector<uint8_t> temp(count);
-        if (readHartMemory(hart_, buffAddr, count, temp.data()) != count)
+        if (readHartMemory(hart_, buffAddr, temp, count) != count)
           return SRV(-EINVAL);
 
 	errno = 0;
@@ -1165,29 +1183,23 @@ Syscall<URV>::emulate()
         int dirfd = effectiveFd(SRV(a0));
 
 	uint64_t rvPath = a1;
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
 	  return SRV(-EINVAL);
 
         uint64_t rvTimeAddr = a2;
-        timespec spec[2];
-        uint8_t* ptr = reinterpret_cast<uint8_t*>(&spec);
-        if (readHartMemory(hart_, rvTimeAddr, sizeof(spec), ptr) != sizeof(spec))
+        std::array<timespec, 2> spec;
+        if (readHartMemory(hart_, rvTimeAddr, spec) != sizeof(spec))
           return SRV(-EINVAL);
 
         int flags = a3;
-        int rc = utimensat(dirfd, path, spec, flags);
+        int rc = utimensat(dirfd, path.data(), spec.data(), flags);
         if (rc >= 0)
           memChanges_.emplace_back(rvTimeAddr, sizeof(spec));
         return rc < 0 ? SRV(-errno) : rc;
       }
 
     case 93:  // exit
-      {
-	throw CoreException(CoreException::Exit, "", 0, a0);
-	return 0;
-      }
-
     case 94:  // exit_group
       {
 	throw CoreException(CoreException::Exit, "", 0, a0);
@@ -1225,8 +1237,7 @@ Syscall<URV>::emulate()
         if (rc >= 0)
           {
             strcpy(uts.release, "5.16.0");
-            size_t len = writeHartMemory(hart_, reinterpret_cast<char*>(&uts),
-                                         rvBuff, sizeof(uts));
+            size_t len = writeHartMemory(hart_, uts, rvBuff);
             if (len)
               memChanges_.emplace_back(rvBuff, len);
             return len == sizeof(uts)? rc : SRV(-EINVAL);
@@ -1344,17 +1355,17 @@ Syscall<URV>::emulate()
     case 276:  // rename
       {
         size_t pathAddr = a1;
-        char oldName[1024];
-        if (not copyRvString(hart_, pathAddr, oldName, sizeof(oldName)))
+        std::array<char, 1024> oldName;
+        if (not copyRvString(hart_, pathAddr, oldName))
           return SRV(-EINVAL);
 
         size_t newPathAddr = a3;
-        char newName[1024];
-        if (not copyRvString(hart_, newPathAddr, newName, sizeof(newName)))
+        std::array<char, 1024> newName;
+        if (not copyRvString(hart_, newPathAddr, newName))
           return SRV(-EINVAL);
 
         errno = 0;
-        int result = rename(oldName, newName);
+        int result = rename(oldName.data(), newName.data());
         return (result == -1) ? -errno : result;
       }
 
@@ -1374,16 +1385,16 @@ Syscall<URV>::emulate()
 	  }
 	int mode = a2;
 
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
-	int rc = open(path, x86Flags, mode);
+	int rc = open(path.data(), x86Flags, mode);
         if (rc >= 0)
           {
             bool isRead = not (x86Flags & (O_WRONLY | O_RDWR));
-            rc = registerLinuxFd(rc, path, isRead);
+            rc = registerLinuxFd(rc, path.data(), isRead);
             if (rc < 0)
               return SRV(-EINVAL);
           }
@@ -1394,12 +1405,12 @@ Syscall<URV>::emulate()
       {
         uint64_t rvPath = a0;
 
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	errno = 0;
-	int rc = unlink(path);
+	int rc = unlink(path.data());
 	return rc < 0 ? SRV(-errno) : rc;
       }
 
@@ -1408,13 +1419,13 @@ Syscall<URV>::emulate()
         uint64_t rvPath = a0;
 
         // Copy rv path into path.
-        char path[1024];
-        if (not copyRvString(hart_, rvPath, path, sizeof(path)))
+        std::array<char, 1024> path;
+        if (not copyRvString(hart_, rvPath, path))
           return SRV(-EINVAL);
 
 	struct stat buff;
 	errno = 0;
-	SRV rc = stat(path, &buff);
+	SRV rc = stat(path.data(), &buff);
 	if (rc < 0)
 	  return SRV(-errno);
 
@@ -1427,6 +1438,9 @@ Syscall<URV>::emulate()
 	return copyOk? rc : SRV(-1);
       }
     }
+
+  /// Syscall numbers about which we have already complained.
+  static std::array<bool, 4096> reportedCalls;
 
   // using urv_ll = long long;
   //printf("syscall %s (0x%llx, 0x%llx, 0x%llx, 0x%llx) = 0x%llx\n",names[num].c_str(),urv_ll(a0), urv_ll(a1),urv_ll(a2), urv_ll(a3), urv_ll(retVal));
@@ -1584,6 +1598,7 @@ template <typename URV>
 int
 Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
 {
+  (void)size;
   auto curr = mmap_blocks_.find(addr);
   if (curr == mmap_blocks_.end())
     {

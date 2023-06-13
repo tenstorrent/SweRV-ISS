@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <span>
 #include <sstream>
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
@@ -1601,9 +1602,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "replay_file")
     {
-      if (not replayFileCommand(line, tokens, replayStream))
-	return false;
-      return true;
+      return replayFileCommand(line, tokens, replayStream);
     }
 
   if (command == "replay")
@@ -1614,10 +1613,8 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 	  return false;
 	}
       bool replayDone = false;
-      if (not replayCommand(line, tokens, traceFile, commandLog,
-			    replayStream, replayDone))
-	return false;
-      return true;
+      return replayCommand(line, tokens, traceFile, commandLog,
+                           replayStream, replayDone);
     }
 
   if (command == "symbols")
@@ -1758,9 +1755,8 @@ Interactive<URV>::replayCommand(const std::string& line,
 	  std::vector<std::string> tokens;
 	  boost::split(tokens, replayLine, boost::is_any_of(" \t"),
 		       boost::token_compress_on);
-	  if (tokens.size() > 0 and tokens.at(0) == "step")
-	    count++;
-	  else if (tokens.size() > 1 and tokens.at(1) == "step")
+          if (std::ranges::any_of(std::span(tokens).first(std::min(tokens.size(), std::size_t{2})),
+                                  [](const auto& token) { return token == "step"; }))
 	    count++;
 	}
 

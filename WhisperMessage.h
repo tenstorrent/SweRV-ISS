@@ -14,7 +14,8 @@
 
 #pragma once
 
-#include <algorithm>
+#include <array>
+#include <span>
 #include <cstdint>
 
 
@@ -45,25 +46,32 @@ enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap, DeferredInt
 struct WhisperMessage
 {
   WhisperMessage(uint32_t hart = 0, WhisperMessageType type = Invalid,
-		 uint32_t resource = 0, uint64_t address = 0, 
+		 uint32_t resource = 0, uint64_t address = 0,
 		 uint64_t value = 0, uint32_t size = 0, uint64_t instrTag = 0,
 		 uint64_t time = 0)
-    : hart(hart), type(type), resource(resource), size(size), flags(0),
+    : hart(hart), type(type), resource(resource), size(size),
       instrTag(instrTag), time(time), address(address), value(value)
   {
-    std::ranges::fill(buffer, 0);
-    std::ranges::fill(tag,    0);
+    buffer.fill(0);
+    tag.fill(0);
   }
+
+  /// Unpack socket message into the returned WhisperMessage object.
+  static WhisperMessage deserializeFrom(std::span<char> buffer);
+
+  /// Serialize the current WhisperMessage into the given buffer.
+  /// Return the number of bytes written into buffer.
+  size_t serializeTo(std::span<char> buffer) const;
 
   uint32_t hart;
   uint32_t type;
   uint32_t resource;
   uint32_t size;
-  uint32_t flags;
+  uint32_t flags = 0;
   uint64_t instrTag; // Instruction tag.
   uint64_t time;     // Time stamp.
   uint64_t address;
   uint64_t value;
-  char buffer[128];
-  char tag[20];
+  std::array<char, 128> buffer;
+  std::array<char, 20>  tag;
 };

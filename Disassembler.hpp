@@ -82,7 +82,7 @@ namespace WdRiscv
   protected:
 
     /// Uncached disassembly.
-    void disassembleUncached(const DecodedInst& di, std::ostream& out);
+    void disassembleUncached(const DecodedInst& di, std::ostream& out) const;
 
     /// Cachsed disassembly.
     void disassemble(const DecodedInst& di, std::string& str);

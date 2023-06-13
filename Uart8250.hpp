@@ -15,7 +15,7 @@ namespace WdRiscv
 
     Uart8250(uint64_t addr, uint64_t size);
 
-    ~Uart8250();
+    ~Uart8250() override;
 
     uint32_t read(uint64_t addr) override;
 

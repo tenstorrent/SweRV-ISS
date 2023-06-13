@@ -32,7 +32,6 @@
 #include <cassert>
 #include <csignal>
 
-#define __STDC_FORMAT_MACROS
 #include <cinttypes>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -327,7 +326,7 @@ Hart<URV>::processExtensions(bool verbose)
   if (isRvs())
     sstc = isRvsstc();
   csRegs_.enableSstc(sstc);
-  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != NULL;
+  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
 
   enableRvzba(isa_.isEnabled(RvExtension::Zba));
   enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
@@ -396,6 +395,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzfa(true);
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
+  if (isa_.isEnabled(RvExtension::Svpbmt))
+    enableTranslationPbmt(true);
 }
 
 
@@ -671,6 +672,10 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   clearTraceData();
 
   decoder_.enableRv64(isRv64());
+
+  // Refect initial state of menvcfg CSR on pbmt and sstc.
+  updateTranslationPbmt();
+  csRegs_.updateSstc();
 }
 
 
@@ -2368,22 +2373,21 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2)
 {
   // Check if stuck because of lack of exception handler. Disable if
   // you do want the stuck behavior.
-  if (true)
+#if 1
+  if (instCounter_ == counterAtLastIllegal_ + 1)
+    consecutiveIllegalCount_++;
+  else
+    consecutiveIllegalCount_ = 0;
+
+  if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
     {
-      if (instCounter_ == counterAtLastIllegal_ + 1)
-	consecutiveIllegalCount_++;
-      else
-	consecutiveIllegalCount_ = 0;
-
-      if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
-	{
-	  throw CoreException(CoreException::Stop,
-			      "64 consecutive illegal instructions",
-			      0, 3);
-	}
-
-      counterAtLastIllegal_ = instCounter_;
+      throw CoreException(CoreException::Stop,
+                          "64 consecutive illegal instructions",
+                          0, 3);
     }
+
+  counterAtLastIllegal_ = instCounter_;
+#endif
 
   // In debug mode no exception is taken. If an ebreak exception and
   // debug park loop is defined, we jump to it. If not an ebreak and
@@ -2423,30 +2427,40 @@ isGvaTrap(unsigned causeCode)
   EC cause = EC{causeCode};
   switch (cause)
     {
-    case EC::INST_ADDR_MISAL:        return true;
-    case EC::INST_ACC_FAULT:         return true;
-    case EC::ILLEGAL_INST:           return false;
-    case EC::BREAKP:                 return true;
-    case EC::LOAD_ADDR_MISAL:        return true;
-    case EC::LOAD_ACC_FAULT:         return true;
-    case EC::STORE_ADDR_MISAL:       return true;
-    case EC::STORE_ACC_FAULT:        return true;
-    case EC::U_ENV_CALL:             return false;
-    case EC::S_ENV_CALL:             return false;
-    case EC::VS_ENV_CALL:            return false;
-    case EC::M_ENV_CALL:             return false;
-    case EC::INST_PAGE_FAULT:        return true;
-    case EC::LOAD_PAGE_FAULT:        return true;
-    case EC::STORE_PAGE_FAULT:       return true;
-    case EC::RESERVED0:              return false;
-    case EC::RESERVED1:              return false;
-    case EC::RESERVED2:              return false;
-    case EC::RESERVED3:              return false;
-    case EC::INST_GUEST_PAGE_FAULT:  return true;
-    case EC::LOAD_GUEST_PAGE_FAULT:  return true;
-    case EC::VIRT_INST:              return false;
-    case EC::STORE_GUEST_PAGE_FAULT: return true;
-    case EC::NONE:                   return false;
+    case EC::INST_ADDR_MISAL:
+    case EC::INST_ACC_FAULT:
+      return true;
+    case EC::ILLEGAL_INST:
+      return false;
+    case EC::BREAKP:
+    case EC::LOAD_ADDR_MISAL:
+    case EC::LOAD_ACC_FAULT:
+    case EC::STORE_ADDR_MISAL:
+    case EC::STORE_ACC_FAULT:
+      return true;
+    case EC::U_ENV_CALL:
+    case EC::S_ENV_CALL:
+    case EC::VS_ENV_CALL:
+    case EC::M_ENV_CALL:
+      return false;
+    case EC::INST_PAGE_FAULT:
+    case EC::LOAD_PAGE_FAULT:
+    case EC::STORE_PAGE_FAULT:
+      return true;
+    case EC::RESERVED0:
+    case EC::RESERVED1:
+    case EC::RESERVED2:
+    case EC::RESERVED3:
+      return false;
+    case EC::INST_GUEST_PAGE_FAULT:
+    case EC::LOAD_GUEST_PAGE_FAULT:
+      return true;
+    case EC::VIRT_INST:
+      return false;
+    case EC::STORE_GUEST_PAGE_FAULT:
+      return true;
+    case EC::NONE:
+      return false;
     }
   return false;
 }
@@ -2462,10 +2476,12 @@ isGpaTrap(unsigned causeCode)
   EC cause = EC{causeCode};
   switch (cause)
     {
-    case EC::INST_GUEST_PAGE_FAULT:  return true;
-    case EC::LOAD_GUEST_PAGE_FAULT:  return true;
-    case EC::STORE_GUEST_PAGE_FAULT: return true;
-    default:                         return false;
+    case EC::INST_GUEST_PAGE_FAULT:
+    case EC::LOAD_GUEST_PAGE_FAULT:
+    case EC::STORE_GUEST_PAGE_FAULT:
+      return true;
+    default:
+      return false;
     }
   return false;
 }
@@ -2850,45 +2866,47 @@ template <typename URV>
 void
 Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 {
+  using CN = CsrNumber;
+
   // This makes sure that counters stop counting after corresponding
   // event reg is written.
   if (enableCounters_)
-    if (csr >= CsrNumber::MHPMEVENT3 and csr <= CsrNumber::MHPMEVENT31)
+    if (csr >= CN::MHPMEVENT3 and csr <= CN::MHPMEVENT31)
       if (not csRegs_.applyPerfEventAssign())
         std::cerr << "Unexpected applyPerfAssign fail\n";
 
-  if (csr == CsrNumber::DCSR)
+  if (csr == CN::DCSR)
     {
       DcsrFields<URV> dcsr(val);
       dcsrStep_ = dcsr.bits_.STEP;
       dcsrStepIe_ = dcsr.bits_.STEPIE;
     }
-  else if (csr >= CsrNumber::PMPCFG0 and csr <= CsrNumber::PMPCFG15)
+  else if (csr >= CN::PMPCFG0 and csr <= CN::PMPCFG15)
     updateMemoryProtection();
-  else if (csr >= CsrNumber::PMPADDR0 and csr <= CsrNumber::PMPADDR63)
+  else if (csr >= CN::PMPADDR0 and csr <= CN::PMPADDR63)
     {
       unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csr);
       auto type = Pmp::Type((config >> 3) & 3);
       if (type != Pmp::Type::Off)
         updateMemoryProtection();
     }
-  else if (csr == CsrNumber::SATP or csr == CsrNumber::VSATP or csr == CsrNumber::HGATP)
+  else if (csr == CN::SATP or csr == CN::VSATP or csr == CN::HGATP)
     updateAddressTranslation();
-  else if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
+  else if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
 
   // Update cached values of MSTATUS,
-  if (csr == CsrNumber::MSTATUS)
+  if (csr == CN::MSTATUS)
     updateCachedMstatus();
-  else if (csr == CsrNumber::SSTATUS)
+  else if (csr == CN::SSTATUS)
     updateCachedSstatus();
-  else if (csr == CsrNumber::VSSTATUS)
+  else if (csr == CN::VSSTATUS)
     updateCachedVsstatus();
-  else if (csr == CsrNumber::HSTATUS)
+  else if (csr == CN::HSTATUS)
     updateCachedHstatus();
 
   // Update cached value of VTYPE
-  if (csr == CsrNumber::VTYPE)
+  if (csr == CN::VTYPE)
     {
       VtypeFields<URV> vtype(val);
       bool vill = vtype.bits_.VILL;
@@ -2899,16 +2917,22 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
 
-  if (csr == CsrNumber::VL)
+  if (csr == CN::VL)
     vecRegs_.elemCount(val);
 
-  if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM or
-      csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE or
-      csr == CsrNumber::VLENB)
+  if (csr == CN::VSTART or csr == CN::VXSAT or csr == CN::VXRM or
+	    csr == CN::VCSR or csr == CN::VL or csr == CN::VTYPE or
+	    csr == CN::VLENB)
     markVsDirty();
 
-  if (csr == CsrNumber::MISA and lastVal != val)
+  if (csr == CN::MISA and lastVal != val)
     processExtensions(false);
+
+  if (csr == CN::MENVCFG)
+    {
+      updateTranslationPbmt();
+      csRegs_.updateSstc();
+    }
 }
 
 
@@ -3051,7 +3075,7 @@ Hart<URV>::findVecReg(std::string_view name, unsigned& num) const
   if (not isRvv())
     return false;
 
-  return vecRegs_.findReg(name, num);
+  return VecRegs::findReg(name, num);
 }
 
 
@@ -3656,7 +3680,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 
 	  FpRegs::FpUnion u{val};
 	  bool done = false;
-	  if (isRvzfh() and fpRegs_.isBoxedHalf(val))
+          if (isRvzfh() and FpRegs::isBoxedHalf(val))
 	    {
 	      Float16 hpVal = u.hp;
 	      addToFpHistogram(prof.srcHisto_.at(srcIx), hpVal);
@@ -3664,7 +3688,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
 	    }
           else if (isRvf())
             {
-	      if (not isRvd() or fpRegs_.isBoxedSingle(val))
+	      if (not isRvd() or FpRegs::isBoxedSingle(val))
 		{
 		  FpRegs::FpUnion u{val};
 		  float spVal = u.sp;
@@ -3868,7 +3892,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   argvAddrs.push_back(0);  // Null pointer at end of argv.
 
   // Setup envp on the stack (LANG is needed for clang compiled code).
-  static constexpr std::string_view envs[] = { "LANG=C", "LC_ALL=C" };
+  static constexpr auto envs = std::to_array<std::string_view>({ "LANG=C", "LC_ALL=C" });
   std::vector<URV> envpAddrs;  // Addresses of the envp strings.
   for (const auto& env : envs)
     {
@@ -3952,11 +3976,9 @@ Hart<URV>::lastVecReg(const DecodedInst& di, unsigned& group) const
   group  = (groupX8 >= 8) ? groupX8/8 : 1;
   vecReg = static_cast<int>(di.op0());  // Make sure we have 1st reg in group.
   if ((instId >= InstId::vlsege8_v and instId <= InstId::vssege1024_v) or
-      (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v))
-    group = group*di.vecFieldCount();  // Scale by field count
-  else if (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v)
-    group = group*di.vecFieldCount();  // Scale by field count
-  else if (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v)
+      (instId >= InstId::vlsege8ff_v and instId <= InstId::vlsege1024ff_v) or
+      (instId >= InstId::vlssege8_v and instId <= InstId::vsssege1024_v) or
+      (instId >= InstId::vluxsegei8_v and instId <= InstId::vsoxsegei1024_v))
     group = group*di.vecFieldCount();  // Scale by field count
 
   return vecReg;
@@ -4016,12 +4038,14 @@ Hart<URV>::takeTriggerAction(FILE* traceFile, URV pc, URV info,
 }
 
 
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 // True if keyboard interrupt (user hit control-c) pending.
 static std::atomic<bool> userStop = false;
 
 // Negation of the preceding variable. Exists for speed (obsessive
 // compulsive engineering).
 static std::atomic<bool> noUserStop = true;
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 void
 forceUserStop(int)
@@ -4115,10 +4139,6 @@ Hart<URV>::fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
 }
 
 
-// We want amo instructions to print in the same order as executed.
-static std::mutex execMutex;
-
-
 template <typename URV>
 bool
 Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
@@ -4170,9 +4190,11 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
       try
 	{
+          // We want amo instructions to print in the same order as executed.
 	  // This avoid interleaving of amo execution and tracing.
+          static std::mutex execMutex;
 	  std::lock_guard<std::mutex> lock(execMutex);
-      
+
           uint32_t inst = 0;
 	  currPc_ = pc_;
 
@@ -4589,6 +4611,7 @@ Hart<URV>::openTcpForGdb()
 }
 
 
+//NOLINTNEXTLINE(bugprone-reserved-identifier, cppcoreguidelines-avoid-non-const-global-variables)
 extern void (*__tracerExtension)(void*);
 
 
@@ -5033,8 +5056,8 @@ Hart<URV>::whatIfSingStep(const DecodedInst& di, ChangeRecord& record)
   triggerTripped_ = false;
 
   // Save current value of operands.
-  uint64_t prevRegValues[4];
-  for (unsigned i = 0; i < 4; ++i)
+  std::array<uint64_t, 4> prevRegValues;
+  for (unsigned i = 0; i < prevRegValues.size(); ++i)
     {
       URV prev = 0;
       prevRegValues[i] = 0;
@@ -6022,7 +6045,7 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_lq:
-      if (not isRvc()) illegalInst(di); else illegalInst(di);
+      if (not isRvc()) illegalInst(di); else execLq(di);
       return;
 
     case InstId::c_lw:
@@ -6042,7 +6065,7 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_sq:
-      if (not isRvc()) illegalInst(di); else illegalInst(di);
+      if (not isRvc()) illegalInst(di); else execSq(di);
       return;
 
     case InstId::c_sw:
@@ -6066,9 +6089,6 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_li:
-      if (not isRvc()) illegalInst(di); else execAddi(di);
-      return;
-
     case InstId::c_addi16sp:
       if (not isRvc()) illegalInst(di); else execAddi(di);
       return;
@@ -6134,9 +6154,6 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_slli:
-      if (not isRvc()) illegalInst(di); else execSlli(di);
-      return;
-
     case InstId::c_slli64:
       if (not isRvc()) illegalInst(di); else execSlli(di);
       return;
@@ -9808,7 +9825,7 @@ Hart<URV>::execWfi(const DecodedInst* di)
       return;
     }
 
-  return;   // No-op.
+  // No-op.
 }
 
 
@@ -10742,6 +10759,16 @@ Hart<uint64_t>::execLd(const DecodedInst* di)
 
 
 template <typename URV>
+inline
+void
+Hart<URV>::execLq(const DecodedInst* di)
+{
+  // TODO: implement once RV128 is supported
+  illegalInst(di);
+}
+
+
+template <typename URV>
 void
 Hart<URV>::execSd(const DecodedInst* di)
 {
@@ -10758,6 +10785,15 @@ Hart<URV>::execSd(const DecodedInst* di)
   URV value = intRegs_.read(di->op0());
 
   store<uint64_t>(addr, false /*hyper*/, value);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execSq(const DecodedInst* di)
+{
+  // TODO: implement once RV128 is supported
+  illegalInst(di);
 }
 
 

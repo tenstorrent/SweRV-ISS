@@ -82,9 +82,7 @@ loadSnapshotValue(std::istream& stream, uint64_t& val)
     return false;
   char* extra = nullptr;
   val = strtoull(str.c_str(), &extra, 0);
-  if (extra and *extra)
-    return false;
-  return true;
+  return not extra or not *extra;
 }
 
 
@@ -229,7 +227,7 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	    std::cerr << "Warning: Register snapshot loader: Line " << lineNum
 		      << ": No such CSR: " << line << '\n';
         }
-      else if (type.compare("x") == 0)   // Integer register
+      else if (type == "x")   // Integer register
         {  
           if (not loadRegNumAndValue(iss, num, val))
             break;
@@ -237,7 +235,7 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	    std::cerr << "Warning: Register snapshot loader: Line " << lineNum
 		      << ": No such register: " << line << '\n';
         }
-      else if (type.compare("f") == 0)   // FP register
+      else if (type == "f")   // FP register
         {
           if (isRvf() or isRvd())
             {
@@ -248,7 +246,7 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 			  << ": No such FP register: " << line << '\n';
             }
         }
-      else if (type.compare("v") == 0) // Vector registers
+      else if (type == "v") // Vector registers
 	{
 	  if (isRvv())
 	    {

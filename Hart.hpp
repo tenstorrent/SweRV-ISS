@@ -361,7 +361,18 @@ namespace WdRiscv
 
     /// Enable page based memory types.
     void enableTranslationPbmt(bool flag)
-    { virtMem_.enablePbmt(flag); }
+    { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
+
+    /// Called when Svpbmt configuration changes. Enable/disable pbmt in
+    /// virtual memory class.
+    void updateTranslationPbmt()
+    {
+      bool flag = extensionIsEnabled(RvExtension::Svpbmt);
+      auto menv = csRegs_.getImplementedCsr(CsrNumber::MENVCFG);
+      if (menv)
+	flag = flag and csRegs_.menvcfgPbmte();
+      virtMem_.enablePbmt(flag);
+    }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
     void enableTranslationNapot(bool flag)
@@ -1256,7 +1267,7 @@ namespace WdRiscv
 
     /// Return true if rv64 (64-bit option) extension is enabled in
     /// this hart.
-    bool isRv64() const
+    static constexpr bool isRv64()
     { return rv64_; }
 
     /// Return true if rvm (multiply/divide) extension is enabled in
@@ -2702,6 +2713,10 @@ namespace WdRiscv
     void execSllw(const DecodedInst*);
     void execSrlw(const DecodedInst*);
     void execSraw(const DecodedInst*);
+
+    // rv128i
+    void execLq(const DecodedInst*);
+    void execSq(const DecodedInst*);
 
     // rv64m
     void execMulw(const DecodedInst*);
@@ -4529,7 +4544,7 @@ namespace WdRiscv
     bool forceRounding_ = false;
     RoundingMode forcedRounding_ = RoundingMode::NearestEven;
 
-    bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
+    static constexpr bool rv64_ = sizeof(URV)==8; // True if 64-bit base (RV64I).
     std::bitset<static_cast<size_t>(RvExtension::None)> ext_enabled_;
 
     URV pc_ = 0;                 // Program counter. Incremented by instr fetch.
@@ -4566,10 +4581,10 @@ namespace WdRiscv
     NmiCause nmiCause_ = NmiCause::UNKNOWN;
 
     // These must be cleared before each instruction when triggers enabled.
-    bool hasException_ = 0;      // True if current inst has an exception.
-    bool csrException_ = 0;      // True if there is a CSR related exception.
-    bool hasInterrupt_ = 0;      // True if there is an interrupt.
-    bool triggerTripped_ = 0;    // True if a trigger trips.
+    bool hasException_ = false;      // True if current inst has an exception.
+    bool csrException_ = false;      // True if there is a CSR related exception.
+    bool hasInterrupt_ = false;      // True if there is an interrupt.
+    bool triggerTripped_ = false;    // True if a trigger trips.
 
     bool lastBranchTaken_ = false; // Useful for performance counters
     bool misalignedLdSt_ = false;  // Useful for performance counters

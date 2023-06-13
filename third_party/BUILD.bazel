@@ -45,6 +45,7 @@ cc_library(
     visibility = ['//:__pkg__'],
     copts = ["-O2"],
     local_defines = ["SOFTFLOAT_ROUND_ODD", "INLINE_LEVEL=5", "SOFTFLOAT_FAST_INT64"],
+    features = ["-default_compile_flags"],
 )
 
 cc_library(

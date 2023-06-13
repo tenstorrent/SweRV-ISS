@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -280,13 +281,13 @@ namespace WdRiscv
     template<typename T>
     bool readIo(uint64_t addr, T& val) const
     {
-      for (const auto& dev : ioDevs_)
-	if (dev->isAddressInRange(addr))
-	  {
-	    val = dev->read(addr);
-	    return true;
-	  }
-      return false;
+      return std::ranges::any_of(ioDevs_,
+                                 [addr, &val](const auto& dev) {
+                                   bool found = dev->isAddressInRange(addr);
+                                   if (found)
+                                     val = dev->read(addr);
+                                   return found;
+                                 });
     }
 
     /// Perfrom write from IO devices. Return true if we hit in any IO
@@ -294,13 +295,13 @@ namespace WdRiscv
     template<typename T>
     bool writeIo(uint64_t addr, T val)
     {
-      for (auto& dev : ioDevs_)
-	if (dev->isAddressInRange(addr))
-	  {
-	    dev->write(addr, val);
-	    return true;
-	  }
-      return false;
+      return std::ranges::any_of(ioDevs_,
+                                 [addr, val](auto& dev) {
+                                   bool found = dev->isAddressInRange(addr);
+                                   if (found)
+                                     dev->write(addr, val);
+                                   return found;
+                                 });
     }
 
     /// Write half-word (2 bytes) to given address. Return true on
@@ -492,7 +493,7 @@ namespace WdRiscv
     /// Take a snapshot of the entire simulated memory into binary
     /// file. Return true on success or false on failure
     bool saveSnapshot(const std::string& filename,
-                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks);
+                      const std::vector<std::pair<uint64_t,uint64_t>>& used_blocks) const;
 
     /// Load the simulated memory from snapshot binary file. Return
     /// true on success or false on failure
@@ -666,9 +667,8 @@ namespace WdRiscv
         {
           if (i == sysHartIx) continue;
           auto& res = reservations_[i];
-          if (addr >= res.addr_ and (addr - res.addr_) < res.size_)
-            res.valid_ = false;
-          else if (addr < res.addr_ and (res.addr_ - addr) < storeSize)
+          if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
+              (addr < res.addr_ and (res.addr_ - addr) < storeSize))
             res.valid_ = false;
         }
     }
@@ -680,9 +680,8 @@ namespace WdRiscv
     {
       for (auto & res : reservations_)
         {
-          if (addr >= res.addr_ and (addr - res.addr_) < res.size_)
-            res.valid_ = false;
-          else if (addr < res.addr_ and (res.addr_ - addr) < storeSize)
+          if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
+              (addr < res.addr_ and (res.addr_ - addr) < storeSize))
             res.valid_ = false;
         }
     }
@@ -719,9 +718,9 @@ namespace WdRiscv
     /// Helper to loadElfFile: Collet ELF sections.
     void collectElfSections(ELFIO::elfio& reader);
 
-    bool saveAddressTrace(std::string_view tag,
-			  const std::unordered_map<uint64_t, uint64_t>& lineMap,
-			  const std::string& path) const;
+    static bool saveAddressTrace(std::string_view tag,
+                                 const std::unordered_map<uint64_t, uint64_t>& lineMap,
+                                 const std::string& path);
 
     /// Add line of given address to the data line address trace.
     void traceDataLine(uint64_t addr) const
