@@ -28,7 +28,26 @@
 namespace WdRiscv
 {
 
-// If the compiler provides a 128-bit integer type, use it.
+  /// Dummy class to use as a wide integer concept.
+  class WideIntBase
+  {
+  };
+
+  /// Class for unsigned integers of width 128/256/512/1204 bits. Half
+  /// is the half-wide unsigned type. Quarter is the quarter-wide
+  /// unsigned type. For example, for Uint256, Half would be Uint128,
+  /// and quarter uint64_t. The quarter type is used in the
+  /// implementation of multiplication.
+  template <typename Half, typename Quarter>
+  class UwideInt;
+
+  /// Class signed integers of width 128/256/512/1204 bits. Half is
+  /// the half-wide signed type. Quarter is the quarter-wide unsigned
+  /// type. For example, for Int256, Half would be Int128, and quarter
+  /// int64_t.
+  template <typename Half, typename Quarter>
+  class WideInt;
+
 #ifdef __SIZEOF_INT128__
 
   __extension__ using Int128  = __int128;
@@ -36,571 +55,713 @@ namespace WdRiscv
 
 #else
 
-  class Int128;
-
-  /// Unsigned 128-bit integer.
-  class Uint128
-  {
-  public:
-
-    using SelfType    = Uint128;
-    using SignedType  = Int128;
-    using HalfType    = uint64_t;
-    using QuarterType = uint32_t;
-
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
-
-    /// Default constructor.
-    constexpr Uint128() = default;
-
-    /// Copy constructor.
-    constexpr Uint128(const Uint128&) = default;
-
-    /// Construct from a 128-bit int: Copy bits.
-    constexpr Uint128(const Int128& x);
-
-    /// Construct from a 64-bit unsigned int.
-    constexpr Uint128(HalfType x)
-      : low_(x)
-    { }
-
-    /// Construct from a pair of half-type ints.
-    constexpr Uint128(HalfType high, HalfType low)
-      : low_(low), high_(high)
-    { }
-
-    /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
-
-    /// Return least sig half.
-    constexpr HalfType low() const
-    { return low_; }
-
-    /// Return most sig half.
-    constexpr HalfType high() const
-    { return high_; }
-
-    /// Convert to a built-in integral type.
-    template <std::integral INT>
-    constexpr explicit operator INT() const
-    { return low_; }
-
-    constexpr SelfType& operator += (const SelfType& x)
-    {
-      HalfType prevLow = low_;
-      low_ += x.low_;
-      high_ += x.high_;
-      if (low_ < prevLow)
-        high_++;
-      return *this;
-    }
-
-    constexpr SelfType& operator -= (const SelfType& x)
-    {
-      HalfType prevLow = low_;
-      low_ -= x.low_;
-      high_ -= x.high_;
-      if (low_ > prevLow)
-        high_--;
-      return *this;
-    }
-
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
-
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
-    { *this += 1; return *this; }
-
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
-
-    constexpr SelfType& operator -- ()
-    { *this -= 1; return *this; }
-
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
-
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
-
-    SelfType& operator *= (const SelfType& x);
-
-    SelfType& operator /= (const SelfType& x);
-
-    SelfType& operator %= (const SelfType& x);
-
-    SelfType& operator >>= (int n);
-
-    SelfType& operator <<= (int n);
-
-    constexpr bool operator == (const SelfType& x) const
-    { return high_ == x.high_ and low_ == x.low_; }
-
-    constexpr bool operator != (const SelfType& x) const
-    { return not (*this == x); }
-
-    constexpr bool operator < (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ < x.low_); }
-
-    constexpr bool operator > (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ > x.low_); }
-
-    constexpr bool operator <= (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ <= x.low_); }
-
-    constexpr bool operator >= (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ >= x.low_); }
-
-  protected:
-
-    HalfType low_ = 0;
-    HalfType high_ = 0;
-  };
-
-  constexpr Uint128 operator + (Uint128 a, const Uint128& b);
-  constexpr Uint128 operator - (Uint128 a, const Uint128& b);
-
-
-  /// Signed 128-bit integer.
-  class Int128
-  {
-  public:
-
-    using SelfType     = Int128;
-    using UnsignedType = Uint128;
-    using HalfType     = int64_t;
-    using HalfUnsigned = uint64_t;
-
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
-
-    /// Default constructor.
-    constexpr Int128() = default;
-
-    /// Copy constructor.
-    constexpr Int128(const Int128&) = default;
-
-    /// Construct from an unsigned 128-bit int: Copy bits.
-    constexpr Int128(Uint128 x)
-      : low_(static_cast<HalfType>(x.low())),
-        high_(static_cast<HalfType>(x.high()))
-    { }
-
-    /// Construct from a smaller signed int.
-    template <std::signed_integral T>
-    constexpr Int128(T x)
-      : low_(x), high_(x < 0? ~HalfType(0) : 0)
-    { }
-
-    /// Construct from a smaller unsigned int.
-    template <std::unsigned_integral T>
-    constexpr Int128(T x)
-      : low_(x)
-    { }
-
-    /// Construct from a pair of half-type ints.
-    constexpr Int128(HalfType high, HalfType low)
-      : low_(low), high_(high)
-    { }
-
-    /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
-
-    /// Return least sig half.
-    constexpr HalfType low() const
-    { return low_; }
-
-    /// Return most sig half.
-    constexpr HalfType high() const
-    { return high_; }
-
-    /// Convert to a built-in integral type.
-    template <std::integral INT>
-    constexpr explicit operator INT() const
-    { return low_; }
-
-    constexpr SelfType& operator += (const SelfType& x)
-    {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) + HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) + HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) < prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) + 1);
-      return *this;
-    }
-
-    constexpr SelfType& operator -= (const SelfType& x)
-    {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) - HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) - HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) > prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) - 1);
-      return *this;
-    }
-
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
-
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
-    { *this += 1; return *this; }
-
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
-
-    constexpr SelfType& operator -- ()
-    { *this -= 1; return *this; }
-
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
-
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
-
-    SelfType& operator *= (const SelfType& x);
-
-    SelfType& operator /= (const SelfType& x);
-
-    SelfType& operator %= (const SelfType& x);
-
-    SelfType& operator >>= (int n);
-
-    SelfType& operator <<= (int n);
-
-    constexpr bool operator == (const SelfType& x) const
-    { return high_ == x.high_ and low_ == x.low_; }
-
-    constexpr bool operator != (const SelfType& x) const
-    { return not (*this == x); }
-
-    constexpr bool operator < (const SelfType& x) const
-    {
-      return (high_ < x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) < HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator > (const SelfType& x) const
-    {
-      return (high_ > x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) > HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator <= (const SelfType& x) const
-    {
-      return (high_ < x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) <= HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator >= (const SelfType& x) const
-    {
-      return (high_ > x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) >= HalfUnsigned(x.low_)));
-    }
-
-  protected:
-
-    HalfType low_ = 0;
-    HalfType high_ = 0;
-  };
+  using Uint128  = UwideInt<uint64_t,  uint32_t>;
+  using Int128  = WideInt<int64_t,  int32_t>;
 
 #endif
 
+  using Uint256  = UwideInt<Uint128,   uint64_t>;
+  using Uint512  = UwideInt<Uint256,   Uint128>;
+  using Uint1024 = UwideInt<Uint512,   Uint256>;
 
-  class Int256;
+  using Int256  = WideInt<Int128,   int64_t>;
+  using Int512  = WideInt<Int256,   Int128>;
+  using Int1024 = WideInt<Int512,   Int256>;
+}
 
-  /// Unsigned 256-bit integer.
-  class Uint256
+namespace std
+{
+  template <> struct make_unsigned<WdRiscv::Int128>   { using type = WdRiscv::Uint128; };
+  template <> struct make_unsigned<WdRiscv::Int256>   { using type = WdRiscv::Uint256; };
+  template <> struct make_unsigned<WdRiscv::Int512>   { using type = WdRiscv::Uint512; };
+  template <> struct make_unsigned<WdRiscv::Int1024>  { using type = WdRiscv::Uint1024; };
+  template <> struct make_unsigned<WdRiscv::Uint128>  { using type = WdRiscv::Uint128; };
+  template <> struct make_unsigned<WdRiscv::Uint256>  { using type = WdRiscv::Uint256; };
+  template <> struct make_unsigned<WdRiscv::Uint512>  { using type = WdRiscv::Uint512; };
+  template <> struct make_unsigned<WdRiscv::Uint1024> { using type = WdRiscv::Uint1024; };
+
+  template <> struct make_signed<WdRiscv::Uint128>  { using type = WdRiscv::Int128; };
+  template <> struct make_signed<WdRiscv::Uint256>  { using type = WdRiscv::Int256; };
+  template <> struct make_signed<WdRiscv::Uint512>  { using type = WdRiscv::Int512; };
+  template <> struct make_signed<WdRiscv::Uint1024> { using type = WdRiscv::Int1024; };
+  template <> struct make_signed<WdRiscv::Int128>   { using type = WdRiscv::Int128; };
+  template <> struct make_signed<WdRiscv::Int256>   { using type = WdRiscv::Int256; };
+  template <> struct make_signed<WdRiscv::Int512>   { using type = WdRiscv::Int512; };
+  template <> struct make_signed<WdRiscv::Int1024>  { using type = WdRiscv::Int1024; };
+}
+
+
+namespace WdRiscv
+{
+  template <typename Half, typename Quarter>
+  class UwideInt : public WideIntBase
   {
   public:
 
-    using SelfType    = Uint256;
-    using SignedType  = Int256;
-    using HalfType    = Uint128;
-    using QuarterType = uint64_t;
+    using Self = UwideInt<Half, Quarter>;
+    using HalfSigned = std::make_signed<Half>::type;
+    using QuarterSigned = std::make_signed<Quarter>::type;
+    using Signed = WideInt<HalfSigned, QuarterSigned>;
 
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
+    static constexpr int width()     { return 8*sizeof(Self); }
+    static constexpr int halfWidth() { return 8*sizeof(Half); }
 
     /// Default constructor.
-    constexpr Uint256() = default;
+    constexpr UwideInt() = default;
 
     /// Copy constructor.
-    constexpr Uint256(const Uint256&) = default;
+    constexpr UwideInt(const Self&) = default;
 
-    /// Construct from a 256-bit int: Copy bits.
-    constexpr Uint256(const Int256& x);
-
-    /// Construct from a smaller unsigned int.
-    template <typename T>
-    requires std::is_integral<T>::value or
-             std::is_same<T, Uint128>::value
-    constexpr Uint256(const T& x)
-      : low_(x)
+    /// Construct from a similar-width int: Copy bits.
+    constexpr UwideInt(const Signed x)
+      : bits_(static_cast<Half>(x.high()), static_cast<Half>(x.low()))
     { }
+
+    /// Construct from a half-size type.
+    constexpr UwideInt(Half x)
+      : bits_(0, x)
+    { }
+
+    /// Construct from an unsigned integral type.
+    template <std::unsigned_integral UINT>
+    constexpr UwideInt(UINT x)
+      : bits_(0, x)
+    { }
+
+    /// Construct from an signed integral type.
+    template <std::signed_integral INT>
+    constexpr UwideInt(INT x)
+      : bits_(0, x)
+    {
+      if (x < 0)
+	high_() = ~high_();
+    }
 
     /// Construct from a pair of half-type ints.
-    constexpr Uint256(const HalfType& high, const HalfType& low)
+    constexpr UwideInt(Half high, Half low)
+      : bits_(high, low)
+    { }
+
+    /// Assignment constructor.
+    constexpr Self& operator = (const Self&) = default;
+
+    /// Return least sig half.
+    constexpr Half low() const
+    { return bits_.halfs_.low_; }
+
+    /// Return most sig half.
+    constexpr Half high() const
+    { return bits_.halfs_.high_; }
+
+    /// Convert to a built-in integral type.
+    template <std::integral INT>
+    constexpr explicit operator INT() const
+    {
+      return static_cast<INT>(low_());
+    }
+
+    constexpr Self& operator += (const Self& x)
+    {
+      Half prevLow = low_();
+      low_() += x.low_();
+      high_() += x.high_();
+      if (low_() < prevLow)
+        high_()++;
+      return *this;
+    }
+
+    constexpr Self& operator -= (const Self& x)
+    {
+      Half prevLow = low_();
+      low_() -= x.low_();
+      high_() -= x.high_();
+      if (low_() > prevLow)
+        high_()--;
+      return *this;
+    }
+
+    constexpr Self& operator |= (const Self& x)
+    {
+      low_() |= x.low_();
+      high_() |= x.high_();
+      return *this;
+    }
+
+    constexpr Self& operator &= (const Self& x)
+    {
+      low_() &= x.low_();
+      high_() &= x.high_();
+      return *this;
+    }
+
+    constexpr Self& operator ^= (const Self& x)
+    {
+      low_() ^= x.low_();
+      high_() ^= x.high_();
+      return *this;
+    }
+
+    constexpr Self& operator ++ ()
+    { *this += 1; return *this; }
+
+    constexpr Self operator ++ (int)
+    { Self temp = *this; temp += 1u; return temp; }
+
+    constexpr Self& operator -- ()
+    { *this -= 1; return *this; }
+
+    constexpr Self operator -- (int)
+    { Self temp = *this; temp -= 1u; return temp; }
+
+    constexpr Self operator ~ () const
+    { Self temp( ~high_(), ~low_()); return temp; }
+
+    Self& operator *= (const Self& x)
+    {
+      static constexpr unsigned qw = width() / 4;
+      Quarter a0{bits_.quarters_.q0_}, a1 = bits_.quarters_.q1_;
+      Quarter a2 = bits_.quarters_.q2_, a3 = bits_.quarters_.q3_;
+      Quarter b0 = x.bits_.quarters_.q0_, b1 = x.bits_.quarters_.q1_;
+      Quarter b2 = x.bits_.quarters_.q2_, b3 = x.bits_.quarters_.q3_;
+
+      *this = 0;
+      Self shifted = 0;
+
+      Half prod = a0; prod *= b0; *this += prod;
+      prod = a0; prod *= b1; shifted = prod; shifted <<= qw; *this += shifted;
+      prod = a0; prod *= b2; shifted = prod; shifted <<= 2*qw; *this += shifted;
+      prod = a0; prod *= b3; shifted = prod; shifted <<= 3*qw; *this += shifted;
+
+      prod = a1; prod *= b0; shifted = prod; shifted <<= qw; *this += shifted;
+      prod = a1; prod *= b1; shifted = prod; shifted <<= 2*qw; *this += shifted;
+      prod = a1; prod *= b2; shifted = prod; shifted <<= 3*qw; *this += shifted;
+      prod = a1; prod *= b3; shifted = prod; shifted <<= 4*qw; *this += shifted;
+
+      prod = a2; prod *= b0; shifted = prod; shifted <<= 2*qw; *this += shifted;
+      prod = a2; prod *= b1; shifted = prod; shifted <<= 3*qw; *this += shifted;
+      prod = a2; prod *= b2; shifted = prod; shifted <<= 4*qw; *this += shifted;
+      prod = a2; prod *= b3; shifted = prod; shifted <<= 5*qw; *this += shifted;
+
+      prod = a3; prod *= b0; shifted = prod; shifted <<= 3*qw; *this += shifted;
+      prod = a3; prod *= b1; shifted = prod; shifted <<= 4*qw; *this += shifted;
+      prod = a3; prod *= b2; shifted = prod; shifted <<= 5*qw; *this += shifted;
+      prod = a3; prod *= b3; shifted = prod; shifted <<= 6*qw; *this += shifted;
+
+      return *this;
+    }
+
+    Self& operator /= (const Self& x)
+    {
+      static constexpr unsigned n = width();
+      Self rem(0), result(0);
+
+      Self y = *this;  // Dividend
+
+      uint8_t* remLow = reinterpret_cast<uint8_t*> (&rem);  // Least sig byte of rem
+      uint8_t* resultLow = reinterpret_cast<uint8_t*> (&result);  // Least sig byte of result
+      uint8_t* yHigh = (reinterpret_cast<uint8_t*> (&y)) + sizeof(y) - 1; // Most sig byte of dividend
+
+      for (unsigned i = 0; i < n; ++i)
+	{
+	  uint8_t yMsb = *yHigh >> 7; // Most sig bit of dividend
+	  rem <<= 1;
+	  result <<= 1;
+	  y <<= 1;
+	  *remLow |= yMsb;
+	  if (x <= rem)
+	    {
+	      *resultLow |= 1;
+	      rem -= x;
+	    }
+	}
+
+      *this = result;
+      return *this;
+    }
+
+    Self& operator %= (const Self& x)
+    {
+      static constexpr unsigned n = width();
+      Self rem(0), result(0);
+
+      Self y = *this;  // Dividend
+
+      uint8_t* remLow = reinterpret_cast<uint8_t*> (&rem);  // Least sig byte of rem
+      uint8_t* resultLow = reinterpret_cast<uint8_t*> (&result);  // Least sig byte of result
+      uint8_t* yHigh = (reinterpret_cast<uint8_t*> (&y)) + sizeof(y) - 1; // Most sig byte of dividend
+
+      for (unsigned i = 0; i < n; ++i)
+	{
+	  uint8_t yMsb = *yHigh >> 7; // Most sig bit of dividend
+	  rem <<= 1;
+	  result <<= 1;
+	  y <<= 1;
+	  *remLow |= yMsb;
+	  if (x <= rem)
+	    {
+	      *resultLow |= 1;
+	      rem -= x;
+	    }
+	}
+
+      *this = rem;
+      return *this;
+    }
+
+    Self& operator >>= (int n)
+    {
+      if (n == 0)
+	return *this;
+
+      static constexpr int halfw = halfWidth();
+
+      if (n >= width())
+	low_() = high_() = Half(0);
+      else if (n >= halfw)
+	{
+	  low_() = high_();
+	  high_() = Half(0);
+	  low_() >>= (n - halfw);
+	}
+      else
+	{
+	  Half temp = high_() << (halfw - n);
+	  high_() >>= n;
+	  low_() >>= n;
+	  low_() |= temp;
+	}
+      return *this;
+    }
+
+    Self& operator <<= (int n)
+    {
+      if (n == 0)
+	return *this;
+
+      static constexpr int halfw = halfWidth();
+
+      if (n >= width())
+	low_() = high_() = Half(0);
+      else if (n >= halfw)
+	{
+	  high_() = low_();
+	  low_() = Half(0);
+	  high_() <<= (n - halfw);
+	}
+      else
+	{
+	  Half temp = low_() >> (halfw - n);
+	  high_() <<= n;
+	  low_() <<= n;
+	  high_() |= temp;
+	}
+      return *this;
+    }
+
+    constexpr bool operator == (const Self& x) const
+    { return high_() == x.high_() and low_() == x.low_(); }
+
+    constexpr bool operator != (const Self& x) const
+    { return not (*this == x); }
+
+    constexpr bool operator < (const Self& x) const
+    { return high_() < x.high_() or (high_() == x.high_() and low_() < x.low_()); }
+
+    constexpr bool operator > (const Self& x) const
+    { return high_() > x.high_() or (high_() == x.high_() and low_() > x.low_()); }
+
+    constexpr bool operator <= (const Self& x) const
+    { return high_() < x.high_() or (high_() == x.high_() and low_() <= x.low_()); }
+
+    constexpr bool operator >= (const Self& x) const
+    { return high_() > x.high_() or (high_() == x.high_() and low_() >= x.low_()); }
+
+  protected:
+
+    /// Reference to most sig half.
+    Half& low_()
+    { return bits_.halfs_.low_; }
+
+    /// Reference to least sig half.
+    Half& high_()
+    { return bits_.halfs_.high_; }
+
+    /// Reference to most sig half.
+    const Half& low_() const
+    { return bits_.halfs_.low_; }
+
+    /// Reference to least sig half.
+    const Half& high_() const
+    { return bits_.halfs_.high_; }
+
+    struct Halfs
+    {
+      Halfs(Half high = 0, Half low = 0)
+	: low_(low), high_(high)
+      { }
+
+      Half low_ = 0;
+      Half high_ = 0;
+    };
+
+    struct Quarters
+    {
+      Quarter q0_;
+      Quarter q1_;
+      Quarter q2_;
+      Quarter q3_;
+    };
+
+    union Bits
+    {
+      Bits(Half high = 0, Half low = 0)
+	: halfs_(high, low)
+      { }
+      Halfs halfs_;
+      Quarters quarters_;
+    };
+
+    Bits bits_;
+  };
+
+
+  template <typename Half, typename Quarter>
+  class WideInt
+  {
+  public:
+
+    using Self = WideInt<Half, Quarter>;
+    using HalfUnsigned = std::make_unsigned<Half>::type;
+    using QuarterUnsigned = std::make_unsigned<Quarter>::type;
+    using Unsigned = UwideInt<HalfUnsigned, QuarterUnsigned>;
+
+    static constexpr int width()     { return 8*sizeof(Self); }
+    static constexpr int halfWidth() { return 8*sizeof(Half); }
+
+    /// Default constructor.
+    constexpr WideInt() = default;
+
+    /// Copy constructor.
+    constexpr WideInt(const Self&) = default;
+
+    /// Construct from an unsigned same-width int: Copy bits.
+    constexpr WideInt(const Unsigned& x)
+      : low_(static_cast<Half>(x.low())), high_(static_cast<Half>(x.high()))
+    { }
+
+    /// Construct from a half-size type.
+    constexpr WideInt(Half x)
+      : low_(x), high_(x < 0? ~Half(0) : 0)
+    { }
+
+    /// Construct from a unsgined half-size type.
+    constexpr WideInt(HalfUnsigned x)
+      : low_(x), high_(0)
+    { }
+
+    /// Construct from an unsigned integral type.
+    template <std::unsigned_integral INT>
+    constexpr WideInt(INT x)
+      : low_(x), high_(0)
+    { }
+
+    /// Construct from an signed integral type.
+    template <std::signed_integral INT>
+    constexpr WideInt(INT x)
+      : low_(x), high_(0)
+    {
+      if (x < 0)
+	high_ = ~high_;
+    }
+
+    /// Construct from a pair of half-width ints.
+    constexpr WideInt(Half high, Half low)
       : low_(low), high_(high)
     { }
 
     /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
+    constexpr Self& operator = (const Self&) = default;
 
     /// Return least sig half.
-    constexpr HalfType low() const
+    constexpr Half low() const
     { return low_; }
 
     /// Return most sig half.
-    constexpr HalfType high() const
+    constexpr Half high() const
     { return high_; }
 
     /// Convert to a built-in integral type.
-    template <typename INT>
-    requires std::is_integral<INT>::value or
-             std::is_same<INT, Int128>::value or
-             std::is_same<INT, Uint128>::value
+    template <std::integral INT>
     constexpr explicit operator INT() const
-    { return INT(low_); }
-
-    constexpr SelfType& operator += (const SelfType& x)
     {
-      HalfType prevLow = low_;
+	return static_cast<INT>(low_);
+    }
+
+    constexpr Self& operator += (const Self& x)
+    {
+      HalfUnsigned prevLow = static_cast<HalfUnsigned>(low_);
       low_ += x.low_;
       high_ += x.high_;
-      if (low_ < prevLow)
+      if (HalfUnsigned(low_) < prevLow)
         high_++;
       return *this;
     }
 
-    constexpr SelfType& operator -= (const SelfType& x)
+    constexpr Self& operator -= (const Self& x)
     {
-      HalfType prevLow = low_;
+      HalfUnsigned prevLow = static_cast<HalfUnsigned>(low_);
       low_ -= x.low_;
       high_ -= x.high_;
-      if (low_ > prevLow)
+      if (HalfUnsigned(low_) > prevLow)
         high_--;
       return *this;
     }
 
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
-
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
-    { *this += 1; return *this; }
-
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
-
-    constexpr SelfType& operator -- ()
-    { *this -= 1; return *this; }
-
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
-
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
-
-    SelfType& operator *= (const SelfType& x);
-
-    SelfType& operator /= (const SelfType& x);
-
-    SelfType& operator %= (const SelfType& x);
-
-    SelfType& operator >>= (int n);
-
-    SelfType& operator <<= (int n);
-
-    constexpr bool operator == (const SelfType& x) const
-    { return high_ == x.high_ and low_ == x.low_; }
-
-    constexpr bool operator != (const SelfType& x) const
-    { return not (*this == x); }
-
-    constexpr bool operator < (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ < x.low_); }
-
-    constexpr bool operator > (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ > x.low_); }
-
-    constexpr bool operator <= (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ <= x.low_); }
-
-    constexpr bool operator >= (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ >= x.low_); }
-
-  protected:
-
-    HalfType low_ = 0;
-    HalfType high_ = 0;
-  };
-
-  constexpr Uint256 operator + (Uint256 a, const Uint256& b);
-  constexpr Uint256 operator - (Uint256 a, const Uint256& b);
-
-
-  /// Signed 256-bit integer.
-  class Int256
-  {
-  public:
-
-    using SelfType     =  Int256;
-    using UnsignedType =  Uint256;
-    using HalfType     =  Int128;
-    using HalfUnsigned =  Uint128;
-
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
-
-    /// Default constructor.
-    constexpr Int256() = default;
-
-    /// Copy constructor.
-    constexpr Int256(const Int256&) = default;
-
-    /// Construct from an unsigned 256-bit int: Copy bits.
-    constexpr Int256(const Uint256& x)
-      : low_(static_cast<HalfType>(x.low())),
-        high_(static_cast<HalfType>(x.high()))
-    { }
-
-    /// Construct from a smaller signed int.
-    template <typename T>
-    requires std::is_signed<T>::value or
-             std::is_same<T, Int128>::value
-    constexpr Int256(const T& x)
-      : low_(x), high_(x < T{}? ~HalfType(0) : HalfType(0))
-    { }
-
-    /// Construct from a smaller unsigned int.
-    template <typename T>
-    requires std::is_unsigned<T>::value or
-             std::is_same<T, Uint128>::value
-    constexpr Int256(const T& x)
-      : low_(x)
-    { }
-
-    /// Construct from a pair of half-type ints.
-    constexpr Int256(const HalfType& high, const HalfType& low)
-      : low_(low), high_(high)
-    { }
-
-    /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
-
-    /// Return least sig half.
-    constexpr HalfType low() const
-    { return low_; }
-
-    /// Return most sig half.
-    constexpr HalfType high() const
-    { return high_; }
-
-    /// Convert to a built-in integral type.
-    template <typename INT>
-    requires std::is_integral<INT>::value or
-             std::is_same<INT, Int128>::value or
-             std::is_same<INT, Uint128>::value
-    constexpr explicit operator INT() const
-    { return INT(low_); }
-
-    constexpr SelfType& operator += (const SelfType& x)
+    constexpr Self& operator |= (const Self& x)
     {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) + HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) + HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) < prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) + 1);
+      low_ |= x.low_;
+      high_ |= x.high_;
       return *this;
     }
 
-    constexpr SelfType& operator -= (const SelfType& x)
+    constexpr Self& operator &= (const Self& x)
     {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) - HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) - HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) > prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) - 1);
+      low_ &= x.low_;
+      high_ &= x.high_;
       return *this;
     }
 
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
+    constexpr Self& operator ^= (const Self& x)
+    {
+      low_ ^= x.low_;
+      high_ ^= x.high_;
+      return *this;
+    }
 
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
+    constexpr Self& operator ++ ()
     { *this += 1; return *this; }
 
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
+    constexpr Self operator ++ (int)
+    { Self temp = *this; temp += 1; return temp; }
 
-    constexpr SelfType& operator -- ()
+    constexpr Self& operator -- ()
     { *this -= 1; return *this; }
 
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
+    constexpr Self operator -- (int)
+    { Self temp = *this; temp -= 1; return temp; }
 
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
+    constexpr Self operator ~ () const
+    { Self temp( ~high_, ~low_); return temp; }
 
-    SelfType& operator *= (const SelfType& x);
+    Self& operator *= (const Self& xx)
+    {
+      if (*this >= Self(0) and xx >= Self(0))
+	{
+	  Unsigned a = *this, b = xx;
+	  a *= b;
+	  *this = a;
+	  return *this;
+	}
 
-    SelfType& operator /= (const SelfType& x);
+      Self minInt(1);
+      minInt <<= width() - 1;
 
-    SelfType& operator %= (const SelfType& x);
+      if (*this == minInt or xx == minInt)
+	{
+	  *this = Self(0);
+	  return *this;
+	}
 
-    SelfType& operator >>= (int n);
+      bool neg = false;
+      Self b = xx;
 
-    SelfType& operator <<= (int n);
+      if (*this < Self(0) and xx >= Self(0))
+	{
+	  neg = true;
+	  *this = - *this;
+	}
+      else if (*this >= Self(0) and xx < Self(0))
+	{
+	  neg = true;
+	  b = -xx;
+	}
+      else
+	{
+	  *this = - *this;
+	  b = -xx;
+	}
+      
+      Self a = *this;
+      a *= b;
+      if (neg)
+	a = -a;
 
-    constexpr bool operator == (const SelfType& x) const
+      *this = a;
+
+      return *this;
+    }
+
+    Self& operator /= (const Self& xx)
+    {
+      if (*this == xx)
+	{
+	  *this = 1;
+	  return *this;
+	}
+
+      Self minInt(1);
+      minInt <<= width() - 1;
+
+      if (xx == minInt)
+	{
+	  *this = 0;
+	  return *this;
+	}
+
+      Unsigned bb = xx;
+      bool neg = false;
+      if (*this < 0)
+	{
+	  *this = - *this;
+	  neg = true;
+	}
+      if (xx < 0)
+	{
+	  bb = -xx;
+	  neg = ! neg;
+	}
+      
+      Unsigned aa = *this;
+      aa /= bb;
+      *this = aa;
+      if (neg)
+	*this = - *this;
+
+      return *this;
+    }
+
+    Self& operator %= (const Self& xx)
+    {
+      if (*this == xx)
+	{
+	  *this = 0;
+	  return *this;
+	}
+
+      Self minInt(1);
+      minInt <<= width() - 1;
+
+      if (xx == minInt)
+	return *this;
+
+      Unsigned bb = xx;
+
+      bool neg = false;
+      if (*this < 0)
+	{
+	  *this = - *this;
+	  neg = true;
+	}
+      if (xx < 0)
+	{
+	  bb = -xx;
+	  neg = ! neg;
+	}
+
+      Unsigned aa = *this;
+      aa %= bb;
+      *this = aa;
+      if (neg)
+	*this = - *this;
+
+      return *this;
+    }
+
+    Self& operator >>= (int n)
+    {
+      if (n == 0)
+	return *this;
+
+      bool neg = high_ < Half(0);
+
+      static constexpr int halfw = halfWidth();
+
+      if (n >= width())
+	{
+	  if (neg)
+	    low_ = high_ = ~Half(0);
+	  else
+	    low_ = high_ = Half(0);
+	}
+      else if (n >= halfw)
+	{
+	  low_ = high_;
+	  if (neg)
+	    low_ |= Half(1) << int(sizeof(low_)*8 - 1);
+	  high_ = neg? ~Half(0) : Half(0);
+	  low_ >>= (n - halfw);
+	}
+      else
+	{
+	  HalfUnsigned temp = high_ << (halfw - n);
+	  high_ >>= n;
+	  low_ = static_cast<Half>(HalfUnsigned(low_) >> n);
+	  low_ |= static_cast<Half>(temp);
+	}
+
+      return *this;
+    }
+
+    Self& operator <<= (int n)
+    {
+      if (n == 0)
+	return *this;
+
+      static constexpr int halfw = halfWidth();
+
+      if (n >= width())
+	low_ = high_ = Half(0);
+      else if (n >= halfw)
+	{
+	  high_ = low_;
+	  low_ = Half(0);
+	  high_ <<= (n - halfw);
+	}
+      else
+	{
+	  HalfUnsigned temp = low_ >> (halfw - n);
+	  high_ <<= n;
+	  low_ <<= n;
+	  high_ |= static_cast<Half>(temp);
+	}
+      return *this;
+    }
+
+    constexpr bool operator == (const Self& x) const
     { return high_ == x.high_ and low_ == x.low_; }
 
-    constexpr bool operator != (const SelfType& x) const
+    constexpr bool operator != (const Self& x) const
     { return not (*this == x); }
 
-    constexpr bool operator < (const SelfType& x) const
+    constexpr bool operator < (const Self& x) const
     {
       return (high_ < x.high_ or
               (high_ == x.high_ and HalfUnsigned(low_) < HalfUnsigned(x.low_)));
     }
 
-    constexpr bool operator > (const SelfType& x) const
+    constexpr bool operator > (const Self& x) const
     {
       return (high_ > x.high_ or
               (high_ == x.high_ and HalfUnsigned(low_) > HalfUnsigned(x.low_)));
     }
 
-    constexpr bool operator <= (const SelfType& x) const
+    constexpr bool operator <= (const Self& x) const
     {
       return (high_ < x.high_ or
               (high_ == x.high_ and HalfUnsigned(low_) <= HalfUnsigned(x.low_)));
     }
 
-    constexpr bool operator >= (const SelfType& x) const
+    constexpr bool operator >= (const Self& x) const
     {
       return (high_ > x.high_ or
               (high_ == x.high_ and HalfUnsigned(low_) >= HalfUnsigned(x.low_)));
@@ -608,635 +769,17 @@ namespace WdRiscv
 
   protected:
 
-    HalfType low_ = 0;
-    HalfType high_ = 0;
-  };
-
-
-  class Int512;
-
-  /// Unsigned 512-bit integer.
-  class Uint512
-  {
-  public:
-
-    using SelfType    = Uint512;
-    using SignedType  = Int512;
-    using HalfType    = Uint256;
-    using QuarterType = Uint128;
-
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
-
-    /// Default constructor.
-    constexpr Uint512() = default;
-
-    /// Copy constructor.
-    constexpr Uint512(const Uint512&) = default;
-
-    /// Construct from a 512-bit int: Copy bits.
-    constexpr Uint512(const Int512& x);
-
-    /// Construct from a smaller unsigned int.
-    template <typename T>
-    requires std::is_integral<T>::value or
-             std::is_same<T, Uint128>::value or
-             std::is_same<T, Uint256>::value
-    constexpr Uint512(const T& x)
-      : low_(x)
-    { }
-
-    /// Construct from a pair of 256-bit unsigned ints.
-    constexpr Uint512(const Uint256& high, const Uint256& low)
-      : low_(low), high_(high)
-    { }
-
-    /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
-
-    /// Return least sig half.
-    constexpr HalfType low() const
-    { return low_; }
-
-    /// Return most sig half.
-    constexpr HalfType high() const
-    { return high_; }
-
-    /// Convert to a half-type.
-    constexpr operator HalfType() const
-    { return low_; }
-
-    /// Convert to a built-in integral type.
-    template <typename INT>
-    requires std::is_integral<INT>::value or
-             std::is_same<INT, Int128>::value or
-             std::is_same<INT, Uint128>::value
-    constexpr explicit operator INT() const
-    { return INT(low_); }
-
-    constexpr SelfType& operator += (const SelfType& x)
-    {
-      HalfType prevLow = low_;
-      low_ += x.low_;
-      high_ += x.high_;
-      if (low_ < prevLow)
-        high_++;
-      return *this;
-    }
-
-    constexpr SelfType& operator -= (const SelfType& x)
-    {
-      HalfType prevLow = low_;
-      low_ -= x.low_;
-      high_ -= x.high_;
-      if (low_ > prevLow)
-        high_--;
-      return *this;
-    }
-
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
-
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
-    { *this += 1; return *this; }
-
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
-
-    constexpr SelfType& operator -- ()
-    { *this -= 1; return *this; }
-
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
-
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
-
-    SelfType& operator *= (const SelfType& x);
-
-    SelfType& operator /= (const SelfType& x);
-
-    SelfType& operator %= (const SelfType& x);
-
-    SelfType& operator >>= (int n);
-
-    SelfType& operator <<= (int n);
-
-    constexpr bool operator == (const SelfType& x) const
-    { return high_ == x.high_ and low_ == x.low_; }
-
-    constexpr bool operator != (const SelfType& x) const
-    { return not (*this == x); }
-
-    constexpr bool operator < (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ < x.low_); }
-
-    constexpr bool operator > (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ > x.low_); }
-
-    constexpr bool operator <= (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ <= x.low_); }
-
-    constexpr bool operator >= (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ >= x.low_); }
-
-  protected:
-
-    HalfType low_ = 0;
-    HalfType high_ = 0;
-  };
-
-  constexpr Uint512 operator + (Uint512 a, const Uint512& b);
-  constexpr Uint512 operator - (Uint512 a, const Uint512& b);
-
-
-  /// Signed 512-bit integer.
-  class Int512
-  {
-  public:
-
-    using SelfType     = Int512;
-    using UnsignedType = Uint512;
-    using HalfType     = Int256;
-    using HalfUnsigned = Uint256;
-
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
-
-    /// Default constructor.
-    constexpr Int512() = default;
-
-    /// Copy constructor.
-    constexpr Int512(const Int512&) = default;
-
-    /// Construct from an unsigned 512-bit int: Copy bits.
-    constexpr Int512(const Uint512& x)
-      : low_(static_cast<HalfType>(x.low())),
-        high_(static_cast<HalfType>(x.high()))
-    { }
-
-    /// Construct from a smaller signed int.
-    template <typename T>
-    requires std::is_signed<T>::value or
-             std::is_same<T, Int128>::value or
-             std::is_same<T, Int256>::value
-    constexpr Int512(const T& x)
-      : low_(x), high_(x < T{}? ~HalfType(0) : HalfType(0))
-    { }
-
-    /// Construct from a smaller unsigned int.
-    template <typename T>
-    requires std::is_unsigned<T>::value or
-             std::is_same<T, Uint128>::value or
-             std::is_same<T, Uint256>::value
-    constexpr Int512(const T& x)
-      : low_(x)
-    { }
-
-    /// Construct from a pair of 256-bit ints.
-    constexpr Int512(const HalfType& high, const HalfType& low)
-      : low_(low), high_(high)
-    { }
-
-    /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
-
-    /// Return least sig half.
-    constexpr HalfType low() const
-    { return low_; }
-
-    /// Return most sig half.
-    constexpr HalfType high() const
-    { return high_; }
-
-    /// Convert to a half.
-    constexpr operator HalfType() const
-    { return low_; }
-
-    /// Convert to a built-in integral type.
-    template <typename INT>
-    requires std::is_integral<INT>::value or
-             std::is_same<INT, Int128>::value or
-             std::is_same<INT, Uint128>::value
-    constexpr explicit operator INT() const
-    { return INT(low_); }
-
-    constexpr SelfType& operator += (const SelfType& x)
-    {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) + HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) + HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) < prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) + 1);
-      return *this;
-    }
-
-    constexpr SelfType& operator -= (const SelfType& x)
-    {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) - HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) - HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) > prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) - 1);
-      return *this;
-    }
-
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
-
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
-    { *this += 1; return *this; }
-
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
-
-    constexpr SelfType& operator -- ()
-    { *this -= 1; return *this; }
-
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
-
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
-
-    SelfType& operator *= (const SelfType& x);
-
-    SelfType& operator /= (const SelfType& x);
-
-    SelfType& operator %= (const SelfType& x);
-
-    SelfType& operator >>= (int n);
-
-    SelfType& operator <<= (int n);
-
-    constexpr bool operator == (const SelfType& x) const
-    { return high_ == x.high_ and low_ == x.low_; }
-
-    constexpr bool operator != (const SelfType& x) const
-    { return not (*this == x); }
-
-    constexpr bool operator < (const SelfType& x) const
-    {
-      return (high_ < x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) < HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator > (const SelfType& x) const
-    {
-      return (high_ > x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) > HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator <= (const SelfType& x) const
-    {
-      return (high_ < x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) <= HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator >= (const SelfType& x) const
-    {
-      return (high_ > x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) >= HalfUnsigned(x.low_)));
-    }
-
-  protected:
-
-    HalfType low_ = 0;
-    HalfType high_ = 0;
-  };
-
-
-  class Int1024;
-
-  /// Unsigned 1024-bit integer.
-  class Uint1024
-  {
-  public:
-
-    using SelfType    = Uint1024;
-    using SignedType  = Int1024;
-    using HalfType    = Uint512;
-    using QuarterType = Uint256;
-
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
-
-    /// Default constructor.
-    constexpr Uint1024() = default;
-
-    /// Copy constructor.
-    constexpr Uint1024(const Uint1024&) = default;
-
-    /// Construct from a 1024-bit int: Copy bits.
-    constexpr Uint1024(const Int1024& x);
-
-    /// Construct from a smaller unsigned int.
-    template <typename T>
-    requires std::is_integral<T>::value or
-             std::is_same<T, Uint128>::value or
-             std::is_same<T, Uint256>::value or
-             std::is_same<T, Uint512>::value
-    constexpr Uint1024(const T& x)
-      : low_(x)
-    { }
-
-    /// Construct from a pair of 512-bit unsigned ints.
-    constexpr Uint1024(const HalfType& high, const HalfType& low)
-      : low_(low), high_(high)
-    { }
-
-    /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
-
-    /// Return least sig half.
-    constexpr HalfType low() const
-    { return low_; }
-
-    /// Return most sig half.
-    constexpr HalfType high() const
-    { return high_; }
-
-    /// Convert to a half-type.
-    constexpr operator HalfType() const
-    { return low_; }
-
-    /// Convert to a built-in integral type.
-    template <typename INT>
-    requires std::is_integral<INT>::value or
-             std::is_same<INT, Int128>::value or
-             std::is_same<INT, Uint128>::value
-    constexpr explicit operator INT() const
-    { return INT(low_); }
-
-    constexpr SelfType& operator += (const SelfType& x)
-    {
-      HalfType prevLow = low_;
-      low_ += x.low_;
-      high_ += x.high_;
-      if (low_ < prevLow)
-        high_++;
-      return *this;
-    }
-
-    constexpr SelfType& operator -= (const SelfType& x)
-    {
-      HalfType prevLow = low_;
-      low_ -= x.low_;
-      high_ -= x.high_;
-      if (low_ > prevLow)
-        high_--;
-      return *this;
-    }
-
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
-
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
-    { *this += 1; return *this; }
-
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
-
-    constexpr SelfType& operator -- ()
-    { *this -= 1; return *this; }
-
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
-
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
-
-    SelfType& operator *= (const SelfType& x);
-
-    SelfType& operator /= (const SelfType& x);
-
-    SelfType& operator %= (const SelfType& x);
-
-    SelfType& operator >>= (int n);
-
-    SelfType& operator <<= (int n);
-
-    constexpr bool operator == (const SelfType& x) const
-    { return high_ == x.high_ and low_ == x.low_; }
-
-    constexpr bool operator != (const SelfType& x) const
-    { return not (*this == x); }
-
-    constexpr bool operator < (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ < x.low_); }
-
-    constexpr bool operator > (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ > x.low_); }
-
-    constexpr bool operator <= (const SelfType& x) const
-    { return high_ < x.high_ or (high_ == x.high_ and low_ <= x.low_); }
-
-    constexpr bool operator >= (const SelfType& x) const
-    { return high_ > x.high_ or (high_ == x.high_ and low_ >= x.low_); }
-
-  protected:
-
-    HalfType low_ = 0;
-    HalfType high_ = 0;
-  };
-
-  constexpr Uint1024 operator + (Uint1024 a, const Uint1024& b);
-  constexpr Uint1024 operator - (Uint1024 a, const Uint1024& b);
-
-
-  /// Signed 1024-bit integer.
-  class Int1024
-  {
-  public:
-
-    using SelfType     = Int1024;
-    using UnsignedType = Uint1024;
-    using HalfType     = Int512;
-    using HalfUnsigned = Uint512;
-
-    static constexpr int width()     { return 8*sizeof(SelfType); }
-    static constexpr int halfWidth() { return 8*sizeof(HalfType); }
-
-    /// Default constructor.
-    constexpr Int1024() = default;
-
-    /// Copy constructor.
-    constexpr Int1024(const Int1024&) = default;
-
-    /// Construct from an unsigned 1024-bit int: Copy bits.
-    constexpr Int1024(const Uint1024& x)
-      : low_(static_cast<HalfType>(x.low())),
-        high_(static_cast<HalfType>(x.high()))
-    { }
-
-    /// Construct from a smaller signed int.
-    template <typename T>
-    requires std::is_signed<T>::value or
-             std::is_same<T, Int128>::value or
-             std::is_same<T, Int256>::value or
-             std::is_same<T, Int512>::value
-    constexpr Int1024(const T& x)
-      : low_(x), high_(x < T{}? ~HalfType(0) : HalfType(0))
-    { }
-
-    /// Construct from a smaller unsigned int.
-    template <typename T>
-    requires std::is_unsigned<T>::value or
-             std::is_same<T, Uint128>::value or
-             std::is_same<T, Uint256>::value or
-             std::is_same<T, Uint512>::value
-    constexpr Int1024(const T& x)
-      : low_(x)
-    { }
-
-    /// Construct from a pair of 512-bit ints.
-    constexpr Int1024(const HalfType& high, const HalfType& low)
-      : low_(low), high_(high)
-    { }
-
-    /// Assignment constructor.
-    constexpr SelfType& operator = (const SelfType&) = default;
-
-    /// Return least sig half.
-    constexpr HalfType low() const
-    { return low_; }
-
-    /// Return most sig half.
-    constexpr HalfType high() const
-    { return high_; }
-
-    /// Convert to a half.
-    constexpr operator HalfType() const
-    { return low_; }
-
-    /// Convert to a built-in integral type.
-    template <typename INT>
-    requires std::is_integral<INT>::value or
-             std::is_same<INT, Int128>::value or
-             std::is_same<INT, Uint128>::value
-    constexpr explicit operator INT() const
-    { return INT(low_); }
-
-    constexpr SelfType& operator += (const SelfType& x)
-    {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) + HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) + HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) < prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) + 1);
-      return *this;
-    }
-
-    constexpr SelfType& operator -= (const SelfType& x)
-    {
-      HalfUnsigned prevLow = low_;
-      low_ = static_cast<HalfType>(HalfUnsigned(low_) - HalfUnsigned(x.low_));
-      high_ = static_cast<HalfType>(HalfUnsigned(high_) - HalfUnsigned(x.high_));
-      if (HalfUnsigned(low_) > prevLow)
-        high_ = static_cast<HalfType>(HalfUnsigned(high_) - 1);
-      return *this;
-    }
-
-    constexpr SelfType& operator |= (const SelfType& x)
-    { low_ |= x.low_; high_ |= x.high_; return *this; }
-
-    constexpr SelfType& operator &= (const SelfType& x)
-    { low_ &= x.low_; high_ &= x.high_; return *this; }
-
-    constexpr SelfType& operator ^= (const SelfType& x)
-    { low_ ^= x.low_; high_ ^= x.high_; return *this; }
-
-    constexpr SelfType& operator ++ ()
-    { *this += 1; return *this; }
-
-    constexpr SelfType operator ++ (int)
-    { SelfType temp = *this; temp += 1; return temp; }
-
-    constexpr SelfType& operator -- ()
-    { *this -= 1; return *this; }
-
-    constexpr SelfType operator -- (int)
-    { SelfType temp = *this; temp -= 1; return temp; }
-
-    constexpr SelfType operator ~ () const
-    { SelfType temp( ~high_, ~low_); return temp; }
-
-    SelfType& operator *= (const SelfType& x);
-
-    SelfType& operator /= (const SelfType& x);
-
-    SelfType& operator %= (const SelfType& x);
-
-    SelfType& operator >>= (int n);
-
-    SelfType& operator <<= (int n);
-
-    constexpr bool operator == (const SelfType& x) const
-    { return high_ == x.high_ and low_ == x.low_; }
-
-    constexpr bool operator != (const SelfType& x) const
-    { return not (*this == x); }
-
-    constexpr bool operator < (const SelfType& x) const
-    {
-      return (high_ < x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) < HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator > (const SelfType& x) const
-    {
-      return (high_ > x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) > HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator <= (const SelfType& x) const
-    {
-      return (high_ < x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) <= HalfUnsigned(x.low_)));
-    }
-
-    constexpr bool operator >= (const SelfType& x) const
-    {
-      return (high_ > x.high_ or
-              (high_ == x.high_ and HalfUnsigned(low_) >= HalfUnsigned(x.low_)));
-    }
-
-  protected:
-
-    HalfType low_ = 0;
-    HalfType high_ = 0;
+    Half low_ = 0;
+    Half high_ = 0;
   };
 
 
 #ifndef __SIZEOF_INT128__
 
-  constexpr
-  Uint128::Uint128(const Int128& x)
-    : low_(x.low()), high_(x.high())
-  { }
-
-  constexpr Uint128 operator + (Uint128 a, const Uint128& b)
+  Uint128 operator + (Uint128 a, const Uint128& b)
   { a += b; return a; }
 
-  constexpr Uint128 operator - (Uint128 a, const Uint128& b)
+  Uint128 operator - (Uint128 a, const Uint128& b)
   { a -= b; return a; }
 
   inline Uint128 operator * (Uint128 a, const Uint128& b)
@@ -1248,7 +791,7 @@ namespace WdRiscv
   inline Uint128 operator % (Uint128 a, const Uint128& b)
   { a %= b; return a; }
 
-  constexpr Uint128 operator - (const Uint128& a)
+  inline Uint128 operator - (const Uint128& a)
   { Uint128 c = 0; c -= a; return c; }
 
   inline Uint128 operator >> (Uint128 x, int n)
@@ -1257,20 +800,20 @@ namespace WdRiscv
   inline Uint128 operator << (Uint128 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint128 operator | (Uint128 a, const Uint128& b)
+  inline Uint128 operator | (Uint128 a, const Uint128& b)
   { a |= b; return a; }
 
-  constexpr Uint128 operator & (Uint128 a, const Uint128& b)
+  inline Uint128 operator & (Uint128 a, const Uint128& b)
   { a &= b; return a; }
 
-  constexpr Uint128 operator ^ (Uint128 a, const Uint128& b)
+  inline Uint128 operator ^ (Uint128 a, const Uint128& b)
   { a ^= b; return a; }
 
 
-  constexpr Int128 operator + (Int128 a, const Int128& b)
+  inline Int128 operator + (Int128 a, const Int128& b)
   { a += b; return a; }
 
-  constexpr Int128 operator - (Int128 a, const Int128& b)
+  inline Int128 operator - (Int128 a, const Int128& b)
   { a -= b; return a; }
 
   inline Int128 operator * (Int128 a, const Int128& b)
@@ -1282,7 +825,7 @@ namespace WdRiscv
   inline Int128 operator % (Int128 a, const Int128& b)
   { a %= b; return a; }
 
-  constexpr Int128 operator - (const Int128& a)
+  inline Int128 operator - (const Int128& a)
   { Int128 c = 0; c -= a; return c; }
 
   inline Int128 operator >> (Int128 x, int n)
@@ -1291,27 +834,22 @@ namespace WdRiscv
   inline Int128 operator << (Int128 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int128 operator | (Int128 a, const Int128& b)
+  inline Int128 operator | (Int128 a, const Int128& b)
   { a |= b; return a; }
 
-  constexpr Int128 operator & (Int128 a, const Int128& b)
+  inline Int128 operator & (Int128 a, const Int128& b)
   { a &= b; return a; }
 
-  constexpr Int128 operator ^ (Int128 a, const Int128& b)
+  inline Int128 operator ^ (Int128 a, const Int128& b)
   { a ^= b; return a; }
 
 #endif
 
 
-  constexpr
-  Uint256::Uint256(const Int256& x)
-    : low_(x.low()), high_(x.high())
-  { }
-
-  constexpr Uint256 operator + (Uint256 a, const Uint256& b)
+  inline Uint256 operator + (Uint256 a, const Uint256& b)
   { a += b; return a; }
 
-  constexpr Uint256 operator - (Uint256 a, const Uint256& b)
+  inline Uint256 operator - (Uint256 a, const Uint256& b)
   { a -= b; return a; }
 
   inline Uint256 operator * (Uint256 a, const Uint256& b)
@@ -1323,8 +861,8 @@ namespace WdRiscv
   inline Uint256 operator % (Uint256 a, const Uint256& b)
   { a %= b; return a; }
 
-  constexpr Uint256 operator - (const Uint256& a)
-  { Uint256 c = 0UL; c -= a; return c; }
+  inline Uint256 operator - (const Uint256& a)
+  { Uint256 c = Uint128{0UL}; c -= a; return c; }
 
   inline Uint256 operator >> (Uint256 x, int n)
   { x >>= n; return x; }
@@ -1332,20 +870,20 @@ namespace WdRiscv
   inline Uint256 operator << (Uint256 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint256 operator | (Uint256 a, const Uint256& b)
+  inline Uint256 operator | (Uint256 a, const Uint256& b)
   { a |= b; return a; }
 
-  constexpr Uint256 operator & (Uint256 a, const Uint256& b)
+  inline Uint256 operator & (Uint256 a, const Uint256& b)
   { a &= b; return a; }
 
-  constexpr Uint256 operator ^ (Uint256 a, const Uint256& b)
+  inline Uint256 operator ^ (Uint256 a, const Uint256& b)
   { a ^= b; return a; }
 
 
-  constexpr Int256 operator + (Int256 a, const Int256& b)
+  inline Int256 operator + (Int256 a, const Int256& b)
   { a += b; return a; }
 
-  constexpr Int256 operator - (Int256 a, const Int256& b)
+  inline Int256 operator - (Int256 a, const Int256& b)
   { a -= b; return a; }
 
   inline Int256 operator * (Int256 a, const Int256& b)
@@ -1357,7 +895,7 @@ namespace WdRiscv
   inline Int256 operator % (Int256 a, const Int256& b)
   { a %= b; return a; }
 
-  constexpr Int256 operator - (const Int256& a)
+  inline Int256 operator - (const Int256& a)
   { Int256 c = 0L; c -= a; return c; }
 
   inline Int256 operator >> (Int256 x, int n)
@@ -1366,25 +904,20 @@ namespace WdRiscv
   inline Int256 operator << (Int256 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int256 operator | (Int256 a, const Int256& b)
+  inline Int256 operator | (Int256 a, const Int256& b)
   { a |= b; return a; }
 
-  constexpr Int256 operator & (Int256 a, const Int256& b)
+  inline Int256 operator & (Int256 a, const Int256& b)
   { a &= b; return a; }
 
-  constexpr Int256 operator ^ (Int256 a, const Int256& b)
+  inline Int256 operator ^ (Int256 a, const Int256& b)
   { a ^= b; return a; }
 
 
-  constexpr
-  Uint512::Uint512(const Int512& x)
-    : low_(x.low()), high_(x.high())
-  { }
-
-  constexpr Uint512 operator + (Uint512 a, const Uint512& b)
+  inline Uint512 operator + (Uint512 a, const Uint512& b)
   { a += b; return a; }
 
-  constexpr Uint512 operator - (Uint512 a, const Uint512& b)
+  inline Uint512 operator - (Uint512 a, const Uint512& b)
   { a -= b; return a; }
 
   inline Uint512 operator * (Uint512 a, const Uint512& b)
@@ -1396,7 +929,7 @@ namespace WdRiscv
   inline Uint512 operator % (Uint512 a, const Uint512& b)
   { a %= b; return a; }
 
-  constexpr Uint512 operator - (const Uint512& a)
+  inline Uint512 operator - (const Uint512& a)
   { Uint512 c = 0UL; c -= a; return c; }
 
   inline Uint512 operator >> (Uint512 x, int n)
@@ -1405,20 +938,20 @@ namespace WdRiscv
   inline Uint512 operator << (Uint512 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint512 operator | (Uint512 a, const Uint512& b)
+  inline Uint512 operator | (Uint512 a, const Uint512& b)
   { a |= b; return a; }
 
-  constexpr Uint512 operator & (Uint512 a, const Uint512& b)
+  inline Uint512 operator & (Uint512 a, const Uint512& b)
   { a &= b; return a; }
 
-  constexpr Uint512 operator ^ (Uint512 a, const Uint512& b)
+  inline Uint512 operator ^ (Uint512 a, const Uint512& b)
   { a ^= b; return a; }
 
 
-  constexpr Int512 operator + (Int512 a, const Int512& b)
+  inline Int512 operator + (Int512 a, const Int512& b)
   { a += b; return a; }
 
-  constexpr Int512 operator - (Int512 a, const Int512& b)
+  inline Int512 operator - (Int512 a, const Int512& b)
   { a -= b; return a; }
 
   inline Int512 operator * (Int512 a, const Int512& b)
@@ -1430,7 +963,7 @@ namespace WdRiscv
   inline Int512 operator % (Int512 a, const Int512& b)
   { a %= b; return a; }
 
-  constexpr Int512 operator - (const Int512& a)
+  inline Int512 operator - (const Int512& a)
   { Int512 c = 0L; c -= a; return c; }
 
   inline Int512 operator >> (Int512 x, int n)
@@ -1439,25 +972,20 @@ namespace WdRiscv
   inline Int512 operator << (Int512 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int512 operator | (Int512 a, const Int512& b)
+  inline Int512 operator | (Int512 a, const Int512& b)
   { a |= b; return a; }
 
-  constexpr Int512 operator & (Int512 a, const Int512& b)
+  inline Int512 operator & (Int512 a, const Int512& b)
   { a &= b; return a; }
 
-  constexpr Int512 operator ^ (Int512 a, const Int512& b)
+  inline Int512 operator ^ (Int512 a, const Int512& b)
   { a ^= b; return a; }
 
 
-  constexpr
-  Uint1024::Uint1024(const Int1024& x)
-    : low_(x.low()), high_(x.high())
-  { }
-
-  constexpr Uint1024 operator + (Uint1024 a, const Uint1024& b)
+  inline Uint1024 operator + (Uint1024 a, const Uint1024& b)
   { a += b; return a; }
 
-  constexpr Uint1024 operator - (Uint1024 a, const Uint1024& b)
+  inline Uint1024 operator - (Uint1024 a, const Uint1024& b)
   { a -= b; return a; }
 
   inline Uint1024 operator * (Uint1024 a, const Uint1024& b)
@@ -1469,7 +997,7 @@ namespace WdRiscv
   inline Uint1024 operator % (Uint1024 a, const Uint1024& b)
   { a %= b; return a; }
 
-  constexpr Uint1024 operator - (const Uint1024& a)
+  inline Uint1024 operator - (const Uint1024& a)
   { Uint1024 c = 0UL; c -= a; return c; }
 
   inline Uint1024 operator >> (Uint1024 x, int n)
@@ -1478,20 +1006,20 @@ namespace WdRiscv
   inline Uint1024 operator << (Uint1024 x, int n)
   { x <<= n; return x; }
 
-  constexpr Uint1024 operator | (Uint1024 a, const Uint1024& b)
+  inline Uint1024 operator | (Uint1024 a, const Uint1024& b)
   { a |= b; return a; }
 
-  constexpr Uint1024 operator & (Uint1024 a, const Uint1024& b)
+  inline Uint1024 operator & (Uint1024 a, const Uint1024& b)
   { a &= b; return a; }
 
-  constexpr Uint1024 operator ^ (Uint1024 a, const Uint1024& b)
+  inline Uint1024 operator ^ (Uint1024 a, const Uint1024& b)
   { a ^= b; return a; }
 
 
-  constexpr Int1024 operator + (Int1024 a, const Int1024& b)
+  inline Int1024 operator + (Int1024 a, const Int1024& b)
   { a += b; return a; }
 
-  constexpr Int1024 operator - (Int1024 a, const Int1024& b)
+  inline Int1024 operator - (Int1024 a, const Int1024& b)
   { a -= b; return a; }
 
   inline Int1024 operator * (Int1024 a, const Int1024& b)
@@ -1503,7 +1031,7 @@ namespace WdRiscv
   inline Int1024 operator % (Int1024 a, const Int1024& b)
   { a %= b; return a; }
 
-  constexpr Int1024 operator - (const Int1024& a)
+  inline Int1024 operator - (const Int1024& a)
   { Int1024 c = 0L; c -= a; return c; }
 
   inline Int1024 operator >> (Int1024 x, int n)
@@ -1512,13 +1040,13 @@ namespace WdRiscv
   inline Int1024 operator << (Int1024 x, int n)
   { x <<= n; return x; }
 
-  constexpr Int1024 operator | (Int1024 a, const Int1024& b)
+  inline Int1024 operator | (Int1024 a, const Int1024& b)
   { a |= b; return a; }
 
-  constexpr Int1024 operator & (Int1024 a, const Int1024& b)
+  inline Int1024 operator & (Int1024 a, const Int1024& b)
   { a &= b; return a; }
 
-  constexpr Int1024 operator ^ (Int1024 a, const Int1024& b)
+  inline Int1024 operator ^ (Int1024 a, const Int1024& b)
   { a ^= b; return a; }
 
 

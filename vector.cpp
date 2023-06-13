@@ -28,6 +28,7 @@
 // make_unsigned/make_signed do not work on our types -- compensate.
 namespace std
 {
+#if 0
   template <>
   struct
   make_unsigned<WdRiscv::Int128>
@@ -139,6 +140,7 @@ namespace std
   {
     using type = WdRiscv::Int1024;
   };
+#endif
 }
 
 
@@ -180,8 +182,8 @@ namespace WdRiscv
   void mulh(const Uint1024& a, const Uint1024& b, Uint1024& result)
   {
     // Unpack b into 512-bit pieces
-    Uint512 a0 = Uint512(a), a1 = Uint512(a >> 512);
-    Uint512 b0 = Uint512(b), b1 = Uint512(b >> 512);
+    Uint512 a0 = a.low(), a1 = a.high();
+    Uint512 b0 = b.low(), b1 = b.high();
 
     // Multiply the 4 pieces accumulating results. Maintain upper 1024
     // bits of resuts.
@@ -211,8 +213,8 @@ namespace WdRiscv
   void mulh(const Int1024& a, const Int1024& b, Int1024& result)
   {
     // Unpack b into 512-bit pieces
-    Int512 a0 = Int512(a), a1 = Int512(a >> 512);
-    Int512 b0 = Int512(b), b1 = Int512(b >> 512);
+    Int512 a0 = a.low(), a1 = a.high();
+    Int512 b0 = b.low(), b1 = b.high();
 
     // Multiply the 4 pieces accumulating results. Maintain upper 1024
     // bits of resuts.
