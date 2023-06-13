@@ -1999,7 +1999,9 @@ Hart<URV>::execFsgnjx_h(const DecodedInst* di)
   unsigned sign2 = std::signbit(f2);
   unsigned sign = sign1 ^ sign2;
 
-  Float16 res = sign != sign1? -f1 : f1;
+  Float16 x = sign? -Float16{} : Float16{};
+
+  Float16 res = std::copysign(f1, x);
   fpRegs_.writeHalf(di->op0(), res);
 
   markFsDirty();
