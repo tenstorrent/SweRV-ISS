@@ -33,7 +33,7 @@ namespace WdRiscv
   {
   };
 
-  /// Class for unsigned integers of width 128/256/512/1204 bits. Half
+  /// Class for unsigned integers of width 128/256/512/1024 bits. Half
   /// is the half-wide unsigned type. Quarter is the quarter-wide
   /// unsigned type. For example, for Uint256, Half would be Uint128,
   /// and quarter uint64_t. The quarter type is used in the
@@ -41,7 +41,7 @@ namespace WdRiscv
   template <typename Half, typename Quarter>
   class UwideInt;
 
-  /// Class signed integers of width 128/256/512/1204 bits. Half is
+  /// Class signed integers of width 128/256/512/1024 bits. Half is
   /// the half-wide signed type. Quarter is the quarter-wide unsigned
   /// type. For example, for Int256, Half would be Int128, and quarter
   /// int64_t.
@@ -93,6 +93,7 @@ namespace std
 
 namespace WdRiscv
 {
+  /// Wide (wider than 64-bits) unsigned integer template.
   template <typename Half, typename Quarter>
   class UwideInt : public WideIntBase
   {
@@ -112,12 +113,12 @@ namespace WdRiscv
     /// Copy constructor.
     constexpr UwideInt(const Self&) = default;
 
-    /// Construct from a similar-width int: Copy bits.
+    /// Construct from a similar-width signed int: Copy bits.
     constexpr UwideInt(const Signed x)
       : bits_(static_cast<Half>(x.high()), static_cast<Half>(x.low()))
     { }
 
-    /// Construct from a half-size type.
+    /// Construct from a half-size unsigned type.
     constexpr UwideInt(Half x)
       : bits_(0, x)
     { }
@@ -137,12 +138,12 @@ namespace WdRiscv
 	high_() = ~high_();
     }
 
-    /// Construct from a pair of half-type ints.
+    /// Construct from a pair of half-width unsigned ints.
     constexpr UwideInt(Half high, Half low)
       : bits_(high, low)
     { }
 
-    /// Assignment constructor.
+    /// Assignment operator.
     constexpr Self& operator = (const Self&) = default;
 
     /// Return least sig half.
@@ -160,6 +161,7 @@ namespace WdRiscv
       return static_cast<INT>(low_());
     }
 
+    /// Plus-equal operator.
     constexpr Self& operator += (const Self& x)
     {
       Half prevLow = low_();
@@ -170,6 +172,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Minus-equal operator.
     constexpr Self& operator -= (const Self& x)
     {
       Half prevLow = low_();
@@ -180,6 +183,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Bitwise or-equal operator.
     constexpr Self& operator |= (const Self& x)
     {
       low_() |= x.low_();
@@ -187,6 +191,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Bitwise and-equal operator.
     constexpr Self& operator &= (const Self& x)
     {
       low_() &= x.low_();
@@ -194,6 +199,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Bitwise xor-equal operator.
     constexpr Self& operator ^= (const Self& x)
     {
       low_() ^= x.low_();
@@ -201,21 +207,27 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Pre-increment operator.
     constexpr Self& operator ++ ()
     { *this += 1; return *this; }
 
+    /// Post-increment operator.
     constexpr Self operator ++ (int)
     { Self temp = *this; temp += 1u; return temp; }
 
+    /// Pre-decrement operator.
     constexpr Self& operator -- ()
     { *this -= 1; return *this; }
 
+    /// Post-decrement operator.
     constexpr Self operator -- (int)
     { Self temp = *this; temp -= 1u; return temp; }
 
+    /// Bitwise complement operator.
     constexpr Self operator ~ () const
     { Self temp( ~high_(), ~low_()); return temp; }
 
+    /// Multiply-equal operator.
     Self& operator *= (const Self& x)
     {
       static constexpr unsigned qw = width() / 4;
@@ -250,6 +262,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Divide-equal operator.
     Self& operator /= (const Self& x)
     {
       static constexpr unsigned n = width();
@@ -279,6 +292,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Remainder-equal operator.
     Self& operator %= (const Self& x)
     {
       static constexpr unsigned n = width();
@@ -308,6 +322,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Right-shift operator.
     Self& operator >>= (int n)
     {
       if (n == 0)
@@ -333,6 +348,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Left-shift operator.
     Self& operator <<= (int n)
     {
       if (n == 0)
@@ -358,21 +374,27 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Equal operator.
     constexpr bool operator == (const Self& x) const
     { return high_() == x.high_() and low_() == x.low_(); }
 
+    /// Not-equal operator.
     constexpr bool operator != (const Self& x) const
     { return not (*this == x); }
 
+    /// Less-than operator.
     constexpr bool operator < (const Self& x) const
     { return high_() < x.high_() or (high_() == x.high_() and low_() < x.low_()); }
 
+    /// Greater-than operator.
     constexpr bool operator > (const Self& x) const
     { return high_() > x.high_() or (high_() == x.high_() and low_() > x.low_()); }
 
+    /// Less-than-or-equal operator.
     constexpr bool operator <= (const Self& x) const
     { return high_() < x.high_() or (high_() == x.high_() and low_() <= x.low_()); }
 
+    /// Greater-than-or-equal operator.
     constexpr bool operator >= (const Self& x) const
     { return high_() > x.high_() or (high_() == x.high_() and low_() >= x.low_()); }
 
@@ -394,6 +416,7 @@ namespace WdRiscv
     const Half& high_() const
     { return bits_.halfs_.high_; }
 
+    /// Wide integer represented as a pair of half-width integers.
     struct Halfs
     {
       Halfs(Half high = 0, Half low = 0)
@@ -404,6 +427,8 @@ namespace WdRiscv
       Half high_ = 0;
     };
 
+    /// Wide integer represented as four quarter-width integers. This
+    /// is useful for implementing multiplication.
     struct Quarters
     {
       Quarter q0_;
@@ -412,6 +437,9 @@ namespace WdRiscv
       Quarter q3_;
     };
 
+    /// Wide integer as a union of two half-width or four
+    /// quarter-width values.  For example, Uint128 is a pair of
+    /// uint64_t or a quad of uint32_t values.
     union Bits
     {
       Bits(Half high = 0, Half low = 0)
@@ -425,6 +453,7 @@ namespace WdRiscv
   };
 
 
+  /// Wide (wider than 64-bits) unsigned integer template.
   template <typename Half, typename Quarter>
   class WideInt
   {
@@ -444,17 +473,17 @@ namespace WdRiscv
     /// Copy constructor.
     constexpr WideInt(const Self&) = default;
 
-    /// Construct from an unsigned same-width int: Copy bits.
+    /// Construct from an unsigned same-width unsigned int: Copy bits.
     constexpr WideInt(const Unsigned& x)
       : low_(static_cast<Half>(x.low())), high_(static_cast<Half>(x.high()))
     { }
 
-    /// Construct from a half-size type.
+    /// Construct from a half-size signed type.
     constexpr WideInt(Half x)
       : low_(x), high_(x < 0? ~Half(0) : 0)
     { }
 
-    /// Construct from a unsgined half-size type.
+    /// Construct from a unsgined half-size unsigned type.
     constexpr WideInt(HalfUnsigned x)
       : low_(x), high_(0)
     { }
@@ -474,12 +503,12 @@ namespace WdRiscv
 	high_ = ~high_;
     }
 
-    /// Construct from a pair of half-width ints.
+    /// Construct from a pair of half-width signed ints.
     constexpr WideInt(Half high, Half low)
       : low_(low), high_(high)
     { }
 
-    /// Assignment constructor.
+    /// Assignment operator.
     constexpr Self& operator = (const Self&) = default;
 
     /// Return least sig half.
@@ -494,9 +523,10 @@ namespace WdRiscv
     template <std::integral INT>
     constexpr explicit operator INT() const
     {
-	return static_cast<INT>(low_);
+      return static_cast<INT>(low_);
     }
 
+    /// Plus-equal operator.
     constexpr Self& operator += (const Self& x)
     {
       HalfUnsigned prevLow = static_cast<HalfUnsigned>(low_);
@@ -507,6 +537,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Minus-equal operator.
     constexpr Self& operator -= (const Self& x)
     {
       HalfUnsigned prevLow = static_cast<HalfUnsigned>(low_);
@@ -517,6 +548,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Bitwise or-equal operator.
     constexpr Self& operator |= (const Self& x)
     {
       low_ |= x.low_;
@@ -524,6 +556,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Bitwise and-equal operator.
     constexpr Self& operator &= (const Self& x)
     {
       low_ &= x.low_;
@@ -531,6 +564,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Bitwise xor-equal operator.
     constexpr Self& operator ^= (const Self& x)
     {
       low_ ^= x.low_;
@@ -538,21 +572,27 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Pre-increment operator.
     constexpr Self& operator ++ ()
     { *this += 1; return *this; }
 
+    /// Post-increment operator.
     constexpr Self operator ++ (int)
     { Self temp = *this; temp += 1; return temp; }
 
+    /// Pre-decrement operator.
     constexpr Self& operator -- ()
     { *this -= 1; return *this; }
 
+    /// Post-decrement operator.
     constexpr Self operator -- (int)
     { Self temp = *this; temp -= 1; return temp; }
 
+    /// Bitwise complement operator.
     constexpr Self operator ~ () const
     { Self temp( ~high_, ~low_); return temp; }
 
+    /// Multiply-equal operator.
     Self& operator *= (const Self& xx)
     {
       if (*this >= Self(0) and xx >= Self(0))
@@ -572,22 +612,17 @@ namespace WdRiscv
 	  return *this;
 	}
 
-      bool neg = false;
       Self b = xx;
+      bool neg = false;
 
-      if (*this < Self(0) and xx >= Self(0))
+      if (*this < Self(0))
 	{
 	  neg = true;
 	  *this = - *this;
 	}
-      else if (*this >= Self(0) and xx < Self(0))
+      if (xx < Self(0))
 	{
-	  neg = true;
-	  b = -xx;
-	}
-      else
-	{
-	  *this = - *this;
+	  neg = ! neg;
 	  b = -xx;
 	}
       
@@ -601,6 +636,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Divide-equal operator.
     Self& operator /= (const Self& xx)
     {
       if (*this == xx)
@@ -620,12 +656,12 @@ namespace WdRiscv
 
       Unsigned bb = xx;
       bool neg = false;
-      if (*this < 0)
+      if (*this < Self(0))
 	{
 	  *this = - *this;
 	  neg = true;
 	}
-      if (xx < 0)
+      if (xx < Self(0))
 	{
 	  bb = -xx;
 	  neg = ! neg;
@@ -640,6 +676,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Remainder-equal operator.
     Self& operator %= (const Self& xx)
     {
       if (*this == xx)
@@ -677,6 +714,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Right-shift operator.
     Self& operator >>= (int n)
     {
       if (n == 0)
@@ -712,6 +750,7 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Left-shift operator.
     Self& operator <<= (int n)
     {
       if (n == 0)
@@ -737,30 +776,36 @@ namespace WdRiscv
       return *this;
     }
 
+    /// Equal operator.
     constexpr bool operator == (const Self& x) const
     { return high_ == x.high_ and low_ == x.low_; }
 
+    /// Not-equal operator.
     constexpr bool operator != (const Self& x) const
     { return not (*this == x); }
 
+    /// Less-than operator.
     constexpr bool operator < (const Self& x) const
     {
       return (high_ < x.high_ or
               (high_ == x.high_ and HalfUnsigned(low_) < HalfUnsigned(x.low_)));
     }
 
+    /// Greater-than operator.
     constexpr bool operator > (const Self& x) const
     {
       return (high_ > x.high_ or
               (high_ == x.high_ and HalfUnsigned(low_) > HalfUnsigned(x.low_)));
     }
 
+    /// Less-than-or-equal operator.
     constexpr bool operator <= (const Self& x) const
     {
       return (high_ < x.high_ or
               (high_ == x.high_ and HalfUnsigned(low_) <= HalfUnsigned(x.low_)));
     }
 
+    /// Greater-than-or-equal operator.
     constexpr bool operator >= (const Self& x) const
     {
       return (high_ > x.high_ or
@@ -769,6 +814,8 @@ namespace WdRiscv
 
   protected:
 
+    /// Wide integer as a pair of two half-width values.  For example,
+    /// Int128 is a pair of int64_t values.
     Half low_ = 0;
     Half high_ = 0;
   };
