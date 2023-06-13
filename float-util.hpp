@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cfenv>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <type_traits>
@@ -610,7 +611,7 @@ doFadd(FT f1, FT f2)
 }
 
 
-/// Floating point subtracr. Return difference of two fp
+/// Floating point subtract. Return difference of two fp
 /// numbers. Return a canonical NAN if either is a NAN.
 template <typename FT>
 inline

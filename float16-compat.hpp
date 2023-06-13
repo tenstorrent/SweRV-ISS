@@ -38,8 +38,7 @@ namespace std
 
 inline auto copysign(Float16 a, Float16 b)
 {
-  return static_cast<Float16>(std::copysignf(static_cast<float>(a),
-                                             static_cast<float>(b)));
+  return __builtin_copysignf16(a, b);
 }
 
 inline auto fmax(Float16 a, Float16 b)
@@ -430,7 +429,11 @@ public:
   constexpr Float16Template operator-() const
   {
     Float16Template ret;
-    ret.u16 = u16 xor 0x8000;
+    ret.u16 = u16;
+    if (std::isnan(*this))
+      ret.u16 |= ((EXP_MASK << (NUM_SIGNIFICAND_BITS - 1)) | // Exponent should be all 1s
+                  (1 << (NUM_SIGNIFICAND_BITS - 2)));
+    ret.u16 = ret.u16 xor 0x8000;
     return ret;
   }
 
