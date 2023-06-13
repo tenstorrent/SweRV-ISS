@@ -99,8 +99,8 @@ namespace WdRiscv
   public:
 
     using Self = UwideInt<Half, Quarter>;
-    using HalfSigned = std::make_signed<Half>::type;
-    using QuarterSigned = std::make_signed<Quarter>::type;
+    using HalfSigned = typename std::make_signed<Half>::type;
+    using QuarterSigned = typename std::make_signed<Quarter>::type;
     using Signed = WideInt<HalfSigned, QuarterSigned>;
 
     static constexpr int width()     { return 8*sizeof(Self); }
@@ -431,8 +431,8 @@ namespace WdRiscv
   public:
 
     using Self = WideInt<Half, Quarter>;
-    using HalfUnsigned = std::make_unsigned<Half>::type;
-    using QuarterUnsigned = std::make_unsigned<Quarter>::type;
+    using HalfUnsigned = typename std::make_unsigned<Half>::type;
+    using QuarterUnsigned = typename std::make_unsigned<Quarter>::type;
     using Unsigned = UwideInt<HalfUnsigned, QuarterUnsigned>;
 
     static constexpr int width()     { return 8*sizeof(Self); }
