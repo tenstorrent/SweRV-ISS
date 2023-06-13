@@ -58,7 +58,7 @@ else
 endif
 
 ifeq (Darwin,$(shell uname))
-  EXTRA_LIBS := -lpthread -lm -lz -ldl
+  EXTRA_LIBS := -lpthread -lm -lz -ldl -lc++
   LINK_LIBS := $(BOOST_LIB_DIR)/lib$(BOOST_LIBS).a $(EXTRA_LIBS)
 else
   LINK_LIBS += -Wl,-export-dynamic
