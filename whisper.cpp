@@ -1197,7 +1197,7 @@ bool
 runServer(System<URV>& system, const std::string& serverFile,
 	  FILE* traceFile, FILE* commandLog)
 {
-  std::array<char, 1024> hostName;
+  std::array<char, 1024> hostName = {};
   if (gethostname(hostName.data(), hostName.size()) != 0)
     {
       std::cerr << "Failed to obtain name of this computer\n";
