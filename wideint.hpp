@@ -63,10 +63,12 @@ namespace WdRiscv
   using Uint256  = UwideInt<Uint128,   uint64_t>;
   using Uint512  = UwideInt<Uint256,   Uint128>;
   using Uint1024 = UwideInt<Uint512,   Uint256>;
+  using Uint2048 = UwideInt<Uint1024,  Uint512>;
 
   using Int256  = WideInt<Int128,   int64_t>;
   using Int512  = WideInt<Int256,   Int128>;
   using Int1024 = WideInt<Int512,   Int256>;
+  using Int2048 = WideInt<Int1024,  Int512>;
 }
 
 namespace std
@@ -75,19 +77,23 @@ namespace std
   template <> struct make_unsigned<WdRiscv::Int256>   { using type = WdRiscv::Uint256; };
   template <> struct make_unsigned<WdRiscv::Int512>   { using type = WdRiscv::Uint512; };
   template <> struct make_unsigned<WdRiscv::Int1024>  { using type = WdRiscv::Uint1024; };
+  template <> struct make_unsigned<WdRiscv::Int2048>  { using type = WdRiscv::Uint2048; };
   template <> struct make_unsigned<WdRiscv::Uint128>  { using type = WdRiscv::Uint128; };
   template <> struct make_unsigned<WdRiscv::Uint256>  { using type = WdRiscv::Uint256; };
   template <> struct make_unsigned<WdRiscv::Uint512>  { using type = WdRiscv::Uint512; };
   template <> struct make_unsigned<WdRiscv::Uint1024> { using type = WdRiscv::Uint1024; };
+  template <> struct make_unsigned<WdRiscv::Uint2048> { using type = WdRiscv::Uint2048; };
 
   template <> struct make_signed<WdRiscv::Uint128>  { using type = WdRiscv::Int128; };
   template <> struct make_signed<WdRiscv::Uint256>  { using type = WdRiscv::Int256; };
   template <> struct make_signed<WdRiscv::Uint512>  { using type = WdRiscv::Int512; };
   template <> struct make_signed<WdRiscv::Uint1024> { using type = WdRiscv::Int1024; };
+  template <> struct make_signed<WdRiscv::Uint2048> { using type = WdRiscv::Int2048; };
   template <> struct make_signed<WdRiscv::Int128>   { using type = WdRiscv::Int128; };
   template <> struct make_signed<WdRiscv::Int256>   { using type = WdRiscv::Int256; };
   template <> struct make_signed<WdRiscv::Int512>   { using type = WdRiscv::Int512; };
   template <> struct make_signed<WdRiscv::Int1024>  { using type = WdRiscv::Int1024; };
+  template <> struct make_signed<WdRiscv::Int2048>  { using type = WdRiscv::Int2048; };
 }
 
 

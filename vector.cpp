@@ -58,68 +58,6 @@ namespace WdRiscv
   }
 
 
-  /// Specialized mulh for 1024-bit unsigned operands.
-  template <>
-  void mulh(const Uint1024& a, const Uint1024& b, Uint1024& result)
-  {
-    // Unpack b into 512-bit pieces
-    Uint512 a0 = a.low(), a1 = a.high();
-    Uint512 b0 = b.low(), b1 = b.high();
-
-    // Multiply the 4 pieces accumulating results. Maintain upper 1024
-    // bits of resuts.
-    Uint1024 temp = a0;
-    temp *= b0;
-    result = temp;
-
-    result >>= 512;
-    temp = a1;
-    temp *= b0;
-    result += temp;
-
-    result >>= 512;
-    temp = a0;
-    temp *= b1;
-    result += temp;
-    
-    result >>= 512;
-    temp = a1;
-    temp *= b1;
-    result += temp;
-  }
-
-
-  /// Specialized mulh for 1024-bit signed operands.
-  template <>
-  void mulh(const Int1024& a, const Int1024& b, Int1024& result)
-  {
-    // Unpack b into 512-bit pieces
-    Int512 a0 = a.low(), a1 = a.high();
-    Int512 b0 = b.low(), b1 = b.high();
-
-    // Multiply the 4 pieces accumulating results. Maintain upper 1024
-    // bits of resuts.
-    Int1024 temp = a0;
-    temp *= b0;
-    result = temp;
-
-    result >>= 512;
-    temp = a1;
-    temp *= b0;
-    result += temp;
-
-    result >>= 512;
-    temp = a0;
-    temp *= b1;
-    result += temp;
-    
-    result >>= 512;
-    temp = a1;
-    temp *= b1;
-    result += temp;
-  }
-
-
   /// Set result to the upper half of a*b computed in double width
   /// intermediate. TS is a signed integer type (e.g. int8_t).
   /// TU is the corresponding unsigned integer type (e.g. uint8_t).
@@ -136,37 +74,6 @@ namespace WdRiscv
     result = TS(temp);
   }
 
-
-  /// Specialized mulhsu for 1024-bit unsigned operands.
-  template <>
-  void mulhsu(const Int1024& a, const Uint1024& b, Int1024& result)
-  {
-    if (a > Int1024(0))
-      {
-        Uint1024 ua(a);
-        Uint1024 temp = 0;
-        mulh(ua, b, temp);
-        result = temp;
-        return;
-      }
-
-    Int1024 smallest = Int1024(1) << 1023;  // Smallest 1024-bit integer.
-    if (a == smallest)
-      {
-        // Result consists of bits 1024 to 2047 of -(power(2,1023)*b)
-        // computed in unlimited precision.
-        Uint1024 temp = b;
-        temp >>= 1;
-        result = temp;
-        result = -result;
-        return;
-      }
-
-    Uint1024 nega(-a), temp(0);
-    mulh(nega, b, temp);
-    result = temp;
-    result = -result;
-  }
 
   /// Set result to the product of a and b where a is signed and b
   /// is unsigned and where a and b have the same width.
