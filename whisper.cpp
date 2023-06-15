@@ -242,7 +242,6 @@ struct Args
   bool linux = false;      // True if target program linked with Linux C-lib.
   bool raw = false;        // True if bare-metal program (no linux no newlib).
   bool elfisa = false;     // Use ELF file RISCV architecture tags to set MISA if true.
-  bool fastExt = false;    // True if fast external interrupt dispatch enabled.
   bool unmappedElfOk = false;
   bool mcm = false;        // Memory consistency checks
   bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
@@ -593,8 +592,6 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	("elfisa", po::bool_switch(&args.elfisa),
 	 "Configure reset value of MISA according to the RISCV architecture tag(s) "
          "encoded into the laoded ELF file(s) if any.")
-	("fastext", po::bool_switch(&args.fastExt),
-	 "Enable fast external interrupt dispatch.")
 	("unmappedelfok", po::bool_switch(&args.unmappedElfOk),
 	 "Do not flag as error ELF file sections targeting unmapped "
          " memory.")
@@ -821,7 +818,7 @@ checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
     {
       auto elfPath = target.at(0);
       if (not linux)
-	linux = Memory::isSymbolInElfFile(elfPath, "__libc_csu_init");
+	linux = Memory::isSymbolInElfFile(elfPath, "__libc_early_init");
 
       if (not newlib)
 	newlib = Memory::isSymbolInElfFile(elfPath, "__call_exitprocs");

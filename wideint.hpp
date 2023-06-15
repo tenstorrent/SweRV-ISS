@@ -461,7 +461,7 @@ namespace WdRiscv
 
   /// Wide (wider than 64-bits) unsigned integer template.
   template <typename Half, typename Quarter>
-  class WideInt
+  class WideInt : public WideIntBase
   {
   public:
 
@@ -827,281 +827,133 @@ namespace WdRiscv
   };
 
 
-#ifndef __SIZEOF_INT128__
-
-  Uint128 operator + (Uint128 a, const Uint128& b)
+  /// Plus operator: Return sum of wide-int and a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator + (Left a, Right b)
   { a += b; return a; }
 
-  Uint128 operator - (Uint128 a, const Uint128& b)
+  /// Plus operator: Return sum of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator + (Left a, Right b)
+  { b += a; return b; }
+
+  /// Minus operator: Return difference of wide-int and a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator - (Left a, Right b)
   { a -= b; return a; }
 
-  inline Uint128 operator * (Uint128 a, const Uint128& b)
+  /// Minus operator: Return difference of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator - (Left a, Right b)
+  { b -= a; return -b; }
+
+  /// Multiply operator: Return product of wide-int and a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator * (Left a, Right b)
   { a *= b; return a; }
 
-  inline Uint128 operator / (Uint128 a, const Uint128& b)
+  /// Multiply operator: Return product of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator * (Left a, Right b)
+  { b *= a; return b; }
+
+  /// Divide operator: Return quotient of wide-int and a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator / (Left a, Right b)
   { a /= b; return a; }
 
-  inline Uint128 operator % (Uint128 a, const Uint128& b)
+  /// Divide operator: Return quotient of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator / (Left a, Right b)
+  { Right c = a; c /= b; return c; }
+
+  /// Remainder operator: Return remainder of wide-int and a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator % (Left a, Right b)
   { a %= b; return a; }
 
-  inline Uint128 operator - (const Uint128& a)
-  { Uint128 c = 0; c -= a; return c; }
+  /// Remainder operator: Return remainde of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator % (Left a, Right b)
+  { Right c = a; c %= b; return c; }
 
-  inline Uint128 operator >> (Uint128 x, int n)
+  /// Unary minus operator: Return negative of a wide-int.
+  template <typename Wide>
+  requires std::derived_from<Wide, WideIntBase>
+  inline Wide operator - (Wide a)
+  { Wide c = Wide{0UL}; c -= a; return c; }
+
+  /// Unary plus operator.
+  template <typename Wide>
+  requires std::derived_from<Wide, WideIntBase>
+  inline Wide operator + (Wide a)
+  { return a; }
+
+  /// Right shift operator: Return a wide-int shifted right by a regular-int.
+  template <typename Left>
+  requires std::derived_from<Left, WideIntBase>
+  inline Left operator >> (Left x, int n)
   { x >>= n; return x; }
 
-  inline Uint128 operator << (Uint128 x, int n)
+  /// Left shift operator: Return a wide-int shifted left by a regular-int.
+  template <typename Left>
+  requires std::derived_from<Left, WideIntBase>
+  inline Left operator << (Left x, int n)
   { x <<= n; return x; }
 
-  inline Uint128 operator | (Uint128 a, const Uint128& b)
+  /// Bitwise-or operator: Return a wide-int ored with a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator | (Left a, Right b)
   { a |= b; return a; }
 
-  inline Uint128 operator & (Uint128 a, const Uint128& b)
+  /// Bitwise-or operator: Return or of a regular-int with a wide-int.
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator | (Left a, Right b)
+  { b |= a; return b; }
+
+  /// Bitwise-and operator: Return a wide-int anded with a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator & (Left a, Right b)
   { a &= b; return a; }
 
-  inline Uint128 operator ^ (Uint128 a, const Uint128& b)
+  /// Bitwise-and operator: Return and of a regular-int with a wide-int.
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator & (Left a, Right b)
+  { b &= a; return b; }
+
+  /// Bitwise-xor operator: Return a wide-int xored with a wide-int/regular-int.
+  template <typename Left, typename Right>
+  requires std::derived_from<Left, WideIntBase> &&
+    (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
+  inline Left operator ^ (Left a, Right b)
   { a ^= b; return a; }
 
-
-  inline Int128 operator + (Int128 a, const Int128& b)
-  { a += b; return a; }
-
-  inline Int128 operator - (Int128 a, const Int128& b)
-  { a -= b; return a; }
-
-  inline Int128 operator * (Int128 a, const Int128& b)
-  { a *= b; return a; }
-
-  inline Int128 operator / (Int128 a, const Int128& b)
-  { a /= b; return a; }
-
-  inline Int128 operator % (Int128 a, const Int128& b)
-  { a %= b; return a; }
-
-  inline Int128 operator - (const Int128& a)
-  { Int128 c = 0; c -= a; return c; }
-
-  inline Int128 operator >> (Int128 x, int n)
-  { x >>= n; return x; }
-
-  inline Int128 operator << (Int128 x, int n)
-  { x <<= n; return x; }
-
-  inline Int128 operator | (Int128 a, const Int128& b)
-  { a |= b; return a; }
-
-  inline Int128 operator & (Int128 a, const Int128& b)
-  { a &= b; return a; }
-
-  inline Int128 operator ^ (Int128 a, const Int128& b)
-  { a ^= b; return a; }
-
-#endif
-
-
-  inline Uint256 operator + (Uint256 a, const Uint256& b)
-  { a += b; return a; }
-
-  inline Uint256 operator - (Uint256 a, const Uint256& b)
-  { a -= b; return a; }
-
-  inline Uint256 operator * (Uint256 a, const Uint256& b)
-  { a *= b; return a; }
-
-  inline Uint256 operator / (Uint256 a, const Uint256& b)
-  { a /= b; return a; }
-
-  inline Uint256 operator % (Uint256 a, const Uint256& b)
-  { a %= b; return a; }
-
-  inline Uint256 operator - (const Uint256& a)
-  { Uint256 c = Uint128{0UL}; c -= a; return c; }
-
-  inline Uint256 operator >> (Uint256 x, int n)
-  { x >>= n; return x; }
-
-  inline Uint256 operator << (Uint256 x, int n)
-  { x <<= n; return x; }
-
-  inline Uint256 operator | (Uint256 a, const Uint256& b)
-  { a |= b; return a; }
-
-  inline Uint256 operator & (Uint256 a, const Uint256& b)
-  { a &= b; return a; }
-
-  inline Uint256 operator ^ (Uint256 a, const Uint256& b)
-  { a ^= b; return a; }
-
-
-  inline Int256 operator + (Int256 a, const Int256& b)
-  { a += b; return a; }
-
-  inline Int256 operator - (Int256 a, const Int256& b)
-  { a -= b; return a; }
-
-  inline Int256 operator * (Int256 a, const Int256& b)
-  { a *= b; return a; }
-
-  inline Int256 operator / (Int256 a, const Int256& b)
-  { a /= b; return a; }
-
-  inline Int256 operator % (Int256 a, const Int256& b)
-  { a %= b; return a; }
-
-  inline Int256 operator - (const Int256& a)
-  { Int256 c = 0L; c -= a; return c; }
-
-  inline Int256 operator >> (Int256 x, int n)
-  { x >>= n; return x; }
-
-  inline Int256 operator << (Int256 x, int n)
-  { x <<= n; return x; }
-
-  inline Int256 operator | (Int256 a, const Int256& b)
-  { a |= b; return a; }
-
-  inline Int256 operator & (Int256 a, const Int256& b)
-  { a &= b; return a; }
-
-  inline Int256 operator ^ (Int256 a, const Int256& b)
-  { a ^= b; return a; }
-
-
-  inline Uint512 operator + (Uint512 a, const Uint512& b)
-  { a += b; return a; }
-
-  inline Uint512 operator - (Uint512 a, const Uint512& b)
-  { a -= b; return a; }
-
-  inline Uint512 operator * (Uint512 a, const Uint512& b)
-  { a *= b; return a; }
-
-  inline Uint512 operator / (Uint512 a, const Uint512& b)
-  { a /= b; return a; }
-
-  inline Uint512 operator % (Uint512 a, const Uint512& b)
-  { a %= b; return a; }
-
-  inline Uint512 operator - (const Uint512& a)
-  { Uint512 c = 0UL; c -= a; return c; }
-
-  inline Uint512 operator >> (Uint512 x, int n)
-  { x >>= n; return x; }
-
-  inline Uint512 operator << (Uint512 x, int n)
-  { x <<= n; return x; }
-
-  inline Uint512 operator | (Uint512 a, const Uint512& b)
-  { a |= b; return a; }
-
-  inline Uint512 operator & (Uint512 a, const Uint512& b)
-  { a &= b; return a; }
-
-  inline Uint512 operator ^ (Uint512 a, const Uint512& b)
-  { a ^= b; return a; }
-
-
-  inline Int512 operator + (Int512 a, const Int512& b)
-  { a += b; return a; }
-
-  inline Int512 operator - (Int512 a, const Int512& b)
-  { a -= b; return a; }
-
-  inline Int512 operator * (Int512 a, const Int512& b)
-  { a *= b; return a; }
-
-  inline Int512 operator / (Int512 a, const Int512& b)
-  { a /= b; return a; }
-
-  inline Int512 operator % (Int512 a, const Int512& b)
-  { a %= b; return a; }
-
-  inline Int512 operator - (const Int512& a)
-  { Int512 c = 0L; c -= a; return c; }
-
-  inline Int512 operator >> (Int512 x, int n)
-  { x >>= n; return x; }
-
-  inline Int512 operator << (Int512 x, int n)
-  { x <<= n; return x; }
-
-  inline Int512 operator | (Int512 a, const Int512& b)
-  { a |= b; return a; }
-
-  inline Int512 operator & (Int512 a, const Int512& b)
-  { a &= b; return a; }
-
-  inline Int512 operator ^ (Int512 a, const Int512& b)
-  { a ^= b; return a; }
-
-
-  inline Uint1024 operator + (Uint1024 a, const Uint1024& b)
-  { a += b; return a; }
-
-  inline Uint1024 operator - (Uint1024 a, const Uint1024& b)
-  { a -= b; return a; }
-
-  inline Uint1024 operator * (Uint1024 a, const Uint1024& b)
-  { a *= b; return a; }
-
-  inline Uint1024 operator / (Uint1024 a, const Uint1024& b)
-  { a /= b; return a; }
-
-  inline Uint1024 operator % (Uint1024 a, const Uint1024& b)
-  { a %= b; return a; }
-
-  inline Uint1024 operator - (const Uint1024& a)
-  { Uint1024 c = 0UL; c -= a; return c; }
-
-  inline Uint1024 operator >> (Uint1024 x, int n)
-  { x >>= n; return x; }
-
-  inline Uint1024 operator << (Uint1024 x, int n)
-  { x <<= n; return x; }
-
-  inline Uint1024 operator | (Uint1024 a, const Uint1024& b)
-  { a |= b; return a; }
-
-  inline Uint1024 operator & (Uint1024 a, const Uint1024& b)
-  { a &= b; return a; }
-
-  inline Uint1024 operator ^ (Uint1024 a, const Uint1024& b)
-  { a ^= b; return a; }
-
-
-  inline Int1024 operator + (Int1024 a, const Int1024& b)
-  { a += b; return a; }
-
-  inline Int1024 operator - (Int1024 a, const Int1024& b)
-  { a -= b; return a; }
-
-  inline Int1024 operator * (Int1024 a, const Int1024& b)
-  { a *= b; return a; }
-
-  inline Int1024 operator / (Int1024 a, const Int1024& b)
-  { a /= b; return a; }
-
-  inline Int1024 operator % (Int1024 a, const Int1024& b)
-  { a %= b; return a; }
-
-  inline Int1024 operator - (const Int1024& a)
-  { Int1024 c = 0L; c -= a; return c; }
-
-  inline Int1024 operator >> (Int1024 x, int n)
-  { x >>= n; return x; }
-
-  inline Int1024 operator << (Int1024 x, int n)
-  { x <<= n; return x; }
-
-  inline Int1024 operator | (Int1024 a, const Int1024& b)
-  { a |= b; return a; }
-
-  inline Int1024 operator & (Int1024 a, const Int1024& b)
-  { a &= b; return a; }
-
-  inline Int1024 operator ^ (Int1024 a, const Int1024& b)
-  { a ^= b; return a; }
-
+  /// Bitwise-xor operator: Return xor of a regular-int with a wide-int.
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator ^ (Left a, Right b)
+  { b ^= a; return b; }
 
   /// Return the width in bits of the given integer type T. This is
   /// usually 8*sizeof(T).
