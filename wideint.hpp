@@ -461,7 +461,7 @@ namespace WdRiscv
 
   /// Wide (wider than 64-bits) unsigned integer template.
   template <typename Half, typename Quarter>
-  class WideInt
+  class WideInt : public WideIntBase
   {
   public:
 
