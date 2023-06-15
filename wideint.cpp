@@ -16,6 +16,19 @@ main(int argc, char* argv[])
 {
   int64_t i64 = uint32_t(0xffffffff);
   Int128 i128 = uint64_t(0xffffffffffffffffLL);
+  i128 = 1 + i128;
+  i128 = 1 * i128;
+  i128 = 1 / i128;
+  i128 = 1 % i128;
+  i128 = i128 >> 2;
+  i128 = i128 | 4;
+  i128 = 4 | i128;
+  i128 = i128 & 4;
+  i128 = 4 & i128;
+  i128 = i128 ^ 4;
+  i128 = 4 ^ i128;
+  i128 = +i128;
+
   Uint128 u128 = 0; u128 = ~u128;
   unsigned bit = unsigned((u128 >> 127) & 1);
   u128 = u128 >> 127;

@@ -834,12 +834,24 @@ namespace WdRiscv
   inline Left operator + (Left a, Right b)
   { a += b; return a; }
 
+  /// Plus operator: Return sum of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator + (Left a, Right b)
+  { b += a; return b; }
+
   /// Minus operator: Return difference of wide-int and a wide-int/regular-int.
   template <typename Left, typename Right>
   requires std::derived_from<Left, WideIntBase> &&
     (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
   inline Left operator - (Left a, Right b)
   { a -= b; return a; }
+
+  /// Minus operator: Return difference of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator - (Left a, Right b)
+  { b -= a; return -b; }
 
   /// Multiply operator: Return product of wide-int and a wide-int/regular-int.
   template <typename Left, typename Right>
@@ -848,12 +860,24 @@ namespace WdRiscv
   inline Left operator * (Left a, Right b)
   { a *= b; return a; }
 
+  /// Multiply operator: Return product of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator * (Left a, Right b)
+  { b *= a; return b; }
+
   /// Divide operator: Return quotient of wide-int and a wide-int/regular-int.
   template <typename Left, typename Right>
   requires std::derived_from<Left, WideIntBase> &&
     (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
   inline Left operator / (Left a, Right b)
   { a /= b; return a; }
+
+  /// Divide operator: Return quotient of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator / (Left a, Right b)
+  { Right c = a; c /= b; return c; }
 
   /// Remainder operator: Return remainder of wide-int and a wide-int/regular-int.
   template <typename Left, typename Right>
@@ -862,11 +886,23 @@ namespace WdRiscv
   inline Left operator % (Left a, Right b)
   { a %= b; return a; }
 
+  /// Remainder operator: Return remainde of a regular-int and a wide-int
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator % (Left a, Right b)
+  { Right c = a; c %= b; return c; }
+
   /// Unary minus operator: Return negative of a wide-int.
   template <typename Wide>
   requires std::derived_from<Wide, WideIntBase>
   inline Wide operator - (Wide a)
   { Wide c = Wide{0UL}; c -= a; return c; }
+
+  /// Unary plus operator.
+  template <typename Wide>
+  requires std::derived_from<Wide, WideIntBase>
+  inline Wide operator + (Wide a)
+  { return a; }
 
   /// Right shift operator: Return a wide-int shifted right by a regular-int.
   template <typename Left>
@@ -887,6 +923,12 @@ namespace WdRiscv
   inline Left operator | (Left a, Right b)
   { a |= b; return a; }
 
+  /// Bitwise-or operator: Return or of a regular-int with a wide-int.
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator | (Left a, Right b)
+  { b |= a; return b; }
+
   /// Bitwise-and operator: Return a wide-int anded with a wide-int/regular-int.
   template <typename Left, typename Right>
   requires std::derived_from<Left, WideIntBase> &&
@@ -894,12 +936,24 @@ namespace WdRiscv
   inline Left operator & (Left a, Right b)
   { a &= b; return a; }
 
+  /// Bitwise-and operator: Return and of a regular-int with a wide-int.
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator & (Left a, Right b)
+  { b &= a; return b; }
+
   /// Bitwise-xor operator: Return a wide-int xored with a wide-int/regular-int.
   template <typename Left, typename Right>
   requires std::derived_from<Left, WideIntBase> &&
     (std::is_integral<Right>::value || std::is_same<Left, Right>::value)
   inline Left operator ^ (Left a, Right b)
   { a ^= b; return a; }
+
+  /// Bitwise-xor operator: Return xor of a regular-int with a wide-int.
+  template <typename Left, typename Right>
+  requires std::is_integral<Left>::value && std::derived_from<Right, WideIntBase>
+  inline Right operator ^ (Left a, Right b)
+  { b ^= a; return b; }
 
   /// Return the width in bits of the given integer type T. This is
   /// usually 8*sizeof(T).
