@@ -129,6 +129,11 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(low);
       csRegs_.findCsr(CsrNumber::STIMECMPH)->tie(high);
 
+      low = reinterpret_cast<URV*>(&vstimecmp_);
+      high = low + 1;
+      csRegs_.findCsr(CsrNumber::VSTIMECMP)->tie(low);
+      csRegs_.findCsr(CsrNumber::VSTIMECMPH)->tie(high);
+
       low = reinterpret_cast<URV*>(&htimedelta_);
       high = low + 1;
       csRegs_.findCsr(CsrNumber::HTIMEDELTA)->tie(low);
