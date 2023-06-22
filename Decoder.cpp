@@ -2917,7 +2917,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     }
                   else if (funct7 == 0xb and op0 == 0)
                     {
-                      op2 = iform.rs2();
+		      op0 = op1;
+                      op1 = op2 & 0x1f;
                       return instTable_.getEntry(InstId::sinval_vma);
                     }
                   else if (funct7 == 0xc)
@@ -2936,7 +2937,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     }
                   else if (funct7 == 0x13 and op0 == 0)
                     {
-                      op2 = iform.rs2();
+		      op0 = op1;
+                      op1 = op2 & 0x1f;
                       return instTable_.getEntry(InstId::hinval_vvma);
                     }
                   else if (funct7 == 0x31 and op0 == 0)
@@ -2946,7 +2948,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     }
                   else if (funct7 == 0x33 and op0 == 0)
                     {
-                      op2 = iform.rs2();
+		      op0 = op1;
+                      op1 = op2 & 0x1f;
                       return instTable_.getEntry(InstId::hinval_gvma);
                     }
                   else if (op2 == 0x102 and op0 == 0 and op1 == 0)
