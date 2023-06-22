@@ -1064,6 +1064,10 @@ namespace WdRiscv
     void enableRvsstc(bool flag)
     { enableExtension(RvExtension::Sstc, flag); }
 
+    /// Enable/disable counter overflow extension (sscofpmf)
+    void enableSscofpmf(bool flag)
+    { csRegs_.enableSscofpmf(flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);

@@ -1583,6 +1583,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableRvsstc(flag);
     }
 
+  tag = "enable_counter_overflow";
+  if (config_ ->contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableSscofpmf(flag);
+    }
+
   return errors == 0;
 }
 
