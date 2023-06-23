@@ -146,11 +146,7 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 		       bool read, bool write, bool exec, uint64_t& pa)
 {
   // Exactly one of read/write/exec must be true.
-  unsigned count = 0;
-  if (read) count++;
-  if (write) count++;
-  if (exec) count++;
-  assert(count == 1);
+  assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
   if (mode_ == Bare)
     {
@@ -227,11 +223,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
     return twoStageTranslate(va, priv, read, write, exec, gpa, pa);
 
   // Exactly one of read/write/exec must be true.
-  unsigned count = 0;
-  if (read) count++;
-  if (write) count++;
-  if (exec) count++;
-  assert(count == 1);
+  assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
   if (mode_ == Bare)
     {
@@ -377,11 +369,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
 			 bool exec, uint64_t& pa)
 {
   // Exactly one of read/write/exec must be true.
-  unsigned count = 0;
-  if (read) count++;
-  if (write) count++;
-  if (exec) count++;
-  assert(count == 1);
+  assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
   if (modeStage2_ == Bare)
     {
@@ -431,11 +419,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 			   bool exec, uint64_t& gpa, uint64_t& pa)
 {
   // Exactly one of read/write/exec must be true.
-  unsigned count = 0;
-  if (read) count++;
-  if (write) count++;
-  if (exec) count++;
-  assert(count == 1);
+  assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
   if (vsMode_ == Bare)
     gpa = va;
