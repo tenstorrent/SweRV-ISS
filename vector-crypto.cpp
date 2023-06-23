@@ -150,6 +150,7 @@ Hart<URV>::vbrev_v(unsigned vd, unsigned vs1, unsigned group,
 		   unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -242,6 +243,7 @@ Hart<URV>::vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -319,6 +321,7 @@ Hart<URV>::vrev8_v(unsigned vd, unsigned vs1, unsigned group,
 		   unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -396,6 +399,7 @@ Hart<URV>::vclz_v(unsigned vd, unsigned vs1, unsigned group,
 		  unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -473,6 +477,7 @@ Hart<URV>::vctz_v(unsigned vd, unsigned vs1, unsigned group,
 		  unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -550,6 +555,7 @@ Hart<URV>::vcpop_v(unsigned vd, unsigned vs1, unsigned group,
 		   unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -916,6 +922,7 @@ Hart<URV>::vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
+  (void)errors;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0;
@@ -1005,6 +1012,7 @@ Hart<URV>::vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
+  (void)errors;
 
   ELEM_TYPE e1 = 0;
   DWT dest = 0;
