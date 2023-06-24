@@ -129,6 +129,11 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(low);
       csRegs_.findCsr(CsrNumber::STIMECMPH)->tie(high);
 
+      low = reinterpret_cast<URV*>(&vstimecmp_);
+      high = low + 1;
+      csRegs_.findCsr(CsrNumber::VSTIMECMP)->tie(low);
+      csRegs_.findCsr(CsrNumber::VSTIMECMPH)->tie(high);
+
       low = reinterpret_cast<URV*>(&htimedelta_);
       high = low + 1;
       csRegs_.findCsr(CsrNumber::HTIMEDELTA)->tie(low);
@@ -3420,131 +3425,91 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
   if (info.extension() == RvExtension::I)
     {
       if (id == InstId::ebreak or id == InstId::c_ebreak)
-	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_);
       else if (id == InstId::ecall)
-	pregs.updateCounters(EventNumber::Ecall, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Ecall, prevPerfControl_, lastPriv_);
       else if (id == InstId::fence)
-	pregs.updateCounters(EventNumber::Fence, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Fence, prevPerfControl_, lastPriv_);
       else if (id == InstId::fence_i)
-	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_, lastPriv_);
       else if (id == InstId::mret)
-	pregs.updateCounters(EventNumber::Mret, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Mret, prevPerfControl_, lastPriv_);
       else if (id != InstId::illegal)
-	pregs.updateCounters(EventNumber::Alu, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Alu, prevPerfControl_, lastPriv_);
     }
   else if (info.isMultiply())
     {
-      pregs.updateCounters(EventNumber::Mult, prevPerfControl_,
-                           lastPriv_);
-      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_,
-                           lastPriv_);
+      pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_);
     }
   else if (info.isDivide())
     {
-      pregs.updateCounters(EventNumber::Div, prevPerfControl_,
-                           lastPriv_);
-      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_,
-                           lastPriv_);
+      pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_);
     }
   else if (info.isPerfLoad())
     {
-      pregs.updateCounters(EventNumber::Load, prevPerfControl_,
-                           lastPriv_);
+      pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_);
       if (misalignedLdSt_)
-	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_, lastPriv_);
       if (isDataAddressExternal(ldStAddr_))
-	pregs.updateCounters(EventNumber::BusLoad, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::BusLoad, prevPerfControl_, lastPriv_);
     }
   else if (info.isPerfStore())
     {
-      pregs.updateCounters(EventNumber::Store, prevPerfControl_,
-                           lastPriv_);
+      pregs.updateCounters(EventNumber::Store, prevPerfControl_, lastPriv_);
       if (misalignedLdSt_)
-	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_, lastPriv_);
       if (isDataAddressExternal(ldStAddr_))
-	pregs.updateCounters(EventNumber::BusStore, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::BusStore, prevPerfControl_, lastPriv_);
     }
   else if (info.isBitManipulation())
     {
-      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_,
-                           lastPriv_);
+      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_);
     }
   else if (info.isAtomic())
     {
       if (id == InstId::lr_w or id == InstId::lr_d)
-	pregs.updateCounters(EventNumber::Lr, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Lr, prevPerfControl_, lastPriv_);
       else if (id == InstId::sc_w or id == InstId::sc_d)
-	pregs.updateCounters(EventNumber::Sc, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Sc, prevPerfControl_, lastPriv_);
       else
-	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_);
     }
   else if (info.isCsr() and not hasException_)
     {
       if ((id == InstId::csrrw or id == InstId::csrrwi))
 	{
 	  if (op0 == 0)
-	    pregs.updateCounters(EventNumber::CsrWrite, prevPerfControl_,
-                                 lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrWrite, prevPerfControl_, lastPriv_);
 	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_,
-                                 lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_);
 	}
       else
 	{
 	  if (op1 == 0)
-	    pregs.updateCounters(EventNumber::CsrRead, prevPerfControl_,
-                                 lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrRead, prevPerfControl_, lastPriv_);
 	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_,
-                                 lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_);
 	}
-      pregs.updateCounters(EventNumber::Csr, prevPerfControl_,
-			   lastPriv_);
+      pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_);
     }
   else if (info.isBranch())
     {
-      pregs.updateCounters(EventNumber::Branch, prevPerfControl_,
-                           lastPriv_);
+      pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_);
       if (lastBranchTaken_)
-	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_,
-                             lastPriv_);
+	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_);
     }
 
   // Some insts (e.g. flw) can be both load/store and FP
   if (info.extension() == RvExtension::F)
-    {
-      pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_,
-                           lastPriv_);
-    }
+    pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_);
   else if (info.extension() == RvExtension::D)
-    {
-      pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_,
-                           lastPriv_);
-    }
+    pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_, lastPriv_);
   else if (info.extension() == RvExtension::Zfh)
-    {
-      pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_,
-                           lastPriv_);
-    }
+    pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_);
   else if (info.extension() == RvExtension::V)
-    {
-      pregs.updateCounters(EventNumber::Vector, prevPerfControl_,
-                           lastPriv_);
-    }
-
+    pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_);
 }
 
 
@@ -3718,8 +3683,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = ((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+                     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
@@ -3730,8 +3694,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 1);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+                     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
@@ -3742,8 +3705,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 2);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+                     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
@@ -3754,8 +3716,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 3);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+		     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
@@ -4683,7 +4644,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
       // Check for interrupts destined for machine-mode (not-delegated).
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER, IC::LCOF,
 				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
 				 IC::VS_TIMER } )
 	{
@@ -4704,7 +4665,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER, IC::LCOF,
 				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
 				 IC::VS_TIMER } )
 	{

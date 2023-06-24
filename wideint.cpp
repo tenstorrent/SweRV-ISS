@@ -1,5 +1,6 @@
 #undef __SIZEOF_INT128__
 
+#include <string_view>
 #include "wideint.hpp"
 
 using namespace WdRiscv;
@@ -11,15 +12,113 @@ using namespace WdRiscv;
 #include <iostream>
 #include <random>
 
+
+template <typename T>
+requires std::derived_from<T, WideIntBase>
+std::string
+toHexString(T x)
+{
+  typedef typename std::make_unsigned<T>::type U;
+  U u = x;
+  std::string res;
+  for ( ; u; u >>= 4)
+    {
+      unsigned hd = unsigned(u & 0xf);
+      res.push_back("0123456789abcdef"[hd]);
+    }
+  std::reverse(res.begin(), res.end());
+  return res;
+}
+
+
+template <typename T>
+T
+fromHexString(const std::string& str)
+{
+  if (str.empty())
+    return 0;
+
+  std::string_view sv(str);
+  if (str.size() > 2 and (str.starts_with("0x") or (str.starts_with("0X"))))
+    sv = std::string_view(str.begin() + 2, str.end());
+
+  T res{};
+  unsigned i = 0;
+  for (auto it = sv.rbegin(); it != sv.rend(); ++it, ++i)
+    {
+      char c = *it;
+      unsigned v = 0;
+      if (c >= '0' and c <= '9')
+	v = c - '0';
+      else if (c >= 'a' and c <= 'f')
+	v = c - 'a' + 10;
+      else if (c >= 'A' and c <= 'F')
+	v = c - 'A' + 10;
+      else
+	throw std::runtime_error("Unexpected character in hexadecimal string");
+      res |= Uint128(v) << (i*4);
+    }
+  return res;
+}
+
+
+template <typename T>
+requires std::derived_from<T, WideIntBase>
+std::string
+toDecimalString(T x)
+{
+  typedef typename std::make_unsigned<T>::type U;
+  U u = x;
+  std::string res;
+  while (u)
+    {
+      unsigned d = u % 10;
+      res.push_back("0123456789"[d]);
+      u /= 10;
+    }
+  std::reverse(res.begin(), res.end());
+  return res;
+}
+
+
+template <typename T>
+T
+fromDecimalString(const std::string& str)
+{
+  if (str.empty())
+    return 0;
+
+  std::string_view sv(str);
+
+  T res{};
+  T weight{1};
+  for (auto it = sv.rbegin(); it != sv.rend(); ++it, weight *= 10)
+    {
+      char c = *it;
+      unsigned v = 0;
+      if (c >= '0' and c <= '9')
+	v = c - '0';
+      else
+	throw std::runtime_error("Unexpected character in hexadecimal string");
+      res += v*weight;
+    }
+  return res;
+}
+
+
 int
 main(int argc, char* argv[])
 {
-  int64_t i64 = uint32_t(0xffffffff);
-  Int128 i128 = uint64_t(0xffffffffffffffffLL);
+  uint64_t ui64 = 0;
+  Int128 i128 = 0xffffffffffffffffLL;
+  i128 <<= 64;
   i128 = 1 + i128;
   i128 = 1 * i128;
   i128 = 1 / i128;
   i128 = 1 % i128;
+  i128 = 0x404040404040404LL;
+  i128 <<= 64;
+  i128 |= 0x404040404040404LL;
   i128 = i128 >> 2;
   i128 = i128 | 4;
   i128 = 4 | i128;
@@ -29,10 +128,23 @@ main(int argc, char* argv[])
   i128 = 4 ^ i128;
   i128 = +i128;
 
+  std::cerr << toHexString(i128) << '\n';
+
+  i128 = fromHexString<Int128>("0x1234567890abcdef1234567890abcdef");
+  std::cerr << toHexString(i128) << '\n';
+
+  i128 = fromDecimalString<Int128>("1024");
+  std::cerr << toHexString(i128) << '\n';
+  std::cerr << toDecimalString(i128) << '\n';
+
+  Int256 i256 = 0;
+  i256 = ~i256;
+  int64_t i64 = int64_t(i256);
+
   Uint128 u128 = 0; u128 = ~u128;
   unsigned bit = unsigned((u128 >> 127) & 1);
   u128 = u128 >> 127;
-  Int256 i256 = u128;
+  i256 = u128;
   i256 = -1;
   Int512 i512{i256};
   bool d = i512 != 0;

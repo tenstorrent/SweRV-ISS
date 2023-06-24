@@ -252,6 +252,7 @@ namespace WdRiscv
       SCOUNTEREN = 0x106,
 
       SENVCFG = 0x10a,
+      SCOUNTOVF = 0xda0,
 
       // Supervisor Trap Handling 
       SSCRATCH = 0x140,
@@ -1414,6 +1415,9 @@ namespace WdRiscv
     /// Enable/disable F extension.
     void enableRvf(bool flag);
 
+    /// Enable/disable counter-overflow extension (sscofpmf)
+    void enableSscofpmf(bool flag);
+
     /// Enable supervisor mode.
     void enableSupervisorMode(bool flag);
 
@@ -1532,6 +1536,7 @@ namespace WdRiscv
     bool superEnabled_ = false;   // Supervisor
     bool hyperEnabled_ = false;   // Hypervisor
     bool sstcEnabled_ = false;    // Supervisor time compare
+    bool cofEnabled_ = false;     // Counter overflow
 
     bool perModeCounterControl_ = false;
     bool recordWrite_ = true;

@@ -427,6 +427,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
     }
 
   updateSstc();  // To activate/deactivate STIMECMP.
+  enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
 }
 
 
@@ -567,6 +568,27 @@ CsRegs<URV>::enableRvf(bool flag)
       else if (not csr->isImplemented())
         csr->setImplemented(flag);
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableSscofpmf(bool flag)
+{
+  cofEnabled_ = flag;
+
+  flag &= superEnabled_;
+
+  auto csrn = CsrNumber::SCOUNTOVF;
+  auto csr = findCsr(csrn);
+  if (not csr)
+    {
+      std::cerr << "Error: enableSscofpmf: CSR number 0x"
+		<< std::hex << URV(csrn) << std::dec << " is not defined\n";
+      assert(0);
+    }
+  else
+    csr->setImplemented(flag);
 }
 
 
@@ -1635,6 +1657,9 @@ CsRegs<URV>::defineSupervisorRegs()
 
   mask = 0xf1;
   defineCsr("senvcfg",    Csrn::SENVCFG,    !mand, !imp, 0, mask, mask);
+
+  mask = 0;
+  defineCsr("scountovf",  Csrn::SCOUNTOVF,  !mand, !imp, 0, mask, 0xfffffff8);
 
   // Supervisor Protection and Translation 
   defineCsr("satp",       Csrn::SATP,       !mand, !imp, 0, wam, wam);

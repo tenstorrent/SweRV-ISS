@@ -521,8 +521,11 @@ Hart<URV>::execFsgnjn_s(const DecodedInst* di)
 
   float f1 = fpRegs_.readSingle(di->op1());
   float f2 = fpRegs_.readSingle(di->op2());
-  float res = std::copysignf(f1, f2);  // Magnitude of rs1 and sign of rs2
-  res = -res;  // Magnitude of rs1 and negative the sign of rs2
+  unsigned sign = std::signbit(f2);
+
+  float x = sign? 1 : -1;
+
+  float res = std::copysignf(f1, x);  // Magnitude of rs1 and sign of x
   fpRegs_.writeSingle(di->op0(), res);
 
   markFsDirty();
@@ -1241,8 +1244,11 @@ Hart<URV>::execFsgnjn_d(const DecodedInst* di)
 
   double d1 = fpRegs_.readDouble(di->op1());
   double d2 = fpRegs_.readDouble(di->op2());
-  double res = copysign(d1, d2);  // Magnitude of rs1 and sign of rs2
-  res = -res;  // Magnitude of rs1 and negative the sign of rs2
+  unsigned sign = std::signbit(d2);
+
+  double x = sign? 1 : -1;
+
+  double res = copysign(d1, x);  // Magnitude of rs1 and sign of x
   fpRegs_.writeDouble(di->op0(), res);
 
   markFsDirty();
@@ -1974,8 +1980,11 @@ Hart<URV>::execFsgnjn_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-  Float16 res = std::copysign(f1, f2);  // Magnitude of f1 and sign of f2
-  res = -res;  // Magnitude of f1 and negative the sign of f2
+  unsigned sign = std::signbit(f2);
+
+  Float16 x = sign? Float16{} : -Float16{};
+
+  Float16 res = std::copysign(f1, x);
   fpRegs_.writeHalf(di->op0(), res);
 
   markFsDirty();

@@ -150,6 +150,7 @@ Hart<URV>::vbrev_v(unsigned vd, unsigned vs1, unsigned group,
 		   unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -160,14 +161,10 @@ Hart<URV>::vbrev_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = bitReverse(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = bitReverse(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   assert(errors == 0);
@@ -242,6 +239,7 @@ Hart<URV>::vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -252,14 +250,10 @@ Hart<URV>::vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  dest = brev8(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = brev8(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   assert(errors == 0);
@@ -319,6 +313,7 @@ Hart<URV>::vrev8_v(unsigned vd, unsigned vs1, unsigned group,
 		   unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -329,14 +324,10 @@ Hart<URV>::vrev8_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = util::byteswap(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = util::byteswap(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   assert(errors == 0);
@@ -396,6 +387,7 @@ Hart<URV>::vclz_v(unsigned vd, unsigned vs1, unsigned group,
 		  unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -406,14 +398,10 @@ Hart<URV>::vclz_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = std::countl_zero(e1);  // Count leading zeros.
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = std::countl_zero(e1);  // Count leading zeros.
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   assert(errors == 0);
@@ -473,6 +461,7 @@ Hart<URV>::vctz_v(unsigned vd, unsigned vs1, unsigned group,
 		  unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -483,14 +472,10 @@ Hart<URV>::vctz_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = std::countr_zero(e1);  // Count trailing zeros.
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = std::countr_zero(e1);  // Count trailing zeros.
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   assert(errors == 0);
@@ -550,6 +535,7 @@ Hart<URV>::vcpop_v(unsigned vd, unsigned vs1, unsigned group,
 		   unsigned start, unsigned elems, bool masked)
 {
   unsigned errors = 0;
+  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -560,14 +546,10 @@ Hart<URV>::vcpop_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = std::popcount(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = std::popcount(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   assert(errors == 0);
@@ -916,6 +898,7 @@ Hart<URV>::vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
+  (void)errors;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0;
@@ -930,14 +913,11 @@ Hart<URV>::vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  dest = mySll(DWT(e1), DWT(e2));
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+
+      dest = mySll(DWT(e1), DWT(e2));
+      vecRegs_.write(vd, ix, wideGroup, dest);
     }
 
   assert(errors == 0);
@@ -1005,6 +985,7 @@ Hart<URV>::vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
   unsigned errors = 0, wideGroup = group*2;
+  (void)errors;
 
   ELEM_TYPE e1 = 0;
   DWT dest = 0;
@@ -1019,14 +1000,10 @@ Hart<URV>::vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = mySll(DWT(e1), DWT(e2));
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = mySll(DWT(e1), DWT(e2));
+      vecRegs_.write(vd, ix, wideGroup, dest);
     }
 
   assert(errors == 0);
@@ -1355,12 +1332,9 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 x{0}, y{0}, h{0}, z{0};
-      if (not vecRegs_.read(vd, i, groupx8, y))
-	assert(0);
-      if (not vecRegs_.read(vs2, i, groupx8, x))
-	assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, h))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, y);
+      vecRegs_.read(vs2, i, groupx8, x);
+      vecRegs_.read(vs1, i, groupx8, h);
       Uint128 s = brev8(y ^ x);
 
       for (unsigned bit = 0; bit < 128; bit++) {
@@ -1373,8 +1347,7 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
           h ^= 0x87;
       }
       Uint128 res = brev8(z);
-      if (not vecRegs_.write(vd, i, groupx8, res))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, res);
     }
 
   postVecSuccess();
@@ -1413,10 +1386,9 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 y{0}, h{0}, z{0};
-      if (not vecRegs_.read(vd, i, groupx8, y))
-	assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, h))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, y);
+      vecRegs_.read(vs1, i, groupx8, h);
+
       for (unsigned bit = 0; bit < 128; bit++)
 	{
 	  if ((y >> static_cast<int>(bit)) & 1U)
@@ -1491,15 +1463,13 @@ Hart<URV>::execVaesdf_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, i, groupx8, rkey);
+
       Uint128 sr = aes_shift_rows_inv(state);
       Uint128 sb = aes_subbytes_inv(sr);
       Uint128 ark = sb ^ rkey;
-      if (not vecRegs_.write(vd, i, groupx8, ark))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, ark);
     }
 
   postVecSuccess();
@@ -1538,15 +1508,13 @@ Hart<URV>::execVaesdf_vs(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, 0, groupx8, rkey);
+
       Uint128 sr = aes_shift_rows_inv(state);
       Uint128 sb = aes_subbytes_inv(sr);
       Uint128 ark = sb ^ rkey;
-      if (not vecRegs_.write(vd, i, groupx8, ark))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, ark);
     }
 
   postVecSuccess();
@@ -1585,15 +1553,13 @@ Hart<URV>::execVaesef_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, i, groupx8, rkey);
+
       Uint128 sb = aes_subbytes_fwd(state);
       Uint128 sr = aes_shift_rows_fwd(sb);
       Uint128 ark = sr ^ rkey;
-      if (not vecRegs_.write(vd, i, groupx8, ark))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, ark);
     }
 
   postVecSuccess();
@@ -1632,15 +1598,13 @@ Hart<URV>::execVaesef_vs(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, 0, groupx8, rkey);
+
       Uint128 sb = aes_subbytes_fwd(state);
       Uint128 sr = aes_shift_rows_fwd(sb);
       Uint128 ark = sr ^ rkey;
-      if (not vecRegs_.write(vd, i, groupx8, ark))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, ark);
     }
 
   postVecSuccess();
@@ -1679,16 +1643,14 @@ Hart<URV>::execVaesem_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, i, groupx8, rkey);
+
       Uint128 sb = aes_subbytes_fwd(state);
       Uint128 sr = aes_shift_rows_fwd(sb);
       Uint128 mix = aes_mixcolumns_fwd(sr);
       Uint128 ark = mix ^ rkey;
-      if (not vecRegs_.write(vd, i, groupx8, ark))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, ark);
     }
 
   postVecSuccess();
@@ -1727,16 +1689,14 @@ Hart<URV>::execVaesem_vs(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, 0, groupx8, rkey);
+
       Uint128 sb = aes_subbytes_fwd(state);
       Uint128 sr = aes_shift_rows_fwd(sb);
       Uint128 mix = aes_mixcolumns_fwd(sr);
       Uint128 ark = mix ^ rkey;
-      if (not vecRegs_.write(vd, i, groupx8, ark))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, ark);
     }
 
   postVecSuccess();
@@ -1775,16 +1735,14 @@ Hart<URV>::execVaesdm_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, i, groupx8, rkey);
+
       Uint128 sr = aes_shift_rows_inv(state);
       Uint128 sb = aes_subbytes_inv(sr);
       Uint128 ark = sb ^ rkey;
       Uint128 mix = aes_mixcolumns_fwd(ark);
-      if (not vecRegs_.write(vd, i, groupx8, mix))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, mix);
     }
 
   postVecSuccess();
@@ -1823,16 +1781,14 @@ Hart<URV>::execVaesdm_vs(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, 0, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, 0, groupx8, rkey);
+
       Uint128 sr = aes_shift_rows_inv(state);
       Uint128 sb = aes_subbytes_inv(sr);
       Uint128 ark = sb ^ rkey;
       Uint128 mix = aes_mixcolumns_fwd(ark);
-      if (not vecRegs_.write(vd, i, groupx8, mix))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, mix);
     }
 
   postVecSuccess();
@@ -1882,8 +1838,8 @@ Hart<URV>::execVaeskf1_vi(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 e1{0};
-      if (not vecRegs_.read(vs1, i, groupx8, e1))
-	assert(0);
+      vecRegs_.read(vs1, i, groupx8, e1);
+
       uint32_t crk0 = static_cast<uint32_t>(e1);
       uint32_t crk1 = static_cast<uint32_t>(e1 >> 32);
       uint32_t crk2 = static_cast<uint32_t>(e1 >> 64);
@@ -1895,8 +1851,7 @@ Hart<URV>::execVaeskf1_vi(const DecodedInst* di)
 
       Uint128 res = (Uint128(w0) | (Uint128(w1) << 32) |
                      (Uint128(w2) << 64) | (Uint128(w3) << 96));
-      if (not vecRegs_.write(vd, i, groupx8, res))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, res);
     }
 
   postVecSuccess();
@@ -1937,12 +1892,11 @@ Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 e1{0}, d{0};
-      if (not vecRegs_.read(vs1, i, groupx8, e1))
-	assert(0);
+      vecRegs_.read(vs1, i, groupx8, e1);
       uint32_t crk3 = static_cast<uint32_t>(e1 >> 96);
 
-      if (not vecRegs_.read(vs1, i, groupx8, d))
-	assert(0);
+      vecRegs_.read(vs1, i, groupx8, d);
+
       uint32_t rkb0 = static_cast<uint32_t>(d);
       uint32_t rkb1 = static_cast<uint32_t>(d >> 32);
       uint32_t rkb2 = static_cast<uint32_t>(d >> 64);
@@ -1956,8 +1910,7 @@ Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
 
       Uint128 res = (Uint128(w0) | (Uint128(w1) << 32) |
                      (Uint128(w2) << 64) | (Uint128(w3) << 96));
-      if (not vecRegs_.write(vd, i, groupx8, res))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, res);
     }
 
   postVecSuccess();
@@ -1996,14 +1949,11 @@ Hart<URV>::execVaesz_vs(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 state{0}, rkey{0};
-      if (not vecRegs_.read(vd, i, groupx8, state))
-	assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, rkey))
-	assert(0);
+      vecRegs_.read(vd, i, groupx8, state);
+      vecRegs_.read(vs1, i, groupx8, rkey);
 
       Uint128 ark = state ^ rkey;
-      if (not vecRegs_.write(vd, i, groupx8, ark))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, ark);
     }
 
   postVecSuccess();
@@ -2103,9 +2053,10 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
       for (unsigned i = egStart; i < egLen; ++i)
 	{
 	  Uint128 dd{0}, e1{0}, e2{0};
-	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  if (not vecRegs_.read(vd, i, groupx8, e1)) assert(0);
-	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
+	  vecRegs_.read(vd, i, groupx8, dd);
+	  vecRegs_.read(vd, i, groupx8, e1);
+	  vecRegs_.read(vd, i, groupx8, e2);
+
 	  vsha2ms<uint32_t, Uint128>(dd, e1, e2);
 	  vecRegs_.write(vd, i, groupx8, dd);
 	}
@@ -2115,9 +2066,10 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
       for (unsigned i = egStart; i < egLen; ++i)
 	{
 	  Uint256 dd{0}, e1{0}, e2{0};
-	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  if (not vecRegs_.read(vd, i, groupx8, e1)) assert(0);
-	  if (not vecRegs_.read(vd, i, groupx8, e2)) assert(0);
+	  vecRegs_.read(vd, i, groupx8, dd);
+	  vecRegs_.read(vd, i, groupx8, e1);
+	  vecRegs_.read(vd, i, groupx8, e2);
+
 	  vsha2ms<uint64_t, Uint256>(dd, e1, e2);
 	  vecRegs_.write(vd, i, groupx8, dd);
 	}
@@ -2276,22 +2228,24 @@ Hart<URV>::execVsha2ch_vv(const DecodedInst* di)
       for (unsigned i = egStart; i < egLen; ++i)
 	{
 	  Uint128 e1{0}, e2{0}, dd{0};
-	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
-	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vecRegs_.read(vd, i, groupx8, dd);
+	  vecRegs_.read(vs1, i, groupx8, e1);
+	  vecRegs_.read(vs2, i, groupx8, e2);
+
 	  vsha2c<uint32_t, Uint128>(dd, e1, e2, true);
-	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	  vecRegs_.write(vd, i, groupx8, dd);
 	}
       break;
     case EW::Word2:
       for (unsigned i = egStart; i < egLen; ++i)
 	{
 	  Uint256 e1{0}, e2{0}, dd{0};
-	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
-	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vecRegs_.read(vd, i, groupx8, dd);
+	  vecRegs_.read(vs1, i, groupx8, e1);
+	  vecRegs_.read(vs2, i, groupx8, e2);
+
 	  vsha2c<uint64_t, Uint256>(dd, e1, e2, true);
-	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	  vecRegs_.write(vd, i, groupx8, dd);
 	}
       break;
     default:
@@ -2341,22 +2295,24 @@ Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
       for (unsigned i = egStart; i < egLen; ++i)
 	{
 	  Uint128 e1{0}, e2{0}, dd{0};
-	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
-	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vecRegs_.read(vd, i, groupx8, dd);
+	  vecRegs_.read(vs1, i, groupx8, e1);
+	  vecRegs_.read(vs2, i, groupx8, e2);
+
 	  vsha2c<uint32_t, Uint128>(dd, e1, e2, false);
-	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	  vecRegs_.write(vd, i, groupx8, dd);
 	}
       break;
     case EW::Word2:
       for (unsigned i = egStart; i < egLen; ++i)
 	{
 	  Uint256 e1{0}, e2{0}, dd{0};
-	  if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-	  if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
-	  if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+	  vecRegs_.read(vd, i, groupx8, dd);
+	  vecRegs_.read(vs1, i, groupx8, e1);
+	  vecRegs_.read(vs2, i, groupx8, e2);
+
 	  vsha2c<uint64_t, Uint256>(dd, e1, e2, false);
-	  if (not vecRegs_.write(vd, i, groupx8, dd)) assert(0);
+	  vecRegs_.write(vd, i, groupx8, dd);
 	}
       break;
     default:
@@ -2424,7 +2380,8 @@ Hart<URV>::execVsm4k_vi(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 e1{0};
-      if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
+      vecRegs_.read(vs1, i, groupx8, e1);
+
       uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
 	rk3 = uint32_t(e1 >> 96);
 
@@ -2446,8 +2403,7 @@ Hart<URV>::execVsm4k_vi(const DecodedInst* di)
 
       Uint128 dd = (Uint128{rk4} | (Uint128{rk5} << 32) | (Uint128{rk6} << 64) |
 		    (Uint128{rk7} << 86));
-      if (not vecRegs_.write(vd, i, groupx8, dd))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, dd);
     }
 
   postVecSuccess();
@@ -2495,8 +2451,8 @@ Hart<URV>::execVsm4r_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 e1{}, dd{};
-      if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
-      if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+      vecRegs_.read(vs1, i, groupx8, e1);
+      vecRegs_.read(vd, i, groupx8, dd);
 
       uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
 	rk3 = uint32_t(e1 >> 96);
@@ -2521,8 +2477,7 @@ Hart<URV>::execVsm4r_vv(const DecodedInst* di)
       uint32_t x7 = sm4_round(x3, s);
 
       dd = Uint128{x4} | (Uint128{x5} << 32) | (Uint128{x6} << 64) | (Uint128{x7} << 96);
-      if (not vecRegs_.write(vd, i, groupx8, dd))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, dd);
     }
       
   postVecSuccess();
@@ -2561,8 +2516,8 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint128 e1{}, dd{};
-      if (not vecRegs_.read(vs1, 0, groupx8, e1)) assert(0);
-      if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
+      vecRegs_.read(vs1, 0, groupx8, e1);
+      vecRegs_.read(vd, i, groupx8, dd);
 
       uint32_t rk0 = uint32_t(e1), rk1 = uint32_t(e1 >> 32), rk2 = uint32_t(e1 >> 64),
 	rk3 = uint32_t(e1 >> 96);
@@ -2587,8 +2542,7 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
       uint32_t x7 = sm4_round(x3, s);
 
       dd = Uint128{x4} | (Uint128{x5} << 32) | (Uint128{x6} << 64) | (Uint128{x7} << 96);
-      if (not vecRegs_.write(vd, i, groupx8, dd))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, dd);
     }
       
   postVecSuccess();
@@ -2645,8 +2599,8 @@ Hart<URV>::execVsm3me_vv(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint256 e1{0}, e2{0};
-      if (not vecRegs_.read(vs1, i, groupx8, e1)) assert(0);
-      if (not vecRegs_.read(vs2, i, groupx8, e2)) assert(0);
+      vecRegs_.read(vs1, i, groupx8, e1);
+      vecRegs_.read(vs2, i, groupx8, e2);
 
       uint32_t w0 = uint32_t{e2}, w1 = uint32_t{e2>>32}, w2 = uint32_t{e2>>32*2},
 	w3 = uint32_t{e2>>32*3}, w4 = uint32_t{e2>>32*4}, w5 = uint32_t{e2>>32*5},
@@ -2699,8 +2653,7 @@ Hart<URV>::execVsm3me_vv(const DecodedInst* di)
 		  (U256{w19} << 32*3) | (U256{w20} << 32*4) | (U256{w21} << 32*5) |
 		  (U256{w22} << 32*6) | (U256{w23} << 32*7) );
 	
-      if (not vecRegs_.write(vd, i, groupx8, dd))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, dd);
     }
       
   postVecSuccess();
@@ -2805,8 +2758,8 @@ Hart<URV>::execVsm3c_vi(const DecodedInst* di)
   for (unsigned i = egStart; i < egLen; ++i)
     {
       Uint256 el1{0}, dd{0};
-      if (not vecRegs_.read(vd, i, groupx8, dd)) assert(0);
-      if (not vecRegs_.read(vs1, i, groupx8, el1)) assert(0);
+      vecRegs_.read(vd, i, groupx8, dd);
+      vecRegs_.read(vs1, i, groupx8, el1);
 
       // load state
       uint32_t ai{uint32_t{dd}}, bi{uint32_t{dd >> 32}}, ci{uint32_t{dd >> 2*32}},
@@ -2878,8 +2831,7 @@ Hart<URV>::execVsm3c_vi(const DecodedInst* di)
 	     (U256{e2} << 32*4) | (U256{e1} << 32*5) | (U256{g2} << 32*6) |
 	     (U256{g1} << 32*7) );
   
-      if (not vecRegs_.write(vd, i, groupx8, dd))
-	assert(0);
+      vecRegs_.write(vd, i, groupx8, dd);
     }
       
   postVecSuccess();

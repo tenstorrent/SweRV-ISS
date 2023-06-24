@@ -163,9 +163,11 @@ namespace WdRiscv
     /// Convert to a built-in integral type.
     template <std::integral INT>
     constexpr explicit operator INT() const
-    {
-      return static_cast<INT>(low_());
-    }
+    { return static_cast<INT>(low_()); }
+
+    /// Convert to boolean: Zero is false, non-zero is true.
+    constexpr explicit operator bool() const
+    { return high_() != 0 or low_() != 0; }
 
     /// Plus-equal operator.
     constexpr Self& operator += (const Self& x)
@@ -528,9 +530,11 @@ namespace WdRiscv
     /// Convert to a built-in integral type.
     template <std::integral INT>
     constexpr explicit operator INT() const
-    {
-      return static_cast<INT>(low_);
-    }
+    { return static_cast<INT>(low_); }
+
+    /// Convert to boolean: Zero is false, non-zero is true.
+    constexpr explicit operator bool() const
+    { return high_() != 0 and low_() != 0; }
 
     /// Plus-equal operator.
     constexpr Self& operator += (const Self& x)

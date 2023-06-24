@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <string_view>
 #include <cassert>
+#include <stdexcept>
 #include "FpRegs.hpp"
 
 namespace WdRiscv
@@ -144,48 +145,50 @@ namespace WdRiscv
     uint32_t bytesInRegisterFile() const
     { return bytesInRegFile_; }
 
-    /// Set value to that of the element with given index within the
-    /// vector register of the given number returning true on sucess
-    /// and false if the combination of element index, vector number
-    /// and group multipier (presecaled by 8) is invalid. We pre-scale
-    /// the group multiplier to avoid passing a fraction.
-    template<typename T>
-    bool read(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
-              T& value) const
+    /// Return true if given elemIx is valid for the given register
+    /// number, and group mpultiplier is valid.
+    bool isValidIndex(uint32_t regNum, uint64_t elemIx, unsigned groupX8,
+		      size_t elemSize) const
     {
       if (regNum >= regCount_ or elemIx >= bytesInRegFile_)
 	return false;
-      if (elemIx*sizeof(T) > ((bytesPerReg_*groupX8) >> 3) - sizeof(T))
+      if (elemIx*elemSize > ((bytesPerReg_*groupX8) >> 3) - elemSize)
         return false;
       std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
-      if (regOffset + elemIx*sizeof(T) > bytesInRegFile_ - sizeof(T))
-        return false;
+      return regOffset + elemIx*elemSize <= bytesInRegFile_ - elemSize;
+    }
+
+    /// Set value to that of the element with given index within the
+    /// vector register of the given number. Throw an exception if the
+    /// combination of element index, vector number and group
+    /// multipier (presecaled by 8) is invalid. We pre-scale the group
+    /// multiplier to avoid passing a fraction.
+    template<typename T>
+    void read(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
+              T& value) const
+    {
+      if (not isValidIndex(regNum, elemIx, groupX8, sizeof(T)))
+        throw std::runtime_error("invalid vector register index");
+      std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
       const T* data = reinterpret_cast<const T*>(data_.data() + regOffset);
       value = data[elemIx];
-      return true;
     }
 
     /// Set the element with given index within the vector register of
-    /// the given number to the given value returning true on success
-    /// and false if the combination of element index, vector number
-    /// and group multipier (presecaled by 8) is invalid. We pre-scale
-    /// the group multiplier to avoid passing a fraction.
+    /// the given number to the given value. Throw an exception 
+    /// if the combination of element index, vector number and group
+    /// multipier (presecaled by 8) is invalid. We pre-scale the group
+    /// multiplier to avoid passing a fraction.
     template<typename T>
-    bool write(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
-               const T& value)
+    void write(uint32_t regNum, uint64_t elemIx, uint32_t groupX8, const T& value)
     {
-      if (regNum >= regCount_ or elemIx >= bytesInRegFile_)
-	return false;
-      if ((elemIx + 1) * sizeof(T) > ((bytesPerReg_*groupX8) >> 3))
-        return false;
+      if (not isValidIndex(regNum, elemIx, groupX8, sizeof(T)))
+        throw std::runtime_error("invalid vector register index");
       std::size_t regOffset = static_cast<std::size_t>(regNum)*bytesPerReg_;
-      if (regOffset + (elemIx + 1)*sizeof(T) > bytesInRegFile_)
-        return false;
       T* data = reinterpret_cast<T*>(data_.data() + regOffset);
       data[elemIx] = value;
       lastWrittenReg_ = regNum;
       lastGroupX8_ = groupX8;
-      return true;
     }
 
     /// Return true if the combination regNum, elemIx, eew, and
@@ -199,32 +202,28 @@ namespace WdRiscv
         case ElementWidth::Byte:
           {
             uint8_t temp = 0;
-            if (not read(regNum, elemIx, groupX8, temp))
-              return false;
+            read(regNum, elemIx, groupX8, temp);
             stride = temp;
-            return true;
+	    return true;
           }
         case ElementWidth::Half:
           {
             uint16_t temp = 0;
-            if (not read(regNum, elemIx, groupX8, temp))
-              return false;
+            read(regNum, elemIx, groupX8, temp);
             stride = temp;
             return true;
           }
         case ElementWidth::Word:
           {
             uint32_t temp = 0;
-            if (not read(regNum, elemIx, groupX8, temp))
-              return false;
+	    read(regNum, elemIx, groupX8, temp);
             stride = temp;
             return true;
           }
         case ElementWidth::Word2:
           {
             uint64_t temp = 0;
-            if (not read(regNum, elemIx, groupX8, temp))
-              return false;
+	    read(regNum, elemIx, groupX8, temp);
             stride = temp;
             return true;
           }
