@@ -3683,8 +3683,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = ((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+                     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
@@ -3695,8 +3694,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 1);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+                     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
@@ -3707,8 +3705,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 2);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+                     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;
@@ -3719,8 +3716,7 @@ Hart<URV>::accumulateInstructionStats(const DecodedInst& di)
                  size_t numElem = (((vecRegs_.bytesPerRegister()*vecRegs_.groupMultiplierX8()) >> 3) >> 3);
                  for (uint32_t elemIx = 0; elemIx < numElem; elemIx++)
                    {
-                     if (not vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val))
-		       assert(0);
+		     vecRegs_.read(regIx, elemIx, vecRegs_.groupMultiplierX8(), val);
                      addToSignedHistogram(prof.srcHisto_.at(srcIx), val);
                    }
                  break;

@@ -886,8 +886,6 @@ Hart<URV>::vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		  unsigned start, unsigned elems, bool masked,
 		  std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -898,17 +896,12 @@ Hart<URV>::vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = op(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = op(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -919,8 +912,6 @@ Hart<URV>::vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 		  unsigned start, unsigned elems, bool masked,
 		  std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -931,17 +922,11 @@ Hart<URV>::vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = op(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = op(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -1268,8 +1253,7 @@ Hart<URV>::vwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0;
@@ -1282,18 +1266,13 @@ Hart<URV>::vwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = DWT(e1);
-          dest += DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = DWT(e1);
+      dest += DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -1376,8 +1355,8 @@ Hart<URV>::vwadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
+
   ELEM_TYPE e1 = 0;
   DWT dest = 0;
 
@@ -1389,18 +1368,12 @@ Hart<URV>::vwadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = DWT(e1);
-          dest += DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = DWT(e1);
+      dest += DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -1487,8 +1460,7 @@ Hart<URV>::vwsub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e1 = 0;
   DWT dest = 0;
@@ -1501,18 +1473,11 @@ Hart<URV>::vwsub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = DWT(e1);
-          dest -= DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      dest = DWT(e1);
+      dest -= DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -1599,8 +1564,7 @@ Hart<URV>::vwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0;
@@ -1613,18 +1577,13 @@ Hart<URV>::vwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = DWT(e1);
-          dest -= DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = DWT(e1);
+      dest -= DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
                         
@@ -1707,8 +1666,7 @@ Hart<URV>::vwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT e1 = 0, dest = 0;
@@ -1721,18 +1679,13 @@ Hart<URV>::vwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, wideGroup, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1;
-          dest += DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, wideGroup, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1;
+      dest += DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -1998,8 +1951,7 @@ Hart<URV>::vwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT e1 = 0, dest = 0;
@@ -2012,18 +1964,13 @@ Hart<URV>::vwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, wideGroup, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1;
-          dest -= DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, wideGroup, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1;
+      dest -= DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -2106,8 +2053,6 @@ Hart<URV>::vmop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		   unsigned start, unsigned elems, bool masked,
 		   std::function<bool(ELEM_TYPE, ELEM_TYPE)> op)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, e2{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -2118,17 +2063,12 @@ Hart<URV>::vmop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          bool flag = op(e1, e2);
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      bool flag = op(e1, e2);
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -2139,8 +2079,6 @@ Hart<URV>::vmop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 		   unsigned start, unsigned elems, bool masked,
 		   std::function<bool(ELEM_TYPE, ELEM_TYPE)> op)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -2151,17 +2089,11 @@ Hart<URV>::vmop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          bool flag = op(e1, e2);
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      bool flag = op(e1, e2);
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -3173,8 +3105,6 @@ Hart<URV>::vnsr_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE2X e1 = 0;
   ELEM_TYPE e2 = 0, dest = 0;
 
@@ -3190,17 +3120,12 @@ Hart<URV>::vnsr_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = ELEM_TYPE(e1 >> (unsigned(e2) & mask));
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group2x, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE(e1 >> (unsigned(e2) & mask));
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -3247,9 +3172,6 @@ Hart<URV>::vnsr_wx(unsigned vd, unsigned vs1, URV e2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
-
   ELEM_TYPE2X e1 = 0;
   ELEM_TYPE dest = 0;
 
@@ -3266,17 +3188,11 @@ Hart<URV>::vnsr_wx(unsigned vd, unsigned vs1, URV e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1))
-        {
-          dest = ELEM_TYPE(e1 >> amount);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group2x, e1);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE(e1 >> amount);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -3474,8 +3390,6 @@ void
 Hart<URV>::vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -3486,24 +3400,21 @@ Hart<URV>::vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = 0;
-	  if (e2 < vecRegs_.bytesPerRegister() * 8)
+      vecRegs_.read(vs2, ix, group, e2);
+
+      dest = 0;
+      if (e2 < vecRegs_.bytesPerRegister() * 8)
+	{
+	  unsigned vs1Ix = unsigned(e2);
+	  if (vecRegs_.isValidIndex(vs1, vs1Ix, group, sizeof(e1)))
 	    {
-	      unsigned vs1Ix = unsigned(e2);
-	      if (vecRegs_.read(vs1, vs1Ix, group, e1))
-		dest = e1;
+	      vecRegs_.read(vs1, vs1Ix, group, e1);
+	      dest = e1;
 	    }
+	}
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -3550,9 +3461,6 @@ void
 Hart<URV>::vrgather_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
-
   unsigned bytesPerElem = sizeof(ELEM_TYPE);
   unsigned vlmax = group*vecRegs_.bitsPerRegister()/bytesPerElem;
 
@@ -3570,14 +3478,14 @@ Hart<URV>::vrgather_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	}
 
       dest = 0;
-      if (vecRegs_.read(vs1, vs1Ix, group, e1))
-        dest = e1;
+      if (vecRegs_.isValidIndex(vs1, vs1Ix, group, sizeof(e1)))
+	{
+	  vecRegs_.read(vs1, vs1Ix, group, e1);
+	  dest = e1;
+	}
 
-      if (not vecRegs_.write(vd, ix, group, dest))
-        errors++;
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -3623,8 +3531,6 @@ Hart<URV>::vrgather_vi(unsigned vd, unsigned vs1, uint32_t imm, unsigned group,
                        unsigned start, unsigned elems, bool masked)
 {
   uint32_t vs1Ix = imm;
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -3636,14 +3542,14 @@ Hart<URV>::vrgather_vi(unsigned vd, unsigned vs1, uint32_t imm, unsigned group,
 	}
 
       dest = 0;
-      if (vecRegs_.read(vs1, vs1Ix, group, e1))
-        dest = e1;
+      if (vecRegs_.isValidIndex(vs1, vs1Ix, group, sizeof(e1)))
+	{
+	  vecRegs_.read(vs1, vs1Ix, group, e1);
+	  dest = e1;
+	}
 
-      if (not vecRegs_.write(vd, ix, group, dest))
-        errors++;
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -3689,8 +3595,6 @@ void
 Hart<URV>::vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2,
                            unsigned group, unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
   uint16_t e2 = 0;
   unsigned e2Group = (16UL*group)/(8*sizeof(ELEM_TYPE));
@@ -3703,21 +3607,18 @@ Hart<URV>::vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, e2Group, e2))
-        {
-          unsigned vs1Ix = e2;
-          dest = 0;
-          if (vecRegs_.read(vs1, vs1Ix, group, e1))
-            dest = e1;
+      vecRegs_.read(vs2, ix, e2Group, e2);
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      unsigned vs1Ix = e2;
+      dest = 0;
+      if (vecRegs_.isValidIndex(vs1, vs1Ix, group, sizeof(e1)))
+	{
+	  vecRegs_.read(vs1, vs1Ix, group, e1);
+	  dest = e1;
+	}
+
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -3784,8 +3685,6 @@ void
 Hart<URV>::vcompress_vm(unsigned vd, unsigned vs1, unsigned vs2,
                         unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
   unsigned destIx = 0;
 
@@ -3793,20 +3692,14 @@ Hart<URV>::vcompress_vm(unsigned vd, unsigned vs1, unsigned vs2,
     {
       if (vecRegs_.isActive(vs2, ix))
         {
-          if (vecRegs_.read(vs1, ix, group, e1))
-            {
-              dest = e1;
-              if (not vecRegs_.write(vd, destIx++, group, dest))
-                errors++;
-            }
-          else
-            errors++;
+	  vecRegs_.read(vs1, ix, group, e1);
+
+	  dest = e1;
+	  vecRegs_.write(vd, destIx++, group, dest);
         }
       else
 	vecRegs_.touchReg(vd, group);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -3855,29 +3748,21 @@ Hart<URV>::vredop_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked,
 		     std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, result = 0;
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result);
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = op(result, e1);
-      else
-	errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      result = op(result, e1);
     }
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
 }
 
 
@@ -4035,13 +3920,10 @@ Hart<URV>::vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE2X result = 0;
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result);
   
   ELEM_TYPE e1 = 0;
 
@@ -4050,19 +3932,13 @@ Hart<URV>::vwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-	{
-	  ELEM_TYPE2X e1dw = e1;
-	  result += e1dw;
-	}
-      else
-	errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      ELEM_TYPE2X e1dw = e1;
+      result += e1dw;
     }
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
 }
 
 
@@ -4591,8 +4467,6 @@ void
 Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -4608,17 +4482,11 @@ Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
 
       unsigned from = ix - amount;
 
-      if (vecRegs_.read(vs1, from, group, e1))
-        {
-          dest = e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, from, group, e1);
 
-  assert(errors == 0);
+      dest = e1;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -4765,8 +4633,6 @@ void
 Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -4781,14 +4647,12 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
       if (amount < vecRegs_.bytesInRegisterFile())
 	{
 	  URV from = ix + amount;
-	  vecRegs_.read(vs1, from, group, e1); // no-op if from out of bounds
+	  if (vecRegs_.isValidIndex(vs1, from, group, sizeof(e1)))
+	    vecRegs_.read(vs1, from, group, e1);
 	}
       dest = e1;
-      if (not vecRegs_.write(vd, ix, group, dest))
-        errors++;
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -5072,8 +4936,6 @@ void
 Hart<URV>::vmulh_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -5084,17 +4946,12 @@ Hart<URV>::vmulh_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          mulh<ELEM_TYPE>(e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      mulh<ELEM_TYPE>(e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5134,8 +4991,6 @@ void
 Hart<URV>::vmulh_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -5146,17 +5001,11 @@ Hart<URV>::vmulh_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          mulh(e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      mulh(e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5226,8 +5075,6 @@ void
 Hart<URV>::vmulhu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = intRegs_.read(rs2), dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -5238,17 +5085,11 @@ Hart<URV>::vmulhu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          mulh(e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      mulh(e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5290,8 +5131,6 @@ Hart<URV>::vmulhsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
   U_ELEM_TYPE e2 = 0;
 
@@ -5303,17 +5142,12 @@ Hart<URV>::vmulhsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          mulhsu(e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      mulhsu(e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5355,8 +5189,6 @@ Hart<URV>::vmulhsu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 {
   using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
   U_ELEM_TYPE e2 = intRegs_.read(rs2);
 
@@ -5368,17 +5200,11 @@ Hart<URV>::vmulhsu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          mulhsu(e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      mulhsu(e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5418,8 +5244,6 @@ void
 Hart<URV>::vmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -5430,19 +5254,13 @@ Hart<URV>::vmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = (e1 * dest) + e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = (e1 * dest) + e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5482,8 +5300,6 @@ void
 Hart<URV>::vmadd_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2 = 0, dest = 0;
   ELEM_TYPE e1 = SRV(intRegs_.read(rs1));
 
@@ -5495,17 +5311,12 @@ Hart<URV>::vmadd_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(v2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = (e1 * dest) + e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(v2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = (e1 * dest) + e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5544,8 +5355,6 @@ void
 Hart<URV>::vnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -5556,19 +5365,13 @@ Hart<URV>::vnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = -(e1 * dest) + e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = -(e1 * dest) + e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5608,8 +5411,6 @@ void
 Hart<URV>::vnmsub_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2 = 0, dest = 0;
   ELEM_TYPE e1 = SRV(intRegs_.read(rs1));
 
@@ -5621,17 +5422,12 @@ Hart<URV>::vnmsub_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(v2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = -(e1 * dest) + e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(v2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = -(e1 * dest) + e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5671,8 +5467,6 @@ void
 Hart<URV>::vmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -5683,19 +5477,13 @@ Hart<URV>::vmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = (e1 * e2) + dest;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = (e1 * e2) + dest;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5735,8 +5523,6 @@ void
 Hart<URV>::vmacc_vx(unsigned vd, unsigned rs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2 = 0, dest = 0;
   ELEM_TYPE e1 = SRV(intRegs_.read(rs1));
 
@@ -5748,17 +5534,12 @@ Hart<URV>::vmacc_vx(unsigned vd, unsigned rs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = (e1 * e2) + dest;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = (e1 * e2) + dest;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5798,8 +5579,6 @@ void
 Hart<URV>::vnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -5810,19 +5589,13 @@ Hart<URV>::vnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = -(e1 * e2) + dest;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = -(e1 * e2) + dest;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5862,8 +5635,6 @@ void
 Hart<URV>::vnmsac_vx(unsigned vd, unsigned rs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2 = 0, dest = 0;
   ELEM_TYPE e1 = SRV(intRegs_.read(rs1));
 
@@ -5875,17 +5646,12 @@ Hart<URV>::vnmsac_vx(unsigned vd, unsigned rs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = -(e1 * e2) + dest;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
 
-  assert(errors == 0);
+      dest = -(e1 * e2) + dest;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -5929,9 +5695,7 @@ Hart<URV>::vwmulu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   ELEM_TYPE e1 = 0, e2 = 0;
   ELEM_TYPE_X2 dest = 0;
-
-  unsigned errors = 0, wideGroup = group * 2;
-  (void)errors;
+  unsigned wideGroup = group * 2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -5941,18 +5705,13 @@ Hart<URV>::vwmulu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = ELEM_TYPE_X2(e1);
-          dest *= e2;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE_X2(e1);
+      dest *= e2;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6003,8 +5762,7 @@ Hart<URV>::vwmulu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   ELEM_TYPE e1 = 0;
   ELEM_TYPE_X2 dest = 0;
-  unsigned errors = 0, wideGroup = group * 2;
-  (void)errors;
+  unsigned wideGroup = group * 2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -6014,18 +5772,12 @@ Hart<URV>::vwmulu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = ELEM_TYPE_X2(e1);
-          dest *= e2;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE_X2(e1);
+      dest *= e2;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6077,8 +5829,7 @@ Hart<URV>::vwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   ELEM_TYPE e1 = 0, e2 = 0;
   ELEM_TYPE_X2 dest = 0;
-  unsigned errors = 0,  wideGroup = group * 2;
-  (void)errors;
+  unsigned  wideGroup = group * 2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -6088,18 +5839,13 @@ Hart<URV>::vwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = ELEM_TYPE_X2(e1);
-          dest *= ELEM_TYPE_X2(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE_X2(e1);
+      dest *= ELEM_TYPE_X2(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6151,8 +5897,7 @@ Hart<URV>::vwmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   ELEM_TYPE e1 = 0;
   ELEM_TYPE_X2 dest = 0;
   ELEM_TYPE_X2 e2Wide(e2);
-  unsigned errors = 0, wideGroup = group * 2;
-  (void)errors;
+  unsigned wideGroup = group * 2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -6162,18 +5907,12 @@ Hart<URV>::vwmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = ELEM_TYPE_X2(e1);
-          dest *= e2Wide;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE_X2(e1);
+      dest *= e2Wide;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6228,8 +5967,7 @@ Hart<URV>::vwmulsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   ELEM_TYPE e1 = 0;
   ELEM_TYPE_U e2u = 0;
   ELEM_TYPE_X2 dest = 0;
-  unsigned errors = 0,  wideGroup = group * 2;
-  (void)errors;
+  unsigned wideGroup = group * 2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -6239,19 +5977,14 @@ Hart<URV>::vwmulsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2u))
-        {
-          dest = ELEM_TYPE_X2(e1);
-          ELEM_TYPE_X2 tmp2(e2u);
-          dest *= tmp2;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2u);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE_X2(e1);
+      ELEM_TYPE_X2 tmp2(e2u);
+      dest *= tmp2;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6305,8 +6038,7 @@ Hart<URV>::vwmulsu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   ELEM_TYPE_U e2u = ELEM_TYPE_U(e2);
   ELEM_TYPE_X2 e2Wide(e2u);
 
-  unsigned errors = 0,  wideGroup = group * 2;
-  (void)errors;
+  unsigned wideGroup = group * 2;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -6316,18 +6048,12 @@ Hart<URV>::vwmulsu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = ELEM_TYPE_X2(e1);
-          dest *= e2Wide;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = ELEM_TYPE_X2(e1);
+      dest *= e2Wide;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6376,8 +6102,7 @@ Hart<URV>::vwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0;
@@ -6390,18 +6115,13 @@ Hart<URV>::vwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2)
-          and vecRegs_.read(vd, ix, wideGroup, dest))
-        {
-          dest += DWT(e1) * DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, wideGroup, dest);
 
-  assert(errors == 0);
+      dest += DWT(e1) * DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6449,8 +6169,7 @@ Hart<URV>::vwmaccu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 {
   using DWT  = typename makeDoubleWide<ELEM_TYPE>::type;  // Double wide type
   using SDWT = typename std::make_signed<DWT>::type;      // Signed double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT dest = 0;
@@ -6465,17 +6184,12 @@ Hart<URV>::vwmaccu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
-        {
-          dest += de1 * DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, wideGroup, dest);
 
-  assert(errors == 0);
+      dest += de1 * DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6561,8 +6275,7 @@ Hart<URV>::vwmacc_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
   using DWT = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide type
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT dest = 0;
@@ -6576,17 +6289,12 @@ Hart<URV>::vwmacc_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
-        {
-          dest += de1 * DWT(e2);
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, wideGroup, dest);
 
-  assert(errors == 0);
+      dest += de1 * DWT(e2);
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6638,8 +6346,7 @@ Hart<URV>::vwmaccsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   using DWTU = typename std::make_unsigned<DWT>::type;        // Double wide type unsigned
   using SWTU = typename std::make_unsigned<ELEM_TYPE>::type;  // Single wide type unsigned
 
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0, temp = 0;
@@ -6652,19 +6359,14 @@ Hart<URV>::vwmaccsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2)
-          and vecRegs_.read(vd, ix, wideGroup, dest))
-        {
-          mulsu(DWT(e1), DWTU(SWTU(e2)), temp);
-          dest += temp;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, wideGroup, dest);
 
-  assert(errors == 0);
+      mulsu(DWT(e1), DWTU(SWTU(e2)), temp);
+      dest += temp;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6714,8 +6416,7 @@ Hart<URV>::vwmaccsu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
   using DWTU = typename std::make_unsigned<DWT>::type;        // Double wide type unsigned
   using SWTU = typename std::make_unsigned<ELEM_TYPE>::type;  // Single wide type unsigned
 
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT de1 = DWT(e1);  // Sign extend.
@@ -6729,18 +6430,13 @@ Hart<URV>::vwmaccsu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
-        {
-          mulsu(de1, DWTU(SWTU(e2)), temp);
-          dest += temp;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, wideGroup, dest);
 
-  assert(errors == 0);
+      mulsu(de1, DWTU(SWTU(e2)), temp);
+      dest += temp;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6792,8 +6488,7 @@ Hart<URV>::vwmaccus_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
   using DWTU = typename std::make_unsigned<DWT>::type;        // Double wide type unsigned
   using SWTU = typename std::make_unsigned<ELEM_TYPE>::type;  // Single wide type unsigned
 
-  unsigned errors = 0, wideGroup = group*2;
-  (void)errors;
+  unsigned wideGroup = group*2;
 
   ELEM_TYPE e2 = 0;
   DWT de1u = DWTU(SWTU(e1));  // Sign extend.
@@ -6807,18 +6502,13 @@ Hart<URV>::vwmaccus_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, wideGroup, dest))
-        {
-          mulsu(DWT(e2), de1u, temp);
-          dest += temp;
-          if (not vecRegs_.write(vd, ix, wideGroup, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, wideGroup, dest);
 
-  assert(errors == 0);
+      mulsu(DWT(e2), de1u, temp);
+      dest += temp;
+      vecRegs_.write(vd, ix, wideGroup, dest);
+    }
 }
 
 
@@ -6866,8 +6556,6 @@ void
 Hart<URV>::vdivu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -6878,19 +6566,14 @@ Hart<URV>::vdivu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = ~ ELEM_TYPE(0); // divide by zero result
-          if (e2 != ELEM_TYPE(0))
-            dest = e1 / e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = ~ ELEM_TYPE(0); // divide by zero result
+      if (e2 != ELEM_TYPE(0))
+	dest = e1 / e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -6930,9 +6613,6 @@ void
 Hart<URV>::vdivu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
-
   // Spec (sep 24, 2020) says scalar register value should be sign
   // extended.
   ELEM_TYPE e1 = 0, e2 = intRegs_.read(rs2), dest = 0;
@@ -6945,19 +6625,13 @@ Hart<URV>::vdivu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = ~ ELEM_TYPE(0); // divide by zero result
-          if (e2 != ELEM_TYPE(0))
-            dest = e1 / e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = ~ ELEM_TYPE(0); // divide by zero result
+      if (e2 != ELEM_TYPE(0))
+	dest = e1 / e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -6997,8 +6671,6 @@ void
 Hart<URV>::vdiv_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   int elemBits = integerWidth<ELEM_TYPE> ();
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
   ELEM_TYPE minInt = ELEM_TYPE(1) << (elemBits - 1);
@@ -7012,24 +6684,19 @@ Hart<URV>::vdiv_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = negOne; // Divide by zero result
-          if (e2 != ELEM_TYPE(0))
-            {
-              if (e1 == minInt and e2 == negOne)
-                dest = e1;
-              else
-                dest = e1 / e2;
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = negOne; // Divide by zero result
+      if (e2 != ELEM_TYPE(0))
+	{
+	  if (e1 == minInt and e2 == negOne)
+	    dest = e1;
+	  else
+	    dest = e1 / e2;
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7069,8 +6736,6 @@ void
 Hart<URV>::vdiv_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   int elemBits = integerWidth<ELEM_TYPE> ();
   ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
   ELEM_TYPE minInt = ELEM_TYPE(1) << (elemBits - 1);
@@ -7084,24 +6749,18 @@ Hart<URV>::vdiv_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = negOne; // Divide by zero result
-          if (e2 != ELEM_TYPE(0))
-            {
-              if (e1 == minInt and e2 == negOne)
-                dest = e1;
-              else
-                dest = e1 / e2;
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = negOne; // Divide by zero result
+      if (e2 != ELEM_TYPE(0))
+	{
+	  if (e1 == minInt and e2 == negOne)
+	    dest = e1;
+	  else
+	    dest = e1 / e2;
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7141,8 +6800,6 @@ void
 Hart<URV>::vremu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -7153,19 +6810,14 @@ Hart<URV>::vremu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1; // divide by zero result
-          if (e2 != ELEM_TYPE(0))
-            dest = e1 % e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1; // divide by zero result
+      if (e2 != ELEM_TYPE(0))
+	dest = e1 % e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7205,9 +6857,6 @@ void
 Hart<URV>::vremu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
-
   // Spec (sep 24, 2020) says scalar register value should be sign
   // extended.
   ELEM_TYPE e1 = 0, e2 = intRegs_.read(rs2), dest = 0;
@@ -7220,19 +6869,13 @@ Hart<URV>::vremu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1; // divide by zero result
-          if (e2 != ELEM_TYPE(0))
-            dest = e1 % e2;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1; // divide by zero result
+      if (e2 != ELEM_TYPE(0))
+	dest = e1 % e2;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7272,8 +6915,6 @@ void
 Hart<URV>::vrem_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   int elemBits = integerWidth<ELEM_TYPE> ();
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
   ELEM_TYPE minInt = ELEM_TYPE(1) << (elemBits - 1);
@@ -7287,24 +6928,19 @@ Hart<URV>::vrem_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1; // Divide by zero remainder
-          if (e2 != ELEM_TYPE(0))
-            {
-              if (e1 == minInt and e2 == negOne)
-                dest = 0;
-              else
-                dest = e1 % e2;
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1; // Divide by zero remainder
+      if (e2 != ELEM_TYPE(0))
+	{
+	  if (e1 == minInt and e2 == negOne)
+	    dest = 0;
+	  else
+	    dest = e1 % e2;
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7344,8 +6980,8 @@ void
 Hart<URV>::vrem_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0,  elemBits = integerWidth<ELEM_TYPE> ();
-  (void)errors;
+  unsigned elemBits = integerWidth<ELEM_TYPE> ();
+
   ELEM_TYPE e1 = 0, e2 = SRV(intRegs_.read(rs2)), dest = 0;
   ELEM_TYPE minInt = ELEM_TYPE(1) << (elemBits - 1);
   ELEM_TYPE negOne = ELEM_TYPE(-1);
@@ -7358,24 +6994,18 @@ Hart<URV>::vrem_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1; // Divide by zero remainder
-          if (e2 != ELEM_TYPE(0))
-            {
-              if (e1 == minInt and e2 == negOne)
-                dest = 0;
-              else
-                dest = e1 % e2;
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1; // Divide by zero remainder
+      if (e2 != ELEM_TYPE(0))
+	{
+	  if (e1 == minInt and e2 == negOne)
+	    dest = 0;
+	  else
+	    dest = e1 % e2;
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7415,8 +7045,6 @@ void
 Hart<URV>::vsext(unsigned vd, unsigned vs1, unsigned group, unsigned fromGroup,
                  unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   FROM_TYPE e1 = 0;
   ELEM_TYPE dest = 0;
 
@@ -7428,17 +7056,11 @@ Hart<URV>::vsext(unsigned vd, unsigned vs1, unsigned group, unsigned fromGroup,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, fromGroup, e1))
-        {
-          dest = e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, fromGroup, e1);
 
-  assert(errors == 0);
+      dest = e1;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7685,8 +7307,6 @@ void
 Hart<URV>::vzext(unsigned vd, unsigned vs1, unsigned group, unsigned fromGroup,
                  unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   FROM_TYPE e1 = 0;
   ELEM_TYPE dest = 0;
 
@@ -7698,17 +7318,11 @@ Hart<URV>::vzext(unsigned vd, unsigned vs1, unsigned group, unsigned fromGroup,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, fromGroup, e1))
-        {
-          dest = e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, fromGroup, e1);
 
-  assert(errors == 0);
+      dest = e1;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7955,25 +7569,18 @@ void
 Hart<URV>::vadc_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned vcin,
                     unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 + e2;
-          if (vecRegs_.isActive(vcin, ix))
-            dest += ELEM_TYPE(1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1 + e2;
+      if (vecRegs_.isActive(vcin, ix))
+	dest += ELEM_TYPE(1);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -7983,25 +7590,17 @@ void
 Hart<URV>::vadc_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned vcin,
                     unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 + e2;
-          if (vecRegs_.isActive(vcin, ix))
-            dest += ELEM_TYPE(1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1 + e2;
+      if (vecRegs_.isActive(vcin, ix))
+	dest += ELEM_TYPE(1);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -8011,25 +7610,18 @@ void
 Hart<URV>::vsbc_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned vbin,
                     unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 - e2;
-          if (vecRegs_.isActive(vbin, ix))
-            dest -= ELEM_TYPE(1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1 - e2;
+      if (vecRegs_.isActive(vbin, ix))
+	dest -= ELEM_TYPE(1);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -8039,25 +7631,17 @@ void
 Hart<URV>::vsbc_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned vbin,
                     unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 - e2;
-          if (vecRegs_.isActive(vbin, ix))
-            dest -= ELEM_TYPE(1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1 - e2;
+      if (vecRegs_.isActive(vbin, ix))
+	dest -= ELEM_TYPE(1);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -8067,28 +7651,21 @@ void
 Hart<URV>::vmadc_vvm(unsigned vcout, unsigned vs1, unsigned vs2, bool carry, unsigned vcin,
                      unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 + e2;
-	  bool cin = carry and vecRegs_.isActive(vcin, ix);
-	  if (cin)
-            dest += ELEM_TYPE(1);
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-          bool cout = cin? dest <= e1 : dest < e1;
-          if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
-            errors++;
-        }
-      else
-        errors++;
+      dest = e1 + e2;
+      bool cin = carry and vecRegs_.isActive(vcin, ix);
+      if (cin)
+	dest += ELEM_TYPE(1);
+
+      bool cout = cin? dest <= e1 : dest < e1;
+      vecRegs_.writeMaskRegister(vcout, ix, cout);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -8098,28 +7675,20 @@ void
 Hart<URV>::vmadc_vxm(unsigned vcout, unsigned vs1, ELEM_TYPE e2, bool carry, unsigned vcin,
                      unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 + e2;
-          bool cin = carry and vecRegs_.isActive(vcin, ix);
-	  if (cin)
-	    dest += ELEM_TYPE(1);
+      vecRegs_.read(vs1, ix, group, e1);
 
-          bool cout = cin? dest <= e1 : dest < e1;
-          if (not vecRegs_.writeMaskRegister(vcout, ix, cout))
-            errors++;
-        }
-      else
-        errors++;
+      dest = e1 + e2;
+      bool cin = carry and vecRegs_.isActive(vcin, ix);
+      if (cin)
+	dest += ELEM_TYPE(1);
+
+      bool cout = cin? dest <= e1 : dest < e1;
+      vecRegs_.writeMaskRegister(vcout, ix, cout);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -8129,31 +7698,24 @@ void
 Hart<URV>::vmsbc_vvm(unsigned vbout, unsigned vs1, unsigned vs2, bool borrow, unsigned vbin,
                      unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 - e2;
-          bool bout = e1 < e2;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-          if (borrow and vecRegs_.isActive(vbin, ix))
-	    {
-	      dest -= ELEM_TYPE(1);
-	      bout = e1 <= e2;
-	    }
+      dest = e1 - e2;
+      bool bout = e1 < e2;
 
-          if (not vecRegs_.writeMaskRegister(vbout, ix, bout))
-            errors++;
-        }
-      else
-        errors++;
+      if (borrow and vecRegs_.isActive(vbin, ix))
+	{
+	  dest -= ELEM_TYPE(1);
+	  bout = e1 <= e2;
+	}
+
+      vecRegs_.writeMaskRegister(vbout, ix, bout);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -8163,31 +7725,23 @@ void
 Hart<URV>::vmsbc_vxm(unsigned vbout, unsigned vs1, ELEM_TYPE e2, bool borrow, unsigned vbin,
                      unsigned group, unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 - e2;
-          bool bout = e1 < e2;
+      vecRegs_.read(vs1, ix, group, e1);
 
-          if (borrow and vecRegs_.isActive(vbin, ix))
-	    {
-	      dest -= ELEM_TYPE(1);
-	      bout = e1 <= e2;
-	    }
+      dest = e1 - e2;
+      bool bout = e1 < e2;
 
-          if (not vecRegs_.writeMaskRegister(vbout, ix, bout))
-            errors++;
-        }
-      else
-        errors++;
+      if (borrow and vecRegs_.isActive(vbin, ix))
+	{
+	  dest -= ELEM_TYPE(1);
+	  bout = e1 <= e2;
+	}
+
+      vecRegs_.writeMaskRegister(vbout, ix, bout);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -8521,24 +8075,16 @@ void
 Hart<URV>::vmerge_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
-
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = vecRegs_.isActive(0, ix) ? e2 : e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -8582,23 +8128,15 @@ void
 Hart<URV>::vmerge_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 		      unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = vecRegs_.isActive(0, ix) ? e2 : e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -8914,23 +8452,15 @@ void
 Hart<URV>::vmv_v_v(unsigned vd, unsigned vs1, unsigned group,
                    unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -8976,14 +8506,8 @@ void
 Hart<URV>::vmv_v_x(unsigned vd, ELEM_TYPE e1, unsigned group,
                    unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
-
   for (unsigned ix = start; ix < elems; ++ix)
-    if (not vecRegs_.write(vd, ix, group, e1))
-      errors++;
-
-  assert(errors == 0);
+    vecRegs_.write(vd, ix, group, e1);
 }
 
 
@@ -9210,8 +8734,6 @@ void
 Hart<URV>::vsaddu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   ELEM_TYPE maxVal = ~ ELEM_TYPE(0);
@@ -9224,22 +8746,17 @@ Hart<URV>::vsaddu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 + e2;
-          if (dest < e1)
-            {
-              dest = maxVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1 + e2;
+      if (dest < e1)
+	{
+	  dest = maxVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9278,8 +8795,6 @@ void
 Hart<URV>::vsaddu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   ELEM_TYPE maxVal = ~ ELEM_TYPE(0);
@@ -9292,22 +8807,16 @@ Hart<URV>::vsaddu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 + e2;
-          if (dest < e1)
-            {
-              dest = maxVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1 + e2;
+      if (dest < e1)
+	{
+	  dest = maxVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9378,8 +8887,6 @@ void
 Hart<URV>::vsadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
@@ -9393,26 +8900,21 @@ Hart<URV>::vsadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 + e2;
-          bool sameSign = (e1 < 0) == (e2 < 0);
-          if (sameSign and ((e1 < 0) != (dest < 0)))
-            {
-              if (e1 < 0)
-                dest = minVal;
-              else
-                dest = maxVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1 + e2;
+      bool sameSign = (e1 < 0) == (e2 < 0);
+      if (sameSign and ((e1 < 0) != (dest < 0)))
+	{
+	  if (e1 < 0)
+	    dest = minVal;
+	  else
+	    dest = maxVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9451,8 +8953,6 @@ void
 Hart<URV>::vsadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
@@ -9466,26 +8966,20 @@ Hart<URV>::vsadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 + e2;
-          bool sameSign = (e1 < 0) == (e2 < 0);
-          if (sameSign and ((e1 < 0) != (dest < 0)))
-            {
-              if (e1 < 0)
-                dest = minVal;
-              else
-                dest = maxVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1 + e2;
+      bool sameSign = (e1 < 0) == (e2 < 0);
+      if (sameSign and ((e1 < 0) != (dest < 0)))
+	{
+	  if (e1 < 0)
+	    dest = minVal;
+	  else
+	    dest = maxVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9556,8 +9050,6 @@ void
 Hart<URV>::vssubu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   ELEM_TYPE minVal = 0;
@@ -9570,22 +9062,17 @@ Hart<URV>::vssubu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 - e2;
-          if (dest > e1)
-            {
-              dest = minVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1 - e2;
+      if (dest > e1)
+	{
+	  dest = minVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9624,10 +9111,7 @@ void
 Hart<URV>::vssubu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
-
   ELEM_TYPE minVal = 0;
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -9638,22 +9122,16 @@ Hart<URV>::vssubu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 - e2;
-          if (dest > e1)
-            {
-              dest = minVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1 - e2;
+      if (dest > e1)
+	{
+	  dest = minVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9694,8 +9172,6 @@ void
 Hart<URV>::vssub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0, dest = 0;
 
   static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
@@ -9709,26 +9185,21 @@ Hart<URV>::vssub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = e1 - e2;
-          bool sameSign = (e1 < 0) == (e2 >= 0);
-          if (sameSign and ((e1 < 0) != (dest < 0)))
-            {
-              if (e1 < 0)
-                dest = minVal;
-              else
-                dest = maxVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = e1 - e2;
+      bool sameSign = (e1 < 0) == (e2 >= 0);
+      if (sameSign and ((e1 < 0) != (dest < 0)))
+	{
+	  if (e1 < 0)
+	    dest = minVal;
+	  else
+	    dest = maxVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9767,8 +9238,6 @@ void
 Hart<URV>::vssub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, dest = 0;
 
   static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
@@ -9782,26 +9251,20 @@ Hart<URV>::vssub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = e1 - e2;
-          bool sameSign = (e1 < 0) == (e2 >= 0);
-          if (sameSign and ((e1 < 0) != (dest < 0)))
-            {
-              if (e1 < 0)
-                dest = minVal;
-              else
-                dest = maxVal;
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = e1 - e2;
+      bool sameSign = (e1 < 0) == (e2 >= 0);
+      if (sameSign and ((e1 < 0) != (dest < 0)))
+	{
+	  if (e1 < 0)
+	    dest = minVal;
+	  else
+	    dest = maxVal;
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9882,8 +9345,6 @@ void
 Hart<URV>::vaadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0;
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
@@ -9900,20 +9361,15 @@ Hart<URV>::vaadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          ELEM_TYPE2 temp = e1;
-          temp += e2;
-          roundoff(rm, temp, 1);
-          ELEM_TYPE dest = ELEM_TYPE(temp);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      ELEM_TYPE2 temp = e1;
+      temp += e2;
+      roundoff(rm, temp, 1);
+      ELEM_TYPE dest = ELEM_TYPE(temp);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -9981,8 +9437,6 @@ void
 Hart<URV>::vaadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0;
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
@@ -9999,20 +9453,14 @@ Hart<URV>::vaadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          ELEM_TYPE2 temp = e1;
-          temp += e2;
-          roundoff(rm, temp, 1);
-          ELEM_TYPE dest = ELEM_TYPE(temp);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      ELEM_TYPE2 temp = e1;
+      temp += e2;
+      roundoff(rm, temp, 1);
+      ELEM_TYPE dest = ELEM_TYPE(temp);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -10084,8 +9532,6 @@ void
 Hart<URV>::vasub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0;
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
@@ -10102,20 +9548,15 @@ Hart<URV>::vasub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          ELEM_TYPE2 temp = e1;
-          temp -= e2;
-          roundoff(rm, temp, 1);
-          ELEM_TYPE dest = ELEM_TYPE(temp);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      ELEM_TYPE2 temp = e1;
+      temp -= e2;
+      roundoff(rm, temp, 1);
+      ELEM_TYPE dest = ELEM_TYPE(temp);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -10183,8 +9624,6 @@ void
 Hart<URV>::vasub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0;
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
@@ -10201,20 +9640,14 @@ Hart<URV>::vasub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          ELEM_TYPE2 temp = e1;
-          temp -= e2;
-          roundoff(rm, temp, 1);
-          ELEM_TYPE dest = ELEM_TYPE(temp);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      ELEM_TYPE2 temp = e1;
+      temp -= e2;
+      roundoff(rm, temp, 1);
+      ELEM_TYPE dest = ELEM_TYPE(temp);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -10286,8 +9719,6 @@ void
 Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0;
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
@@ -10306,31 +9737,26 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          ELEM_TYPE dest = 0;
-          if (e1 == minVal and e2 == minVal)
-            {
-              // Result saturates at max positive value.
-              dest = std::numeric_limits<ELEM_TYPE>::max();
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          else
-            {
-              ELEM_TYPE2 temp = e1;
-              temp *= e2;
-              roundoff(rm, temp, sizeof(ELEM_TYPE)*8 - 1);
-              dest = ELEM_TYPE(temp);
-            }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
+      ELEM_TYPE dest = 0;
+      if (e1 == minVal and e2 == minVal)
+	{
+	  // Result saturates at max positive value.
+	  dest = std::numeric_limits<ELEM_TYPE>::max();
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
       else
-        errors++;
-    }
+	{
+	  ELEM_TYPE2 temp = e1;
+	  temp *= e2;
+	  roundoff(rm, temp, sizeof(ELEM_TYPE)*8 - 1);
+	  dest = ELEM_TYPE(temp);
+	}
 
-  assert(errors == 0);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -10369,8 +9795,6 @@ void
 Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0;
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
@@ -10389,31 +9813,25 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          ELEM_TYPE dest = 0;
-          if (e1 == minVal and e2 == minVal)
-            {
-              // Result saturates at max positive value.
-              dest = std::numeric_limits<ELEM_TYPE>::max();
-              csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-            }
-          else
-            {
-              ELEM_TYPE2 temp = e1;
-              temp *= e2;
-              roundoff(rm, temp, sizeof(ELEM_TYPE)*8 - 1);
-              dest = ELEM_TYPE(temp);
-            }
+      vecRegs_.read(vs1, ix, group, e1);
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
+      ELEM_TYPE dest = 0;
+      if (e1 == minVal and e2 == minVal)
+	{
+	  // Result saturates at max positive value.
+	  dest = std::numeric_limits<ELEM_TYPE>::max();
+	  csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
+	}
       else
-        errors++;
-    }
+	{
+	  ELEM_TYPE2 temp = e1;
+	  temp *= e2;
+	  roundoff(rm, temp, sizeof(ELEM_TYPE)*8 - 1);
+	  dest = ELEM_TYPE(temp);
+	}
 
-  assert(errors == 0);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -10454,8 +9872,6 @@ void
 Hart<URV>::vssr_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0, e2 = 0;
 
   URV rmVal = 0;
@@ -10473,20 +9889,14 @@ Hart<URV>::vssr_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          ELEM_TYPE dest = e1;
-          unsigned amount = unsigned(e2) & mask;
-          roundoff(rm, dest, amount);
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      ELEM_TYPE dest = e1;
+      unsigned amount = unsigned(e2) & mask;
+      roundoff(rm, dest, amount);
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -10525,8 +9935,6 @@ void
 Hart<URV>::vssr_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
                    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = 0;
 
   URV rmVal = 0;
@@ -10545,18 +9953,12 @@ Hart<URV>::vssr_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          ELEM_TYPE dest = e1;
-          roundoff(rm, dest, amount);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      ELEM_TYPE dest = e1;
+      roundoff(rm, dest, amount);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -10718,8 +10120,6 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE2X e1 = 0;
   ELEM_TYPE e2 = 0;
 
@@ -10740,32 +10140,27 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          unsigned amount = unsigned(e2) & mask;
-          roundoff(rm, e1, amount);
+      vecRegs_.read(vs1, ix, group2x, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-          ELEM_TYPE dest = ELEM_TYPE(e1);
-          if (e1 != ELEM_TYPE2X(dest))
-            {
-              if constexpr (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
-                dest = std::numeric_limits<ELEM_TYPE>::max();
-              else
-                dest = (e1 < 0) ? std::numeric_limits<ELEM_TYPE>::min() : std::numeric_limits<ELEM_TYPE>::max();
-	      saturated = true;
-            }
+      unsigned amount = unsigned(e2) & mask;
+      roundoff(rm, e1, amount);
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      ELEM_TYPE dest = ELEM_TYPE(e1);
+      if (e1 != ELEM_TYPE2X(dest))
+	{
+	  if constexpr (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
+	    dest = std::numeric_limits<ELEM_TYPE>::max();
+	  else
+	    dest = (e1 < 0) ? std::numeric_limits<ELEM_TYPE>::min() : std::numeric_limits<ELEM_TYPE>::max();
+	  saturated = true;
+	}
+
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   if (saturated)
     csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-
-  assert(errors == 0);
 }
 
 
@@ -10813,8 +10208,6 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   using U_ELEM_TYPE = typename std::make_unsigned<ELEM_TYPE>::type;
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE2X e1 = 0;
 
   URV rmVal = 0;
@@ -10835,31 +10228,25 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1))
-        {
-          roundoff(rm, e1, amount);
+      vecRegs_.read(vs1, ix, group2x, e1);
 
-          ELEM_TYPE dest = ELEM_TYPE(e1);
-          if (e1 != ELEM_TYPE2X(dest))
-            {
-              if constexpr (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
-                dest = std::numeric_limits<ELEM_TYPE>::max();
-              else
-                dest = (e1 < 0) ? std::numeric_limits<ELEM_TYPE>::min() : std::numeric_limits<ELEM_TYPE>::max();
-	      saturated = true;
-            }
+      roundoff(rm, e1, amount);
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      ELEM_TYPE dest = ELEM_TYPE(e1);
+      if (e1 != ELEM_TYPE2X(dest))
+	{
+	  if constexpr (std::is_same<ELEM_TYPE, U_ELEM_TYPE>::value)
+	    dest = std::numeric_limits<ELEM_TYPE>::max();
+	  else
+	    dest = (e1 < 0) ? std::numeric_limits<ELEM_TYPE>::min() : std::numeric_limits<ELEM_TYPE>::max();
+	  saturated = true;
+	}
+
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   if (saturated)
     csRegs_.write(CsrNumber::VXSAT, PrivilegeMode::Machine, 1);
-
-  assert(errors == 0);
 }
 
 
@@ -11104,8 +10491,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
           return false;
         }
 
-      if (not vecRegs_.write(vd, ix, groupX8, elem))
-	assert(0);
+      vecRegs_.write(vd, ix, groupX8, elem);
     }
   return true;
 }
@@ -11209,8 +10595,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
     }
 
   bool masked = di->isMasked();
-  uint32_t vd = di->op0(), rs1 = di->op1(), errors = 0;
-  (void)errors;
+  uint32_t vd = di->op0(), rs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
@@ -11233,11 +10618,7 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 	}
 
       ELEM_TYPE elem = 0;
-      if (not vecRegs_.read(vd, ix, groupX8, elem))
-        {
-          errors++;
-          break;
-        }
+      vecRegs_.read(vd, ix, groupX8, elem);
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
@@ -11253,12 +10634,10 @@ Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
         {
           csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
           initiateStoreException(cause, pa1, gpa1);
-	  assert(errors == 0);
           return false;
         }
     }
 
-  assert(errors == 0);
   return true;
 }
 
@@ -11446,11 +10825,7 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
           return false;
         }
 
-      if (not vecRegs_.write(vd, ix, groupX8, elem))
-        {
-          assert(0);
-          return false;
-        }
+      vecRegs_.write(vd, ix, groupX8, elem);
 
       vecRegs_.ldStAddr_.push_back(addr);
       vecRegs_.maskedAddr_.push_back(false);
@@ -11560,11 +10935,7 @@ Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
   for (unsigned ix = start; ix < elemCount; ++ix, addr += elemSize)
     {
       uint8_t elem = 0;
-      if (not vecRegs_.read(vd, ix, groupX8, elem))
-        {
-          assert(0);
-          return false;
-        }
+      vecRegs_.read(vd, ix, groupX8, elem);
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
@@ -11766,11 +11137,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
           return false;
         }
 
-      if (not vecRegs_.write(vd, ix, groupX8, elem))
-        {
-          assert(0);
-          return false;
-        }
+      vecRegs_.write(vd, ix, groupX8, elem);
     }
 
   return true;
@@ -11900,11 +11267,7 @@ Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 	}
 
       ELEM_TYPE elem = 0;
-      if (not vecRegs_.read(vd, ix, groupX8, elem))
-        {
-          assert(0);
-          return false;
-        }
+      vecRegs_.read(vd, ix, groupX8, elem);
 
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = addr, gpa2 = addr;
@@ -12039,11 +11402,8 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
       uint64_t offset = 0;
-      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-	{
-	  assert(0);
-	  return false;
-	}
+      vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
+
       uint64_t vaddr = addr + offset;
       bool skip = masked and not vecRegs_.isActive(0, ix);
       vecRegs_.ldStAddr_.push_back(vaddr);
@@ -12065,25 +11425,25 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	    {
 	      uint8_t x = 0;
 	      memRead(pa1, pa2, x);
-	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	      vecRegs_.write(vd, ix, groupX8, x);
 	    }
 	  else if (elemSize == 2)
 	    {
 	      uint16_t x = 0;
 	      memRead(pa1, pa2, x);
-	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	      vecRegs_.write(vd, ix, groupX8, x);
 	    }
 	  else if (elemSize == 4)
 	    {
 	      uint32_t x = 0;
 	      memRead(pa1, pa2, x);
-	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	      vecRegs_.write(vd, ix, groupX8, x);
 	    }
 	  else if (elemSize == 8)
 	    {
 	      uint64_t x = 0;
 	      memRead(pa1, pa2, x);
-	      if (not vecRegs_.write(vd, ix, groupX8, x)) assert(0);
+	      vecRegs_.write(vd, ix, groupX8, x);
 	    }
 	  else
 	    assert(0);
@@ -12289,7 +11649,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (elemSize == 1)
 	{
 	  uint8_t x = 0;
-	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  vecRegs_.read(vd, ix, groupX8, x);
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
@@ -12299,7 +11659,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       else if (elemSize == 2)
 	{
 	  uint16_t x = 0;
-	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  vecRegs_.read(vd, ix, groupX8, x);
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
@@ -12309,7 +11669,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       else if (elemSize == 4)
 	{
 	  uint32_t x = 0;
-	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  vecRegs_.read(vd, ix, groupX8, x);
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
@@ -12319,7 +11679,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
       else if (elemSize == 8)
 	{
 	  uint64_t x = 0;
-	  if (not vecRegs_.read(vd, ix, groupX8, x)) assert(0);
+	  vecRegs_.read(vd, ix, groupX8, x);
 	  cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                           false /*hyper*/);
 	  if (cause == ExceptionCause::NONE)
@@ -12553,8 +11913,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	      return false;
 	    }
 
-	  if (not vecRegs_.write(dvg, ix, groupX8, elem))
-	    assert(0);
+	  vecRegs_.write(dvg, ix, groupX8, elem);
 	}
     }
 
@@ -12706,8 +12065,7 @@ Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 	    }
 
 	  ELEM_TYPE elem = 0;
-	  if (not vecRegs_.read(dvg, ix, groupX8, elem))
-	    assert(0);
+	  vecRegs_.read(dvg, ix, groupX8, elem);
 
 	  auto cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(elem),
                                                false /*hyper*/);
@@ -13055,25 +12413,25 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 		{
 		  uint8_t x = 0;
 		  memRead(pa1, pa2, x);
-		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		  vecRegs_.write(dvg, ix, groupX8, x);
 		}
 	      else if (elemSize == 2)
 		{
 		  uint16_t x = 0;
 		  memRead(pa1, pa2, x);
-		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		  vecRegs_.write(dvg, ix, groupX8, x);
 		}
 	      else if (elemSize == 4)
 		{
 		  uint32_t x = 0;
 		  memRead(pa1, pa2, x);
-		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		  vecRegs_.write(dvg, ix, groupX8, x);
 		}
 	      else if (elemSize == 8)
 		{
 		  uint64_t x = 0;
 		  memRead(pa1, pa2, x);
-		  if (not vecRegs_.write(dvg, ix, groupX8, x)) assert(0);
+		  vecRegs_.write(dvg, ix, groupX8, x);
 		}
 	      else
 		assert(0);
@@ -13225,7 +12583,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  if (elemSize == 1)
 	    {
 	      uint8_t x = 0;
-	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      vecRegs_.read(dvg, ix, groupX8, x);
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
@@ -13235,7 +12593,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  else if (elemSize == 2)
 	    {
 	      uint16_t x = 0;
-	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      vecRegs_.read(dvg, ix, groupX8, x);
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
@@ -13245,7 +12603,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  else if (elemSize == 4)
 	    {
 	      uint32_t x = 0;
-	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      vecRegs_.read(dvg, ix, groupX8, x);
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
@@ -13255,7 +12613,7 @@ Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  else if (elemSize == 8)
 	    {
 	      uint64_t x = 0;
-	      if (not vecRegs_.read(dvg, ix, groupX8, x)) assert(0);
+	      vecRegs_.read(dvg, ix, groupX8, x);
 	      cause = determineStoreException(pa1, pa2, gpa1, gpa2, sizeof(x),
                                               false /*hyper*/);
 	      if (cause == ExceptionCause::NONE)
@@ -13981,8 +13339,6 @@ void
 Hart<URV>::vfadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -13994,17 +13350,11 @@ Hart<URV>::vfadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFadd(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = doFadd(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -14082,8 +13432,6 @@ void
 Hart<URV>::vfsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE negE2 = - fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -14095,17 +13443,11 @@ Hart<URV>::vfsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFadd(e1, negE2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = doFadd(e1, negE2);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -14145,8 +13487,6 @@ void
 Hart<URV>::vfrsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -14158,17 +13498,11 @@ Hart<URV>::vfrsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFadd(e2, -e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = doFadd(e2, -e1);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -14210,8 +13544,6 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -14225,19 +13557,14 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = doFadd(e1dw, e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = doFadd(e1dw, e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14288,8 +13615,6 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
@@ -14305,18 +13630,12 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-          dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14365,8 +13684,6 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -14380,19 +13697,14 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = doFadd(e1dw, -e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = doFadd(e1dw, -e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14443,8 +13755,6 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
@@ -14460,18 +13770,12 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-          dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14520,8 +13824,6 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -14535,18 +13837,13 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = doFadd(e1dw, e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group2x, e1dw);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = doFadd(e1dw, e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14597,8 +13894,6 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
   WidenedFpScalar e2dw{e2};
@@ -14613,17 +13908,11 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1dw))
-        {
-          dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group2x, e1dw);
 
-  assert(errors == 0);
+      dest = doFadd<ELEM_TYPE2X>(e1dw, e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14672,8 +13961,6 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE  e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -14687,18 +13974,13 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1dw) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = doFadd(e1dw, -e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group2x, e1dw);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = doFadd(e1dw, -e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14747,8 +14029,6 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
   WidenedFpScalar negE2dw{-e2};
@@ -14763,17 +14043,11 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1dw))
-        {
-          dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group2x, e1dw);
 
-  assert(errors == 0);
+      dest = doFadd<ELEM_TYPE2X>(e1dw, negE2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -14858,8 +14132,6 @@ void
 Hart<URV>::vfmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -14871,17 +14143,11 @@ Hart<URV>::vfmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFmul(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = doFmul(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -14959,8 +14225,6 @@ void
 Hart<URV>::vfdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -14972,17 +14236,11 @@ Hart<URV>::vfdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFdiv(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = doFdiv(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -15022,8 +14280,6 @@ void
 Hart<URV>::vfrdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -15035,17 +14291,11 @@ Hart<URV>::vfrdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFdiv(e2, e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = doFdiv(e2, e1);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -15086,8 +14336,6 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -15101,19 +14349,14 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = doFmul(e1dw, e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = doFmul(e1dw, e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -15161,8 +14404,6 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
   ELEM_TYPE2X e1dw{}, dest{};
@@ -15178,18 +14419,12 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-          dest = doFmul<ELEM_TYPE2X>(e1dw, e2dw);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      dest = doFmul<ELEM_TYPE2X>(e1dw, e2dw);
+      vecRegs_.write(vd, ix, group2x, dest);
+    }
 }
 
 
@@ -15235,8 +14470,6 @@ void
 Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -15247,22 +14480,15 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(e1, dest, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, dest, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15299,8 +14525,6 @@ void
 Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -15312,19 +14536,14 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vf2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(e1, dest, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vf2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, dest, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15362,8 +14581,6 @@ void
 Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -15374,22 +14591,15 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(-e1, dest, -e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, dest, -e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15426,8 +14636,6 @@ void
 Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -15439,19 +14647,14 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(-e1, dest, -e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, dest, -e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15489,8 +14692,6 @@ void
 Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -15501,22 +14702,15 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(e1, dest, -e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, dest, -e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15553,8 +14747,6 @@ void
 Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -15566,19 +14758,14 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(e1, dest, -e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, dest, -e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15616,8 +14803,6 @@ void
 Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -15628,22 +14813,15 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(-e1, dest, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, dest, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15680,8 +14858,6 @@ void
 Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -15693,19 +14869,14 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(-e1, dest, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, dest, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15743,8 +14914,6 @@ void
 Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -15755,22 +14924,15 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15807,8 +14969,6 @@ void
 Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -15820,19 +14980,14 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15885,8 +15040,6 @@ void
 Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -15897,22 +15050,15 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(-e1, e2, -dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, e2, -dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -15949,8 +15095,6 @@ void
 Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -15962,19 +15106,14 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(-e1, e2, -dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, e2, -dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16012,8 +15151,6 @@ void
 Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -16024,22 +15161,15 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(e1, e2, -dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, e2, -dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16076,8 +15206,6 @@ void
 Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -16089,19 +15217,14 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(e1, e2, -dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(e1, e2, -dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16139,8 +15262,6 @@ void
 Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE(), dest = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -16151,22 +15272,15 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group, dest))
-        {
-	  dest = fusedMultiplyAdd(-e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16203,8 +15317,6 @@ void
 Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{}, dest{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
 
@@ -16216,19 +15328,14 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group, dest))
-        {
-          dest = fusedMultiplyAdd(-e1, e2, dest);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group, dest);
+
+      dest = fusedMultiplyAdd(-e1, e2, dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16268,8 +15375,6 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -16283,24 +15388,17 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = fusedMultiplyAdd(e1dw, e2dw, dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd(e1dw, e2dw, dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16344,8 +15442,6 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(f1);
   ELEM_TYPE2X e2dw{}, dest{};
@@ -16361,20 +15457,15 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16419,8 +15510,6 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -16434,24 +15523,17 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd(-e1dw, e2dw, -dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16495,8 +15577,6 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
@@ -16512,20 +15592,15 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, -dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, -dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16570,8 +15645,6 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -16585,24 +15658,17 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd(e1dw, e2dw, -dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16646,8 +15712,6 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
@@ -16663,20 +15727,15 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, -dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, -dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16721,8 +15780,6 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
   ELEM_TYPE2X e1dw{}, e2dw{}, dest{};
 
@@ -16736,24 +15793,17 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and
-	  vecRegs_.read(vs2, ix, group, e2) and
-	  vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-	  dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd(-e1dw, e2dw, dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
-
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16798,8 +15848,6 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(fs1);
   ELEM_TYPE2X e2dw{}, dest{};
@@ -16815,20 +15863,15 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs2, ix, group, e2) and vecRegs_.read(vd, ix, group2x, dest))
-        {
-	  e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
-          dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, dest);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs2, ix, group, e2);
+      vecRegs_.read(vd, ix, group2x, dest);
+
+      e2dw = fpConvertTo<ELEM_TYPE2X, true>(e2);
+      dest = fusedMultiplyAdd<ELEM_TYPE2X>(e1dw, e2dw, dest);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16871,8 +15914,6 @@ void
 Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -16883,19 +15924,13 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFsqrt(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = doFsqrt(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -16933,25 +15968,16 @@ void
 Hart<URV>::vfmerge(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		   unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
+      vecRegs_.read(vs1, ix, group, e1);
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = vecRegs_.isActive(0, ix) ? e2 : e1;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -17007,18 +16033,12 @@ void
 Hart<URV>::vfmv_v_f(unsigned vd, unsigned rs1, unsigned group,
 		    unsigned start, unsigned elems)
 {
-  unsigned errors = 0;
-  (void)errors;
-  ELEM_TYPE e1{};
-  e1 = fpRegs_.read<ELEM_TYPE>(rs1);
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(rs1);
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (not vecRegs_.write(vd, ix, group, e1))
-	errors++;
+      vecRegs_.write(vd, ix, group, e1);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -17074,8 +16094,6 @@ void
 Hart<URV>::vmfeq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17086,24 +16104,20 @@ Hart<URV>::vmfeq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    {
-	      if (isSnan(e1) or isSnan(e2))
-		orFcsrFlags(FpFlags::Invalid);
-	    }
-	  else
-	    flag = e1 == e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	{
+	  if (isSnan(e1) or isSnan(e2))
+	    orFcsrFlags(FpFlags::Invalid);
+	}
+      else
+	flag = e1 == e2;
+
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17139,8 +16153,6 @@ void
 Hart<URV>::vmfeq_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
@@ -17152,24 +16164,18 @@ Hart<URV>::vmfeq_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    {
-	      if (isSnan(e1) or isSnan(e2))
-		orFcsrFlags(FpFlags::Invalid);
-	    }
-	  else
-	    flag = e1 == e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	{
+	  if (isSnan(e1) or isSnan(e2))
+	    orFcsrFlags(FpFlags::Invalid);
+	}
+      else
+	flag = e1 == e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17204,8 +16210,6 @@ void
 Hart<URV>::vmfne_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17216,24 +16220,20 @@ Hart<URV>::vmfne_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  bool flag = true;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    {
-	      if (isSnan(e1) or isSnan(e2))
-		orFcsrFlags(FpFlags::Invalid);
-	    }
-	  else
-	    flag = e1 != e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      bool flag = true;
+      if (std::isnan(e1) or std::isnan(e2))
+	{
+	  if (isSnan(e1) or isSnan(e2))
+	    orFcsrFlags(FpFlags::Invalid);
+	}
+      else
+	flag = e1 != e2;
+
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17269,8 +16269,6 @@ void
 Hart<URV>::vmfne_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
@@ -17282,24 +16280,18 @@ Hart<URV>::vmfne_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  bool flag = true;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    {
-	      if (isSnan(e1) or isSnan(e2))
-		orFcsrFlags(FpFlags::Invalid);
-	    }
-	  else
-	    flag = e1 != e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      bool flag = true;
+      if (std::isnan(e1) or std::isnan(e2))
+	{
+	  if (isSnan(e1) or isSnan(e2))
+	    orFcsrFlags(FpFlags::Invalid);
+	}
+      else
+	flag = e1 != e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17334,8 +16326,6 @@ void
 Hart<URV>::vmflt_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17346,21 +16336,16 @@ Hart<URV>::vmflt_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    orFcsrFlags(FpFlags::Invalid);
-	  else
-	    flag = e1 < e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	orFcsrFlags(FpFlags::Invalid);
+      else
+	flag = e1 < e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17396,8 +16381,6 @@ void
 Hart<URV>::vmflt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
@@ -17409,21 +16392,15 @@ Hart<URV>::vmflt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    orFcsrFlags(FpFlags::Invalid);
-	  else
-	    flag = e1 < e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	orFcsrFlags(FpFlags::Invalid);
+      else
+	flag = e1 < e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17458,8 +16435,6 @@ void
 Hart<URV>::vmfle_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1 = ELEM_TYPE(), e2 = ELEM_TYPE();
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17470,21 +16445,16 @@ Hart<URV>::vmfle_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    orFcsrFlags(FpFlags::Invalid);
-	  else
-	    flag = e1 <= e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	orFcsrFlags(FpFlags::Invalid);
+      else
+	flag = e1 <= e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17520,8 +16490,6 @@ void
 Hart<URV>::vmfle_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
@@ -17533,21 +16501,15 @@ Hart<URV>::vmfle_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    orFcsrFlags(FpFlags::Invalid);
-	  else
-	    flag = e1 <= e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	orFcsrFlags(FpFlags::Invalid);
+      else
+	flag = e1 <= e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17582,8 +16544,6 @@ void
 Hart<URV>::vmfgt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
@@ -17595,21 +16555,15 @@ Hart<URV>::vmfgt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    orFcsrFlags(FpFlags::Invalid);
-	  else
-	    flag = e1 > e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	orFcsrFlags(FpFlags::Invalid);
+      else
+	flag = e1 > e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17644,8 +16598,6 @@ void
 Hart<URV>::vmfge_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(rs2);
 
@@ -17657,21 +16609,15 @@ Hart<URV>::vmfge_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  bool flag = false;
-	  if (std::isnan(e1) or std::isnan(e2))
-	    orFcsrFlags(FpFlags::Invalid);
-	  else
-	    flag = e1 >= e2;
-          if (not vecRegs_.writeMaskRegister(vd, ix, flag))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      bool flag = false;
+      if (std::isnan(e1) or std::isnan(e2))
+	orFcsrFlags(FpFlags::Invalid);
+      else
+	flag = e1 >= e2;
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
 }
 
 
@@ -17706,8 +16652,6 @@ void
 Hart<URV>::vfclass_v(unsigned vd, unsigned vs1, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17718,18 +16662,12 @@ Hart<URV>::vfclass_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
-	  INT_TYPE dest = fpClassifyRiscv(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
+      INT_TYPE dest = fpClassifyRiscv(e1);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -17768,8 +16706,6 @@ void
 Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17780,19 +16716,14 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  using UINT_TYPE = typename getSameWidthUintType<ELEM_TYPE>::type;
-	  UINT_TYPE dest = fpConvertTo<UINT_TYPE>(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      using UINT_TYPE = typename getSameWidthUintType<ELEM_TYPE>::type;
+      UINT_TYPE dest = fpConvertTo<UINT_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -17831,8 +16762,6 @@ void
 Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -17843,19 +16772,14 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
-	  INT_TYPE dest = fpConvertTo<INT_TYPE>(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
+      INT_TYPE dest = fpConvertTo<INT_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -17956,8 +16880,6 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 {
   using UINT_TYPE = typename getSameWidthUintType<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   UINT_TYPE e1{0};
   ELEM_TYPE dest{};
 
@@ -17969,18 +16891,13 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  dest = fpConvertTo<ELEM_TYPE>(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = fpConvertTo<ELEM_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18021,8 +16938,6 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 {
   using INT_TYPE = typename getSameWidthIntType<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   INT_TYPE e1{0};
   ELEM_TYPE dest{};
 
@@ -18034,18 +16949,13 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  dest = fpConvertTo<ELEM_TYPE>(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = fpConvertTo<ELEM_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18084,8 +16994,6 @@ void
 Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   unsigned group2x = group*2;
 
@@ -18097,21 +17005,16 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          using UINT_TYPE   = typename getSameWidthUintType<ELEM_TYPE>::type;
-          using UINT_TYPE2X = typename makeDoubleWide<UINT_TYPE>::type;
-	  UINT_TYPE2X dest = fpConvertTo<UINT_TYPE2X>(e1);
+      vecRegs_.read(vs1, ix, group, e1);
 
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      using UINT_TYPE   = typename getSameWidthUintType<ELEM_TYPE>::type;
+      using UINT_TYPE2X = typename makeDoubleWide<UINT_TYPE>::type;
+      UINT_TYPE2X dest = fpConvertTo<UINT_TYPE2X>(e1);
+
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18157,8 +17060,6 @@ void
 Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   unsigned group2x = group*2;
 
@@ -18170,21 +17071,16 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          using INT_TYPE   = typename getSameWidthIntType<ELEM_TYPE>::type;
-          using INT_TYPE2X = typename makeDoubleWide<INT_TYPE>::type;
-	  INT_TYPE2X dest = fpConvertTo<INT_TYPE2X>(e1);
+      vecRegs_.read(vs1, ix, group, e1);
 
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      using INT_TYPE   = typename getSameWidthIntType<ELEM_TYPE>::type;
+      using INT_TYPE2X = typename makeDoubleWide<INT_TYPE>::type;
+      INT_TYPE2X dest = fpConvertTo<INT_TYPE2X>(e1);
+
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18306,8 +17202,6 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
   using FP_TYPE2X   = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   FP_TYPE2X dest{};
   unsigned group2x = group*2;
@@ -18320,18 +17214,13 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  dest = fpConvertTo<FP_TYPE2X>(e1);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = fpConvertTo<FP_TYPE2X>(e1);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18393,8 +17282,6 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
   using FP_TYPE2X   = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   FP_TYPE2X dest{};
   unsigned group2x = group*2;
@@ -18407,18 +17294,13 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  dest = fpConvertTo<FP_TYPE2X>(e1);
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = fpConvertTo<FP_TYPE2X>(e1);
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18479,8 +17361,6 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{};
   ELEM_TYPE2X dest{};
   unsigned group2x = group*2;
@@ -18493,23 +17373,18 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = fpConvertTo<ELEM_TYPE2X, false>(e1);
-          if (isSnan(dest))
-            {
-              dest = std::numeric_limits<ELEM_TYPE2X>::quiet_NaN();
-              raiseSimulatorFpFlags(FpFlags::Invalid);
-            }
-          if (not vecRegs_.write(vd, ix, group2x, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = fpConvertTo<ELEM_TYPE2X, false>(e1);
+      if (isSnan(dest))
+	{
+	  dest = std::numeric_limits<ELEM_TYPE2X>::quiet_NaN();
+	  raiseSimulatorFpFlags(FpFlags::Invalid);
+	}
+      vecRegs_.write(vd, ix, group2x, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18557,8 +17432,6 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
   using ELEM_TYPE2X  = typename makeDoubleWide<ELEM_TYPE>::type;
   using FLOAT_TYPE2X = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   FLOAT_TYPE2X e1{};
   unsigned group2x = group*2;
 
@@ -18570,19 +17443,12 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1))
-        {
-	  ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
-
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group2x, e1);
+      ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18642,8 +17508,6 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
   using ELEM_TYPE2X  = typename makeDoubleWide<ELEM_TYPE>::type;
   using FLOAT_TYPE2X = typename getSameWidthFloatType<ELEM_TYPE2X>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   FLOAT_TYPE2X e1{};
   unsigned group2x = group*2;
 
@@ -18655,19 +17519,12 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1))
-        {
-	  ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
-
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group2x, e1);
+      ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18827,8 +17684,6 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
   using FLOAT_TYPE  = typename getSameWidthFloatType<ELEM_TYPE>::type;
   using UINT_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   UINT_TYPE2X e1{0};
   FLOAT_TYPE dest{};
   unsigned group2x = group*2;
@@ -18841,18 +17696,12 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1))
-        {
-	  dest = fpConvertTo<FLOAT_TYPE>(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group2x, e1);
+      dest = fpConvertTo<FLOAT_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18903,8 +17752,6 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
   using FLOAT_TYPE = typename getSameWidthFloatType<ELEM_TYPE>::type;
   using INT_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   INT_TYPE2X e1{0};
   FLOAT_TYPE dest{};
   unsigned group2x = group*2;
@@ -18917,18 +17764,12 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1))
-        {
-	  dest = fpConvertTo<FLOAT_TYPE>(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group2x, e1);
+      dest = fpConvertTo<FLOAT_TYPE>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -18978,8 +17819,6 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE2X e1{};
   ELEM_TYPE dest{};
   unsigned group2x = group*2;
@@ -18992,18 +17831,12 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group2x, e1))
-        {
-	  dest = fpConvertTo<ELEM_TYPE, false>(e1);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group2x, e1);
+      dest = fpConvertTo<ELEM_TYPE, false>(e1);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-  assert(errors == 0);
 }
 
 
@@ -19095,13 +17928,10 @@ void
 Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2);
 
   ELEM_TYPE e1{}, result{e2};
 
@@ -19113,10 +17943,8 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
         continue;
 
       anyActive = true;
-      if (vecRegs_.read(vs1, ix, group, e1))
-        result = doFadd(result, e1);
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      result = doFadd(result, e1);
     }
 
   // Note: NaN canonicalization when there are no active elements
@@ -19125,10 +17953,7 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   if (not anyActive and std::isnan(result))
     result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
 }
 
 
@@ -19172,13 +17997,10 @@ void
 Hart<URV>::vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2);
   
   ELEM_TYPE e1{}, result{e2};
 
@@ -19187,16 +18009,11 @@ Hart<URV>::vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-	result = doFadd(result, e1);
-      else
-	errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      result = doFadd(result, e1);
     }
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
 }
 
 
@@ -19240,13 +18057,10 @@ void
 Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2);
 
   ELEM_TYPE e1{}, result{e2};
 
@@ -19255,16 +18069,11 @@ Hart<URV>::vfredmin_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        result = doFmin(result, e1);
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      result = doFmin(result, e1);
     }
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
   updateAccruedFpBits();
 }
 
@@ -19308,13 +18117,10 @@ void
 Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e2{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, e2);
 
   ELEM_TYPE e1{}, result{e2};
 
@@ -19323,16 +18129,11 @@ Hart<URV>::vfredmax_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        result = doFmax(result, e1);
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      result = doFmax(result, e1);
     }
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
   updateAccruedFpBits();
 }
 
@@ -19378,13 +18179,10 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE2X result{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result);
 
   ELEM_TYPE e1{};
 
@@ -19396,13 +18194,9 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
         continue;
 
       anyActive = true;
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-          result           = doFadd(result, e1dw);
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      result           = doFadd(result, e1dw);
     }
 
   // Note: NaN canonicalization when there are no active elements
@@ -19410,10 +18204,7 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   if (not anyActive and std::isnan(result))
     result = std::numeric_limits<decltype(result)>::quiet_NaN();
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
 }
 
 
@@ -19459,13 +18250,10 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
 {
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE2X result{};
   unsigned scalarElemIx = 0, scalarElemGroupX8 = 8;
 
-  if (not vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
+  vecRegs_.read(vs2, scalarElemIx, scalarElemGroupX8, result);
   
   ELEM_TYPE e1{};
 
@@ -19474,19 +18262,13 @@ Hart<URV>::vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group
       if (masked and not vecRegs_.isActive(0, ix))
 	continue;
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-	{
-	  ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
-	  result = doFadd(result, e1dw);
-	}
-      else
-	errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      ELEM_TYPE2X e1dw = fpConvertTo<ELEM_TYPE2X, true>(e1);
+      result = doFadd(result, e1dw);
     }
 
-  if (not vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result))
-    errors++;
-
-  assert(errors == 0);
+  vecRegs_.write(vd, scalarElemIx, scalarElemGroupX8, result);
 }
 
 
@@ -19530,8 +18312,6 @@ void
 Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
 
   bool inv = false, dbz = false;
@@ -19544,17 +18324,13 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  bool edbz = false, einv = false;  // Element divide-by-zero and invalid
-	  dest = doFrsqrt7(e1, edbz, einv);
-	  dbz = dbz or edbz;
-	  inv = inv or einv;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      bool edbz = false, einv = false;  // Element divide-by-zero and invalid
+      dest = doFrsqrt7(e1, edbz, einv);
+      dbz = dbz or edbz;
+      inv = inv or einv;
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   clearSimulatorFpFlags();
@@ -19563,8 +18339,6 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
   if (dbz) raiseSimulatorFpFlags(FpFlags::DivByZero);
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -19602,8 +18376,6 @@ void
 Hart<URV>::vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
 		     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
 
   FpFlags flags = FpFlags::None;
@@ -19617,21 +18389,15 @@ Hart<URV>::vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  FpFlags elemFlags = FpFlags::None;
-	  dest = doFrec7(e1, mode, elemFlags);
-	  flags = FpFlags(unsigned(flags) | unsigned(elemFlags));
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      FpFlags elemFlags = FpFlags::None;
+      dest = doFrec7(e1, mode, elemFlags);
+      flags = FpFlags(unsigned(flags) | unsigned(elemFlags));
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   orFcsrFlags(flags);
-
-  assert(errors == 0);
 }
 
 
@@ -19669,8 +18435,6 @@ void
 Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -19681,19 +18445,14 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = doFmin(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+
+      dest = doFmin(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -19734,8 +18493,6 @@ void
 Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -19747,19 +18504,13 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFmin(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = doFmin(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -19797,8 +18548,6 @@ void
 Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -19809,19 +18558,14 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = doFmax(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
+
+      dest = doFmax(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -19862,8 +18606,6 @@ void
 Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -19875,19 +18617,13 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = doFmax(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+
+      dest = doFmax(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
 
   updateAccruedFpBits();
-
-  assert(errors == 0);
 }
 
 
@@ -19926,8 +18662,6 @@ void
 Hart<URV>::vfsgnj_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
                     unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -19938,17 +18672,12 @@ Hart<URV>::vfsgnj_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = std::copysign(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = std::copysign(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -19989,8 +18718,6 @@ void
 Hart<URV>::vfsgnj_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		    unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -20002,17 +18729,10 @@ Hart<URV>::vfsgnj_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = std::copysign(e1, e2);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      vecRegs_.read(vs1, ix, group, e1);
+      dest = std::copysign(e1, e2);
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
@@ -20051,8 +18771,6 @@ void
 Hart<URV>::vfsgnjn_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20063,18 +18781,13 @@ Hart<URV>::vfsgnjn_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-          dest = std::copysign(e1, e2);
-	  dest = -dest;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      dest = std::copysign(e1, e2);
+      dest = -dest;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -20115,8 +18828,6 @@ void
 Hart<URV>::vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -20128,18 +18839,12 @@ Hart<URV>::vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-          dest = std::copysign(e1, e2);
-	  dest = -dest;
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
 
-  assert(errors == 0);
+      dest = std::copysign(e1, e2);
+      dest = -dest;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -20178,8 +18883,6 @@ void
 Hart<URV>::vfsgnjx_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, e2{}, dest{};
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -20190,23 +18893,18 @@ Hart<URV>::vfsgnjx_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1) and vecRegs_.read(vs2, ix, group, e2))
-        {
-	  int s1 = (std::signbit(e1) == 0) ? 0 : 1;
-	  int s2 = (std::signbit(e2) == 0) ? 0 : 1;
-	  int sign = s1 ^ s2;
-	  ELEM_TYPE x{};
-	  if (sign)
-	    x = -x;
-	  dest = std::copysign(e1, x);
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
-    }
+      vecRegs_.read(vs1, ix, group, e1);
+      vecRegs_.read(vs2, ix, group, e2);
 
-  assert(errors == 0);
+      int s1 = (std::signbit(e1) == 0) ? 0 : 1;
+      int s2 = (std::signbit(e2) == 0) ? 0 : 1;
+      int sign = s1 ^ s2;
+      ELEM_TYPE x{};
+      if (sign)
+	x = -x;
+      dest = std::copysign(e1, x);
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -20247,8 +18945,6 @@ void
 Hart<URV>::vfsgnjx_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked)
 {
-  unsigned errors = 0;
-  (void)errors;
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
@@ -20260,24 +18956,18 @@ Hart<URV>::vfsgnjx_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 	  continue;
 	}
 
-      if (vecRegs_.read(vs1, ix, group, e1))
-        {
-	  int s1 = (std::signbit(e1) == 0) ? 0 : 1;
-	  int s2 = (std::signbit(e2) == 0) ? 0 : 1;
-	  int sign = s1 ^ s2;
-	  ELEM_TYPE x{};
-	  if (sign)
-	    x = -x;
-	  dest = std::copysign(e1, x);
+      vecRegs_.read(vs1, ix, group, e1);
 
-          if (not vecRegs_.write(vd, ix, group, dest))
-            errors++;
-        }
-      else
-        errors++;
+      int s1 = (std::signbit(e1) == 0) ? 0 : 1;
+      int s2 = (std::signbit(e2) == 0) ? 0 : 1;
+      int sign = s1 ^ s2;
+      ELEM_TYPE x{};
+      if (sign)
+	x = -x;
+      dest = std::copysign(e1, x);
+
+      vecRegs_.write(vd, ix, group, dest);
     }
-
-  assert(errors == 0);
 }
 
 
