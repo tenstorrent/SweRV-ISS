@@ -288,6 +288,12 @@ namespace WdRiscv
     bool lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
     { return hart_->lastLdStAddress(virtAddr, physAddr); }
 
+    bool lastStVal(uint64_t& value) const
+    {
+      uint64_t addr;
+      return hart_->lastStore(addr, value);
+    }
+
     bool misalignedLdSt(bool& misal) const
     { return hart_->misalignedLdSt(misal); }
 
