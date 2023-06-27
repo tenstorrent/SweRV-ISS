@@ -34,7 +34,7 @@ Hart<URV>::enableRvf(bool flag)
 {
   enableExtension(RvExtension::F, flag);
   csRegs_.enableRvf(flag);
-  if (not flag)
+  if (not flag and not isRvs())
     setFpStatus(FpStatus::Off);
 }
 
