@@ -26,7 +26,6 @@ namespace WdRiscv
     uint8_t hartIx_ = 0;
     uint8_t size_ = 0;
     bool isRead_ = false;
-    bool internal_ = false;
     bool failRead_ = false;
     bool canceled_ = false;
 
@@ -107,18 +106,14 @@ namespace WdRiscv
 
     ~Mcm();
 
-    /// Initiate an out of order read for a load instruction. If the
-    /// the read is external, we read the data from the global memory
-    /// and keep for a later compare to the RTL data (we do not perform
-    /// an immediate compare becuase the instruction may later be canceled).
-    /// If the the read is internal we defer it till the corresponding
-    /// instruction is retired because some of the store instructions
-    /// from which to obtain forwarded data may not have yet appeared.
-    /// Return true on success.  Return false if load is exernal but
-    /// corresponding memory is not readable.
+    /// Initiate an out of order read for a load instruction. If a
+    /// preceding overlapping store has not yet left the merge/store
+    /// buffer then forward data from that store to the read operation;
+    /// otherwise, get the data from glbal memory. Return true on
+    /// success and false if global memory is not readable (in the
+    /// case where we do not forward).
     bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		uint64_t physAddr, unsigned size, uint64_t rtlData,
-		bool internal);
+		uint64_t physAddr, unsigned size, uint64_t rtlData);
     
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where
@@ -265,8 +260,6 @@ namespace WdRiscv
 
     bool instrHasRead(const McmInstr& instr) const;
     bool instrHasWrite(const McmInstr& instr) const;
-
-    bool checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const;
 
     bool checkStoreComplete(const McmInstr& instr) const;
 

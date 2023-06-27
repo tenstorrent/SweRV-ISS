@@ -240,8 +240,16 @@ namespace WdRiscv
     unsigned mergeBufferSize() const
     { return mbSize_; }
 
+    /// Initiate an out of order read operation for a load
+    /// instruction. If a preceding overlapping store has not yet left
+    /// the merge/store buffer then forward data from that store to
+    /// the read operation; otherwise, get the data from glbal
+    /// memory. Return true on success and false if global memory is
+    /// not readable (in the case where we do not forward). Tag is the
+    /// instruction number of the load instruction. Addr/size/data are
+    /// address,size, and data of the read operation.
     bool mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag, uint64_t addr,
-		 unsigned size, uint64_t data, bool internal);
+		 unsigned size, uint64_t data);
 
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where

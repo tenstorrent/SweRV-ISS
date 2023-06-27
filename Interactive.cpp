@@ -1775,10 +1775,10 @@ Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
   // Format: [hart=<number>] [time=<number>] mread <instruction-tag> <physical-address> <size> <rtl-data> <i>|<é>
-  if (tokens.size() != 6)
+  if (tokens.size() < 5)
     {
       std::cerr << "Invalid mread command: " << line << '\n';
-      std::cerr << "  Expecting: mread <tag> <addr> <size> <data> <i>|<e>\n";
+      std::cerr << "  Expecting: mread <tag> <addr> <size> <data>\n";
       return false;
     }
 
@@ -1803,15 +1803,7 @@ Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
   if (not parseCmdLineNumber("data", tokens.at(4), data))
     return false;
 
-  const auto& ie = tokens.at(5);
-  if (ie.empty() or (ie.at(0) != 'i' and ie.at(0) != 'e'))
-    {
-      std::cerr << "Invalid internal/external token: '" << ie << "' -- expecting  'i' or 'e'\n";
-      return false;
-    }
-  bool internal = ie.at(0) == 'i';
-
-  return system_.mcmRead(hart, this->time_, tag, addr, size, data, internal);
+  return system_.mcmRead(hart, this->time_, tag, addr, size, data);
 }
 
 
