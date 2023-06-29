@@ -1059,12 +1059,12 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
       case McmRead:
         if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
-                                msg.size, msg.value, msg.flags))
+                                msg.size, msg.value))
           reply.type = Invalid;
         if (commandLog)
-          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 " %s\n",
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
-                  msg.value, msg.flags? "i" : "e");
+                  msg.value);
         break;
 
       case McmInsert:

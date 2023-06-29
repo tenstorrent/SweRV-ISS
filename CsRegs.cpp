@@ -589,6 +589,51 @@ CsRegs<URV>::enableSscofpmf(bool flag)
     }
   else
     csr->setImplemented(flag);
+
+  mPerfRegs_.enableOverflow(flag);
+  if (flag and not mPerfRegs_.ovfCallback_)
+    {
+      // Define callback to be invoked when a counter overflows. The
+      // callback sets the LCOF bit of the MIP CSR.
+      mPerfRegs_.ovfCallback_ = [this](unsigned ix) {
+	assert(ix < 29);
+
+	// Get value of MHPMEVENT CSR corresponding to counter.
+	uint64_t mhpmVal = 0;
+	if (not this->getMhpmeventValue(ix, mhpmVal))
+	  return; // Should not happen.
+
+	MhpmeventFields fields(mhpmVal);
+	if (fields.bits_.OF)
+	  return;   // Overflow bit already set: No interrupt.
+
+	fields.bits_.OF = 1;
+
+	CsrNumber evnum = CsrNumber(unsigned(CsrNumber::MHPMEVENT3) + ix);
+	if (rv32_)
+	  evnum = CsrNumber(unsigned(CsrNumber::MHPMEVENTH3) + ix);
+	auto event = this->findCsr(evnum);
+	if (not event)
+	  {
+	    assert(0);
+	    return;
+	  }
+
+	if (rv32_)
+	  event->poke(fields.value_ >> 32);
+	else
+	  event->poke(fields.value_);
+	this->recordWrite(evnum);
+
+	auto mip = this->findCsr(CsrNumber::MIP);
+	if (mip)
+	  {
+	    URV newVal = mip->read() | (1 << URV(InterruptCause::LCOF));
+	    mip->poke(newVal);
+	    recordWrite(CsrNumber::MIP);
+	  }
+      };
+    }
 }
 
 
@@ -862,9 +907,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       return true;
     }
 
-  if (num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31)
-    value = legalizeMhpmevent(num, value);
-  else if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
+  if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
     {
       URV prev = 0;
       peek(num, prev);
@@ -874,7 +917,10 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
   csr->write(value);
   recordWrite(num);
 
-  if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
+  if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
+      (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
+    updateCounterControl(num);
+  else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
     updateFcsrGroupForWrite(num, value);   // fflags and frm are part of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
     updateVcsrGroupForWrite(num, value);   // vxsat and vrm are part of vcsr
@@ -1404,7 +1450,7 @@ CsRegs<URV>::defineMachineRegs()
 
   // MIP is read-only for CSR instructions but the bits corresponding
   // to defined interrupts are modifiable.
-  defineCsr("mip", CsrNumber::MIP, mand, imp, 0, rom, mieMask);
+  defineCsr("mip", CsrNumber::MIP, mand, imp, 0, rom, mieMask | 0x3000);
 
   // Physical memory protection. Odd-numbered PMPCFG are only present
   // in 32-bit implementations.
@@ -2197,9 +2243,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       return true;
     }
 
-  if (num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31)
-    value = legalizeMhpmevent(num, value);
-  else if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
+  if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
     {
       URV prev = 0;
       peek(num, prev);
@@ -2213,7 +2257,10 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
 
   csr->poke(value);
 
-  if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
+  if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
+      (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
+    updateCounterControl(num);
+  else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
     updateFcsrGroupForPoke(num, value);   // fflags and frm are parts of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
     updateVcsrGroupForPoke(num, value); // fflags and frm are parts of fcsr
@@ -2504,19 +2551,26 @@ CsRegs<URV>::updateCounterPrivilege()
 
 
 template <typename URV>
-URV
-CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
+void
+CsRegs<URV>::updateCounterControl(CsrNumber csrn)
 {
-  bool enableUser = true;
-  bool enableMachine = true;
-  URV event = value;
-
-  if (perModeCounterControl_)
+  unsigned counterIx = 0;
+  if (not getIndexOfMhpmevent(csrn, counterIx))
     {
-      enableUser = ! ((value >> 16) & 1);
-      enableMachine = ! ((value >> 19) & 1);
-      event = value & URV(0xffff);
+      assert(0);
+      return;
     }
+
+  // This gets 64-bit value (MHPMEVEN and MHPMEVENTH in rv32).
+  uint64_t value = 0;
+  if (not getMhpmeventValue(counterIx, value))
+    {
+      assert(0);
+      return;
+    }
+
+  uint32_t mask = ~uint32_t(0);  // All privilege modes enabled.
+  URV event = (value << 8 >> 8);  // Drop top 8 bits of 64-bit value.
 
   if (hasPerfEventSet_)
     {
@@ -2526,16 +2580,25 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
   else
     event = std::min(event, maxEventId_);
 
-  if (perModeCounterControl_)
-    value = (value & ~URV(0xffff)) | event;
-  else
-    value = event;
+  if (cofEnabled_)
+    {
+      MhpmeventFields fields(value);
+      event = fields.bits_.EVENT;
+      if (fields.bits_.MINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::Machine, false);
+      if (fields.bits_.SINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::Supervisor, false);
+      if (fields.bits_.UINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::User, false);
+      if (fields.bits_.VSINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::Supervisor, true);
+      if (fields.bits_.VUINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::User, true);
+    }
 
-  unsigned counterIx = unsigned(number) - unsigned(CsrNumber::MHPMEVENT3);
-  assignEventToCounter(event, counterIx, enableUser, enableMachine);
-
-  return value;
+  assignEventToCounter(event, counterIx, mask);
 }
+
 
 template <typename URV>
 void

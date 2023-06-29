@@ -1675,10 +1675,6 @@ namespace WdRiscv
         }
     }
 
-    /// Enable per-privilege-mode performance-counter control.
-    void enablePerModeCounterControl(bool flag)
-    { csRegs_.enablePerModeCounterControl(flag); }
-
     /// Invalidate whole cache.
     void invalidateDecodeCache();
 

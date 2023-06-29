@@ -524,4 +524,25 @@ namespace WdRiscv
   };
 
 
+  /// Structure used to unpack/pack the fields of the mhpmevent register
+  union MhpmeventFields
+  {
+    MhpmeventFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;  // register value
+    struct
+    {
+      uint64_t EVENT : 56;
+      unsigned res   : 2;
+      unsigned VUINH : 1;
+      unsigned VSINH : 1;
+      unsigned UINH  : 1;
+      unsigned SINH  : 1;  // Supervisor inhibit
+      unsigned MINH  : 1;  // Machine inhibit
+      unsigned OF    : 1;
+    } bits_;
+  };
+
 }

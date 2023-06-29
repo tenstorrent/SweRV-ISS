@@ -243,6 +243,36 @@ namespace WdRiscv
       MHPMEVENT30 = 0x33e,
       MHPMEVENT31 = 0x33f,
 
+      MHPMEVENTH3 = 0x723,
+      MHPMEVENTH4 = 0x724,
+      MHPMEVENTH5 = 0x725,
+      MHPMEVENTH6 = 0x726,
+      MHPMEVENTH7 = 0x727,
+      MHPMEVENTH8 = 0x728,
+      MHPMEVENTH9 = 0x729,
+      MHPMEVENTH10 = 0x72a,
+      MHPMEVENTH11 = 0x72b,
+      MHPMEVENTH12 = 0x72c,
+      MHPMEVENTH13 = 0x72d,
+      MHPMEVENTH14 = 0x72e,
+      MHPMEVENTH15 = 0x72f,
+      MHPMEVENTH16 = 0x730,
+      MHPMEVENTH17 = 0x731,
+      MHPMEVENTH18 = 0x732,
+      MHPMEVENTH19 = 0x733,
+      MHPMEVENTH20 = 0x734,
+      MHPMEVENTH21 = 0x735,
+      MHPMEVENTH22 = 0x736,
+      MHPMEVENTH23 = 0x737,
+      MHPMEVENTH24 = 0x738,
+      MHPMEVENTH25 = 0x739,
+      MHPMEVENTH26 = 0x73a,
+      MHPMEVENTH27 = 0x73b,
+      MHPMEVENTH28 = 0x73c,
+      MHPMEVENTH29 = 0x73d,
+      MHPMEVENTH30 = 0x73e,
+      MHPMEVENTH31 = 0x73f,
+
       // Supervisor mode registers.
 
       // Supervisor trap setup.
@@ -1053,21 +1083,17 @@ namespace WdRiscv
     { triggers_.getTriggerChange(trigger, t1, t2, t3); }
 
     /// Associate given event number with given counter.  Subsequent
-    /// calls to updatePerofrmanceCounters(en) will cause given
-    /// counter to count up by 1 in user mode if user is true and in
-    /// machine mode if machine is true. Return true on
-    /// success. Return false if counter number is out of bounds.
-    bool assignEventToCounter(URV event, unsigned counter,
-                              bool user, bool machine)
-    {
-      return mPerfRegs_.assignEventToCounter(event, counter,
-                                             user, machine);
-    }
+    /// calls to Hart::updatePerofrmanceCounters will cause given
+    /// counter to count up by 1 if enabled for the hart privilege
+    /// mode.  Return true on success. Return false if counter number
+    /// is out of bounds. The mask parameter is a bit-field
+    /// corresponding to the privilege modes for which the event is
+    /// enabled (see PerfRegs::PrivModeMask and privModeToMask).
+    bool assignEventToCounter(URV event, unsigned counter, uint32_t mask)
+    { return mPerfRegs_.assignEventToCounter(event, counter, mask); }
 
     bool applyPerfEventAssign()
-    {
-      return mPerfRegs_.applyPerfEventAssign();
-    }
+    { return mPerfRegs_.applyPerfEventAssign(); }
 
     /// Return true if there is one or more tripped trigger action set
     /// to "enter debug mode".
@@ -1435,13 +1461,9 @@ namespace WdRiscv
     /// Return a legal mstatus value (chanign mpp if necessary).
     URV legalizeMstatusValue(URV value) const;
 
-    /// Legalize mhpevent and assign it to correspondign counter.
-    /// Return legalized value.
-    URV legalizeMhpmevent(CsrNumber number, URV value);
-
-    /// Enable per-privilege-mode performance-counter control.
-    void enablePerModeCounterControl(bool flag)
-    { perModeCounterControl_ = flag; }
+    /// Called after an MHPMEVENT CSR is written/poked to update the
+    /// contorl of the underlying counter.
+    void updateCounterControl(CsrNumber number);
 
     /// Turn on/off virtual mode. When virtual mode is on read/write to
     /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
@@ -1502,6 +1524,66 @@ namespace WdRiscv
       return fields.bits_.PBMTE;
     }
 
+    /// Set ix to the counter index corresponding to the given
+    /// MHPMEVENT CSR number (0 for MHPMEVENT3, 1 for MHPMEVENT4, ...)
+    /// Return true on success and false if number does not correspond
+    /// to an MHPMEVENT CSR.
+    bool getIndexOfMhpmevent(CsrNumber csrn, unsigned& ix) const
+    {
+      unsigned n = static_cast<unsigned>(csrn);
+      unsigned low = static_cast<unsigned>(CsrNumber::MHPMEVENT3);
+      unsigned high = static_cast<unsigned>(CsrNumber::MHPMEVENT31);
+      if (n >= low and n <= high)
+	{
+	  ix = n - low;
+	  return true;
+	}
+
+      if (rv32_)
+	{
+	  low = static_cast<unsigned>(CsrNumber::MHPMEVENTH3);
+	  high = static_cast<unsigned>(CsrNumber::MHPMEVENTH31);
+	  if (n >= low and n <= high)
+	    {
+	      ix = n - low;
+	      return true;
+	    }
+	}
+
+      return false;
+    }
+
+    /// Set value to the value of the MHPMEVENT register indexed by
+    /// the given index (0 corresponds to MHPMEVENT3).  For RV32 and
+    /// if counter-overflow is enabled, then use the MHPMEVENTH
+    /// registers to get the upper 64-bits of the returned value.
+    /// Return true on succes.  Return false leaving value unmodified
+    /// if index is out of bounds.
+    bool getMhpmeventValue(unsigned ix, uint64_t& value) const
+    {
+      if (ix >= 29)
+	return false;
+      
+      using CN = CsrNumber;
+      CN csrn = CN(unsigned(CN::MHPMEVENT3) + ix);
+      auto csr = findCsr(csrn);
+      if (not csr)
+	return false;
+
+      value = csr->read();
+
+      if (rv32_ and cofEnabled_)
+	  {
+	    CN hcsrn = CN(unsigned(CN::MHPMEVENTH3) + ix);
+	    auto hcsr = this->findCsr(hcsrn);
+	    if (not hcsr)
+	      return false;
+	    value |= uint64_t(hcsr->read()) << 32;
+	  }
+
+      return true;
+    }
+
   private:
 
     bool rv32_ = sizeof(URV) == 4;
@@ -1538,7 +1620,6 @@ namespace WdRiscv
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
 
-    bool perModeCounterControl_ = false;
     bool recordWrite_ = true;
     bool debugMode_ = false;
     bool virtMode_ = false;       // True if hart virtual (V) mode is on.

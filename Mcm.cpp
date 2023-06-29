@@ -60,8 +60,7 @@ Mcm<URV>::updateTime(const char* method, uint64_t time)
 template <typename URV>
 bool
 Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		 uint64_t physAddr, unsigned size, uint64_t rtlData,
-		 bool internal)
+		 uint64_t physAddr, unsigned size, uint64_t rtlData)
 {
   if (not updateTime("Mcm::readOp", time))
     return false;
@@ -89,7 +88,6 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = true;
-  op.internal_ = internal;
 
   if (size == 1)
     {
@@ -293,7 +291,6 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   op.hartIx_ = hartIx;
   op.size_ = size;
   op.isRead_ = false;
-  op.internal_ = false;
 
   if (not writeOnInsert_)
     hartPendingWrites_.at(hartIx).push_back(op);
@@ -850,41 +847,6 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
 }
 
 
-/// An external read op should not be able to forward
-template <typename URV>
-bool
-Mcm<URV>::checkExternalRead(Hart<URV>& hart, const MemoryOp& op) const
-{
-  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
-
-  if (op.isCanceled() or op.failRead_ or op.internal_ or op.instrTag_ >= instrVec.size())
-    {
-      cerr << "Error: Checking external read for a canceled/failed/internal op: "
-	   << "hart-id=" << hart.hartId() << " op-time=" << op.time_ << " op-instr-tag="
-	   << op.instrTag_ << '\n';
-      return false;
-    }
-
-  for (auto tag = op.instrTag_; tag > 0; --tag)
-    {
-      const auto& prev = instrVec.at(tag);
-      if (not prev.isStore_ or not prev.overlaps(op))
-	continue;
-      bool fail = not prev.complete_ or latestOpTime(prev) >= op.time_;
-      if (fail)
-	{
-	  cerr << "Error: External read op must not forward from store: hart-id="
-	       << hart.hartId() << " op-time=" << op.time_ << " op-instr-tag="
-	       << op.instrTag_ << " store-tag=" << prev.tag_ << '\n';
-	  return false;
-	}
-
-      // TBD FIX : Once op is covered by store instructions return true.
-    }
-  return true;
-}
-
-
 template <typename URV>
 bool
 Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
@@ -1152,11 +1114,6 @@ template <typename URV>
 bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
-#if 0
-  if (not op.internal_)
-    return false;
-#endif
-
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
   for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
