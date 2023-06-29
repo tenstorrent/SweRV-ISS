@@ -34,8 +34,7 @@ PerfRegs::config(unsigned numCounters)
   assert(numCounters < counters_.size());
 
   eventOfCounter_.resize(numCounters);
-  enableUser_.resize(numCounters);
-  enableMachine_.resize(numCounters);
+  enableMask_.resize(numCounters);
 }
 
 
@@ -51,8 +50,7 @@ PerfRegs::applyPerfEventAssign()
     return false;
 
   eventOfCounter_.at(pendingCounter_) = pendingEvent_;
-  enableUser_.at(pendingCounter_) = pendingUser_;
-  enableMachine_.at(pendingCounter_) = pendingMachine_;
+  enableMask_.at(pendingCounter_) = pendingMask_;
 
   return true;
 }

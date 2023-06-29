@@ -1235,13 +1235,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.perfCountFpLoadStore(flag);
     }
 
-  tag = "enable_per_mode_counter_control";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enablePerModeCounterControl(flag);
-    }
-
   for (std::string_view ztag : { "zba", "zbb", "zbc", "zbs", "zfh" , "zfhmin", "zknd",
 		     "zkne", "zknh", "zbkb", "zbkx", "zksed", "zksh"} )
     {

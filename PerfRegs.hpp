@@ -127,22 +127,23 @@ namespace WdRiscv
     friend class CsRegs<uint32_t>;
     friend class CsRegs<uint64_t>;
 
-    /// Define numCounters counters. These correspond to mhp
-    PerfRegs(unsigned numCounters = 0);
+    /// Define n counters (none if n is zero). Defined counters correspond
+    /// consecutively to CSRs mhpcounter3, mhpmcounter4 ...
+    PerfRegs(unsigned n = 0);
 
-    /// Configure numCounters counters initializing them to zero.  This
-    /// should not be used if some CSR registers are tied to the
-    /// counters in here.
-    void config(unsigned numCounters);
+    /// Chnage to n, number of defined counters. Defined counters correspond
+    /// consecutively to CSRs mhpcounter3, mhpmcounter4 ...
+    void config(unsigned n);
 
     /// Update (count-up) all the performance counters currently
-    /// associated with the given event and enabled for the given
-    /// mode.
+    /// associated with the given event, globally enabled in
+    /// perfControl, and enabled for the given mode.
     bool updateCounters(EventNumber event, uint32_t perfControl,
                         PrivilegeMode mode)
     {
-      bool user = (mode == PrivilegeMode::User);
-      bool machine = (mode == PrivilegeMode::Machine);
+      bool isVirt = false;
+      uint32_t mask = privModeToMask(mode, isVirt);
+
       for (unsigned counterIx = 0; counterIx < eventOfCounter_.size(); ++counterIx)
 	{
 	  if (event != eventOfCounter_.at(counterIx))
@@ -151,10 +152,12 @@ namespace WdRiscv
           // MHPMCOUNTER31 and they are indexed 0 to 29.
           if ((perfControl >> (3+counterIx)) & 1)
             {
-              bool enable = ((user and enableUser_.at(counterIx)) or
-                             (machine and enableMachine_.at(counterIx)));
-              if (enable)
-                counters_.at(counterIx)++;
+	      if (enableMask_.at(counterIx) & mask)
+		{
+		  uint64_t prev = counters_.at(counterIx)++;
+		  if (ovfEnabled_ and counters_.at(counterIx) < prev and ovfCallback_)
+		    ovfCallback_(counterIx);
+		}
             }
 	}
       return true;
@@ -162,11 +165,11 @@ namespace WdRiscv
 
     /// Associate given event number with given counter.  Subsequent
     /// calls to updatePerofrmanceCounters(en) will cause given
-    /// counter to count up by 1 in user mode if enableUser is true
-    /// and in machine mode if enableMachine is true. Return true on
-    /// success. Return false if counter number is out of bounds.
-    bool assignEventToCounter(uint64_t event, unsigned counter,
-                              bool enableUser, bool enableMachine)
+    /// counter to count up by 1 if this counter is enabled for the
+    /// hart privilege mode. The mask parameter is a bit-field
+    /// corresponding to the privilege modes for which the event is
+    /// enabled (see PerfRegs::PrivModeMask and privModeToMask).
+    bool assignEventToCounter(uint64_t event, unsigned counter, unsigned mask)
     {
       EventNumber eventId = EventNumber::None;
       if (userNumberToId_.empty())
@@ -179,8 +182,7 @@ namespace WdRiscv
 	}
       pendingEvent_ = eventId;
       pendingCounter_ = counter;
-      pendingUser_ = enableUser;
-      pendingMachine_ = enableMachine;
+      pendingMask_ = mask;
       hasPending_ = true;
       return true;
     }
@@ -194,6 +196,10 @@ namespace WdRiscv
     /// the corresponding event-id is associated with the event counter csr.
     void configEventNumber(uint64_t userNumber, EventNumber eventId)
     { userNumberToId_[userNumber] = eventId; }
+
+    /// Enable/disable counter overflow.
+    void enableOverflow(bool flag)
+    { ovfEnabled_ = flag; }
 
     /// Set id to event-id (tag from enum EventNumber) coresponding to the
     /// given event name returning true. Return false leaving id unmodified
@@ -209,6 +215,19 @@ namespace WdRiscv
 
   protected:
 
+    /// This is for documentation.
+    enum class PrivModeMask : uint32_t { U = 1, S = 2, M = 4, VU = 8, VS = 16 };
+
+    /// Return mask corresponding to given privilege mode and V bit.
+    uint32_t privModeToMask(PrivilegeMode mode, bool isVirt)
+    {
+      uint32_t n = static_cast<uint32_t>(mode);
+      n = n + 1;
+      if (isVirt)
+	n *= 8;
+      return n;
+    }
+
     bool applyPerfEventAssign();
 
     /// Reset all assosiations among events and counters.
@@ -219,11 +238,8 @@ namespace WdRiscv
     // Map counter index to event currently associated with counter.
     std::vector<EventNumber> eventOfCounter_;
 
-    // Map counter index to enable flag in user mode.
-    std::vector<bool> enableUser_;
-
-    // Map counter index to enable flag in machine mode.
-    std::vector<bool> enableMachine_;
+    // Map counter index to a word containing enable bits (1 bit per privielge mode).
+    std::vector<uint32_t> enableMask_;
 
     std::vector<uint64_t> counters_;
 
@@ -236,8 +252,11 @@ namespace WdRiscv
     // Pending event assignment to counter.
     EventNumber pendingEvent_ = EventNumber::None;
     unsigned pendingCounter_ = 0;
-    bool pendingUser_ = false;
-    bool pendingMachine_ = false;
+    uint32_t pendingMask_ = 0;
     bool hasPending_ = false;
+
+    // Called with counter index (0 corresponds to mhpmcounter3) on overflow.
+    std::function<void(unsigned)> ovfCallback_ = nullptr;
+    bool ovfEnabled_ = false;   // True if counter overflow enabled.
   };
 }

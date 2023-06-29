@@ -1053,21 +1053,17 @@ namespace WdRiscv
     { triggers_.getTriggerChange(trigger, t1, t2, t3); }
 
     /// Associate given event number with given counter.  Subsequent
-    /// calls to updatePerofrmanceCounters(en) will cause given
-    /// counter to count up by 1 in user mode if user is true and in
-    /// machine mode if machine is true. Return true on
-    /// success. Return false if counter number is out of bounds.
-    bool assignEventToCounter(URV event, unsigned counter,
-                              bool user, bool machine)
-    {
-      return mPerfRegs_.assignEventToCounter(event, counter,
-                                             user, machine);
-    }
+    /// calls to Hart::updatePerofrmanceCounters will cause given
+    /// counter to count up by 1 if enabled for the hart privilege
+    /// mode.  Return true on success. Return false if counter number
+    /// is out of bounds. The mask parameter is a bit-field
+    /// corresponding to the privilege modes for which the event is
+    /// enabled (see PerfRegs::PrivModeMask and privModeToMask).
+    bool assignEventToCounter(URV event, unsigned counter, uint32_t mask)
+    { return mPerfRegs_.assignEventToCounter(event, counter, mask); }
 
     bool applyPerfEventAssign()
-    {
-      return mPerfRegs_.applyPerfEventAssign();
-    }
+    { return mPerfRegs_.applyPerfEventAssign(); }
 
     /// Return true if there is one or more tripped trigger action set
     /// to "enter debug mode".
@@ -1439,10 +1435,6 @@ namespace WdRiscv
     /// Return legalized value.
     URV legalizeMhpmevent(CsrNumber number, URV value);
 
-    /// Enable per-privilege-mode performance-counter control.
-    void enablePerModeCounterControl(bool flag)
-    { perModeCounterControl_ = flag; }
-
     /// Turn on/off virtual mode. When virtual mode is on read/write to
     /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
     /// of virtual supervisor CSRs become illegal.
@@ -1538,7 +1530,6 @@ namespace WdRiscv
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
 
-    bool perModeCounterControl_ = false;
     bool recordWrite_ = true;
     bool debugMode_ = false;
     bool virtMode_ = false;       // True if hart virtual (V) mode is on.

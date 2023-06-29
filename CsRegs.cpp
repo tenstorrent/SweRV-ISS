@@ -589,6 +589,33 @@ CsRegs<URV>::enableSscofpmf(bool flag)
     }
   else
     csr->setImplemented(flag);
+
+  mPerfRegs_.enableOverflow(flag);
+  if (flag and not mPerfRegs_.ovfCallback_)
+    {
+      mPerfRegs_.ovfCallback_ = [this](unsigned ix) {
+	assert(ix < 29);
+	CsrNumber csrn = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3) + ix);
+	auto ctr = this->findCsr(csrn);
+	if (ctr)
+	  {
+	    MhpmeventFields fields(ctr->read());
+	    if (not fields.bits_.OF)
+	      {
+		fields.bits_.OF = 1;
+		ctr->poke(fields.value_);
+		this->recordWrite(csrn);
+		auto mip = this->findCsr(CsrNumber::MIP);
+		if (mip)
+		  {
+		    URV newVal = mip->read() | (1 << URV(InterruptCause::LCOF));
+		    mip->poke(newVal);
+		    recordWrite(CsrNumber::MIP);
+		  }
+	      }
+	  }
+      };
+    }
 }
 
 
@@ -1404,7 +1431,7 @@ CsRegs<URV>::defineMachineRegs()
 
   // MIP is read-only for CSR instructions but the bits corresponding
   // to defined interrupts are modifiable.
-  defineCsr("mip", CsrNumber::MIP, mand, imp, 0, rom, mieMask);
+  defineCsr("mip", CsrNumber::MIP, mand, imp, 0, rom, mieMask | 0x3000);
 
   // Physical memory protection. Odd-numbered PMPCFG are only present
   // in 32-bit implementations.
@@ -2507,16 +2534,8 @@ template <typename URV>
 URV
 CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
 {
-  bool enableUser = true;
-  bool enableMachine = true;
+  uint32_t mask = ~uint32_t(0);  // All privilege modes enabled.
   URV event = value;
-
-  if (perModeCounterControl_)
-    {
-      enableUser = ! ((value >> 16) & 1);
-      enableMachine = ! ((value >> 19) & 1);
-      event = value & URV(0xffff);
-    }
 
   if (hasPerfEventSet_)
     {
@@ -2526,13 +2545,31 @@ CsRegs<URV>::legalizeMhpmevent(CsrNumber number, URV value)
   else
     event = std::min(event, maxEventId_);
 
-  if (perModeCounterControl_)
-    value = (value & ~URV(0xffff)) | event;
-  else
-    value = event;
+  if (cofEnabled_)
+    {
+      uint64_t val64 = value;
+      if constexpr (sizeof(URV) == 4)
+	{
+	}
+      else
+	{
+	}
+      MhpmeventFields fields(val64);
+      event = fields.bits_.EVENT;
+      if (fields.bits_.MINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::Machine, false);
+      if (fields.bits_.SINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::Supervisor, false);
+      if (fields.bits_.UINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::User, false);
+      if (fields.bits_.VSINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::Supervisor, true);
+      if (fields.bits_.VUINH)
+	mask &= ~ mPerfRegs_.privModeToMask(PrivilegeMode::User, true);
+    }
 
   unsigned counterIx = unsigned(number) - unsigned(CsrNumber::MHPMEVENT3);
-  assignEventToCounter(event, counterIx, enableUser, enableMachine);
+  assignEventToCounter(event, counterIx, mask);
 
   return value;
 }
