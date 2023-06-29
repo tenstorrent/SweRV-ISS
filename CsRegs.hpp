@@ -487,6 +487,23 @@ namespace WdRiscv
     };
 
 
+  /// Return true if first csr number is smaller than the second.
+  inline bool operator< (CsrNumber a, CsrNumber b)
+  { return static_cast<unsigned>(a) < static_cast<unsigned>(b); }
+
+  /// Return true if first csr number is smaller than or equal the second.
+  inline bool operator<= (CsrNumber a, CsrNumber b)
+  { return static_cast<unsigned>(a) <= static_cast<unsigned>(b); }
+
+  /// Return true if first csr number is greater than the second.
+  inline bool operator> (CsrNumber a, CsrNumber b)
+  { return static_cast<unsigned>(a) > static_cast<unsigned>(b); }
+
+  /// Return true if first csr number is greater than or equal the second.
+  inline bool operator>= (CsrNumber a, CsrNumber b)
+  { return static_cast<unsigned>(a) >= static_cast<unsigned>(b); }
+
+
   template <typename URV>
   class CsRegs;
 
@@ -914,6 +931,14 @@ namespace WdRiscv
     }
 
   protected:
+
+    /// Advance a csr number by the given amount (add amount to number).
+    static CsrNumber advance(CsrNumber csrn, uint32_t amount)
+    { return CsrNumber(uint32_t(csrn) + amount); }
+
+    /// Advance a csr number by the given amount (add amount to number).
+    static CsrNumber advance(CsrNumber csrn, int32_t amount)
+    { return CsrNumber(uint32_t(csrn) + amount); }
 
     /// Similar to read but returned value is sign extended: sign bit is bit
     /// corresponding to most significant set bit in write mask of CSR.
@@ -1530,22 +1555,17 @@ namespace WdRiscv
     /// to an MHPMEVENT CSR.
     bool getIndexOfMhpmevent(CsrNumber csrn, unsigned& ix) const
     {
-      unsigned n = static_cast<unsigned>(csrn);
-      unsigned low = static_cast<unsigned>(CsrNumber::MHPMEVENT3);
-      unsigned high = static_cast<unsigned>(CsrNumber::MHPMEVENT31);
-      if (n >= low and n <= high)
+      if (csrn >= CsrNumber::MHPMEVENT3 and csrn <= CsrNumber::MHPMEVENT31)
 	{
-	  ix = n - low;
+	  ix = unsigned(csrn) - unsigned(CsrNumber::MHPMEVENT3);
 	  return true;
 	}
 
       if (rv32_)
 	{
-	  low = static_cast<unsigned>(CsrNumber::MHPMEVENTH3);
-	  high = static_cast<unsigned>(CsrNumber::MHPMEVENTH31);
-	  if (n >= low and n <= high)
+	  if (csrn >= CsrNumber::MHPMEVENTH3 and csrn <= CsrNumber::MHPMEVENTH31)
 	    {
-	      ix = n - low;
+	      ix = unsigned(csrn) - unsigned(CsrNumber::MHPMEVENTH3);
 	      return true;
 	    }
 	}

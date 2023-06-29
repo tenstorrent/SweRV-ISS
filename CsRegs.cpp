@@ -150,7 +150,7 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode)
     return csr;
   if (not csr->mapsToVirtual())
     return csr;
-  num = CsrNumber(URV(num) + 0x100);
+  num = advance(num, 0x100);   // Get VCSR corresponding to CSR.
   return getImplementedCsr(num);
 }
 
@@ -166,7 +166,7 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode) const
     return csr;
   if (not csr->mapsToVirtual())
     return csr;
-  num = CsrNumber(URV(num) + 0x100);
+  num = advance(num, 0x100);   // Get VCSR corresponding to CSR.
   return getImplementedCsr(num);
 }
 
@@ -240,7 +240,7 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
 
 
       // If a bit is zero in MSTATEEN, it becomes zero in SSTATEEN
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
+      CsrNumber mnum = advance(CN::MSTATEEN0, ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	  value &= mcsr->read();
@@ -251,7 +251,7 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
 	  if (ix == 0 and hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
 	    return false;  // SSTATEN0 not accessible because bit 63 of HSTATEEN0 is 0.
 
-	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + ix);
+	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);
 	  auto hcsr = getImplementedCsr(hnum);
 	  if (hcsr)
 	    value &= hcsr->read();
@@ -283,7 +283,7 @@ CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
 	return false;  // SSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
 
       // If a bit is zero in MSTATEEN, it becomes zero in HSTATEEN
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
+      CsrNumber mnum = advance(CN::MSTATEEN0, ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	value &= mcsr->read();
@@ -609,9 +609,9 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 
 	fields.bits_.OF = 1;
 
-	CsrNumber evnum = CsrNumber(unsigned(CsrNumber::MHPMEVENT3) + ix);
+	CsrNumber evnum = advance(CsrNumber::MHPMEVENT3, ix);
 	if (rv32_)
-	  evnum = CsrNumber(unsigned(CsrNumber::MHPMEVENTH3) + ix);
+	  evnum = advance(CsrNumber::MHPMEVENTH3, ix);
 	auto event = this->findCsr(evnum);
 	if (not event)
 	  {
@@ -774,7 +774,7 @@ CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
 
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
+      CsrNumber mnum = advance(CN::MSTATEEN0, ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	mask &= mcsr->read();
@@ -785,7 +785,7 @@ CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
 	  if (ix == 0 and hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
 	    return false;  // SSTATEN0 not accessible because bit 63 of HSTATEEN0 is 0.
 
-	  CsrNumber hnum = CsrNumber(unsigned(CN::HSTATEEN0) + ix);
+	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);
 	  auto hcsr = getImplementedCsr(hnum);
 	  if (hcsr)
 	    mask &= hcsr->read();
@@ -830,7 +830,7 @@ CsRegs<URV>::writeHstateen(CsrNumber num, URV value)
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
 
-      CsrNumber mnum = CsrNumber(unsigned(CN::MSTATEEN0) + ix);
+      CsrNumber mnum = advance(CN::MSTATEEN0, ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	mask &= mcsr->read();
@@ -1078,7 +1078,7 @@ CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters)
       if (i >= numCounters)
 	mask = pokeMask = 0;
 
-      CsrNumber csrNum = CsrNumber(i + unsigned(CsrNumber::MHPMCOUNTER3));
+      CsrNumber csrNum = advance(CsrNumber::MHPMCOUNTER3, i);
       bool isDebug = false;
       if (not configCsr(csrNum, true, resetValue, mask, pokeMask, isDebug,
                         shared))
@@ -1086,13 +1086,13 @@ CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters)
 
       if (rv32_)
          {
-	   csrNum = CsrNumber(i + unsigned(CsrNumber::MHPMCOUNTER3H));
+	   csrNum = advance(CsrNumber::MHPMCOUNTER3H, i);
 	   if (not configCsr(csrNum, true, resetValue, mask, pokeMask,
                              isDebug, shared))
 	     errors++;
 	 }
 
-      csrNum = CsrNumber(i + unsigned(CsrNumber::MHPMEVENT3));
+      csrNum = advance(CsrNumber::MHPMEVENT3, i);
       if (not configCsr(csrNum, true, resetValue, mask, pokeMask, isDebug,
                         shared))
 	errors++;
@@ -1129,7 +1129,7 @@ CsRegs<URV>::configUserModePerfCounters(unsigned numCounters)
       if (i >= numCounters)
 	mask = pokeMask = 0;
 
-      CsrNumber csrNum = CsrNumber(i + unsigned(CsrNumber::HPMCOUNTER3));
+      CsrNumber csrNum = advance(CsrNumber::HPMCOUNTER3, i);
       bool isDebug = false;
       if (not configCsr(csrNum, true, resetValue, mask, pokeMask, isDebug,
                         shared))
@@ -1137,7 +1137,7 @@ CsRegs<URV>::configUserModePerfCounters(unsigned numCounters)
 
       if (rv32_)
          {
-	   csrNum = CsrNumber(i + unsigned(CsrNumber::HPMCOUNTER3H));
+	   csrNum = advance(CsrNumber::HPMCOUNTER3H, i);
 	   if (not configCsr(csrNum, true, resetValue, mask, pokeMask,
                              isDebug, shared))
 	     errors++;
@@ -1527,7 +1527,7 @@ CsRegs<URV>::defineMachineRegs()
   // mhpmevent3/mhpmevent3h to mhpmevent3h/mhpmevent31h.
   for (unsigned i = 3; i <= 31; ++i)
     {
-      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3) + i - 3);
+      CsrNumber csrNum = advance(CsrNumber::MHPMCOUNTER3, i - 3);
       std::string name = "mhpmcounter" + std::to_string(i);
       defineCsr(name, csrNum, mand, imp, 0, rom, rom);
 
@@ -1535,13 +1535,13 @@ CsRegs<URV>::defineMachineRegs()
         {
           // High register counterpart of mhpmcounter.
           name += "h";
-          csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3H) + i - 3);
+          csrNum = advance(CsrNumber::MHPMCOUNTER3H, i - 3);
           bool hmand = rv32_;  // high counters mandatory only in rv32
           auto c = defineCsr(std::move(name), csrNum, hmand, imp, 0, rom, rom);
 	  c->markAsHighHalf(true);
         }
 
-      csrNum = CsrNumber(unsigned(CsrNumber::MHPMEVENT3) + i - 3);
+      csrNum = advance(CsrNumber::MHPMEVENT3, i - 3);
       name = "mhpmevent" + std::to_string(i);
       defineCsr(std::move(name), csrNum, mand, imp, 0, rom, rom);
     }
@@ -1771,13 +1771,13 @@ CsRegs<URV>::defineUserRegs()
   // file).  Same for mhpmevent3/mhpmevent3h to mhpmevent3h/mhpmevent31h.
   for (unsigned i = 3; i <= 31; ++i)
     {
-      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3) + i - 3);
+      CsrNumber csrNum = advance(CsrNumber::HPMCOUNTER3, i - 3);
       std::string name = "hpmcounter" + std::to_string(i);
       defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
 
       // High register counterpart of mhpmcounter.
       name += "h";
-      csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
+      csrNum = advance(CsrNumber::HPMCOUNTER3H, i - 3);
       c = defineCsr(std::move(name), csrNum, !mand, !imp, 0, wam, wam);
       c->markAsHighHalf(true);
     }
@@ -2387,7 +2387,7 @@ CsRegs<URV>::getPmpConfigByteFromPmpAddr(CsrNumber csrn) const
       byteIx = pmpIx % 8;
     }
 
-  CsrNumber cfgNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + cfgOffset);
+  CsrNumber cfgNum = advance(CsrNumber::PMPCFG0, cfgOffset);
 
   URV val = 0;
   if (peek(cfgNum, val))
@@ -2483,7 +2483,7 @@ CsRegs<URV>::isPmpaddrLocked(CsrNumber csrn) const
   if (csrn >= CsrNumber::PMPADDR63)
     return false;  // No next PMPADDR register.
 
-  CsrNumber csrn2 = CsrNumber(unsigned(csrn) + 1);
+  CsrNumber csrn2 = advance(csrn, 1);
   byte = getPmpConfigByteFromPmpAddr(csrn2);
   locked = byte & 0x80;
   bool tor = ((byte >> 3) & 3) == 1;
@@ -2682,7 +2682,7 @@ CsRegs<URV>::addMachineFields()
 
       if (rv32_)
         {
-          CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i + 1);
+          CsrNumber csrNum = advance(CsrNumber::PMPCFG0, i + 1);
           unsigned end = pmpIx + 4;
           for (; pmpIx < end; pmpIx++)
             {
@@ -2698,7 +2698,7 @@ CsRegs<URV>::addMachineFields()
         }
       else
         {
-          CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPCFG0) + i);
+          CsrNumber csrNum = advance(CsrNumber::PMPCFG0, i);
           unsigned end = pmpIx + 8;
           for (; pmpIx < end; pmpIx++)
             {
@@ -2716,7 +2716,7 @@ CsRegs<URV>::addMachineFields()
     }
   for (unsigned i = 0; i < 64; ++i)
     {
-      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::PMPADDR0) + i);
+      CsrNumber csrNum = advance(CsrNumber::PMPADDR0, i);
       if (rv32_)
         setCsrFields(csrNum, {{"addr", 32}});
       else
@@ -2725,13 +2725,13 @@ CsRegs<URV>::addMachineFields()
 
   for (unsigned i = 3; i <= 31; ++i)
     {
-      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3) + i - 3);
+      CsrNumber csrNum = advance(CsrNumber::MHPMCOUNTER3, i - 3);
       std::string name = "mhpmcounter" + std::to_string(i);
       setCsrFields(csrNum, {{name, xlen}});
       if (rv32_)
         {
           // High register counterpart of mhpmcounter.
-          csrNum = CsrNumber(unsigned(CsrNumber::MHPMCOUNTER3H) + i - 3);
+          csrNum = advance(CsrNumber::MHPMCOUNTER3H, i - 3);
           name += "h";
           setCsrFields(csrNum, {{name, xlen}});
         }
@@ -2808,13 +2808,13 @@ CsRegs<URV>::addUserFields()
 
   for (unsigned i = 3; i <= 31; ++i)
     {
-      CsrNumber csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3) + i - 3);
+      CsrNumber csrNum = advance(CsrNumber::HPMCOUNTER3, i - 3);
       std::string name = "hpmcounter" + std::to_string(i);
       setCsrFields(csrNum, {{name, xlen}});
       if (rv32_)
         {
           // High register counterpart of hpmcounter.
-          csrNum = CsrNumber(unsigned(CsrNumber::HPMCOUNTER3H) + i - 3);
+          csrNum = advance(CsrNumber::HPMCOUNTER3H, i - 3);
           name += "h";
           setCsrFields(csrNum, {{name, xlen}});
         }
