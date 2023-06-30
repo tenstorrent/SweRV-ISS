@@ -132,12 +132,13 @@ namespace WdRiscv
     /// Destructor.
     ~VecRegs();
     
-    /// Return vector register count.
+    /// Return count of vector registers. This is independent of group
+    /// multiplier.
     uint32_t registerCount() const
     { return regCount_; }
 
-    /// Return the number of bytes per register. This is independent
-    /// of group multiplier.
+    /// Return the number of bytes per vecotor register. This is
+    /// independent of group multiplier.
     uint32_t bytesPerRegister() const
     { return bytesPerReg_; }
 
@@ -146,7 +147,7 @@ namespace WdRiscv
     { return bytesInRegFile_; }
 
     /// Return true if given elemIx is valid for the given register
-    /// number, and group mpultiplier is valid.
+    /// number, group mpultiplier, and element size.
     bool isValidIndex(uint32_t regNum, uint64_t elemIx, unsigned groupX8,
 		      size_t elemSize) const
     {
@@ -161,8 +162,8 @@ namespace WdRiscv
     /// Set value to that of the element with given index within the
     /// vector register of the given number. Throw an exception if the
     /// combination of element index, vector number and group
-    /// multipier (presecaled by 8) is invalid. We pre-scale the group
-    /// multiplier to avoid passing a fraction.
+    /// multiplier (presecaled by 8) is invalid. We require a
+    /// pre-scaled group multiplier to avoid passing a fraction.
     template<typename T>
     void read(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
               T& value) const
@@ -177,8 +178,8 @@ namespace WdRiscv
     /// Set the element with given index within the vector register of
     /// the given number to the given value. Throw an exception 
     /// if the combination of element index, vector number and group
-    /// multipier (presecaled by 8) is invalid. We pre-scale the group
-    /// multiplier to avoid passing a fraction.
+    /// multiplier (presecaled by 8) is invalid. We require a
+    /// pre-scaled multiplier to avoid passing a fraction.
     template<typename T>
     void write(uint32_t regNum, uint64_t elemIx, uint32_t groupX8, const T& value)
     {
@@ -192,8 +193,9 @@ namespace WdRiscv
     }
 
     /// Return true if the combination regNum, elemIx, eew, and
-    /// groupX8 is valid setting stride to the value of the
-    /// element. Return false otherwise leaving stride unmodified.
+    /// groupX8 is valid setting stride to the value of the designated
+    /// register element. Return false otherwise leaving stride
+    /// unmodified.
     bool readStride(uint32_t regNum, uint32_t elemIx, ElementWidth eew,
 		    uint32_t groupX8, uint64_t& stride) const
     {
@@ -245,22 +247,22 @@ namespace WdRiscv
     ElementWidth elemWidth() const
     { return sew_; }
 
-    /// Return the current configured group multiplier.
+    /// Return the currently configured group multiplier.
     GroupMultiplier groupMultiplier() const
     { return group_; }
 
-    /// Return the currently configured element width in bits (for example
-    /// if SEW is Byte, then this reurns 8).
+    /// Return the currently configured element width in bits (for
+    /// example if SEW is Byte, then this reurns 8).
     uint32_t elemWidthInBits() const
     { return sewInBits_; }
 
-    /// Return the element width in bit given the symbolic element width.
-    /// Rturn 0 if symbolic value is out of bounds.
+    /// Return the width in bits corresponding to the given symbolic
+    /// element width. Rturn 0 if symbolic value is out of bounds.
     static uint32_t elemWidthInBits(ElementWidth ew)
     { return ew > ElementWidth::Word32 ? 0 : uint32_t(8) << uint32_t(ew); }
 
     /// Return the currently configured group multiplier as a unsigned
-    /// integer scaled by 8.  For example if group multiplier is One,
+    /// integer scaled by 8. For example if group multiplier is One,
     /// this reurns 8. If group multiplier is Eigth, this returns 1.
     /// We pre-scale by 8 to avoid division when the multiplier is a
     /// fraction.
@@ -285,9 +287,9 @@ namespace WdRiscv
     }
 
     /// Set ix to the number of the register corresponding to the
-    /// given name returning true on success and false if no such
-    /// register.  For example, if name is "v2" then ix will be set to
-    /// 2.
+    /// given vector register name returning true on success and false
+    /// if no such register. For example, if name is "v2" then ix
+    /// will be set to 2.
     static bool findReg(std::string_view name, unsigned& ix);
 
     /// Get the addresses, data, and element size of the memory
@@ -295,7 +297,7 @@ namespace WdRiscv
     /// on success and false if the most recent instruction was not a
     /// memory-referencing vector instruction. If most recent instruction
     /// was not a store, then data will be cleared; otherwise, it will have
-    /// as many elements as addresses.
+    /// as many etries as addresses.
     bool getLastMemory(std::vector<uint64_t>& addresses,
 		       std::vector<uint64_t>& data,
 		       unsigned& elementSize) const;
@@ -310,7 +312,9 @@ namespace WdRiscv
       return groupFlags.at(size_t(mul));
     }
 
-    /// Return the smallest element size in bytes.
+    /// Return the smallest element size in bytes supported by
+    /// this vector register file. This may change from run to
+    /// run based on the configuration.
     unsigned minElementSizeInBytes() const
     { return minBytesPerElem_; }
 
@@ -331,8 +335,7 @@ namespace WdRiscv
     }
 
     /// Set dsew to the double of the given sew returning true on
-    /// succes and false if given sew cannot be doubled.  false if
-    /// groupX8 is out of bounds.
+    /// succes and false if double the given sew is out of bounds.
     static constexpr
     bool doubleSew(ElementWidth sew, ElementWidth& dsew)
     {
@@ -363,14 +366,15 @@ namespace WdRiscv
       return 0;
     }
 
-    /// Return the maximum element count for the current SEW and LMUL.
+    /// Return the element count in a register group defined by the
+    /// currently configured group multiplier and element width.
     uint32_t vlmax() const
     {
       return groupX8_*bytesPerReg_/sewInBits_;
     }
 
-    /// Return the maximum lement count for the given group multiplier
-    /// element width.
+    /// Return the element count in a register group defined by the
+    /// given group mutiplier and element width.
     uint32_t vlmax(GroupMultiplier gm, ElementWidth eew) const
     {
       uint32_t gm8 = groupMultiplierX8(gm);
@@ -378,6 +382,7 @@ namespace WdRiscv
       return gm8*bytesPerReg_/eewInBits;
     }
 
+    /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
     {
       using namespace std::string_view_literals;
@@ -387,6 +392,7 @@ namespace WdRiscv
       return size_t(group) < vec.size()? vec.at(size_t(group)) : "m?";
     }
 
+    /// Return a string representation of the given element width.
     static constexpr std::string_view to_string(ElementWidth ew)
     {
       using namespace std::string_view_literals;
@@ -396,6 +402,9 @@ namespace WdRiscv
       return size_t(ew) < vec.size()? vec.at(size_t(ew)) : "e?";
     }
 
+    /// Convert given string to a group multiplier returning true on
+    /// success and false if given string does not contain a valid
+    /// group multiplier representation.
     static bool to_lmul(std::string_view lmul, GroupMultiplier& group)
     {
       static const std::unordered_map<std::string_view, GroupMultiplier> map(
@@ -413,6 +422,9 @@ namespace WdRiscv
       return false;
     }
 
+    /// Convert given string to an element width returning true on
+    /// success and false if given string does not contain a valid
+    /// element width.  Example: "e32" yields ElementWidth::Word.
     static bool to_sew(std::string_view sew, ElementWidth& ew)
     {
       static const std::unordered_map<std::string_view, ElementWidth> map(
@@ -429,7 +441,6 @@ namespace WdRiscv
         }
       return false;
     }
-
 
   protected:
 
