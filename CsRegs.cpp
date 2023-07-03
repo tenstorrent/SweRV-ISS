@@ -1436,7 +1436,9 @@ CsRegs<URV>::defineMachineRegs()
 
   defineCsr("mcounteren", Csrn::MCOUNTEREN, !mand, imp, 0, wam, wam);
 
-  mask = ~URV(2);  // All bits writeable except 1.
+  mask = ~URV(2);  // All bits writeable except for bit 1.
+  if (not rv32_)
+    mask = 0xfffffffd;  // Least sig 32 bis writable except for bit 1.
   defineCsr("mcountinhibit", Csrn::MCOUNTINHIBIT, !mand, imp, 0, mask, mask);
 
   // Machine trap handling: mscratch and mepc.
