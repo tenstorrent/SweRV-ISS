@@ -1805,7 +1805,7 @@ Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
       auto [rkb0, rkb1, rkb2, rkb3] = toQuarters(d);
 
       uint32_t w0 = (round & 1) ? aes_subword_fwd(crk3) ^ rkb0 :
-	aes_subword_fwd(aes_rotword(crk3)) ^ aes_decode_rcon(round >> 1) ^ rkb0;
+	aes_subword_fwd(aes_rotword(crk3)) ^ aes_decode_rcon((round >> 1) - 1) ^ rkb0;
       uint32_t w1 = w0 ^ rkb1;
       uint32_t w2 = w1 ^ rkb2;
       uint32_t w3 = w2 ^ rkb3;
