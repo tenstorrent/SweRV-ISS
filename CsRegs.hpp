@@ -1469,6 +1469,9 @@ namespace WdRiscv
     /// Enable/disable counter-overflow extension (sscofpmf)
     void enableSscofpmf(bool flag);
 
+    /// Enable/disable access to certain CSRs from non-machine mode.
+    void enableStateen(bool flag);
+
     /// Enable supervisor mode.
     void enableSupervisorMode(bool flag);
 
@@ -1639,6 +1642,7 @@ namespace WdRiscv
     bool hyperEnabled_ = false;   // Hypervisor
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
+    bool stateenOn_ = false;      // Mstateen extension.
 
     bool recordWrite_ = true;
     bool debugMode_ = false;

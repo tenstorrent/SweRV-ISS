@@ -428,6 +428,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
+  enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
 }
 
 
@@ -549,6 +550,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
     }
 
   updateSstc();  // To activate/deactivate VSTIMECMP.
+  enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
 }
 
 
@@ -635,6 +637,57 @@ CsRegs<URV>::enableSscofpmf(bool flag)
       };
     }
 }
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableStateen(bool flag)
+{
+  stateenOn_ = flag;
+
+  using CN = CsrNumber;
+
+
+  for (auto csrn : { CN::MSTATEEN0, CN::MSTATEEN1, CN::MSTATEEN2, CN::MSTATEEN3 } )
+    {
+      auto csr = findCsr(csrn);
+      if (csr)
+	csr->setImplemented(flag);
+    }
+
+  if (rv32_)
+    for (auto csrn : { CN::MSTATEEN0H, CN::MSTATEEN1H, CN::MSTATEEN2H, CN::MSTATEEN3H } )
+      {
+	auto csr = findCsr(csrn);
+	if (csr)
+	  csr->setImplemented(flag);
+      }
+
+  flag &= superEnabled_;
+  for (auto csrn : { CN::SSTATEEN0, CN::SSTATEEN1, CN::SSTATEEN2, CN::SSTATEEN3 } )
+    {
+      auto csr = findCsr(csrn);
+      if (csr)
+	csr->setImplemented(flag);
+    }
+
+  flag &= hyperEnabled_;
+  for (auto csrn : { CN::HSTATEEN0, CN::HSTATEEN1, CN::HSTATEEN2, CN::HSTATEEN3 } )
+    {
+      auto csr = findCsr(csrn);
+      if (csr)
+	csr->setImplemented(flag);
+    }
+
+  if (rv32_)
+    for (auto csrn : { CN::HSTATEEN0H, CN::HSTATEEN1H, CN::HSTATEEN2H, CN::HSTATEEN3H } )
+      {
+	auto csr = findCsr(csrn);
+	if (csr)
+	  csr->setImplemented(flag);
+      }
+}
+
 
 
 template <typename URV>
