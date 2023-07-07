@@ -2297,6 +2297,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               }
             if (funct3 == 2)
               {
+		op0 = iform.fields.rs1;
                 if (imm == 0 and rd == 0)
                   return instTable_.getEntry(InstId::cbo_inval);
                 if (imm == 1 and rd == 0)
