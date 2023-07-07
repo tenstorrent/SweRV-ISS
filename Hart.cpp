@@ -11072,11 +11072,31 @@ template <typename URV>
 void
 Hart<URV>::execWrs_nto(const DecodedInst* di)
 {
+  // Wait for reservation store. No timeout.
+
   if (not isRvzawrs())
     {
       illegalInst(di);
       return;
     }
+
+  using PM = PrivilegeMode;
+  auto pm = privilegeMode();
+
+  if (mstatus_.bits_.TW and pm != PM::Machine)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // VS/VU mode, VTW=1 and mstatus.TW=0
+  if (virtMode_ and (pm == PM::Supervisor or pm == PM::User) and not mstatus_.bits_.TW and hstatus_.bits_.VTW)
+    {
+      virtualInst(di);
+      return;
+    }
+
+  cancelLr();  // Lose reservation.
 }
 
 
@@ -11084,11 +11104,15 @@ template <typename URV>
 void
 Hart<URV>::execWrs_sto(const DecodedInst* di)
 {
+  // Wait for reservaton store. Short timeout.
+
   if (not isRvzawrs())
     {
       illegalInst(di);
       return;
     }
+
+  cancelLr();  // Lose reservation.
 }
 
 
