@@ -291,11 +291,7 @@ Hart<URV>::execFlw(const DecodedInst* di)
     {
       fpRegs_.writeSingle(di->op0(), std::bit_cast<float>(static_cast<uint32_t>(data)));
       markFsDirty();
-      return;
     }
-
-  auto cause = ExceptionCause::LOAD_ACC_FAULT;
-  initiateLoadException(cause, virtAddr);
 }
 
 
@@ -1025,13 +1021,8 @@ Hart<URV>::execFld(const DecodedInst* di)
   if (load<uint64_t>(virtAddr, false /*hyper*/, data))
     {
       fpRegs_.writeDouble(di->op0(), std::bit_cast<double>(data));
-
       markFsDirty();
-      return;
     }
-
-  auto cause = ExceptionCause::LOAD_ACC_FAULT;
-  initiateLoadException(cause, virtAddr);
 }
 
 
@@ -1750,11 +1741,7 @@ Hart<URV>::execFlh(const DecodedInst* di)
     {
       fpRegs_.writeHalf(di->op0(), std::bit_cast<Float16>(static_cast<uint16_t>(data)));
       markFsDirty();
-      return;
     }
-
-  auto cause = ExceptionCause::LOAD_ACC_FAULT;
-  initiateLoadException(cause, virtAddr);
 }
 
 

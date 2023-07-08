@@ -1262,88 +1262,82 @@ Decoder::decodeVecCrypto(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& 
 
       switch(f6)
 	{
-	case 0x18:
-	  if (op2 == 0 and not masked)
-	    return instTable_.getEntry(InstId::vaesdm_vv);
-	  if (op2 == 1 and not masked)
-	    return instTable_.getEntry(InstId::vaesdf_vv);
-	  if (op2 == 2 and not masked)
-	    return instTable_.getEntry(InstId::vaesem_vv);
-	  if (op2 == 3 and not masked)
-	    return instTable_.getEntry(InstId::vaesef_vv);
-	  if (op2 == 0x11 and not masked)
-	    return instTable_.getEntry(InstId::vgmul_vv);
-	  break;
+        case 0b100000:
+          if (not masked)
+            return instTable_.getEntry(InstId::vsm3me_vv);
+          break;
 
-	case 0x19:
-	  if (op2 == 0 and not masked)
-	    return instTable_.getEntry(InstId::vaesdm_vs);
-	  if (op2 == 1 and not masked)
-	    return instTable_.getEntry(InstId::vaesdf_vs);
-	  if (op2 == 2 and not masked)
-	    return instTable_.getEntry(InstId::vaesem_vs);
-	  if (op2 == 3 and not masked)
-	    return instTable_.getEntry(InstId::vaesef_vs);
-	  break;
+        case 0b100001:
+          if (not masked)
+            return instTable_.getEntry(InstId::vsm4k_vi);
+          break;
 
-	case 0x1d:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vsha2ms_vv);
-	  break;
+        case 0b100010:
+          if (not masked)
+            return instTable_.getEntry(InstId::vaeskf1_vi);
+          break;
 
-	case 0x20:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vsm3me_vv);
-	  break;
+        case 0b101000:
+          if (op2 == 0 and not masked)
+            return instTable_.getEntry(InstId::vaesdm_vv);
+          if (op2 == 1 and not masked)
+            return instTable_.getEntry(InstId::vaesdf_vv);
+          if (op2 == 2 and not masked)
+            return instTable_.getEntry(InstId::vaesem_vv);
+          if (op2 == 3 and not masked)
+            return instTable_.getEntry(InstId::vaesef_vv);
+          if (op2 == 0x10 and not masked)
+            return instTable_.getEntry(InstId::vsm4r_vv);
+          if (op2 == 0x11 and not masked)
+            return instTable_.getEntry(InstId::vgmul_vv);
+          break;
 
-	case 0x21:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vsm4k_vi);
-	  break;
+        case 0b101001:
+          if (op2 == 0 and not masked)
+            return instTable_.getEntry(InstId::vaesdm_vs);
+          if (op2 == 1 and not masked)
+            return instTable_.getEntry(InstId::vaesdf_vs);
+          if (op2 == 2 and not masked)
+            return instTable_.getEntry(InstId::vaesem_vs);
+          if (op2 == 3 and not masked)
+            return instTable_.getEntry(InstId::vaesef_vs);
+          if (op2 == 7 and not masked)
+            return instTable_.getEntry(InstId::vaesz_vs);
+          if (op2 == 0x10 and not masked)
+            return instTable_.getEntry(InstId::vsm4r_vs);
+          break;
 
-	case 0x22:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vaeskf1_vi);
-	  break;
+        case 0b101010:
+          if (not masked)
+            return instTable_.getEntry(InstId::vaeskf2_vi);
+          break;
 
-	case 0x2b:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vsm3c_vi);
-	  break;
+        case 0b101011:
+          if (not masked)
+            return instTable_.getEntry(InstId::vsm3c_vi);
+          break;
 
-	case 0x28:
-	  if (op2 == 8 and not masked)
-	    return instTable_.getEntry(InstId::vsm4r_vv);
-	  break;
+        case 0b101100:
+          if (not masked)
+            return instTable_.getEntry(InstId::vghsh_vv);
+          break;
 
-	case 0x29:
-	  if (op2 == 7 and not masked)
-	    return instTable_.getEntry(InstId::vaesz_vs);
-	  if (op2 == 8 and not masked)
-	    return instTable_.getEntry(InstId::vsm4r_vs);
-	  break;
+        case 0b101101:
+          if (not masked)
+            return instTable_.getEntry(InstId::vsha2ms_vv);
+          break;
 
-	case 0x2a:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vaeskf2_vi);
-	  break;
+        case 0b101110:
+          if (not masked)
+            return instTable_.getEntry(InstId::vsha2ch_vv);
+          break;
 
-	case 0x2c:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vghsh_vv);
-	  break;
+        case 0b101111:
+          if (not masked)
+            return instTable_.getEntry(InstId::vsha2cl_vv);
+          break;
 
-	case 0x2e:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vsha2ch_vv);
-	  break;
-
-	case 0x2f:
-	  if (not masked)
-	    return instTable_.getEntry(InstId::vsha2cl_vv);
-	  break;
-
-	default:
+        default:
 	  return illegal;
 	}
     }
@@ -2303,6 +2297,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               }
             if (funct3 == 2)
               {
+		op0 = iform.fields.rs1;
                 if (imm == 0 and rd == 0)
                   return instTable_.getEntry(InstId::cbo_inval);
                 if (imm == 1 and rd == 0)
