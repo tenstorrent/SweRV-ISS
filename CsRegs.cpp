@@ -1932,7 +1932,8 @@ CsRegs<URV>::defineHypervisorRegs()
   csr->setHypervisor(true);
   csr = defineCsr("vssratch",    Csrn::VSSCRATCH,   !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
-  csr = defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, wam, wam);
+  mask = ~URV(1);  // Bit 0 of VSEPC is not writable.
+  csr = defineCsr("vsepc",       Csrn::VSEPC,       !mand, !imp, 0, mask, mask);
   csr->setHypervisor(true);
   csr = defineCsr("vscause",     Csrn::VSCAUSE,     !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
