@@ -1146,9 +1146,10 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           URV mipVal = msg.address;
           InterruptCause cause = InterruptCause{0};
           reply.flags = hart.isInterruptPossible(mipVal, cause);
+          reply.value = static_cast<uint64_t>(cause);
           if (commandLog)
             fprintf(commandLog, "hart=%" PRIu32 " check_interrupt 0x%" PRIxMAX "\n", hartId,
-                    uintmax_t(msg.value));
+                    uintmax_t(msg.address));
         }
         break;
 
