@@ -413,6 +413,11 @@ namespace WdRiscv
     /// A size smaller than 4/8 in rv32/rv64 has the effect of 4/8.
     void configReservationSize(unsigned size)
     { lrResSize_ = size; }
+
+    /// Configure SC.W/D to keep/drop (flag=true/false) reservation on
+    /// exceptions in SC.W/D.
+    void keepReservationOnScException(bool flag)
+    { keepReservOnScException_ = flag; }
       
     /// Get the values of the three components of the given debug
     /// trigger. Return true on success and false if trigger is out of
@@ -4620,6 +4625,7 @@ namespace WdRiscv
     uint64_t scCount_ = 0;    // Count of dispatched store-conditional instructions.
     uint64_t scSuccess_ = 0;  // Count of successful SC (store accomplished).
     unsigned lrResSize_ = sizeof(URV); // LR reservation size.
+    bool keepReservOnScException_ = false; // Keep rservation on SC.W/D exception.
 
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.

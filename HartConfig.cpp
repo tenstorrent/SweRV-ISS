@@ -1205,6 +1205,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	errors++;
     }
 
+  // Keep reservation on exception in SC.W/D.
+  tag = "keep_reservation_on_sc_excetpion";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.keepReservationOnScException(flag);
+    }
+
   // Enable debug triggers.
   tag = "enable_triggers";
   if (config_ -> contains(tag))
