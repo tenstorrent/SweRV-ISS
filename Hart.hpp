@@ -2270,8 +2270,9 @@ namespace WdRiscv
     void hyperStore(const DecodedInst* di);
 
     /// Helper to CSR instructions: return true if given CSR is
-    /// writebale and false otherwise.
-    bool isCsrWriteable(CsrNumber csr) const;
+    /// writebale in the given privielge level and virtual (V) mode
+    /// and false otherwise.
+    bool isCsrWriteable(CsrNumber csr, PrivilegeMode mode, bool virtMode) const;
 
     /// Helper to CSR instructions: Write csr and integer register if csr
     /// is writeable.
