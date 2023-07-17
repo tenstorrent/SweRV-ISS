@@ -9865,11 +9865,18 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     }
 
   if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
-    if (mstatus_.bits_.TVM)
-      {
-	illegalInst(di);
-	return false;
-      }
+    {
+      if (mstatus_.bits_.TVM and not virtMode_)
+	{
+	  illegalInst(di);
+	  return false;
+	}
+      if (hstatus_.bits_.VTVM and virtMode_)
+	{
+	  virtualInst(di);
+	  return false;
+	}
+    }
 
   if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
     if (mstatus_.bits_.TVM)
@@ -9922,9 +9929,14 @@ Hart<URV>::isCsrWriteable(CsrNumber csr) const
   if (not csRegs_.isWriteable(csr, privMode_))
     return false;
 
-  if (csr == CsrNumber::SATP and privMode_ == PM::Supervisor)
-    if (mstatus_.bits_.TVM)
-      return false;
+  if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
+    {
+      if (mstatus_.bits_.TVM and not virtMode_)
+	return false;
+      if (hstatus_.bits_.VTVM and virtMode_)
+	return false;
+      return true;
+    }
 
   if (csr == CsrNumber::HGATP and privMode_ == PM::Supervisor and not virtMode_)
     if (mstatus_.bits_.TVM)
@@ -9956,19 +9968,14 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
     {
       if (virtMode_)
 	{
-	  bool hsq = isRvs() and csRegs_.isWriteable(csr, PM::Supervisor); // HS qualified
-	  if (not csRegs_.isHighHalf(csr))
-	    {
-	      if (hsq) virtualInst(di); else illegalInst(di);
-	    }
+	  if (csr == CsrNumber::SATP)
+	    virtualInst(di);
 	  else
 	    {
-	      if (sizeof(URV) == 4)
-		{
-		  if (hsq) virtualInst(di); else illegalInst(di);
-		}
-	      else
-		illegalInst(di);
+	      bool hsq = isRvs() and csRegs_.isWriteable(csr, PM::Supervisor); // HS qualified
+	      if (csRegs_.isHighHalf(csr) and sizeof(URV) > 4)
+		hsq = false;
+	      if (hsq) virtualInst(di); else illegalInst(di);
 	    }
 	}
       else
