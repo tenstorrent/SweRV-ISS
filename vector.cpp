@@ -689,6 +689,10 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   bool vill = (vtypeVal >> (8*sizeof(URV) - 1)) & 1;
   vill = vill or not vecRegs_.legalConfig(ew, gm);
 
+  // Only least sig 8 bits can be non-zero. Spec is vague but this
+  // seems to be the intent.
+  vill = vill or ((vtypeVal >> 8) != 0);
+
   // Determine vl
   URV elems = 0;
 
