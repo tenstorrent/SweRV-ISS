@@ -360,10 +360,12 @@ Hart<URV>::execSc_w(const DecodedInst* di)
   URV addr = intRegs_.read(rs1);
   scCount_++;
 
-  uint64_t prevCount = exceptionCount_;
-
   bool ok = storeConditional(addr, uint32_t(value));
-  cancelLr(); // Clear LR reservation (if any).
+
+  // If there is an exception then reservation may/may-not be dropped
+  // depending on config.
+  if (not keepReservOnScException_ or not hasException_)
+    cancelLr(); // Clear LR reservation (if any).
 
   if (ok)
     {
@@ -375,7 +377,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
     }
 
   // If exception or trigger tripped then rd is not modified.
-  if (triggerTripped_ or exceptionCount_ != prevCount)
+  if (triggerTripped_ or hasException_)
     return;
 
   intRegs_.write(di->op0(), 1);  // fail
@@ -560,10 +562,12 @@ Hart<URV>::execSc_d(const DecodedInst* di)
   URV addr = intRegs_.read(rs1);
   scCount_++;
 
-  uint64_t prevCount = exceptionCount_;
-
   bool ok = storeConditional(addr, uint64_t(value));
-  cancelLr(); // Clear LR reservation (if any).
+
+  // If there is an exception then reservation may/may-not be dropped
+  // depending on config.
+  if (not keepReservOnScException_ or not hasException_)
+    cancelLr(); // Clear LR reservation (if any).
 
   if (ok)
     {
@@ -575,7 +579,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
     }
 
   // If exception or trigger tripped then rd is not modified.
-  if (triggerTripped_ or exceptionCount_ != prevCount)
+  if (triggerTripped_ or hasException_)
     return;
 
   intRegs_.write(di->op0(), 1);  // fail

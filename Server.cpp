@@ -1143,12 +1143,20 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
       case CheckInterrupt:
         {
+	  // We want to check for interrupts regardless of deferral.
+	  URV deferred = hart.deferredInterrupts();
+	  hart.setDeferredInterrupts(0);
+
           URV mipVal = msg.address;
           InterruptCause cause = InterruptCause{0};
           reply.flags = hart.isInterruptPossible(mipVal, cause);
+          reply.value = static_cast<uint64_t>(cause);
+
+	  hart.setDeferredInterrupts(deferred);
+
           if (commandLog)
             fprintf(commandLog, "hart=%" PRIu32 " check_interrupt 0x%" PRIxMAX "\n", hartId,
-                    uintmax_t(msg.value));
+                    uintmax_t(msg.address));
         }
         break;
 

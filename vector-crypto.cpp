@@ -1234,12 +1234,6 @@ Hart<URV>::execVclmulh_vx(const DecodedInst* di)
 }
 
 
-struct
-MyGhsh
-{
-};  
-
-
 template <typename URV>
 void
 Hart<URV>::execVghsh_vv(const DecodedInst* di)

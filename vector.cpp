@@ -689,6 +689,10 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   bool vill = (vtypeVal >> (8*sizeof(URV) - 1)) & 1;
   vill = vill or not vecRegs_.legalConfig(ew, gm);
 
+  // Only least sig 8 bits can be non-zero. All other bits are
+  // reserved.
+  vill = vill or ((vtypeVal >> 8) != 0);
+
   // Determine vl
   URV elems = 0;
 
@@ -1504,7 +1508,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
+  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extended. We differ.
 
   using EW = ElementWidth;
   switch (sew)
@@ -1875,7 +1879,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
-  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
+  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extended. We differ.
 
   using EW = ElementWidth;
   switch (sew)
@@ -4366,10 +4370,11 @@ Hart<URV>::execViota_m(const DecodedInst* di)
 {
   uint32_t start = csRegs_.peekVstart();
   unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
-  unsigned group = vecRegs_.groupMultiplierX8();
+  unsigned groupx8 = vecRegs_.groupMultiplierX8();
+  unsigned group = groupx8 <= 8 ? 1 : groupx8/8;
 
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0 or
-      (vs1 >= vd and vs1 < vd + group/8))
+      (vs1 >= vd and vs1 < vd + group))
     {
       postVecFail(di);
       return;
@@ -4384,7 +4389,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
       return;
     }
 
-  if (not checkVecOpsVsEmul(di, vd, group))
+  if (not checkVecOpsVsEmul(di, vd, groupx8))
     return;
 
   unsigned sum = 0;
@@ -4398,10 +4403,10 @@ Hart<URV>::execViota_m(const DecodedInst* di)
 
       switch (sew)
         {
-        case ElementWidth::Byte: vecRegs_.write(vd, ix, group, int8_t(sum)); break;
-        case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(sum)); break;
-        case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(sum)); break;
-        case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(sum)); break;
+        case ElementWidth::Byte: vecRegs_.write(vd, ix, groupx8, int8_t(sum)); break;
+        case ElementWidth::Half: vecRegs_.write(vd, ix, groupx8, int16_t(sum)); break;
+        case ElementWidth::Word: vecRegs_.write(vd, ix, groupx8, int32_t(sum)); break;
+        case ElementWidth::Word2: vecRegs_.write(vd, ix, groupx8, int64_t(sum)); break;
 	default:  postVecFail(di); return;
         }
 
