@@ -689,8 +689,8 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
   bool vill = (vtypeVal >> (8*sizeof(URV) - 1)) & 1;
   vill = vill or not vecRegs_.legalConfig(ew, gm);
 
-  // Only least sig 8 bits can be non-zero. Spec is vague but this
-  // seems to be the intent.
+  // Only least sig 8 bits can be non-zero. All other bits are
+  // reserved.
   vill = vill or ((vtypeVal >> 8) != 0);
 
   // Determine vl
@@ -1508,7 +1508,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
 
-  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
+  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extended. We differ.
 
   using EW = ElementWidth;
   switch (sew)
@@ -1879,7 +1879,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
 
-  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extened. We differ.
+  URV e2 = intRegs_.read(di->op2()); // FIX: Spec says sign extended. We differ.
 
   using EW = ElementWidth;
   switch (sew)
