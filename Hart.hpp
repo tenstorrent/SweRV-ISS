@@ -1581,6 +1581,7 @@ namespace WdRiscv
     void setDeferredInterrupts(URV val)
     { deferredInterrupts_ = val; }
 
+    /// Return the mask of deferred interrupts.
     URV deferredInterrupts()
     { return deferredInterrupts_; }
 

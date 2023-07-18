@@ -2020,9 +2020,15 @@ Interactive<URV>::checkInterruptCommand(Hart<URV>& hart, const std::string& line
       return false;
     }
 
+  // We want to check for interrupts regardless of deferral.
+  URV deferred = hart.deferredInterrupts();
+  hart.setDeferredInterrupts(0);
+
   InterruptCause cause;
   if (hart.isInterruptPossible(mip, cause))
     std::cout << unsigned(cause) << '\n';
+
+  hart.setDeferredInterrupts(deferred);
 
   return true;
 }
