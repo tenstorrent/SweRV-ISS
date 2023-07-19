@@ -1822,20 +1822,20 @@ getPrimaryConfigParameters(const Args& args, const HartConfig& config,
   config.getHartsPerCore(hartsPerCore);
   if (args.hasHarts)
     hartsPerCore = args.harts;
-  if (hartsPerCore == 0 or hartsPerCore > 16)
+  if (hartsPerCore == 0 or hartsPerCore > 32)
     {
       std::cerr << "Unsupported hart count: " << hartsPerCore;
-      std::cerr << " (1 to 16 currently suppored)\n";
+      std::cerr << " (1 to 32 currently suppored)\n";
       return false;
     }
 
   config.getCoreCount(coreCount);
   if (args.hasCores)
     coreCount = args.cores;
-  if (coreCount == 0 or coreCount > 16)
+  if (coreCount == 0 or coreCount > 32)
     {
       std::cerr << "Unsupported core count: " << coreCount;
-      std::cerr << " (1 to 16 currently suppored)\n";
+      std::cerr << " (1 to 32 currently suppored)\n";
       return false;
     }
 
