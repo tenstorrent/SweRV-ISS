@@ -7990,9 +7990,6 @@ template <typename URV>
 void
 Hart<URV>::execVmadc_vim(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   bool carry = di->isMasked();
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
 
