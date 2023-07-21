@@ -9492,6 +9492,14 @@ template <typename URV>
 void
 Hart<URV>::execSinval_vma(const DecodedInst* di)
 {
+  if (not isRvs() or not isRvsvinval() or privMode_ < PrivilegeMode::Supervisor)
+   {
+      if (virtMode_ and privMode_ == PrivilegeMode::User)
+	virtualInst(di);
+      else
+	illegalInst(di);
+      return;
+    }
   execSfence_vma(di);
 }
 
