@@ -525,6 +525,9 @@ fusedMultiplyAdd(float x, float y, float z, bool& invalid)
   res = softToNative(tmp);
 #endif
 
+  if (std::isnan(res))
+    res = std::numeric_limits<float>::quiet_NaN();
+
   invalid = (std::isinf(x) and y == 0) or (x == 0 and std::isinf(y));
   return res;
 }
@@ -549,6 +552,9 @@ fusedMultiplyAdd(Float16 x, Float16 y, Float16 z, bool& invalid)
   res = softToNative(tmp);
 #endif
 
+  if (res.isNan())
+    res = Float16::quietNan();
+
   invalid = (std::isinf(x.toFloat()) and y.toFloat() == 0) or (x.toFloat() == 0 and std::isinf(y.toFloat()));
   return res;
 }
@@ -570,6 +576,9 @@ fusedMultiplyAdd(double x, double y, double z, bool& invalid)
   float64_t tmp = f64_mulAdd(nativeToSoft(x), nativeToSoft(y), nativeToSoft(z));
   res = softToNative(tmp);
 #endif
+
+  if (std::isnan(res))
+    res = std::numeric_limits<double>::quiet_NaN();
 
   invalid = (std::isinf(x) and y == 0) or (x == 0 and std::isinf(y));
   return res;
