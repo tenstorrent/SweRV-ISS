@@ -128,7 +128,7 @@ Hart<URV>::enableVectorExtension(bool flag)
   enableExtension(RvExtension::V, flag);
   csRegs_.enableVectorExtension(flag);
 
-  if (not flag and not isRvs())
+  if (not flag and isRvs())
     setVecStatus(VecStatus::Off);
 }
 
@@ -207,6 +207,22 @@ bool
 Hart<URV>::checkFpSewLmulVstart(const DecodedInst* di, bool wide,
 				 bool (Hart::*fp16LegalFn)() const)
 {
+  // vector extension must be enabled, mstatus.fs must not be off, sew/lmul must
+  // be legal, vtype.vill must not be set.
+  if (not isVecLegal() or not vecRegs_.legalConfig())
+    {
+      postVecFail(di);
+      return false;
+    }
+
+  // Trap on use of non-zero vstart for arithmetic vector ops.
+  URV vstart = csRegs_.peekVstart();
+  if (trapNonZeroVstart_ and vstart > 0)
+    {
+      postVecFail(di);
+      return false;
+    }
+
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = false;
 
