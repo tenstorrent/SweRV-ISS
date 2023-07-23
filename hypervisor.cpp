@@ -317,7 +317,10 @@ template <typename URV>
 void
 Hart<URV>::execHinval_vvma(const DecodedInst* di)
 {
-  execHfence_vvma(di);
+  if (not isRvsvinval())
+    illegalInst(di);
+  else
+    execHfence_vvma(di);
 }
 
 
@@ -325,7 +328,10 @@ template <typename URV>
 void
 Hart<URV>::execHinval_gvma(const DecodedInst* di)
 {
-  execHfence_gvma(di);
+  if (not isRvsvinval())
+    illegalInst(di);
+  else
+    execHfence_gvma(di);
 }
 
 

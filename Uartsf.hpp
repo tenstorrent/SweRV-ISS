@@ -26,7 +26,7 @@ namespace WdRiscv
 
     /// This runs in its own thread. It monitors the standard input and
     /// marks interrupt pending when input is possible placing the input
-    /// character in byte_ for the Uart to consme.
+    /// character in byte_ for the Uart to consume.
     void monitorStdin();
 
     enum RegId { TX_FIFO, RX_FIFO, TX_CTRL, RX_CTRL, IE, IP, DIV, N };
