@@ -177,7 +177,22 @@
         "enable_misaligned_data": {
             "$ref": "#/definitions/bool_or_bool_string"
         },
-        "enable_pbmt": {
+        "enable_translation_pbmt": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_translation_napot": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_svinval": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_user_pointer_masking": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_supervisor_time_compare": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
+        "enable_counter_overflow": {
             "$ref": "#/definitions/bool_or_bool_string"
         },
         "enable_per_mode_counter_control": {
