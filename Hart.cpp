@@ -8800,7 +8800,7 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_not:
-      if (not isRvzcb()) illegalInst(di); else execXor(di);
+      if (not isRvzcb()) illegalInst(di); else execXori(di);
       return;
 
     case InstId::c_mul:
