@@ -128,7 +128,7 @@ Hart<URV>::enableVectorExtension(bool flag)
   enableExtension(RvExtension::V, flag);
   csRegs_.enableVectorExtension(flag);
 
-  if (not flag and not isRvs())
+  if (not flag and isRvs())
     setVecStatus(VecStatus::Off);
 }
 
@@ -207,6 +207,22 @@ bool
 Hart<URV>::checkFpSewLmulVstart(const DecodedInst* di, bool wide,
 				 bool (Hart::*fp16LegalFn)() const)
 {
+  // vector extension must be enabled, mstatus.fs must not be off, sew/lmul must
+  // be legal, vtype.vill must not be set.
+  if (not isVecLegal() or not vecRegs_.legalConfig())
+    {
+      postVecFail(di);
+      return false;
+    }
+
+  // Trap on use of non-zero vstart for arithmetic vector ops.
+  URV vstart = csRegs_.peekVstart();
+  if (trapNonZeroVstart_ and vstart > 0)
+    {
+      postVecFail(di);
+      return false;
+    }
+
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = false;
 
@@ -3950,7 +3966,7 @@ template <typename URV>
 void
 Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -3981,7 +3997,7 @@ template <typename URV>
 void
 Hart<URV>::execVwredsum_vs(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
+  if (not checkSewLmulVstart(di))
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
@@ -11465,9 +11481,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxei8_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -11490,9 +11503,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxei16_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -11515,9 +11525,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxei32_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -11540,9 +11547,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxei64_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -11709,9 +11713,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei8_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -11734,9 +11735,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei16_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -11759,9 +11757,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei32_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -11784,9 +11779,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxei64_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12253,9 +12245,6 @@ template <typename URV>
 void
 Hart<URV>::execVsssege8_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Byte))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint8_t>(di, ElementWidth::Byte, fieldCount, stride))
@@ -12268,9 +12257,6 @@ template <typename URV>
 void
 Hart<URV>::execVsssege16_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Half))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint16_t>(di, ElementWidth::Half, fieldCount, stride))
@@ -12283,9 +12269,6 @@ template <typename URV>
 void
 Hart<URV>::execVsssege32_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint32_t>(di, ElementWidth::Word, fieldCount, stride))
@@ -12298,9 +12281,6 @@ template <typename URV>
 void
 Hart<URV>::execVsssege64_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di, vecRegs_.groupMultiplier(), ElementWidth::Word2))
-    return;
-
   uint64_t stride = intRegs_.read(di->op2());
   unsigned fieldCount = di->vecFieldCount();
   if (not vectorStoreSeg<uint64_t>(di, ElementWidth::Word2, fieldCount, stride))
@@ -12708,9 +12688,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei8_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12733,9 +12710,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei16_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12758,9 +12732,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei32_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12783,9 +12754,6 @@ template <typename URV>
 void
 Hart<URV>::execVloxsegei64_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12840,9 +12808,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei8_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12865,9 +12830,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei16_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12890,9 +12852,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei32_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 
@@ -12915,9 +12874,6 @@ template <typename URV>
 void
 Hart<URV>::execVsoxsegei64_v(const DecodedInst* di)
 {
-  if (not checkVecIntInst(di))
-    return;
-
   ElementWidth sew = vecRegs_.elemWidth();
   bool ok = true;
 

@@ -363,6 +363,10 @@ namespace WdRiscv
     void enableTranslationPbmt(bool flag)
     { enableExtension(RvExtension::Svpbmt, flag); updateTranslationPbmt(); }
 
+    /// Enable Svinval extension.
+    void enableSvinval(bool flag)
+    { enableExtension(RvExtension::Svinval, flag); }
+
     /// Called when Svpbmt configuration changes. Enable/disable pbmt in
     /// virtual memory class.
     void updateTranslationPbmt()
