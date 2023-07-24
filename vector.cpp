@@ -18,6 +18,7 @@
 #include <climits>
 #include <cassert>
 #include <optional>
+#include "functors.hpp"
 #include "wideint.hpp"
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
@@ -1240,14 +1241,6 @@ Hart<URV>::execVsub_vx(const DecodedInst* di)
 {
   execVop_vx(di, std::minus());
 }
-
-
-struct MyRsub
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return b - a; }
-};
 
 
 template <typename URV>
@@ -2867,14 +2860,6 @@ Hart<URV>::execVmsgt_vi(const DecodedInst* di)
 }
 
 
-struct MyMin
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return a < b ? a : b; }
-};
-
-
 template <typename URV>
 void
 Hart<URV>::execVminu_vv(const DecodedInst* di)
@@ -2905,14 +2890,6 @@ Hart<URV>::execVmin_vx(const DecodedInst* di)
 {
   execVop_vx(di, MyMin());
 }
-
-
-struct MyMax
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return a > b ? a : b; }
-};
 
 
 template <typename URV>
@@ -3019,19 +2996,6 @@ Hart<URV>::execVxor_vi(const DecodedInst* di)
 }
 
 
-/// Shift left.
-struct MySll
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  {
-    unsigned mask = sizeof(T)*8 - 1;
-    unsigned amount = b & mask;
-    return a << amount;
-  }
-};
-
-
 template <typename URV>
 void
 Hart<URV>::execVsll_vv(const DecodedInst* di)
@@ -3054,19 +3018,6 @@ Hart<URV>::execVsll_vi(const DecodedInst* di)
 {
   execVopu_vi(di, MySll());
 }
-
-
-/// Shift right.
-struct MySr
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  {
-    unsigned mask = sizeof(T)*8 - 1;
-    unsigned amount = b & mask;
-    return a >> amount;
-  }
-};
 
 
 template <typename URV>
@@ -4074,30 +4025,12 @@ Hart<URV>::execVmand_mm(const DecodedInst* di)
 }
 
 
-struct
-MyBitNand
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return ~ (a & b); }
-};
-
-
 template <typename URV>
 void
 Hart<URV>::execVmnand_mm(const DecodedInst* di)
 {
   execVmop_mm(di, MyBitNand());
 }
-
-
-struct
-MyBitAndNot
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return a & ~b; }
-};
 
 
 template <typename URV>
@@ -4124,15 +4057,6 @@ Hart<URV>::execVmor_mm(const DecodedInst* di)
 }
 
 
-struct
-MyBitNor
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return ~ (a | b); }
-};
-
-
 template <typename URV>
 void
 Hart<URV>::execVmnor_mm(const DecodedInst* di)
@@ -4141,30 +4065,12 @@ Hart<URV>::execVmnor_mm(const DecodedInst* di)
 }
 
 
-struct
-MyBitOrNot
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return a | ~b; }
-};
-
-
 template <typename URV>
 void
 Hart<URV>::execVmornot_mm(const DecodedInst* di)
 {
   execVmop_mm(di, MyBitOrNot());
 }
-
-
-struct
-MyBitXnor
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return ~ (a ^ b); }
-};
 
 
 template <typename URV>
