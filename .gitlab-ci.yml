@@ -68,6 +68,8 @@ riscof-job:
     # Get the isa population code from whisper's plugin and use it in spike's plugin
     - sed -n -Ee '/self.isa =/,/self.compile_cmd =/ { s/( {4,})/  \1/g ; p }' ../../arch_test_target/riscof_whisper.py > isa_py.txt
     - sed -i -e '/self.isa =/,/^$/ {' -e '/self.isa =/r isa_py.txt' -e 'd }' spike/riscof_spike.py
+    # Up the timeout time
+    - sed -i 's/make.execute_all(self.work_dir)/make.execute_all(self.work_dir, timeout=900)/' spike/riscof_spike.py
     # Clone and build spike
     - git clone https://github.com/riscv-software-src/riscv-isa-sim
     - mkdir riscv-isa-sim/build
