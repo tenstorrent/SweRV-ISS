@@ -330,6 +330,10 @@ namespace WdRiscv
     ExceptionCause translateNoTlb(uint64_t va, PrivilegeMode pm, bool twoStage,
 				  bool r, bool w, bool x, uint64_t& pa, TlbEntry& entry);
 
+    /// Heler to translateNoTlb.
+    ExceptionCause twoStageTranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool write,
+					  bool exec, uint64_t& pa, TlbEntry& entry);
+
     /// Helper to translate methods for 2nd stage of guest address translation
     /// (guest physical address to host physical address).
     ExceptionCause stage2TranslateNoTlb(uint64_t va, PrivilegeMode pm, bool r,

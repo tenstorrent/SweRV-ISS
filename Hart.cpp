@@ -2572,7 +2572,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   if (not csRegs_.write(tvalNum, privMode_, info))
     assert(0 and "Failed to write TVAL register");
 
-  URV mtval2 = 0, htval = 0;  // New values of MTVAL2 and HTVAL CSRs.
+  URV mtval2 = 0;  // New values of MTVAL2 CSR.
 
   bool gva = isRvh() and origVirtMode and not interrupt and isGvaTrap(cause);
 
