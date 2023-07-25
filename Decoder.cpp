@@ -1403,24 +1403,24 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	  unsigned f6 = cl.bits.funct6;
 	  if (f6 == 0x20)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed();
 	      return instTable_.getEntry(InstId::c_lbu);
 	    }
 	  if (f6 == 0x21)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed() & 2;
 	      if (cl.funct1() == 0)
 		return instTable_.getEntry(InstId::c_lhu);
 	      return instTable_.getEntry(InstId::c_lh);
 	    }
 	  if (f6 == 0x22)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed();
 	      return instTable_.getEntry(InstId::c_sb);
 	    }
 	  if (f6 == 0x23)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed() & 2;
 	      if (cl.funct1() == 0)
 		return instTable_.getEntry(InstId::c_sh);
 	    }
@@ -1560,7 +1560,10 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
               if (imm012 == 3)
                 return instTable_.getEntry(InstId::c_sext_h);
               if (imm012 == 4)
-                return instTable_.getEntry(InstId::c_zext_w);
+                {
+                  op2 = 0;
+                  return instTable_.getEntry(InstId::c_zext_w);
+                }
               if (imm012 == 5)
                 {
                   op2 = -1;
