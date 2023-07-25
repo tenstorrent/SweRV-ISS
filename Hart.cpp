@@ -2471,8 +2471,7 @@ isGvaTrap(unsigned causeCode)
 }
 
 
-/// Return true if given trap number would result in a (guest physical
-/// address >> 2) being written to htval if a trap was taken from VS/VU to HS.
+/// Return true if given trap number corresponds to a gust page fault.
 bool
 isGpaTrap(unsigned causeCode)
 {
@@ -2573,6 +2572,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   if (not csRegs_.write(tvalNum, privMode_, info))
     assert(0 and "Failed to write TVAL register");
 
+  URV mtval2 = 0, htval = 0;  // New values of MTVAL2 and HTVAL CSRs.
+
   bool gva = isRvh() and origVirtMode and not interrupt and isGvaTrap(cause);
 
   // Update status register saving xIE in xPIE and previous privilege
@@ -2588,6 +2589,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
       writeMstatus();
       if (isRvh() and not csRegs_.write(CsrNumber::MTINST, PM::Machine, 0))
 	assert(0 and "Failed to write MTINST register");
+      if (isGpaTrap(cause))
+	mtval2 = info2 >> 2;
     }
   else if (nextMode == PM::Supervisor)
     {
@@ -2627,6 +2630,12 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 		assert(0 and "Failed to write HTINST register");
 	    }
 	}
+    }
+
+  if (isRvh())
+    {
+      if (not csRegs_.write(CsrNumber::MTVAL2, privMode_, mtval2))
+	assert(0 and "Failed to write MTVAL2 register");
     }
 
   // Set program counter to trap handler address.
