@@ -18,22 +18,13 @@
 #include <climits>
 #include <cassert>
 #include "crypto-util.hpp"
+#include "functors.hpp"
 #include "instforms.hpp"
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 
 
 using namespace WdRiscv;
-
-
-/// Function operator to compute bitwise a and not b (a & ~b).
-struct MyAndn 
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  { return a & ~b; }
-};
-
 
 
 template <typename URV>
@@ -814,22 +805,6 @@ Hart<URV>::execVror_vi(const DecodedInst* di)
 }
 
 
-/// Function operator to shift a left by b bits.
-/// Only the least sig n bits of b are used, n is log2(width of T).
-struct
-MySll
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  {
-    unsigned width = sizeof(T)*8;  // Bit count of T
-    unsigned mask = width - 1;
-    unsigned amount = unsigned(b & mask);
-    return a >> amount;
-  }
-};
-
-
 template <typename URV>
 template<typename ELEM_TYPE>
 void
@@ -1047,23 +1022,6 @@ Hart<URV>::execVwsll_vi(const DecodedInst* di)
 }
 
 
-/// Function operator to perform carry-less multiply of a and b.
-struct
-MyClmul
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  {
-    unsigned width = sizeof(T)*8;  // Bit count of T
-    T res{0};
-    for (unsigned i = 0; i < width; ++i)
-      if ((b >> i) & 1)
-	res ^= a << i;
-    return res;
-  }
-};
-
-
 template <typename URV>
 void
 Hart<URV>::execVclmul_vv(const DecodedInst* di)
@@ -1138,24 +1096,6 @@ Hart<URV>::execVclmul_vx(const DecodedInst* di)
 
   postVecSuccess();
 }
-
-
-/// Function operator to perform carry-less multiply of a and b and
-/// return the upper w bits of the product. W is the width of T.
-struct
-MyClmulh
-{
-  template <typename T>
-  constexpr T operator() (const T& a, const T& b) const
-  {
-    unsigned width = sizeof(T)*8;  // Bit count of T
-    T res{0};
-    for (unsigned i = 0; i < width; ++i)
-      if ((b >> i) & 1)
-	res ^= (a >> (width - i));
-    return res;
-  }
-};
 
 
 template <typename URV>

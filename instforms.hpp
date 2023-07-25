@@ -837,6 +837,9 @@ namespace WdRiscv
     unsigned funct1() const
     { return bits.uimm >> 1; }
 
+    unsigned immed() const
+    { return bits.uimm >> 1 | bits.uimm << 1; }
+
     uint32_t code;
 
     struct
