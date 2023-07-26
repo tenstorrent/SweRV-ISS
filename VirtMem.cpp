@@ -291,7 +291,7 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
-  unsigned pmb = 0;  // Pointer masking bits (J extension).
+  unsigned pmb = 0;    // Pointer masking bits (J extension).
 
   if (mode_ == Sv39)
     {
@@ -302,7 +302,7 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
   else if (mode_ == Sv48)
     {
       vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
-      pmb = 16; 
+      pmb = 16;
       walkFn = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
     }
   else if (mode_ == Sv57)
@@ -320,7 +320,7 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
   // Bits higher than bit vaMsb must be identical to bit vaMsb.
   uint64_t va1 = va;
   uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
-  if (pmEnabled_ and priv == PrivilegeMode::User)
+  if (pmEnabled_ and priv == PrivilegeMode::User and not exec)
     {
       va1 = (va1 << pmb) >> pmb;
       va2 = (va2 << pmb) >> pmb;
@@ -490,7 +490,7 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
-  unsigned pmb = 0;  // Pointer masking bits (J extension).
+  unsigned pmb = 0;    // Pointer masking bits (J extension).
 
   if (vsMode_ == Sv39)
     {
@@ -501,13 +501,13 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   else if (vsMode_ == Sv48)
     {
       vaMsb = 49; // Bits 63 to 50 of va must equal bit 49
-      pmb = 16; 
+      pmb = 16;
       walkFn = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
     }
   else if (vsMode_ == Sv57)
     {
       vaMsb = 58; // Bits 63 to 59 of va must equal bit 58
-      pmb = 16; 
+      pmb = 7;
       walkFn = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
     }
   else
@@ -519,7 +519,7 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   // Bits higher than bit vaMsb must be identical to bit vaMsb.
   uint64_t va1 = va;
   uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
-  if (pmEnabled_ and priv == PrivilegeMode::User)
+  if (pmEnabled_ and priv == PrivilegeMode::User and not exec)
     {
       va1 = (va1 << pmb) >> pmb;
       va2 = (va2 << pmb) >> pmb;

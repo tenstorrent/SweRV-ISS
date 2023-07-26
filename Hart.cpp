@@ -9600,7 +9600,7 @@ namespace WdRiscv
     if (not csRegs_.readSignExtend(CsrNumber::MEPC, privMode_, epc))
       assert(0);
     setPc(epc);
-      
+
     // 3. Update virtual mode.
     if (savedMode != PrivilegeMode::Machine)
       setVirtualMode(savedVirt);
