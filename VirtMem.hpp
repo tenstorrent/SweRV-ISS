@@ -476,6 +476,25 @@ namespace WdRiscv
 	  byte = (prev.value_ >> ((addr - prev.addr_)*8)) & 0xff;
     }
 
+    /// Check for NAPOT on PTE and apply NAPOT fixup if applicable.
+    /// Returns false if PTE would cause a pagefault due to NAPOT, and true otherwise.
+    template <typename PTE, typename VA>
+    bool napotCheck(PTE& pte, VA va)
+    {
+      if (napotEnabled_)
+        {
+          if (pte.hasNapot())
+            {
+              if ((pte.ppn0() & 0xf) != 0x8)
+                return false;
+              pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
+            }
+        }
+      else if (pte.hasNapot())
+        return false;
+      return true;
+    }
+
   private:
 
     struct UpdatedPte
