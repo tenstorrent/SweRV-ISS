@@ -494,26 +494,26 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
 
   if (vsMode_ == Sv39)
     {
-      vaMsb = 40; // Bits 63 to 41 of va must equal bit 40
+      vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
       pmb = 16;
       walkFn = &VirtMem::stage1PageTableWalk<Pte39, Va39>;
     }
   else if (vsMode_ == Sv48)
     {
-      vaMsb = 49; // Bits 63 to 50 of va must equal bit 49
+      vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
       pmb = 16; 
       walkFn = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
     }
   else if (vsMode_ == Sv57)
     {
-      vaMsb = 58; // Bits 63 to 59 of va must equal bit 58
-      pmb = 16; 
+      vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
+      pmb = 7;
       walkFn = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
     }
   else
     {
       assert(0 and "Unsupported virtual memory mode.");
-      return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
+      return ExceptionCause::LOAD_PAGE_FAULT;
     }
 
   // Bits higher than bit vaMsb must be identical to bit vaMsb.
