@@ -570,18 +570,10 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	    return accessFaultType(read, write, exec);
 	}
 
+
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage1PageFaultType(read, write, exec);
-      if (napotEnabled_)
-	{
-	  if (pte.hasNapot())
-	    {
-	      if ((pte.ppn0() & 0xf) != 0x8)
-		return stage1PageFaultType(read, write, exec);
-	      pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
-	    }
-	}
-      else if (pte.hasNapot())
+      if (not napotCheck(pte, va))
         return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
@@ -663,6 +655,9 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);
+            if (not napotCheck(pte2, va))
+              return stage1PageFaultType(read, write, exec);
+
 	    if (pte.data_ != pte2.data_)
 	      continue;  // Comparison fails: return to step 2.
 	    pte.bits_.accessed_ = 1;
@@ -744,16 +739,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage2PageFaultType(read, write, exec);
-      if (napotEnabled_)
-	{
-	  if (pte.hasNapot())
-	    {
-	      if ((pte.ppn0() & 0xf) != 0x8)
-		return stage2PageFaultType(read, write, exec);
-	      pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
-	    }
-	}
-      else if (pte.hasNapot())
+      if (not napotCheck(pte, va))
         return stage2PageFaultType(read, write, exec);
 
       if (attFile_)
@@ -834,6 +820,9 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);
+            if (not napotCheck(pte2, va))
+              return stage2PageFaultType(read, write, exec);
+
 	    if (pte.data_ != pte2.data_)
 	      continue;  // Comparison fails: return to step 2.
 	    pte.bits_.accessed_ = 1;
@@ -929,16 +918,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
         return stage1PageFaultType(read, write, exec);
-      if (napotEnabled_)
-	{
-	  if (pte.hasNapot())
-	    {
-	      if ((pte.ppn0() & 0xf) != 0x8)
-		return stage1PageFaultType(read, write, exec);
-	      pte.setPpn0((pte.ppn0() & ~0xf) | (va.vpn0() & 0xf));
-	    }
-	}
-      else if (pte.hasNapot())
+      if (not napotCheck(pte, va))
         return stage1PageFaultType(read, write, exec);
 
       if (attFile_)
@@ -1022,6 +1002,9 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    // B2. Compare pte to memory.
 	    PTE pte2(0);
 	    memRead(pteAddr, bigEnd_, pte2.data_);
+            if (not napotCheck(pte2, va))
+              return stage1PageFaultType(read, write, exec);
+
 	    if (pte.data_ != pte2.data_)
 	      continue;  // Comparison fails: return to step 2.
 	    pte.bits_.accessed_ = 1;
