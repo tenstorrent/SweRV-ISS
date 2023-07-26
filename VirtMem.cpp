@@ -65,18 +65,6 @@ stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
 }
 
 
-/// Page fault type for read/write/exec access (one and only one of
-/// which must be true).
-static constexpr
-ExceptionCause
-pageFaultType(bool twoStage, bool read, bool write, bool exec)
-{
-  if (twoStage)
-    return stage2PageFaultType(read, write, exec);
-  return stage1PageFaultType(read, write, exec);
-}
-
-
 static constexpr
 ExceptionCause
 accessFaultType(bool read, bool write, bool exec)
@@ -148,30 +136,34 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
 
-  if (mode_ == Bare)
+  // TBD FIX -- use TLB for two-stage case.
+  if (not twoStage)
     {
-      pa = va;
-      return ExceptionCause::NONE;
-    }
+      if (mode_ == Bare)
+	{
+	  pa = va;
+	  return ExceptionCause::NONE;
+	}
 
-  // Lookup virtual page number in TLB.
-  uint64_t virPageNum = va >> pageBits_;
-  TlbEntry* entry = tlb_.findEntry(virPageNum, asid_);
-  if (entry)
-    {
-      // Use TLB entry.
-      if (priv == PrivilegeMode::User and not entry->user_)
-        return pageFaultType(twoStage, read, write, exec);
-      if (priv == PrivilegeMode::Supervisor)
-	if (entry->user_ and (exec or not sum_))
-	  return pageFaultType(twoStage, read, write, exec);
-      bool ra = entry->read_ or (execReadable_ and entry->exec_);
-      bool wa = entry->write_, xa = entry->exec_;
-      if ((read and not ra) or (write and not wa) or (exec and not xa))
-        return pageFaultType(twoStage, read, write, exec);
-      // We do not check/update access/dirty bits.
-      pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
-      return ExceptionCause::NONE;
+      // Lookup virtual page number in TLB.
+      uint64_t virPageNum = va >> pageBits_;
+      TlbEntry* entry = tlb_.findEntry(virPageNum, asid_);
+      if (entry)
+	{
+	  // Use TLB entry.
+	  if (priv == PrivilegeMode::User and not entry->user_)
+	    return stage1PageFaultType(read, write, exec);
+	  if (priv == PrivilegeMode::Supervisor)
+	    if (entry->user_ and (exec or not sum_))
+	      return stage1PageFaultType(read, write, exec);
+	  bool ra = entry->read_ or (execReadable_ and entry->exec_);
+	  bool wa = entry->write_, xa = entry->exec_;
+	  if ((read and not ra) or (write and not wa) or (exec and not xa))
+	    return stage1PageFaultType(read, write, exec);
+	  // We do not check/update access/dirty bits.
+	  pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+	  return ExceptionCause::NONE;
+	}
     }
 
   TlbEntry tlbEntry;
@@ -238,18 +230,18 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
     {
       // Use TLB entry.
       if (priv == PrivilegeMode::User and not entry->user_)
-        return pageFaultType(twoStage, read, write, exec);
+        return stage1PageFaultType(read, write, exec);
       if (priv == PrivilegeMode::Supervisor)
 	if (entry->user_ and (exec or not sum_))
-	  return pageFaultType(twoStage, read, write, exec);
+	  return stage1PageFaultType(read, write, exec);
       bool ra = entry->read_ or (execReadable_ and entry->exec_);
       bool wa = entry->write_, xa = entry->exec_;
       if ((read and not ra) or (write and not wa) or (exec and not xa))
-        return pageFaultType(twoStage, read, write, exec);
+        return stage1PageFaultType(read, write, exec);
       if (not entry->accessed_ or (write and not entry->dirty_))
         {
           if (faultOnFirstAccess_)
-            return pageFaultType(twoStage, read, write, exec);
+            return stage1PageFaultType(read, write, exec);
           entry->accessed_ = true;
           if (write)
             entry->dirty_ = true;
@@ -270,16 +262,36 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
 
 
 ExceptionCause
+VirtMem::twoStageTranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
+				bool write, bool exec, uint64_t& pa, TlbEntry& entry)
+{
+  uint64_t gpa = va;
+  if (vsMode_ != Bare)
+    {
+      auto cause = stage1TranslateNoTlb(va, priv, read, write, exec, gpa, entry);
+      if (cause != ExceptionCause::NONE)
+	return cause;
+    }
+
+  TlbEntry entry2;
+  return stage2TranslateNoTlb(gpa, priv, read, write, exec, pa, entry2);
+}
+
+
+ExceptionCause
 VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool read,
 			bool write, bool exec, uint64_t& pa, TlbEntry& entry)
 {
+  if (twoStage)
+    return twoStageTranslateNoTlb(va, priv, read, write, exec, pa, entry);
+
   // Perform a page table walk.
   if (mode_ == Sv32)
     return pageTableWalk1p12<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
-  unsigned pmb = 0;  // Pointer masking bits (J extension).
+  unsigned pmb = 0;    // Pointer masking bits (J extension).
 
   if (mode_ == Sv39)
     {
@@ -290,7 +302,7 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
   else if (mode_ == Sv48)
     {
       vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
-      pmb = 16; 
+      pmb = 16;
       walkFn = &VirtMem::pageTableWalk1p12<Pte48, Va48>;
     }
   else if (mode_ == Sv57)
@@ -308,13 +320,13 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
   // Bits higher than bit vaMsb must be identical to bit vaMsb.
   uint64_t va1 = va;
   uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
-  if (pmEnabled_ and priv == PrivilegeMode::User)
+  if (pmEnabled_ and priv == PrivilegeMode::User and not exec)
     {
       va1 = (va1 << pmb) >> pmb;
       va2 = (va2 << pmb) >> pmb;
     }
   if (va1 != va2)
-    return pageFaultType(twoStage, read, write, exec);
+    return stage1PageFaultType(read, write, exec);
 
   return (this->*walkFn)(va, priv, read, write, exec, pa, entry);
 }
@@ -478,36 +490,36 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
-  unsigned pmb = 0;  // Pointer masking bits (J extension).
+  unsigned pmb = 0;    // Pointer masking bits (J extension).
 
   if (vsMode_ == Sv39)
     {
-      vaMsb = 40; // Bits 63 to 41 of va must equal bit 40
+      vaMsb = 38; // Bits 63 to 39 of va must equal bit 38
       pmb = 16;
       walkFn = &VirtMem::stage1PageTableWalk<Pte39, Va39>;
     }
   else if (vsMode_ == Sv48)
     {
-      vaMsb = 49; // Bits 63 to 50 of va must equal bit 49
+      vaMsb = 47; // Bits 63 to 48 of va must equal bit 47
       pmb = 16; 
       walkFn = &VirtMem::stage1PageTableWalk<Pte48, Va48>;
     }
   else if (vsMode_ == Sv57)
     {
-      vaMsb = 58; // Bits 63 to 59 of va must equal bit 58
-      pmb = 16; 
+      vaMsb = 56; // Bits 63 to 57 of va must equal bit 56
+      pmb = 7;
       walkFn = &VirtMem::stage1PageTableWalk<Pte57, Va57>;
     }
   else
     {
       assert(0 and "Unsupported virtual memory mode.");
-      return ExceptionCause::LOAD_GUEST_PAGE_FAULT;
+      return ExceptionCause::LOAD_PAGE_FAULT;
     }
 
   // Bits higher than bit vaMsb must be identical to bit vaMsb.
   uint64_t va1 = va;
   uint64_t va2 = (int64_t(va) << (63-vaMsb)) >> (63-vaMsb); // Expected va.
-  if (pmEnabled_ and priv == PrivilegeMode::User)
+  if (pmEnabled_ and priv == PrivilegeMode::User and not exec)
     {
       va1 = (va1 << pmb) >> pmb;
       va2 = (va2 << pmb) >> pmb;

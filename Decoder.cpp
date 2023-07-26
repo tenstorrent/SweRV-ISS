@@ -238,7 +238,7 @@ Decoder::decodeFp(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
           if (op2 == 8)         return instTable_.getEntry(InstId::fcvt_bf16_s);
           return instTable_.getEntry(InstId::illegal);
         }
-      if (top5 == 0xb)          return instTable_.getEntry(InstId::fsqrt_h);
+      if (top5==0xb and op2==0) return instTable_.getEntry(InstId::fsqrt_h);
       if (top5 == 0x14)
 	{
 	  if (f3 == 0)          return instTable_.getEntry(InstId::fle_h);

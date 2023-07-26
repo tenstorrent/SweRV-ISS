@@ -1206,7 +1206,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   // Keep reservation on exception in SC.W/D.
-  tag = "keep_reservation_on_sc_excetpion";
+  tag = "keep_reservation_on_sc_exception";
   if (config_ -> contains(tag))
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
