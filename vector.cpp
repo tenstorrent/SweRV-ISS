@@ -129,7 +129,7 @@ Hart<URV>::enableVectorExtension(bool flag)
   enableExtension(RvExtension::V, flag);
   csRegs_.enableVectorExtension(flag);
 
-  if (not flag and isRvs())
+  if (not flag and not isRvs())
     setVecStatus(VecStatus::Off);
 }
 
