@@ -1639,7 +1639,7 @@ determineIsa(const HartConfig& config, const Args& args, bool clib, std::string&
   if (isa.empty() and clib)
     {
       if (args.verbose)
-        std::cerr << "No ISA specfied, using a/c/m/f/d/v extensions for newlib/linux\n";
+        std::cerr << "No ISA specfied, using i/m/a/c/f/d/v extensions for newlib/linux\n";
       isa = "imcafdv";
     }
 
