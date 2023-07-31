@@ -791,9 +791,11 @@ Hart<URV>::postVecSuccess()
 
 template <typename URV>
 void
-Hart<URV>::postVecFail(const DecodedInst* di)
+Hart<URV>::postVecFail(const DecodedInst* di, bool clearVstart)
 {
   illegalInst(di);
+  if (clearVstart)
+    csRegs_.clearVstart();
   if (vecRegs_.getLastWrittenReg() >= 0)
     markVsDirty();
 }
@@ -4088,8 +4090,7 @@ Hart<URV>::execVcpop_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4118,8 +4119,7 @@ Hart<URV>::execVfirst_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4152,8 +4152,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4162,8 +4161,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4199,8 +4197,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4209,8 +4206,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4247,8 +4243,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4257,8 +4252,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4306,8 +4300,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0 or
       (vs1 >= vd and vs1 < vd + group))
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4316,8 +4309,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
 
   if (masked and vd == 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4339,10 +4331,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, groupx8, int16_t(sum)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, groupx8, int32_t(sum)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, groupx8, int64_t(sum)); break;
-	default:
-	  postVecSuccess();  // To clear vstart.
-	  postVecFail(di);
-	  return;
+	default: postVecFail(di, true /*clearVstart*/); return;
         }
 
       if (sourceSet)
@@ -4361,8 +4350,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4374,8 +4362,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
 
   if (masked and vd == 0)
     {
-      postVecSuccess();  // To clear vstart.
-      postVecFail(di);
+      postVecFail(di, true /*clearVstart*/);
       return;
     }
 
@@ -4396,10 +4383,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(ix)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(ix)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(ix)); break;
-	default:
-	  postVecSuccess();  // To clear vstart.
-	  postVecFail(di);
-	  return;
+	default: postVecFail(di, true /*clearVstart*/); return;
         }
     }
   postVecSuccess();

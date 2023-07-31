@@ -2635,7 +2635,7 @@ namespace WdRiscv
 
     // Called at the end of a trapping vector instruction to mark VS
     // dirty if a vector register was updated.
-    void postVecFail(const DecodedInst* di);
+    void postVecFail(const DecodedInst* di, bool clearVstart = false);
 
     // The program counter is adjusted (size of current instruction
     // added) before any of the following exec methods are called. To
