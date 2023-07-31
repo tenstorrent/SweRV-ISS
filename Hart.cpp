@@ -3160,7 +3160,7 @@ Hart<URV>::configIsa(std::string_view isa, bool updateMisa)
       if (isa_.isEnabled(RvExtension::M))
 	misaReset |= URV(0x1000);
       if (isa_.isEnabled(RvExtension::V))
-	misaReset |= URV(0x20000);
+	misaReset |= URV(0x200000);
   
       URV mask = 0, pokeMask = 0;
       bool implemented = true, isDebug = false, shared = true;
@@ -4261,7 +4261,7 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
   bool success = untilAddress(address, traceFile);
       
-  if (instCounter_ == limit)
+  if (instCounter_ >= limit)
     std::cerr << "Stopped -- Reached instruction limit\n";
   else if (pc_ == address)
     std::cerr << "Stopped -- Reached end address\n";

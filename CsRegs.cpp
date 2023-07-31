@@ -1462,7 +1462,7 @@ CsRegs<URV>::defineMachineRegs()
 
   val = 0x4000112d;  // MISA: acdfim
   if constexpr (sizeof(URV) == 8)
-    val = 0x800000000000112d;  // MISA: acdfim
+    val = 0x800000000020112d;  // MISA: acdfimv
   defineCsr("misa", Csrn::MISA, mand, imp, val, rom, rom);
 
   // Bits corresponding to reserved interrupts are hardwired to zero
