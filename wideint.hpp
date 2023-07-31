@@ -1112,9 +1112,9 @@ namespace WdRiscv
     if constexpr (std::is_base_of<WideIntBase, RetType>::value)
       {
         // Upper half is provided first
-        auto h0 = fromHalves(q1, q0);
-        auto h1 = fromHalves(q3, q2);
-        return fromHalves(h1, h0);
+        auto h0 = fromHalves(q0, q1);
+        auto h1 = fromHalves(q2, q3);
+        return fromHalves(h0, h1);
       }
 
     auto quarters = std::array{ q0, q1, q2, q3 };
