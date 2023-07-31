@@ -818,8 +818,8 @@ checkForNewlibOrLinux(const Args& args, bool& newlib, bool& linux)
     {
       auto elfPath = target.at(0);
       if (not linux)
-	linux = Memory::isSymbolInElfFile(elfPath, "__libc_early_init");
-
+	linux = (Memory::isSymbolInElfFile(elfPath, "__libc_early_init") or
+		 Memory::isSymbolInElfFile(elfPath, "__dladdr"));
       if (not newlib)
 	newlib = Memory::isSymbolInElfFile(elfPath, "__call_exitprocs");
 
