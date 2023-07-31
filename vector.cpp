@@ -796,7 +796,7 @@ Hart<URV>::postVecFail(const DecodedInst* di, bool clearVstart)
   illegalInst(di);
   if (clearVstart)
     csRegs_.clearVstart();
-  if (vecRegs_.getLastWrittenReg() >= 0)
+  if (vecRegs_.getLastWrittenReg() >= 0 or clearVstart)
     markVsDirty();
 }
 
