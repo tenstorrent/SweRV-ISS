@@ -1431,6 +1431,9 @@ namespace WdRiscv
     /// is replaced by the current value. Return the legalized value.
     URV legalizePmpcfgValue(URV current, URV value) const;
 
+    /// Legalize scountovf, matching OF bit of given mhpmevent.
+    void updateScountovfValue(CsrNumber mhpm, uint64_t value);
+
     /// Return true if given CSR number is a PMPADDR register and if
     /// that register is locked.  Return false otherwise.
     bool isPmpaddrLocked(CsrNumber csrn) const;

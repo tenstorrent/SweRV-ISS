@@ -2885,7 +2885,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   // This makes sure that counters stop counting after corresponding
   // event reg is written.
   if (enableCounters_)
-    if (csr >= CN::MHPMEVENT3 and csr <= CN::MHPMEVENT31)
+    if ((csr >= CN::MHPMEVENT3 and csr <= CN::MHPMEVENT31) or
+        (csr >= CN::MHPMEVENTH3 and csr <= CN::MHPMEVENTH31))
       if (not csRegs_.applyPerfEventAssign())
         std::cerr << "Unexpected applyPerfAssign fail\n";
 

@@ -592,6 +592,22 @@ CsRegs<URV>::enableSscofpmf(bool flag)
   else
     csr->setImplemented(flag);
 
+  // un-mask LCOF bits
+  if (flag)
+    {
+      auto lcof = 1 << URV(InterruptCause::LCOF);
+      for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
+        {
+          auto csr = findCsr(csrn);
+          if (csr)
+            {
+              auto lcof = 1 << URV(InterruptCause::LCOF);
+              csr->setWriteMask(csr->getWriteMask() | lcof);
+              csr->setPokeMask(csr->getWriteMask() | lcof);
+            }
+        }
+    }
+
   mPerfRegs_.enableOverflow(flag);
   if (flag and not mPerfRegs_.ovfCallback_)
     {
@@ -622,9 +638,15 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 	  }
 
 	if (rv32_)
-	  event->poke(fields.value_ >> 32);
+          {
+            event->poke(fields.value_ >> 32);
+            updateScountovfValue(evnum, fields.value_ >> 32);
+          }
 	else
-	  event->poke(fields.value_);
+          {
+            event->poke(fields.value_);
+            updateScountovfValue(evnum, fields.value_);
+          }
 	this->recordWrite(evnum);
 
 	auto mip = this->findCsr(CsrNumber::MIP);
@@ -972,7 +994,16 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
-    updateCounterControl(num);
+    {
+      updateCounterControl(num);
+      if (cofEnabled_)
+        {
+          if (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31)
+            updateScountovfValue(num, value);
+          else if (not rv32_)
+            updateScountovfValue(num, value);
+        }
+    }
   else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
     updateFcsrGroupForWrite(num, value);   // fflags and frm are part of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
@@ -2313,7 +2344,16 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
 
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
-    updateCounterControl(num);
+    {
+      updateCounterControl(num);
+      if (cofEnabled_)
+        {
+          if (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31)
+            updateScountovfValue(num, value);
+          else if (not rv32_)
+            updateScountovfValue(num, value);
+        }
+    }
   else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
     updateFcsrGroupForPoke(num, value);   // fflags and frm are parts of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
@@ -2517,7 +2557,39 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
     }
 
   return legal;
-}  
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::updateScountovfValue(CsrNumber mhpm, uint64_t value)
+{
+  using CN = CsrNumber;
+
+  Csr<URV>* csr = getImplementedCsr(CN::SCOUNTOVF);
+  if (not csr)
+    {
+      assert(0);
+      return;
+    }
+
+  bool of = value >> 8*sizeof(URV);
+  URV ix = 3;
+  if (rv32_)
+    {
+      assert(mhpm >= CN::MHPMEVENTH3 and mhpm <= CN::MHPMEVENTH31);
+      ix += uint32_t(mhpm) - uint32_t(CN::MHPMEVENTH3);
+    }
+  else
+    {
+      assert(mhpm >= CN::MHPMEVENT3 and mhpm <= CN::MHPMEVENT31);
+      ix += uint32_t(mhpm) - uint32_t(CN::MHPMEVENT3);
+    }
+
+  URV mask = ~ (1 << ix);
+  URV prev = csr->read() & mask;
+  csr->poke(of << ix | prev);
+}
 
 
 template <typename URV>
