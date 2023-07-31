@@ -1416,6 +1416,9 @@ namespace WdRiscv
     /// Adjust the value of HSTATEEN by masking with MSTATEEN.
     URV adjustHstateenValue(CsrNumber csrn, URV value) const;
 
+    // Adjust the value of SCOUNTOVF by masking with MCOUNTEREN/HCOUNTEREN
+    URV adjustScountovfValue(URV value) const;
+
     /// Helper to write method: Mask with MIP/MIE/MIDELEG.
     bool writeSipSie(CsrNumber num, URV value);
 

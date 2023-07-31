@@ -293,6 +293,23 @@ CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
 
 
 template <typename URV>
+URV
+CsRegs<URV>::adjustScountovfValue(URV value) const
+{
+  auto csr = getImplementedCsr(CsrNumber::MCOUNTEREN);
+  assert(csr and "MCOUNTEREN not implemented");
+  URV mask = csr->read();
+  if (virtMode_)
+    {
+      csr = getImplementedCsr(CsrNumber::HCOUNTEREN);
+      assert(csr and "HCOUNTERN not implemented");
+      mask &= csr->read();
+    }
+  return value & mask;
+}
+
+
+template <typename URV>
 bool
 CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
 {
@@ -336,6 +353,8 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     value = adjustSstateenValue(num, value);
   else if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
     value = adjustHstateenValue(num, value);
+  else if (num == CN::SCOUNTOVF)
+    value = adjustScountovfValue(value);
 
   return true;
 }
@@ -595,7 +614,6 @@ CsRegs<URV>::enableSscofpmf(bool flag)
   // un-mask LCOF bits
   if (flag)
     {
-      auto lcof = 1 << URV(InterruptCause::LCOF);
       for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
         {
           auto csr = findCsr(csrn);
@@ -2573,7 +2591,7 @@ CsRegs<URV>::updateScountovfValue(CsrNumber mhpm, uint64_t value)
       return;
     }
 
-  bool of = value >> 8*sizeof(URV);
+  bool of = value >> (8*sizeof(URV) - 1);
   URV ix = 3;
   if (rv32_)
     {
