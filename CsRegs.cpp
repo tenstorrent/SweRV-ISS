@@ -231,14 +231,6 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
       CN base = CN::SSTATEEN0;
       unsigned ix = unsigned(num) - unsigned(base);
 
-      constexpr bool rv32 = sizeof(URV) == 4;
-
-      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
-      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // SSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
-
-
       // If a bit is zero in MSTATEEN, it becomes zero in SSTATEEN
       CsrNumber mnum = advance(CN::MSTATEEN0, ix);
       auto mcsr = getImplementedCsr(mnum);
@@ -247,10 +239,6 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
 
       if (virtMode_)
 	{
-	  auto hcsr0 = getImplementedCsr(rv32? CN::HSTATEEN0H : CN::HSTATEEN0);
-	  if (ix == 0 and hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
-	    return false;  // SSTATEN0 not accessible because bit 63 of HSTATEEN0 is 0.
-
 	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);
 	  auto hcsr = getImplementedCsr(hnum);
 	  if (hcsr)
@@ -276,19 +264,33 @@ CsRegs<URV>::adjustHstateenValue(CsrNumber num, URV value) const
 	base = CN::HSTATEEN0H;
       unsigned ix = unsigned(num) - unsigned(base);
 
-      constexpr bool rv32 = sizeof(URV) == 4;
-      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
-      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // SSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
-
       // If a bit is zero in MSTATEEN, it becomes zero in HSTATEEN
-      CsrNumber mnum = advance(CN::MSTATEEN0, ix);
+      CN mnum = CN::MSTATEEN0;
+      if (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H)
+        mnum = CN::MSTATEEN0H;
+      mnum = advance(mnum, ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	value &= mcsr->read();
     }
   return value;
+}
+
+
+template <typename URV>
+URV
+CsRegs<URV>::adjustScountovfValue(URV value) const
+{
+  auto csr = getImplementedCsr(CsrNumber::MCOUNTEREN);
+  assert(csr and "MCOUNTEREN not implemented");
+  URV mask = csr->read();
+  if (virtMode_)
+    {
+      csr = getImplementedCsr(CsrNumber::HCOUNTEREN);
+      assert(csr and "HCOUNTERN not implemented");
+      mask &= csr->read();
+    }
+  return value & mask;
 }
 
 
@@ -307,6 +309,9 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
 
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
+
+  if (not isStateEnabled(num, mode))
+    return false;
 
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
     return readTdata(num, mode, value);
@@ -334,8 +339,11 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     value = adjustPmpValue(num, value);
   else if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     value = adjustSstateenValue(num, value);
-  else if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
+  else if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
+           (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
     value = adjustHstateenValue(num, value);
+  else if (num == CN::SCOUNTOVF)
+    value = adjustScountovfValue(value);
 
   return true;
 }
@@ -592,6 +600,21 @@ CsRegs<URV>::enableSscofpmf(bool flag)
   else
     csr->setImplemented(flag);
 
+  // un-mask LCOF bits
+  if (flag)
+    {
+      for (auto csrn : {CsrNumber::MIE, CsrNumber::MIP, CsrNumber::SIE, CsrNumber::SIP})
+        {
+          auto csr = findCsr(csrn);
+          if (csr)
+            {
+              auto lcof = 1 << URV(InterruptCause::LCOF);
+              csr->setWriteMask(csr->getWriteMask() | lcof);
+              csr->setPokeMask(csr->getWriteMask() | lcof);
+            }
+        }
+    }
+
   mPerfRegs_.enableOverflow(flag);
   if (flag and not mPerfRegs_.ovfCallback_)
     {
@@ -622,9 +645,15 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 	  }
 
 	if (rv32_)
-	  event->poke(fields.value_ >> 32);
+          {
+            event->poke(fields.value_ >> 32);
+            updateScountovfValue(evnum, fields.value_ >> 32);
+          }
 	else
-	  event->poke(fields.value_);
+          {
+            event->poke(fields.value_);
+            updateScountovfValue(evnum, fields.value_);
+          }
 	this->recordWrite(evnum);
 
 	auto mip = this->findCsr(CsrNumber::MIP);
@@ -814,31 +843,21 @@ CsRegs<URV>::writeSstateen(CsrNumber num, URV value)
       CN base = CN::SSTATEEN0;
       unsigned ix = unsigned(num) - unsigned(base);
 
-      Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode_);
       if (not csr)
 	return false;
-
-      constexpr bool rv32 = sizeof(URV) == 4;
-      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
-      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // SSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
 
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
 
-      CsrNumber mnum = advance(CN::MSTATEEN0, ix);
+      CN mnum = advance(CN::MSTATEEN0, ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	mask &= mcsr->read();
 
       if (virtMode_)
 	{
-	  auto hcsr0 = getImplementedCsr(rv32? CN::HSTATEEN0H : CN::HSTATEEN0);
-	  if (ix == 0 and hcsr0 and not ((hcsr0->read() >> msbIx) & 1))
-	    return false;  // SSTATEN0 not accessible because bit 63 of HSTATEEN0 is 0.
-
-	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);
+	  CN hnum = advance(CN::HSTATEEN0, ix);
 	  auto hcsr = getImplementedCsr(hnum);
 	  if (hcsr)
 	    mask &= hcsr->read();
@@ -870,20 +889,17 @@ CsRegs<URV>::writeHstateen(CsrNumber num, URV value)
 	base = CN::HSTATEEN0H;
       unsigned ix = unsigned(num) - unsigned(base);
 
-      Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+      auto csr = getImplementedCsr(num, virtMode_);
       if (not csr)
 	return false;
-
-      constexpr bool rv32 = sizeof(URV) == 4;
-      constexpr unsigned msbIx = sizeof(URV)*8 - 1; // Most sig bit
-      auto mcsr0 = getImplementedCsr(rv32? CN::MSTATEEN0H : CN::MSTATEEN0);
-      if (ix == 0 and mcsr0 and not ((mcsr0->read() >> msbIx) & 1))
-	return false;  // HSSTATEN0 not accessible because MSB of MSTATEEN0 is 0.
 
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
 
-      CsrNumber mnum = advance(CN::MSTATEEN0, ix);
+      CN mnum = CN::MSTATEEN0;
+      if (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H)
+        mnum = CN::MSTATEEN0H;
+      mnum = advance(mnum, ix);
       auto mcsr = getImplementedCsr(mnum);
       if (mcsr)
 	mask &= mcsr->read();
@@ -917,6 +933,9 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       return true;  // Writing a locked PMPADDR register has no effect.
     }
 
+  if (not isStateEnabled(num, mode))
+    return false;
+
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
     {
       if (not writeTdata(num, mode, value))
@@ -933,7 +952,8 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     return writeSstateen(num, value);
 
-  if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
+  if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
+      (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
     return writeHstateen(num, value);
 
   if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
@@ -966,20 +986,27 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
-   
+
   csr->write(value);
   recordWrite(num);
 
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
-    updateCounterControl(num);
+    {
+      updateCounterControl(num);
+      if (cofEnabled_)
+        {
+          if (not rv32_ or (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
+            updateScountovfValue(num, value);
+        }
+    }
   else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
     updateFcsrGroupForWrite(num, value);   // fflags and frm are part of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
     updateVcsrGroupForWrite(num, value);   // vxsat and vrm are part of vcsr
   else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN)
     updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
-  else 
+  else
     hyperWrite(csr);   // Update hypervisor CSR aliased bits.
 
   return true;
@@ -2313,7 +2340,16 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
 
   if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
-    updateCounterControl(num);
+    {
+      updateCounterControl(num);
+      if (cofEnabled_)
+        {
+          if (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31)
+            updateScountovfValue(num, value);
+          else if (not rv32_)
+            updateScountovfValue(num, value);
+        }
+    }
   else if (num == CN::FFLAGS or num == CN::FRM or num == CN::FCSR)
     updateFcsrGroupForPoke(num, value);   // fflags and frm are parts of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
@@ -2517,7 +2553,39 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
     }
 
   return legal;
-}  
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::updateScountovfValue(CsrNumber mhpm, uint64_t value)
+{
+  using CN = CsrNumber;
+
+  Csr<URV>* csr = getImplementedCsr(CN::SCOUNTOVF);
+  if (not csr)
+    {
+      assert(0);
+      return;
+    }
+
+  bool of = value >> (8*sizeof(URV) - 1);
+  URV ix = 3;
+  if (rv32_)
+    {
+      assert(mhpm >= CN::MHPMEVENTH3 and mhpm <= CN::MHPMEVENTH31);
+      ix += uint32_t(mhpm) - uint32_t(CN::MHPMEVENTH3);
+    }
+  else
+    {
+      assert(mhpm >= CN::MHPMEVENT3 and mhpm <= CN::MHPMEVENT31);
+      ix += uint32_t(mhpm) - uint32_t(CN::MHPMEVENT3);
+    }
+
+  URV mask = ~ (1 << ix);
+  URV prev = csr->read() & mask;
+  csr->poke(of << ix | prev);
+}
 
 
 template <typename URV>
@@ -3087,6 +3155,60 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	{
 	  hie->poke((hie->read() & ~vsMask) | (mie->read() & vsMask));
 	}
+    }
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
+{
+  if (not stateenOn_ or mode == PrivilegeMode::Machine)
+    return true;
+
+  using CN = CsrNumber;
+  // sstateen not applicable for now
+  CN csrn = rv32_? CN::MSTATEEN0H : CN::MSTATEEN0;
+  if (virtMode_)
+    csrn = rv32_? CN::HSTATEEN0H : CN::HSTATEEN0;
+
+  int enableBit = -1;
+  unsigned offset = 0;
+  if (num == CN::HCONTEXT or num == CN::SCONTEXT)
+    enableBit = 57;
+  else if (num == CN::HENVCFG or num == CN::HENVCFGH or num == CN::SENVCFG)
+    enableBit = 62;
+  else if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
+    {
+      enableBit = 63;
+      offset = unsigned(num) - unsigned(CN::HSTATEEN0);
+    }
+  else if (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H)
+    {
+      enableBit = 63;
+      offset = unsigned(num) - unsigned(CN::HSTATEEN0H);
+    }
+  else if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
+    {
+      enableBit = 63;
+      offset = unsigned(num) - unsigned(CN::SSTATEEN0);
+    }
+
+  if (enableBit < 0)
+    return true;
+  else
+    {
+      csrn = advance(csrn, offset);
+      auto csr = getImplementedCsr(csrn);
+      if (not csr)
+        {
+          assert(0);
+          return false;
+        }
+
+      if (rv32_) enableBit -= 8*sizeof(URV);
+      URV value = csr->read();
+      return (value >> enableBit) & 1;
     }
 }
 

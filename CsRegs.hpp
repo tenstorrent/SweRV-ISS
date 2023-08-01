@@ -1416,6 +1416,9 @@ namespace WdRiscv
     /// Adjust the value of HSTATEEN by masking with MSTATEEN.
     URV adjustHstateenValue(CsrNumber csrn, URV value) const;
 
+    // Adjust the value of SCOUNTOVF by masking with MCOUNTEREN/HCOUNTEREN
+    URV adjustScountovfValue(URV value) const;
+
     /// Helper to write method: Mask with MIP/MIE/MIDELEG.
     bool writeSipSie(CsrNumber num, URV value);
 
@@ -1430,6 +1433,9 @@ namespace WdRiscv
     /// mode is not selectable in the A field. If a field is locked it
     /// is replaced by the current value. Return the legalized value.
     URV legalizePmpcfgValue(URV current, URV value) const;
+
+    /// Legalize scountovf, matching OF bit of given mhpmevent.
+    void updateScountovfValue(CsrNumber mhpm, uint64_t value);
 
     /// Return true if given CSR number is a PMPADDR register and if
     /// that register is locked.  Return false otherwise.
@@ -1606,6 +1612,10 @@ namespace WdRiscv
 
       return true;
     }
+
+    /// Returns true if CSR is defined as part of a STATEEN and enabled, or
+    /// not part of STATEEN. Returns false otherwise.
+    bool isStateEnabled(CsrNumber num, PrivilegeMode mode) const;
 
   private:
 
