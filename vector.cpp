@@ -4090,7 +4090,7 @@ Hart<URV>::execVcpop_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4119,7 +4119,7 @@ Hart<URV>::execVfirst_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4152,7 +4152,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4161,7 +4161,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4197,7 +4197,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4206,7 +4206,7 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4243,7 +4243,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4252,7 +4252,7 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
 
   if (vd == vs1 or (masked and vd == 0))
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4300,7 +4300,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0 or
       (vs1 >= vd and vs1 < vd + group))
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4309,7 +4309,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
 
   if (masked and vd == 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4331,7 +4331,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, groupx8, int16_t(sum)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, groupx8, int32_t(sum)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, groupx8, int64_t(sum)); break;
-	default: postVecFail(di, true /*clearVstart*/); return;
+	default: postVecFail(di); return;
         }
 
       if (sourceSet)
@@ -4350,7 +4350,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   uint32_t start = csRegs_.peekVstart();
   if (not isVecLegal() or not vecRegs_.legalConfig() or start > 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4362,7 +4362,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
 
   if (masked and vd == 0)
     {
-      postVecFail(di, true /*clearVstart*/);
+      postVecFail(di);
       return;
     }
 
@@ -4383,7 +4383,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
         case ElementWidth::Half: vecRegs_.write(vd, ix, group, int16_t(ix)); break;
         case ElementWidth::Word: vecRegs_.write(vd, ix, group, int32_t(ix)); break;
         case ElementWidth::Word2: vecRegs_.write(vd, ix, group, int64_t(ix)); break;
-	default: postVecFail(di, true /*clearVstart*/); return;
+	default: postVecFail(di); return;
         }
     }
   postVecSuccess();

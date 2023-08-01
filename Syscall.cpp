@@ -85,7 +85,7 @@ readHartMemory(Hart<URV>& hart, uint64_t readAddr, T&& dest, std::optional<std::
       destBytes[i] = static_cast<std::byte>(byte);
     }
 
-  return dest.size();
+  return size.value_or(dest.size());
 }
 
 template <typename URV, typename T>
@@ -110,7 +110,7 @@ writeHartMemory(Hart<URV>& hart, T&& data, uint64_t writeAddr, std::optional<std
       if (not hart.pokeMemory(writeAddr + i, byte, true))
         return i;
     }
-  return dataBytes.size();
+  return size.value_or(dataBytes.size());
 }
 
 template <typename URV, typename T>
