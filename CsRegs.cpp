@@ -310,7 +310,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
 
-  if (stateenOn_ and not isStateEnabled(num, mode))
+  if (not isStateEnabled(num, mode))
     return false;
 
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
@@ -933,7 +933,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       return true;  // Writing a locked PMPADDR register has no effect.
     }
 
-  if (stateenOn_ and not isStateEnabled(num, mode))
+  if (not isStateEnabled(num, mode))
     return false;
 
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
@@ -3163,16 +3163,14 @@ template <typename URV>
 bool
 CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
 {
-  using CN = CsrNumber;
-  CN csrn;
-
-  // sstateen not applicable for now
-  if (mode == PrivilegeMode::Supervisor and not virtMode_)
-    csrn = rv32_? CN::MSTATEEN0H : CN::MSTATEEN0;
-  else if (virtMode_)
-    csrn = rv32_? CN::HSTATEEN0H : CN::HSTATEEN0;
-  else
+  if (not stateenOn_ or mode == PrivilegeMode::Machine)
     return true;
+
+  using CN = CsrNumber;
+  // sstateen not applicable for now
+  CN csrn = rv32_? CN::MSTATEEN0H : CN::MSTATEEN0;
+  if (virtMode_)
+    csrn = rv32_? CN::HSTATEEN0H : CN::HSTATEEN0;
 
   int enableBit = -1;
   unsigned offset = 0;
