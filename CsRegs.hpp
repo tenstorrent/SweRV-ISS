@@ -1613,6 +1613,10 @@ namespace WdRiscv
       return true;
     }
 
+    /// Returns true if CSR is defined as part of a STATEEN and enabled, or
+    /// not part of STATEEN. Returns false otherwise.
+    bool isStateEnabled(CsrNumber num, PrivilegeMode mode) const;
+
   private:
 
     bool rv32_ = sizeof(URV) == 4;
