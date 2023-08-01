@@ -155,6 +155,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::TIME)->tie(&cycleCount_);
 
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
+      csRegs_.findCsr(CsrNumber::VSTIMECMP)->tie(&vstimecmp_);
       csRegs_.findCsr(CsrNumber::HTIMEDELTA)->tie(&htimedelta_);
     }
 
@@ -327,12 +328,10 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  bool sstc = false;
-  if (isRvs())
-    sstc = isRvsstc();
-  csRegs_.enableSstc(sstc);
+  flag = isRvsstc();
+  csRegs_.enableSstc(flag);
   stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
-
+  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
   enableRvzba(isa_.isEnabled(RvExtension::Zba));
   enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
   enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
@@ -2943,7 +2942,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   if (csr == CN::MISA and lastVal != val)
     processExtensions(false);
 
-  if (csr == CN::MENVCFG)
+  if (csr == CN::MENVCFG or csr == CN::HENVCFG)
     {
       updateTranslationPbmt();
       csRegs_.updateSstc();
@@ -4687,7 +4686,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 	    }
 	}
     }
-  if (privMode_ == PM::Supervisor and not virtMode_)
+  if (not virtMode_)
     return false;
 
   // Check for interrupts destined to VS privilege.
@@ -4778,7 +4777,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear virtual supervisor timer from vstimecmp CSR.
       if (vstimecmpActive_)
 	{
-	  if ((instCounter_ >> counterToTimeShift_) >= vstimecmp_ - htimedelta_)
+	  if ((instCounter_ >> counterToTimeShift_) >= (vstimecmp_ - htimedelta_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));

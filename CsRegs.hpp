@@ -1558,6 +1558,23 @@ namespace WdRiscv
       return fields.bits_.PBMTE;
     }
 
+    /// Return the value of the STCE bit of the HENVCFG CSR. Return
+    /// false if CSR is not implemented
+    bool henvcfgStce()
+    {
+      auto csr = getImplementedCsr(rv32_? CsrNumber::HENVCFGH : CsrNumber::HENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      if (rv32_)
+	{
+	  HenvcfghFields<uint32_t> fields(value);
+	  return fields.bits_.STCE;
+	}
+      HenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.STCE;
+    }
+
     /// Set ix to the counter index corresponding to the given
     /// MHPMEVENT CSR number (0 for MHPMEVENT3, 1 for MHPMEVENT4, ...)
     /// Return true on success and false if number does not correspond
