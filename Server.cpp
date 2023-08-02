@@ -683,6 +683,9 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   if (wasInDebug)
     hart.exitDebugMode();
 
+  uint32_t inst = 0;
+  hart.readInst(hart.pc(), inst);  // In case instruction is interrupted.
+
   DecodedInst di;
   // Memory consistency model support. No-op if mcm is off.
   if (system_.isMcmEnabled())
@@ -697,9 +700,9 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   else
     hart.singleStep(di, traceFile);
 
-  uint32_t inst = di.inst();
-
   bool interrupted = hart.getInterruptCount() != interruptCount;
+  if (not interrupted)
+    inst = di.inst();
 
   unsigned preCount = 0, postCount = 0;
   hart.countTrippedTriggers(preCount, postCount);
