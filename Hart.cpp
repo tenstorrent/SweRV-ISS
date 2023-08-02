@@ -9873,12 +9873,12 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	  if (not csRegs_.isHighHalf(csr))
 	    {
 	      if (hsq) virtualInst(di); else illegalInst(di);
-	      return false;
 	    }
-          if (sizeof(URV) == 4 and hsq)
+          else if (sizeof(URV) == 4 and hsq)
             virtualInst(di);
           else
-            illegalInst(di);
+	    illegalInst(di);
+	  return false;
         }
     }
 
