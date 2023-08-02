@@ -496,13 +496,15 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
 	  write.time_ = time;
 	  if (write.physAddr_ + write.size_  > lineEnd)
 	    {
-	      cerr << "Mcm::mergeBufferWrite: Error: Store address out of line bounds\n";
+	      cerr << "Mcm::mergeBufferWrite: Error: Pending store address out "
+		   << "of line bounds: 0x" << std::hex << write.physAddr_ << std::dec << "\n";
 	      return false;
 	    }
 	  McmInstr* instr = findOrAddInstr(hartIx, write.instrTag_);
 	  if (not instr or instr->isCanceled())
 	    {
-	      cerr << "Mcm::mergeBufferWrite: Write for an invalid store\n";
+	      cerr << "Mcm::mergeBufferWrite: Error: Write for an invalid/speculated store: 0x"
+		   << std::hex << write.physAddr_ << std::dec << "\n";
 	      return false;
 	    }
 	  instr->addMemOp(sysMemOps_.size());
@@ -609,7 +611,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	    }
 	  if (not rtlMask.empty() and i < rtlMask.size() and mask.at(i) != rtlMask.at(i))
 	    {
-	      cerr << "Error: Mismatch on merge buffer update time=" << time
+	      cerr << "Error: Mismatch on merge buffer update mask time=" << time
 		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
 		   << (physAddr + i) << std::dec << " rtl=" << rtlMask.at(i)
 		   << " whisper=" << mask.at(i) << '\n';

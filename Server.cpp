@@ -677,7 +677,6 @@ Server<URV>::stepCommand(const WhisperMessage& req,
 
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
-  uint64_t interruptCount = hart.getInterruptCount();
 
   bool wasInDebug = hart.inDebugMode();
   if (wasInDebug)
@@ -700,7 +699,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   else
     hart.singleStep(di, traceFile);
 
-  bool interrupted = hart.getInterruptCount() != interruptCount;
+  unsigned interrupted = hart.lastInstructionInterrupted() ? 1 : 0;
   if (not interrupted)
     inst = di.inst();
 
@@ -719,7 +718,8 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   unsigned fpFlags = hart.lastFpFlags();
   unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
   unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
-  reply.flags = (pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) | (stop << 7);;
+  reply.flags = ((pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) |
+		 (stop << 7) | (interrupted << 8));
 
   if (wasInDebug)
     hart.enterDebugMode(hart.peekPc());
