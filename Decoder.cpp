@@ -39,7 +39,7 @@ Decoder::decode(uint64_t addr, uint64_t physAddr, uint32_t inst, DecodedInst& di
 
   di.reset(addr, physAddr, inst, &entry, op0, op1, op2, op3);
 
-  // Set the mask bit for vector instructions.  Set acuire/release bits
+  // Set the mask bit for vector instructions.  Set acquire/release bits
   // for atomic instructions.
   if (di.instEntry())
     {

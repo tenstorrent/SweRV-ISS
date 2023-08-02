@@ -711,7 +711,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   else if (type == RvExtension::F or type == RvExtension::D or type == RvExtension::Zfh or
            type == RvExtension::Zfbfmin)
     buffer.printChar('f');
-  else if (type == RvExtension::V or type == RvExtension::Zvfbfmin or type == RvExtension::Zvfbfwma)
+  else if (instEntry->isVector())
     buffer.printChar('v');
 
   // Privilege mode.

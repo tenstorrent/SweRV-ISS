@@ -261,7 +261,7 @@ namespace WdRiscv
 
     /// Return true if this is an vector instruction.
     bool isVector() const
-    { return ext_ == RvExtension::V; }
+    { return isVector_; }
 
     /// Return true if source operands have unsigned integer values.
     bool isUnsigned() const
@@ -352,6 +352,10 @@ namespace WdRiscv
     void setCompressedRv64(bool flag)
     { isCompressedRv64_ = flag; }
 
+    /// Mark an instruction as a vector instruction.
+    void setVector(bool flag)
+    { isVector_ = flag; }
+
   private:
 
     std::string name_;
@@ -394,6 +398,7 @@ namespace WdRiscv
     bool isDiv_ = false;       // True for integer divide or remainder instr.
     bool isCompressedRv32_ = false; // True if compressed rv32 instruction variant.
     bool isCompressedRv64_ = false; // True if compressed rv64 instruction variant.
+    bool isVector_ = false;         // True if V extension or other vector sub-extension.
   };
 
 

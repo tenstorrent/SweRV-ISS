@@ -45,12 +45,34 @@ InstTable::InstTable()
 {
   setupInstVec();
 
-  // Sanity check.
+  // Sanity check. Mark vector instructions.
   for (unsigned i = 0; InstId(i) <= InstId::maxId; ++i)
     {
       InstId id = InstId(i);
-      (void)id;
-      assert(instVec_.at(i).instId() == id);
+      auto& entry = instVec_.at(i);
+      assert(entry.instId() == id);
+
+      auto ext = entry.extension();
+      switch(ext)
+	{
+	case RvExtension::V:
+	case RvExtension::Zvfh:
+	case RvExtension::Zvfhmin:
+	case RvExtension::Zvbb:
+	case RvExtension::Zvbc:
+	case RvExtension::Zvkg:
+	case RvExtension::Zvkned:
+	case RvExtension::Zvknha:
+	case RvExtension::Zvknhb:
+	case RvExtension::Zvksed:
+	case RvExtension::Zvksh:
+	case RvExtension::Zvfbfmin:
+	case RvExtension::Zvfbfwma:
+	  entry.setVector(true);
+	  break;
+	default:
+	  break;
+	}
     }
 
   for (const auto& instInfo : instVec_)
