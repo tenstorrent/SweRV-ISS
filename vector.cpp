@@ -18650,8 +18650,8 @@ Hart<URV>::vfsgnjn_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
 
+      e2 = -e2;
       dest = std::copysign(e1, e2);
-      dest = -dest;
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -18697,6 +18697,8 @@ Hart<URV>::vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
   ELEM_TYPE e1{}, dest{};
   ELEM_TYPE e2 = fpRegs_.read<ELEM_TYPE>(fs2);
 
+  e2 = -e2;
+
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -18708,7 +18710,6 @@ Hart<URV>::vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
       vecRegs_.read(vs1, ix, group, e1);
 
       dest = std::copysign(e1, e2);
-      dest = -dest;
       vecRegs_.write(vd, ix, group, dest);
     }
 }
