@@ -1111,14 +1111,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                 for (uint8_t item :  data)
                   fprintf(commandLog, "%02x", item);
                 if (msg.flags)
-                  {
+                  {    // Print mask with least sig digit on the right
                     fprintf(commandLog, " 0x");
-                    data.clear();
-                    for (size_t i = 0; i < msg.size / 8; ++i)
-                      data.push_back(msg.tag[i]);
-                    std::reverse(data.begin(), data.end());
-                    for (uint8_t item : data)
-                      fprintf(commandLog, "%02x", item);
+		    unsigned n = msg.size / 8;
+                    for (unsigned i = 0; i < n; ++i)
+                      fprintf(commandLog, "%02x", msg.tag[n-1-i]);
                   }
                 fprintf(commandLog, "\n");
               }
