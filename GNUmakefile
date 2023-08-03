@@ -25,9 +25,9 @@ BOOST_LIBS := boost_program_options
 EXTRA_LIBS := -lpthread -lm -lz -ldl -static-libstdc++ -lrt
 
 ifdef SOFT_FLOAT
-  override CPPFLAGS += -I$(PWD)/third_party/softfloat/source/include
+  override CPPFLAGS += -I$(CURDIR)/third_party/softfloat/source/include
   override CPPFLAGS += -DSOFT_FLOAT
-  soft_float_build := $(wildcard $(PWD)/third_party/softfloat/build/RISCV-GCC)
+  soft_float_build := $(wildcard $(CURDIR)/third_party/softfloat/build/RISCV-GCC)
   soft_float_lib := $(soft_float_build)/softfloat.a
 endif
 
