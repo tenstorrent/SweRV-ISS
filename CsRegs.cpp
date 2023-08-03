@@ -2178,7 +2178,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("nhienh",     CsrNumber::NHIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("hviprio3h",  CsrNumber::HVIPRIO3H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("hviprio2h",  CsrNumber::HVIPRIO2H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("vsieh",      CsrNumber::VSIEH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("vsiph",      CsrNumber::VSIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
 }

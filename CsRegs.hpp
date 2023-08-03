@@ -456,7 +456,7 @@ namespace WdRiscv
       NHIENH     = 0x618,
       HVIPH      = 0x655,
       HVIPRIO1H  = 0x656,
-      HVIPRIO3H  = 0x657,
+      HVIPRIO2H  = 0x657,
       VSIEH      = 0x214,
       VSIPH      = 0x254,
 
