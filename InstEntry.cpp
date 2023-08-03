@@ -48,9 +48,8 @@ InstTable::InstTable()
   // Sanity check. Mark vector instructions.
   for (unsigned i = 0; InstId(i) <= InstId::maxId; ++i)
     {
-      InstId id = InstId(i);
       auto& entry = instVec_.at(i);
-      assert(entry.instId() == id);
+      assert(entry.instId() == InstId(i));
 
       auto ext = entry.extension();
       switch(ext)

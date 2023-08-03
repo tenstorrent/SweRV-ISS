@@ -677,11 +677,13 @@ Server<URV>::stepCommand(const WhisperMessage& req,
 
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
-  uint64_t interruptCount = hart.getInterruptCount();
 
   bool wasInDebug = hart.inDebugMode();
   if (wasInDebug)
     hart.exitDebugMode();
+
+  uint32_t inst = 0;
+  hart.readInst(hart.pc(), inst);  // In case instruction is interrupted.
 
   DecodedInst di;
   // Memory consistency model support. No-op if mcm is off.
@@ -697,9 +699,9 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   else
     hart.singleStep(di, traceFile);
 
-  uint32_t inst = di.inst();
-
-  bool interrupted = hart.getInterruptCount() != interruptCount;
+  unsigned interrupted = hart.lastInstructionInterrupted() ? 1 : 0;
+  if (not interrupted)
+    inst = di.inst();
 
   unsigned preCount = 0, postCount = 0;
   hart.countTrippedTriggers(preCount, postCount);
@@ -716,7 +718,8 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   unsigned fpFlags = hart.lastFpFlags();
   unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
   unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
-  reply.flags = (pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) | (stop << 7);;
+  reply.flags = ((pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) |
+		 (stop << 7) | (interrupted << 8));
 
   if (wasInDebug)
     hart.enterDebugMode(hart.peekPc());
@@ -1108,14 +1111,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                 for (uint8_t item :  data)
                   fprintf(commandLog, "%02x", item);
                 if (msg.flags)
-                  {
+                  {    // Print mask with least sig digit on the right
                     fprintf(commandLog, " 0x");
-                    data.clear();
-                    for (size_t i = 0; i < msg.size / 8; ++i)
-                      data.push_back(msg.tag[i]);
-                    std::reverse(data.begin(), data.end());
-                    for (uint8_t item : data)
-                      fprintf(commandLog, "%02x", item);
+		    unsigned n = msg.size / 8;
+                    for (unsigned i = 0; i < n; ++i)
+                      fprintf(commandLog, "%02x", msg.tag[n-1-i]);
                   }
                 fprintf(commandLog, "\n");
               }

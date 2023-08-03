@@ -744,12 +744,13 @@ namespace WdRiscv
     int lastVecReg(const DecodedInst& di, unsigned& group) const;
 
     /// Return true if the last executed instruction triggered a trap
-    /// (had an exception or encouted an interrupt).
+    /// (had an exception or encoutered an interrupt).
     bool lastInstructionTrapped() const
     { return hasException_ or hasInterrupt_; }
 
-    /// Return true if last executed instruction had an exception. Set
-    /// cause to mstatus cause.
+    /// Return true if the last executed instruction was interrupted.
+    bool lastInstructionInterrupted() const
+    { return hasInterrupt_; }
 
     /// Support for tracing: Fill the csrs vector with the
     /// register-numbers of the CSRs written by the execution of the
