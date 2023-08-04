@@ -699,6 +699,13 @@ namespace WdRiscv
       res.valid_ = true;
     }
 
+    // returns true if the given hart has a valid LR reservation
+    bool hasLr(unsigned sysHartIx) const
+    {
+      const auto& res = reservations_.at(sysHartIx);
+      return res.valid_;
+    }
+
     /// Return true if given hart has a valid LR reservation and if it
     /// contains the range defined by the given address and size.
     bool hasLr(unsigned sysHartIx, uint64_t addr, unsigned size) const
