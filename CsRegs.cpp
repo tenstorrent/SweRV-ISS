@@ -3137,7 +3137,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       URV val = (mie->read() & vsMask);
       if (hie)
 	{
-	  hie->poke((hie->read() & ~vsMask) | (mie->read() & vsMask));
+	  hie->poke((hie->read() & ~vsMask) | val);
 	  recordWrite(CsrNumber::HIE);
 	}
       if (vsie)
@@ -3234,7 +3234,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
     {
       URV val = (mie->read() & vsMask);
       if (hie)
-	hie->poke((hie->read() & ~vsMask) | (mie->read() & vsMask));
+	hie->poke((hie->read() & ~vsMask) | val);
       if (vsie)
         vsie->poke(val >> 1);
     }
