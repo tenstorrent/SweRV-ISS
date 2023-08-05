@@ -2947,6 +2947,23 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       updateTranslationPbmt();
       csRegs_.updateSstc();
     }
+
+  if (csr == CN::STIMECMP)
+    {
+      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
+      if (fromHostValid_ and hasPendingInput(inFd))
+        {
+          uint64_t v = 0;
+          peekMemory(fromHost_, v, true);
+          if (v == 0)
+            {
+              int c = char(readCharNonBlocking(inFd));
+              if (c > 0)
+                memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+            }
+        }
+    }
 }
 
 

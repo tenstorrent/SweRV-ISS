@@ -825,41 +825,43 @@ CsRegs<URV>::writeSipSie(CsrNumber num, URV value)
 {
   using CN = CsrNumber;
 
-  if (num == CN::SIP or num == CN::SIE)
+  Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+  if (not csr)
+    return false;
+
+  bool s = num == CN::SIE or num == CN::SIP;
+  bool vs = num == CN::VSIE or num == CN::VSIP;
+  auto mcsr = getImplementedCsr(advance(num, s? 0x200 : 0x100));
+
+  auto mideleg = getImplementedCsr(CN::MIDELEG);
+
+  URV prevMask = csr->getWriteMask();
+  URV mask = prevMask << (vs or (s and virtMode_));
+
+  if (mcsr)
+    mask &= mcsr->getWriteMask();
+  mask &= mideleg ? mideleg->read() : 0; // Only delegated bits writeable
+
+  if (s and not virtMode_)
     {
-      Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-      if (not csr)
-	return false;
-
-      // Get corresponding M register (MIP or MIE).
-      auto mcsr = getImplementedCsr(advance(num, 0x200));
-
-      auto mideleg = getImplementedCsr(CN::MIDELEG);
-
-      URV prevMask = csr->getWriteMask();
-      URV mask = prevMask << virtMode_;
-
-      if (mcsr)
-	mask &= mcsr->getWriteMask();
-      mask &= mideleg ? mideleg->read() : 0; // Only delegated bits writeable
-
-      if (virtMode_)
-        {
-          auto hideleg = getImplementedCsr(CN::HIDELEG);
-          mask &= hideleg ? hideleg->read() : 0;
-          URV mMask = mcsr->getWriteMask();
-          mcsr->setWriteMask(mask);
-          mcsr->write(value << 1);
-          mcsr->setWriteMask(mMask);
-          hyperWrite(mcsr);
-          return true;
-        }
-
       csr->setWriteMask(mask);
       csr->write(value);
       csr->setWriteMask(prevMask);
 
       recordWrite(num);
+      return true;
+    }
+  else if (vs or (s and virtMode_))
+    {
+      auto hideleg = getImplementedCsr(CN::HIDELEG);
+      mask &= hideleg ? hideleg->read() : 0;
+
+      // write to MIP/MIE and trigger a hypervisor update
+      URV mMask = mcsr->getWriteMask();
+      mcsr->setWriteMask(mask);
+      mcsr->write(value << 1);
+      mcsr->setWriteMask(mMask);
+      hyperWrite(mcsr);
       return true;
     }
   return false;
@@ -980,7 +982,8 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
   // Write mask of SIP/SIE is a combined with that of MIP/MIE and
   // delgation register.
-  if (num == CN::SIP or num == CN::SIE)
+  if (num == CN::SIP or num == CN::SIE or
+      num == CN::VSIP or num == CN::VSIE)
     return writeSipSie(num, value);
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
