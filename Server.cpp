@@ -686,6 +686,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   hart.readInst(hart.pc(), inst);  // In case instruction is interrupted.
 
   DecodedInst di;
+  bool ok = true;
   // Memory consistency model support. No-op if mcm is off.
   if (system_.isMcmEnabled())
     {
@@ -694,7 +695,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
       hart.singleStep(di, traceFile);
       if (not di.isValid())
 	assert(hart.lastInstructionTrapped());
-      system_.mcmRetire(hart, req.time, req.instrTag, di);
+      ok = system_.mcmRetire(hart, req.time, req.instrTag, di);
     }
   else
     hart.singleStep(di, traceFile);
@@ -723,7 +724,7 @@ Server<URV>::stepCommand(const WhisperMessage& req,
 
   if (wasInDebug)
     hart.enterDebugMode(hart.peekPc());
-  return true;
+  return ok;
 }
 
 
@@ -948,7 +949,8 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case Step:
-        stepCommand(msg, pendingChanges_, reply, hart, traceFile);
+        if (not stepCommand(msg, pendingChanges_, reply, hart, traceFile))
+          reply.type = Invalid;
         if (commandLog)
           {
             if (system_.isMcmEnabled())
