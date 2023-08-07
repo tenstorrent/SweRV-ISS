@@ -3107,7 +3107,6 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	}
 
       // Updating HIP is reflected in VSIP and MIP.
-      auto vsip = getImplementedCsr(CsrNumber::VSIP);
       if (vsip and num != CsrNumber::VSIP)
 	{
 	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
@@ -3241,7 +3240,6 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	}
 
       // Updating HIP is reflected in VSIP and MIP.
-      auto vsip = getImplementedCsr(CsrNumber::VSIP);
       if (vsip and num != CsrNumber::VSIP)
 	{
 	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
