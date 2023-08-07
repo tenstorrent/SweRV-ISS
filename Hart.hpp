@@ -2287,9 +2287,9 @@ namespace WdRiscv
 
     /// Helper to CSR instructions: Read csr register returning true
     /// on success and false on failure (csr does not exist or is not
-    /// accessible). The isWrite flags should be set to true if the
-    /// CSR instruction writes the CSR register when the read is
-    /// successful.
+    /// accessible). The isWrite flags should be set to true if
+    /// doCsrRead is called from a CSR instruction that would write
+    /// the CSR register when the read is successful.
     bool doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& csrVal);
 
     /// This is called after a csr is written/poked to update the

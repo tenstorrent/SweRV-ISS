@@ -9867,6 +9867,12 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor);
   if (virtMode_)
     {
+      if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
+	{
+	  virtualInst(di);  // Section 2.3 of AIA.
+	  return false;
+	}
+
       if (csRegs_.isHypervisor(csr) or
 	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User)))
 	{
@@ -9882,21 +9888,21 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
         }
     }
 
-  if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
+  if (csr == CsrNumber::SATP and privMode_ == PM::Supervisor)
     {
       if (mstatus_.bits_.TVM and not virtMode_)
 	{
 	  illegalInst(di);
 	  return false;
 	}
-      if (hstatus_.bits_.VTVM and virtMode_)
+      else if (hstatus_.bits_.VTVM and virtMode_)
 	{
 	  virtualInst(di);
 	  return false;
 	}
     }
 
-  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+  if (csr == CsrNumber::HGATP and privMode_ == PM::Supervisor and not virtMode_)
     if (mstatus_.bits_.TVM)
       {
 	illegalInst(di);
@@ -9984,6 +9990,12 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 
   if (not isCsrWriteable(csr, privMode_, virtMode_))
     {
+      if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
+	{
+	  virtualInst(di);  // Section 2.3 of AIA.
+	  return;
+	}
+
       if (virtMode_)
 	{
 	  if (csr == CsrNumber::SATP)

@@ -3922,11 +3922,17 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
   if (not checkSewLmulVstart(di))
     return;
 
+  ElementWidth sew = vecRegs_.elemWidth();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
   if (not checkRedOpVsEmul(di, vs1, group, start))
@@ -3953,11 +3959,17 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
   if (not checkSewLmulVstart(di))
     return;
 
+  ElementWidth sew = vecRegs_.elemWidth();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
   if (not checkRedOpVsEmul(di, vs1, group, start))
@@ -18081,11 +18093,17 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
   if (not checkFpSewLmulVstart(di, true))
     return;
 
+  ElementWidth sew = vecRegs_.elemWidth();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
   if (not checkRedOpVsEmul(di, vs1, group, start))
@@ -18145,11 +18163,17 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
   if (not checkFpSewLmulVstart(di, true))
     return;
 
+  ElementWidth sew = vecRegs_.elemWidth();
+  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
+  if (not vecRegs_.isDoubleWideLegal(sew, group))
+    {
+      postVecFail(di);
+      return;
+    }
+
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.elemCount();
-  ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
   if (not checkRedOpVsEmul(di, vs1, group, start))

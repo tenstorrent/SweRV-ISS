@@ -3176,6 +3176,8 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
   unsigned offset = 0;
   if (num == CN::HCONTEXT or num == CN::SCONTEXT)
     enableBit = 57;
+  else if (num == CN::SISELECT or num == CN::SIREG or num == CN::VSISELECT or num == CN::VSIREG)
+    enableBit = 60;
   else if (num == CN::HENVCFG or num == CN::HENVCFGH or num == CN::SENVCFG)
     enableBit = 62;
   else if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
@@ -3195,21 +3197,20 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
     }
 
   if (enableBit < 0)
-    return true;
-  else
-    {
-      csrn = advance(csrn, offset);
-      auto csr = getImplementedCsr(csrn);
-      if (not csr)
-        {
-          assert(0);
-          return false;
-        }
+    return true;  // CSR not affected by STTEND
 
-      if (rv32_) enableBit -= 8*sizeof(URV);
-      URV value = csr->read();
-      return (value >> enableBit) & 1;
+
+  csrn = advance(csrn, offset);
+  auto csr = getImplementedCsr(csrn);
+  if (not csr)
+    {
+      assert(0);
+      return false;
     }
+
+  if (rv32_) enableBit -= 8*sizeof(URV);
+  URV value = csr->read();
+  return (value >> enableBit) & 1;
 }
 
 
