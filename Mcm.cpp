@@ -1814,14 +1814,21 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       unsigned addrReg = effectiveRegIx(mdi, 1); // Address reg is operand 1 of instr.
       auto apTag = hartRegProducers_.at(hartIx).at(addrReg); // address producer tag
 
-      const auto& instrA = instrVec.at(apTag);
-      if (instrA.di_.isValid())
-	if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
-	  {
-	    cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		 << apTag << " tag2=" << instrB.tag_ << " mtag=" << mtag << '\n';
-	    return false;
-	  }
+      unsigned doi = mdi.isAmo()? 2 : 0;  // Data-register operand index.
+      unsigned dataReg = effectiveRegIx(mdi, doi);
+      auto dpTag = hartRegProducers_.at(hartIx).at(dataReg); // data producer tag
+
+      for (auto aTag : { apTag, dpTag } )
+	{
+	  const auto& instrA = instrVec.at(aTag);
+	  if (instrA.di_.isValid())
+	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
+	      {
+		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
+		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag << '\n';
+		return false;
+	      }
+	}
     }
 
   return true;
