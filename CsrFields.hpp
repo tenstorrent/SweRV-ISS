@@ -378,6 +378,71 @@ namespace WdRiscv
     } bits_;
   };
 
+  /// Structure used to unpack/pack the fields of the HENVCFG register
+  template <typename URV>
+  union HenvcfgFields;
+
+  template <>
+  union HenvcfgFields<uint32_t>
+  {
+    HenvcfgFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_; // HENVCFG register value
+    struct
+    {
+      unsigned FIOM : 1;
+      unsigned reserved0: 3;
+      unsigned CBIE : 2;
+      unsigned CBCFE : 1;
+      unsigned CBZE : 1;
+      unsigned reserved1 : 24;
+    } bits_;
+  };
+
+  template <>
+  union HenvcfgFields<uint64_t>
+  {
+    HenvcfgFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_; // HENVCFG register value
+    struct
+    {
+      unsigned FIOM : 1;
+      unsigned reserved0: 3;
+      unsigned CBIE : 2;
+      unsigned CBCFE : 1;
+      unsigned CBZE : 1;
+      uint64_t reserved1 : 54;
+      unsigned PBMTE : 1;
+      unsigned STCE : 1;
+    } bits_;
+  };
+
+  /// Structure used to unpack/pack the fields of the HENVCFGH register (rv32 only)
+  template <typename URV>
+  union HenvcfghFields;
+
+  template <>
+  union HenvcfghFields<uint32_t>
+  {
+    HenvcfghFields(uint32_t value = 0)
+      : value_(value)
+    { }
+
+    uint32_t value_; // HENVCFGH register value
+    struct
+    {
+      unsigned reserved0 : 30;
+      unsigned PBMTE : 1;
+      unsigned STCE : 1;
+    } bits_;
+  };
+
+
   /// Structure used to unpack/pack the fields of the DCSR register
   template <typename URV>
   union DcsrFields;
