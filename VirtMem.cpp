@@ -273,6 +273,12 @@ VirtMem::twoStageTranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 	return cause;
     }
 
+  if (modeStage2_ == Bare)
+    {
+      pa = gpa;
+      return ExceptionCause::NONE;
+    }
+
   TlbEntry entry2;
   return stage2TranslateNoTlb(gpa, priv, read, write, exec, pa, entry2);
 }
