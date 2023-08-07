@@ -453,7 +453,7 @@ namespace WdRiscv
       VSTOPEI    = 0x25c,
       VSTOPI     = 0xeb0,
       HIDELEGH   = 0x613,
-      NHIENH     = 0x618,
+      HVIENH     = 0x618,
       HVIPH      = 0x655,
       HVIPRIO1H  = 0x656,
       HVIPRIO2H  = 0x657,

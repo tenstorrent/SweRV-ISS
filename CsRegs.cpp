@@ -2211,7 +2211,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("vstopei",    CsrNumber::VSTOPEI,    !mand, !imp, 0, wam, wam);
   defineCsr("vstopi",     CsrNumber::VSTOPI,     !mand, !imp, 0, wam, wam);
   defineCsr("hidelegh",   CsrNumber::HIDELEGH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("nhienh",     CsrNumber::NHIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("hvienh",     CsrNumber::HVIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviprio2h",  CsrNumber::HVIPRIO2H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
@@ -3305,6 +3305,20 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
     enableBit = 57;
   else if (num == CN::SISELECT or num == CN::SIREG or num == CN::VSISELECT or num == CN::VSIREG)
     enableBit = 60;
+  if (num == CN::SIPH or num == CN::SIEH or num == CN::STOPEI or num == CN::HIDELEGH or
+      num == CN::HVIEN or num == CN::HVIENH or num == CN::HVIPH or num == CN::HVICTL or
+      num == CN::HVIPRIO1 or num == CN::HVIPRIO1H or num == CN::HVIPRIO2 or
+      num == CN::HVIPRIO2H or num == CN::VSIPH or num == CN::VSIEH or num == CN::VSTOPEI)
+    enableBit = 59;
+  else if (num == CN::SIREG)
+    {
+      URV select = 0;
+      if (peek(CN::SISELECT, select))
+	{
+	  if (select >= 0x30 and select <= 0x3f)
+	    enableBit = 59;  // Sections 2.5 and 5.4.1 of AIA
+	}
+    }
   else if (num == CN::HENVCFG or num == CN::HENVCFGH or num == CN::SENVCFG)
     enableBit = 62;
   else if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
@@ -3325,7 +3339,6 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
 
   if (enableBit < 0)
     return true;  // CSR not affected by STTEND
-
 
   csrn = advance(csrn, offset);
   auto csr = getImplementedCsr(csrn);
