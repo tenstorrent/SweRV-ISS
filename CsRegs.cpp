@@ -3301,13 +3301,19 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
   unsigned offset = 0;
   if (num == CN::HCONTEXT or num == CN::SCONTEXT)
     enableBit = 57;
-  else if (num == CN::SISELECT or num == CN::SIREG or num == CN::VSISELECT or num == CN::VSIREG)
-    enableBit = 60;
-  if (num == CN::SIPH or num == CN::SIEH or num == CN::STOPEI or num == CN::HIDELEGH or
+  // hgeip hgeie
+  else if (num == CN::MISELECT or num == CN::MIREG or num == CN::MTOPEI or num == CN::MTOPI or
+	   num == CN::MVIEN or num == CN::MVIP or num == CN::MIDELEGH or num == CN::MIEH or
+	   num == CN::MVIENH or num == CN::MVIPH or num == CN::MIPH or num == CN::STOPEI or
+	   num == CN::VSTOPEI)
+    enableBit = 58;  // IMSIC state.
+  if (num == CN::SIPH or num == CN::SIEH or num == CN::STOPI or num == CN::HIDELEGH or
       num == CN::HVIEN or num == CN::HVIENH or num == CN::HVIPH or num == CN::HVICTL or
       num == CN::HVIPRIO1 or num == CN::HVIPRIO1H or num == CN::HVIPRIO2 or
-      num == CN::HVIPRIO2H or num == CN::VSIPH or num == CN::VSIEH or num == CN::VSTOPEI)
-    enableBit = 59;
+      num == CN::HVIPRIO2H or num == CN::VSIPH or num == CN::VSIEH or num == CN::VSTOPI)
+    enableBit = 59;  // AIA state not controlled by bits 58 and 60
+  else if (num == CN::SISELECT or num == CN::SIREG or num == CN::VSISELECT or num == CN::VSIREG)
+    enableBit = 60;
   else if (num == CN::SIREG)
     {
       URV select = 0;
