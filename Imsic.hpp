@@ -8,7 +8,7 @@
 namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Controller.
 {
 
-  /// Model an IMISIC file: One enable bit and one pending bit for
+  /// Model an IMSIC file: One enable bit and one pending bit for
   /// each interrupt identity.  For a file of size n, interrupt id 0
   /// is reserved, and valid ids are 1 to n-1. Priorities are
   /// associated with ids with the lowest id having the highest
@@ -17,16 +17,24 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
   {
   public:
 
-    /// Define a file with n-1 interrupt identitities: 1 to
+    /// Define an inactive file. File may be later activated it using
+    /// the activate method. An inactive file does not cover any
+    /// address.
+    File ()
+    { }
+
+    /// Define a file with n-1 interrupt identities: 1 to
     /// n-1. Identity 0 is reserved. Initial value: All disabled none
-    /// pending. The n parameter must be a multiple of 64.
+    /// pending. The given address must be page aligned and n must be
+    /// a multiple of 64.
     File (uint64_t address, unsigned n)
       : addr_(address), pending_(n), enabled_(n), topId_(0), active_(true)
     {
-      assert((n & 0x3f) == 0);
+      assert((address & pageSize_) == 0);
+      assert((n % 64) == 0);
     }
 
-    /// Reutrn the address of this IMSIC.
+    /// Return the address of this file.
     uint64_t address() const
     { return addr_; }
 
@@ -79,7 +87,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	}
     }
 
-    /// Set the top interrutp id threshold. Ids larger than or equal
+    /// Set the top interrupt id threshold. Ids larger than or equal
     /// to the threshold do not participate in the computation of top
     /// id even if pending and enabled.
     void setThreshold(unsigned t)
@@ -137,18 +145,29 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     bool isCoveredAddress(uint64_t addr) const
     { return active_ and addr >= addr_ and addr - addr_ < pageSize_; }
 
-    /// Mark this imsic as active/inactive. Harts that do not
-    /// implement a supervisor would mark the supervisode file
-    /// inactive.
-    void setActive(bool flag)
+    /// Mark this file as active and associate it with given address
+    /// and size: interrupts ids are 1 to size - 1 inclusive.
+    /// All previous enable/pending state is lost. Given address must
+    /// be page aligned and size must be a multiple of 64.
+    void activate(uint64_t addr, unsigned size)
     {
-      active_ = flag;
-      updateTopId();
+      assert((addr % pageSize_) == 0);
+      assert((size % 64) == 0);
+      topId_ = 0;
+      addr_ = addr;
+      pending_.clear();
+      enabled_.clear();
+      pending_.resize(size);
+      enabled_.resize(size);
+      active_ = true;
     }
 
-    /// Return true iff this imsic is active.
-    bool isAtvive() const
+    /// Return true if this file is active.
+    bool isActive() const
     { return active_; }
+
+    unsigned pageSize() const
+    { return pageSize_; }
 
   private:
 
@@ -166,23 +185,46 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
   {
   public:
 
-    /// Define an IMSIC with the given machine privilege address and
-    /// size (size is the highest interrupt id plus 1 and must be a
-    /// multiple of 64).
-    Imsic(uint64_t maddr, unsigned msize)
-      : mfile_(maddr, msize), sfile_(0, 0)
-    {
-      sfile_.setActive(false);
-    }
+    /// Define an inactive IMSIC (no machine/supervisor/guest file,
+    /// does not cover any address).
+    Imsic()
+      : mfile_(0, 0), sfile_(0, 0)
+    { }
 
-    /// Define an IMSIC with the given machine/supervisor privilege
-    /// address and size (size is the highest interrupt id plus 1 and
-    /// must be a multiple of 64).
-    Imsic(uint64_t maddr, unsigned msize, uint64_t saddr, unsigned ssize)
-      : mfile_(maddr, msize), sfile_(saddr, ssize)
+    /// Acivate the machine privilege file at the given address and
+    /// with the given size (size is the highest interrupt id plus 1
+    /// and must be a multiple of 64).  All pevious state
+    /// enabled/pending state is lost.
+    void activateMachine(uint64_t addr, unsigned size)
+    { mfile_.activate(addr, size); }
+
+    /// Acivate the supervisor privilege file at the given address and
+    /// with the given size (size is the highest interrupt id plus 1
+    /// and must be a multiple of 64).  All pevious state
+    /// enabled/pending state is lost.
+    void activateSupervisor(uint64_t addr, unsigned size)
+    { sfile_.activate(addr, size); }
+
+    /// Activate g guest files of n-1 interrupt ids each. The guest
+    /// addresses will be s+p, s+2p, s+3p, ... where s is the
+    /// supervisor file address and p is the page size. A supervisor
+    /// file must be activated before the guests files are
+    /// activated. The parameter g must not exceede 64.
+    void activateGuests(unsigned g, unsigned n)
     {
-      sfile_.setActive(false);
+      assert(g <= 64);
+      assert(sfile_.isActive());
+      gfiles_.clear();
+      gfiles_.resize(g);
+      unsigned pageSize = sfile_.pageSize();
+      uint64_t addr = sfile_.address() + pageSize;
+      for (auto& file : gfiles_)
+	{
+	  file.activate(addr, n);
+	  addr += pageSize;
+	}
     }
+      
 
     /// Return the physical address for machine privilege file in this
     /// IMSIC. This is also the address for little-endian access.
@@ -204,9 +246,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     uint64_t bigEndianSupervisorAddress() const
     { return sfile_.address() + 4; }
 
-    /// Return true if given address is valid for this imsic:
+    /// Return true if given address is valid for this IMSIC:
     /// Within the machine/supervisor/guest pages associated with
-    /// this imsic and word aligned.
+    /// this IMSIC and word aligned.
     bool isValidAddress(uint64_t addr) const
     {
       if (mfile_.isValidAddress(addr) or sfile_.isValidAddress(addr))
@@ -217,7 +259,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return false;
     }
 
-    /// Write to this imsic. Return false doing nothing if address is
+    /// Write to this IMSIC. Return false doing nothing if address is
     /// not valid. Return true and perform write if address is valid.
     /// Write may be a no-op if written data corresponds to a
     /// non-implemented id.
