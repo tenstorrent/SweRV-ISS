@@ -26,7 +26,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       assert((n & 0x3f) == 0);
     }
 
-    /// Reutrn the address of this IMSIC>
+    /// Reutrn the address of this IMSIC.
     uint64_t address() const
     { return addr_; }
 
@@ -50,7 +50,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return id < enabled_.size() and enabled_.at(id);
     }
 
-    /// Mark the given interrupt id as pending/not-pending. Setting id 0
+    /// Mark the given interrupt id as pending/not-pending. Marking id 0
     /// or an out of bounds id has no effect. Update the highest priority
     /// enabled top id.
     void setPending(unsigned id, bool flag)
@@ -65,8 +65,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	}
     }
 
-    /// Mark the given interrupt id as enabled/not-pending. Setting id 0
-    /// or an out of bounds id has no effect.  
+    /// Mark the given interrupt id as enabled/not-enabled. Marking id
+    /// 0 or an out of bounds id has no effect.
     void setEnabled(unsigned id, bool flag)
     {
       if (id > 0 and id < enabled_.size())
@@ -79,17 +79,17 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	}
     }
 
-    /// Set the top interrutp id threshold.
+    /// Set the top interrutp id threshold. Ids larger than or equal
+    /// to the threshold do not participate in the computation of top
+    /// id even if pending and enabled.
     void setThreshold(unsigned t)
     { threshold_ = t; } 
 
-    /// Return the top interrupt id threshold: Ids larger than or
-    /// equal to the threshold do not participate in the computation
-    /// of top id even if pending and enabled.
+    /// Return the top interrupt id threshold.  See setThrshold.
     unsigned threshold() const
     { return threshold_; }
 
-    /// Return the id of the highest priority (smallest id) interrutp
+    /// Return the id of the highest priority (smallest id) interrupt
     /// id that is pending and enabled and exceeds the threshold id.
     unsigned topId() const
     { return threshold_ == 0 ? 0 : std::min(topId_, threshold_ - 1); }
@@ -166,8 +166,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
   {
   public:
 
-    /// Define an imsic with the given machine privilege address and
-    /// size (size the the highest interrupt id plus 1 and must be a
+    /// Define an IMSIC with the given machine privilege address and
+    /// size (size is the highest interrupt id plus 1 and must be a
     /// multiple of 64).
     Imsic(uint64_t maddr, unsigned msize)
       : mfile_(maddr, msize), sfile_(0, 0)
@@ -175,8 +175,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       sfile_.setActive(false);
     }
 
-    /// Define an imsic with the given machine/supervisor privilege
-    /// address and size (size the the highest interrupt id plus 1 and
+    /// Define an IMSIC with the given machine/supervisor privilege
+    /// address and size (size is the highest interrupt id plus 1 and
     /// must be a multiple of 64).
     Imsic(uint64_t maddr, unsigned msize, uint64_t saddr, unsigned ssize)
       : mfile_(maddr, msize), sfile_(saddr, ssize)
@@ -185,7 +185,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     }
 
     /// Return the physical address for machine privilege file in this
-    /// IMSIC. This is also the address for little endian access.
+    /// IMSIC. This is also the address for little-endian access.
     uint64_t machineAddress() const
     { return mfile_.address(); }
 
@@ -195,7 +195,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     { return mfile_.address() + 4; }
 
     /// Return the physical address for supervisor privilege file in this
-    /// IMSIC. This is also the address for little endian access.
+    /// IMSIC. This is also the address for little-endian access.
     uint64_t supervisorAddress() const
     { return sfile_.address(); }
 
@@ -217,7 +217,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return false;
     }
 
-    /// Write to this imsic. Return false doing nothing if adress is
+    /// Write to this imsic. Return false doing nothing if address is
     /// not valid. Return true and perform write if address is valid.
     /// Write may be a no-op if written data corresponds to a
     /// non-implemented id.
