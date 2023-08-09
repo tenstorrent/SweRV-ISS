@@ -4,7 +4,7 @@
 using namespace TT_IMSIC;
 
 bool
-Imsic::write(uint64_t addr, uint64_t data, unsigned size)
+Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
 {
   if (size != 4)
     return false;
@@ -23,7 +23,7 @@ Imsic::write(uint64_t addr, uint64_t data, unsigned size)
 	file = &gfile;
 
   if (not file)
-    return true;  // Address is not covered by this imsic
+    return false;  // Address is not covered by this imsic
 
   if (not file->isValidAddress(addr))
     return false;

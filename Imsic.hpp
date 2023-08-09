@@ -224,7 +224,6 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	  addr += pageSize;
 	}
     }
-      
 
     /// Return the physical address for machine privilege file in this
     /// IMSIC. This is also the address for little-endian access.
@@ -260,10 +259,23 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     }
 
     /// Write to this IMSIC. Return false doing nothing if address is
-    /// not valid. Return true and perform write if address is valid.
-    /// Write may be a no-op if written data corresponds to a
+    /// not valid. Return true and perform a write if address is
+    /// valid.  Write may be a no-op if written data corresponds to a
     /// non-implemented id.
-    bool write(uint64_t addr, uint64_t data, unsigned size);
+    bool write(uint64_t addr, unsigned size, uint64_t data);
+
+    /// Read from this IMSIC. Return false doing nothing if address is
+    /// not valid. Return true and perform a read if address is valid.
+    /// Read from an IMSIC always returns a zero.
+    bool read(uint64_t addr, unsigned size, uint64_t& data)
+    {
+      if (size != 4)
+	return false;
+      if (not isValidAddress(addr))
+	return false;
+      data = 0;
+      return true;
+    }
 
   private:
 
