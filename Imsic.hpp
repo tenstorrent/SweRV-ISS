@@ -17,6 +17,18 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
   {
   public:
 
+    enum ExternalInterruptCsr
+    {
+      DELIVERY = 0x70,
+      THRESHOLD = 0x72,
+
+      P0 = 0x80,
+      P63 = 0xBF,
+
+      E0 = 0xC0,
+      E63 = 0xFF
+    };
+
     /// Define an inactive file. File may be later activated it using
     /// the activate method. An inactive file does not cover any
     /// address.
@@ -91,7 +103,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// to the threshold do not participate in the computation of top
     /// id even if pending and enabled.
     void setThreshold(unsigned t)
-    { threshold_ = t; } 
+    { threshold_ = t; }
 
     /// Return the top interrupt id threshold.  See setThrshold.
     unsigned threshold() const
@@ -169,15 +181,31 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned pageSize() const
     { return pageSize_; }
 
+    /// Select CSR for *ireg if valid.
+    void select(uint8_t num)
+    { select_ = num; }
+
+    /// Read from selected register by selectRegister. Returns false if
+    /// access would cause an illegal instruction trap and true otherwise.
+    template <typename URV>
+    bool read(URV& val) const;
+
+    /// Write to selected register by selectRegister. Returns false if
+    /// access would cause an illegal instruction trap and true otherwise.
+    template <typename URV>
+    bool write(URV val);
+
   private:
 
     uint64_t addr_ = 0;
     std::vector<bool> pending_;
     std::vector<bool> enabled_;
     unsigned topId_ = 0;
+    unsigned delivery_ = 0;
     unsigned threshold_ = 0;
     bool active_ = false;
     const unsigned pageSize_ = 1024;
+    uint64_t select_ = 0; // cached value of indirect register select
   };
 
 
