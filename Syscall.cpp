@@ -1602,26 +1602,45 @@ Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
   auto curr = mmap_blocks_.find(addr);
   if (curr == mmap_blocks_.end())
     {
-      assert(false);
+      // Currently not supported: unmapping an address not directly returned by mmap.
+      // TODO FIX : Find address within an allocated block and deallocate tail portion
+      // of that block.
       return -1;
     }
+
   auto curr_size = curr->second.length;
-  assert(not curr->second.free and curr_size == size);
+  assert(not curr->second.free and size <= curr_size);
   curr->second.free = true;
+
+  // Clear deallocated space
   auto mem_addr = curr->first;
-  auto mem_end_addr = mem_addr+(curr_size);
+  auto mem_end_addr = mem_addr + size;
   for (; mem_addr<mem_end_addr; mem_addr+=uint64_t(sizeof(uint64_t)))
     hart_.pokeMemory(mem_addr,uint64_t(0), true /*usePma*/);
-  auto next = curr;
-  if (++next != mmap_blocks_.end() and next->second.free)
+
+  if (size < curr_size)
     {
-      curr->second.length += next->second.length;
-      mmap_blocks_.erase(next);
+      // Deallocating leading part of block. Put back as used tail end
+      // of original block
+      mmap_blocks_.insert(std::make_pair(mem_end_addr, blk_t(curr_size - size, false)));
+      curr->second.length = size;
     }
+  else
+    {
+      // Merge block with subsequent block if they are adjacent in memory.
+      auto next = curr; ++next;
+      if (next != mmap_blocks_.end() and next->second.free and mem_end_addr == next->first)
+	{
+	  curr->second.length += next->second.length;
+	  mmap_blocks_.erase(next);
+	}
+    }
+
+  // Merge block with preceeding block if the are adjacent in memory.
   if(curr != mmap_blocks_.begin())
     {
-      auto prev = curr;
-      if ((--prev)->second.free)
+      auto prev = curr; --prev;
+      if (prev->second.free and (prev->first + prev->second.length) == mem_addr)
         {
           prev->second.length += curr->second.length;
           mmap_blocks_.erase(curr);
