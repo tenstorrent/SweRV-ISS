@@ -1598,14 +1598,25 @@ template <typename URV>
 int
 Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
 {
-  (void)size;
-  auto curr = mmap_blocks_.find(addr);
-  if (curr == mmap_blocks_.end())
+  if (mmap_blocks_.empty())
+    return -1;
+
+  // Find block containing address.
+  auto curr = mmap_blocks_.lower_bound(addr);  // Smallest item that is >= addr
+  if (curr == mmap_blocks_.end() or curr->first > addr)
+    --curr;
+
+  uint64_t orig_length = curr->second.length;
+  if (addr < curr->first or addr > (curr->first + curr->second.length) or
+      curr->second.free or size > orig_length)
+    return -1;
+
+  if (addr > curr->first)
     {
-      // Currently not supported: unmapping an address not directly returned by mmap.
-      // TODO FIX : Find address within an allocated block and deallocate tail portion
-      // of that block.
-      return -1;
+      // Deallocating tail part of block.
+      curr->second.length -= addr - curr->first;
+      mmap_blocks_.insert(std::make_pair(addr, blk_t(size, true)));
+      return 0;
     }
 
   auto curr_size = curr->second.length;
