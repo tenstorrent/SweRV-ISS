@@ -618,7 +618,14 @@ inline
 FT
 doFsub(FT f1, FT f2)
 {
-  return doFadd(f1, -f2);
+#ifdef SOFT_FLOAT
+  FT res = softSub(f1, f2);
+#else
+  FT res = f1 - f2;
+#endif
+
+  res = maybeAdjustForTininessBeforeRoundingAndQuietNaN(res);
+  return res;
 }
 
 
