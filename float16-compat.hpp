@@ -436,7 +436,7 @@ public:
     if (std::isnan(*this))
       ret.u16 |= ((EXP_MASK << (NUM_SIGNIFICAND_BITS - 1)) | // Exponent should be all 1s
                   (1 << (NUM_SIGNIFICAND_BITS - 2)));
-#ifndef SOFT_FLOAT
+#endif
     ret.u16 = ret.u16 xor 0x8000;
     return ret;
   }
