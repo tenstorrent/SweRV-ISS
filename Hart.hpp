@@ -2012,7 +2012,11 @@ namespace WdRiscv
 
     // Mark VS field of mstatus as dirty.
     void markVsDirty()
-    { setVecStatus(VecStatus::Dirty); }
+    {
+#ifndef FAST_SLOPPY
+      setVecStatus(VecStatus::Dirty);
+#endif
+    }
 
     // Enable/disable virtual (V) mode.
     void setVirtualMode(bool mode)

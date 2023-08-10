@@ -132,6 +132,16 @@ Hart<URV>::markFsDirty()
 {
 }
 
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkRoundingModeCommon(const DecodedInst*)
+{
+  return true;
+}
+
+
 #else
 
 
@@ -192,9 +202,6 @@ Hart<URV>::markFsDirty()
 }
 
 
-#endif
-
-
 template <typename URV>
 inline
 bool
@@ -211,6 +218,8 @@ Hart<URV>::checkRoundingModeCommon(const DecodedInst* di)
   setSimulatorRoundingMode(riscvMode);
   return true;
 }
+
+#endif
 
 
 template <typename URV>

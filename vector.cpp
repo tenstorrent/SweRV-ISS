@@ -10404,8 +10404,10 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
       uint64_t gpa1 = addr, gpa2 = addr;
 
       ELEM_TYPE elem = 0;
+#ifndef FAST_SLOPPY
       cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
                                      false /*hyper*/);
+#endif
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
       else
@@ -10738,8 +10740,10 @@ Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
       uint64_t gpa1 = addr, gpa2 = addr;
 
       ELEM_TYPE elem = 0;
+#ifndef FAST_SLOPPY
       cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
                                      false /*hyper*/);
+#endif
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
 
@@ -11051,8 +11055,10 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
       uint64_t gpa1 = addr, gpa2 = addr;
 
       ELEM_TYPE elem = 0;
+#ifndef FAST_SLOPPY
       cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
                                      false /*hyper*/);
+#endif
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
       else
@@ -11342,8 +11348,11 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = vaddr, gpa2 = vaddr;
 
-      auto cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
-                                          false /*hyper*/);
+      auto cause = ExceptionCause::NONE;
+#ifndef FAST_SLOPPY
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
+				     false /*hyper*/);
+#endif
       if (cause == ExceptionCause::NONE)
 	{
 	  if (elemSize == 1)
@@ -11801,9 +11810,11 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
           uint64_t gpa1 = faddr, gpa2 = faddr;
 
-	  auto cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
-                                              false /*hyper*/);
-
+	  auto cause = ExceptionCause::NONE;
+#ifndef FAST_SLOPPY
+	  cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
+					 false /*hyper*/);
+#endif
 	  if (cause == ExceptionCause::NONE)
             memRead(pa1, pa2, elem);
 	  else
@@ -12294,8 +12305,11 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
           uint64_t gpa1 = faddr, gpa2 = faddr;
 
-          auto cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
-                                              false /*hyper*/);
+	  auto cause = ExceptionCause::NONE;
+#ifndef FAST_SLOPPY
+          cause = determineLoadException(pa1, pa2, gpa1, gpa2, elemSize,
+					 false /*hyper*/);
+#endif
 	  if (cause == ExceptionCause::NONE)
 	    {
 	      if (elemSize == 1)
