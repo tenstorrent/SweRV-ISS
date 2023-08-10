@@ -18,7 +18,7 @@ File::read(URV& val) const
     {
       val = 0;
       unsigned offset;
-      std::vector<bool>* it;
+      const std::vector<bool>* it;
       if (select_ >= EIC::P0 and select_ <= EIC::P63)
         {
           offset = select_ - EIC::P0;
