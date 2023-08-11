@@ -401,6 +401,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvsstc(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
+  enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
+  enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
 }
 
 

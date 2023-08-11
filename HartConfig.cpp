@@ -1604,10 +1604,22 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 
 template<typename URV>
 bool
-HartConfig::configHarts(System<URV>& system, bool userMode,
-                        bool verbose) const
+HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
 {
-  userMode = userMode or this->userModeEnabled();
+  constexpr std::string_view tag = "clint";
+  if (not config_ -> contains(tag))
+    return true;
+
+  uint64_t addr = 0;
+  if (not getJsonUnsigned(tag, config_ ->at(tag), addr))
+    return false;
+
+  if ((addr & 7) != 0)
+    {
+      std::cerr << "Error: Config file clint address (0x" << std::hex
+		<< addr << std::dec << ") is not a multiple of 8\n";
+      return false;
+    }
 
   bool siOnReset = false;
   constexpr std::string_view siTag = "clint_software_interrupt_on_reset";
@@ -1615,34 +1627,30 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
     if (not getJsonBoolean(siTag, config_ -> at(siTag), siOnReset))
       return false;
 
-  // Apply JSON configuration.
+  uint64_t clintStart = addr, clintEnd = addr + 0xc000 - 1;
+  return configClint(system, hart, clintStart, clintEnd, siOnReset);
+}
+
+
+template<typename URV>
+bool
+HartConfig::configHarts(System<URV>& system, bool userMode,
+                        bool verbose) const
+{
+  userMode = userMode or this->userModeEnabled();
+
+  // Apply JSON configuration to each hart.
   for (unsigned i = 0; i < system.hartCount(); ++i)
     {
       Hart<URV>& hart = *system.ithHart(i);
       if (not applyConfig(hart, userMode, verbose))
 	return false;
 
-      constexpr std::string_view tag = "clint";
-      if (config_ -> contains(tag))
-	{
-	  uint64_t addr = 0;
-	  if (getJsonUnsigned(tag, config_ ->at(tag), addr))
-	    {
-	      if ((addr & 7) != 0)
-		{
-		  std::cerr << "Error: Config file clint address (0x" << std::hex
-			    << addr << std::dec << ") is not a multiple of 8\n";
-		  return false;
-		}
-
-              uint64_t clintStart = addr, clintEnd = addr + 0xc000 - 1;
-              if (not configClint(system, hart, clintStart, clintEnd, siOnReset))
-                return false;
-	    }
-	  else
-	    return false;
-	}
+      if (not applyClintConfig(system, hart))
+	return false;
     }
+
+  // System configuration.
 
   unsigned mbLineSize = 64;
   std::string_view tag = "merge_buffer_line_size";
