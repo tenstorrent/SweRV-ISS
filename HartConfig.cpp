@@ -1812,7 +1812,7 @@ HartConfig::getMcmCheckAll(bool& ca) const
   constexpr std::string_view tag = "merge_buffer_check_all";
   if (not config_ -> contains(tag))
     return false;
-  return getJsonUnsigned(tag, config_ -> at(tag), ca);
+  return getJsonBoolean(tag, config_ -> at(tag), ca);
 }
 
 
