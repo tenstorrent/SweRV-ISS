@@ -123,9 +123,9 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zmmul)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zvfh)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,8}}, {0,8} };
+  infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,8}}, {0,8} };
+  infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,8}}, {0,8} };
   infoVec_.at(extIx(RvExtension::Sstc)) = Info{ {{0,5}}, {0,5} };
   infoVec_.at(extIx(RvExtension::Svpbmt)) = Info{ {{1,0}}, {1,0} };
 
