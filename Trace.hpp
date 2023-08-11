@@ -297,6 +297,9 @@ namespace WdRiscv
     bool misalignedLdSt(bool& misal) const
     { return hart_->misalignedLdSt(misal); }
 
+    bool hasLr() const
+    { return hart_->hasLr(); }
+
     /// TODO: add support for vector ld/st (multiple PMAs accessed)
     /// Collect PMAs accessed for previous load stores
     bool getPmas(Pma& pma) const

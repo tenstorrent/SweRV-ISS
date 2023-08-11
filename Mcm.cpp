@@ -1664,7 +1664,7 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
 
   if (instrB.isCanceled())
     {
-      cerr << "Mcm::ppoRule12: Instr B canceled: tag=" << instrB.tag_ << "\n";
+      cerr << "Mcm::ppoRule9: Instr B canceled: tag=" << instrB.tag_ << "\n";
       return false;
     }
 
@@ -1796,9 +1796,9 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
   if (instrVec.empty() or instrB.tag_ == 0)
     return true;  // Nothing before B in instruction order.
 
-  // Check all preceeding instructions for a non-finished store M with
-  // address overlapping that of B. This is expensive. We need to keep
-  // set of non-finished stores.
+  // Check all preceeding instructions for a store M with address
+  // overlapping that of B. This is expensive. We need to keep set of
+  // non-finished stores.
   size_t ix = std::min(size_t(instrB.tag_), instrVec.size());
   for ( ; ix ; --ix)
     {
@@ -1808,8 +1808,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	continue;
 
       const auto& mdi = instrM.di_;
-      if ((not mdi.isStore() and not mdi.isAmo()) or instrM.complete_
-	  or not instrM.overlaps(instrB))
+      if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
 	continue;
 
       unsigned addrReg = effectiveRegIx(mdi, 1); // Address reg is operand 1 of instr.
@@ -1826,7 +1825,7 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
 	      {
 		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		     << aTag << " tag2=" << instrB.tag_ << '\n';
+		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag << '\n';
 		return false;
 	      }
 	}

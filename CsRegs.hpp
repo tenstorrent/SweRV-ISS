@@ -453,7 +453,7 @@ namespace WdRiscv
       VSTOPEI    = 0x25c,
       VSTOPI     = 0xeb0,
       HIDELEGH   = 0x613,
-      NHIENH     = 0x618,
+      HVIENH     = 0x618,
       HVIPH      = 0x655,
       HVIPRIO1H  = 0x656,
       HVIPRIO2H  = 0x657,
@@ -1556,6 +1556,23 @@ namespace WdRiscv
 	}
       MenvcfgFields<uint64_t> fields(value);
       return fields.bits_.PBMTE;
+    }
+
+    /// Return the value of the STCE bit of the HENVCFG CSR. Return
+    /// false if CSR is not implemented
+    bool henvcfgStce()
+    {
+      auto csr = getImplementedCsr(rv32_? CsrNumber::HENVCFGH : CsrNumber::HENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      if (rv32_)
+	{
+	  HenvcfghFields<uint32_t> fields(value);
+	  return fields.bits_.STCE;
+	}
+      HenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.STCE;
     }
 
     /// Set ix to the counter index corresponding to the given

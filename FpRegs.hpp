@@ -132,7 +132,7 @@ namespace WdRiscv
     {
       assert(flen_ >= 64);
       originalValue_ = regs_.at(i);
-      regs_.at(i) = value;
+      regs_[i] = value;  // Use [] instead of at for speed.
       lastWrittenReg_ = i;
     }
 
@@ -302,7 +302,7 @@ namespace WdRiscv
     assert(flen_ >= 32);
     originalValue_ = regs_.at(i);
 
-    regs_.at(i) = x;
+    regs_[i] = x;  // Use [] instead of at for speed.
     lastWrittenReg_ = i;
   }
 
@@ -328,7 +328,7 @@ namespace WdRiscv
     assert(flen_ >= 16);
     originalValue_ = regs_.at(i);
 
-    regs_.at(i) = x;
+    regs_[i] = x;  // Use [] instead of at for speed.
     lastWrittenReg_ = i;
   }
 

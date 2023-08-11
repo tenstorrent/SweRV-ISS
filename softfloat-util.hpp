@@ -95,6 +95,33 @@ namespace WdRiscv
   }
 
 
+  /// Perform a floating point subtract using the softfloat library.
+  inline float
+  softSub(float a, float b)
+  {
+    float res = softToNative(f32_sub(nativeToSoft(a), nativeToSoft(b)));
+    return res;
+  }
+
+
+  /// Perform a floating point subtract using the softfloat library.
+  inline double
+  softSub(double a, double b)
+  {
+    double res = softToNative(f64_sub(nativeToSoft(a), nativeToSoft(b)));
+    return res;
+  }
+
+
+  /// Perform a floating point subtract using the softfloat library.
+  inline Float16
+  softSub(Float16 a, Float16 b)
+  {
+    Float16 res = softToNative(f16_sub(nativeToSoft(a), nativeToSoft(b)));
+    return res;
+  }
+
+
   /// Perform a floating point mul using the softfloat library.
   inline float
   softMul(float a, float b)

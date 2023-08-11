@@ -179,7 +179,7 @@ CsRegs<URV>::adjustSipSieValue(URV value) const
   auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
   if (deleg)
     {
-      value &= deleg->read();
+      value &= deleg->read() >> virtMode_;
       if (virtMode_)
 	{
 	  auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
@@ -446,12 +446,21 @@ CsRegs<URV>::updateSstc()
 {
   bool flag = sstcEnabled_;
 
-  flag = flag and superEnabled_;
+  bool s = false;
   auto menv = getImplementedCsr(CsrNumber::MENVCFG);
   if (menv)
-    flag = flag and menvcfgStce();
-  
-  findCsr(CsrNumber::STIMECMP)->setImplemented(flag);
+    s = menvcfgStce();
+
+  flag = flag and superEnabled_;
+  auto stimecmp = findCsr(CsrNumber::STIMECMP);
+  stimecmp->setImplemented(flag);
+  stimecmp->setPrivilegeMode(s? PrivilegeMode::Supervisor : PrivilegeMode::Machine);
+  if (rv32_)
+    {
+      auto stimecmph = findCsr(CsrNumber::STIMECMPH);
+      stimecmph->setImplemented(flag);
+      stimecmph->setPrivilegeMode(s? PrivilegeMode::Supervisor : PrivilegeMode::Machine);
+    }
 
   if (superEnabled_)
     {
@@ -467,8 +476,21 @@ CsRegs<URV>::updateSstc()
 	}
     }
 
+  bool vs = false;
+  auto henv = getImplementedCsr(CsrNumber::HENVCFG);
+  if (henv)
+    vs = henvcfgStce();
+
   flag = flag and hyperEnabled_;
-  findCsr(CsrNumber::VSTIMECMP)->setImplemented(flag);
+  auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
+  vstimecmp->setImplemented(flag);
+  vstimecmp->setHypervisor(!vs);
+  if (rv32_)
+    {
+      auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
+      vstimecmph->setImplemented(flag);
+      vstimecmph->setHypervisor(!vs);
+    }
 }
 
 
@@ -807,25 +829,32 @@ CsRegs<URV>::writeSipSie(CsrNumber num, URV value)
     {
       Csr<URV>* csr = getImplementedCsr(num, virtMode_);
       if (not csr)
-	return false;
-
-      // Get corresponding M register (MIP or MIE).
-      auto mcsr = getImplementedCsr(CN(unsigned(num) + 0x200));
-
-      auto mideleg = getImplementedCsr(CN(CN::MIDELEG));
+        return false;
 
       URV prevMask = csr->getWriteMask();
       URV mask = prevMask;
 
+      auto mcsr = getImplementedCsr(advance(num, 0x200));
       if (mcsr)
-	mask &= mcsr->getWriteMask();
-      mask &= mideleg ? mideleg->read() : 0; // Only delegated bits writeable
+        mask &= mcsr->getWriteMask() >> virtMode_;
+
+      auto mideleg = getImplementedCsr(CN::MIDELEG);
+      mask &= mideleg ? mideleg->read() >> virtMode_: 0; // Only delegated bits writeable
+
+      if (virtMode_)
+        {
+          auto hideleg = getImplementedCsr(CN::HIDELEG);
+          mask &= hideleg ? hideleg->read() >> 1: 0;
+        }
 
       csr->setWriteMask(mask);
       csr->write(value);
       csr->setWriteMask(prevMask);
 
       recordWrite(num);
+
+      if (virtMode_)
+        hyperWrite(csr);
       return true;
     }
   return false;
@@ -945,7 +974,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
     }
 
   // Write mask of SIP/SIE is a combined with that of MIP/MIE and
-  // delgation register.
+  // delgation registers.
   if (num == CN::SIP or num == CN::SIE)
     return writeSipSie(num, value);
 
@@ -1004,7 +1033,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
     updateFcsrGroupForWrite(num, value);   // fflags and frm are part of fcsr
   else if (num == CN::VXSAT or num == CN::VXRM or num == CN::VCSR)
     updateVcsrGroupForWrite(num, value);   // vxsat and vrm are part of vcsr
-  else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN)
+  else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN or num == CN::HCOUNTEREN)
     updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
   else
     hyperWrite(csr);   // Update hypervisor CSR aliased bits.
@@ -1791,13 +1820,12 @@ CsRegs<URV>::defineSupervisorRegs()
   defineCsr("satp",       Csrn::SATP,       !mand, !imp, 0, wam, wam);
 
   // Supervisor time compare.
-  auto stc = defineCsr("stimecmp",   Csrn::STIMECMP,   !mand, !imp, 0, wam, wam);
-  stc->setHypervisor(true);
+  auto stimecmp = defineCsr("stimecmp",   Csrn::STIMECMP,   !mand, !imp, 0, wam, wam);
+  stimecmp->setHypervisor(true); // small hack for stimecmp accessed in VS (vstimecmp)
   if (rv32_)
     {
-      auto csr = defineCsr("stimecmph",  Csrn::STIMECMPH,  !mand, !imp, 0, wam, wam);
-      if (csr)
-	csr->setHypervisor(true);
+      auto stimecmph = defineCsr("stimecmph",  Csrn::STIMECMPH,  !mand, !imp, 0, wam, wam);
+      stimecmph->setHypervisor(true);
     }
 
 
@@ -1835,15 +1863,21 @@ CsRegs<URV>::defineUserRegs()
   using Csrn = CsrNumber;
 
   // User Counter/Timers
-  defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
-  defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);
-  defineCsr("instret",  Csrn::INSTRET,  !mand, imp,  0, wam, wam);
+  auto c = defineCsr("cycle",    Csrn::CYCLE,    !mand, imp,  0, wam, wam);
+  c->setHypervisor(true);
+  c = defineCsr("time",     Csrn::TIME,     !mand, imp,  0, wam, wam);
+  c->setHypervisor(true);
+  c = defineCsr("instret",  Csrn::INSTRET,  !mand, imp,  0, wam, wam);
+  c->setHypervisor(true);
 
-  auto c = defineCsr("cycleh",   Csrn::CYCLEH,   !mand, !imp, 0, wam, wam);
+  c = defineCsr("cycleh",   Csrn::CYCLEH,   !mand, !imp, 0, wam, wam);
+  c->setHypervisor(true);
   c->markAsHighHalf(true);
   c = defineCsr("timeh",    Csrn::TIMEH,    !mand, !imp, 0, wam, wam);
+  c->setHypervisor(true);
   c->markAsHighHalf(true);
   c = defineCsr("instreth", Csrn::INSTRETH, !mand, !imp, 0, wam, wam);
+  c->setHypervisor(true);
   c->markAsHighHalf(true);
 
   // Define hpmcounter3/hpmcounter3h to hpmcounter31/hpmcounter31h
@@ -1853,12 +1887,14 @@ CsRegs<URV>::defineUserRegs()
     {
       CsrNumber csrNum = advance(CsrNumber::HPMCOUNTER3, i - 3);
       std::string name = "hpmcounter" + std::to_string(i);
-      defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
+      c = defineCsr(name, csrNum, !mand, !imp, 0, wam, wam);
+      c->setHypervisor(true);
 
       // High register counterpart of mhpmcounter.
       name += "h";
       csrNum = advance(CsrNumber::HPMCOUNTER3H, i - 3);
       c = defineCsr(std::move(name), csrNum, !mand, !imp, 0, wam, wam);
+      c->setHypervisor(true);
       c->markAsHighHalf(true);
     }
 
@@ -2175,7 +2211,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("vstopei",    CsrNumber::VSTOPEI,    !mand, !imp, 0, wam, wam);
   defineCsr("vstopi",     CsrNumber::VSTOPI,     !mand, !imp, 0, wam, wam);
   defineCsr("hidelegh",   CsrNumber::HIDELEGH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("nhienh",     CsrNumber::NHIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  defineCsr("hvienh",     CsrNumber::HVIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
   defineCsr("hviprio2h",  CsrNumber::HVIPRIO2H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
@@ -2361,7 +2397,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       MstatusFields<URV> fields(csr->read());
       interruptEnable_ = fields.bits_.MIE;
     }
-  else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN)
+  else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN or num == CN::HCOUNTEREN)
     updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
   else
     hyperPoke(csr);    // Update hypervisor CSR aliased bits.
@@ -2624,25 +2660,34 @@ CsRegs<URV>::updateCounterPrivilege()
   URV sMask = 0;
   peek(CsrNumber::SCOUNTEREN, sMask);
 
+  URV hMask = 0;
+  peek(CsrNumber::HCOUNTEREN, hMask);
+
   // Bits 0, 1, 2, 3 to 31 of mask correspond to CYCLE, TIME, INSTRET,
   // HPMCOUNTER3 to HPMCOUNTER31
   for (unsigned i = 0; i < 32; ++i)
     {
       bool mFlag = (mMask >> i) & 1;
       PrivilegeMode nextMode = PrivilegeMode::Machine;
+      bool virtAccess = false;
 
       if (mFlag)
         {
           if (superEnabled_)
             {
               nextMode = PrivilegeMode::Supervisor;
-
               bool sFlag = (sMask >> i) & 1;
+
               if (sFlag and userEnabled_)
                 nextMode = PrivilegeMode::User;
             }
           else if (userEnabled_)
             nextMode = PrivilegeMode::User;
+
+          // from the spec, if counter is visible from VU, by effect it will also
+          // be visible from U i.e. if a counter is visible from U and VS, then it must also be visible to VU.
+          if (hyperEnabled_)
+            virtAccess = (hMask >> i) & 1;
         }
 
       unsigned num = i + unsigned(CsrNumber::CYCLE);
@@ -2650,23 +2695,36 @@ CsRegs<URV>::updateCounterPrivilege()
       CsrNumber csrn = CsrNumber(num);
       auto csr = getImplementedCsr(csrn);
       if (csr)
-        csr->setPrivilegeMode(nextMode);
+        {
+          csr->setPrivilegeMode(nextMode);
+          csr->setHypervisor(!virtAccess);
+        }
 
-      num = i + unsigned(CsrNumber::CYCLEH);
-      csrn = CsrNumber(num);
+      csrn = advance(CsrNumber::CYCLEH, i);
       csr = getImplementedCsr(csrn);
       if (csr)
-        csr->setPrivilegeMode(nextMode);
+        {
+          csr->setPrivilegeMode(nextMode);
+          csr->setHypervisor(!virtAccess);
+        }
     }
 
-  auto stimecmp = findCsr(CsrNumber::STIMECMP);
-  auto stimecmph = findCsr(CsrNumber::STIMECMP);
+  auto stimecmp = getImplementedCsr(CsrNumber::STIMECMP);
+  auto stimecmph = getImplementedCsr(CsrNumber::STIMECMPH);
   for (auto csr : {stimecmp, stimecmph})
     {
-      if ((mMask & 2) == 0)  // TM bit set in mcounteren.
-	csr->setPrivilegeMode(PrivilegeMode::Machine);
-      else if (superEnabled_)
-	csr->setPrivilegeMode(PrivilegeMode::Supervisor);
+      if (csr)
+        {
+          if ((mMask & 2) == 0)  // TM bit set in mcounteren.
+            csr->setPrivilegeMode(PrivilegeMode::Machine);
+          else if (superEnabled_)
+            csr->setPrivilegeMode(PrivilegeMode::Supervisor);
+
+          if (((hMask & 2) == 0) or ((mMask & 2) == 0)) // TM set in both mcounteren/hcounteren
+            csr->setHypervisor(true);
+          else
+            csr->setHypervisor(false);
+        }
     }
 }
 
@@ -2983,30 +3041,35 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto hip = getImplementedCsr(CsrNumber::HIP);
   auto hvip = getImplementedCsr(CsrNumber::HVIP);
   auto mip = getImplementedCsr(CsrNumber::MIP);
+  auto vsip = getImplementedCsr(CsrNumber::VSIP);
 
   bool hipUpdated = num == CsrNumber::HIP;
   URV vsMask = 0x444;  // VSEIP, VSTIP and VSSIP.
 
   if (num == CsrNumber::MIP)
     {
-      // Updating MIP is reflected into HIP.
+      // Updating MIP is reflected into HIP/VSIP.
+      URV val = mip->read() & vsMask;
       if (hip)
 	{
-	  URV newVal = (mip->read() & vsMask) | (hip->read() & ~vsMask);
-	  hip->poke(newVal);
+	  hip->poke(val | (hip->read() & ~vsMask));
 	  hipUpdated = true;
 	  recordWrite(CsrNumber::HIP);
 	}
+      if (vsip)
+	vsip->poke(val >> 1);
     }
   else if (num == CsrNumber::HIP)
     {
-      // Updating HIP is reflected into MIP.
+      URV val = hip->read() & vsMask;
+      // Updating HIP is reflected into MIP/VSIP.
       if (mip)
 	{
-	  URV newVal = (mip->read() & vsMask) | (hip->read() & ~vsMask);
-	  mip->poke(newVal);
+	  mip->poke((mip->read() & ~vsMask) | val);
 	  recordWrite(CsrNumber::MIP);
 	}
+      if (vsip)
+        vsip->poke(val >> 1);
     }
   else if (num == CsrNumber::HVIP)
     {
@@ -3018,12 +3081,24 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  hipUpdated = true;
 	  recordWrite(CsrNumber::HIP);
 	}
+      if (vsip)
+        vsip->poke(value >> 1);
+    }
+  else if (num == CsrNumber::VSIP)
+    {
+      // Poking VSIP injects values into HIP
+      if (hip)
+        {
+          hip->poke(value << 1);
+          hipUpdated = true;
+	  recordWrite(CsrNumber::VSIP);
+        }
     }
 
   if (hipUpdated)
     {
       // Writing HIP changes bit VSSIP in HVIP.
-      if (hvip  and num != CsrNumber::HVIP)
+      if (hvip and num != CsrNumber::HVIP)
 	{
 	  URV mask = 0x400; // Bit VSSIP
 	  URV newVal = (value & mask) | (hvip->read() & ~mask);
@@ -3032,8 +3107,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	}
 
       // Updating HIP is reflected in VSIP and MIP.
-      auto vsip = getImplementedCsr(CsrNumber::VSIP);
-      if (vsip)
+      if (vsip and num != CsrNumber::VSIP)
 	{
 	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
 	  vsip->poke(val >> 1);
@@ -3051,20 +3125,47 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 
   auto hie = getImplementedCsr(CsrNumber::HIE);
   auto mie = getImplementedCsr(CsrNumber::MIE);
+  auto vsie = getImplementedCsr(CsrNumber::VSIE);
   if (num == CsrNumber::HIE)
     {
+      URV val = hie->read() & vsMask;
       if (mie)
 	{
-	  mie->poke((mie->read() & ~vsMask) | (hie->read() & vsMask));
-	  recordWrite(CsrNumber::MIP);
+	  mie->poke((mie->read() & ~vsMask) | val);
+	  recordWrite(CsrNumber::MIE);
 	}
+      if (vsie)
+        {
+          vsie->poke(val >> 1);
+          recordWrite(CsrNumber::VSIE);
+        }
     }
   else if (num == CsrNumber::MIE)
     {
+      URV val = (mie->read() & vsMask);
       if (hie)
 	{
-	  hie->poke((hie->read() & ~vsMask) | (mie->read() & vsMask));
-	  recordWrite(CsrNumber::MIP);
+	  hie->poke(val | (hie->read() & ~vsMask));
+	  recordWrite(CsrNumber::HIE);
+	}
+      if (vsie)
+        {
+          vsie->poke(val >> 1);
+          recordWrite(CsrNumber::VSIE);
+        }
+    }
+  else if (num == CsrNumber::VSIE)
+    {
+      URV val = ((vsie->read() << 1) & vsMask);
+      if (mie)
+	{
+	  mie->poke((mie->read() & ~vsMask) | val);
+	  recordWrite(CsrNumber::MIE);
+	}
+      if (hie)
+	{
+	  hie->poke(val | (hie->read() & ~vsMask));
+	  recordWrite(CsrNumber::HIE);
 	}
     }
 }
@@ -3080,44 +3181,58 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
   auto hip = getImplementedCsr(CsrNumber::HIP);
   auto hvip = getImplementedCsr(CsrNumber::HVIP);
   auto mip = getImplementedCsr(CsrNumber::MIP);
+  auto vsip = getImplementedCsr(CsrNumber::VSIP);
 
   bool hipUpdated = num == CsrNumber::HIP;
   URV vsMask = 0x444;  // VSEIP, VSTIP and VSSIP.
 
   if (num == CsrNumber::MIP)
     {
-      // Updating MIP is reflected into HIP.
+      // Updating MIP is reflected into HIP/VSIP.
+      URV val = mip->read() & vsMask;
       if (hip)
 	{
-	  URV newVal = (mip->read() & vsMask) | (hip->read() & ~vsMask);
-	  hip->poke(newVal);
+	  hip->poke(val | (hip->read() & ~vsMask));
 	  hipUpdated = true;
 	}
+      if (vsip)
+	vsip->poke(val >> 1);
     }
   else if (num == CsrNumber::HIP)
     {
-      // Updating HIP is reflected into MIP.
+      URV val = hip->read() & vsMask;
+      // Updating HIP is reflected into MIP/VSIP.
       if (mip)
-	{
-	  URV newVal = (mip->read() & vsMask) | (hip->read() & ~vsMask);
-	  mip->poke(newVal);
-	}
+	mip->poke((mip->read() & ~vsMask) | val);
+      if (vsip)
+        vsip->poke(val >> 1);
     }
   else if (num == CsrNumber::HVIP)
     {
       // Poking HVIP injects values into HIP. FIX : Need to
       // logical-or external values for VSEIP and VSTIP.
       if (hip)
-	{
-	  hip->poke(value);
-	  hipUpdated = true;
-	}
+        {
+          hip->poke(value);
+          hipUpdated = true;
+        }
+      if (vsip)
+        vsip->poke(value >> 1);
+    }
+  else if (num == CsrNumber::VSIP)
+    {
+      // Poking VSIP injects values into HIP
+      if (hip)
+        {
+          hip->poke(value << 1);
+          hipUpdated = true;
+        }
     }
 
   if (hipUpdated)
     {
       // Writing HIP changes bit VSSIP in HVIP.
-      if (hvip  and num != CsrNumber::HVIP)
+      if (hvip and num != CsrNumber::HVIP)
 	{
 	  URV mask = 0x400; // Bit VSSIP
 	  URV newVal = (value & mask) | (hvip->read() & ~mask);
@@ -3125,8 +3240,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	}
 
       // Updating HIP is reflected in VSIP and MIP.
-      auto vsip = getImplementedCsr(CsrNumber::VSIP);
-      if (vsip)
+      if (vsip and num != CsrNumber::VSIP)
 	{
 	  URV val = hip->read() & ~ URV(0x1000);  // Clear bit 12 (SGEIP)
 	  vsip->poke(val >> 1);
@@ -3142,19 +3256,30 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 
   auto hie = getImplementedCsr(CsrNumber::HIE);
   auto mie = getImplementedCsr(CsrNumber::MIE);
+  auto vsie = getImplementedCsr(CsrNumber::VSIE);
   if (num == CsrNumber::HIE)
     {
+      URV val = hie->read() & vsMask;
       if (mie)
-	{
-	  mie->poke((mie->read() & ~vsMask) | (hie->read() & vsMask));
-	}
+        mie->poke((mie->read() & ~vsMask) | val);
+      if (vsie)
+        vsie->poke(val >> 1);
     }
   else if (num == CsrNumber::MIE)
     {
+      URV val = (mie->read() & vsMask);
       if (hie)
-	{
-	  hie->poke((hie->read() & ~vsMask) | (mie->read() & vsMask));
-	}
+        hie->poke(val | (hie->read() & ~vsMask));
+      if (vsie)
+        vsie->poke(val >> 1);
+    }
+  else if (num == CsrNumber::VSIE)
+    {
+      URV val = ((vsie->read() << 1) & vsMask);
+      if (mie)
+        mie->poke((mie->read() & ~vsMask) | val);
+      if (hie)
+        hie->poke(val | (hie->read() & ~vsMask));
     }
 }
 
@@ -3176,6 +3301,28 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
   unsigned offset = 0;
   if (num == CN::HCONTEXT or num == CN::SCONTEXT)
     enableBit = 57;
+  // hgeip hgeie
+  else if (num == CN::MISELECT or num == CN::MIREG or num == CN::MTOPEI or num == CN::MTOPI or
+	   num == CN::MVIEN or num == CN::MVIP or num == CN::MIDELEGH or num == CN::MIEH or
+	   num == CN::MVIENH or num == CN::MVIPH or num == CN::MIPH or num == CN::STOPEI or
+	   num == CN::VSTOPEI)
+    enableBit = 58;  // IMSIC state.
+  if (num == CN::SIPH or num == CN::SIEH or num == CN::STOPI or num == CN::HIDELEGH or
+      num == CN::HVIEN or num == CN::HVIENH or num == CN::HVIPH or num == CN::HVICTL or
+      num == CN::HVIPRIO1 or num == CN::HVIPRIO1H or num == CN::HVIPRIO2 or
+      num == CN::HVIPRIO2H or num == CN::VSIPH or num == CN::VSIEH or num == CN::VSTOPI)
+    enableBit = 59;  // AIA state not controlled by bits 58 and 60
+  else if (num == CN::SISELECT or num == CN::SIREG or num == CN::VSISELECT or num == CN::VSIREG)
+    enableBit = 60;
+  else if (num == CN::SIREG)
+    {
+      URV select = 0;
+      if (peek(CN::SISELECT, select))
+	{
+	  if (select >= 0x30 and select <= 0x3f)
+	    enableBit = 59;  // Sections 2.5 and 5.4.1 of AIA
+	}
+    }
   else if (num == CN::HENVCFG or num == CN::HENVCFGH or num == CN::SENVCFG)
     enableBit = 62;
   else if (num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3)
@@ -3195,21 +3342,19 @@ CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
     }
 
   if (enableBit < 0)
-    return true;
-  else
-    {
-      csrn = advance(csrn, offset);
-      auto csr = getImplementedCsr(csrn);
-      if (not csr)
-        {
-          assert(0);
-          return false;
-        }
+    return true;  // CSR not affected by STTEND
 
-      if (rv32_) enableBit -= 8*sizeof(URV);
-      URV value = csr->read();
-      return (value >> enableBit) & 1;
+  csrn = advance(csrn, offset);
+  auto csr = getImplementedCsr(csrn);
+  if (not csr)
+    {
+      assert(0);
+      return false;
     }
+
+  if (rv32_) enableBit -= 8*sizeof(URV);
+  URV value = csr->read();
+  return (value >> enableBit) & 1;
 }
 
 

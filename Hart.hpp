@@ -1508,6 +1508,10 @@ namespace WdRiscv
     /// unrolled div/rem inst). This is for the test-bench.
     bool cancelLastDiv();
 
+    // returns true if there is any valid LR reservation
+    bool hasLr() const
+    { return memory_.hasLr(hartIx_); }
+
     /// Cancel load reservation held by this hart (if any).
     void cancelLr()
     { memory_.invalidateLr(hartIx_); }
@@ -2008,7 +2012,11 @@ namespace WdRiscv
 
     // Mark VS field of mstatus as dirty.
     void markVsDirty()
-    { setVecStatus(VecStatus::Dirty); }
+    {
+#ifndef FAST_SLOPPY
+      setVecStatus(VecStatus::Dirty);
+#endif
+    }
 
     // Enable/disable virtual (V) mode.
     void setVirtualMode(bool mode)
@@ -2287,9 +2295,9 @@ namespace WdRiscv
 
     /// Helper to CSR instructions: Read csr register returning true
     /// on success and false on failure (csr does not exist or is not
-    /// accessible). The isWrite flags should be set to true if the
-    /// CSR instruction writes the CSR register when the read is
-    /// successful.
+    /// accessible). The isWrite flags should be set to true if
+    /// doCsrRead is called from a CSR instruction that would write
+    /// the CSR register when the read is successful.
     bool doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& csrVal);
 
     /// This is called after a csr is written/poked to update the

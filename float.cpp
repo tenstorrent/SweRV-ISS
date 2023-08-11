@@ -132,6 +132,16 @@ Hart<URV>::markFsDirty()
 {
 }
 
+
+template <typename URV>
+inline
+bool
+Hart<URV>::checkRoundingModeCommon(const DecodedInst*)
+{
+  return true;
+}
+
+
 #else
 
 
@@ -192,9 +202,6 @@ Hart<URV>::markFsDirty()
 }
 
 
-#endif
-
-
 template <typename URV>
 inline
 bool
@@ -211,6 +218,8 @@ Hart<URV>::checkRoundingModeCommon(const DecodedInst* di)
   setSimulatorRoundingMode(riscvMode);
   return true;
 }
+
+#endif
 
 
 template <typename URV>
@@ -1876,7 +1885,7 @@ Hart<URV>::execFsub_h(const DecodedInst* di)
 
   Float16 f1 = fpRegs_.readHalf(di->op1());
   Float16 f2 = fpRegs_.readHalf(di->op2());
-  Float16 res = doFadd(f1, -f2);
+  Float16 res = doFsub(f1, f2);
   fpRegs_.writeHalf(di->op0(), res);
 
   updateAccruedFpBits();

@@ -155,6 +155,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::TIME)->tie(&cycleCount_);
 
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
+      csRegs_.findCsr(CsrNumber::VSTIMECMP)->tie(&vstimecmp_);
       csRegs_.findCsr(CsrNumber::HTIMEDELTA)->tie(&htimedelta_);
     }
 
@@ -327,12 +328,10 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  bool sstc = false;
-  if (isRvs())
-    sstc = isRvsstc();
-  csRegs_.enableSstc(sstc);
+  flag = isRvsstc();
+  csRegs_.enableSstc(flag);
   stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
-
+  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
   enableRvzba(isa_.isEnabled(RvExtension::Zba));
   enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
   enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
@@ -2943,10 +2942,27 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   if (csr == CN::MISA and lastVal != val)
     processExtensions(false);
 
-  if (csr == CN::MENVCFG)
+  if (csr == CN::MENVCFG or csr == CN::HENVCFG)
     {
       updateTranslationPbmt();
       csRegs_.updateSstc();
+    }
+
+  if (csr == CN::STIMECMP)
+    {
+      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
+      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
+      if (fromHostValid_ and hasPendingInput(inFd))
+        {
+          uint64_t v = 0;
+          peekMemory(fromHost_, v, true);
+          if (v == 0)
+            {
+              int c = char(readCharNonBlocking(inFd));
+              if (c > 0)
+                memory_.poke(fromHost_, (uint64_t(1) << 56) | (char) c, true);
+            }
+        }
     }
 }
 
@@ -4687,7 +4703,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 	    }
 	}
     }
-  if (privMode_ == PM::Supervisor and not virtMode_)
+  if (not virtMode_)
     return false;
 
   // Check for interrupts destined to VS privilege.
@@ -4778,7 +4794,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear virtual supervisor timer from vstimecmp CSR.
       if (vstimecmpActive_)
 	{
-	  if ((instCounter_ >> counterToTimeShift_) >= vstimecmp_ - htimedelta_)
+	  if ((instCounter_ >> counterToTimeShift_) >= (vstimecmp_ - htimedelta_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
@@ -9867,6 +9883,12 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor);
   if (virtMode_)
     {
+      if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
+	{
+	  virtualInst(di);  // Section 2.3 of AIA.
+	  return false;
+	}
+
       if (csRegs_.isHypervisor(csr) or
 	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User)))
 	{
@@ -9882,21 +9904,21 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
         }
     }
 
-  if (csr == CsrNumber::SATP and privMode_ == PrivilegeMode::Supervisor)
+  if (csr == CsrNumber::SATP and privMode_ == PM::Supervisor)
     {
       if (mstatus_.bits_.TVM and not virtMode_)
 	{
 	  illegalInst(di);
 	  return false;
 	}
-      if (hstatus_.bits_.VTVM and virtMode_)
+      else if (hstatus_.bits_.VTVM and virtMode_)
 	{
 	  virtualInst(di);
 	  return false;
 	}
     }
 
-  if (csr == CsrNumber::HGATP and privMode_ == PrivilegeMode::Supervisor and not virtMode_)
+  if (csr == CsrNumber::HGATP and privMode_ == PM::Supervisor and not virtMode_)
     if (mstatus_.bits_.TVM)
       {
 	illegalInst(di);
@@ -9984,6 +10006,12 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 
   if (not isCsrWriteable(csr, privMode_, virtMode_))
     {
+      if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
+	{
+	  virtualInst(di);  // Section 2.3 of AIA.
+	  return;
+	}
+
       if (virtMode_)
 	{
 	  if (csr == CsrNumber::SATP)
