@@ -1606,9 +1606,10 @@ Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
   if (curr == mmap_blocks_.end() or curr->first > addr)
     --curr;
 
+  // Check that requested unmap falls within a prevously mapped block.
   uint64_t orig_length = curr->second.length;
   if (addr < curr->first or addr > (curr->first + curr->second.length) or
-      curr->second.free or size > orig_length)
+      curr->second.free or (addr + size) > (curr->first + orig_length))
     return -1;
 
   if (addr > curr->first)
