@@ -8146,7 +8146,7 @@ Hart<URV>::execVmv_x_s(const DecodedInst* di)
   unsigned rd = di->op0(), vs1 = di->op1(), groupX8 = 8;
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if ((vs1 % eg) or di->isMasked())
+  if (di->isMasked())
     {
       postVecFail(di);
       return;
@@ -8255,13 +8255,7 @@ Hart<URV>::execVfmv_f_s(const DecodedInst* di)
     }
 
   unsigned rd = di->op0(), vs1 = di->op1(), groupX8 = 8;
-
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
-  if (vs1 % eg)
-    {
-      postVecFail(di);
-      return;
-    }
   vecRegs_.setOpEmul(1, eg);  // Track operand group for logging
 
   ElementWidth sew = vecRegs_.elemWidth();
