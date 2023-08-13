@@ -594,6 +594,16 @@ namespace WdRiscv
       sewInBits_ = elemWidthInBits(sew);
     }
 
+    /// Return the vstart value at the begining of the last executed
+    /// vector instruction.
+    unsigned getLastVstart() const
+    { return lastVstart_; }
+
+    /// Set the vstart at the beginning of execution of the last executed
+    /// vector instruction.
+    void setLastVstart(unsigned n)
+    { lastVstart_ = n; }
+
   private:
 
     /// Map an vector group multiplier to a flag indicating whether given

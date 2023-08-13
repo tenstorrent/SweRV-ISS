@@ -2038,7 +2038,7 @@ namespace WdRiscv
     // execution to use for logging/tracing after execution.
     bool preVecExec()
     {
-      vecRegs_.lastVstart_ = csRegs_.peekVstart();
+      vecRegs_.setLastVstart(csRegs_.peekVstart());
       return isVecLegal();
     }
 
