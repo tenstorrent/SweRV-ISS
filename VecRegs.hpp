@@ -624,6 +624,7 @@ namespace WdRiscv
 
     std::optional<unsigned> lastWrittenReg_;
     uint32_t lastGroupX8_ = 8;   // 8 times last grouping factor
+    uint32_t lastVstart_ = 0;    // Vstart at beginning of last vec instruction.
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.

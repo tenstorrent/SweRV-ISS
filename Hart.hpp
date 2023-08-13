@@ -2034,6 +2034,14 @@ namespace WdRiscv
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
 
+    // Similar to isVecLegal but also saves copy of vstart ahead of
+    // execution to use for logging/tracing after execution.
+    bool preVecExec()
+    {
+      vecRegs_.lastVstart_ = csRegs_.peekVstart();
+      return isVecLegal();
+    }
+
     // We avoid the cost of locating MSTATUS in the CSRs register file
     // by caching its value in this class. We do this whenever MSTATUS
     // is written/poked.
