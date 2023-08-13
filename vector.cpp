@@ -8073,8 +8073,7 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2(), start = csRegs_.peekVstart();
-  if (not di->isMasked() or di->op0() == 0 or // Must be masked, dest must not overlap v0.
-      not di->isMasked())
+  if (not di->isMasked() or di->op0() == 0)  // Must be masked, dest must not overlap v0.
     {
       postVecFail(di);
       return;
