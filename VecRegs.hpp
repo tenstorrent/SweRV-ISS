@@ -482,7 +482,7 @@ namespace WdRiscv
     { opsEmul_.at(0) = emul0; opsEmul_.at(1) = emul1; opsEmul_.at(2) = emul2; }
 
     /// For instructions that do not use the write method, mark the
-    /// last written register and the effective element widht.
+    /// last written register and the effective group multiplier.
     void touchReg(uint32_t reg, uint32_t groupX8)
     { lastWrittenReg_ = reg; lastGroupX8_ = groupX8; }
 
@@ -505,6 +505,47 @@ namespace WdRiscv
 
       const uint8_t* data = data_.data() + static_cast<std::size_t>(maskReg)*bytesPerReg_;
       return (data[byteIx] >> bitIx) & 1;
+    }
+
+    /// Return true if inactive element of a masked instruction should
+    /// be skipped (either preserved or written with all ones. Return
+    /// false if element is active or if it should not be skipped.
+    bool skipMaskAgnostic(unsigned vd, unsigned groupx8, bool masked, unsigned ix)
+    {
+      if (masked and not isActive(0, ix))
+	{
+	  if (not maskAgn_)
+	    {
+	      touchReg(vd, groupx8);  // Mark register for logging.
+	      return true;
+	    }
+	  // Either we write all ones or compute value for masked elem.
+	  // For now preserve.
+	  touchReg(vd, groupx8);
+	  return true;
+	}
+      return false;
+    }
+
+    /// Return true if inactive element of a masked mask instruction
+    /// (instruction producing a mask) should be skipped (either
+    /// preserved or written with all ones. Return false if element is
+    /// active or if it should not be skipped.
+    bool skipMaskAgnosticMask(unsigned vd, bool masked, unsigned ix)
+    {
+      if (masked and not isActive(0, ix))
+	{
+	  if (not maskAgn_)
+	    {
+	      touchMask(vd);  // Mark register for logging.
+	      return true;
+	    }
+	  // Either we write all ones or compute value for masked elem.
+	  // For now preserve.
+	  touchMask(vd);
+	  return true;
+	}
+      return false;
     }
 
     /// Set the ith bit of the given mask regiser to the given value.

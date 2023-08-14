@@ -913,15 +913,11 @@ Hart<URV>::vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
-
       dest = op(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
@@ -939,14 +935,10 @@ Hart<URV>::vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
-
       dest = op(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
@@ -1275,11 +1267,8 @@ Hart<URV>::vwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -1377,14 +1366,10 @@ Hart<URV>::vwadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
-
       dest = DWT(e1);
       dest += DWT(e2);
       vecRegs_.write(vd, ix, wideGroup, dest);
@@ -1482,11 +1467,8 @@ Hart<URV>::vwsub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       dest = DWT(e1);
@@ -1586,15 +1568,11 @@ Hart<URV>::vwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
-
       dest = DWT(e1);
       dest -= DWT(e2);
       vecRegs_.write(vd, ix, wideGroup, dest);
@@ -1688,15 +1666,11 @@ Hart<URV>::vwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, wideGroup, e1);
       vecRegs_.read(vs2, ix, group, e2);
-
       dest = e1;
       dest += DWT(e2);
       vecRegs_.write(vd, ix, wideGroup, dest);
@@ -1973,15 +1947,11 @@ Hart<URV>::vwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, wideGroup, e1);
       vecRegs_.read(vs2, ix, group, e2);
-
       dest = e1;
       dest -= DWT(e2);
       vecRegs_.write(vd, ix, wideGroup, dest);
@@ -2072,15 +2042,11 @@ Hart<URV>::vmop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
-
       bool flag = op(e1, e2);
       vecRegs_.writeMaskRegister(vd, ix, flag);
     }
@@ -2098,14 +2064,10 @@ Hart<URV>::vmop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
-
       bool flag = op(e1, e2);
       vecRegs_.writeMaskRegister(vd, ix, flag);
     }
@@ -3087,15 +3049,11 @@ Hart<URV>::vnsr_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
       vecRegs_.read(vs2, ix, group, e2);
-
       dest = ELEM_TYPE(e1 >> (unsigned(e2) & mask));
       vecRegs_.write(vd, ix, group, dest);
     }
@@ -3155,14 +3113,10 @@ Hart<URV>::vnsr_wx(unsigned vd, unsigned vs1, URV e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
-
       dest = ELEM_TYPE(e1 >> amount);
       vecRegs_.write(vd, ix, group, dest);
     }
@@ -3367,11 +3321,8 @@ Hart<URV>::vrgather_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
 
@@ -3444,11 +3395,8 @@ Hart<URV>::vrgather_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       dest = 0;
       if (vecRegs_.isValidIndex(vs1, vs1Ix, group, sizeof(e1)))
@@ -3508,11 +3456,8 @@ Hart<URV>::vrgather_vi(unsigned vd, unsigned vs1, uint32_t imm, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       dest = 0;
       if (vecRegs_.isValidIndex(vs1, vs1Ix, group, sizeof(e1)))
@@ -3574,11 +3519,8 @@ Hart<URV>::vrgatherei16_vv(unsigned vd, unsigned vs1, unsigned vs2,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, e2Group, e2);
 
@@ -4370,11 +4312,8 @@ Hart<URV>::execVid_v(const DecodedInst* di)
 
   for (uint32_t ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       switch (sew)
         {
@@ -4399,11 +4338,8 @@ Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       if (ix < amount)
         continue;
@@ -4565,11 +4501,8 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       e1 = 0;
       if (amount < vecRegs_.bytesInRegisterFile())
@@ -4868,11 +4801,8 @@ Hart<URV>::vmulh_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -4923,11 +4853,8 @@ Hart<URV>::vmulh_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -5007,11 +4934,8 @@ Hart<URV>::vmulhu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -5064,11 +4988,8 @@ Hart<URV>::vmulhsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -5122,11 +5043,8 @@ Hart<URV>::vmulhsu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -5176,11 +5094,8 @@ Hart<URV>::vmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -5233,11 +5148,8 @@ Hart<URV>::vmadd_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(v2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -5287,11 +5199,8 @@ Hart<URV>::vnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -5344,11 +5253,8 @@ Hart<URV>::vnmsub_vx(unsigned vd, unsigned rs1, unsigned v2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(v2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -5399,11 +5305,8 @@ Hart<URV>::vmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -5456,11 +5359,8 @@ Hart<URV>::vmacc_vx(unsigned vd, unsigned rs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -5511,11 +5411,8 @@ Hart<URV>::vnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -5568,11 +5465,8 @@ Hart<URV>::vnmsac_vx(unsigned vd, unsigned rs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -5627,11 +5521,8 @@ Hart<URV>::vwmulu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -5694,11 +5585,8 @@ Hart<URV>::vwmulu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -5761,11 +5649,8 @@ Hart<URV>::vwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -5829,11 +5714,8 @@ Hart<URV>::vwmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -5899,11 +5781,8 @@ Hart<URV>::vwmulsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2u);
@@ -5970,11 +5849,8 @@ Hart<URV>::vwmulsu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -6037,11 +5913,8 @@ Hart<URV>::vwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -6106,11 +5979,8 @@ Hart<URV>::vwmaccu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, wideGroup, dest);
@@ -6211,11 +6081,8 @@ Hart<URV>::vwmacc_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, wideGroup, dest);
@@ -6281,11 +6148,8 @@ Hart<URV>::vwmaccsu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -6352,11 +6216,8 @@ Hart<URV>::vwmaccsu_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, wideGroup, dest);
@@ -6424,11 +6285,8 @@ Hart<URV>::vwmaccus_vx(unsigned vd, ELEM_TYPE e1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, wideGroup, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, wideGroup, dest);
@@ -6488,11 +6346,8 @@ Hart<URV>::vdivu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -6547,11 +6402,8 @@ Hart<URV>::vdivu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -6606,11 +6458,8 @@ Hart<URV>::vdiv_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -6671,11 +6520,8 @@ Hart<URV>::vdiv_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -6732,11 +6578,8 @@ Hart<URV>::vremu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -6791,11 +6634,8 @@ Hart<URV>::vremu_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -6850,11 +6690,8 @@ Hart<URV>::vrem_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -6916,11 +6753,8 @@ Hart<URV>::vrem_vx(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -6978,11 +6812,8 @@ Hart<URV>::vsext(unsigned vd, unsigned vs1, unsigned group, unsigned fromGroup,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, fromGroup, e1);
 
@@ -7240,11 +7071,8 @@ Hart<URV>::vzext(unsigned vd, unsigned vs1, unsigned group, unsigned fromGroup,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, fromGroup, e1);
 
@@ -8658,11 +8486,8 @@ Hart<URV>::vsaddu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -8719,11 +8544,8 @@ Hart<URV>::vsaddu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -8812,11 +8634,8 @@ Hart<URV>::vsadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -8878,11 +8697,8 @@ Hart<URV>::vsadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -8974,11 +8790,8 @@ Hart<URV>::vssubu_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -9034,11 +8847,8 @@ Hart<URV>::vssubu_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -9097,11 +8907,8 @@ Hart<URV>::vssub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -9163,11 +8970,8 @@ Hart<URV>::vssub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -9273,11 +9077,8 @@ Hart<URV>::vaadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -9365,11 +9166,8 @@ Hart<URV>::vaadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -9460,11 +9258,8 @@ Hart<URV>::vasub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -9552,11 +9347,8 @@ Hart<URV>::vasub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -9649,11 +9441,8 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -9725,11 +9514,8 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -9801,11 +9587,8 @@ Hart<URV>::vssr_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -9865,11 +9648,8 @@ Hart<URV>::vssr_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -10052,11 +9832,8 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -10140,11 +9917,8 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
 
@@ -13216,11 +12990,8 @@ Hart<URV>::vfadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -13309,11 +13080,8 @@ Hart<URV>::vfsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -13364,11 +13132,8 @@ Hart<URV>::vfrsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -13423,11 +13188,8 @@ Hart<URV>::vfwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -13496,11 +13258,8 @@ Hart<URV>::vfwadd_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -13563,11 +13322,8 @@ Hart<URV>::vfwsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -13636,11 +13392,8 @@ Hart<URV>::vfwsub_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -13703,11 +13456,8 @@ Hart<URV>::vfwadd_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1dw);
       vecRegs_.read(vs2, ix, group, e2);
@@ -13774,11 +13524,8 @@ Hart<URV>::vfwadd_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1dw);
 
@@ -13840,11 +13587,8 @@ Hart<URV>::vfwsub_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1dw);
       vecRegs_.read(vs2, ix, group, e2);
@@ -13909,11 +13653,8 @@ Hart<URV>::vfwsub_wf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1dw);
 
@@ -14009,11 +13750,8 @@ Hart<URV>::vfmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -14102,11 +13840,8 @@ Hart<URV>::vfdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -14157,11 +13892,8 @@ Hart<URV>::vfrdiv_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -14215,11 +13947,8 @@ Hart<URV>::vfwmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -14285,11 +14014,8 @@ Hart<URV>::vfwmul_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -14346,11 +14072,8 @@ Hart<URV>::vfmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -14402,11 +14125,8 @@ Hart<URV>::vfmadd_vf(unsigned vd, unsigned f1, unsigned vf2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vf2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -14457,11 +14177,8 @@ Hart<URV>::vfnmadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -14513,11 +14230,8 @@ Hart<URV>::vfnmadd_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -14568,11 +14282,8 @@ Hart<URV>::vfmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -14624,11 +14335,8 @@ Hart<URV>::vfmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -14679,11 +14387,8 @@ Hart<URV>::vfnmsub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -14735,11 +14440,8 @@ Hart<URV>::vfnmsub_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -14790,11 +14492,8 @@ Hart<URV>::vfmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -14846,11 +14545,8 @@ Hart<URV>::vfmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -14916,11 +14612,8 @@ Hart<URV>::vfnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -14972,11 +14665,8 @@ Hart<URV>::vfnmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -15027,11 +14717,8 @@ Hart<URV>::vfmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -15083,11 +14770,8 @@ Hart<URV>::vfmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -15138,11 +14822,8 @@ Hart<URV>::vfnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -15194,11 +14875,8 @@ Hart<URV>::vfnmsac_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group, dest);
@@ -15254,11 +14932,8 @@ Hart<URV>::vfwmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -15323,11 +14998,8 @@ Hart<URV>::vfwmacc_vf(unsigned vd, unsigned f1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group2x, dest);
@@ -15389,11 +15061,8 @@ Hart<URV>::vfwnmacc_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -15458,11 +15127,8 @@ Hart<URV>::vfwnmacc_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group2x, dest);
@@ -15524,11 +15190,8 @@ Hart<URV>::vfwmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -15593,11 +15256,8 @@ Hart<URV>::vfwmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group2x, dest);
@@ -15659,11 +15319,8 @@ Hart<URV>::vfwnmsac_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -15729,11 +15386,8 @@ Hart<URV>::vfwnmsac_vf(unsigned vd, unsigned fs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs2, ix, group, e2);
       vecRegs_.read(vd, ix, group2x, dest);
@@ -15790,11 +15444,8 @@ Hart<URV>::vfsqrt_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -15970,11 +15621,8 @@ Hart<URV>::vmfeq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -16030,11 +15678,8 @@ Hart<URV>::vmfeq_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16086,11 +15731,8 @@ Hart<URV>::vmfne_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -16146,11 +15788,8 @@ Hart<URV>::vmfne_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16202,11 +15841,8 @@ Hart<URV>::vmflt_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -16258,11 +15894,8 @@ Hart<URV>::vmflt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16311,11 +15944,8 @@ Hart<URV>::vmfle_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
       vecRegs_.read(vs2, ix, group, e2);
@@ -16367,11 +15997,8 @@ Hart<URV>::vmfle_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16421,11 +16048,8 @@ Hart<URV>::vmfgt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16475,11 +16099,8 @@ Hart<URV>::vmfge_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchMask(vd);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnosticMask(vd, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16528,11 +16149,8 @@ Hart<URV>::vfclass_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16582,11 +16200,8 @@ Hart<URV>::vfcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16638,11 +16253,8 @@ Hart<URV>::vfcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16757,11 +16369,8 @@ Hart<URV>::vfcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16815,11 +16424,8 @@ Hart<URV>::vfcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16871,11 +16477,8 @@ Hart<URV>::vfwcvt_xu_f_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -16937,11 +16540,8 @@ Hart<URV>::vfwcvt_x_f_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -17080,11 +16680,8 @@ Hart<URV>::vfwcvt_f_xu_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -17160,11 +16757,8 @@ Hart<URV>::vfwcvt_f_x_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -17239,11 +16833,8 @@ Hart<URV>::vfwcvt_f_f_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group2x);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group2x, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group, e1);
 
@@ -17309,11 +16900,8 @@ Hart<URV>::vfncvt_xu_f_w(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
       ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
@@ -17385,11 +16973,8 @@ Hart<URV>::vfncvt_x_f_w(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
       ELEM_TYPE dest = fpConvertTo<ELEM_TYPE>(e1);
@@ -17562,11 +17147,8 @@ Hart<URV>::vfncvt_f_xu_w(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
       dest = fpConvertTo<FLOAT_TYPE>(e1);
@@ -17630,11 +17212,8 @@ Hart<URV>::vfncvt_f_x_w(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
       dest = fpConvertTo<FLOAT_TYPE>(e1);
@@ -17697,11 +17276,8 @@ Hart<URV>::vfncvt_f_f_w(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
-	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
-	}
+      if (vecRegs_.skipMaskAgnostic(vd, group, masked, ix))
+	continue;
 
       vecRegs_.read(vs1, ix, group2x, e1);
       dest = fpConvertTo<ELEM_TYPE, false>(e1);
