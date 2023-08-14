@@ -18,8 +18,9 @@ Whisper
 
 [Memory Consistency Checks](#Consistency)
 
-[Limitations](#Limitations)
+[Enabling Code Coverage](#Coverage)
 
+[Limitations](#Limitations)
 
 [Running riscv-arch-test Tests with RISCOF](#RISCOF)
 
@@ -737,6 +738,22 @@ whisper information about the time, hart-id, size, instruction tag and
 data of read/write operations associated with load/store/amo
 instructions. We use such information to check the preserved program
 order (ppo) rules of RISCV.
+
+<a name="Coverage" />
+
+# Enabling Code Coverage
+
+C++ code coverage for Whisper can be configured and collected on Linux with minimal effort using [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov-Intro.html) and [lcov](https://github.com/linux-test-project/lcov).
+
+To enable and collect C++ code coverage:
+1. Pass the `--coverage` flag to the compiler and linker.  Note: coverage should be enabled with optimizations disabled to get the most accurate line information.
+    - When compiling using the Makefile, invoke `make` with `OFLAGS="-g -O0 --coverage"`.  If done successfully, a .gcno file should exist in the build folder beside the .d and .o file for each source file included in the build.
+    - When compile using bazel, invoke `bazel build` with `--compilation_mode dbg --collect_code_coverage --instrumentation_filter=rvcore,whisper`.  If done successfully, a .gcno file should exist in the bazel-bin/_objs folder (or subfolder for the target) beside the .d and .o file for each source file included in the build.
+2. Run a test or set of tests that invokes the whisper executable created in step 1.  Coverage information will be aggregated across invocations into a .gcda file for each source file in the build.  These .gcda files should be created beside the .gcno file but may be put in a different place depending on the working directory.  Running tests from the repository root should prevent this issue, but some testing tools (e.g. riscof) run tests in their own working directory.  The output directory of these .gcda files can be controlled using the `GCOV_PREFIX` and `GCOV_PREFIX_STRIP` environment variables, so set these values if necessary so that the .gcda file is created next to the .gcno file (for example, running riscof with a local bazel build likely requires `GCOV_PREFIX=[Whisper repo root absolute path]` and `GCOV_PREFIX_STRIP=3`).
+3. Use `lcov` to aggregate the coverage information from the .gcda files into a single coverage report.  Invoke `lcov` with `--output-file [report name; for example, _coverage_report.dat] --directory [path to directory containing .gcno and .gcda files] --base-directory [Whisper repo root absolute path] --capture --no-external`.  If done correctly, a file with the name passed to `lcov` in the `--output-file` parameter will be created and should not be empty.
+4. (optional) Generate an html report using `genhtml`.  `genhtml` should be invoked using `-o [collateral output directory] [coverage report file from step 3]`.  The index.html page in the output directory can then be opened using a web browser.
+
+Note that for any test defined using bazel and run with `bazel test`, steps 2 and 3 will be handled automatically by bazel, and the final coverage report should exist inside bazel-out/_coverage.
 
 <a name="Limitations"/>
 
