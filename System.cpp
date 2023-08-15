@@ -368,6 +368,73 @@ System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
 
 template <typename URV>
 bool
+System<URV>::configImsic(uint64_t mbase, uint64_t msize,
+			 uint64_t sbase, uint64_t ssize,
+			 unsigned guests)
+{
+  using std::cerr;
+
+  size_t ps = pageSize();
+
+  if ((mbase % ps) != 0)
+    {
+      cerr << "Error: IMISC mbase (0x" << std::hex << mbase << ") is not"
+	   << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+      return false;
+    }
+
+  if (msize == 0)
+    {
+      cerr << "Error: IMSIC msize must not be zero.\n";
+      return false;
+    }
+
+  if ((msize % ps) != 0)
+    {
+      cerr << "Error: IMISC msize (0x" << std::hex << msize << ") is not"
+	   << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+      return false;
+    }
+
+  if (ssize)
+    {
+      if ((sbase % ps) != 0)
+	{
+	  cerr << "Error: IMISC sbase (0x" << std::hex << sbase << ") is not"
+	       << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+	  return false;
+	}
+
+      if ((ssize % ps) != 0)
+	{
+	  cerr << "Error: IMISC ssize (0x" << std::hex << ssize << ") is not"
+	       << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+	  return false;
+	}
+    }
+
+  if (guests and ssize < (guests + 1)*ps)
+    {
+      cerr << "Error: IMISC supervisor size (0x" << std::hex << ssize << ") is"
+	   << " too small for configured guests (" << std::dec << guests << ").\n";
+      return false;
+    }
+
+  if (msize and ssize)
+    {
+      unsigned hc = hartCount();
+      uint64_t mend = mbase + hc*msize, send = sbase + hc*ssize;
+      if ((sbase > mbase and sbase < mend) or
+	  (send > mbase and send < mend))
+	cerr << "Warning: IMSIC machine file address range overlaps that of supervisor.\n";
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
 System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 {
   if (mbLineSize != 0)

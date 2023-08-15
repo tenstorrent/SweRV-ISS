@@ -224,6 +224,23 @@ namespace WdRiscv
     /// size (in bytes) of address space for it.
     void defineUart(uint64_t addr, uint64_t size);
 
+    /// Return the memory page size.
+    size_t pageSize() const
+    { return memory_->pageSize(); }
+
+    /// Configure incoming message signaled interrupt controller.  The
+    /// addresses of the machine files of hart0, hart1, ... will be
+    /// mbase, mbase + msize, mbase + 2*msize ...  Similartly the
+    /// address of the supervisor files will be sbase, sbase + ssize,
+    /// sbase + 2*ssize.  If msize is zero then no machine file is
+    /// defined.  If ssize is zero then no supervisor file is defined.
+    /// Guest files will take one page each and will start one page
+    /// after each supervisor file (supervisor stride must be large
+    /// enough).
+    bool configImsic(uint64_t mbase, uint64_t msize,
+		     uint64_t sbase, uint64_t ssize,
+		     unsigned guests);
+
     /// Enable memory consistency model. This is relevant in
     /// server/interactive where RTL monitor or interactive command
     /// may initiate out of order memory transactions. Behavior is

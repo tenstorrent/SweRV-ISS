@@ -100,7 +100,7 @@ namespace WdRiscv
         uint64_t         u64 = strtoull(str.data(), &end, 0);
         if (end and *end)
           {
-            std::cerr << "Invalid config file value for '" << tag << "': "
+            std::cerr << "Invalid config file unsigned value for '" << tag << "': "
                       << str << '\n';
             return false;
           }
@@ -207,7 +207,7 @@ namespace WdRiscv
           value = true;
         else
           {
-            std::cerr << "Invalid config file value for '" << tag << "': "
+            std::cerr << "Invalid config file boolean value for '" << tag << "': "
                       << str << '\n';
             return false;
           }
@@ -1634,8 +1634,48 @@ HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
 
 template<typename URV>
 bool
-HartConfig::configHarts(System<URV>& system, bool userMode,
-                        bool verbose) const
+HartConfig::applyImsicConfig(System<URV>& system) const
+{
+  if (not config_ -> contains("imsic"))
+    return true;
+
+  auto& imsic = config_ -> at("imsic");
+
+  uint64_t mbase = 0, msize = 0, sbase = 0, ssize = 0;
+
+  std::string_view tag = "mbase";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.mbase",  imsic.at(tag), mbase))
+      return false;
+
+  tag = "msize";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.msize",  imsic.at(tag), msize))
+      return false;
+
+  tag = "sbase";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.sbase",  imsic.at(tag), sbase))
+      return false;
+
+  tag = "ssize";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.ssize",  imsic.at(tag), ssize))
+      return false;
+
+  unsigned guests;
+  tag = "guests";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.guests", imsic.at(tag), guests))
+      return false;
+
+  return system.configImsic(mbase, msize, sbase, ssize, guests);
+}
+
+
+template<typename URV>
+bool
+HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 {
   userMode = userMode or this->userModeEnabled();
 
@@ -1651,6 +1691,8 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
     }
 
   // System configuration.
+  if (not applyImsicConfig(system))
+    return false;
 
   unsigned mbLineSize = 64;
   std::string_view tag = "merge_buffer_line_size";
