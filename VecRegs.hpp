@@ -24,6 +24,7 @@
 #include <cassert>
 #include <stdexcept>
 #include "FpRegs.hpp"
+#include "float-util.hpp"
 
 namespace WdRiscv
 {
@@ -382,6 +383,12 @@ namespace WdRiscv
       return gm8*bytesPerReg_/eewInBits;
     }
 
+    /// If flag is true, configure vector engine for writing ones in
+    /// inactive destination register elements when mask-agnostic is
+    /// on. Otherwise, preserve inactive elements.
+    void configMaskAgnosticAllOnes(bool flag)
+    { maskAgnOnes_ = flag; }
+
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
     {
@@ -507,59 +514,46 @@ namespace WdRiscv
       return (data[byteIx] >> bitIx) & 1;
     }
 
-    /// Return true if inactive element of a masked instruction should
-    /// be skipped (either preserved or written with all ones. Return
-    /// false if element is active or if it should not be skipped.
-    bool skipMaskAgnostic(unsigned vd, unsigned groupx8, bool masked, unsigned ix)
+    /// Return true is element at ix of vector detination is active;
+    /// otherwise, return false and either read element at ix into val
+    /// or set va to all ones depending on mask-agnostic policy.
+    template<typename T>
+    bool isDestActive(unsigned vd, unsigned ix, unsigned emulx8, bool masked, T& val) const
     {
       if (masked and not isActive(0, ix))
 	{
-	  if (not maskAgn_)
-	    {
-	      touchReg(vd, groupx8);  // Mark register for logging.
-	      return true;
-	    }
-	  // Either we write all ones or compute value for masked elem.
-	  // For now preserve.
-	  touchReg(vd, groupx8);
-	  return true;
+	  if (maskAgn_ and maskAgnOnes_)
+	    setAllBits(val);
+	  else
+	    read(vd, ix, emulx8, val);
+	  return false;
 	}
-      return false;
+      return true;
     }
 
-    /// Return true if inactive element of a masked mask instruction
-    /// (instruction producing a mask) should be skipped (either
-    /// preserved or written with all ones. Return false if element is
-    /// active or if it should not be skipped.
-    bool skipMaskAgnosticMask(unsigned vd, bool masked, unsigned ix)
+    /// Return true if element at ix of mask destination is active;
+    /// otherwise, return false and either read element at ix into val
+    /// or set val to all ones depending on mask-agnostic policy.
+    bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, bool& val) const
     {
       if (masked and not isActive(0, ix))
 	{
-	  if (not maskAgn_)
-	    {
-	      touchMask(vd);  // Mark register for logging.
-	      return true;
-	    }
-	  // Either we write all ones or compute value for masked elem.
-	  // For now preserve.
-	  touchMask(vd);
-	  return true;
+	  if (maskAgn_ and maskAgnOnes_)
+	    val = true;
+	  else
+	    readMaskRegister(vd, ix, val);
+	  return false;
 	}
-      return false;
+      return true;
     }
 
     /// Set the ith bit of the given mask regiser to the given value.
-    /// Return true on success and false on failure (register or
-    /// element index out of bound.
-    bool writeMaskRegister(uint32_t maskReg, uint32_t i, bool value)
+    void writeMaskRegister(uint32_t maskReg, uint32_t i, bool value)
     {
-      if (maskReg >= regCount_)
-        return false;
-
       uint32_t byteIx = i >> 3;
       uint32_t bitIx = i & 7;  // bit in byte
-      if (byteIx >= bytesPerReg_)
-        return false;
+      if (maskReg >= regCount_ or byteIx >= bytesPerReg_)
+        throw std::runtime_error("invalid vector register index");
 
       uint8_t* data = data_.data() + static_cast<std::size_t>(maskReg)*bytesPerReg_;
       uint8_t mask = uint8_t(1) << bitIx;
@@ -569,7 +563,19 @@ namespace WdRiscv
         data[byteIx] &= ~mask;
       lastWrittenReg_ = maskReg;
       lastGroupX8_ = 8;
-      return true;
+    }
+
+    /// Set value to the ith bit of the given mask regiser.
+    void readMaskRegister(uint32_t maskReg, uint32_t i, bool& value) const
+    {
+      uint32_t byteIx = i >> 3;
+      uint32_t bitIx = i & 7;  // bit in byte
+      if (maskReg >= regCount_ or byteIx >= bytesPerReg_)
+        throw std::runtime_error("invalid vector register index");
+
+      const uint8_t* data = data_.data() + static_cast<std::size_t>(maskReg)*bytesPerReg_;
+      uint8_t mask = uint8_t(1) << bitIx;
+      value = data[byteIx] & mask;
     }
 
     /// Return the pointers to the 1st byte of the memory area
@@ -667,6 +673,8 @@ namespace WdRiscv
     bool maskAgn_ = false;                         // Cached VTYPE.ma
     bool tailAgn_ = false;                         // Cached VTYPE.ta
     bool vill_ = false;                            // Cached VTYPE.VILL
+    bool maskAgnOnes_ = false; // True if ones written in masked elems when mask agnostic.
+    bool tailAgnOnes_ = false; // True if ones written in tail elems when mask agnostic.
 
     uint32_t groupX8_ = 8;    // Group multipler as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).
