@@ -684,28 +684,21 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
 	continue;  // Byte forwarded by another instruction.
 
       // Check if read-op byte overlaps departed write-op of instruction
-      bool departed = false;
-      uint64_t wopTime = 0;
+      bool departed = true;
       for (const auto wopIx : instr.memOps_)
 	{
 	  if (wopIx >= sysMemOps_.size())
 	    continue;
 	  const auto& wop = sysMemOps_.at(wopIx);
 	  if (wop.isRead_)
-	    continue;  // Should not happen.
-	  if (wop.time_ < readOp.time_)  // TBD : <= instead of < ?
-	    {
-	      wopTime = wop.time_;
-	      departed = false; // Write op left core before read.
-	    }
+	    continue;  // May happen for AMO.
+	  if (byteAddr < wop.physAddr_ or byteAddr >= wop.physAddr_ + wop.size_)
+	    continue;
+	  if (wop.time_ >= readOp.time_)
+	    departed = false; // Write op can forward.
 	}
       if (departed)
-	{
-	  cerr << "Read op forward source already drained from "
-	       << "merge buffer: read-time=" << readOp.time_ << " read-tag="
-	       << readOp.instrTag_ << " write-time=" << wopTime
-	       << " write-tag=" << instr.tag_ << '\n';
-	}
+	continue;
       
       uint8_t byteVal = instr.data_ >> (byteAddr - il)*8;
       uint64_t aligned = uint64_t(byteVal) << 8*rix;
@@ -1069,8 +1062,8 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
       if (not op.isRead_)
 	continue;
 
-      if (not forwardToRead(hart, tag, op))
-	assert(0);
+      // Let forwarding override read-op data.
+      forwardToRead(hart, tag, op);
 
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
@@ -1125,26 +1118,14 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	continue;
 
       const auto& di = instr.di_;
-      if (not di.instEntry()->isAtomic())
-	continue;
-
-      cerr << "Error: Read op forwards from an atomic instruction"
-	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
-	   << " instr-tag=" << tag << " addr=0x" << std::hex
-	   << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
-      // return false;
+      if (di.instEntry()->isAtomic())
+	{
+	  cerr << "Error: Read op forwards from an atomic instruction"
+	       << " time=" << op.time_ << " hart-id=" << hart.hartId()
+	       << " instr-tag=" << tag << " addr=0x" << std::hex
+	       << op.physAddr_ << " amo-tag=" << instr.tag_ << std::dec << '\n';
+	}
     }
-
-#if 0
-  if (mask != 0)
-    {
-      cerr << "Error: Read op does not forward from preceeding stores"
-	   << " time=" << op.time_ << " hart-id=" << hart.hartId()
-	   << " instr-tag=" << tag << " addr=0x" << std::hex
-	   << op.physAddr_ << std::dec << '\n';
-      return false;
-    }
-#endif
 
   return true;
 }
