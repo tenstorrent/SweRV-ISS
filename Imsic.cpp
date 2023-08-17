@@ -93,6 +93,7 @@ File::write(URV val)
   return true;
 }
 
+
 bool
 Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
 {
@@ -103,13 +104,13 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
 
   File* file = nullptr;
 
-  if (mfile_.isCoveredAddress(addr))
+  if (mfile_.coversAddress(addr))
     file = &mfile_;
-  else if (sfile_.isCoveredAddress(addr))
+  else if (sfile_.coversAddress(addr))
     file = &sfile_;
   else
     for (auto& gfile : gfiles_)
-      if (gfile.isCoveredAddress(addr))
+      if (gfile.coversAddress(addr))
 	file = &gfile;
 
   if (not file)
@@ -125,6 +126,59 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
       word = util::byteswap(word);
       file->setPending(word, true);
     }
+
+  return true;
+}
+
+
+bool
+ImsicMgr::configMachine(uint64_t addr, uint64_t stride, unsigned ids)
+{
+  if ((addr % pageSize_) != 0 or (stride % pageSize_) != 0 or stride == 0)
+    return false;
+
+  if (ids == 0 or (ids % 64) != 0)
+    return false;
+
+  mbase_ = addr;
+  mstride_ = stride;
+  for (auto& imsic : imsics_)
+    {
+      imsic.activateMachine(addr, ids);
+      addr += stride;
+    }
+  return true;
+}
+
+
+bool
+ImsicMgr::configSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
+{
+  if ((addr % pageSize_) != 0 or (stride % pageSize_) != 0 or stride == 0)
+    return false;
+
+  if (ids == 0 or (ids % 64) != 0)
+    return false;
+
+  sbase_ = addr;
+  sstride_ = stride;
+  for (auto& imsic : imsics_)
+    {
+      imsic.activateSupervisor(addr, ids);
+      addr += stride;
+    }
+  return true;
+}
+
+
+bool
+ImsicMgr::configGuests(unsigned n, unsigned ids)
+{
+  if (sstride_ < (n+1) * pageSize_)
+    return false;  // No enough space.
+
+  for (auto& imsic : imsics_)
+    imsic.activateGuests(n, ids);
 
   return true;
 }

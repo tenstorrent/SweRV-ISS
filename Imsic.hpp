@@ -149,12 +149,12 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// address is word aligned and is within the page associated with
     /// this file.
     bool isValidAddress(uint64_t addr) const
-    { return (addr & 3) == 0 and isCoveredAddress(addr); }
+    { return (addr & 3) == 0 and coversAddress(addr); }
 
     /// Return true if given address is in the rage of addresses
     /// covered by this file. Return false otherwise. Return false
     /// if this file is not active.
-    bool isCoveredAddress(uint64_t addr) const
+    bool coversAddress(uint64_t addr) const
     { return active_ and addr >= addr_ and addr - addr_ < pageSize_; }
 
     /// Mark this file as active and associate it with given address
@@ -209,6 +209,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
   };
 
 
+  /// Model an IMSIC device.
   class Imsic
   {
   public:
@@ -219,16 +220,16 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       : mfile_(0, 0), sfile_(0, 0)
     { }
 
-    /// Acivate the machine privilege file at the given address and
+    /// Activate the machine privilege file at the given address and
     /// with the given size (size is the highest interrupt id plus 1
-    /// and must be a multiple of 64).  All pevious state
+    /// and must be a multiple of 64). All previous state
     /// enabled/pending state is lost.
     void activateMachine(uint64_t addr, unsigned size)
     { mfile_.activate(addr, size); }
 
-    /// Acivate the supervisor privilege file at the given address and
-    /// with the given size (size is the highest interrupt id plus 1
-    /// and must be a multiple of 64).  All pevious state
+    /// Activate the supervisor privilege file at the given address
+    /// and with the given size (size is the highest interrupt id plus
+    /// 1 and must be a multiple of 64).  All previous state
     /// enabled/pending state is lost.
     void activateSupervisor(uint64_t addr, unsigned size)
     { sfile_.activate(addr, size); }
@@ -237,7 +238,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// addresses will be s+p, s+2p, s+3p, ... where s is the
     /// supervisor file address and p is the page size. A supervisor
     /// file must be activated before the guests files are
-    /// activated. The parameter g must not exceede 64.
+    /// activated. The parameter g must not exceed 64.
     void activateGuests(unsigned g, unsigned n)
     {
       assert(g <= 64);
@@ -305,10 +306,157 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return true;
     }
 
+    /// Return the machine file top pending and enabled interrupt id.
+    /// Ids filetered out by the threshold mechanism are not
+    /// considered.
+    unsigned machineTopId() const
+    { return mfile_.topId(); }
+
+    /// Return the supervisor file top pending and enabled interrupt id.
+    /// Ids filetered out by the threshold mechanism are not
+    /// considered.
+    unsigned supervisorTopId() const
+    { return sfile_.topId(); }
+
+    /// Return the supervisor file top pending and enabled interrupt id.
+    /// Ids filetered out by the threshold mechanism are not
+    /// considered.
+    unsigned guestTopId(unsigned guestIx) const
+    { return guestIx < gfiles_.size() ? gfiles_.at(guestIx).topId() : 0; }
+
   private:
 
     File mfile_;
     File sfile_;
     std::vector<File> gfiles_;
+  };
+
+
+  /// Model a collection of IMSIC devices.
+  class ImsicMgr
+  {
+  public:
+
+    /// Constructor.
+    ImsicMgr(unsigned hartCount, unsigned pageSize);
+
+    /// Configure machine privilege IMISC files (one per
+    /// hart). Machine files will be at addresses addr, addr + stride,
+    /// addr + 2*stride ...  Memory region reserved for machine files
+    /// will be [addr, addr + n*stride - 1] where n is the number of
+    /// harts in the system. The ids parameter is one plus the largest
+    /// interrupt id supported by each file and must be a multiple of
+    /// 64. Return true on success and false on failure: We fail if
+    /// addr/stride are nog page aligned or if ids is larger than 64.
+    bool configMachine(uint64_t addr, uint64_t stride, unsigned ids);
+
+    /// Configure supervisor privilege IMISC files (one per hart) and
+    /// guest privilege file (guestCount per hart). Supervisor files
+    /// will be at addresses addr, addr + stride, addr + 2*stride.
+    /// See configMachine.
+    bool configSupervisor(uint64_t addr, uint64_t stride, unsigned ids);
+
+    /// Configure n guests per hart. Guest files at each hart will be
+    /// at s + ps, s + 2*ps, s + 3*ps, ... where s is the address of
+    /// the supervisor file for that hart and ps is the page size.
+    /// Return true on success and false on failure. Fail if
+    /// supervisor files are not configured or if n is larger than 64
+    /// or if ids is not a multiple of 64.
+    bool configGuests(unsigned n, unsigned ids);
+
+    /// Return true if given address is covered by any of the configured
+    /// IMSIC files.
+    bool coversAddress(uint64_t addr) const
+    { return isMachineAddr(addr) or isSupervisorAddr(addr); }
+
+    /// Perform a memory read operation to the memory region
+    /// associated with the IMSIC devices. Return true on success
+    /// setting value (reads from this region always yield zero).
+    /// Return false if address is out of bounds, or address is not
+    /// word aligned or if size is not 4.
+    bool read(uint64_t addr, unsigned size, uint64_t& data) const
+    {
+      if (not coversAddress(addr) or size != 4 or (size & 3) != 0)
+	return false;
+      data = 0;
+      return true;
+    }
+
+    /// Perform a memory write operation to the memory region
+    /// associated with the IMSIC devices. Return true on success.
+    /// Return false if address is out of bounds, if address is not
+    /// word aligned, or if size is not 4. If successful, hartIx to the hart
+    /// index associated with the targeted IMSIC.
+    bool write(uint64_t addr, unsigned size, uint64_t data,
+	       unsigned& hartIx)
+    {
+      if (size != 4 or (size & 3) != 0)
+	return false;
+      unsigned ix = 0;
+      if (isMachineAddr(addr))
+	{
+	  ix = (addr - mbase_) / mstride_;
+	  assert(ix < harts_);
+	}
+      else if (isSupervisorAddr(addr))
+	{
+	  ix = (addr - mbase_) / mstride_;
+	  assert(ix < harts_);
+	}
+      else
+	return false;
+
+      hartIx = ix;
+      auto& imsic = imsics_.at(ix);
+      imsic.write(addr, size, data);
+      return true;
+    }
+
+    /// For the given hart index, return the highest priority pending
+    /// and enabled machine interrup id or 0 if no interrupt and
+    /// enabled. Interrupt ids filtered out by the threshold mechanism
+    /// are not considered.
+    unsigned machineTopId(unsigned hartIx) const
+    { return hartIx < imsics_.size()? imsics_.at(hartIx).machineTopId() : 0; }
+
+    /// For the given hart index, return the highest priority pending
+    /// and enabled supervisor interrup id or 0 if no interrupt and
+    /// enabled. Interrupt ids filtered out by the threshold mechanism
+    /// are not considered.
+    unsigned supervisorTopId(unsigned hartIx) const
+    { return hartIx < imsics_.size()? imsics_.at(hartIx).supervisorTopId() : 0; }
+
+    /// For the given hart and guest indices (virtual guest associated
+    /// with a hart), return the highest priority pending and enabled
+    /// supervisor interrup id or 0 if no interrupt and
+    /// enabled. Interrupt ids filtered out by the threshold mechanism
+    /// are not considered.
+    unsigned guestTopId(unsigned hartIx, unsigned guestIx) const
+    { return hartIx < imsics_.size()? imsics_.at(hartIx).guestTopId(guestIx) : 0; }
+
+  protected:
+
+    /// Return true if given address is withing the address range of the
+    /// machine privilege IMSIC files.
+    bool isMachineAddr(uint64_t addr) const
+    { return addr >= mbase_ and addr < mbase_ + harts_ * mstride_; }
+
+    /// Return true if given address is withing the address range of the
+    /// supervisor privilege IMSIC files (which includes the guest files).
+    bool isSupervisorAddr(uint64_t addr) const
+    { return addr >= sbase_ and addr < sbase_ + harts_ * sstride_; }
+
+    /// Set ix to the index of the hart covering the 
+
+  private:
+    unsigned harts_ = 0;
+    unsigned pageSize_ = 0;
+    uint64_t mbase_ = 0;     // Base address of machine files.
+    uint64_t mstride_ = 0;   // Memory space reserved for each machine file.
+    uint64_t sbase_ = 0;     // Base address of supervisor files.
+    uint64_t sstride_ = 0;   // Memory space reserved for each supervisor file.
+    unsigned guests_ = 0;    // Guest count.
+
+    std::vector<Imsic> imsics_;
   };
 }

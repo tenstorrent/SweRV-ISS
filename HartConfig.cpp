@@ -1663,7 +1663,7 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.ssize",  imsic.at(tag), ssize))
       return false;
 
-  unsigned guests;
+  unsigned guests = 0;
   tag = "guests";
   if (imsic.contains(tag))
     if (not getJsonUnsigned("imsic.guests", imsic.at(tag), guests))
