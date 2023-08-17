@@ -455,7 +455,6 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     uint64_t mstride_ = 0;   // Memory space reserved for each machine file.
     uint64_t sbase_ = 0;     // Base address of supervisor files.
     uint64_t sstride_ = 0;   // Memory space reserved for each supervisor file.
-    unsigned guests_ = 0;    // Guest count.
 
     std::vector<Imsic> imsics_;
   };
