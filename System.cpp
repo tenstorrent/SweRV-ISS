@@ -40,7 +40,8 @@ template <typename URV>
 System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                     unsigned hartIdOffset, size_t memSize,
                     size_t pageSize)
-  : hartCount_(coreCount * hartsPerCore), hartsPerCore_(hartsPerCore)
+  : hartCount_(coreCount * hartsPerCore), hartsPerCore_(hartsPerCore),
+    imsicMgr_((coreCount * hartsPerCore), pageSize)
 {
   cores_.resize(coreCount);
 
@@ -426,8 +427,13 @@ System<URV>::configImsic(uint64_t mbase, uint64_t msize,
       uint64_t mend = mbase + hc*msize, send = sbase + hc*ssize;
       if ((sbase > mbase and sbase < mend) or
 	  (send > mbase and send < mend))
-	cerr << "Warning: IMSIC machine file address range overlaps that of supervisor.\n";
+	{
+	  cerr << "Error: IMSIC machine file address range overlaps that of supervisor.\n";
+	  return false;
+	}
     }
+
+  
 
   return true;
 }

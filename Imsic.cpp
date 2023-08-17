@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "util.hpp"
 #include "Imsic.hpp"
 
@@ -128,6 +129,14 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
     }
 
   return true;
+}
+
+
+ImsicMgr::ImsicMgr(unsigned hartCount, unsigned pageSize)
+  : harts_(hartCount), pageSize_(pageSize), imsics_(hartCount)
+{
+  if (pageSize_ == 0)
+    throw std::runtime_error("Zero page size in ImsciMgr constructor.");
 }
 
 

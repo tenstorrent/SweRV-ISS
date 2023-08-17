@@ -20,6 +20,7 @@
 #include <string_view>
 #include <unordered_map>
 #include "Memory.hpp"
+#include "Imsic.hpp"
 
 namespace WdRiscv
 {
@@ -299,6 +300,7 @@ namespace WdRiscv
 
     unsigned hartCount_;
     unsigned hartsPerCore_;
+    TT_IMSIC::ImsicMgr imsicMgr_;
 
     std::vector< std::shared_ptr<CoreClass> > cores_;
     std::vector< std::shared_ptr<HartClass> > sysHarts_; // All harts in system.
