@@ -369,9 +369,9 @@ System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
 
 template <typename URV>
 bool
-System<URV>::configImsic(uint64_t mbase, uint64_t msize,
-			 uint64_t sbase, uint64_t ssize,
-			 unsigned guests)
+System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
+			 uint64_t sbase, uint64_t sstride,
+			 unsigned guests, unsigned ids)
 {
   using std::cerr;
 
@@ -384,20 +384,20 @@ System<URV>::configImsic(uint64_t mbase, uint64_t msize,
       return false;
     }
 
-  if (msize == 0)
+  if (mstride == 0)
     {
-      cerr << "Error: IMSIC msize must not be zero.\n";
+      cerr << "Error: IMSIC mstride must not be zero.\n";
       return false;
     }
 
-  if ((msize % ps) != 0)
+  if ((mstride % ps) != 0)
     {
-      cerr << "Error: IMISC msize (0x" << std::hex << msize << ") is not"
+      cerr << "Error: IMISC mstride (0x" << std::hex << mstride << ") is not"
 	   << " a multiple of page size (0x" << ps << ")\n" << std::dec;
       return false;
     }
 
-  if (ssize)
+  if (sstride)
     {
       if ((sbase % ps) != 0)
 	{
@@ -406,25 +406,25 @@ System<URV>::configImsic(uint64_t mbase, uint64_t msize,
 	  return false;
 	}
 
-      if ((ssize % ps) != 0)
+      if ((sstride % ps) != 0)
 	{
-	  cerr << "Error: IMISC ssize (0x" << std::hex << ssize << ") is not"
+	  cerr << "Error: IMISC sstride (0x" << std::hex << sstride << ") is not"
 	       << " a multiple of page size (0x" << ps << ")\n" << std::dec;
 	  return false;
 	}
     }
 
-  if (guests and ssize < (guests + 1)*ps)
+  if (guests and sstride < (guests + 1)*ps)
     {
-      cerr << "Error: IMISC supervisor size (0x" << std::hex << ssize << ") is"
+      cerr << "Error: IMISC supervisor stride (0x" << std::hex << sstride << ") is"
 	   << " too small for configured guests (" << std::dec << guests << ").\n";
       return false;
     }
 
-  if (msize and ssize)
+  if (mstride and sstride)
     {
       unsigned hc = hartCount();
-      uint64_t mend = mbase + hc*msize, send = sbase + hc*ssize;
+      uint64_t mend = mbase + hc*mstride, send = sbase + hc*sstride;
       if ((sbase > mbase and sbase < mend) or
 	  (send > mbase and send < mend))
 	{
@@ -433,7 +433,15 @@ System<URV>::configImsic(uint64_t mbase, uint64_t msize,
 	}
     }
 
-  
+  if ((ids % 64) != 0)
+    {
+      cerr << "Error: IMSIC max interrupt id (" << ids << ") is not a multiple of 64.\n";
+      return false;
+    }
+
+  imsicMgr_.configMachine(mbase, mstride, ids);
+  imsicMgr_.configSupervisor(sbase, sstride, ids);
+  imsicMgr_.configGuests(guests, ids);
 
   return true;
 }

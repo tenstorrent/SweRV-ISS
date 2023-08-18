@@ -231,16 +231,18 @@ namespace WdRiscv
 
     /// Configure incoming message signaled interrupt controller.  The
     /// addresses of the machine files of hart0, hart1, ... will be
-    /// mbase, mbase + msize, mbase + 2*msize ...  Similartly the
-    /// address of the supervisor files will be sbase, sbase + ssize,
-    /// sbase + 2*ssize.  If msize is zero then no machine file is
-    /// defined.  If ssize is zero then no supervisor file is defined.
+    /// mbase, mbase + mstride, mbase + 2*mstride ...  Similartly the
+    /// address of the supervisor files will be sbase, sbase + sstride,
+    /// sbase + 2*sstride.  If mstride is zero then no machine file is
+    /// defined. If sstride is zero then no supervisor file is defined.
     /// Guest files will take one page each and will start one page
     /// after each supervisor file (supervisor stride must be large
-    /// enough).
-    bool configImsic(uint64_t mbase, uint64_t msize,
-		     uint64_t sbase, uint64_t ssize,
-		     unsigned guests);
+    /// enough). Guest files require supervisor files which require
+    /// machine files. The ids parameter denotes the max interrupt
+    /// id and must be a multiple of 64.
+    bool configImsic(uint64_t mbase, uint64_t mstride,
+		     uint64_t sbase, uint64_t sstride,
+		     unsigned guests, unsigned ids);
 
     /// Enable memory consistency model. This is relevant in
     /// server/interactive where RTL monitor or interactive command

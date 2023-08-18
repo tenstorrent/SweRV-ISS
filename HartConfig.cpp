@@ -1641,16 +1641,16 @@ HartConfig::applyImsicConfig(System<URV>& system) const
 
   auto& imsic = config_ -> at("imsic");
 
-  uint64_t mbase = 0, msize = 0, sbase = 0, ssize = 0;
+  uint64_t mbase = 0, mstride = 0, sbase = 0, sstride = 0;
 
   std::string_view tag = "mbase";
   if (imsic.contains(tag))
     if (not getJsonUnsigned("imsic.mbase",  imsic.at(tag), mbase))
       return false;
 
-  tag = "msize";
+  tag = "mstride";
   if (imsic.contains(tag))
-    if (not getJsonUnsigned("imsic.msize",  imsic.at(tag), msize))
+    if (not getJsonUnsigned("imsic.mstride",  imsic.at(tag), mstride))
       return false;
 
   tag = "sbase";
@@ -1658,9 +1658,9 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.sbase",  imsic.at(tag), sbase))
       return false;
 
-  tag = "ssize";
+  tag = "sstride";
   if (imsic.contains(tag))
-    if (not getJsonUnsigned("imsic.ssize",  imsic.at(tag), ssize))
+    if (not getJsonUnsigned("imsic.stride",  imsic.at(tag), sstride))
       return false;
 
   unsigned guests = 0;
@@ -1669,7 +1669,13 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.guests", imsic.at(tag), guests))
       return false;
 
-  return system.configImsic(mbase, msize, sbase, ssize, guests);
+  unsigned ids = 64;
+  tag = "ids";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.ids", imsic.at(tag), guests))
+      return false;
+
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids);
 }
 
 
