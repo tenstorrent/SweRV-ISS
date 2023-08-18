@@ -319,10 +319,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (not memory_.hasLr(hartIx_, addr1, sizeof(storeVal)))
     return false;
 
-  STORE_TYPE prev = 0;
-  memory_.peek(addr1, prev, false /*usePma*/);
   ldStData_ = storeVal;
-  ldStPrevData_ = prev;
   ldStWrite_ = true;
 
   // If we write to special location, end the simulation.

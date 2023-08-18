@@ -472,28 +472,6 @@ namespace WdRiscv
     /// in given di object.
     void singleStep(DecodedInst& di, FILE* file = nullptr);
 
-    /// Determine the effect of instruction fetching and discarding n
-    /// bytes (where n is the instruction size of the given
-    /// instruction) from memory and then executing the given
-    /// instruction without actually changing the state of the hart or
-    /// the memory. Return true if the instruction would execute
-    /// without an exception. Return false otherwise. In either case
-    /// set the record fields corresponding to the resources that
-    /// would have been changed by the execution of the instruction.
-    bool whatIfSingleStep(URV programCounter, uint32_t inst,
-			  ChangeRecord& record);
-
-    /// Similar to the preceding method but without fetching anything
-    /// from from instruction memory (in other words, this variant
-    /// will never cause an misaligned/instruction-access-fault
-    /// exception).
-    bool whatIfSingleStep(uint32_t inst, ChangeRecord& record);
-
-    /// Similar to the preceding but without fetching register
-    /// operands. Register operand values are obtained from the given
-    /// decoded instruction object.
-    bool whatIfSingStep(const DecodedInst& inst, ChangeRecord& record);
-
     /// Run until the program counter reaches the given address. Do
     /// execute the instruction at that address. If file is non-null
     /// then print thereon tracing information after each executed
@@ -2117,9 +2095,6 @@ namespace WdRiscv
     /// Helper to decode. Used for compressed instructions.
     const InstEntry& decode16(uint16_t inst, uint32_t& op0, uint32_t& op1,
 			      uint32_t& op2);
-
-    /// Helper to whatIfSingleStep.
-    void collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record);
 
     /// Return the effective rounding mode for the currently executing
     /// floating point instruction.
@@ -4668,7 +4643,6 @@ namespace WdRiscv
     uint64_t ldStPhysAddr2_ = 0;    // Physical address of 2nd page across page boundary.
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing
-    uint64_t ldStPrevData_ = 0;
     bool ldStWrite_ = false;        // True if memory written by last store.
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 

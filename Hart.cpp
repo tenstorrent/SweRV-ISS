@@ -1784,10 +1784,6 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
   ldStSize_ = sizeof(STORE_TYPE);
   ldStData_ = storeVal;
 
-  STORE_TYPE prev = 0;
-  memory_.peek(addr, prev, false /*usePma*/);
-  ldStPrevData_ = prev;
-
   if (memory_.write(hartIx_, addr, storeVal))
     {
       ldStWrite_ = true;
@@ -1941,10 +1937,6 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
       return false;
     }
 
-  STORE_TYPE temp = 0;
-  memPeek(addr1, addr2, temp, false /*usePma*/);
-  ldStPrevData_ = temp;
-
   // If addr is special location, then write to console.
   if (conIoValid_ and addr1 == conIo_)
     {
@@ -1996,6 +1988,8 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
 
   memWrite(addr1, addr2, storeVal);
   ldStWrite_ = true;
+
+  STORE_TYPE temp = 0;
   memPeek(addr1, addr2, temp, false /*usePma*/);
   ldStData_ = temp;
   return true;
@@ -4963,252 +4957,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       logStop(ce, instCounter_, traceFile);
     }
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::whatIfSingleStep(uint32_t inst, ChangeRecord& record)
-{
-  uint64_t prevExceptionCount = exceptionCount_;
-  URV prevPc = pc_;
-
-  clearTraceData();
-  triggerTripped_ = false;
-
-  // Note: triggers not yet supported.
-
-  DecodedInst di;
-  uint64_t physPc = pc_;
-  decode(pc_, physPc, inst, di);
-
-  // Execute instruction
-  pc_ += di.instSize();
-  execute(&di);
-
-  bool result = exceptionCount_ == prevExceptionCount;
-
-  // If step bit set in dcsr then enter debug mode unless already there.
-  if (dcsrStep_ and not ebreakInstDebug_)
-    enterDebugMode_(DebugModeCause::STEP, pc_);
-
-  // Collect changes. Undo each collected change.
-  exceptionCount_ = prevExceptionCount;
-
-  collectAndUndoWhatIfChanges(prevPc, record);
-  
-  return result;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::whatIfSingleStep(URV whatIfPc, uint32_t inst, ChangeRecord& record)
-{
-  URV prevPc = pc_;
-  setPc(whatIfPc);
-
-  // Note: triggers not yet supported.
-  triggerTripped_ = false;
-
-  // Fetch instruction. We don't care about what we fetch. Just checking
-  // if there is a fetch exception.
-  uint32_t tempInst = 0;
-  uint64_t physPc = 0;
-  bool fetchOk = fetchInst(pc_, physPc, tempInst);
-
-  if (not fetchOk)
-    {
-      collectAndUndoWhatIfChanges(prevPc, record);
-      return false;
-    }
-
-  bool res = whatIfSingleStep(inst, record);
-
-  setPc(prevPc);
-  return res;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::whatIfSingStep(const DecodedInst& di, ChangeRecord& record)
-{
-  clearTraceData();
-  uint64_t prevExceptionCount = exceptionCount_;
-  URV prevPc  = pc_, prevCurrPc = currPc_;
-
-  setPc(di.address());
-  currPc_ = pc_;
-
-  // Note: triggers not yet supported.
-  triggerTripped_ = false;
-
-  // Save current value of operands.
-  std::array<uint64_t, 4> prevRegValues;
-  for (unsigned i = 0; i < prevRegValues.size(); ++i)
-    {
-      URV prev = 0;
-      prevRegValues[i] = 0;
-      uint32_t operand = di.ithOperand(i);
-
-      switch (di.ithOperandType(i))
-	{
-	case OperandType::None:
-	case OperandType::Imm:
-	  break;
-	case OperandType::IntReg:
-	  peekIntReg(operand, prev);
-	  prevRegValues[i] = prev;
-	  break;
-	case OperandType::FpReg:
-	  peekFpReg(operand, prevRegValues[i]);
-	  break;
-	case OperandType::CsReg:
-	  peekCsr(CsrNumber(operand), prev);
-	  prevRegValues[i] = prev;
-	  break;
-        case OperandType::VecReg:
-          assert(0);
-          break;
-	}
-    }
-
-  // Temporarily set value of operands to what-if values.
-  for (unsigned i = 0; i < 4; ++i)
-    {
-      uint32_t operand = di.ithOperand(i);
-
-      switch (di.ithOperandType(i))
-	{
-	case OperandType::None:
-	case OperandType::Imm:
-	  break;
-	case OperandType::IntReg:
-	  pokeIntReg(operand, di.ithOperandValue(i));
-	  break;
-	case OperandType::FpReg:
-	  pokeFpReg(operand, di.ithOperandValue(i));
-	  break;
-	case OperandType::CsReg:
-	  pokeCsr(CsrNumber(operand), di.ithOperandValue(i));
-	  break;
-        case OperandType::VecReg:
-          assert(0);
-          break;
-	}
-    }
-
-  // Execute instruction.
-  pc_ += di.instSize();
-  if (di.instEntry()->instId() != InstId::illegal)
-    execute(&di);
-  bool result = exceptionCount_ == prevExceptionCount;
-
-  // Collect changes. Undo each collected change.
-  exceptionCount_ = prevExceptionCount;
-  collectAndUndoWhatIfChanges(prevPc, record);
-
-  // Restore temporarily modified registers.
-  for (unsigned i = 0; i < 4; ++i)
-    {
-      uint32_t operand = di.ithOperand(i);
-
-      switch (di.ithOperandType(i))
-	{
-	case OperandType::None:
-	case OperandType::Imm:
-	  break;
-	case OperandType::IntReg:
-	  pokeIntReg(operand, prevRegValues[i]);
-	  break;
-	case OperandType::FpReg:
-	  pokeFpReg(operand, prevRegValues[i]);
-	  break;
-	case OperandType::CsReg:
-	  pokeCsr(CsrNumber(operand), prevRegValues[i]);
-	  break;
-        case OperandType::VecReg:
-          assert(0);
-          break;
-	}
-    }
-
-  setPc(prevPc);
-  currPc_ = prevCurrPc;
-
-  return result;
-}
-
-
-template <typename URV>
-void
-Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
-{
-  record.clear();
-
-  record.newPc = pc_;
-  setPc(prevPc);
-
-  uint64_t oldValue = 0;
-  int regIx = intRegs_.getLastWrittenReg(oldValue);
-  if (regIx >= 0)
-    {
-      URV newValue = 0;
-      peekIntReg(regIx, newValue);
-      pokeIntReg(regIx, oldValue);
-
-      record.hasIntReg = true;
-      record.intRegIx = regIx;
-      record.intRegValue = newValue;
-    }
-
-  uint64_t oldFpValue = 0;
-  regIx = fpRegs_.getLastWrittenReg(oldFpValue);
-  if (regIx >= 0)
-    {
-      uint64_t newFpValue = 0;
-      peekFpReg(regIx, newFpValue);
-      pokeFpReg(regIx, oldFpValue);
-
-      record.hasFpReg = true;
-      record.fpRegIx = regIx;
-      record.fpRegValue = newFpValue;
-    }
-
-  if (ldStWrite_)
-    {
-      record.memSize = ldStSize_;
-      record.memAddr = ldStPhysAddr1_;
-      record.memValue = ldStData_;
-      uint64_t addr = ldStPhysAddr1_;
-      uint64_t value = ldStPrevData_;
-      for (size_t i = 0; i < ldStSize_; ++i, ++addr)
-	{
-	  pokeMemory(addr, uint8_t(value), true);
-	  value = value >> 8;
-	}
-    }
-
-  std::vector<CsrNumber> csrNums;
-  std::vector<unsigned> triggerNums;
-  csRegs_.getLastWrittenRegs(csrNums, triggerNums);
-
-  for (auto csrn : csrNums)
-    {
-      Csr<URV>* csr = csRegs_.getImplementedCsr(csrn, virtMode_);
-      if (not csr)
-	continue;
-
-      URV newVal = csr->read();
-      URV oldVal = csr->prevValue();
-      csr->write(oldVal);
-
-      record.csrIx.push_back(csrn);
-      record.csrValue.push_back(newVal);
-    }
-
-  clearTraceData();
 }
 
 
