@@ -17784,18 +17784,15 @@ Hart<URV>::vfrsqrt7_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+
+	  bool edbz = false, einv = false;  // Element divide-by-zero and invalid
+	  dest = doFrsqrt7(e1, edbz, einv);
+	  dbz = dbz or edbz;
+	  inv = inv or einv;
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      bool edbz = false, einv = false;  // Element divide-by-zero and invalid
-      dest = doFrsqrt7(e1, edbz, einv);
-      dbz = dbz or edbz;
-      inv = inv or einv;
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -17849,17 +17846,14 @@ Hart<URV>::vfrec7_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+
+	  FpFlags elemFlags = FpFlags::None;
+	  dest = doFrec7(e1, mode, elemFlags);
+	  flags = FpFlags(unsigned(flags) | unsigned(elemFlags));
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      FpFlags elemFlags = FpFlags::None;
-      dest = doFrec7(e1, mode, elemFlags);
-      flags = FpFlags(unsigned(flags) | unsigned(elemFlags));
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -17905,16 +17899,13 @@ Hart<URV>::vfmin_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+
+	  dest = doFmin(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
-
-      dest = doFmin(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -17964,15 +17955,11 @@ Hart<URV>::vfmin_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = doFmin(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = doFmin(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -18018,16 +18005,12 @@ Hart<URV>::vfmax_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+	  dest = doFmax(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
-
-      dest = doFmax(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -18077,15 +18060,11 @@ Hart<URV>::vfmax_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = doFmax(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = doFmax(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -18132,16 +18111,12 @@ Hart<URV>::vfsgnj_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+	  dest = std::copysign(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
-
-      dest = std::copysign(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -18189,14 +18164,11 @@ Hart<URV>::vfsgnj_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = std::copysign(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-      dest = std::copysign(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -18241,17 +18213,13 @@ Hart<URV>::vfsgnjn_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+	  e2 = -e2;
+	  dest = std::copysign(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
-
-      e2 = -e2;
-      dest = std::copysign(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -18301,15 +18269,11 @@ Hart<URV>::vfsgnjn_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = std::copysign(e1, e2);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = std::copysign(e1, e2);
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -18354,22 +18318,19 @@ Hart<URV>::vfsgnjx_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+
+	  int s1 = (std::signbit(e1) == 0) ? 0 : 1;
+	  int s2 = (std::signbit(e2) == 0) ? 0 : 1;
+	  int sign = s1 ^ s2;
+	  ELEM_TYPE x{};
+	  if (sign)
+	    x = -x;
+	  dest = std::copysign(e1, x);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
-
-      int s1 = (std::signbit(e1) == 0) ? 0 : 1;
-      int s2 = (std::signbit(e2) == 0) ? 0 : 1;
-      int sign = s1 ^ s2;
-      ELEM_TYPE x{};
-      if (sign)
-	x = -x;
-      dest = std::copysign(e1, x);
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -18417,22 +18378,18 @@ Hart<URV>::vfsgnjx_vf(unsigned vd, unsigned vs1, unsigned fs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+
+	  int s1 = (std::signbit(e1) == 0) ? 0 : 1;
+	  int s2 = (std::signbit(e2) == 0) ? 0 : 1;
+	  int sign = s1 ^ s2;
+	  ELEM_TYPE x{};
+	  if (sign)
+	    x = -x;
+	  dest = std::copysign(e1, x);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      int s1 = (std::signbit(e1) == 0) ? 0 : 1;
-      int s2 = (std::signbit(e2) == 0) ? 0 : 1;
-      int sign = s1 ^ s2;
-      ELEM_TYPE x{};
-      if (sign)
-	x = -x;
-      dest = std::copysign(e1, x);
-
       vecRegs_.write(vd, ix, group, dest);
     }
 }

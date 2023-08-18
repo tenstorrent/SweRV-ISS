@@ -1118,27 +1118,30 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
     errors++;
 
   // Setup target program arguments.
-  if (clib)
+  if (not args.expandedTargets.empty())
     {
-      if (args.loadFrom.empty())
-        if (not hart.setTargetProgramArgs(args.expandedTargets.front()))
-          {
-            size_t memSize = hart.memorySize();
-            size_t suggestedStack = memSize - 4;
+      if (clib)
+	{
+	  if (args.loadFrom.empty())
+	    if (not hart.setTargetProgramArgs(args.expandedTargets.front()))
+	      {
+		size_t memSize = hart.memorySize();
+		size_t suggestedStack = memSize - 4;
 
-            std::cerr << "Failed to setup target program arguments -- stack "
-                      << "is not writable\n"
-                      << "Try using --setreg sp=<val> to set the stack pointer "
-                      << "to a\nwritable region of memory (e.g. --setreg "
-                      << "sp=0x" << std::hex << suggestedStack << '\n'
-                      << std::dec;
-            errors++;
-          }
-    }
-  else if (not args.expandedTargets.empty() and args.expandedTargets.front().size() > 1)
-    {
-      std::cerr << "Warning: Target program options present which requires\n"
-		<< "         the use of --newlib/--linux. Options ignored.\n";
+		std::cerr << "Failed to setup target program arguments -- stack "
+			  << "is not writable\n"
+			  << "Try using --setreg sp=<val> to set the stack pointer "
+			  << "to a\nwritable region of memory (e.g. --setreg "
+			  << "sp=0x" << std::hex << suggestedStack << '\n'
+			  << std::dec;
+		errors++;
+	      }
+	}
+      else if (args.expandedTargets.front().size() > 1)
+	{
+	  std::cerr << "Warning: Target program options present which requires\n"
+		    << "         the use of --newlib/--linux. Options ignored.\n";
+	}
     }
 
   if (args.csv)
