@@ -439,9 +439,14 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
       return false;
     }
 
-  imsicMgr_.configMachine(mbase, mstride, ids);
-  imsicMgr_.configSupervisor(sbase, sstride, ids);
-  imsicMgr_.configGuests(guests, ids);
+  bool ok = imsicMgr_.configureMachine(mbase, mstride, ids);
+  ok = imsicMgr_.configureSupervisor(sbase, sstride, ids) and ok;
+  ok = imsicMgr_.configureGuests(guests, ids) and ok;
+  if (not ok)
+    {
+      cerr << "Error: Failed to configure IMSIC.\n";
+      return false;
+    }
 
   return true;
 }

@@ -7,7 +7,7 @@ using namespace TT_IMSIC;
 
 template <typename URV>
 bool
-File::read(URV& val) const
+File::iregRead(URV& val) const
 {
   using EIC = ExternalInterruptCsr;
 
@@ -52,7 +52,7 @@ File::read(URV& val) const
 
 template <typename URV>
 bool
-File::write(URV val)
+File::iregWrite(URV val)
 {
   using EIC = ExternalInterruptCsr;
 
@@ -104,15 +104,21 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
   uint32_t word = data;
 
   File* file = nullptr;
+  bool isGuest = false;
+  unsigned guestIx = 0;
 
   if (mfile_.coversAddress(addr))
     file = &mfile_;
   else if (sfile_.coversAddress(addr))
     file = &sfile_;
   else
-    for (auto& gfile : gfiles_)
-      if (gfile.coversAddress(addr))
-	file = &gfile;
+    for (size_t i = 0; i < gfiles_.size(); ++i)
+      if (gfiles_.at(i).coversAddress(addr))
+	{
+	  file = &gfiles_.at(i);
+	  guestIx = i;
+	  isGuest = true;
+	}
 
   if (not file)
     return false;  // Address is not covered by this imsic
@@ -128,6 +134,9 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
       file->setPending(word, true);
     }
 
+  if (isGuest and file->canDeliver() and file->topId())
+    guestInterrupts_ |= uint64_t(1) << guestIx;
+
   return true;
 }
 
@@ -141,7 +150,7 @@ ImsicMgr::ImsicMgr(unsigned hartCount, unsigned pageSize)
 
 
 bool
-ImsicMgr::configMachine(uint64_t addr, uint64_t stride, unsigned ids)
+ImsicMgr::configureMachine(uint64_t addr, uint64_t stride, unsigned ids)
 {
   if ((addr % pageSize_) != 0 or (stride % pageSize_) != 0 or stride == 0)
     return false;
@@ -153,7 +162,7 @@ ImsicMgr::configMachine(uint64_t addr, uint64_t stride, unsigned ids)
   mstride_ = stride;
   for (auto& imsic : imsics_)
     {
-      imsic.activateMachine(addr, ids);
+      imsic.configureMachine(addr, ids);
       addr += stride;
     }
   return true;
@@ -161,7 +170,7 @@ ImsicMgr::configMachine(uint64_t addr, uint64_t stride, unsigned ids)
 
 
 bool
-ImsicMgr::configSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
+ImsicMgr::configureSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
 {
   if ((addr % pageSize_) != 0 or (stride % pageSize_) != 0 or stride == 0)
     return false;
@@ -173,7 +182,7 @@ ImsicMgr::configSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
   sstride_ = stride;
   for (auto& imsic : imsics_)
     {
-      imsic.activateSupervisor(addr, ids);
+      imsic.configureSupervisor(addr, ids);
       addr += stride;
     }
   return true;
@@ -181,13 +190,13 @@ ImsicMgr::configSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
 
 
 bool
-ImsicMgr::configGuests(unsigned n, unsigned ids)
+ImsicMgr::configureGuests(unsigned n, unsigned ids)
 {
   if (sstride_ < (n+1) * pageSize_)
     return false;  // No enough space.
 
   for (auto& imsic : imsics_)
-    imsic.activateGuests(n, ids);
+    imsic.configureGuests(n, ids);
 
   return true;
 }

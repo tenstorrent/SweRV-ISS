@@ -4796,6 +4796,29 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
 	}
 
+      // Check IMSCI
+      if (imsic_)
+	{
+	  // Deliver/clear machine external interrupt from IMSIC.
+	  if (imsic_->machineEnabled() and imsic_->machineTopId())
+	    mipVal = mipVal | (URV(1) << URV(IC::M_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::M_EXTERNAL));
+	  // Deliver/clear supervisor external interrupt from IMSIC.
+	  if (imsic_->supervisorEnabled() and imsic_->supervisorTopId())
+	    mipVal = mipVal | (URV(1) << URV(IC::S_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::S_EXTERNAL));
+	  // Deliver/clear guest external interrupts from IMSIC.
+	  URV gip = imsic_->guestInterrupts();
+	  csRegs_.poke(CsrNumber::HGEIP, gip);
+	  URV gie = csRegs_.peekHgeip();
+	  if ((gip & gie) != 0)
+	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::G_EXTERNAL));
+	}
+
       if (mipVal != prev)
 	csRegs_.poke(CsrNumber::MIP, mipVal);
     }
@@ -9813,9 +9836,10 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
     }
 
   // Update CSR.
+  URV lastVal = 0;
+  csRegs_.peek(csr, lastVal);
   csRegs_.write(csr, privMode_, val);
-
-  postCsrUpdate(csr, val, intRegVal);
+  postCsrUpdate(csr, val, lastVal);
 
   // Csr was written. If it was minstret, compensate for
   // auto-increment that will be done by run, runUntilAddress or

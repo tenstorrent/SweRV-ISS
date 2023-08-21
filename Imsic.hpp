@@ -29,9 +29,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       E63 = 0xFF
     };
 
-    /// Define an inactive file. File may be later activated it using
-    /// the activate method. An inactive file does not cover any
-    /// address.
+    /// Define an non-configured file. File may be later configured
+    /// using the config method. An non-configured file does not cover
+    /// any address.
     File ()
     { }
 
@@ -40,7 +40,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// pending. The given address must be page aligned and n must be
     /// a multiple of 64.
     File (uint64_t address, unsigned n)
-      : addr_(address), pending_(n), enabled_(n), topId_(0), active_(true)
+      : addr_(address), pending_(n), enabled_(n), topId_(0), config_(true)
     {
       assert((address & pageSize_) == 0);
       assert((n % 64) == 0);
@@ -51,24 +51,16 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     { return addr_; }
 
     /// Return one plus the largest supported interrupt id.
-    unsigned size() const
+    unsigned idCount() const
     { return pending_.size(); }
 
     /// Return true if given interrupt id is pending.
     bool isPending(unsigned id) const
-    {
-      if (not active_)
-	return false;
-      return id < pending_.size() and pending_.at(id);
-    }
+    { return config_ and id < pending_.size() and pending_.at(id); }
 
     /// Return true if given interrupt id is enabled.
     bool isEnabled(unsigned id) const
-    {
-      if (not active_)
-	return false;
-      return id < enabled_.size() and enabled_.at(id);
-    }
+    { return config_ and id < enabled_.size() and enabled_.at(id); }
 
     /// Mark the given interrupt id as pending/not-pending. Marking id 0
     /// or an out of bounds id has no effect. Update the highest priority
@@ -119,7 +111,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     void updateTopId()
     {
       topId_ = 0;
-      if (not active_)
+      if (not config_)
 	return;
       for (size_t i = 1; i < pending_.size(); ++i)
 	if (pending_.at(i) and enabled_.at(i))
@@ -133,7 +125,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Return 0 if i is out of bounds.
     uint32_t ithEnableWord(unsigned i) const
     {
-      if (not active_)
+      if (not config_)
 	return false;
       unsigned word = 0;
       for (unsigned bitIx = 0; bitIx < 32; ++bitIx)
@@ -153,30 +145,35 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     /// Return true if given address is in the rage of addresses
     /// covered by this file. Return false otherwise. Return false
-    /// if this file is not active.
+    /// if this file is not configured.
     bool coversAddress(uint64_t addr) const
-    { return active_ and addr >= addr_ and addr - addr_ < pageSize_; }
+    { return config_ and addr >= addr_ and addr - addr_ < pageSize_; }
 
-    /// Mark this file as active and associate it with given address
-    /// and size: interrupts ids are 1 to size - 1 inclusive.
-    /// All previous enable/pending state is lost. Given address must
-    /// be page aligned and size must be a multiple of 64.
-    void activate(uint64_t addr, unsigned size)
+    /// Configure this file and associate it with given address and id
+    /// count: interrupts ids are 1 to idCount - 1 inclusive.  All
+    /// previous enable/pending state is lost. Given address must be
+    /// page aligned and idCount must be a multiple of 64.
+    void configure(uint64_t addr, unsigned idCount)
     {
       assert((addr % pageSize_) == 0);
-      assert((size % 64) == 0);
+      assert((idCount % 64) == 0);
       topId_ = 0;
       addr_ = addr;
       pending_.clear();
       enabled_.clear();
-      pending_.resize(size);
-      enabled_.resize(size);
-      active_ = true;
+      pending_.resize(idCount);
+      enabled_.resize(idCount);
+      config_ = true;
     }
 
-    /// Return true if this file is active.
-    bool isActive() const
-    { return active_; }
+    /// Return true if this can delier an interrupt to its hart
+    /// (i.e. delivery register set to 1).
+    bool canDeliver() const
+    { return delivery_ == 1; }
+
+    /// Return true if this file is configured.
+    bool isConfigured() const
+    { return config_; }
 
     unsigned pageSize() const
     { return pageSize_; }
@@ -188,12 +185,12 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Read from selected register by selectRegister. Returns false if
     /// access would cause an illegal instruction trap and true otherwise.
     template <typename URV>
-    bool read(URV& val) const;
+    bool iregRead(URV& val) const;
 
     /// Write to selected register by selectRegister. Returns false if
     /// access would cause an illegal instruction trap and true otherwise.
     template <typename URV>
-    bool write(URV val);
+    bool iregWrite(URV val);
 
   private:
 
@@ -203,7 +200,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned topId_ = 0;
     unsigned delivery_ = 0;
     unsigned threshold_ = 0;
-    bool active_ = false;
+    bool config_ = false;
     const unsigned pageSize_ = 1024;
     uint64_t select_ = 0; // cached value of indirect register select
   };
@@ -214,42 +211,42 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
   {
   public:
 
-    /// Define an inactive IMSIC (no machine/supervisor/guest file,
-    /// does not cover any address).
+    /// Define a non-configured IMSIC (no machine/supervisor/guest
+    /// file, does not cover any address).
     Imsic()
       : mfile_(0, 0), sfile_(0, 0)
     { }
 
-    /// Activate the machine privilege file at the given address and
-    /// with the given size (size is the highest interrupt id plus 1
-    /// and must be a multiple of 64). All previous state
-    /// enabled/pending state is lost.
-    void activateMachine(uint64_t addr, unsigned size)
-    { mfile_.activate(addr, size); }
+    /// Configure the machine privilege file at the given address and
+    /// with the given count of interrupt ids (idCount is the highest
+    /// interrupt id plus 1 and must be a multiple of 64). All
+    /// previous state enabled/pending state is lost.
+    void configureMachine(uint64_t addr, unsigned idCount)
+    { mfile_.configure(addr, idCount); }
 
-    /// Activate the supervisor privilege file at the given address
-    /// and with the given size (size is the highest interrupt id plus
-    /// 1 and must be a multiple of 64).  All previous state
-    /// enabled/pending state is lost.
-    void activateSupervisor(uint64_t addr, unsigned size)
-    { sfile_.activate(addr, size); }
+    /// Configure the supervisor privilege file at the given address
+    /// and with the given count of interrupt ids (idCount is the
+    /// highest interrupt id plus 1 and must be a multiple of 64).
+    /// All previous state enabled/pending state is lost.
+    void configureSupervisor(uint64_t addr, unsigned idCount)
+    { sfile_.configure(addr, idCount); }
 
-    /// Activate g guest files of n-1 interrupt ids each. The guest
+    /// Configure g guest files of n-1 interrupt ids each. The guest
     /// addresses will be s+p, s+2p, s+3p, ... where s is the
     /// supervisor file address and p is the page size. A supervisor
-    /// file must be activated before the guests files are
-    /// activated. The parameter g must not exceed 64.
-    void activateGuests(unsigned g, unsigned n)
+    /// file must be configured before the guests files are
+    /// configured. The parameter g must not exceed 64.
+    void configureGuests(unsigned g, unsigned n)
     {
       assert(g <= 64);
-      assert(sfile_.isActive());
+      assert(sfile_.isConfigured());
       gfiles_.clear();
       gfiles_.resize(g);
       unsigned pageSize = sfile_.pageSize();
       uint64_t addr = sfile_.address() + pageSize;
       for (auto& file : gfiles_)
 	{
-	  file.activate(addr, n);
+	  file.configure(addr, n);
 	  addr += pageSize;
 	}
     }
@@ -306,6 +303,50 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return true;
     }
 
+    /// Called from the associated hart for a CSR write to miselect.
+    bool machineSelect(uint8_t num)
+    { mfile_.select(num); return true; }
+
+    /// Called from the associated hart for a CSR write to siselect/vsislect.
+    /// Guest field is used if virt is true (VS privilege).
+    bool supervisorSelect(uint8_t num, bool virt, unsigned guest)
+    {
+      if (virt)
+	{
+	  if (guest >= gfiles_.size())
+	    return false;
+	  gfiles_.at(guest).select(num);
+	}
+      else
+	sfile_.select(num);
+      return true;
+    }
+
+    /// Called form the associated hart for a CSR write to mireg.
+    template <typename URV>
+    bool writeMireg(URV value)
+    { return mfile_.iregWrite(value); }
+    
+    /// Called form the associated hart for a CSR write to sireg/vsireg.
+    /// Guest field is used if virt is true.
+    template <typename URV>
+    bool writeSireg(bool virt, unsigned guest, URV value)
+    {
+      if (virt)
+	{
+	  if (guest >= gfiles_.size())
+	    return false;
+	  auto& gfile = gfiles_.at(guest);
+	  bool ok = gfile.iregWrite(value);
+	  if (gfile.canDeliver() and gfile.topId())
+	    guestInterrupts_ |= (uint64_t(1) << guest);
+	  else
+	    guestInterrupts_ &= ~(uint64_t(1) << guest);
+	  return ok;
+	}
+      return sfile_.iregWrite(value);
+    }
+
     /// Return the machine file top pending and enabled interrupt id.
     /// Ids filetered out by the threshold mechanism are not
     /// considered.
@@ -324,11 +365,29 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned guestTopId(unsigned guestIx) const
     { return guestIx < gfiles_.size() ? gfiles_.at(guestIx).topId() : 0; }
 
+    /// Rsturn true if machine file of this IMSIC is enabled to
+    /// deliver itnerrupts to the associated hart (i.e. delivery is 1
+    /// in the file).
+    bool machineEnabled() const
+    { return mfile_.canDeliver(); }
+
+    /// Rsturn true if supervisor file of this IMSIC is enabled to
+    /// deliver itnerrupts to the associated hart (i.e. delivery is 1
+    /// in the file).
+    bool supervisorEnabled() const
+    { return sfile_.canDeliver(); }
+
+    /// Return mask with 1 bits set for each guest interrupt file that
+    /// has deliverey enabled and that has a non-zero top interrupt id.
+    uint64_t guestInterrupts() const
+    { return guestInterrupts_; }
+
   private:
 
     File mfile_;
     File sfile_;
     std::vector<File> gfiles_;
+    uint64_t guestInterrupts_ = 0;
   };
 
 
@@ -348,13 +407,13 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// interrupt id supported by each file and must be a multiple of
     /// 64. Return true on success and false on failure: We fail if
     /// addr/stride are nog page aligned or if ids is larger than 64.
-    bool configMachine(uint64_t addr, uint64_t stride, unsigned ids);
+    bool configureMachine(uint64_t addr, uint64_t stride, unsigned ids);
 
     /// Configure supervisor privilege IMISC files (one per hart) and
     /// guest privilege file (guestCount per hart). Supervisor files
     /// will be at addresses addr, addr + stride, addr + 2*stride.
     /// See configMachine.
-    bool configSupervisor(uint64_t addr, uint64_t stride, unsigned ids);
+    bool configureSupervisor(uint64_t addr, uint64_t stride, unsigned ids);
 
     /// Configure n guests per hart. Guest files at each hart will be
     /// at s + ps, s + 2*ps, s + 3*ps, ... where s is the address of
@@ -362,7 +421,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Return true on success and false on failure. Fail if
     /// supervisor files are not configured or if n is larger than 64
     /// or if ids is not a multiple of 64.
-    bool configGuests(unsigned n, unsigned ids);
+    bool configureGuests(unsigned n, unsigned ids);
 
     /// Return true if given address is covered by any of the configured
     /// IMSIC files.
@@ -433,6 +492,42 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// are not considered.
     unsigned guestTopId(unsigned hartIx, unsigned guestIx) const
     { return hartIx < imsics_.size()? imsics_.at(hartIx).guestTopId(guestIx) : 0; }
+
+    /// Called from the associated hart for a CSR write to miselect.
+    bool machineSelect(unsigned hartIx, uint8_t num)
+    {
+      if (hartIx >= imsics_.size())
+	return false;
+      return imsics_.at(hartIx).machineSelect(num);
+    }
+
+    /// Called from the associated hart for a CSR write to siselect/vsislect.
+    /// Guest field is used if virt is true (VS privilege).
+    bool supervisorSelect(unsigned hartIx, uint8_t num, bool virt, unsigned guest)
+    {
+      if (hartIx >= imsics_.size())
+	return false;
+      return imsics_.at(hartIx).supervisorSelect(num, virt, guest);
+    }
+
+    /// Called form hart of given hartIx for a CSR write to mireg.
+    template <typename URV>
+    bool writeMireg(unsigned hartIx, URV value)
+    {
+      if (hartIx >= imsics_.size())
+	return false;
+      return imsics_.at(hartIx).writeMireg(value);
+    }
+    
+    /// Called form hart of given hartIx for a CSR write to sireg/vsireg.
+    /// Guest field is used if virt is true.
+    template<typename URV>
+    bool writeSireg(unsigned hartIx, bool virt, unsigned guest, URV value)
+    {
+      if (hartIx >= imsics_.size())
+	return false;
+      return imsics_.at(hartIx).writeSireg(virt, guest, value);
+    }
 
   protected:
 

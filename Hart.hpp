@@ -37,6 +37,7 @@
 #include "Decoder.hpp"
 #include "Disassembler.hpp"
 #include "util.hpp"
+#include "Imsic.hpp"
 
 
 namespace WdRiscv
@@ -4720,6 +4721,7 @@ namespace WdRiscv
     Isa isa_;
     Decoder decoder_;
     Disassembler disas_;
+    std::shared_ptr<TT_IMSIC::Imsic> imsic_;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

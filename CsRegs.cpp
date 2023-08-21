@@ -1941,14 +1941,14 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 
-  mask = 0x1444;     // Bits SGEIP, VSEIP, VSTIP, and VSSIP writeable.
-  pokeMask = mask;   // Same bits pokeable.
+  pokeMask = mask = 0x1444;     // Bits SGEIP, VSEIP, VSTIP, and VSSIP writeable.
   csr = defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 
   csr = defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
-  csr = defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, wam, wam);
+  pokeMask = mask = ~URV(1); // All bits writeable except bit 0
+  csr = defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
   csr = defineCsr("htval",       Csrn::HTVAL,       !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
@@ -1964,7 +1964,8 @@ CsRegs<URV>::defineHypervisorRegs()
 
   csr = defineCsr("htinst",      Csrn::HTINST,      !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
-  csr = defineCsr("hgeip",       Csrn::HGEIP,       !mand, !imp, 0, wam, wam);
+  pokeMask = mask = ~URV(1); // All bits writeable except bit 0
+  csr = defineCsr("hgeip",       Csrn::HGEIP,       !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
   csr = defineCsr("henvcfg",     Csrn::HENVCFG,     !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
