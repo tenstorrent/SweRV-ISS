@@ -4290,7 +4290,7 @@ Hart<URV>::execViota_m(const DecodedInst* di)
 	    vecRegs_.write(vd, ix, groupx8, dest);
 	  }
 	  break;
-	case ElementWidth::Word2: vecRegs_.write(vd, ix, groupx8, int64_t(sum)); break;
+	case ElementWidth::Word2:
 	  {
 	    int64_t dest{};
 	    if (vecRegs_.isDestActive(vd, ix, groupx8, masked, dest))

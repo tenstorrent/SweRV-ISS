@@ -1672,7 +1672,7 @@ HartConfig::applyImsicConfig(System<URV>& system) const
   unsigned ids = 64;
   tag = "ids";
   if (imsic.contains(tag))
-    if (not getJsonUnsigned("imsic.ids", imsic.at(tag), guests))
+    if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
       return false;
 
   return system.configImsic(mbase, mstride, sbase, sstride, guests, ids);
