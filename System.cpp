@@ -448,6 +448,25 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
       return false;
     }
 
+  uint64_t mend = mbase + mstride * hartCount();
+  uint64_t send = sbase + sstride * hartCount();
+
+  auto readFunc = [this](uint64_t addr, unsigned size, uint64_t& data) -> bool {
+    return this->imsicMgr_.read(addr, size, data);
+  };
+
+  auto writeFunc = [this](uint64_t addr, unsigned size, uint64_t data,
+			  unsigned& hartIx) -> bool {
+    return  this->imsicMgr_.write(addr, size, data, hartIx);
+  };
+
+  for (unsigned i = 0; i < hartCount(); ++i)
+    {
+      auto hart = ithHart(i);
+      auto imsic = imsicMgr_.ithImsic(i);
+      hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc);
+    }
+
   return true;
 }
 

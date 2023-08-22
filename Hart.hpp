@@ -522,12 +522,12 @@ namespace WdRiscv
     { logStart_ = rank; }
 
     /// Define memory mapped locations for CLINT.
-    void configClint(uint64_t clintStart, uint64_t clintLimit,
+    void configClint(uint64_t clintStart, uint64_t clintEnd,
 		     bool softwareInterruptOnReset,
                      std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       clintStart_ = clintStart;
-      clintLimit_ = clintLimit;
+      clintEnd_ = clintEnd;
       clintSiOnReset_ = softwareInterruptOnReset;
       indexToHart_ = indexToHart;
     }
@@ -1794,6 +1794,21 @@ namespace WdRiscv
     void setDebugTrapAddress(URV addr)
     { debugTrapAddr_ = addr; }
 
+    /// Associate given IMSIC with this hart and define the address
+    /// space for all IMSICs in the system.
+    void attachImsic(std::shared_ptr<TT_IMSIC::Imsic> imsic,
+		     uint64_t mbase, uint64_t mend,
+		     uint64_t sbase, uint64_t send,
+		     std::function<bool(uint64_t, unsigned, uint64_t&)> readFunc,
+		     std::function<bool(uint64_t, unsigned, uint64_t, unsigned&)> writeFunc)
+    {
+      imsic_ = imsic;
+      imsicMbase_ = mbase; imsicMend_ = mend;
+      imsicSbase_ = sbase; imsicSend_ = send;
+      imsicRead_ = readFunc;
+      imsicWrite_ = writeFunc;
+    }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -1907,7 +1922,7 @@ namespace WdRiscv
 
     /// Return true if CLINT is configured.
     bool hasClint() const
-    { return clintStart_ < clintLimit_; }
+    { return clintStart_ < clintEnd_; }
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
@@ -4569,7 +4584,7 @@ namespace WdRiscv
     bool enableConIn_ = true;
 
     uint64_t clintStart_ = 0;
-    uint64_t clintLimit_ = 0;
+    uint64_t clintEnd_ = 0;
     uint64_t clintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
     bool clintSiOnReset_ = false;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
@@ -4722,6 +4737,12 @@ namespace WdRiscv
     Decoder decoder_;
     Disassembler disas_;
     std::shared_ptr<TT_IMSIC::Imsic> imsic_;
+    uint64_t imsicMbase_ = 0;
+    uint64_t imsicMend_ = 0;
+    uint64_t imsicSbase_ = 0;
+    uint64_t imsicSend_ = 0;
+    std::function<bool(uint64_t, unsigned, uint64_t&)> imsicRead_ = nullptr;
+    std::function<bool(uint64_t, unsigned, uint64_t, unsigned&)> imsicWrite_ = nullptr;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

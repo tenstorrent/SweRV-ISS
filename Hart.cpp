@@ -953,7 +953,7 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   URV adjusted = val;
-  if (addr >= clintStart_ and addr < clintLimit_)
+  if (addr >= clintStart_ and addr < clintEnd_)
     {
       processClintWrite(addr, sizeof(val), adjusted);
       val = adjusted;
@@ -1696,7 +1696,7 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
     }
 
   ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr1 >= clintStart_ and addr1 < clintLimit_ and addr1 - clintStart_ >= 0xbff8)
+  if (addr1 >= clintStart_ and addr1 < clintEnd_ and addr1 - clintStart_ >= 0xbff8)
     {
       uint64_t tm = instCounter_ >> counterToTimeShift_; // Fake time: instr count
       tm = tm >> (addr1 - 0xbff8) * 8;
@@ -1975,7 +1975,7 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
       return true;  // Memory updated when merge buffer is written.
     }
 
-  if (addr1 >= clintStart_ and addr1 < clintLimit_)
+  if (addr1 >= clintStart_ and addr1 < clintEnd_)
     {
       assert(addr1 == addr2);
       URV val = storeVal;
@@ -4746,13 +4746,6 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
     {
       URV mipVal = csRegs_.peekMip();
       URV prev = mipVal;
-
-      for (const auto& dev : memory_.ioDevs_)
-	if (dev->isInterruptPending())
-	  {
-	    mipVal |=  (URV(1) << URV(IC::M_EXTERNAL)) | (URV(1) << URV(IC::S_EXTERNAL));
-	    dev->setInterruptPending(false);
-	  }
 
       if (hasClint())
 	{

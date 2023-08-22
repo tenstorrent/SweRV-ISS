@@ -142,10 +142,13 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
 
 
 ImsicMgr::ImsicMgr(unsigned hartCount, unsigned pageSize)
-  : harts_(hartCount), pageSize_(pageSize), imsics_(hartCount)
+  : pageSize_(pageSize), imsics_(hartCount)
 {
   if (pageSize_ == 0)
     throw std::runtime_error("Zero page size in ImsciMgr constructor.");
+
+  for (unsigned ix = 0; ix < hartCount; ++ix)
+    imsics_.at(ix) = std::make_shared<Imsic>();
 }
 
 
@@ -160,9 +163,9 @@ ImsicMgr::configureMachine(uint64_t addr, uint64_t stride, unsigned ids)
 
   mbase_ = addr;
   mstride_ = stride;
-  for (auto& imsic : imsics_)
+  for (auto imsic : imsics_)
     {
-      imsic.configureMachine(addr, ids);
+      imsic->configureMachine(addr, ids);
       addr += stride;
     }
   return true;
@@ -180,9 +183,9 @@ ImsicMgr::configureSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
 
   sbase_ = addr;
   sstride_ = stride;
-  for (auto& imsic : imsics_)
+  for (auto imsic : imsics_)
     {
-      imsic.configureSupervisor(addr, ids);
+      imsic->configureSupervisor(addr, ids);
       addr += stride;
     }
   return true;
@@ -195,8 +198,8 @@ ImsicMgr::configureGuests(unsigned n, unsigned ids)
   if (sstride_ < (n+1) * pageSize_)
     return false;  // No enough space.
 
-  for (auto& imsic : imsics_)
-    imsic.configureGuests(n, ids);
+  for (auto imsic : imsics_)
+    imsic->configureGuests(n, ids);
 
   return true;
 }

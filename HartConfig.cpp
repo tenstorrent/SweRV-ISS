@@ -1104,7 +1104,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 template<typename URV>
 bool
 HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
-			uint64_t clintStart, uint64_t clintLimit,
+			uint64_t clintStart, uint64_t clintEnd,
 			bool siOnReset) const
 {
   // Define callback to recover a hart from a hart index. We do
@@ -1113,7 +1113,7 @@ HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
     return system.ithHart(ix).get();
   };
 
-  hart.configClint(clintStart, clintLimit, siOnReset, indexToHart);
+  hart.configClint(clintStart, clintEnd, siOnReset, indexToHart);
   return true;
 }
 
@@ -2059,12 +2059,12 @@ HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
 
 template bool
 HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
-				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t clintStart, uint64_t clintEnd,
 				  bool siOnReset) const;
 
 template bool
 HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
-				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t clintStart, uint64_t clintEnd,
 				  bool siOnReset) const;
 
 template bool

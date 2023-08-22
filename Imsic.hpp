@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <cassert>
+#include <memory>
 
 
 namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Controller.
@@ -453,21 +454,15 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	return false;
       unsigned ix = 0;
       if (isMachineAddr(addr))
-	{
-	  ix = (addr - mbase_) / mstride_;
-	  assert(ix < harts_);
-	}
+	ix = (addr - mbase_) / mstride_;
       else if (isSupervisorAddr(addr))
-	{
-	  ix = (addr - mbase_) / mstride_;
-	  assert(ix < harts_);
-	}
+	ix = (addr - mbase_) / mstride_;
       else
 	return false;
 
       hartIx = ix;
-      auto& imsic = imsics_.at(ix);
-      imsic.write(addr, size, data);
+      auto imsic = imsics_.at(ix);
+      imsic->write(addr, size, data);
       return true;
     }
 
@@ -476,14 +471,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// enabled. Interrupt ids filtered out by the threshold mechanism
     /// are not considered.
     unsigned machineTopId(unsigned hartIx) const
-    { return hartIx < imsics_.size()? imsics_.at(hartIx).machineTopId() : 0; }
+    { return hartIx < imsics_.size()? imsics_.at(hartIx)->machineTopId() : 0; }
 
     /// For the given hart index, return the highest priority pending
     /// and enabled supervisor interrup id or 0 if no interrupt and
     /// enabled. Interrupt ids filtered out by the threshold mechanism
     /// are not considered.
     unsigned supervisorTopId(unsigned hartIx) const
-    { return hartIx < imsics_.size()? imsics_.at(hartIx).supervisorTopId() : 0; }
+    { return hartIx < imsics_.size()? imsics_.at(hartIx)->supervisorTopId() : 0; }
 
     /// For the given hart and guest indices (virtual guest associated
     /// with a hart), return the highest priority pending and enabled
@@ -491,14 +486,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// enabled. Interrupt ids filtered out by the threshold mechanism
     /// are not considered.
     unsigned guestTopId(unsigned hartIx, unsigned guestIx) const
-    { return hartIx < imsics_.size()? imsics_.at(hartIx).guestTopId(guestIx) : 0; }
+    { return hartIx < imsics_.size()? imsics_.at(hartIx)->guestTopId(guestIx) : 0; }
 
     /// Called from the associated hart for a CSR write to miselect.
     bool machineSelect(unsigned hartIx, uint8_t num)
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx).machineSelect(num);
+      return imsics_.at(hartIx)->machineSelect(num);
     }
 
     /// Called from the associated hart for a CSR write to siselect/vsislect.
@@ -507,7 +502,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx).supervisorSelect(num, virt, guest);
+      return imsics_.at(hartIx)->supervisorSelect(num, virt, guest);
     }
 
     /// Called form hart of given hartIx for a CSR write to mireg.
@@ -516,7 +511,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx).writeMireg(value);
+      return imsics_.at(hartIx)->writeMireg(value);
     }
     
     /// Called form hart of given hartIx for a CSR write to sireg/vsireg.
@@ -526,7 +521,20 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx).writeSireg(virt, guest, value);
+      return imsics_.at(hartIx)->writeSireg(virt, guest, value);
+    }
+
+    /// Return the number of IMSICs in this manager.
+    size_t size() const
+    { return imsics_.size(); }
+
+    /// Return a pointer to the ith imsic or null if i is out of
+    /// bounds.
+    std::shared_ptr<Imsic> ithImsic(unsigned i)
+    {
+      if (i >= imsics_.size())
+	return std::shared_ptr<Imsic>();
+      return imsics_.at(i);
     }
 
   protected:
@@ -534,23 +542,23 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Return true if given address is withing the address range of the
     /// machine privilege IMSIC files.
     bool isMachineAddr(uint64_t addr) const
-    { return addr >= mbase_ and addr < mbase_ + harts_ * mstride_; }
+    { return addr >= mbase_ and addr < mbase_ + imsics_.size() * mstride_; }
 
     /// Return true if given address is withing the address range of the
     /// supervisor privilege IMSIC files (which includes the guest files).
     bool isSupervisorAddr(uint64_t addr) const
-    { return addr >= sbase_ and addr < sbase_ + harts_ * sstride_; }
+    { return addr >= sbase_ and addr < sbase_ + imsics_.size() * sstride_; }
 
     /// Set ix to the index of the hart covering the 
 
   private:
-    unsigned harts_ = 0;
+
     unsigned pageSize_ = 0;
     uint64_t mbase_ = 0;     // Base address of machine files.
     uint64_t mstride_ = 0;   // Memory space reserved for each machine file.
     uint64_t sbase_ = 0;     // Base address of supervisor files.
     uint64_t sstride_ = 0;   // Memory space reserved for each supervisor file.
 
-    std::vector<Imsic> imsics_;
+    std::vector< std::shared_ptr<Imsic> > imsics_;
   };
 }
