@@ -958,6 +958,10 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
       processClintWrite(addr, sizeof(val), adjusted);
       val = adjusted;
     }
+  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
+	   (addr >= imsicSbase_ and addr < imsicSend_))
+    if (imsicWrite_)
+      imsicWrite_(addr, sizeof(val), val);
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -1968,12 +1972,11 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
     memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
   invalidateDecodeCache(virtAddr, ldStSize_);
 
+  ldStWrite_ = true;
+  ldStData_ = storeVal;
+
   if (mcm_)
-    {
-      ldStWrite_ = true;
-      ldStData_ = storeVal;
-      return true;  // Memory updated when merge buffer is written.
-    }
+    return true;  // Memory updated when merge buffer is written.
 
   if (addr1 >= clintStart_ and addr1 < clintEnd_)
     {
@@ -1982,12 +1985,16 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
       processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
     }
-
-  if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
+  else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
     processInterruptorWrite(storeVal);
+  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
+		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+    {
+      imsicWrite_(addr1, sizeof(storeVal), storeVal);
+      storeVal = 0;  // Reads from IMSIC space will yield zero.
+    }
 
   memWrite(addr1, addr2, storeVal);
-  ldStWrite_ = true;
 
   STORE_TYPE temp = 0;
   memPeek(addr1, addr2, temp, false /*usePma*/);

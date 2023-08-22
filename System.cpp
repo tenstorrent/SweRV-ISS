@@ -455,9 +455,8 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
     return this->imsicMgr_.read(addr, size, data);
   };
 
-  auto writeFunc = [this](uint64_t addr, unsigned size, uint64_t data,
-			  unsigned& hartIx) -> bool {
-    return  this->imsicMgr_.write(addr, size, data, hartIx);
+  auto writeFunc = [this](uint64_t addr, unsigned size, uint64_t data) -> bool {
+    return  this->imsicMgr_.write(addr, size, data);
   };
 
   for (unsigned i = 0; i < hartCount(); ++i)

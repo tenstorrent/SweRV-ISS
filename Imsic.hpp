@@ -447,8 +447,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Return false if address is out of bounds, if address is not
     /// word aligned, or if size is not 4. If successful, hartIx to the hart
     /// index associated with the targeted IMSIC.
-    bool write(uint64_t addr, unsigned size, uint64_t data,
-	       unsigned& hartIx)
+    bool write(uint64_t addr, unsigned size, uint64_t data, unsigned& hartIx)
     {
       if (size != 4 or (size & 3) != 0)
 	return false;
@@ -464,6 +463,23 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       auto imsic = imsics_.at(ix);
       imsic->write(addr, size, data);
       return true;
+    }
+
+    /// Same as above but without a hart-index parameter.
+    bool write(uint64_t addr, unsigned size, uint64_t data)
+    {
+      if (size != 4 or (size & 3) != 0)
+	return false;
+      unsigned ix = 0;
+      if (isMachineAddr(addr))
+	ix = (addr - mbase_) / mstride_;
+      else if (isSupervisorAddr(addr))
+	ix = (addr - mbase_) / mstride_;
+      else
+	return false;
+
+      auto imsic = imsics_.at(ix);
+      return imsic->write(addr, size, data);
     }
 
     /// For the given hart index, return the highest priority pending

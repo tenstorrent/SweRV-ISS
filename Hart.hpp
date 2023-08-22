@@ -1800,7 +1800,7 @@ namespace WdRiscv
 		     uint64_t mbase, uint64_t mend,
 		     uint64_t sbase, uint64_t send,
 		     std::function<bool(uint64_t, unsigned, uint64_t&)> readFunc,
-		     std::function<bool(uint64_t, unsigned, uint64_t, unsigned&)> writeFunc)
+		     std::function<bool(uint64_t, unsigned, uint64_t)> writeFunc)
     {
       imsic_ = imsic;
       imsicMbase_ = mbase; imsicMend_ = mend;
@@ -4742,7 +4742,7 @@ namespace WdRiscv
     uint64_t imsicSbase_ = 0;
     uint64_t imsicSend_ = 0;
     std::function<bool(uint64_t, unsigned, uint64_t&)> imsicRead_ = nullptr;
-    std::function<bool(uint64_t, unsigned, uint64_t, unsigned&)> imsicWrite_ = nullptr;
+    std::function<bool(uint64_t, unsigned, uint64_t)> imsicWrite_ = nullptr;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;
