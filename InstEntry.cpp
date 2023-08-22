@@ -109,6 +109,15 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::c_lwsp))  .setLoadSize(4);
   instVec_.at(size_t(InstId::c_flwsp)) .setLoadSize(4);
   instVec_.at(size_t(InstId::c_ldsp))  .setLoadSize(8);
+  instVec_.at(size_t(InstId::hlv_b))   .setLoadSize(1);
+  instVec_.at(size_t(InstId::hlv_bu))  .setLoadSize(1);
+  instVec_.at(size_t(InstId::hlv_h))   .setLoadSize(2);
+  instVec_.at(size_t(InstId::hlv_hu))  .setLoadSize(2);
+  instVec_.at(size_t(InstId::hlv_w))   .setLoadSize(4);
+  instVec_.at(size_t(InstId::hlv_wu))  .setLoadSize(4);
+  instVec_.at(size_t(InstId::hlvx_hu)) .setLoadSize(2);
+  instVec_.at(size_t(InstId::hlvx_wu)) .setLoadSize(4);
+  instVec_.at(size_t(InstId::hlv_d))   .setLoadSize(8);
 
   // Set data size of store instructions.
   instVec_.at(size_t(InstId::sb))      .setStoreSize(1);
@@ -129,6 +138,10 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::c_swsp))  .setStoreSize(4);
   instVec_.at(size_t(InstId::c_fswsp)) .setStoreSize(4);
   instVec_.at(size_t(InstId::c_sdsp))  .setStoreSize(8);
+  instVec_.at(size_t(InstId::hsv_b))   .setStoreSize(1);
+  instVec_.at(size_t(InstId::hsv_h))   .setStoreSize(2);
+  instVec_.at(size_t(InstId::hsv_w))   .setStoreSize(4);
+  instVec_.at(size_t(InstId::hsv_d))   .setStoreSize(8);
 
   // Mark conditional branch instructions.
   instVec_.at(size_t(InstId::beq))    .setConditionalBranch(true);
