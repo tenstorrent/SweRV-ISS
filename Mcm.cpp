@@ -684,7 +684,7 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
 	continue;  // Byte forwarded by another instruction.
 
       // Check if read-op byte overlaps departed write-op of instruction
-      bool departed = true;
+      bool departed = false;
       for (const auto wopIx : instr.memOps_)
 	{
 	  if (wopIx >= sysMemOps_.size())
@@ -693,9 +693,9 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
 	  if (wop.isRead_)
 	    continue;  // May happen for AMO.
 	  if (byteAddr < wop.physAddr_ or byteAddr >= wop.physAddr_ + wop.size_)
-	    continue;
-	  if (wop.time_ >= readOp.time_)
-	    departed = false; // Write op can forward.
+	    continue;  // Write op does overalp read.
+	  if (wop.time_ < readOp.time_)
+	    departed = true; // Write op cannot forward.
 	}
       if (departed)
 	continue;
