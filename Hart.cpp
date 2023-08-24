@@ -2680,7 +2680,8 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   hasInterrupt_ = true;
   interruptCount_++;
 
-  cancelLr();  // Clear LR reservation (if any).
+  if (cancelLrOnTrap_)
+    cancelLr();  // Clear LR reservation (if any).
 
   PrivilegeMode origMode = privMode_;
 
@@ -9349,9 +9350,6 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    if (cancelLrOnTrap_)
-      cancelLr();
-
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint64_t value = csRegs_.peekMstatus();
 
@@ -9413,9 +9411,6 @@ namespace WdRiscv
 
     if (triggerTripped_)
       return;
-
-    if (cancelLrOnTrap_)
-      cancelLr();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint32_t value = csRegs_.peekMstatus();
@@ -9502,9 +9497,6 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   if (triggerTripped_)
     return;
-
-  if (cancelLrOnTrap_)
-    cancelLr();
 
   // Restore privilege mode and interrupt enable by getting
   // current value of SSTATUS, ...
