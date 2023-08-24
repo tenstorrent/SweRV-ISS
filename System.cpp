@@ -40,7 +40,8 @@ template <typename URV>
 System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                     unsigned hartIdOffset, size_t memSize,
                     size_t pageSize)
-  : hartCount_(coreCount * hartsPerCore), hartsPerCore_(hartsPerCore)
+  : hartCount_(coreCount * hartsPerCore), hartsPerCore_(hartsPerCore),
+    imsicMgr_((coreCount * hartsPerCore), pageSize)
 {
   cores_.resize(coreCount);
 
@@ -363,6 +364,109 @@ System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
 
   Filesystem::path fdPath = dirPath / "fd";
   return syscall.loadFileDescriptors(fdPath.string());
+}
+
+
+template <typename URV>
+bool
+System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
+			 uint64_t sbase, uint64_t sstride,
+			 unsigned guests, unsigned ids)
+{
+  using std::cerr;
+
+  size_t ps = pageSize();
+
+  if ((mbase % ps) != 0)
+    {
+      cerr << "Error: IMISC mbase (0x" << std::hex << mbase << ") is not"
+	   << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+      return false;
+    }
+
+  if (mstride == 0)
+    {
+      cerr << "Error: IMSIC mstride must not be zero.\n";
+      return false;
+    }
+
+  if ((mstride % ps) != 0)
+    {
+      cerr << "Error: IMISC mstride (0x" << std::hex << mstride << ") is not"
+	   << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+      return false;
+    }
+
+  if (sstride)
+    {
+      if ((sbase % ps) != 0)
+	{
+	  cerr << "Error: IMISC sbase (0x" << std::hex << sbase << ") is not"
+	       << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+	  return false;
+	}
+
+      if ((sstride % ps) != 0)
+	{
+	  cerr << "Error: IMISC sstride (0x" << std::hex << sstride << ") is not"
+	       << " a multiple of page size (0x" << ps << ")\n" << std::dec;
+	  return false;
+	}
+    }
+
+  if (guests and sstride < (guests + 1)*ps)
+    {
+      cerr << "Error: IMISC supervisor stride (0x" << std::hex << sstride << ") is"
+	   << " too small for configured guests (" << std::dec << guests << ").\n";
+      return false;
+    }
+
+  if (mstride and sstride)
+    {
+      unsigned hc = hartCount();
+      uint64_t mend = mbase + hc*mstride, send = sbase + hc*sstride;
+      if ((sbase > mbase and sbase < mend) or
+	  (send > mbase and send < mend))
+	{
+	  cerr << "Error: IMSIC machine file address range overlaps that of supervisor.\n";
+	  return false;
+	}
+    }
+
+  if ((ids % 64) != 0)
+    {
+      cerr << "Error: IMSIC max interrupt id (" << ids << ") is not a multiple of 64.\n";
+      return false;
+    }
+
+  bool ok = imsicMgr_.configureMachine(mbase, mstride, ids);
+  ok = imsicMgr_.configureSupervisor(sbase, sstride, ids) and ok;
+  ok = imsicMgr_.configureGuests(guests, ids) and ok;
+  if (not ok)
+    {
+      cerr << "Error: Failed to configure IMSIC.\n";
+      return false;
+    }
+
+  uint64_t mend = mbase + mstride * hartCount();
+  uint64_t send = sbase + sstride * hartCount();
+
+  auto readFunc = [this](uint64_t addr, unsigned size, uint64_t& data) -> bool {
+    return this->imsicMgr_.read(addr, size, data);
+  };
+
+  auto writeFunc = [this](uint64_t addr, unsigned size, uint64_t data) -> bool {
+    return  this->imsicMgr_.write(addr, size, data);
+  };
+
+  for (unsigned i = 0; i < hartCount(); ++i)
+    {
+      auto hart = ithHart(i);
+      auto imsic = imsicMgr_.ithImsic(i);
+      hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc);
+    }
+
+  return true;
 }
 
 

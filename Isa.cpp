@@ -2,6 +2,7 @@
 #include <cassert>
 #include <charconv>
 #include <iostream>
+#include <boost/algorithm/string.hpp>
 #include "Isa.hpp"
 
 
@@ -66,6 +67,8 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zvfbfwma", RvExtension::Zvfbfwma },
   { "sstc", RvExtension::Sstc },
   { "svpbmt", RvExtension::Svpbmt },
+  { "svpbmt", RvExtension::Smaia },
+  { "svpbmt", RvExtension::Ssaia },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -123,11 +126,13 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zmmul)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zvfh)) = Info{ {{0,1}}, {0,1} };
   infoVec_.at(extIx(RvExtension::Zvfhmin)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,1}}, {0,1} };
-  infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,1}}, {0,1} };
+  infoVec_.at(extIx(RvExtension::Zfbfmin)) = Info{ {{0,8}}, {0,8} };
+  infoVec_.at(extIx(RvExtension::Zvfbfmin)) = Info{ {{0,8}}, {0,8} };
+  infoVec_.at(extIx(RvExtension::Zvfbfwma)) = Info{ {{0,8}}, {0,8} };
   infoVec_.at(extIx(RvExtension::Sstc)) = Info{ {{0,5}}, {0,5} };
   infoVec_.at(extIx(RvExtension::Svpbmt)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Smaia)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Ssaia)) = Info{ {{1,0}}, {1,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }
@@ -256,57 +261,54 @@ Isa::extensionToString(RvExtension ext)
 }
 
 
-/// Extract a single charecter (not 'z') extension or a multi-character
-/// extension starting with a 'z' from the isa string starting at locaton
-/// i and update i.  Multi-char extensions are of of the
-/// form: z<name><version>p<subversion>
-/// where <name> is a sequence of letters, or a sequence of letters
-/// followed by a sequence of digits and then a letter other than 'p'.
-/// The <version>/<subversion> are sequences of digits. The
-/// <version>p<subversion> suffix is optional.
+/// Parse a string of the form <ext>[<n>p<m>] into <ext>, <n>, and <m>.
+/// Return true on success and false on failure.
+/// Example strings: a, m1p0
 bool
-extractExtension(std::string_view isa, size_t& i, std::string_view& extension)
+parseIsa(const std::string_view& token, std::string_view& extension,
+	 std::string_view& version, std::string_view& subversion)
 {
-  size_t len = isa.size();
-  if (i >= len)
+  if (token.empty() or std::isdigit(token.at(0)))
+    {
+      std::cerr << "Invalid ISA extension: " << token << '\n';
+      return false;
+    }
+
+  size_t ix = 0;
+  for ( ; ix < token.size(); ++ix)
+    if (std::isdigit(token.at(ix)))
+      break;
+  extension = token.substr(0, ix);
+
+  version = token.substr(ix);
+  if (version.empty())
     return true;
-  if (isa.at(i) == 'z')
+
+  for (ix = 0; ix < version.size(); ++ix)
     {
-      // A sequence of letters following 'z', is part of the extension
-      // name.
-      size_t init = i;
-      for ( ; i < len and isa.at(i) >= 'a' and isa.at(i) <= 'z'; i++)
-        ;
-
-      extension = isa.substr(init, i - init);
-
-      // A sequence of digits followed by an letter other than 'p' is also
-      // part of the extension name.
-      size_t j = i;
-      for ( ; j < len and std::isdigit(isa.at(j)); ++j)
-        ;
-
-      if (j < len and j > i)
-        {
-          auto c = isa.at(j);
-          if (c >= 'a' and c < 'z' and c != 'p')
-            {
-              extension = isa.substr(init, j - init);
-              i         = j + 1;
-            }
-        }
-
-      return true;
+      if (std::isdigit(version.at(ix)))
+	continue;
+      if (version.at(ix) != 'p')
+	{
+	  std::cerr << "Invalid ISA extension: " << token << '\n';
+	  return false;
+	}
+      subversion = version.substr(ix+1);
+      version = version.substr(0, ix);
+      break;
     }
 
-  if (isa.at(i) >= 'a' and isa.at(i) < 'z')
-    {
-      extension = isa.substr(i, 1);
-      if (i + 1 < len and std::isdigit(isa.at(i + 1)))
-        ++i;
-      return true;
-    }
-  return false;
+  if (subversion.empty())
+    return true;
+
+  for (size_t ix = 0; ix < subversion.size(); ++ix)
+    if (not std::isdigit(subversion.at(ix)))
+      {
+	std::cerr << "Invalid ISA extension: " << token << '\n';
+	return false;
+      }
+
+  return true;
 }
 
 
@@ -346,11 +348,49 @@ extractVersion(std::string_view isa, size_t& i, std::string_view& version,
 bool
 Isa::configIsa(std::string_view isa)
 {
-  if (applyIsaString(isa))
-    return true;
+  return applyIsaString(isa);
+}
 
-  std::cerr << "Invalid ISA: " << isa << '\n';
+
+static bool
+isLongExtension(std::string_view str)
+{
+  if (str.size() < 2)
+    return false;
+  if (str.at(0) == 'z')
+    return true;
+  if (str.at(0) == 's' and not std::isdigit(str.at(1)))
+    return true;
   return false;
+}
+
+
+static
+void splitFirstIsaToken(const std::string& tok, std::vector<std::string>& parts)
+{
+  parts.clear();
+  if (tok.empty())
+    return;
+
+  size_t prev = 0;
+  for (size_t i = 0; i < tok.size(); ++i)
+    {
+      char c = tok.at(i);
+      if (c == 'z')
+	{
+	  if (i > 0)
+	    parts.push_back(tok.substr(prev, i-prev));
+	  parts.push_back(tok.substr(i));
+	  return;
+	}
+      if (std::isalpha(c) and i > prev and (c != 'p' or not std::isdigit(tok.at(i-1))))
+	{
+	  parts.push_back(tok.substr(prev, i-prev));
+	  prev = i;
+	}
+    }
+
+  parts.push_back(tok.substr(prev));
 }
 
 
@@ -364,43 +404,51 @@ Isa::applyIsaString(std::string_view isaStr)
     isa = isa.substr(4);
   else if (isa.starts_with("rv") and isa.size() > 2 and std::isdigit(isa.at(2)))
     {
-      std::cerr << "Unsupported ISA: " << isa << '\n';
+      std::cerr << "Unsupported ISA: " << isaStr << '\n';
       return false;
     }
 
-  bool hasZ = false;
-
-  for (size_t i = 0; i < isa.size(); ++i)
+  // Split string around '_'.
+  std::vector<std::string> tokens;
+  boost::split(tokens, isa, boost::is_any_of("_"));
+  if (tokens.empty() or (tokens.size() == 1 and tokens[0].empty()))
     {
+      std::cerr << "Invalid ISA string: " << isaStr << '\n';
+      return false;
+    }      
+
+  // First token may have a z-extension without a preceeding underscore. Spilt it:
+  // split something like a1p0m1p1zbb into: a1p0, m1p1 and zbb
+  if (not tokens.empty() and not tokens.at(0).empty())
+    {
+      std::vector<std::string> parts;
+      splitFirstIsaToken(tokens.at(0), parts);
+      if (not parts.empty())
+	parts.insert(parts.end(), tokens.begin() + 1, tokens.end());
+      std::swap(tokens, parts);
+    }
+
+  // Once we see a Z (e.g zbb) or S (e.g. sstc) token, then remaining tokens must
+  // be Z or S.
+  bool hasLong = false;
+
+  for (const auto& token : tokens)
+    {
+      if (token.empty())
+	continue;
+
       std::string_view extension, version, subversion;
 
-      char c = isa.at(i);
-      if (c == '_')
+      if (isLongExtension(token))
+	hasLong = true;
+      else if (hasLong and (not isLongExtension(token)))
 	{
-	  if (i == 0)
-	    return false;
-	  continue;
+	  std::cerr << "Misordered ISA: Z/S multi-char extensions must "
+		    << "be at end: " << isaStr << '\n';
+	  return false;
 	}
-      if (c == 'z')
-	{
-	  // First extension cannot be a z. Z exts must be separated with _.
-	  if (i == 0 or ((hasZ and isa.at(i-1) != '_')))
-	    return false;  // 1st extension cannot be a z extension.
-	  hasZ = true;
-	}
-      else if (c >= 'a' and c < 'z')
-	{
-	  if (hasZ)
-	    return false; // Cannot have a regular exension after z.
-	}
-      else
-	return false;  // Bad character
 
-      if (not extractExtension(isa, i, extension))
-	return false;
-
-      assert(not extension.empty());
-      if (not extractVersion(isa, i, version, subversion))
+      if (not parseIsa(token, extension, version, subversion))
 	return false;
 
       RvExtension ext = stringToExtension(extension);

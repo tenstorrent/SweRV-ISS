@@ -401,6 +401,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvsstc(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
+  enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
+  enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
 }
 
 
@@ -951,11 +953,15 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
   memory_.invalidateOtherHartLr(hartIx_, addr, sizeof(val));
 
   URV adjusted = val;
-  if (addr >= clintStart_ and addr < clintLimit_)
+  if (addr >= clintStart_ and addr < clintEnd_)
     {
       processClintWrite(addr, sizeof(val), adjusted);
       val = adjusted;
     }
+  else if ((addr >= imsicMbase_ and addr < imsicMend_) or
+	   (addr >= imsicSbase_ and addr < imsicSend_))
+    if (imsicWrite_)
+      imsicWrite_(addr, sizeof(val), val);
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -1694,7 +1700,7 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
     }
 
   ULT narrow = 0;   // Unsigned narrow loaded value
-  if (addr1 >= clintStart_ and addr1 < clintLimit_ and addr1 - clintStart_ >= 0xbff8)
+  if (addr1 >= clintStart_ and addr1 < clintEnd_ and addr1 - clintStart_ >= 0xbff8)
     {
       uint64_t tm = instCounter_ >> counterToTimeShift_; // Fake time: instr count
       tm = tm >> (addr1 - 0xbff8) * 8;
@@ -1781,10 +1787,6 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
   ldStPhysAddr1_ = addr;
   ldStSize_ = sizeof(STORE_TYPE);
   ldStData_ = storeVal;
-
-  STORE_TYPE prev = 0;
-  memory_.peek(addr, prev, false /*usePma*/);
-  ldStPrevData_ = prev;
 
   if (memory_.write(hartIx_, addr, storeVal))
     {
@@ -1939,10 +1941,6 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
       return false;
     }
 
-  STORE_TYPE temp = 0;
-  memPeek(addr1, addr2, temp, false /*usePma*/);
-  ldStPrevData_ = temp;
-
   // If addr is special location, then write to console.
   if (conIoValid_ and addr1 == conIo_)
     {
@@ -1974,26 +1972,31 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
     memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
   invalidateDecodeCache(virtAddr, ldStSize_);
 
-  if (mcm_)
-    {
-      ldStWrite_ = true;
-      ldStData_ = storeVal;
-      return true;  // Memory updated when merge buffer is written.
-    }
+  ldStWrite_ = true;
+  ldStData_ = storeVal;
 
-  if (addr1 >= clintStart_ and addr1 < clintLimit_)
+  if (mcm_)
+    return true;  // Memory updated when merge buffer is written.
+
+  if (addr1 >= clintStart_ and addr1 < clintEnd_)
     {
       assert(addr1 == addr2);
       URV val = storeVal;
       processClintWrite(addr1, ldStSize_, val);
       storeVal = val;
     }
-
-  if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
+  else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
     processInterruptorWrite(storeVal);
+  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
+		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+    {
+      imsicWrite_(addr1, sizeof(storeVal), storeVal);
+      storeVal = 0;  // Reads from IMSIC space will yield zero.
+    }
 
   memWrite(addr1, addr2, storeVal);
-  ldStWrite_ = true;
+
+  STORE_TYPE temp = 0;
   memPeek(addr1, addr2, temp, false /*usePma*/);
   ldStData_ = temp;
   return true;
@@ -2677,7 +2680,8 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   hasInterrupt_ = true;
   interruptCount_++;
 
-  cancelLr();  // Clear LR reservation (if any).
+  if (cancelLrOnTrap_)
+    cancelLr();  // Clear LR reservation (if any).
 
   PrivilegeMode origMode = privMode_;
 
@@ -4751,13 +4755,6 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       URV mipVal = csRegs_.peekMip();
       URV prev = mipVal;
 
-      for (const auto& dev : memory_.ioDevs_)
-	if (dev->isInterruptPending())
-	  {
-	    mipVal |=  (URV(1) << URV(IC::M_EXTERNAL)) | (URV(1) << URV(IC::S_EXTERNAL));
-	    dev->setInterruptPending(false);
-	  }
-
       if (hasClint())
 	{
 	  // Deliver/clear machine timer interrupt from clint.
@@ -4798,6 +4795,29 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
+	}
+
+      // Check IMSCI
+      if (imsic_)
+	{
+	  // Deliver/clear machine external interrupt from IMSIC.
+	  if (imsic_->machineEnabled() and imsic_->machineTopId())
+	    mipVal = mipVal | (URV(1) << URV(IC::M_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::M_EXTERNAL));
+	  // Deliver/clear supervisor external interrupt from IMSIC.
+	  if (imsic_->supervisorEnabled() and imsic_->supervisorTopId())
+	    mipVal = mipVal | (URV(1) << URV(IC::S_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::S_EXTERNAL));
+	  // Deliver/clear guest external interrupts from IMSIC.
+	  URV gip = imsic_->guestInterrupts();
+	  csRegs_.poke(CsrNumber::HGEIP, gip);
+	  URV gie = csRegs_.peekHgeip();
+	  if ((gip & gie) != 0)
+	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::G_EXTERNAL));
 	}
 
       if (mipVal != prev)
@@ -4961,252 +4981,6 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
 
       logStop(ce, instCounter_, traceFile);
     }
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::whatIfSingleStep(uint32_t inst, ChangeRecord& record)
-{
-  uint64_t prevExceptionCount = exceptionCount_;
-  URV prevPc = pc_;
-
-  clearTraceData();
-  triggerTripped_ = false;
-
-  // Note: triggers not yet supported.
-
-  DecodedInst di;
-  uint64_t physPc = pc_;
-  decode(pc_, physPc, inst, di);
-
-  // Execute instruction
-  pc_ += di.instSize();
-  execute(&di);
-
-  bool result = exceptionCount_ == prevExceptionCount;
-
-  // If step bit set in dcsr then enter debug mode unless already there.
-  if (dcsrStep_ and not ebreakInstDebug_)
-    enterDebugMode_(DebugModeCause::STEP, pc_);
-
-  // Collect changes. Undo each collected change.
-  exceptionCount_ = prevExceptionCount;
-
-  collectAndUndoWhatIfChanges(prevPc, record);
-  
-  return result;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::whatIfSingleStep(URV whatIfPc, uint32_t inst, ChangeRecord& record)
-{
-  URV prevPc = pc_;
-  setPc(whatIfPc);
-
-  // Note: triggers not yet supported.
-  triggerTripped_ = false;
-
-  // Fetch instruction. We don't care about what we fetch. Just checking
-  // if there is a fetch exception.
-  uint32_t tempInst = 0;
-  uint64_t physPc = 0;
-  bool fetchOk = fetchInst(pc_, physPc, tempInst);
-
-  if (not fetchOk)
-    {
-      collectAndUndoWhatIfChanges(prevPc, record);
-      return false;
-    }
-
-  bool res = whatIfSingleStep(inst, record);
-
-  setPc(prevPc);
-  return res;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::whatIfSingStep(const DecodedInst& di, ChangeRecord& record)
-{
-  clearTraceData();
-  uint64_t prevExceptionCount = exceptionCount_;
-  URV prevPc  = pc_, prevCurrPc = currPc_;
-
-  setPc(di.address());
-  currPc_ = pc_;
-
-  // Note: triggers not yet supported.
-  triggerTripped_ = false;
-
-  // Save current value of operands.
-  std::array<uint64_t, 4> prevRegValues;
-  for (unsigned i = 0; i < prevRegValues.size(); ++i)
-    {
-      URV prev = 0;
-      prevRegValues[i] = 0;
-      uint32_t operand = di.ithOperand(i);
-
-      switch (di.ithOperandType(i))
-	{
-	case OperandType::None:
-	case OperandType::Imm:
-	  break;
-	case OperandType::IntReg:
-	  peekIntReg(operand, prev);
-	  prevRegValues[i] = prev;
-	  break;
-	case OperandType::FpReg:
-	  peekFpReg(operand, prevRegValues[i]);
-	  break;
-	case OperandType::CsReg:
-	  peekCsr(CsrNumber(operand), prev);
-	  prevRegValues[i] = prev;
-	  break;
-        case OperandType::VecReg:
-          assert(0);
-          break;
-	}
-    }
-
-  // Temporarily set value of operands to what-if values.
-  for (unsigned i = 0; i < 4; ++i)
-    {
-      uint32_t operand = di.ithOperand(i);
-
-      switch (di.ithOperandType(i))
-	{
-	case OperandType::None:
-	case OperandType::Imm:
-	  break;
-	case OperandType::IntReg:
-	  pokeIntReg(operand, di.ithOperandValue(i));
-	  break;
-	case OperandType::FpReg:
-	  pokeFpReg(operand, di.ithOperandValue(i));
-	  break;
-	case OperandType::CsReg:
-	  pokeCsr(CsrNumber(operand), di.ithOperandValue(i));
-	  break;
-        case OperandType::VecReg:
-          assert(0);
-          break;
-	}
-    }
-
-  // Execute instruction.
-  pc_ += di.instSize();
-  if (di.instEntry()->instId() != InstId::illegal)
-    execute(&di);
-  bool result = exceptionCount_ == prevExceptionCount;
-
-  // Collect changes. Undo each collected change.
-  exceptionCount_ = prevExceptionCount;
-  collectAndUndoWhatIfChanges(prevPc, record);
-
-  // Restore temporarily modified registers.
-  for (unsigned i = 0; i < 4; ++i)
-    {
-      uint32_t operand = di.ithOperand(i);
-
-      switch (di.ithOperandType(i))
-	{
-	case OperandType::None:
-	case OperandType::Imm:
-	  break;
-	case OperandType::IntReg:
-	  pokeIntReg(operand, prevRegValues[i]);
-	  break;
-	case OperandType::FpReg:
-	  pokeFpReg(operand, prevRegValues[i]);
-	  break;
-	case OperandType::CsReg:
-	  pokeCsr(CsrNumber(operand), prevRegValues[i]);
-	  break;
-        case OperandType::VecReg:
-          assert(0);
-          break;
-	}
-    }
-
-  setPc(prevPc);
-  currPc_ = prevCurrPc;
-
-  return result;
-}
-
-
-template <typename URV>
-void
-Hart<URV>::collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record)
-{
-  record.clear();
-
-  record.newPc = pc_;
-  setPc(prevPc);
-
-  uint64_t oldValue = 0;
-  int regIx = intRegs_.getLastWrittenReg(oldValue);
-  if (regIx >= 0)
-    {
-      URV newValue = 0;
-      peekIntReg(regIx, newValue);
-      pokeIntReg(regIx, oldValue);
-
-      record.hasIntReg = true;
-      record.intRegIx = regIx;
-      record.intRegValue = newValue;
-    }
-
-  uint64_t oldFpValue = 0;
-  regIx = fpRegs_.getLastWrittenReg(oldFpValue);
-  if (regIx >= 0)
-    {
-      uint64_t newFpValue = 0;
-      peekFpReg(regIx, newFpValue);
-      pokeFpReg(regIx, oldFpValue);
-
-      record.hasFpReg = true;
-      record.fpRegIx = regIx;
-      record.fpRegValue = newFpValue;
-    }
-
-  if (ldStWrite_)
-    {
-      record.memSize = ldStSize_;
-      record.memAddr = ldStPhysAddr1_;
-      record.memValue = ldStData_;
-      uint64_t addr = ldStPhysAddr1_;
-      uint64_t value = ldStPrevData_;
-      for (size_t i = 0; i < ldStSize_; ++i, ++addr)
-	{
-	  pokeMemory(addr, uint8_t(value), true);
-	  value = value >> 8;
-	}
-    }
-
-  std::vector<CsrNumber> csrNums;
-  std::vector<unsigned> triggerNums;
-  csRegs_.getLastWrittenRegs(csrNums, triggerNums);
-
-  for (auto csrn : csrNums)
-    {
-      Csr<URV>* csr = csRegs_.getImplementedCsr(csrn, virtMode_);
-      if (not csr)
-	continue;
-
-      URV newVal = csr->read();
-      URV oldVal = csr->prevValue();
-      csr->write(oldVal);
-
-      record.csrIx.push_back(csrn);
-      record.csrValue.push_back(newVal);
-    }
-
-  clearTraceData();
 }
 
 
@@ -9576,9 +9350,6 @@ namespace WdRiscv
     if (triggerTripped_)
       return;
 
-    if (cancelLrOnTrap_)
-      cancelLr();
-
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint64_t value = csRegs_.peekMstatus();
 
@@ -9640,9 +9411,6 @@ namespace WdRiscv
 
     if (triggerTripped_)
       return;
-
-    if (cancelLrOnTrap_)
-      cancelLr();
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint32_t value = csRegs_.peekMstatus();
@@ -9729,9 +9497,6 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   if (triggerTripped_)
     return;
-
-  if (cancelLrOnTrap_)
-    cancelLr();
 
   // Restore privilege mode and interrupt enable by getting
   // current value of SSTATUS, ...
@@ -10063,9 +9828,10 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
     }
 
   // Update CSR.
+  URV lastVal = 0;
+  csRegs_.peek(csr, lastVal);
   csRegs_.write(csr, privMode_, val);
-
-  postCsrUpdate(csr, val, intRegVal);
+  postCsrUpdate(csr, val, lastVal);
 
   // Csr was written. If it was minstret, compensate for
   // auto-increment that will be done by run, runUntilAddress or

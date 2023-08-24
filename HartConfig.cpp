@@ -100,7 +100,7 @@ namespace WdRiscv
         uint64_t         u64 = strtoull(str.data(), &end, 0);
         if (end and *end)
           {
-            std::cerr << "Invalid config file value for '" << tag << "': "
+            std::cerr << "Invalid config file unsigned value for '" << tag << "': "
                       << str << '\n';
             return false;
           }
@@ -207,7 +207,7 @@ namespace WdRiscv
           value = true;
         else
           {
-            std::cerr << "Invalid config file value for '" << tag << "': "
+            std::cerr << "Invalid config file boolean value for '" << tag << "': "
                       << str << '\n';
             return false;
           }
@@ -1104,7 +1104,7 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
 template<typename URV>
 bool
 HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
-			uint64_t clintStart, uint64_t clintLimit,
+			uint64_t clintStart, uint64_t clintEnd,
 			bool siOnReset) const
 {
   // Define callback to recover a hart from a hart index. We do
@@ -1113,7 +1113,7 @@ HartConfig::configClint(System<URV>& system, Hart<URV>& hart,
     return system.ithHart(ix).get();
   };
 
-  hart.configClint(clintStart, clintLimit, siOnReset, indexToHart);
+  hart.configClint(clintStart, clintEnd, siOnReset, indexToHart);
   return true;
 }
 
@@ -1604,10 +1604,22 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 
 template<typename URV>
 bool
-HartConfig::configHarts(System<URV>& system, bool userMode,
-                        bool verbose) const
+HartConfig::applyClintConfig(System<URV>& system, Hart<URV>& hart) const
 {
-  userMode = userMode or this->userModeEnabled();
+  constexpr std::string_view tag = "clint";
+  if (not config_ -> contains(tag))
+    return true;
+
+  uint64_t addr = 0;
+  if (not getJsonUnsigned(tag, config_ ->at(tag), addr))
+    return false;
+
+  if ((addr & 7) != 0)
+    {
+      std::cerr << "Error: Config file clint address (0x" << std::hex
+		<< addr << std::dec << ") is not a multiple of 8\n";
+      return false;
+    }
 
   bool siOnReset = false;
   constexpr std::string_view siTag = "clint_software_interrupt_on_reset";
@@ -1615,34 +1627,78 @@ HartConfig::configHarts(System<URV>& system, bool userMode,
     if (not getJsonBoolean(siTag, config_ -> at(siTag), siOnReset))
       return false;
 
-  // Apply JSON configuration.
+  uint64_t clintStart = addr, clintEnd = addr + 0xc000 - 1;
+  return configClint(system, hart, clintStart, clintEnd, siOnReset);
+}
+
+
+template<typename URV>
+bool
+HartConfig::applyImsicConfig(System<URV>& system) const
+{
+  if (not config_ -> contains("imsic"))
+    return true;
+
+  auto& imsic = config_ -> at("imsic");
+
+  uint64_t mbase = 0, mstride = 0, sbase = 0, sstride = 0;
+
+  std::string_view tag = "mbase";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.mbase",  imsic.at(tag), mbase))
+      return false;
+
+  tag = "mstride";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.mstride",  imsic.at(tag), mstride))
+      return false;
+
+  tag = "sbase";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.sbase",  imsic.at(tag), sbase))
+      return false;
+
+  tag = "sstride";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.stride",  imsic.at(tag), sstride))
+      return false;
+
+  unsigned guests = 0;
+  tag = "guests";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.guests", imsic.at(tag), guests))
+      return false;
+
+  unsigned ids = 64;
+  tag = "ids";
+  if (imsic.contains(tag))
+    if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
+      return false;
+
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids);
+}
+
+
+template<typename URV>
+bool
+HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
+{
+  userMode = userMode or this->userModeEnabled();
+
+  // Apply JSON configuration to each hart.
   for (unsigned i = 0; i < system.hartCount(); ++i)
     {
       Hart<URV>& hart = *system.ithHart(i);
       if (not applyConfig(hart, userMode, verbose))
 	return false;
 
-      constexpr std::string_view tag = "clint";
-      if (config_ -> contains(tag))
-	{
-	  uint64_t addr = 0;
-	  if (getJsonUnsigned(tag, config_ ->at(tag), addr))
-	    {
-	      if ((addr & 7) != 0)
-		{
-		  std::cerr << "Error: Config file clint address (0x" << std::hex
-			    << addr << std::dec << ") is not a multiple of 8\n";
-		  return false;
-		}
-
-              uint64_t clintStart = addr, clintEnd = addr + 0xc000 - 1;
-              if (not configClint(system, hart, clintStart, clintEnd, siOnReset))
-                return false;
-	    }
-	  else
-	    return false;
-	}
+      if (not applyClintConfig(system, hart))
+	return false;
     }
+
+  // System configuration.
+  if (not applyImsicConfig(system))
+    return false;
 
   unsigned mbLineSize = 64;
   std::string_view tag = "merge_buffer_line_size";
@@ -1812,7 +1868,7 @@ HartConfig::getMcmCheckAll(bool& ca) const
   constexpr std::string_view tag = "merge_buffer_check_all";
   if (not config_ -> contains(tag))
     return false;
-  return getJsonUnsigned(tag, config_ -> at(tag), ca);
+  return getJsonBoolean(tag, config_ -> at(tag), ca);
 }
 
 
@@ -2003,12 +2059,12 @@ HartConfig::finalizeCsrConfig<uint64_t>(System<uint64_t>&) const;
 
 template bool
 HartConfig::configClint<uint32_t>(System<uint32_t>& system, Hart<uint32_t>& hart,
-				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t clintStart, uint64_t clintEnd,
 				  bool siOnReset) const;
 
 template bool
 HartConfig::configClint<uint64_t>(System<uint64_t>& system, Hart<uint64_t>& hart,
-				  uint64_t clintStart, uint64_t clintLimit,
+				  uint64_t clintStart, uint64_t clintEnd,
 				  bool siOnReset) const;
 
 template bool

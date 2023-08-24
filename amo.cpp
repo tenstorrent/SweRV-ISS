@@ -267,20 +267,19 @@ template <typename STORE_TYPE>
 bool
 Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 {
-  ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
-  ldStPhysAddr1_ = ldStAddr_;
-  ldStPhysAddr2_ = ldStAddr_;
-  ldStSize_ = sizeof(STORE_TYPE);
   ldStAtomic_ = true;
+
+  ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
+  ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
+  ldStSize_ = sizeof(STORE_TYPE);
 
   // ld/st-address or instruction-address triggers have priority over
   // ld/st access or misaligned exceptions.
   bool hasTrig = hasActiveTrigger();
   TriggerTiming timing = TriggerTiming::Before;
-  bool isLoad = false;
-  if (hasTrig)
-    if (ldStAddrTriggerHit(virtAddr, timing, isLoad))
-      triggerTripped_ = true;
+  bool isLd = false;  // Not a load.
+  if (hasTrig and ldStAddrTriggerHit(virtAddr, timing, isLd))
+    triggerTripped_ = true;
 
   // Misaligned store causes an exception.
   constexpr unsigned alignMask = sizeof(STORE_TYPE) - 1;
@@ -292,25 +291,27 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   auto cause = determineStoreException(addr1, addr2, gaddr1, gaddr2, sizeof(storeVal), false /*hyper*/);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
-  if (cause == ExceptionCause::STORE_ADDR_MISAL and
-      misalAtomicCauseAccessFault_)
-    cause = ExceptionCause::STORE_ACC_FAULT;
 
-  bool fail = misal or (amoInDccmOnly_ and not isAddrInDccm(addr1));
-  if (cause == ExceptionCause::NONE)
-    fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
+  using EC = ExceptionCause;
+  if (misal and cause != EC::STORE_ACC_FAULT)
+    cause =  misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
 
-  if (fail and cause == ExceptionCause::NONE)
-    cause = ExceptionCause::STORE_ACC_FAULT;
+  if (cause == EC::NONE)
+    {
+      bool fail = not memory_.pmaMgr_.getPma(addr1).isRsrv();
+      fail = fail or (amoInDccmOnly_ and not isAddrInDccm(addr1));
+      if (fail)
+	cause = EC::STORE_ACC_FAULT;
+    }
 
   // If no exception: consider store-data  trigger
-  if (cause == ExceptionCause::NONE and hasTrig)
-    if (ldStDataTriggerHit(storeVal, timing, isLoad))
+  if (cause == EC::NONE and hasTrig)
+    if (ldStDataTriggerHit(storeVal, timing, isLd))
       triggerTripped_ = true;
   if (triggerTripped_)
     return false;
 
-  if (cause != ExceptionCause::NONE)
+  if (cause != EC::NONE)
     {
       initiateStoreException(cause, virtAddr, gaddr1);
       return false;
@@ -319,10 +320,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (not memory_.hasLr(hartIx_, addr1, sizeof(storeVal)))
     return false;
 
-  STORE_TYPE prev = 0;
-  memory_.peek(addr1, prev, false /*usePma*/);
   ldStData_ = storeVal;
-  ldStPrevData_ = prev;
   ldStWrite_ = true;
 
   // If we write to special location, end the simulation.
@@ -336,7 +334,27 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (mcm_)
     return true;  // Memory updated when merge buffer is written.
 
+  if (addr1 >= clintStart_ and addr1 < clintEnd_)
+    {
+      assert(addr1 == addr2);
+      URV val = storeVal;
+      processClintWrite(addr1, ldStSize_, val);
+      storeVal = val;
+    }
+  else if (hasInterruptor_ and addr1 == interruptor_ and ldStSize_ == 4)
+    processInterruptorWrite(storeVal);
+  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
+		       (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+    {
+      imsicWrite_(addr1, sizeof(storeVal), storeVal);
+      storeVal = 0;  // Reads from IMSIC space will yield zero.
+    }
+
   memWrite(addr1, addr1, storeVal);
+
+  STORE_TYPE temp = 0;
+  memPeek(addr1, addr2, temp, false /*usePma*/);
+  ldStData_ = temp;
 
   invalidateDecodeCache(virtAddr, sizeof(STORE_TYPE));
   return true;

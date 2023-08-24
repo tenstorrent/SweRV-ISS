@@ -516,6 +516,18 @@ namespace WdRiscv
     unsigned lineSize() const
     { return 1 << lineShift_; }
 
+    /// Return the page size.
+    uint64_t pageSize() const
+    { return pageSize_; }
+
+    /// Return the number of the page containing the given address.
+    uint64_t getPageIx(uint64_t addr) const
+    { return addr >> pageShift_; }
+
+    /// Return start address of page containing given address.
+    uint64_t getPageStartAddr(uint64_t addr) const
+    { return (addr >> pageShift_) << pageShift_; }
+
   protected:
 
     /// Same as write but effects not recorded in last-write info and
@@ -576,18 +588,6 @@ namespace WdRiscv
       auto& lwd = lastWriteData_.at(sysHartIx);
       lwd.size_ = 0;
     }
-
-    /// Return the page size.
-    uint64_t pageSize() const
-    { return pageSize_; }
-
-    /// Return the number of the page containing the given address.
-    uint64_t getPageIx(uint64_t addr) const
-    { return addr >> pageShift_; }
-
-    /// Return start address of page containing given address.
-    uint64_t getPageStartAddr(uint64_t addr) const
-    { return (addr >> pageShift_) << pageShift_; }
 
     /// Return true if CCM (iccm or dccm) configuration defined by
     /// addr/size is valid. Return false otherwise. Tag parameter

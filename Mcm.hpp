@@ -242,13 +242,14 @@ namespace WdRiscv
 
     /// Forward from a store to a read op. Return true on success.
     /// Return false if instr is not retired, is canceled, is not a
-    /// store, is amo or does not match range address of op.  Mask is
-    /// the mask of bits of op to be updated by the forward (bypass)
-    /// operartion and is updated (bits cleared) if some parts of op,
-    /// covered by the mask, are successfully updated.
+    /// store (amo couts as store), or does not match range address of
+    /// op.  Mask is the mask of bits of op to be updated by the
+    /// forward (bypass) operartion and is updated (bits cleared) if
+    /// some parts of op, covered by the mask, are successfully
+    /// updated.
     bool forwardTo(const McmInstr& instr, MemoryOp& op, uint64_t& mask);
 
-    /// Forward to the given read op from the stores of the returned
+    /// Forward to the given read op from the stores of the retired
     /// instructions ahead of tag.
     bool forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op);
 

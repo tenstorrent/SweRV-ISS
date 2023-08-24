@@ -134,15 +134,11 @@ Hart<URV>::vbrev_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = bitReverse(e1);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = bitReverse(e1);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -208,15 +204,11 @@ Hart<URV>::vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = brev8(e1);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = brev8(e1);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -282,15 +274,11 @@ Hart<URV>::vrev8_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = util::byteswap(e1);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = util::byteswap(e1);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -356,15 +344,11 @@ Hart<URV>::vclz_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = std::countl_zero(e1);  // Count leading zeros.
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = std::countl_zero(e1);  // Count leading zeros.
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -430,15 +414,11 @@ Hart<URV>::vctz_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = std::countr_zero(e1);  // Count trailing zeros.
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = std::countr_zero(e1);  // Count trailing zeros.
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -504,15 +484,11 @@ Hart<URV>::vcpop_v(unsigned vd, unsigned vs1, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, group);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = std::popcount(e1);
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = std::popcount(e1);
       vecRegs_.write(vd, ix, group, dest);
     }
 
@@ -822,16 +798,12 @@ Hart<URV>::vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
+	  dest = mySll(DWT(e1), DWT(e2));
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
-
-      dest = mySll(DWT(e1), DWT(e2));
       vecRegs_.write(vd, ix, wideGroup, dest);
     }
 
@@ -909,15 +881,11 @@ Hart<URV>::vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (masked and not vecRegs_.isActive(0, ix))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  vecRegs_.touchReg(vd, wideGroup);
-	  continue;
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = mySll(DWT(e1), DWT(e2));
 	}
-
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = mySll(DWT(e1), DWT(e2));
       vecRegs_.write(vd, ix, wideGroup, dest);
     }
 

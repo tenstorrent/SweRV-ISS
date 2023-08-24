@@ -20,6 +20,7 @@
 #include <string_view>
 #include <unordered_map>
 #include "Memory.hpp"
+#include "Imsic.hpp"
 
 namespace WdRiscv
 {
@@ -224,6 +225,25 @@ namespace WdRiscv
     /// size (in bytes) of address space for it.
     void defineUart(uint64_t addr, uint64_t size);
 
+    /// Return the memory page size.
+    size_t pageSize() const
+    { return memory_->pageSize(); }
+
+    /// Configure incoming message signaled interrupt controller.  The
+    /// addresses of the machine files of hart0, hart1, ... will be
+    /// mbase, mbase + mstride, mbase + 2*mstride ...  Similartly the
+    /// address of the supervisor files will be sbase, sbase + sstride,
+    /// sbase + 2*sstride.  If mstride is zero then no machine file is
+    /// defined. If sstride is zero then no supervisor file is defined.
+    /// Guest files will take one page each and will start one page
+    /// after each supervisor file (supervisor stride must be large
+    /// enough). Guest files require supervisor files which require
+    /// machine files. The ids parameter denotes the max interrupt
+    /// id and must be a multiple of 64.
+    bool configImsic(uint64_t mbase, uint64_t mstride,
+		     uint64_t sbase, uint64_t sstride,
+		     unsigned guests, unsigned ids);
+
     /// Enable memory consistency model. This is relevant in
     /// server/interactive where RTL monitor or interactive command
     /// may initiate out of order memory transactions. Behavior is
@@ -282,6 +302,7 @@ namespace WdRiscv
 
     unsigned hartCount_;
     unsigned hartsPerCore_;
+    TT_IMSIC::ImsicMgr imsicMgr_;
 
     std::vector< std::shared_ptr<CoreClass> > cores_;
     std::vector< std::shared_ptr<HartClass> > sysHarts_; // All harts in system.

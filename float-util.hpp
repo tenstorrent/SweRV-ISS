@@ -793,4 +793,55 @@ doFround(FT f1)
   return res;
 }
 
+
+/// Set to 1 all the bis of x (T is an intergral type).
+template<typename T>
+void setAllBits(T& x)
+{
+  x = ~ T{0};
+}
+
+/// Set to 1 all the bis of x.
+inline
+void setAllBits(float& x)
+{
+  union
+  {
+    uint32_t u;
+    float f;
+  } uf;
+  uf.u = ~uint32_t(0);
+  x = uf.f;
+}
+
+/// Set to 1 all the bis of x.
+inline
+void setAllBits(double& x)
+{
+  union
+  {
+    uint64_t u;
+    double d;
+  } ud;
+  ud.u = ~uint64_t(0);
+  x = ud.d;
+}
+
+/// Set to 1 all the bis of x.
+inline
+void setAllBits(Float16& x)
+{
+  uint16_t u = 0xffff;
+  x = *(reinterpret_cast<Float16*>(&u));
+};
+
+/// Set to 1 all the bis of x.
+inline
+void setAllBits(BFloat16& x)
+{
+  uint16_t u = 0xffff;
+  x = *(reinterpret_cast<BFloat16*>(&u));
+};
+
+
 }

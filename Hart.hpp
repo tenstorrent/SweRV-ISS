@@ -37,6 +37,7 @@
 #include "Decoder.hpp"
 #include "Disassembler.hpp"
 #include "util.hpp"
+#include "Imsic.hpp"
 
 
 namespace WdRiscv
@@ -472,28 +473,6 @@ namespace WdRiscv
     /// in given di object.
     void singleStep(DecodedInst& di, FILE* file = nullptr);
 
-    /// Determine the effect of instruction fetching and discarding n
-    /// bytes (where n is the instruction size of the given
-    /// instruction) from memory and then executing the given
-    /// instruction without actually changing the state of the hart or
-    /// the memory. Return true if the instruction would execute
-    /// without an exception. Return false otherwise. In either case
-    /// set the record fields corresponding to the resources that
-    /// would have been changed by the execution of the instruction.
-    bool whatIfSingleStep(URV programCounter, uint32_t inst,
-			  ChangeRecord& record);
-
-    /// Similar to the preceding method but without fetching anything
-    /// from from instruction memory (in other words, this variant
-    /// will never cause an misaligned/instruction-access-fault
-    /// exception).
-    bool whatIfSingleStep(uint32_t inst, ChangeRecord& record);
-
-    /// Similar to the preceding but without fetching register
-    /// operands. Register operand values are obtained from the given
-    /// decoded instruction object.
-    bool whatIfSingStep(const DecodedInst& inst, ChangeRecord& record);
-
     /// Run until the program counter reaches the given address. Do
     /// execute the instruction at that address. If file is non-null
     /// then print thereon tracing information after each executed
@@ -543,12 +522,12 @@ namespace WdRiscv
     { logStart_ = rank; }
 
     /// Define memory mapped locations for CLINT.
-    void configClint(uint64_t clintStart, uint64_t clintLimit,
+    void configClint(uint64_t clintStart, uint64_t clintEnd,
 		     bool softwareInterruptOnReset,
                      std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       clintStart_ = clintStart;
-      clintLimit_ = clintLimit;
+      clintEnd_ = clintEnd;
       clintSiOnReset_ = softwareInterruptOnReset;
       indexToHart_ = indexToHart;
     }
@@ -1815,6 +1794,21 @@ namespace WdRiscv
     void setDebugTrapAddress(URV addr)
     { debugTrapAddr_ = addr; }
 
+    /// Associate given IMSIC with this hart and define the address
+    /// space for all IMSICs in the system.
+    void attachImsic(std::shared_ptr<TT_IMSIC::Imsic> imsic,
+		     uint64_t mbase, uint64_t mend,
+		     uint64_t sbase, uint64_t send,
+		     std::function<bool(uint64_t, unsigned, uint64_t&)> readFunc,
+		     std::function<bool(uint64_t, unsigned, uint64_t)> writeFunc)
+    {
+      imsic_ = imsic;
+      imsicMbase_ = mbase; imsicMend_ = mend;
+      imsicSbase_ = sbase; imsicSend_ = send;
+      imsicRead_ = readFunc;
+      imsicWrite_ = writeFunc;
+    }
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -1928,7 +1922,7 @@ namespace WdRiscv
 
     /// Return true if CLINT is configured.
     bool hasClint() const
-    { return clintStart_ < clintLimit_; }
+    { return clintStart_ < clintEnd_; }
 
     // Return true if FS field of mstatus is not off.
     bool isFpEnabled() const
@@ -2034,6 +2028,14 @@ namespace WdRiscv
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
 
+    // Similar to isVecLegal but also saves copy of vstart ahead of
+    // execution to use for logging/tracing after execution.
+    bool preVecExec()
+    {
+      vecRegs_.setLastVstart(csRegs_.peekVstart());
+      return isVecLegal();
+    }
+
     // We avoid the cost of locating MSTATUS in the CSRs register file
     // by caching its value in this class. We do this whenever MSTATUS
     // is written/poked.
@@ -2109,9 +2111,6 @@ namespace WdRiscv
     /// Helper to decode. Used for compressed instructions.
     const InstEntry& decode16(uint16_t inst, uint32_t& op0, uint32_t& op1,
 			      uint32_t& op2);
-
-    /// Helper to whatIfSingleStep.
-    void collectAndUndoWhatIfChanges(URV prevPc, ChangeRecord& record);
 
     /// Return the effective rounding mode for the currently executing
     /// floating point instruction.
@@ -4585,7 +4584,7 @@ namespace WdRiscv
     bool enableConIn_ = true;
 
     uint64_t clintStart_ = 0;
-    uint64_t clintLimit_ = 0;
+    uint64_t clintEnd_ = 0;
     uint64_t clintAlarm_ = ~uint64_t(0); // Interrupt when timer >= this
     bool clintSiOnReset_ = false;
     std::function<Hart<URV>*(unsigned ix)> indexToHart_ = nullptr;
@@ -4660,7 +4659,6 @@ namespace WdRiscv
     uint64_t ldStPhysAddr2_ = 0;    // Physical address of 2nd page across page boundary.
     unsigned ldStSize_ = 0;         // Non-zero if ld/st/atomic.
     uint64_t ldStData_ = 0;         // For tracing
-    uint64_t ldStPrevData_ = 0;
     bool ldStWrite_ = false;        // True if memory written by last store.
     bool ldStAtomic_ = false;       // True if amo or lr/sc
 
@@ -4738,6 +4736,13 @@ namespace WdRiscv
     Isa isa_;
     Decoder decoder_;
     Disassembler disas_;
+    std::shared_ptr<TT_IMSIC::Imsic> imsic_;
+    uint64_t imsicMbase_ = 0;
+    uint64_t imsicMend_ = 0;
+    uint64_t imsicSbase_ = 0;
+    uint64_t imsicSend_ = 0;
+    std::function<bool(uint64_t, unsigned, uint64_t&)> imsicRead_ = nullptr;
+    std::function<bool(uint64_t, unsigned, uint64_t)> imsicWrite_ = nullptr;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

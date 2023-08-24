@@ -71,12 +71,19 @@ namespace WdRiscv
     template<typename URV>
     bool applyMemoryConfig(Hart<URV>&) const;
     
+    /// Confgure a core-local-interrupt (CLINT) device in the given
+    /// address range: clintStart to  clintEnd - 1. If siOnReset
+    /// is true then a software interrupt for hart0 is injected
+    /// in the clint at reset.
     template<typename URV>
     bool configClint(System<URV>&, Hart<URV>&, uint64_t clintStart,
-		     uint64_t clintLimit, bool siOnReset = false) const;
+		     uint64_t clintEnd, bool siOnReset = false) const;
 
     template<typename URV>
     bool configInterruptor(System<URV>&, Hart<URV>&, uint64_t addr) const;
+
+    template<typename URV>
+    bool applyImsicConfig(System<URV>&) const;
 
     /// Set xeln to the register width configuration held in this
     /// object returning true on success and false if this object does
@@ -146,6 +153,10 @@ namespace WdRiscv
     bool hasCsrConfig(std::string_view csrName) const;
 
   protected:
+
+    /// Helper to configHarts.
+    template<typename URV>
+    bool applyClintConfig(System<URV>& system, Hart<URV>& hart) const;
 
     /// Set val to the reset value of the MISA CSR returning true on
     /// success and false if no such entry in this config or if entry

@@ -425,9 +425,6 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x1b: return instTable_.getEntry(InstId::vmflt_vv);
 	case 0x1c: return instTable_.getEntry(InstId::vmfne_vv);
 	case 0x20: return instTable_.getEntry(InstId::vfdiv_vv);
-        case 0x23:
-          std::swap(op1, op2);  // per spec
-          return instTable_.getEntry(InstId::vfwmaccbf16_vv);
 	case 0x24: return instTable_.getEntry(InstId::vfmul_vv);
 	case 0x28:
           std::swap(op1, op2);  // per spec
@@ -460,6 +457,9 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x34: return instTable_.getEntry(InstId::vfwadd_wv);
 	case 0x36: return instTable_.getEntry(InstId::vfwsub_wv);
 	case 0x38: return instTable_.getEntry(InstId::vfwmul_vv);
+        case 0x3b:
+          std::swap(op1, op2);  // per spec
+          return instTable_.getEntry(InstId::vfwmaccbf16_vv);
 	case 0x3c:
           std::swap(op1, op2);  // per spec
 	  return instTable_.getEntry(InstId::vfwmacc_vv);
@@ -804,9 +804,6 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x1f: return instTable_.getEntry(InstId::vmfge_vf);
 	case 0x20: return instTable_.getEntry(InstId::vfdiv_vf);
 	case 0x21: return instTable_.getEntry(InstId::vfrdiv_vf);
-        case 0x23:
-          std::swap(op1, op2);  // per spec
-          return instTable_.getEntry(InstId::vfwmaccbf16_vf);
 	case 0x24: return instTable_.getEntry(InstId::vfmul_vf);
 	case 0x27: return instTable_.getEntry(InstId::vfrsub_vf);
 	case 0x28:
@@ -838,6 +835,9 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	case 0x34: return instTable_.getEntry(InstId::vfwadd_wf);
 	case 0x36: return instTable_.getEntry(InstId::vfwsub_wf);
 	case 0x38: return instTable_.getEntry(InstId::vfwmul_vf);
+        case 0x3b:
+          std::swap(op1, op2);  // per spec
+          return instTable_.getEntry(InstId::vfwmaccbf16_vf);
 	case 0x3c:
           std::swap(op1, op2);  // per spec
 	  return instTable_.getEntry(InstId::vfwmacc_vf);
