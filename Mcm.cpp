@@ -311,15 +311,20 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
       sysMemOps_.push_back(op);
-      if (checkStoreComplete(*instr))
+      instr->complete_ = checkStoreComplete(*instr);
+
+      if (not instr->retired_)
 	{
-	  instr->complete_ = true;
-	  if (instr->retired_)
-	    if (not ppoRule1(hart, *instr))
-	      result = false;
+	  cerr << "Mcm::MergeBufferInsert: Error: Merge buffer write for a non-retired store\n";
+	  return false;
 	}
 
-      // Commit write to memory. 
+      if (not ppoRule1(hart, *instr))
+	result = false;
+
+      // We commit the RTL data to memory but we check them against
+      // whisper data (checkRtlWrite below). This is simpler than
+      // committing part of whisper instruction data.
       if (op.size_ == 1)
 	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
       else if (op.size_ == 2)
@@ -330,8 +335,9 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	hart.pokeMemory(physAddr, uint64_t(rtlData), true);
       else
 	{
-	  cerr << "Mcm::MergeBufferInsert: Error: write size not a power of 2\n";
-	  assert(0 && "Mcm::MergeBufferInsert: write size not a power of 2");
+	  cerr << "Mcm::MergeBufferInsert: Error: data size not a power of 2\n";
+	  assert(0 && "Mcm::MergeBufferInsert: data size not a power of 2");
+	  result = false;
 	}
     }
 
