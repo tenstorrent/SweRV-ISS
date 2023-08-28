@@ -24,6 +24,7 @@
 #include "Triggers.hpp"
 #include "PerfRegs.hpp"
 #include "CsrFields.hpp"
+#include "Imsic.hpp"
 #include "util.hpp"
 
 
@@ -930,6 +931,10 @@ namespace WdRiscv
       triggers_.getLastWrittenTriggers(triggerNums);
     }
 
+    /// Associate an IMSIC with this register file.
+    void attachImsic(std::shared_ptr<TT_IMSIC::Imsic> imsic)
+    { imsic_ = imsic; }
+
   protected:
 
     /// Advance a csr number by the given amount (add amount to number).
@@ -1435,6 +1440,24 @@ namespace WdRiscv
     /// Helper to write method: Mask with MSTATEEN.
     bool writeHstateen(CsrNumber num, URV value);
 
+    /// Helper to write method.
+    bool writeMireg(CsrNumber num, URV value);
+
+    /// Helper to write method.
+    bool writeSireg(CsrNumber num, URV value);
+
+    /// Helper to write method.
+    bool writeVsireg(CsrNumber num, URV value);
+
+    /// Helper to write method.
+    bool writeMtopei();
+
+    /// Helper to write method.
+    bool writeStopei();
+
+    /// Helper to write method.
+    bool writeVstopei();
+
     /// Legalize the PMPCFG value before updating such a register: If
     /// the grain factor G is greater than or equal to 1, then the NA4
     /// mode is not selectable in the A field. If a field is locked it
@@ -1648,6 +1671,7 @@ namespace WdRiscv
     std::unordered_map<std::string, CsrNumber, util::string_hash, std::equal_to<>> nameToNumber_;
 
     Triggers<URV> triggers_;
+    std::shared_ptr<TT_IMSIC::Imsic> imsic_;
 
     // Register written since most recent clearLastWrittenRegs
     std::vector<CsrNumber> lastWrittenRegs_;

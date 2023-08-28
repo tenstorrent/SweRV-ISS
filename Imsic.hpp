@@ -185,19 +185,15 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned pageSize() const
     { return pageSize_; }
 
-    /// Select CSR for *ireg if valid.
-    void select(uint8_t num)
-    { select_ = num; }
-
-    /// Read from selected register by selectRegister. Returns false if
-    /// access would cause an illegal instruction trap and true otherwise.
+    /// Read from selected register into val. Returns false if access
+    /// would cause an illegal instruction trap and true otherwise.
     template <typename URV>
-    bool iregRead(URV& val) const;
+    bool iregRead(unsigned select, URV& val) const;
 
-    /// Write to selected register by selectRegister. Returns false if
-    /// access would cause an illegal instruction trap and true otherwise.
+    /// Write to selected register from val. Returns false if access
+    /// would cause an illegal instruction trap and true otherwise.
     template <typename URV>
-    bool iregWrite(URV val);
+    bool iregWrite(unsigned select, URV val);
 
   private:
 
@@ -209,7 +205,6 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned threshold_ = 0;
     bool config_ = false;
     const unsigned pageSize_ = 1024;
-    uint64_t select_ = 0; // cached value of indirect register select
   };
 
 
@@ -310,48 +305,50 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return true;
     }
 
-    /// Called from the associated hart for a CSR write to miselect.
-    bool machineSelect(uint8_t num)
-    { mfile_.select(num); return true; }
-
-    /// Called from the associated hart for a CSR write to siselect/vsislect.
-    /// Guest field is used if virt is true (VS privilege).
-    bool supervisorSelect(uint8_t num, bool virt, unsigned guest)
-    {
-      if (virt)
-	{
-	  if (guest >= gfiles_.size())
-	    return false;
-	  gfiles_.at(guest).select(num);
-	}
-      else
-	sfile_.select(num);
-      return true;
-    }
-
     /// Called form the associated hart for a CSR write to mireg.
     template <typename URV>
-    bool writeMireg(URV value)
-    { return mfile_.iregWrite(value); }
+    bool writeMireg(unsigned select, URV value)
+    { return mfile_.iregWrite(select, value); }
     
     /// Called form the associated hart for a CSR write to sireg/vsireg.
     /// Guest field is used if virt is true.
     template <typename URV>
-    bool writeSireg(bool virt, unsigned guest, URV value)
+    bool writeSireg(bool virt, unsigned guest, unsigned select, URV value)
     {
       if (virt)
 	{
 	  if (guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
-	  bool ok = gfile.iregWrite(value);
+	  bool ok = gfile.iregWrite(select, value);
 	  if (gfile.canDeliver() and gfile.topId())
 	    guestInterrupts_ |= (uint64_t(1) << guest);
 	  else
 	    guestInterrupts_ &= ~(uint64_t(1) << guest);
 	  return ok;
 	}
-      return sfile_.iregWrite(value);
+      return sfile_.iregWrite(select, value);
+    }
+
+    /// Called form the associated hart for a CSR read from mireg.
+    template <typename URV>
+    bool readMireg(unsigned select, URV value) const
+    { return mfile_.iregRead(select, value); }
+    
+
+    /// Called form the associated hart for a CSR read from sireg/vsireg.
+    /// Guest field is used if virt is true.
+    template <typename URV>
+    bool readSireg(bool virt, unsigned guest, unsigned select, URV value) const
+    {
+      if (virt)
+	{
+	  if (guest >= gfiles_.size())
+	    return false;
+	  auto& gfile = gfiles_.at(guest);
+	  return gfile.iregRead(select, value);
+	}
+      return sfile_.iregRead(select, value);
     }
 
     /// Return the machine file top pending and enabled interrupt id.
@@ -388,6 +385,24 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// has deliverey enabled and that has a non-zero top interrupt id.
     uint64_t guestInterrupts() const
     { return guestInterrupts_; }
+
+    /// In the machine file, set/clear the pending bit correponding to
+    /// the given interrupt id.
+    void setMachinePending(unsigned id, bool flag)
+    { mfile_.setPending(id, flag); }
+
+    /// In the supervisor file, set/clear the pending bit correponding
+    /// to the given interrupt id.
+    void setSupervisorPending(unsigned id, bool flag)
+    { sfile_.setPending(id, flag); }
+
+    /// In the file of the given guest, set/clear the pending bit
+    /// correponding to the given interrupt id.
+    void setGuestPending(unsigned guest, unsigned id, bool flag)
+    {
+      if (guest < gfiles_.size())
+	gfiles_.at(guest).setPending(id, flag);
+    }
 
   private:
 
@@ -510,40 +525,23 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned guestTopId(unsigned hartIx, unsigned guestIx) const
     { return hartIx < imsics_.size()? imsics_.at(hartIx)->guestTopId(guestIx) : 0; }
 
-    /// Called from the associated hart for a CSR write to miselect.
-    bool machineSelect(unsigned hartIx, uint8_t num)
-    {
-      if (hartIx >= imsics_.size())
-	return false;
-      return imsics_.at(hartIx)->machineSelect(num);
-    }
-
-    /// Called from the associated hart for a CSR write to siselect/vsislect.
-    /// Guest field is used if virt is true (VS privilege).
-    bool supervisorSelect(unsigned hartIx, uint8_t num, bool virt, unsigned guest)
-    {
-      if (hartIx >= imsics_.size())
-	return false;
-      return imsics_.at(hartIx)->supervisorSelect(num, virt, guest);
-    }
-
     /// Called form hart of given hartIx for a CSR write to mireg.
     template <typename URV>
-    bool writeMireg(unsigned hartIx, URV value)
+    bool writeMireg(unsigned hartIx, unsigned sel, URV value)
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx)->writeMireg(value);
+      return imsics_.at(hartIx)->writeMireg(sel, value);
     }
     
     /// Called form hart of given hartIx for a CSR write to sireg/vsireg.
     /// Guest field is used if virt is true.
     template<typename URV>
-    bool writeSireg(unsigned hartIx, bool virt, unsigned guest, URV value)
+    bool writeSireg(unsigned hartIx, bool virt, unsigned guest, unsigned sel, URV value)
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx)->writeSireg(virt, guest, value);
+      return imsics_.at(hartIx)->writeSireg(virt, guest, sel, value);
     }
 
     /// Return the number of IMSICs in this manager.

@@ -1807,6 +1807,7 @@ namespace WdRiscv
       imsicSbase_ = sbase; imsicSend_ = send;
       imsicRead_ = readFunc;
       imsicWrite_ = writeFunc;
+      csRegs_.attachImsic(imsic);
     }
 
   protected:

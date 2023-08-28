@@ -632,7 +632,7 @@ CsRegs<URV>::enableSscofpmf(bool flag)
             {
               auto lcof = 1 << URV(InterruptCause::LCOF);
               csr->setWriteMask(csr->getWriteMask() | lcof);
-              csr->setPokeMask(csr->getWriteMask() | lcof);
+              csr->setPokeMask(csr->getPokeMask() | lcof);
             }
         }
     }
@@ -946,6 +946,126 @@ CsRegs<URV>::writeHstateen(CsrNumber num, URV value)
 
 template <typename URV>
 bool
+CsRegs<URV>::writeMireg(CsrNumber num, URV value)
+{
+  URV sel = 0;
+  peek(CsrNumber::MISELECT, sel);
+
+  if (imsic_)
+    {
+      Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+      if (not csr)
+	return false;
+
+      if (imsic_->writeMireg(sel, value))
+	{
+	  imsic_->readMireg(sel, value);
+	  csr->write(value);
+	  recordWrite(num);
+	  return true;
+	}
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::writeSireg(CsrNumber num, URV value)
+{
+  URV sel = 0;
+  peek(CsrNumber::SISELECT, sel);
+
+  if (imsic_)
+    {
+      Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+      if (not csr)
+	return false;
+
+      unsigned guest = 0;
+      if (virtMode_)
+	assert(0 && "get guest from hstatus");
+
+      if (imsic_->writeSireg(virtMode_, guest, sel, value))
+	{
+	  imsic_->readMireg(sel, value);
+	  csr->write(value);
+	  recordWrite(num);
+	  return true;
+	}
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::writeVsireg(CsrNumber num, URV value)
+{
+  URV sel = 0;
+  peek(CsrNumber::VSISELECT, sel);
+
+  if (imsic_)
+    {
+      Csr<URV>* csr = getImplementedCsr(num, virtMode_);
+      if (not csr)
+	return false;
+
+      unsigned guest = 0;
+      if (virtMode_)
+	assert(0 && "get guest from hstatus");
+
+      if (imsic_->writeSireg(virtMode_, guest, sel, value))
+	{
+	  imsic_->readSireg(virtMode_, guest, sel, value);
+	  csr->write(value);
+	  recordWrite(num);
+	  return true;
+	}
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::writeMtopei()
+{
+  if (not imsic_)
+    return false;
+
+  unsigned id = imsic_->machineTopId();
+  if (id)
+    imsic_->setMachinePending(id, false);
+  return true;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::writeStopei()
+{
+  if (not imsic_)
+    return false;
+
+  unsigned id = imsic_->supervisorTopId();
+  if (id)
+    imsic_->setSupervisorPending(id, false);
+  return true;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::writeVstopei()
+{
+  assert(0);
+  return false;
+}
+
+
+template <typename URV>
+bool
 CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 {
   using CN = CsrNumber;
@@ -1008,6 +1128,19 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       recordWrite(num);
       return true;
     }
+
+  if (num == CN::MIREG)
+    return writeMireg(num, value);
+  else if (num == CN::SIREG)
+    return writeSireg(num, value);
+  else if (num == CN::VSIREG)
+    return writeVsireg(num, value);
+  else if (num == CN::MTOPEI)
+    return writeMtopei();
+  else if (num == CN::STOPEI)
+    return writeStopei();
+  else if (num == CN::VSTOPEI)
+    return writeVstopei();
 
   if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
     {
