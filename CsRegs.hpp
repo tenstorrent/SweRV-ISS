@@ -427,7 +427,7 @@ namespace WdRiscv
       VLENB    = 0xc22,
 
       // Advanced interrupt architecture (AIA)
-      MISELECT   = 0x315,
+      MISELECT   = 0x350,
       MIREG      = 0x351,
       MTOPEI     = 0x35c,
       MTOPI      = 0xFB0,

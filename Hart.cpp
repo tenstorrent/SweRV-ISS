@@ -2934,19 +2934,17 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       ElementWidth ew = ElementWidth(vtype.bits_.SEW);
       vecRegs_.updateConfig(ew, gm, ma, ta, vill);
     }
-
-  if (csr == CN::VL)
+  else if (csr == CN::VL)
     vecRegs_.elemCount(val);
 
   if (csr == CN::VSTART or csr == CN::VXSAT or csr == CN::VXRM or
-	    csr == CN::VCSR or csr == CN::VL or csr == CN::VTYPE or
-	    csr == CN::VLENB)
+      csr == CN::VCSR or csr == CN::VL or csr == CN::VTYPE or
+      csr == CN::VLENB)
     markVsDirty();
 
   if (csr == CN::MISA and lastVal != val)
     processExtensions(false);
-
-  if (csr == CN::MENVCFG or csr == CN::HENVCFG)
+  else if (csr == CN::MENVCFG or csr == CN::HENVCFG)
     {
       updateTranslationPbmt();
       csRegs_.updateSstc();
