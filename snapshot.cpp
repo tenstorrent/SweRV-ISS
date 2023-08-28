@@ -35,12 +35,13 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
     ofs << "x " << std::dec << i << " 0x" << std::hex << peekIntReg(i) << std::dec << "\n";
 
   // write floating point registers
-  for (unsigned i = 0; i < 32; i++)
-    {
-      uint64_t val = 0;
-      peekFpReg(i, val);
-      ofs << "f " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
-    }
+  if (isRvf())
+    for (unsigned i = 0; i < 32; i++)
+      {
+	uint64_t val = 0;
+	peekFpReg(i, val);
+	ofs << "f " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
+      }
 
   // write control & status registers
   for (unsigned i = unsigned(CsrNumber::MIN_CSR_); i <= unsigned(CsrNumber::MAX_CSR_); i++)
@@ -52,16 +53,19 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
     }
 
   // write vector registers.
-  std::vector<uint8_t> vecBytes;
-  for (unsigned i = 0; i < vecRegCount(); ++i)
+  if (isRvv())
     {
-      peekVecReg(i, vecBytes);
-      ofs << "v " << std::dec << i << " 0x";
-      ofs << std::hex;
-      for (auto byte : vecBytes)
-	ofs << std::setw(2) << std::setfill('0') << unsigned(byte);
-      ofs << std::dec;
-      ofs << '\n';
+      std::vector<uint8_t> vecBytes;
+      for (unsigned i = 0; i < vecRegCount(); ++i)
+	{
+	  peekVecReg(i, vecBytes);
+	  ofs << "v " << std::dec << i << " 0x";
+	  ofs << std::hex;
+	  for (auto byte : vecBytes)
+	    ofs << std::setw(2) << std::setfill('0') << unsigned(byte);
+	  ofs << std::dec;
+	  ofs << '\n';
+	}
     }
 
   ofs.close();
