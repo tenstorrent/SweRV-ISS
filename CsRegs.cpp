@@ -336,6 +336,18 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       value = imsic_->machineTopId();
       return true;
     }
+  else if (num == CN::STOPEI)
+    {
+      if (not imsic_)
+	return false;
+      value = imsic_->supervisorTopId();
+      return true;
+    }
+  else if (num == CN::VSTOPEI)
+    {
+      assert(0);
+      return false;
+    }
 
   value = csr->read();
 
