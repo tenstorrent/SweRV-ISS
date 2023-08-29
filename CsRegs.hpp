@@ -1458,6 +1458,9 @@ namespace WdRiscv
     /// Helper to write method.
     bool writeVstopei();
 
+    /// Helper to read method.
+    bool readMtopei();
+
     /// Legalize the PMPCFG value before updating such a register: If
     /// the grain factor G is greater than or equal to 1, then the NA4
     /// mode is not selectable in the A field. If a field is locked it

@@ -62,7 +62,6 @@ File::iregWrite(unsigned sel, URV val)
     threshold_ = val;
   else
     {
-      val = 0;
       unsigned offset;
       std::vector<bool>* it;
       if (sel >= EIC::P0 and sel <= EIC::P63)
@@ -89,6 +88,8 @@ File::iregWrite(unsigned sel, URV val)
       // slow, use bitset?
       for (unsigned i = begin; i < end; i++)
         arr[i] = (val >> (i - begin)) & 1;
+
+      updateTopId();
     }
 
   return true;
