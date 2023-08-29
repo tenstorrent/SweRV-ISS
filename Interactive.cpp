@@ -1594,7 +1594,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "cancel_lr")
     {
-      hart.cancelLr();
+      hart.cancelLr(CancelLrCause::INTERACTIVE);
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
       return true;

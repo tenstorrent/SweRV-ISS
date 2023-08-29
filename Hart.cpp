@@ -624,7 +624,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // mapped register data loaded from the ELF/HEX file.
   if (resetMemoryMappedRegs)
     memory_.resetMemoryMappedRegisters();
-  cancelLr(); // Clear LR reservation (if any).
+  cancelLr(CancelLrCause::RESET); // Clear LR reservation (if any).
 
   clearPendingNmi();
 
@@ -2498,7 +2498,7 @@ void
 Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV info2)
 {
   if (cancelLrOnTrap_)
-    cancelLr();
+    cancelLr(CancelLrCause::TRAP);
 
   bool origVirtMode = virtMode_;
 
@@ -2681,7 +2681,7 @@ Hart<URV>::undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc)
   interruptCount_++;
 
   if (cancelLrOnTrap_)
-    cancelLr();  // Clear LR reservation (if any).
+    cancelLr(CancelLrCause::TRAP);  // Clear LR reservation (if any).
 
   PrivilegeMode origMode = privMode_;
 
@@ -8721,7 +8721,7 @@ template <typename URV>
 void
 Hart<URV>::enterDebugMode_(DebugModeCause cause, URV pc)
 {
-  cancelLr();  // Entering debug modes loses LR reservation.
+  cancelLr(CancelLrCause::ENTER_DEBUG);  // Entering debug modes loses LR reservation.
 
   if (debugMode_)
     std::cerr << "Error: Entering debug-mode while in debug-mode\n";
@@ -8776,7 +8776,7 @@ Hart<URV>::exitDebugMode()
       return;
     }
 
-  cancelLr();  // Exiting debug modes loses LR reservation.
+  cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
   peekCsr(CsrNumber::DPC, pc_);  // Restore PC
   
@@ -9607,7 +9607,7 @@ Hart<URV>::execDret(const DecodedInst* di)
       return;
     }
 
-  cancelLr();  // Exiting debug modes loses LR reservation.
+  cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
   peekCsr(CsrNumber::DPC, pc_);  // Restore PC
   
@@ -10913,7 +10913,7 @@ Hart<URV>::execWrs_nto(const DecodedInst* di)
       return;
     }
 
-  cancelLr();  // Lose reservation.
+  cancelLr(CancelLrCause::WRS_NTO);  // Lose reservation.
 }
 
 
@@ -10929,7 +10929,7 @@ Hart<URV>::execWrs_sto(const DecodedInst* di)
       return;
     }
 
-  cancelLr();  // Lose reservation.
+  cancelLr(CancelLrCause::WRS_STO);  // Lose reservation.
 }
 
 

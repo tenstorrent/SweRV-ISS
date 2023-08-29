@@ -1048,7 +1048,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
       case CancelLr:
         if (checkHart(msg, "cancel_lr", reply))
-          hart.cancelLr();
+          hart.cancelLr(CancelLrCause::SERVER);
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " cancel_lr # ts=%s\n", hartId,
                   timeStamp.c_str());

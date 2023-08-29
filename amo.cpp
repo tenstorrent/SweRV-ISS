@@ -383,7 +383,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
   if (not keepReservOnScException_ or not hasException_)
-    cancelLr(); // Clear LR reservation (if any).
+    cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
 
   if (ok)
     {
@@ -585,7 +585,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
   if (not keepReservOnScException_ or not hasException_)
-    cancelLr(); // Clear LR reservation (if any).
+    cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
 
   if (ok)
     {

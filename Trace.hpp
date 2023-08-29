@@ -297,8 +297,14 @@ namespace WdRiscv
     bool misalignedLdSt(bool& misal) const
     { return hart_->misalignedLdSt(misal); }
 
+    /// Return true if associated hart is holding a reservation
+    /// (obtained thru an LR instruction).
     bool hasLr() const
     { return hart_->hasLr(); }
+
+    /// Return the reason for loss of reservation of the associated hart.
+    CancelLrCause cancelLrCause() const
+    { return hart_->cancelLrCause(); }
 
     /// TODO: add support for vector ld/st (multiple PMAs accessed)
     /// Collect PMAs accessed for previous load stores

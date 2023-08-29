@@ -23,6 +23,7 @@
 #include <mutex>
 #include <type_traits>
 #include <cassert>
+#include "trapEnums.hpp"
 #include "PmaManager.hpp"
 #include "IoDevice.hpp"
 #include "util.hpp"
@@ -654,6 +655,7 @@ namespace WdRiscv
       uint64_t addr_ = 0;
       unsigned size_ = 0;
       bool valid_ = false;
+      CancelLrCause cause_ = CancelLrCause::NONE;
     };
       
     /// Invalidate LR reservations matching address of poked/written
@@ -669,26 +671,21 @@ namespace WdRiscv
           auto& res = reservations_[i];
           if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
               (addr < res.addr_ and (res.addr_ - addr) < storeSize))
-            res.valid_ = false;
+	    {
+	      res.valid_ = false;
+	      res.cause_ = CancelLrCause::STORE;
+	    }
         }
     }
 
-    /// Invalidate LR reservations matching address of poked/written
-    /// bytes. The memory tracks one reservation per hart indexed by
-    /// local hart ids.
-    void invalidateLrs(uint64_t addr, unsigned storeSize)
-    {
-      for (auto & res : reservations_)
-        {
-          if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
-              (addr < res.addr_ and (res.addr_ - addr) < storeSize))
-            res.valid_ = false;
-        }
-    }
 
     /// Invalidate LR reservation corresponding to the given hart.
-    void invalidateLr(unsigned sysHartIx)
-    { reservations_.at(sysHartIx).valid_ = false; }
+    void invalidateLr(unsigned sysHartIx, CancelLrCause cause)
+    {
+      auto& res = reservations_.at(sysHartIx);
+      res.valid_ = false;
+      res.cause_ = cause;
+    }
 
     /// Make a LR reservation for the given hart.
     void makeLr(unsigned sysHartIx, uint64_t addr, unsigned size)
@@ -697,6 +694,7 @@ namespace WdRiscv
       res.addr_ = addr;
       res.size_ = size;
       res.valid_ = true;
+      res.cause_ = CancelLrCause::NONE;
     }
 
     // returns true if the given hart has a valid LR reservation
@@ -713,6 +711,17 @@ namespace WdRiscv
       const auto& res = reservations_.at(sysHartIx);
       return (res.valid_ and res.addr_ <= addr and
 	      addr + size <= res.addr_ + res.size_);
+    }
+
+    /// Return the cause for the reservation cancleation in the given
+    /// hart. Return NONE if hart index is out of bounds. Return NONE
+    /// if given hart has a valid reservation.
+    CancelLrCause cancelLrCause(unsigned sysHartIx) const
+    {
+      if (sysHartIx >= reservations_.size())
+	return CancelLrCause::NONE;
+      const auto& res = reservations_.at(sysHartIx);
+      return res.valid_ ? CancelLrCause::NONE : res.cause_;
     }
 
     /// Load contents of given ELF segment into memory.

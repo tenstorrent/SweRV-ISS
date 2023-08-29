@@ -1491,9 +1491,15 @@ namespace WdRiscv
     bool hasLr() const
     { return memory_.hasLr(hartIx_); }
 
-    /// Cancel load reservation held by this hart (if any).
-    void cancelLr()
-    { memory_.invalidateLr(hartIx_); }
+    /// Cancel load reservation held by this hart (if any). Mark
+    /// cause of cancelation which persists until overwritten
+    /// by another cancelLr or until a new reservation is made.
+    void cancelLr(CancelLrCause cause)
+    { memory_.invalidateLr(hartIx_, cause); }
+
+    /// Return the cause of the last LR reservation cancelation.
+    CancelLrCause cancelLrCause() const
+    { return memory_.cancelLrCause(hartIx_); }
 
     /// Report the files opened by the target RISCV program during
     /// current run.
