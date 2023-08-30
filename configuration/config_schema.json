@@ -212,6 +212,9 @@
         "exec_opcode_trigger": {
             "$ref": "#/definitions/bool_or_bool_string"
         },
+        "enable_aia": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
         "force_rounding_mode": {
             "type": "string",
             "enum": [
@@ -622,6 +625,35 @@
                 "min_bytes_per_elem"
             ]
         },
+	"imsic": {
+            "type": "object",
+	    "properties" : {
+                "mbase": {
+                    "type": "integer",
+		    "description": "base address of machine files",
+		},
+                "mstride": {
+                    "type": "integer",
+		    "description": "offset (in bytes) between machine files",
+		},
+                "sbase": {
+                    "type": "integer",
+		    "description": "supervisor address of machine files",
+		},
+                "sstride": {
+                    "type": "integer",
+		    "description": "offset (in bytes) between supervisor files",
+		},
+                "guests": {
+                    "type": "integer",
+		    "description": "number of guests per hart",
+		},
+                "ids": {
+                    "type": "integer",
+		    "description": "number of interrupt identifiers per file (must be a multiple of 64)",
+		}
+	    }
+	},
         "xlen": {
             "$id": "xlen",
             "type": "integer",
@@ -629,7 +661,6 @@
         }
     },
     "required": [
-        "isa",
-        "xlen"
+        "isa"
     ]
 }
