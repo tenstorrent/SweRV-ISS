@@ -880,8 +880,8 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	{
 	  if (addr + size > op.physAddr_)
 	    {
-	      mask = expectedMask;
-	      mask = mask << (op.physAddr_ - addr + 1);
+	      mask = (1 << op.size_) - 1;
+	      mask = mask << (op.physAddr_ - addr);
 	    }
 	}
       mask &= expectedMask;
