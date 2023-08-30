@@ -760,7 +760,6 @@ CsRegs<URV>::enableStateen(bool flag)
 }
 
 
-
 template <typename URV>
 void
 CsRegs<URV>::enableVectorExtension(bool flag)
@@ -778,6 +777,32 @@ CsRegs<URV>::enableVectorExtension(bool flag)
         }
       else
         csr->setImplemented(flag);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::enableAiaExtension(bool flag)
+{
+  using CN = CsrNumber;
+
+  for (auto csrn : { CN::MISELECT, CN::MIREG, CN::MTOPEI, CN::MTOPI, CN::MVIEN,
+		     CN::MVIP, CN::SISELECT, CN::SIREG, CN::STOPEI, CN::STOPI,
+		     CN::HVIEN, CN::HVICTL, CN::HVIPRIO1, CN::HVIPRIO2,   
+		     CN::VSISELECT, CN::VSIREG, CN::VSTOPEI, CN::VSTOPI } )
+    {
+      auto csr = findCsr(csrn);
+      csr->setImplemented(flag);
+    }
+
+  if (sizeof(URV) == 4)
+    for (auto csrn : { CN::MIDELEGH, CN::MIEH, CN::MVIENH, CN::MVIPH, CN::MIPH,       
+		       CN::SIEH, CN::SIPH, CN::HIDELEGH, CN::HVIENH, CN::HVIPH,
+		       CN::HVIPRIO1H, CN::HVIPRIO2H, CN::VSIEH, CN::VSIPH } )
+    {
+      auto csr = findCsr(csrn);
+      csr->setImplemented(flag);
     }
 }
 

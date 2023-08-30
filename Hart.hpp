@@ -1540,6 +1540,10 @@ namespace WdRiscv
     /// Enable vector extension.
     void enableVectorExtension(bool flag);
 
+    /// Enable Advance Interrupt Architecture (AIA) extension.
+    void enableAiaExtension(bool flag)
+    { csRegs_.enableAiaExtension(flag); }
+
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.
     void enableClearMprvOnRet(bool flag)

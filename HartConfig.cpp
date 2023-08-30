@@ -1598,6 +1598,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableSscofpmf(flag);
     }
 
+  tag = "enable_aia";
+  if (config_ ->contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableAiaExtension(flag);
+    }
+
   return errors == 0;
 }
 

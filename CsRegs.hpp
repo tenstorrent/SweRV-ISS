@@ -1520,6 +1520,8 @@ namespace WdRiscv
     /// Enable vector extension.
     void enableVectorExtension(bool flag);
 
+    void enableAiaExtension(bool flag);
+
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
     /// actually read/write vsstatus).
