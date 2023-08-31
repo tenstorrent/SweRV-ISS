@@ -336,17 +336,23 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       value = imsic_->machineTopId();
       return true;
     }
-  else if (num == CN::STOPEI)
+  else if (csr->getNumber() == CN::STOPEI)
     {
       if (not imsic_)
 	return false;
       value = imsic_->supervisorTopId();
       return true;
     }
-  else if (num == CN::VSTOPEI)
+  else if (csr->getNumber() == CN::VSTOPEI)
     {
-      assert(0);
-      return false;
+      if (not imsic_)
+	return false;
+      const auto& hs = regs_.at(size_t(CsrNumber::HSTATUS));
+      URV hsVal = hs.read();
+      HstatusFields<URV> hsf(hsVal);
+      unsigned vgein = hsf.bits_.VGEIN;
+      value = imsic_->guestTopId(vgein);
+      return true;
     }
 
   value = csr->read();
@@ -1104,7 +1110,16 @@ template <typename URV>
 bool
 CsRegs<URV>::writeVstopei()
 {
-  assert(0);
+  if (not imsic_)
+    return false;
+
+  const auto& hs = regs_.at(size_t(CsrNumber::HSTATUS));
+  URV hsVal = hs.read();
+  HstatusFields<URV> hsf(hsVal);
+  unsigned vgein = hsf.bits_.VGEIN;
+  unsigned id = imsic_->guestTopId(vgein);
+  if (id)
+    imsic_->setGuestPending(vgein, id, false);
   return false;
 }
 
@@ -1176,15 +1191,15 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
   if (num == CN::MIREG)
     return writeMireg(num, value);
-  else if (num == CN::SIREG)
+  else if (csr->getNumber() == CN::SIREG)
     return writeSireg(num, value);
-  else if (num == CN::VSIREG)
+  else if (csr->getNumber() == CN::VSIREG)
     return writeVsireg(num, value);
   else if (num == CN::MTOPEI)
     return writeMtopei();
-  else if (num == CN::STOPEI)
+  else if (csr->getNumber() == CN::STOPEI)
     return writeStopei();
-  else if (num == CN::VSTOPEI)
+  else if (csr->getNumber() == CN::VSTOPEI)
     return writeVstopei();
 
   if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
@@ -2364,38 +2379,58 @@ CsRegs<URV>::defineAiaRegs()
   URV wam = ~URV(0);  // Write-all mask: all bits writeable.
 
   // Advanced interrupt archtecture CSRs
-  defineCsr("miselect",   CsrNumber::MISELECT,   !mand, !imp, 0, wam, wam);
-  defineCsr("mireg",      CsrNumber::MIREG,      !mand, !imp, 0, wam, wam);
-  defineCsr("mtopei",     CsrNumber::MTOPEI,     !mand, !imp, 0, wam, wam);
-  defineCsr("mtopi",      CsrNumber::MTOPI,      !mand, !imp, 0, wam, wam);
-  defineCsr("mvien",      CsrNumber::MVIEN,      !mand, !imp, 0, wam, wam);
-  defineCsr("mvip",       CsrNumber::MVIP,       !mand, !imp, 0, wam, wam);
-  defineCsr("midelegh",   CsrNumber::MIDELEGH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("mieh",       CsrNumber::MIEH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("mvienh",     CsrNumber::MVIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("mviph",      CsrNumber::MVIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("miph",       CsrNumber::MIPH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("siselect",   CsrNumber::SISELECT,   !mand, !imp, 0, wam, wam);
-  defineCsr("sireg",      CsrNumber::SIREG,      !mand, !imp, 0, wam, wam);
-  defineCsr("stopei",     CsrNumber::STOPEI,     !mand, !imp, 0, wam, wam);
-  defineCsr("stopi",      CsrNumber::STOPI,      !mand, !imp, 0, wam, wam);
-  defineCsr("sieh",       CsrNumber::SIEH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("siph",       CsrNumber::SIPH,       !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("hvien",      CsrNumber::HVIEN,      !mand, !imp, 0, wam, wam);
-  defineCsr("hvictl",     CsrNumber::HVICTL,     !mand, !imp, 0, wam, wam);
-  defineCsr("hviprio1",   CsrNumber::HVIPRIO1,   !mand, !imp, 0, wam, wam);
-  defineCsr("hviprio2",   CsrNumber::HVIPRIO2,   !mand, !imp, 0, wam, wam);
-  defineCsr("vsiselect",  CsrNumber::VSISELECT,  !mand, !imp, 0, wam, wam);
-  defineCsr("vsireg",     CsrNumber::VSIREG,     !mand, !imp, 0, wam, wam);
-  defineCsr("vstopei",    CsrNumber::VSTOPEI,    !mand, !imp, 0, wam, wam);
-  defineCsr("vstopi",     CsrNumber::VSTOPI,     !mand, !imp, 0, wam, wam);
-  defineCsr("hidelegh",   CsrNumber::HIDELEGH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("hvienh",     CsrNumber::HVIENH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("hviph",      CsrNumber::HVIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("hviprio1h",  CsrNumber::HVIPRIO1H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("hviprio2h",  CsrNumber::HVIPRIO2H,  !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("vsieh",      CsrNumber::VSIEH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
-  defineCsr("vsiph",      CsrNumber::VSIPH,      !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+  using CN = CsrNumber;
+
+  defineCsr("miselect",   CN::MISELECT,   !mand, !imp, 0, wam, wam);
+  defineCsr("mireg",      CN::MIREG,      !mand, !imp, 0, wam, wam);
+  defineCsr("mtopei",     CN::MTOPEI,     !mand, !imp, 0, wam, wam);
+  defineCsr("mtopi",      CN::MTOPI,      !mand, !imp, 0, wam, wam);
+  defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, wam, wam);
+  defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, wam, wam);
+  defineCsr("siselect",   CN::SISELECT,   !mand, !imp, 0, wam, wam);
+  defineCsr("sireg",      CN::SIREG,      !mand, !imp, 0, wam, wam);
+  defineCsr("stopei",     CN::STOPEI,     !mand, !imp, 0, wam, wam);
+  defineCsr("stopi",      CN::STOPI,      !mand, !imp, 0, wam, wam);
+  defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, wam, wam);
+  defineCsr("hvictl",     CN::HVICTL,     !mand, !imp, 0, wam, wam);
+  defineCsr("hviprio1",   CN::HVIPRIO1,   !mand, !imp, 0, wam, wam);
+  defineCsr("hviprio2",   CN::HVIPRIO2,   !mand, !imp, 0, wam, wam);
+  defineCsr("vsiselect",  CN::VSISELECT,  !mand, !imp, 0, wam, wam);
+  defineCsr("vsireg",     CN::VSIREG,     !mand, !imp, 0, wam, wam);
+  defineCsr("vstopei",    CN::VSTOPEI,    !mand, !imp, 0, wam, wam);
+  defineCsr("vstopi",     CN::VSTOPI,     !mand, !imp, 0, wam, wam);
+
+  for (auto csrn : { CN::VSISELECT, CN::VSIREG, CN::VSTOPEI, CN::VSTOPI } )
+    {
+      auto csr = findCsr(csrn);
+      if (csr)
+	csr->setMapsToVirtual(true);
+    }
+
+  if (sizeof(URV) == 4)
+    {
+      defineCsr("midelegh", CN::MIDELEGH, !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("mieh",     CN::MIEH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("mvienh",   CN::MVIENH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("mviph",    CN::MVIPH,    !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("miph",     CN::MIPH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("sieh",     CN::SIEH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("siph",     CN::SIPH,     !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("hidelegh", CN::HIDELEGH, !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("hvienh",   CN::HVIENH,   !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("hviph",    CN::HVIPH,    !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("hviprio1h",CN::HVIPRIO1H,!mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("hviprio2h",CN::HVIPRIO2H,!mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("vsieh",    CN::VSIEH,    !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+      defineCsr("vsiph",    CN::VSIPH,    !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
+
+      for (auto csrn : { CN::VSIEH, CN::VSIPH } )
+	{
+	  auto csr = findCsr(csrn);
+	  if (csr)
+	    csr->setMapsToVirtual(true);
+	}
+    }
 }
 
 
