@@ -334,6 +334,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       if (not imsic_)
 	return false;
       value = imsic_->machineTopId();
+      value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
   else if (csr->getNumber() == CN::STOPEI)
@@ -341,6 +342,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       if (not imsic_)
 	return false;
       value = imsic_->supervisorTopId();
+      value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
   else if (csr->getNumber() == CN::VSTOPEI)
@@ -351,7 +353,10 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       URV hsVal = hs.read();
       HstatusFields<URV> hsf(hsVal);
       unsigned vgein = hsf.bits_.VGEIN;
+      if (vgein >= imsic_->guestCount())
+	return false;
       value = imsic_->guestTopId(vgein);
+      value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
 
@@ -1116,7 +1121,11 @@ CsRegs<URV>::writeVstopei()
   const auto& hs = regs_.at(size_t(CsrNumber::HSTATUS));
   URV hsVal = hs.read();
   HstatusFields<URV> hsf(hsVal);
+
   unsigned vgein = hsf.bits_.VGEIN;
+  if (vgein >= imsic_->guestCount())
+    return false;
+
   unsigned id = imsic_->guestTopId(vgein);
   if (id)
     imsic_->setGuestPending(vgein, id, false);

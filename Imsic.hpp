@@ -404,6 +404,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	gfiles_.at(guest).setPending(id, flag);
     }
 
+    /// Return the number of guests configured into this IMSIC.
+    size_t guestCount() const
+    { return gfiles_.size(); }
+
   private:
 
     File mfile_;
