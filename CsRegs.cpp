@@ -301,17 +301,11 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   using CN = CsrNumber;
 
   auto csr = getImplementedCsr(num, virtMode_);
-  if (not csr)
-    return false;
-
-  if (mode < csr->privilegeMode())
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode))
     return false;
 
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
-
-  if (not isStateEnabled(num, mode))
-    return false;
 
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
     return readTdata(num, mode, value);
@@ -1140,8 +1134,10 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
   using CN = CsrNumber;
 
   Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-  if (not csr or mode < csr->privilegeMode() or csr->isReadOnly())
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode) or
+      csr->isReadOnly())
     return false;
+
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
 
@@ -1150,9 +1146,6 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       recordWrite(num);
       return true;  // Writing a locked PMPADDR register has no effect.
     }
-
-  if (not isStateEnabled(num, mode))
-    return false;
 
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
     {
@@ -1249,13 +1242,8 @@ bool
 CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
 {
   const Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-  if (not csr)
-    return false;
-
-  if (mode < csr->privilegeMode())
-    return false;
-
-  if (csr->isReadOnly())
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode) or
+      csr->isReadOnly())
     return false;
 
   if (csr->isDebug() and not inDebugMode())
@@ -1287,10 +1275,7 @@ bool
 CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode mode ) const
 {
   const Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-  if (not csr)
-    return false;
-
-  if (mode < csr->privilegeMode())
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode))
     return false;
 
   if (csr->isDebug() and not inDebugMode())
