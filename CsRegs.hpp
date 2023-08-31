@@ -1610,6 +1610,28 @@ namespace WdRiscv
       return fields.bits_.STCE;
     }
 
+    /// Return the ADUE bit of MENVCFG CSR.
+    bool menvcfgAdue()
+    {
+      auto csr = getImplementedCsr(CsrNumber::MENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.ADUE;
+    }
+
+    /// Return the ADUE bit of MENVCFG CSR.
+    bool henvcfgAdue()
+    {
+      auto csr = getImplementedCsr(CsrNumber::HENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.ADUE;
+    }
+
     /// Set ix to the counter index corresponding to the given
     /// MHPMEVENT CSR number (0 for MHPMEVENT3, 1 for MHPMEVENT4, ...)
     /// Return true on success and false if number does not correspond

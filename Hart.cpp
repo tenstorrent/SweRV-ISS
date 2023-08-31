@@ -679,7 +679,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   decoder_.enableRv64(isRv64());
 
-  // Refect initial state of menvcfg CSR on pbmt and sstc.
+  // Reflect initial state of menvcfg CSR on pbmt and sstc.
   updateTranslationPbmt();
   csRegs_.updateSstc();
 }

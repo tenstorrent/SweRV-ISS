@@ -377,6 +377,17 @@ namespace WdRiscv
       if (menv)
 	flag = flag and csRegs_.menvcfgPbmte();
       virtMem_.enablePbmt(flag);
+      if (menv)
+	{
+	  flag = csRegs_.menvcfgAdue();
+	  virtMem_.setFaultOnFirstAccess(not flag);
+	}
+      auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
+      if (henv)
+	{
+	  flag = csRegs_.henvcfgAdue();
+	  virtMem_.setFaultOnFirstAccessStage2(not flag);
+	}
     }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
@@ -1621,9 +1632,17 @@ namespace WdRiscv
     /// Write the collected branch traces to the file at the given path.
     bool saveBranchTrace(const std::string& path);
 
-    /// Set behavior if first access to page
+    /// Set behavior of first access to a virtual memory page: Either
+    /// we take a page fault (flag is true) or we update the A/D bits
+    /// of the PTE. When V is on, this applies to the first stage (VS)
+    /// translation.
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
+
+    /// Similar to setFaultOnFirstAccess but applies to the second stage
+    /// of 2-stage translation.
+    void setFaultOnFirstAccessStage2(bool flag)
+    { virtMem_.setFaultOnFirstAccessStage2(flag); }
 
     /// Translate virtual address without updating TLB or
     /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE

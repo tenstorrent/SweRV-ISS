@@ -310,9 +310,10 @@ namespace WdRiscv
       unsigned CBIE : 2;
       unsigned CBCFE : 1;
       unsigned CBZE : 1;
-      uint64_t reserved1 : 54;
-      unsigned PBMTE : 1;
-      unsigned STCE : 1;
+      uint64_t reserved1 : 53;
+      unsigned ADUE : 1;           // Bit 61
+      unsigned PBMTE : 1;          // Bit 62
+      unsigned STCE : 1;           // Bit 63
     } bits_;
   };
 

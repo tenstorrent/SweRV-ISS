@@ -3093,8 +3093,9 @@ CsRegs<URV>::addMachineFields()
          {"UXL",  2},  {"SXL",  2}, {"SBE",  1}, {"MBE",   1},
          {"res0", 25}, {"SD",   1}});
       setCsrFields(CsrNumber::MENVCFG,
-        {{"FIOM", 1}, {"res0",  3}, {"CBIE",  2}, {"CBCFE", 1},
-         {"CBZE", 1}, {"res1", 54}, {"PBMTE", 1}, {"STCE",  1}});
+        {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
+         {"CBZE", 1}, {"res1", 53}, {"ADUE", 1}, {"PBMTE", 1},
+	 {"STCE", 1}});
     }
 
   unsigned pmpIx = 0;

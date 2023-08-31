@@ -449,6 +449,10 @@ namespace WdRiscv
     void setFaultOnFirstAccess(bool flag)
     { faultOnFirstAccess_ = flag; }
 
+    /// Similar to above but applies to 2nd stage translation.
+    void setFaultOnFirstAccessStage2(bool flag)
+    { faultOnFirstAccess2_ = flag; }
+
     /// Clear saved data for updated leaf level PTE.
     void clearUpdatedPtes()
     { updatedPtes_.clear(); }
@@ -539,6 +543,7 @@ namespace WdRiscv
     bool sum_ = false;  // Supervisor privilege can access user pages.
     bool vsSum_ = false;  // Supervisor privilege can access user pages for VS mode.
     bool faultOnFirstAccess_ = true;
+    bool faultOnFirstAccess2_ = true;
     bool accessDirtyCheck_ = true;  // To be able to supress AD check
 
     bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read
