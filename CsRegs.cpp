@@ -1246,9 +1246,9 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
 template <typename URV>
 bool
-CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
+CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
 {
-  const Csr<URV>* csr = getImplementedCsr(number, virtMode_);
+  const Csr<URV>* csr = getImplementedCsr(num, virtMode_);
   if (not csr)
     return false;
 
@@ -1261,15 +1261,32 @@ CsRegs<URV>::isWriteable(CsrNumber number, PrivilegeMode mode ) const
   if (csr->isDebug() and not inDebugMode())
     return false;  // Debug-mode register.
 
+  using CN = CsrNumber;
+
+  if (imsic_)
+    {
+      if (csr->getNumber() == CN::VSTOPEI)
+	{
+	  const auto& hs = regs_.at(size_t(CN::HSTATUS));
+	  URV hsVal = hs.read();
+	  HstatusFields<URV> hsf(hsVal);
+	  unsigned vgein = hsf.bits_.VGEIN;
+	  if (vgein >= imsic_->guestCount())
+	    return false;
+	}
+    }
+  else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
+    return false;
+
   return true;
 }
 
 
 template <typename URV>
 bool
-CsRegs<URV>::isReadable(CsrNumber number, PrivilegeMode mode ) const
+CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode mode ) const
 {
-  const Csr<URV>* csr = getImplementedCsr(number, virtMode_);
+  const Csr<URV>* csr = getImplementedCsr(num, virtMode_);
   if (not csr)
     return false;
 
@@ -1278,6 +1295,23 @@ CsRegs<URV>::isReadable(CsrNumber number, PrivilegeMode mode ) const
 
   if (csr->isDebug() and not inDebugMode())
     return false;  // Debug-mode register.
+
+  using CN = CsrNumber;
+
+  if (imsic_)
+    {
+      if (csr->getNumber() == CN::VSTOPEI)
+	{
+	  const auto& hs = regs_.at(size_t(CN::HSTATUS));
+	  URV hsVal = hs.read();
+	  HstatusFields<URV> hsf(hsVal);
+	  unsigned vgein = hsf.bits_.VGEIN;
+	  if (vgein >= imsic_->guestCount())
+	    return false;
+	}
+    }
+  else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
+    return false;
 
   return true;
 }
