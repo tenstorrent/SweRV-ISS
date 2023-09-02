@@ -32,12 +32,14 @@ namespace WdRiscv
 
     enum Attrib
       {
-       None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8, Amo = 16,
-       Iccm = 32, Dccm = 64, MemMapped = 128, Rsrv = 256, Io = 512,
-       Cacheable = 1024,
-       MisalOk = 2048, // True if misaligned access supported.
-       MisalAccFault = 4096, // Set if misaligned generates access fault.
+       None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8,
+       AmoArith = 0x10, AmoSwap = 0x20, AmoLogical = 0x40,
+       Iccm = 0x80, Dccm = 0x100, MemMapped = 0x200, Rsrv = 0x400,
+       Io = 0x800, Cacheable = 0x1000,
+       MisalOk = 0x2000, // True if misaligned access supported.
+       MisalAccFault = 0x4000, // Set if misaligned generates access fault.
        Mapped = Exec | Read | Write,
+       Amo = AmoSwap | AmoArith | AmoLogical,
        Default = Read | Write | Exec | Idempotent | Amo | Rsrv | MisalOk
       };
 
@@ -126,6 +128,12 @@ namespace WdRiscv
     /// Disable given attribute in this PMA. Disabling None has no effect.
     void disable(Attrib a)
     { attrib_ &= ~a; }
+
+    /// Return true if this PMA has the given attribute. If given value
+    /// is the or of multiple attributes, then all attributes must be
+    /// present in this PMA.
+    bool hasAttrib(Attrib a) const
+    { return (attrib_ & a) == a; }
 
     /// Convert given string to a Pma object. Return true on success
     /// return false if string does not contain a valid attribute names.

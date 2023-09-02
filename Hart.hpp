@@ -2509,14 +2509,18 @@ namespace WdRiscv
     /// true on success putting the loaded value in val. Return false
     /// if a trigger tripped or an exception took place in which case
     /// val is not modified. The loaded word is sign extended to fill
-    /// the URV value (this is relevant for rv64).
-    bool amoLoad32(uint32_t rs1, URV& val);
+    /// the URV value (this is relevant for rv64). The accessed memory
+    /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
+    /// or access fault.
+    bool amoLoad32(uint32_t rs1, Pma::Attrib attrib, URV& val);
 
     /// Do the load value part of a double-word-sized AMO
     /// instruction. Return true on success putting the loaded value
     /// in val. Return false if a trigger tripped or an exception took
-    /// place in which case val is not modified.
-    bool amoLoad64(uint32_t rs1, URV& val);
+    /// place in which case val is not modified. The accessed memory
+    /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
+    /// or access fault.
+    bool amoLoad64(uint32_t rs1, Pma::Attrib attrib, URV& val);
 
     /// Invalidate cache entries overlapping the bytes written by a
     /// store.
@@ -2886,7 +2890,7 @@ namespace WdRiscv
 
     // atomic
     template <typename OP>
-    void execAmo32Op(const DecodedInst*, OP op);
+    void execAmo32Op(const DecodedInst*, Pma::Attrib attrib, OP op);
     void execAmoadd_w(const DecodedInst*);
     void execAmoswap_w(const DecodedInst*);
     void execLr_w(const DecodedInst*);
@@ -2901,7 +2905,7 @@ namespace WdRiscv
 
     // atmomic + rv64
     template <typename OP>
-    void execAmo64Op(const DecodedInst*, OP op);
+    void execAmo64Op(const DecodedInst*, Pma::Attrib attrib, OP op);
     void execAmoadd_d(const DecodedInst*);
     void execAmoswap_d(const DecodedInst*);
     void execLr_d(const DecodedInst*);

@@ -50,17 +50,13 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
   if (cause != ExceptionCause::NONE)
     return cause;
 
-  Pma pma = memory_.pmaMgr_.getPma(addr);
-  if (not pma.isAmo())
-    return ExceptionCause::STORE_ACC_FAULT;
-
   return cause;
 }
 
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
+Hart<URV>::amoLoad32(uint32_t rs1, Pma::Attrib attrib, URV& value)
 {
   URV virtAddr = intRegs_.read(rs1);
 
@@ -81,6 +77,13 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
   auto cause = validateAmoAddr(addr, gaddr, ldStSize_);
   ldStPhysAddr1_ = addr;
   ldStPhysAddr2_ = addr;
+
+  if (cause == ExceptionCause::NONE)
+    {
+      Pma pma = memory_.pmaMgr_.getPma(addr);
+      if (not pma.hasAttrib(attrib))
+	cause = ExceptionCause::STORE_ACC_FAULT;
+    }
 
   if (cause != ExceptionCause::NONE)
     {
@@ -112,7 +115,7 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
+Hart<URV>::amoLoad64(uint32_t rs1, Pma::Attrib attrib, URV& value)
 {
   URV virtAddr = intRegs_.read(rs1);
 
@@ -133,6 +136,13 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
   auto cause = validateAmoAddr(addr, gaddr, ldStSize_);
   ldStPhysAddr1_ = addr;
   ldStPhysAddr2_ = addr;
+
+  if (cause == ExceptionCause::NONE)
+    {
+      Pma pma = memory_.pmaMgr_.getPma(addr);
+      if (not pma.hasAttrib(attrib))
+	cause = ExceptionCause::STORE_ACC_FAULT;
+    }
 
   if (cause != ExceptionCause::NONE)
     {
@@ -405,7 +415,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
 template <typename URV>
 template <typename OP>
 void
-Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
+Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 {
   if (not isRva())
     {
@@ -419,7 +429,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
 
   URV loadedValue = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad32(rs1, loadedValue);
+  bool loadOk = amoLoad32(rs1, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -440,7 +450,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoadd_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::plus<URV>{});
+  execAmo32Op(di, Pma::AmoArith, std::plus<URV>{});
 }
 
 
@@ -452,7 +462,7 @@ Hart<URV>::execAmoswap_w(const DecodedInst* di)
     return a;
   };
 
-  execAmo32Op(di, getFirst);
+  execAmo32Op(di, Pma::AmoSwap, getFirst);
 }
 
 
@@ -460,7 +470,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoxor_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::bit_xor{});
+  execAmo32Op(di, Pma::AmoLogical, std::bit_xor{});
 }
 
 
@@ -468,7 +478,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoor_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::bit_or{});
+  execAmo32Op(di, Pma::AmoLogical, std::bit_or{});
 }
 
 
@@ -476,7 +486,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoand_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::bit_and{});
+  execAmo32Op(di, Pma::AmoLogical, std::bit_and{});
 }
 
 
@@ -489,7 +499,7 @@ Hart<URV>::execAmomin_w(const DecodedInst* di)
     auto sb = static_cast<int32_t>(b);
     return std::min(sa, sb);
   };
-  execAmo32Op(di, myMin);
+  execAmo32Op(di, Pma::AmoArith, myMin);
 }
 
 
@@ -502,7 +512,7 @@ Hart<URV>::execAmominu_w(const DecodedInst* di)
     auto ub = static_cast<uint32_t>(b);
     return std::min(ua, ub);
   };
-  execAmo32Op(di, myMin);
+  execAmo32Op(di, Pma::AmoArith, myMin);
 }
 
 
@@ -515,7 +525,7 @@ Hart<URV>::execAmomax_w(const DecodedInst* di)
     auto sb = static_cast<int32_t>(b);
     return std::max(sa, sb);
   };
-  execAmo32Op(di, myMax);
+  execAmo32Op(di, Pma::AmoArith, myMax);
 }
 
 
@@ -528,7 +538,7 @@ Hart<URV>::execAmomaxu_w(const DecodedInst* di)
     auto ub = static_cast<uint32_t>(b);
     return std::max(ua, ub);
   };
-  execAmo32Op(di, myMax);
+  execAmo32Op(di, Pma::AmoArith, myMax);
 }
 
 
@@ -607,7 +617,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
 template <typename URV>
 template <typename OP>
 void
-Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
+Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 {
   if (not isRva() or not isRv64())
     {
@@ -621,11 +631,10 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
 
   URV loadedValue = 0;
   URV rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad64(rs1, loadedValue);
+  bool loadOk = amoLoad64(rs1, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
-
       URV rdVal = loadedValue;
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
@@ -642,7 +651,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoadd_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::plus<URV>{});
+  execAmo64Op(di, Pma::AmoArith, std::plus<URV>{});
 }
 
 
@@ -654,7 +663,7 @@ Hart<URV>::execAmoswap_d(const DecodedInst* di)
     return a;
   };
 
-  execAmo64Op(di, getFirst);
+  execAmo64Op(di, Pma::AmoSwap, getFirst);
 }
 
 
@@ -662,7 +671,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoxor_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::bit_xor{});
+  execAmo64Op(di, Pma::AmoLogical, std::bit_xor{});
 }
 
 
@@ -670,7 +679,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoor_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::bit_or{});
+  execAmo64Op(di, Pma::AmoLogical, std::bit_or{});
 }
 
 
@@ -678,7 +687,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoand_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::bit_and{});
+  execAmo64Op(di, Pma::AmoLogical, std::bit_and{});
 }
 
 
@@ -691,7 +700,7 @@ Hart<URV>::execAmomin_d(const DecodedInst* di)
     auto sb = static_cast<int64_t>(b);
     return std::min(sa, sb);
   };
-  execAmo64Op(di, myMin);
+  execAmo64Op(di, Pma::AmoArith, myMin);
 }
 
 
@@ -704,7 +713,7 @@ Hart<URV>::execAmominu_d(const DecodedInst* di)
     auto ub = static_cast<uint64_t>(b);
     return std::min(ua, ub);
   };
-  execAmo64Op(di, myMin);
+  execAmo64Op(di, Pma::AmoArith, myMin);
 }
 
 
@@ -717,7 +726,7 @@ Hart<URV>::execAmomax_d(const DecodedInst* di)
     auto sb = static_cast<int64_t>(b);
     return std::max(sa, sb);
   };
-  execAmo64Op(di, myMax);
+  execAmo64Op(di, Pma::AmoArith, myMax);
 }
 
 
@@ -730,7 +739,7 @@ Hart<URV>::execAmomaxu_d(const DecodedInst* di)
     auto ub = static_cast<uint64_t>(b);
     return std::max(ua, ub);
   };
-  execAmo64Op(di, myMax);
+  execAmo64Op(di, Pma::AmoArith, myMax);
 }
 
 
