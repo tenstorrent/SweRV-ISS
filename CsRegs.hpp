@@ -408,8 +408,10 @@ namespace WdRiscv
       HSTATEEN3H  = 0x61f,
 
       // Ascalon physical memory attributes
-      PMACFG0 = 0x7c0,
-      PMACFG63 = 0x7ff,
+      PMACFG0 = 0x7e0,
+      PMACFG31 = 0x7ff,
+      PMACFG32 = 0xbe0,
+      PMACFG63 = 0xbff,
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
@@ -1135,6 +1137,9 @@ namespace WdRiscv
 
     /// Helper to construtor. Define Mstateen extension CSRs
     void defineStateEnableRegs();
+
+    /// Helper to constructor. Define PMA CSRs.
+    void definePmaRegs();
 
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.

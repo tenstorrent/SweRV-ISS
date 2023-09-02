@@ -41,6 +41,7 @@ CsRegs<URV>::CsRegs()
   defineFpRegs();
   defineAiaRegs();
   defineStateEnableRegs();
+  definePmaRegs();
 }
 
 
@@ -2473,6 +2474,28 @@ CsRegs<URV>::defineStateEnableRegs()
       defineCsr("hstateen1h", CsrNumber::HSTATEEN1H,  !mand, !imp, 0, wam, wam);
       defineCsr("hstateen2h", CsrNumber::HSTATEEN2H,  !mand, !imp, 0, wam, wam);
       defineCsr("hstateen3h", CsrNumber::HSTATEEN3H,  !mand, !imp, 0, wam, wam);
+    }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::definePmaRegs()
+{
+  using CN = CsrNumber;
+
+  bool imp = true;
+  bool mand = true;
+
+  uint64_t reset = 0, mask = 0;
+
+  for (unsigned i = 0; i < 64; ++i)
+    {
+      std::string name = std::string("pmacfg") + std::to_string(i);
+      CN num = CN(unsigned(CN::PMACFG0) + i);
+      if (i >= 32)
+	num = CN(unsigned(CN::PMACFG32) + i - 32);
+      defineCsr(name, num, !mand, !imp, reset, mask, mask);
     }
 }
 

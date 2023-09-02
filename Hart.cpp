@@ -2965,14 +2965,17 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       return;
     }
 
-  if (csr >= CN::PMACFG0 and csr <= CN::PMACFG63)
+  if ((csr >= CN::PMACFG0 and csr <= CN::PMACFG32) or
+      (csr >= CN::PMACFG32 and csr <= CN::PMACFG63))
     {
       URV val = 0; // Value of pmpcfg csr.
       peekCsr(csr, val);
       uint64_t low = 0, high = 0;
       Pma pma;
       unpackPmacfg(val, low, high, pma);
-      unsigned ix = unsigned(csr) - unsigned(CN::PMACFG0);
+      unsigned ix = unsigned(csr);
+      ix = ix < unsigned(CN::PMACFG32) ? ix - unsigned(CN::PMACFG0) :
+	                                 32 + ix - unsigned(CN::PMACFG32);
       definePmaRegion(ix, low, high, pma);
       return;
     }
