@@ -55,6 +55,7 @@ PmaManager::PmaManager(uint64_t memSize)
   : memSize_(memSize)
 {
   noAccessPma_.enable(Pma::Attrib::MisalOk);
+  regions_.reserve(32);
 }
 
 

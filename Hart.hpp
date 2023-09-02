@@ -1720,11 +1720,13 @@ namespace WdRiscv
     void registerPreInst(std::function<void(Hart<URV>&, bool&, bool&)> callback)
     { preInst_ = std::move(callback); }
 
-    /// Define physical memory attribute region. Region addresses are between
-    /// low and high inclusive. To define a 1024-byte region at address zero
-    /// we would set low to zero and high to 1023.
-    bool definePmaRegion(uint64_t low, uint64_t high, Pma pma)
-    { return memory_.pmaMgr_.defineRegion(low, high, pma); }
+    /// Define physical memory attribute region at index ix. Region
+    /// addresses are between low and high inclusive. To define a
+    /// 1024-byte region at address zero we would set low to zero and
+    /// high to 1023. Region are checked in order and the first
+    /// matching region applies.
+    bool definePmaRegion(unsigned ix, uint64_t low, uint64_t high, Pma pma)
+    { return memory_.pmaMgr_.defineRegion(ix, low, high, pma); }
 
     /// Associate a mask with the word-aligned word at the given
     /// address. Return true on success and flase if given address is

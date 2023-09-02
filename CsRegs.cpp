@@ -1787,35 +1787,12 @@ CsRegs<URV>::defineMachineRegs()
   uint64_t cfgMask = 0x9f9f9f9f;
   if (not rv32_)
     cfgMask = 0x9f9f9f9f9f9f9f9fL;
-  defineCsr("pmpcfg0",   Csrn::PMPCFG0,   !mand, imp, 0, cfgMask, cfgMask);
-  defineCsr("pmpcfg2",   Csrn::PMPCFG2,   !mand, imp, 0, cfgMask, cfgMask);
-  defineCsr("pmpcfg4",   Csrn::PMPCFG4,   !mand, imp, 0, cfgMask, cfgMask);
-  defineCsr("pmpcfg6",   Csrn::PMPCFG6,   !mand, imp, 0, cfgMask, cfgMask);
-  defineCsr("pmpcfg8",   Csrn::PMPCFG8,   !mand, imp, 0, cfgMask, cfgMask);
-  defineCsr("pmpcfg10",  Csrn::PMPCFG10,  !mand, imp, 0, cfgMask, cfgMask);
-  defineCsr("pmpcfg12",  Csrn::PMPCFG12,  !mand, imp, 0, cfgMask, cfgMask);
-  defineCsr("pmpcfg14",  Csrn::PMPCFG14,  !mand, imp, 0, cfgMask, cfgMask);
-  if (rv32_)
+  for (unsigned i = 0; i < 16; ++i)
     {
-      defineCsr("pmpcfg1",   Csrn::PMPCFG1,   !mand, imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg3",   Csrn::PMPCFG3,   !mand, imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg5",   Csrn::PMPCFG5,   !mand, imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg7",   Csrn::PMPCFG7,   !mand, imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg9",   Csrn::PMPCFG9,   !mand, imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg11",  Csrn::PMPCFG11,  !mand, imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg13",  Csrn::PMPCFG13,  !mand, imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg15",  Csrn::PMPCFG15,  !mand, imp, 0, cfgMask, cfgMask);
-    }
-  else
-    {
-      defineCsr("pmpcfg1",   Csrn::PMPCFG1,   !mand, !imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg3",   Csrn::PMPCFG3,   !mand, !imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg5",   Csrn::PMPCFG5,   !mand, !imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg7",   Csrn::PMPCFG7,   !mand, !imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg9",   Csrn::PMPCFG9,   !mand, !imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg11",  Csrn::PMPCFG11,  !mand, !imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg13",  Csrn::PMPCFG13,  !mand, !imp, 0, cfgMask, cfgMask);
-      defineCsr("pmpcfg15",  Csrn::PMPCFG15,  !mand, !imp, 0, cfgMask, cfgMask);
+      bool implemented = rv32_ or (i & 1) == 0;  // Only even numbered CSRs in rv64
+      std::string name = std::string("pmpcfg") + std::to_string(i);
+      Csrn csrn = Csrn(unsigned(Csrn::PMPCFG0) + i);
+      defineCsr(name, csrn,  !mand, implemented, 0, cfgMask, cfgMask);
     }
 
   uint64_t pmpMask = 0xffffffff;

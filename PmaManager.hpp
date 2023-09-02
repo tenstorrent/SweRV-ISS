@@ -169,17 +169,23 @@ namespace WdRiscv
       return defaultPma_;  // rwx amo rsrv idempotent misalok
     }
 
-    /// Define a physical memory attribute region. Regions must be defined
-    /// in order (if an address is covered by multiple regions, then the
-    /// first defined region applies). The defined region consists of the
-    /// word-aligned words with addresses between fistAddr and lastAddr
-    /// inclusive. For example, if firstAddr is 5 and lastAddr is 13,
-    /// then the defined region consists of the words at 8 and 12 (bytes
-    /// 8 to 15).
-    bool defineRegion(uint64_t firstAddr, uint64_t lastAddr, Pma pma)
+    /// Define a physical memory attribute region at given index ix
+    /// (indices are 0 to n-1 where n is the region count). Regions
+    /// are checked in order order (if an address is covered by
+    /// multiple regions, then the first defined region applies). The
+    /// defined region consists of the word-aligned words with
+    /// addresses between fistAddr and lastAddr inclusive. For
+    /// example, if firstAddr is 5 and lastAddr is 13, then the
+    /// defined region consists of the words at 8 and 12 (bytes 8 to
+    /// 15).
+    bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma)
     {
       Region region{firstAddr, lastAddr, pma};
-      regions_.push_back(region);
+      if (ix >= 128)
+	return false;  // Arbitrary limit.
+      if (ix >= regions_.size())
+	regions_.resize(ix + 1);
+      regions_.at(ix) = region;
       return true;
     }
 

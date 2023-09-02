@@ -1059,7 +1059,7 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 	    itemErrors++;
 	  if (not itemErrors)
 	    {
-	      if (not hart.definePmaRegion(low, high, pma))
+	      if (not hart.definePmaRegion(ix, low, high, pma))
 		itemErrors++;
 	      else if (pma.isMemMappedReg())
 		{
@@ -1078,6 +1078,53 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 }
 
 
+/// Return true if config has a defined pmacfg CSR. This is either a
+/// pmacfg with no "exists" attribute or with "exists" attribute set
+/// to true.
+static bool
+hasDefinedPmacfgCsr(const nlohmann::json& config)
+{
+  if (not config.contains("csr"))
+    return false;  // No csr section
+
+  const auto& csrs = config.at("csr");
+  if (not csrs.is_object())
+    return false;  // No csr section in this config.
+
+  // We could have a pmacfg entry with a range of indices.
+  if (csrs.contains("pmacfg"))
+    {
+      const auto& entry = csrs.at("pmacfg");
+      if (entry.is_object())
+	{
+	  if (not entry.contains("exists"))
+	    return true;
+	  bool exists = false;
+	  if (getJsonBoolean("csr.pmacfg", entry.at("exists"), exists) and exists)
+	    return true;
+	}
+    }
+      
+  // We could have a specific pmacfg csr (example pmacfg0).
+  for (unsigned i = 0; i < 64; ++i)
+    {
+      std::string name = "pmacfg";
+      name += std::to_string(i);
+      if (csrs.contains(name))
+	{
+	  const auto& entry = csrs.at(name);
+	  if (not entry.contains("exists"))
+	    return true;
+	  bool exists = false;
+	  if (getJsonBoolean(name + ".exists", entry.at("exists"), exists) and exists)
+	    return true;
+	}
+    }
+
+  return false;
+}
+
+
 template<typename URV>
 bool
 HartConfig::applyMemoryConfig(Hart<URV>& hart) const
@@ -1090,8 +1137,15 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
       const auto& memMap = config_ -> at("memmap");
       std::string_view tag = "pma";
       if (memMap.contains(tag))
-	if (not applyPmaConfig(hart, memMap.at(tag)))
-	  errors++;
+	{
+	  if (hasDefinedPmacfgCsr(*config_))
+	    {
+	      std::cerr << "Warning: Configuration file has both memmap pma "
+			<< "and a pmacfg CSR. CSRs will override memmap.\n";
+	    }
+	  if (not applyPmaConfig(hart, memMap.at(tag)))
+	    errors++;
+	}
     }
 
   if (config_ -> contains("cache"))

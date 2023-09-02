@@ -2879,6 +2879,52 @@ Hart<URV>::peekCsr(CsrNumber csrn, std::string_view field, URV& val) const
 }
 
 
+static
+void
+unpackPmacfg(uint64_t val, uint64_t& low, uint64_t& high, Pma& pma)
+{
+  unsigned attrib = 0;
+
+  if (val & 1)
+    attrib |= Pma::Attrib::Read;
+
+  if (val & 2)
+    attrib |= Pma::Attrib::Write;
+
+  if (val & 4)
+    attrib |= Pma::Attrib::Exec;
+
+  // TBD FIX : Support io channel0 and channel1
+  unsigned memType = (val >> 3) & 3;   // Bits 4:3
+  if (memType != 0)
+    attrib |= Pma::Attrib::Io;
+
+  // TBD FIX : Support aomswap, amological, and amoarithmetic
+  unsigned amoType = (val >> 5) & 3;   // Bits 6:5
+  if (amoType != 0)
+    attrib |= Pma::Attrib::Amo;
+
+  if (val & 0x10)  // Bit 7
+    attrib |= Pma::Attrib::Cacheable;
+
+  pma = Pma(Pma::Attrib(attrib));
+
+  // Recover base address: Bits 55:12
+  uint64_t addr = (val << 8) >> 8;  // Clear top 8 bits of val.
+  addr = (addr >> 12) << 12;   // Clear least sig 12 bits of val.
+  low = addr;
+
+  // Recover n = log2 of size.
+  uint64_t n = val >> 58;   // Bits 63:58
+  if (n < 12)
+    n = 12;
+
+  high = ~uint64_t(0);
+  if (n < 56)
+    high = (high << n) >> n;  // Clear least sig n bits
+}
+
+
 template <typename URV>
 void
 Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
@@ -2890,25 +2936,48 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   if (enableCounters_)
     if ((csr >= CN::MHPMEVENT3 and csr <= CN::MHPMEVENT31) or
         (csr >= CN::MHPMEVENTH3 and csr <= CN::MHPMEVENTH31))
-      if (not csRegs_.applyPerfEventAssign())
-        std::cerr << "Unexpected applyPerfAssign fail\n";
+      {
+	if (not csRegs_.applyPerfEventAssign())
+	  std::cerr << "Unexpected applyPerfAssign fail\n";
+	return;
+      }
 
   if (csr == CN::DCSR)
     {
       DcsrFields<URV> dcsr(val);
       dcsrStep_ = dcsr.bits_.STEP;
       dcsrStepIe_ = dcsr.bits_.STEPIE;
+      return;
     }
-  else if (csr >= CN::PMPCFG0 and csr <= CN::PMPCFG15)
-    updateMemoryProtection();
-  else if (csr >= CN::PMPADDR0 and csr <= CN::PMPADDR63)
+
+  if (csr >= CN::PMPCFG0 and csr <= CN::PMPCFG15)
+    {
+      updateMemoryProtection();
+      return;
+    }
+
+  if (csr >= CN::PMPADDR0 and csr <= CN::PMPADDR63)
     {
       unsigned config = csRegs_.getPmpConfigByteFromPmpAddr(csr);
       auto type = Pmp::Type((config >> 3) & 3);
       if (type != Pmp::Type::Off)
         updateMemoryProtection();
+      return;
     }
-  else if (csr == CN::SATP or csr == CN::VSATP or csr == CN::HGATP)
+
+  if (csr >= CN::PMACFG0 and csr <= CN::PMACFG63)
+    {
+      URV val = 0; // Value of pmpcfg csr.
+      peekCsr(csr, val);
+      uint64_t low = 0, high = 0;
+      Pma pma;
+      unpackPmacfg(val, low, high, pma);
+      unsigned ix = unsigned(csr) - unsigned(CN::PMACFG0);
+      definePmaRegion(ix, low, high, pma);
+      return;
+    }
+
+  if (csr == CN::SATP or csr == CN::VSATP or csr == CN::HGATP)
     updateAddressTranslation();
   else if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
     markFsDirty(); // Update FS field of MSTATS if FCSR is written
