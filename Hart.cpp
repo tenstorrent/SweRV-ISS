@@ -2919,11 +2919,13 @@ unpackPmacfg(uint64_t val, uint64_t& low, uint64_t& high, Pma& pma)
   if (n < 12)
     n = 12;
 
+  low = (low  >> n) << n;  // Clear least sig n bits.
+
   high = ~uint64_t(0);
   if (n < 56)
     {
-      high = (high >> n) << n;  // Clear least sig n bits
-      high = high - 1;
+      high = low;
+      high |= (uint64_t(1) << n) - 1; // Set bits 0 to n-1
     }
 }
 

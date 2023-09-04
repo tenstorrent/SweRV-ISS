@@ -2487,7 +2487,7 @@ CsRegs<URV>::definePmaRegs()
   bool imp = true;
   bool mand = true;
 
-  uint64_t reset = 0, mask = 0;
+  uint64_t reset = 0x7, mask = 0xfcfffffffffff1ff;
 
   for (unsigned i = 0; i < 64; ++i)
     {
