@@ -682,6 +682,18 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // Reflect initial state of menvcfg CSR on pbmt and sstc.
   updateTranslationPbmt();
   csRegs_.updateSstc();
+
+  // If any PMPCFG CSR is defined, change the default PMA to no access.
+  bool hasPmacfg = false;
+  using CN = CsrNumber;
+  for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG31); ++ix)
+    if (csRegs_.getImplementedCsr(CN(ix)))
+	hasPmacfg = true;
+  for (unsigned ix = unsigned(CN::PMACFG32); ix <= unsigned(CN::PMACFG63); ++ix)
+    if (csRegs_.getImplementedCsr(CN(ix)))
+	hasPmacfg = true;
+  if (hasPmacfg)
+    memory_.pmaMgr_.clearDefaultPma();
 }
 
 
@@ -2881,8 +2893,17 @@ Hart<URV>::peekCsr(CsrNumber csrn, std::string_view field, URV& val) const
 
 static
 void
-unpackPmacfg(uint64_t val, uint64_t& low, uint64_t& high, Pma& pma)
+unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
 {
+  // Recover n = log2 of size.
+  uint64_t n = val >> 58;   // Bits 63:58
+  valid = n != 0;
+  if (not valid)
+    return;
+
+  if (n < 12)
+    n = 12;
+
   unsigned attrib = 0;
 
   if (val & 1)
@@ -2913,11 +2934,6 @@ unpackPmacfg(uint64_t val, uint64_t& low, uint64_t& high, Pma& pma)
   uint64_t addr = (val << 8) >> 8;  // Clear top 8 bits of val.
   addr = (addr >> 12) << 12;   // Clear least sig 12 bits of val.
   low = addr;
-
-  // Recover n = log2 of size.
-  uint64_t n = val >> 58;   // Bits 63:58
-  if (n < 12)
-    n = 12;
 
   low = (low  >> n) << n;  // Clear least sig n bits.
 
@@ -2970,18 +2986,22 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       return;
     }
 
-  if ((csr >= CN::PMACFG0 and csr <= CN::PMACFG32) or
+  if ((csr >= CN::PMACFG0 and csr <= CN::PMACFG31) or
       (csr >= CN::PMACFG32 and csr <= CN::PMACFG63))
     {
       URV val = 0; // Value of pmpcfg csr.
       peekCsr(csr, val);
       uint64_t low = 0, high = 0;
       Pma pma;
-      unpackPmacfg(val, low, high, pma);
+      bool valid = false;
+      unpackPmacfg(val, valid, low, high, pma);
       unsigned ix = unsigned(csr);
-      ix = ix < unsigned(CN::PMACFG32) ? ix - unsigned(CN::PMACFG0) :
+      ix = ix <= unsigned(CN::PMACFG31) ? ix - unsigned(CN::PMACFG0) :
 	                                 32 + ix - unsigned(CN::PMACFG32);
-      definePmaRegion(ix, low, high, pma);
+      if (valid)
+	definePmaRegion(ix, low, high, pma);
+      else
+	invalidatePmaEntry(ix);
       return;
     }
 

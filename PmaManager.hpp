@@ -143,7 +143,7 @@ namespace WdRiscv
 
   private:
 
-    uint32_t attrib_;
+    uint32_t attrib_ = 0;
   };
 
 
@@ -169,7 +169,7 @@ namespace WdRiscv
 
       // Search regions in order. Return first matching.
       for (const auto& region : regions_)
-	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pma_;
 
       if (addr >= memSize_)
@@ -188,13 +188,23 @@ namespace WdRiscv
     /// 15).
     bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma)
     {
-      Region region{firstAddr, lastAddr, pma};
+      Region region{firstAddr, lastAddr, pma, true};
       if (ix >= 128)
 	return false;  // Arbitrary limit.
       if (ix >= regions_.size())
 	regions_.resize(ix + 1);
       regions_.at(ix) = region;
       return true;
+    }
+
+    /// Mark entry at given index as invalid.
+    void invalidateEntry(unsigned ix)
+    {
+      if (ix >= 128)
+	return;  // Arbitrary limit.
+      if (ix >= regions_.size())
+	regions_.resize(ix + 1);
+      regions_.at(ix).valid_ = false;
     }
 
     /// Associate a mask with the word-aligned word at the given
@@ -231,6 +241,10 @@ namespace WdRiscv
 	}
     }
 
+    /// Clear the default PMA (no access).
+    void clearDefaultPma()
+    { defaultPma_.attrib_ = Pma::Attrib::None; }
+
   protected:
 
     /// Reset (to zero) all memory mapped registers.
@@ -266,6 +280,7 @@ namespace WdRiscv
       uint64_t firstAddr_ = 0;
       uint64_t lastAddr_ = 0;
       Pma pma_;
+      bool valid_ = false;
     };
     
     struct MemMappedReg

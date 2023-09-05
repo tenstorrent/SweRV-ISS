@@ -1728,6 +1728,10 @@ namespace WdRiscv
     bool definePmaRegion(unsigned ix, uint64_t low, uint64_t high, Pma pma)
     { return memory_.pmaMgr_.defineRegion(ix, low, high, pma); }
 
+    /// Mark as invalid entry with the given index.
+    void invalidatePmaEntry(unsigned ix)
+    { memory_.pmaMgr_.invalidateEntry(ix); }
+
     /// Associate a mask with the word-aligned word at the given
     /// address. Return true on success and flase if given address is
     /// not in a memory mapped region.
