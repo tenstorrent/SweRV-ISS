@@ -1553,7 +1553,7 @@ namespace WdRiscv
 
     /// Enable Advance Interrupt Architecture (AIA) extension.
     void enableAiaExtension(bool flag)
-    { csRegs_.enableAiaExtension(flag); }
+    { enableExtension(RvExtension::Smaia, flag); csRegs_.enableAiaExtension(flag); }
 
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.
@@ -1844,6 +1844,13 @@ namespace WdRiscv
       imsicWrite_ = writeFunc;
       csRegs_.attachImsic(imsic);
     }
+
+    /// Return true if given extension is enabled.
+    constexpr bool extensionIsEnabled(RvExtension ext) const
+    {
+      return ext_enabled_.test(static_cast<std::size_t>(ext));
+    }
+
 
   protected:
 
@@ -4581,10 +4588,7 @@ namespace WdRiscv
     void dumpBasicBlocks();
     void dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr);
 
-    constexpr bool extensionIsEnabled(RvExtension ext) const
-    {
-      return ext_enabled_.test(static_cast<std::size_t>(ext));
-    }
+    /// Enable given extension.
     constexpr void enableExtension(RvExtension ext, bool isEnabled)
     {
       ext_enabled_.set(static_cast<std::size_t>(ext), isEnabled);
