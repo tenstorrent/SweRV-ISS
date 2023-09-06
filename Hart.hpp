@@ -1732,6 +1732,10 @@ namespace WdRiscv
     void invalidatePmaEntry(unsigned ix)
     { memory_.pmaMgr_.invalidateEntry(ix); }
 
+    /// Called after a chance to a PMACFG CSR. Return true on success
+    /// and false if num is not that of PMACFG CSR.
+    bool processPmaChange(CsrNumber num);
+
     /// Associate a mask with the word-aligned word at the given
     /// address. Return true on success and flase if given address is
     /// not in a memory mapped region.

@@ -688,10 +688,16 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   using CN = CsrNumber;
   for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG31); ++ix)
     if (csRegs_.getImplementedCsr(CN(ix)))
+      {
 	hasPmacfg = true;
+	processPmaChange(CN(ix));
+      }
   for (unsigned ix = unsigned(CN::PMACFG32); ix <= unsigned(CN::PMACFG63); ++ix)
     if (csRegs_.getImplementedCsr(CN(ix)))
+      {
 	hasPmacfg = true;
+	processPmaChange(CN(ix));
+      }
   if (hasPmacfg)
     memory_.pmaMgr_.clearDefaultPma();
 }
@@ -2398,10 +2404,10 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2)
   else
     consecutiveIllegalCount_ = 0;
 
-  if (consecutiveIllegalCount_ > 64)  // FIX: Make a parameter
+  if (consecutiveIllegalCount_ > 10)  // FIX: Make a parameter
     {
       throw CoreException(CoreException::Stop,
-                          "64 consecutive illegal instructions",
+                          "10 consecutive illegal instructions",
                           0, 3);
     }
 
@@ -2947,6 +2953,34 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
 
 
 template <typename URV>
+bool
+Hart<URV>::processPmaChange(CsrNumber csr)
+{
+  using CN = CsrNumber;
+
+  unsigned ix = unsigned(csr);
+  if (ix >= unsigned(CN::PMACFG0) and ix <= unsigned(CN::PMACFG31))
+    ix -= unsigned(CN::PMACFG0);
+  else  if (ix >= unsigned(CN::PMACFG32) and ix <= unsigned(CN::PMACFG63))
+    ix = 32 + ix - unsigned(CN::PMACFG32);
+  else
+    return false;
+
+  URV val = 0; // Value of pmpcfg csr.
+  peekCsr(csr, val);
+  uint64_t low = 0, high = 0;
+  Pma pma;
+  bool valid = false;
+  unpackPmacfg(val, valid, low, high, pma);
+  if (valid)
+    definePmaRegion(ix, low, high, pma);
+  else
+    invalidatePmaEntry(ix);
+  return true;
+}
+
+
+template <typename URV>
 void
 Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 {
@@ -2989,19 +3023,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
   if ((csr >= CN::PMACFG0 and csr <= CN::PMACFG31) or
       (csr >= CN::PMACFG32 and csr <= CN::PMACFG63))
     {
-      URV val = 0; // Value of pmpcfg csr.
-      peekCsr(csr, val);
-      uint64_t low = 0, high = 0;
-      Pma pma;
-      bool valid = false;
-      unpackPmacfg(val, valid, low, high, pma);
-      unsigned ix = unsigned(csr);
-      ix = ix <= unsigned(CN::PMACFG31) ? ix - unsigned(CN::PMACFG0) :
-	                                 32 + ix - unsigned(CN::PMACFG32);
-      if (valid)
-	definePmaRegion(ix, low, high, pma);
-      else
-	invalidatePmaEntry(ix);
+      if (not processPmaChange(csr))
+	assert(0);
       return;
     }
 
