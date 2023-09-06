@@ -1698,15 +1698,15 @@ template<typename URV>
 bool
 HartConfig::applyImsicConfig(System<URV>& system) const
 {
+  if (not config_ -> contains("imsic"))
+    return true;
+
   auto& hart0 = *system.ithHart(0);
   if (not hart0.extensionIsEnabled(RvExtension::Smaia))
     {
       std::cerr << "Cannot configure IMSIC without enabling Smaia\n";
       return false;
     }
-
-  if (not config_ -> contains("imsic"))
-    return true;
 
   auto& imsic = config_ -> at("imsic");
 
