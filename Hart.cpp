@@ -2928,8 +2928,17 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
 
   // TBD FIX : Support aomswap, amological, and amoarithmetic
   unsigned amoType = (val >> 5) & 3;   // Bits 6:5
-  if (amoType != 0)
-    attrib |= Pma::Attrib::Amo;
+  if (amoType == 0)
+    {
+      attrib |= Pma::Attrib::MisalOk;
+      attrib |= Pma::Attrib::Rsrv;
+    }
+  else if (amoType == 1)
+    attrib |= Pma::Attrib::AmoSwap;
+  else if (amoType == 2)
+    attrib |= Pma::Attrib::AmoLogical;
+  else if (amoType == 3)
+    attrib |= Pma::Attrib::AmoArith;
 
   if (val & 0x10)  // Bit 7
     attrib |= Pma::Attrib::Cacheable;
