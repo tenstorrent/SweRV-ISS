@@ -2912,6 +2912,9 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
 
   unsigned attrib = 0;
 
+  // Misaligned allowed everywhere (msial for AMO/LR/SC is separate).
+  attrib |= Pma::Attrib::MisalOk;
+
   if (val & 1)
     attrib |= Pma::Attrib::Read;
 
@@ -2926,12 +2929,15 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
   if (memType != 0)
     attrib |= Pma::Attrib::Io;
 
+  bool cacheable = val & 0x10;  // Bit 7
+
   // TBD FIX : Support aomswap, amological, and amoarithmetic
   unsigned amoType = (val >> 5) & 3;   // Bits 6:5
   if (amoType == 0)
     {
       attrib |= Pma::Attrib::MisalOk;
-      attrib |= Pma::Attrib::Rsrv;
+      if (cacheable)
+	attrib |= Pma::Attrib::Rsrv;
     }
   else if (amoType == 1)
     attrib |= Pma::Attrib::AmoSwap;
@@ -2940,7 +2946,7 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
   else if (amoType == 3)
     attrib |= Pma::Attrib::AmoArith;
 
-  if (val & 0x10)  // Bit 7
+  if (cacheable)  // Bit 7
     attrib |= Pma::Attrib::Cacheable;
 
   pma = Pma(Pma::Attrib(attrib));
