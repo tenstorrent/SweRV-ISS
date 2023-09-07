@@ -4000,6 +4000,13 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   if (not peekIntReg(RegSp, sp))
     return false;
 
+  // GCC allocates stack space for vector registers without checking
+  // VLENB. It under-allocated when vector size is more than 16 bytes
+  // and that sometimes causes a stack overflow. Avoid overflow by
+  // pre-allocating 4k bytes.
+  if (hasIsaExtension(RvExtension::V))
+    sp -= 4*1024;
+
   // Make sp 16-byte aligned.
   if ((sp & 0xf) != 0)
     sp -= (sp & 0xf);
