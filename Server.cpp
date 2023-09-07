@@ -678,9 +678,13 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
 
-  bool wasInDebug = hart.inDebugMode();
-  if (wasInDebug)
-    hart.exitDebugMode();
+  bool wasInDebug = false;
+  if (not hart.hasDebugParkLoop())
+    {
+      wasInDebug = hart.inDebugMode();
+      if (wasInDebug)
+	hart.exitDebugMode();
+    }
 
   uint32_t inst = 0;
   hart.readInst(hart.pc(), inst);  // In case instruction is interrupted.

@@ -218,9 +218,13 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
       hasTag = true;
     }
 
-  bool wasInDebug = hart.inDebugMode();
-  if (wasInDebug)
-    hart.exitDebugMode();
+  bool wasInDebug = false;
+  if (not hart.hasDebugParkLoop())
+    {
+      wasInDebug = hart.inDebugMode();
+      if (wasInDebug)
+	hart.exitDebugMode();
+    }
 
   for (uint64_t i = 0; i < count; ++i)
     {

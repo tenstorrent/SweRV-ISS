@@ -662,7 +662,7 @@ namespace WdRiscv
     { defined_ = flag; }
 
     /// True if this is a hypervisor register. Hypervisor registers
-    /// are not available in VS (virtual-supervisor) mode.
+    /// are not available in VS/VU (virtual-supervisor) mode.
     void setHypervisor(bool flag)
     { hyper_ = flag; }
 

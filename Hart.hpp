@@ -1833,6 +1833,10 @@ namespace WdRiscv
     void setDebugTrapAddress(URV addr)
     { debugTrapAddr_ = addr; }
 
+    /// Return true a park loop is defined for debug mode.
+    bool hasDebugParkLoop() const
+    { return debugParkLoop_ != ~URV(0); }
+
     /// Associate given IMSIC with this hart and define the address
     /// space for all IMSICs in the system.
     void attachImsic(std::shared_ptr<TT_IMSIC::Imsic> imsic,
