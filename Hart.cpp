@@ -4005,7 +4005,7 @@ Hart<URV>::setTargetProgramArgs(const std::vector<std::string>& args)
   // and that sometimes causes a stack overflow. Avoid overflow by
   // pre-allocating 4k bytes.
   if (hasIsaExtension(RvExtension::V))
-    sp -= 4*1024;
+    sp -= 8*1024;
 
   // Make sp 16-byte aligned.
   if ((sp & 0xf) != 0)
