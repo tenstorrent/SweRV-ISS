@@ -673,7 +673,7 @@ namespace WdRiscv
     bool maskAgn_ = false;                         // Cached VTYPE.ma
     bool tailAgn_ = false;                         // Cached VTYPE.ta
     bool vill_ = false;                            // Cached VTYPE.VILL
-    bool maskAgnOnes_ = false; // True if ones written in masked elems when mask agnostic.
+    bool maskAgnOnes_ = true; // True if ones written in masked elems when mask agnostic.
     bool tailAgnOnes_ = false; // True if ones written in tail elems when mask agnostic.
 
     uint32_t groupX8_ = 8;    // Group multipler as a number scaled by 8.
