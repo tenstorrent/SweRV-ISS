@@ -661,6 +661,7 @@ The vector configuration is an object with the following fields:
 * min_bytes_per_elem: narrowest suppoted element size in bytes (default 1).
 * max_bytes_per_elem: widest supported element size in bytes (no default).
 * min_bytes_per_lmul: map of lmul to min-element-width-in bytes (default: no min).
+* mask_agnostic_policy: "ones" or "undisturb" to set behavior of mask-anostic instructions, default is "ones".
 
 Example:
 ```

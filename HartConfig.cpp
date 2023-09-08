@@ -892,6 +892,34 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
     hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
 		      &maxBytesPerLmul);
 
+  tag = "mask_agnostic_policy";
+  if (vconf.contains(tag))
+    {
+      auto& item = vconf.at(tag);
+      if (not item.is_string())
+	{
+	  std::cerr << "Error: Configuration file tag vector.mask_agnostic_policy must have a string value\n";
+	errors++;
+	}
+      else
+	{
+	  std::string val = item.get<std::string>();
+	  if (val == "ones")
+	    hart.configMaksAgnosticAllOnes(true);
+	  else if (val == "undisturb")
+	    hart.configMaksAgnosticAllOnes(false);
+	  else
+	    {
+	      std::cerr << "Error: Configuration file tag vector.mask_agnostic_policy must be 'ones' or 'undisturb'\n";
+	      errors++;
+	    }
+	}
+    }
+
+  if (errors == 0)
+    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
+		      &maxBytesPerLmul);
+
   return errors == 0;
 }
 

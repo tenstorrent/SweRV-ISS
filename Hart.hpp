@@ -417,6 +417,11 @@ namespace WdRiscv
 		      std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul, maxSewPerLmul); }
 
+    /// Configure mask agnostic policy. Allones if flag is true,
+    /// undisturb if false.
+    void configMaksAgnosticAllOnes(bool flag)
+    { vecRegs_.configMaskAgnosticAllOnes(flag); }
+
     /// Return currently configured element width
     ElementWidth elemWidth() const
     { return vecRegs_.elemWidth(); }
