@@ -916,6 +916,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 	}
     }
 
+  tag = "trap_non_zero_vstart";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.enableTrapNonZeroVstart(flag);
+    }
+
   if (errors == 0)
     hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
 		      &maxBytesPerLmul);
@@ -1575,16 +1585,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
       else
         hart.setDebugTrapAddress(addr);
-    }
-
-  tag = "trap_non_zero_vstart";
-  if (config_ -> contains(tag))
-    {
-      bool flag = false;
-      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
-        errors++;
-      else
-        hart.enableTrapNonZeroVstart(flag);
     }
 
   tag = "trace_pmp";
