@@ -10216,8 +10216,10 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 
       ELEM_TYPE elem = 0;
 #ifndef FAST_SLOPPY
-      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem),
-                                     false /*hyper*/);
+      cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false);
+#else
+      if (faultFirst)
+	cause = determineLoadException(pa1, pa2, gpa1, gpa2, sizeof(elem), false);
 #endif
       if (cause == ExceptionCause::NONE)
 	memRead(pa1, pa2, elem);
