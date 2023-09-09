@@ -2000,7 +2000,7 @@ CsRegs<URV>::defineSupervisorRegs()
   if (sie and mie)
     sie->tie(mie->valuePtr_);
 
-  // Bits of SIE appear hardwired to zreo unless delegated.
+  // Bits of SIP appear hardwired to zreo unless delegated.
   mask = 0x2;  // Only ssip bit writable (when delegated)
   defineCsr("sip",        Csrn::SIP,        !mand, !imp, 0, mask, mask);
 
