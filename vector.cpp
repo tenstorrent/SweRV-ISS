@@ -11134,7 +11134,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
