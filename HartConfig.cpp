@@ -1688,6 +1688,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableAiaExtension(flag);
     }
 
+  tag = "enable_smstateen";
+  if (config_ ->contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableSmstaten(flag);
+    }
+
   return errors == 0;
 }
 
