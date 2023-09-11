@@ -322,14 +322,16 @@ Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0,
 }
 
 
+// Check that the given vector operand (vector register number) is a multiple
+// of the effective group. The effective group is 1 for fractional groups.
 template <typename URV>
 inline
 bool
-Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned groupX8)
+Hart<URV>::checkVecOpsVsEmul(const DecodedInst* di, unsigned op, unsigned groupX8)
 {
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
-  if ((op0 & mask) == 0)
+  if ((op & mask) == 0)
     {
       vecRegs_.setOpEmul(eg);  // Track operand group for logging
       return true;
@@ -11353,7 +11355,7 @@ Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
   bool masked = di->isMasked();
   uint32_t vd = di->op0(), rs1 = di->op1(), vi = di->op2();
 
-  if (not checkVecOpsVsEmul(di, vd, groupX8))
+  if (not checkVecOpsVsEmul(di, vd, groupX8) or not checkVecOpsVsEmul(di, vi, offsetGroupX8))
     return false;
 
   uint64_t addr = intRegs_.read(rs1);
