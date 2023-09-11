@@ -480,7 +480,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (isMachineAddr(addr))
 	ix = (addr - mbase_) / mstride_;
       else if (isSupervisorAddr(addr))
-	ix = (addr - mbase_) / mstride_;
+	ix = (addr - sbase_) / sstride_;
       else
 	return false;
 
@@ -499,7 +499,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (isMachineAddr(addr))
 	ix = (addr - mbase_) / mstride_;
       else if (isSupervisorAddr(addr))
-	ix = (addr - mbase_) / mstride_;
+	ix = (addr - sbase_) / sstride_;
       else
 	return false;
 
