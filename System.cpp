@@ -435,7 +435,13 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 
   if ((ids % 64) != 0)
     {
-      cerr << "Error: IMSIC max interrupt id (" << ids << ") is not a multiple of 64.\n";
+      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is not a multiple of 64.\n";
+      return false;
+    }
+
+  if (ids > 2048)
+    {
+      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is larger than 2048.\n";
       return false;
     }
 

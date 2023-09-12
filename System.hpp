@@ -239,7 +239,7 @@ namespace WdRiscv
     /// after each supervisor file (supervisor stride must be large
     /// enough). Guest files require supervisor files which require
     /// machine files. The ids parameter denotes the max interrupt
-    /// id and must be a multiple of 64.
+    /// id plus 1 and must be a multiple of 64.
     bool configImsic(uint64_t mbase, uint64_t mstride,
 		     uint64_t sbase, uint64_t sstride,
 		     unsigned guests, unsigned ids);
