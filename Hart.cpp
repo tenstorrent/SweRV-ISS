@@ -2924,7 +2924,7 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
   if (val & 4)
     attrib |= Pma::Attrib::Exec;
 
-  bool cacheable = val & 0x10;  // Bit 7
+  bool cacheable = val & 0x80;  // Bit 7
 
   // TBD FIX : Support io channel0 and channel1
   unsigned memType = (val >> 3) & 3;   // Bits 4:3
