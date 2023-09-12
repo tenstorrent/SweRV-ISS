@@ -237,7 +237,7 @@ namespace WdRiscv
     bool pokeCsr(CsrNumber csr, URV val);
 
     /// Similar to pokeCsr but meant for server/interactive code: Keep
-    /// track of external MIP pokes to avoid cloberring them with internal
+    /// track of external MIP pokes to avoid clobbering them with internal
     /// ones.
     bool externalPokeCsr(CsrNumber csr, URV val)
     { if (csr == CsrNumber::MIP) mipPoked_ = true; return pokeCsr(csr, val); }
@@ -247,9 +247,9 @@ namespace WdRiscv
     /// if reg is out of bounds.
     bool peekVecReg(unsigned reg, std::vector<uint8_t>& value) const;
 
-    /// Put the bytes of the value in the given vector regiser.
+    /// Put the bytes of the value in the given vector register.
     /// The first byte in value should be the most significant.
-    /// If value is smaller than vector regiser size, it is padded
+    /// If value is smaller than vector register size, it is padded
     /// with zeros on the most-significant side.
     bool pokeVecReg(unsigned reg, const std::vector<uint8_t>& value);
 
@@ -308,7 +308,7 @@ namespace WdRiscv
     /// for linux/newlib emulation).
     bool configIsa(std::string_view string, bool updateMisa);
 
-    /// Enable/disable load-data debug triggerring (disabled by default).
+    /// Enable/disable load-data debug triggering (disabled by default).
     void configLoadDataTrigger(bool flag)
     { csRegs_.configLoadDataTrigger(flag); }
 
@@ -351,7 +351,7 @@ namespace WdRiscv
     { csRegs_.configPerfEvents(eventVec); }
 
     /// Map the give user event number to the given internal event id.
-    /// Wehn the given user number is written to an mphpmevent csr, then
+    /// When the given user number is written to an mphpmevent csr, then
     /// the corresponding event-id is associated with the event counter csr.
     void configEventNumber(URV userNumber, EventNumber eventId)
     { csRegs_.mPerfRegs_.configEventNumber(userNumber, eventId); }
@@ -790,7 +790,7 @@ namespace WdRiscv
     /// store) setting virtAddr and physAddr to the corresponding virtual and physical
     /// data addresses. Return 0 if last instruction was not a ld/st instruction
     /// leaving virtAddr and physAddr unmodified. The value of physAddr will be zero
-    /// if virtual to physical translation encoutered an exception.
+    /// if virtual to physical translation encountered an exception.
     unsigned lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
     {
       if (ldStSize_ == 0)
@@ -928,7 +928,7 @@ namespace WdRiscv
     { enableExtension(RvExtension::Zbp, flag); }
 
     /// Enable/disable the zbr (bit manipulation crc)
-    /// extension. When disbaled all the instructions in zbr extension
+    /// extension. When disabled all the instructions in zbr extension
     /// result in an illegal instruction exception.
     void enableRvzbr(bool flag)
     { enableExtension(RvExtension::Zbr, flag); }
@@ -1306,7 +1306,7 @@ namespace WdRiscv
     bool isRvs() const
     { return extensionIsEnabled(RvExtension::S); }
 
-    /// Return true if rvh (hupervisor) extension is enabled in this hart.
+    /// Return true if rvh (hypervisor) extension is enabled in this hart.
     bool isRvh() const
     { return extensionIsEnabled(RvExtension::H); }
 
@@ -1388,27 +1388,27 @@ namespace WdRiscv
     bool isRvsstc() const
     { return extensionIsEnabled(RvExtension::Sstc); }
 
-    /// Return true if the bit-manip vector extension is enabled.
+    /// Return true if the bit-manip vector extension zvbb is enabled.
     bool isRvzvbb() const
     { return extensionIsEnabled(RvExtension::Zvbb); }
 
-    /// Return true if the bit-manip vector extension is enabled.
+    /// Return true if the bit-manip vector extension zvbc is enabled.
     bool isRvzvbc() const
     { return extensionIsEnabled(RvExtension::Zvbc); }
 
-    /// Return true if the vector ghash extension is enabled.
+    /// Return true if the vector zvkg extension is enabled.
     bool isRvzvkg() const
     { return extensionIsEnabled(RvExtension::Zvkg); }
 
-    /// Return true if the vector ghash extension is enabled.
+    /// Return true if the vector zvkned extension is enabled.
     bool isRvzvkned() const
     { return extensionIsEnabled(RvExtension::Zvkned); }
 
-    /// Return true if the vector secure hash extension is enabled.
+    /// Return true if the vector secure hash zvknha extension is enabled.
     bool isRvzvknha() const
     { return extensionIsEnabled(RvExtension::Zvknha); }
 
-    /// Return true if the vector secure hash extension is enabled.
+    /// Return true if the vector secure hash zvknhb extension is enabled.
     bool isRvzvknhb() const
     { return extensionIsEnabled(RvExtension::Zvknhb); }
 
@@ -1420,7 +1420,7 @@ namespace WdRiscv
     bool isRvzvksh() const
     { return extensionIsEnabled(RvExtension::Zvksh); }
 
-    /// Return true if the zicon extension is enabled.
+    /// Return true if the zicond extension is enabled.
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
 
@@ -1432,7 +1432,7 @@ namespace WdRiscv
     bool isRvzfa() const
     { return extensionIsEnabled(RvExtension::Zfa); }
 
-    /// Return true if current program is considered finihsed (either
+    /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
     bool hasTargetProgramFinished() const
     { return targetProgFinished_; }
@@ -1446,7 +1446,7 @@ namespace WdRiscv
     void setAmoInDccmOnly(bool flag)
     { amoInDccmOnly_ = flag; }
 
-    /// Make atomic memory operations illegal/legal for non cachable
+    /// Make atomic memory operations illegal/legal for non cacheable
     /// memory based on the value of flag (true/false).
     void setAmoInCacheableOnly(bool flag)
     { amoInCacheableOnly_ = flag; }
@@ -1512,7 +1512,7 @@ namespace WdRiscv
     { return memory_.hasLr(hartIx_); }
 
     /// Cancel load reservation held by this hart (if any). Mark
-    /// cause of cancelation which persists until overwritten
+    /// cause of cancellation which persists until overwritten
     /// by another cancelLr or until a new reservation is made.
     void cancelLr(CancelLrCause cause)
     { memory_.invalidateLr(hartIx_, cause); }
@@ -1712,7 +1712,7 @@ namespace WdRiscv
 
     /// Register a callback to be invoked before a CSR instruction
     /// acceses its target CSR. Callback is invoked with the
-    /// hart-index (hart index in sytstem) and csr number. This is for
+    /// hart-index (hart index in system) and csr number. This is for
     /// the SOC (system on chip) model.
     void registerPreCsrInst(std::function<void(unsigned, CsrNumber)> callback)
     { preCsrInst_ = std::move(callback); }
@@ -1720,7 +1720,7 @@ namespace WdRiscv
     /// Register a callback to be invoked after a CSR accesses its
     /// target CSR, or in the case of an exception, after the CSR
     /// instruction takes the exception.  Callback is invoked with the
-    /// hart-index (hart index in sytstem) and csr number. This is for
+    /// hart-index (hart index in system) and csr number. This is for
     /// the SOC model.
     void registerPostCsrInst(std::function<void(unsigned, CsrNumber)> callback)
     { postCsrInst_ = std::move(callback); }
@@ -1756,7 +1756,7 @@ namespace WdRiscv
     /// PMPADDR0, ... 63 to PMPADDR63). Return true on success setting
     /// type, mode, locked, low and high to the corresponding values
     /// associated with the entry. If entry mode is off the low and
-    /// hight will be set to zero. Return false on failure (entry
+    /// high will be set to zero. Return false on failure (entry
     /// index out of bounds or corresponding CSR not implemented).
     bool unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
                                 Pmp::Mode& mode, bool& locked,
@@ -1836,7 +1836,7 @@ namespace WdRiscv
     { debugParkLoop_ = addr; }
 
     /// Configure this hart to set its program counter to the given
-    /// addr on encoutering a trap (except breakpoint) during debug
+    /// addr on encountering a trap (except breakpoint) during debug
     /// mode. If addr bits are all set, then the PC is not changed on
     /// a trap.
     void setDebugTrapAddress(URV addr)
@@ -2052,7 +2052,7 @@ namespace WdRiscv
     // Mark FS field of mstatus as dirty.
     void markFsDirty();
 
-    // Return true if vS field of mstatus is not off.
+    // Return true if VS field of mstatus is not off.
     bool isVecEnabled() const
     {
       unsigned vecOff = unsigned(VecStatus::Off);
@@ -2083,7 +2083,7 @@ namespace WdRiscv
     }
 
     // Return true if it is legal to execute a vector instruction: V
-    // extension must be enabled and VS feild of MSTATUS must not be
+    // extension must be enabled and VS field of MSTATUS must not be
     // OFF.
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
@@ -2138,7 +2138,7 @@ namespace WdRiscv
     /// Simulate a periodic external timer interrupt: Count-down the
     /// periodic counter. Return true if counter reaches zero (and
     /// keep returning true thereafter until timer interrupt is taken).
-    /// If counter reches zero, it is reset to its initial value.
+    /// If counter reaches zero, it is reset to its initial value.
     bool doAlarmCountdown();
 
     /// Return the 8-bit content of the pmpconfig register
@@ -2152,7 +2152,7 @@ namespace WdRiscv
     void updateMemoryProtection();
 
     /// Update the address translation manager. This is called on
-    /// reset or whenever the supervisor address trasnaltion register
+    /// reset or whenever the supervisor address translation register
     /// (SATP) is updated.
     void updateAddressTranslation();
 
@@ -2266,9 +2266,9 @@ namespace WdRiscv
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
     /// etc... for lbu, lhu, etc...
     /// Return true if the load is successful. Return false if an exception
-    /// or a trigger is encoutered. On succes loadd value (sign extended for
+    /// or a trigger is encountered. On success, loaded value (sign extended for
     /// signed type) is placed in value. Updating the destination register is
-    /// the resposibilty of the caller. The hyper flag should be set to true
+    /// the responsibilty of the caller. The hyper flag should be set to true
     /// for hypervisor load/store instruction to select 2-stage address
     /// translation.
     template<typename LOAD_TYPE>
@@ -2278,7 +2278,7 @@ namespace WdRiscv
     template<typename LOAD_TYPE>
     bool fastLoad(uint64_t virtAddr, uint64_t& value);
 
-    /// Helper to load method: Return possible load exception (wihtout
+    /// Helper to load method: Return possible load exception (without
     /// taking any exception). If supervisor mode is enabled, and
     /// address translation is successful, then addr1 is changed to
     /// the translated physical address and addr2 to the physical
@@ -2292,7 +2292,7 @@ namespace WdRiscv
                                           uint64_t& gaddr1, uint64_t& gaddr2,
 					  unsigned ldSize, bool hyper);
 
-    /// Helepr to the cache block operaion (cbo) instructions.
+    /// Helper to the cache block operation (cbo) instructions.
     ExceptionCause determineCboException(uint64_t& addr, bool isRead);
 
     /// Implement part of TIF protocol for writing the "tohost" magical
@@ -2313,7 +2313,7 @@ namespace WdRiscv
     template<typename STORE_TYPE>
     bool fastStore(URV addr, STORE_TYPE value);
 
-    /// Helper to store method: Return possible exception (wihtout
+    /// Helper to store method: Return possible exception (without
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
     ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
@@ -2441,7 +2441,7 @@ namespace WdRiscv
     /// physical address corresponding to the given virtual address.
     bool fetchInst(URV virAddr, uint64_t& physAddr, uint32_t& instr);
 
-    /// Heler to the run methods: Fetch an instruction taking debug triggers
+    /// Helper to the run methods: Fetch an instruction taking debug triggers
     /// into consideration. Return true if successful. Return false if
     /// instruction fetch fails (an exception is signaled in that case).
     bool fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
@@ -2581,7 +2581,7 @@ namespace WdRiscv
     /// Called to check if a clint memory mapped register is written.
     /// Clear/set software-interrupt bit in the MIP CSR of
     /// corresponding hart if all the conditions are met. Set timer
-    /// limit if timer-limit regiser is written. Update stVal: if location
+    /// limit if timer-limit register is written. Update stVal: if location
     /// is outside the range of valid harts, set stVal to zero.  If it is
     /// in the software interrupt range then keep it least sig bit and zero
     /// the rest.
@@ -2604,114 +2604,117 @@ namespace WdRiscv
       return 0x1f;
     }
 
-    // Return true if maskable integer vector instruction is legal for
-    // current sew and lmul, current vstart, and mask-register
-    // destination register overlap. Check if vector extension is
-    // enabled. Take an illegal instuction exception and return false
-    // otherwise. This is for non-load, non-mask destination,
-    // non-reduction instructions.
+    /// Return true if maskable integer vector instruction is legal for
+    /// current sew and lmul, current vstart, and mask-register
+    /// destination register overlap. Check if vector extension is
+    /// enabled. Take an illegal instruction exception and return false
+    /// otherwise. This is for non-load, non-mask destination,
+    /// non-reduction instructions.
     bool checkVecIntInst(const DecodedInst* di);
 
-    // Same as above but with explicit group multiplier and element width.
+    /// Same as above but with explicit group multiplier and element width.
     bool checkVecIntInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
-    // Return true if given arithmetic (non load/store) instruction is
-    // legal. Check if vector extension is enabled. Check if the
-    // currnet sew/lmul is legal. Return true if legal. Take an
-    // illegal instruction exception and return false otherwise. This
-    // is for integer instructions.
+    /// Return true if given arithmetic (non load/store) instruction is
+    /// legal. Check if vector extension is enabled. Check if the
+    /// current sew/lmul is legal. Return true if legal. Take an
+    /// illegal instruction exception and return false otherwise. This
+    /// is for integer instructions.
     bool checkSewLmulVstart(const DecodedInst* di);
 
-    // Similar to above but includes check for floating point operations (is F/D/ZFH
-    // enabled ...).
+    /// Similar to above but includes check for floating point operations (is F/D/ZFH
+    /// enabled ...).
     bool checkFpSewLmulVstart(const DecodedInst* di, bool wide = false,
 			      bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
-    // Return true if maskable floating point vecotr instruction is
-    // legal. Take an illegal instuction exception and return false
-    // otherwise.
+    /// Return true if maskable floating point vector instruction is
+    /// legal. Take an illegal instuction exception and return false
+    /// otherwise.
     bool checkVecFpInst(const DecodedInst* di, bool wide = false,
 			bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
-    // Return true if vector operands are mutliples of the given group
-    // multiplier (scaled by 8). Return false initiating an illegal instruction
-    // trap otherwise.
+    /// Return true if vector operands are multiples of the given group
+    /// multiplier (scaled by 8). Initiating an illegal instruction
+    /// trap and return false otherwise.
     bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 			   unsigned op2, unsigned groupX8);
 
-    // Similar to above but for 2 vector operand instructions.
+    /// Similar to above but for vector instructions with 2 vector operands.
     bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 			   unsigned groupX8);
 
-    // Similar to above but for 1 vector operand instructions.
-    bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned groupX8);
+    /// Similar to above but a vector instructions with 1 vector
+    /// operand. This also work for checking one vector operand of a
+    /// multi-operand instruction.
+    bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op, unsigned groupX8);
 
-    // Return if mask producing instruction (e.g. vmseq) is
-    // legal. Check if vector operands are mutliples of the given
-    // group multiplier (scaled by 8). Return true if legal.  Return
-    // false initiating an illegal instruction trap otherwise.
+    /// Return if mask producing instruction (e.g. vmseq) is
+    /// legal. Check if vector operands are multiples of the given
+    /// group multiplier (scaled by 8). Return true if legal.  Return
+    /// false initiating an illegal instruction trap otherwise.
     bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 			  unsigned groupX8);
 
-    // Similar to the above but for 3 vector operand instructions.
+    /// Similar to the above but for 3 vector operand instructions.
     bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 			  unsigned op2, unsigned groupX8);
 
 
-    // Similar to the above but for floating point instructions.
+    /// Similar to the above but for floating point instructions.
     bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned groupX8);
 
-    // Similar to the above but for floating point instructions with 3
-    // vector operands.
+    /// Similar to the above but for floating point instructions with 3
+    /// vector operands.
     bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8);
 
-    // Check reduction vector operand against the group multiplier. Return true
-    // if operand is a multiple of multiplier and false otherwise. Record group
-    // multiplier for tracing.
+    /// Check reduction vector operand against the group multiplier. Return true
+    /// if operand is a multiple of multiplier and false otherwise. Record group
+    /// multiplier for tracing.
     bool checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
 			  unsigned groupX8, unsigned vstart);
 
-    // Similar to above but 3 vector operands and 1st operand is wide.
+    /// Similar to above but 3 vector operands and 1st operand is wide.
     bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned op2, unsigned groupX8);
 
-    // Similar to above but 2 vector operands and 1st operand is wide.
+    /// Similar to above but 2 vector operands and 1st operand is wide.
     bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
-    // Similar to above but 3 vector operands and 1st 2 operands are wide.
+    /// Similar to above but 3 vector operands and 1st 2 operands are wide.
     bool checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0, unsigned op1,
 			       unsigned op2, unsigned groupX8);
 
-    // Similar to above but 2 vector operands and 1st 2 operands are wide.
+    /// Similar to above but 2 vector operands and 1st 2 operands are wide.
     bool checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0, unsigned op1,
 			       unsigned groupX8);
 
-    // Similar to above but 3 vector operands with 2nd operand wide.
+    /// Similar to above but 3 vector operands with 2nd operand wide.
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned op2, unsigned groupX8);
 
-    // Similar to above but 2 vector operands with 2nd operand wide.
+    /// Similar to above but 2 vector operands with 2nd operand wide.
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
-    // Emit a trace record for the given branch instruction in the
-    // branch trace file.
+    /// Emit a trace record for the given branch instruction in the
+    /// branch trace file.
     void traceBranch(const DecodedInst* di);
 
-    // Called at the end of successul vector instruction to clear the vstart
-    // register and mark VS dirty if a vector register was updated.
+    /// Called at the end of successul vector instruction to clear the
+    /// vstart register and mark VS dirty if a vector register was
+    /// updated.
     void postVecSuccess();
 
-    // Called at the end of a trapping vector instruction to mark VS
-    // dirty if a vector register was updated.
+    /// Called at the end of a trapping vector instruction to mark VS
+    /// dirty if a vector register was updated.
     void postVecFail(const DecodedInst* di, bool clearVstart = false);
 
-    // The program counter is adjusted (size of current instruction
-    // added) before any of the following exec methods are called. To
-    // get the address before adjustment, use currPc_.
+    /// The program counter is adjusted (size of current instruction
+    /// added) before any of the following exec methods are called. To
+    /// get the address before adjustment, use currPc_.
 
     void execBeq(const DecodedInst*);
     void execBne(const DecodedInst*);
@@ -4696,11 +4699,11 @@ namespace WdRiscv
     uint64_t consecutiveIllegalCount_ = 0;
     uint64_t counterAtLastIllegal_ = 0;
     uint64_t lrCount_ = 0;    // Count of dispatched load-reserve instructions.
-    uint64_t lrSuccess_ = 0;  // Count of successful LR (reservaton acquired).
+    uint64_t lrSuccess_ = 0;  // Count of successful LR (reservation acquired).
     uint64_t scCount_ = 0;    // Count of dispatched store-conditional instructions.
     uint64_t scSuccess_ = 0;  // Count of successful SC (store accomplished).
     unsigned lrResSize_ = sizeof(URV); // LR reservation size.
-    bool keepReservOnScException_ = false; // Keep rservation on SC.W/D exception.
+    bool keepReservOnScException_ = false; // Keep reservation on SC.W/D exception.
 
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
@@ -4809,11 +4812,11 @@ namespace WdRiscv
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;
 
     // Callback invoked after a CSR instruction accesses a CSR or, in
-    // the case of an exception, after the CSR intruction takes the
+    // the case of an exception, after the CSR instruction takes the
     // exception.
     std::function<void(unsigned, CsrNumber)> postCsrInst_ = nullptr;
 
-    // Callback invoked beofre execution of an instruction. Callback
+    // Callback invoked before execution of an instruction. Callback
     // invoked as follows: preInst_(hart, halt, reset), and upon completion
     // the hart will halt if halt is true and will reset if reset is true.
     // If both halt and reset are true, reset takes precedence.
@@ -4855,7 +4858,7 @@ namespace WdRiscv
     std::unordered_set<uint64_t> initDataLines_;
 
     // Shift executed instruction counter by this amount to produce a
-    // fake timer value. For example, if shift amout is 3, we are
+    // fake timer value. For example, if shift amount is 3, we are
     // dividing instruction count by 8 (2 to power 3) to produce a
     // timer value.
     unsigned counterToTimeShift_ = 0;
