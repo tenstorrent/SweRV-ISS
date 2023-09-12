@@ -2924,6 +2924,8 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
   if (val & 4)
     attrib |= Pma::Attrib::Exec;
 
+  bool cacheable = val & 0x10;  // Bit 7
+
   // TBD FIX : Support io channel0 and channel1
   unsigned memType = (val >> 3) & 3;   // Bits 4:3
   if (memType != 0)
@@ -2931,16 +2933,17 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
       attrib |= Pma::Attrib::Io;
       attrib &= ~Pma::Attrib::MisalOk;  // No misaligned IO region access.
     }
-
-  bool cacheable = val & 0x10;  // Bit 7
+  else
+    {
+      if (cacheable)
+	attrib |= Pma::Attrib::Rsrv; // Regular memory and cacheable: allow LR/SC
+    }
 
   // TBD FIX : Support aomswap, amological, and amoarithmetic
   unsigned amoType = (val >> 5) & 3;   // Bits 6:5
   if (amoType == 0)
     {
       attrib |= Pma::Attrib::MisalOk;
-      if (cacheable)
-	attrib |= Pma::Attrib::Rsrv;
     }
   else if (amoType == 1)
     attrib |= Pma::Attrib::AmoSwap;
