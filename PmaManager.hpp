@@ -33,13 +33,15 @@ namespace WdRiscv
     enum Attrib
       {
        None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8,
-       AmoArith = 0x10, AmoSwap = 0x20, AmoLogical = 0x40,
+       AmoOther = 0x10,  // for amo add/min/max
+       AmoSwap = 0x20, AmoLogical = 0x40,
        Iccm = 0x80, Dccm = 0x100, MemMapped = 0x200, Rsrv = 0x400,
        Io = 0x800, Cacheable = 0x1000,
        MisalOk = 0x2000, // True if misaligned access supported.
        MisalAccFault = 0x4000, // Set if misaligned generates access fault.
        Mapped = Exec | Read | Write,
-       Amo = AmoSwap | AmoArith | AmoLogical,
+       AmoArith = AmoSwap | AmoOther | AmoLogical,
+       Amo = AmoArith,
        Default = Read | Write | Exec | Idempotent | Amo | Rsrv | MisalOk
       };
 

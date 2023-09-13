@@ -450,7 +450,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoadd_w(const DecodedInst* di)
 {
-  execAmo32Op(di, Pma::AmoArith, std::plus<URV>{});
+  execAmo32Op(di, Pma::AmoOther, std::plus<URV>{});
 }
 
 
@@ -499,7 +499,7 @@ Hart<URV>::execAmomin_w(const DecodedInst* di)
     auto sb = static_cast<int32_t>(b);
     return std::min(sa, sb);
   };
-  execAmo32Op(di, Pma::AmoArith, myMin);
+  execAmo32Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -512,7 +512,7 @@ Hart<URV>::execAmominu_w(const DecodedInst* di)
     auto ub = static_cast<uint32_t>(b);
     return std::min(ua, ub);
   };
-  execAmo32Op(di, Pma::AmoArith, myMin);
+  execAmo32Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -525,7 +525,7 @@ Hart<URV>::execAmomax_w(const DecodedInst* di)
     auto sb = static_cast<int32_t>(b);
     return std::max(sa, sb);
   };
-  execAmo32Op(di, Pma::AmoArith, myMax);
+  execAmo32Op(di, Pma::AmoOther, myMax);
 }
 
 
@@ -538,7 +538,7 @@ Hart<URV>::execAmomaxu_w(const DecodedInst* di)
     auto ub = static_cast<uint32_t>(b);
     return std::max(ua, ub);
   };
-  execAmo32Op(di, Pma::AmoArith, myMax);
+  execAmo32Op(di, Pma::AmoOther, myMax);
 }
 
 
@@ -651,7 +651,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoadd_d(const DecodedInst* di)
 {
-  execAmo64Op(di, Pma::AmoArith, std::plus<URV>{});
+  execAmo64Op(di, Pma::AmoOther, std::plus<URV>{});
 }
 
 
@@ -700,7 +700,7 @@ Hart<URV>::execAmomin_d(const DecodedInst* di)
     auto sb = static_cast<int64_t>(b);
     return std::min(sa, sb);
   };
-  execAmo64Op(di, Pma::AmoArith, myMin);
+  execAmo64Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -713,7 +713,7 @@ Hart<URV>::execAmominu_d(const DecodedInst* di)
     auto ub = static_cast<uint64_t>(b);
     return std::min(ua, ub);
   };
-  execAmo64Op(di, Pma::AmoArith, myMin);
+  execAmo64Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -726,7 +726,7 @@ Hart<URV>::execAmomax_d(const DecodedInst* di)
     auto sb = static_cast<int64_t>(b);
     return std::max(sa, sb);
   };
-  execAmo64Op(di, Pma::AmoArith, myMax);
+  execAmo64Op(di, Pma::AmoOther, myMax);
 }
 
 
@@ -739,7 +739,7 @@ Hart<URV>::execAmomaxu_d(const DecodedInst* di)
     auto ub = static_cast<uint64_t>(b);
     return std::max(ua, ub);
   };
-  execAmo64Op(di, Pma::AmoArith, myMax);
+  execAmo64Op(di, Pma::AmoOther, myMax);
 }
 
 
