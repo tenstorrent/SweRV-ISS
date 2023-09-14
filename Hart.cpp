@@ -3332,9 +3332,9 @@ Hart<URV>::configIsa(std::string_view isa, bool updateMisa)
 
 template <typename URV>
 bool
-Hart<URV>::configMachineModePerfCounters(unsigned numCounters)
+Hart<URV>::configMachineModePerfCounters(unsigned numCounters, bool cof)
 {
-  return csRegs_.configMachineModePerfCounters(numCounters);
+  return csRegs_.configMachineModePerfCounters(numCounters, cof);
 }
 
 

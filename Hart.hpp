@@ -327,7 +327,9 @@ namespace WdRiscv
     /// remaining counters are made write-any read-zero. For each
     /// counter that is made read-write the corresponding MHPMEVENT is
     /// made read-write otherwise it is make write-any read-zero.
-    bool configMachineModePerfCounters(unsigned n);
+    /// The cof flag indicates whether or not counter-overflow extension
+    /// is enabled.
+    bool configMachineModePerfCounters(unsigned n, bool cof);
 
     /// Configure user mode performance counters returning true on
     /// success and false on failure. N cannot exceed the number of machine

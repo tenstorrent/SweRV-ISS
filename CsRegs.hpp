@@ -1086,13 +1086,15 @@ namespace WdRiscv
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The
     /// remaining counters are made read only. For each counter that
     /// is made read-write the corresponding MHPMEVENT is made
-    /// read-write.
-    bool configMachineModePerfCounters(unsigned numCounters);
+    /// read-write. The cof flag indicates that counter overflow
+    /// extension is enabled.
+    bool configMachineModePerfCounters(unsigned numCounters, bool cof);
 
     /// Configure user mode performance counters returning true on
-    /// success and false on failure. N cannot exceed the number of machine
-    /// mode performance registers. First N performance counters are configured
-    /// as readable, the remaining ones are made read-zero.
+    /// success and false on failure. N cannot exceed the number of
+    /// machine mode performance registers. First N performance
+    /// counters are configured as readable, the remaining ones are
+    /// made read-zero.
     bool configUserModePerfCounters(unsigned numCounters);
 
     /// Helper to write method. Update frm/fflags after fscr is written.

@@ -604,7 +604,7 @@ template <typename URV>
 static
 bool
 applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
-                bool userMode, bool /*verbose*/)
+                bool userMode, bool cof, bool /*verbose*/)
 {
   unsigned errors = 0;
 
@@ -616,7 +616,7 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
         errors++;
       else
         {
-          if (not hart.configMachineModePerfCounters(count))
+          if (not hart.configMachineModePerfCounters(count, cof))
             errors++;
           if (userMode)
             if (not hart.configUserModePerfCounters(count))
@@ -1351,10 +1351,17 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
-  applyPerfEvents(hart, *config_, userMode, verbose) or errors++;
+  tag = "enable_counter_overflow";
+  bool cof = false;  // Counter overflow: sscofpmf extension
+  if (config_ ->contains(tag))
+    getJsonBoolean(tag, config_ ->at(tag), cof) or errors++;
+
+  applyPerfEvents(hart, *config_, userMode, cof, verbose) or errors++;
   applyCsrConfig(hart, *config_, verbose) or errors++;
   applyTriggerConfig(hart, *config_) or errors++;
   applyVectorConfig(hart, *config_) or errors++;
+
+  hart.enableSscofpmf(cof);
 
   tag = "even_odd_trigger_chains";
   if (config_ -> contains(tag))
@@ -1681,13 +1688,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableRvsstc(flag);
-    }
-
-  tag = "enable_counter_overflow";
-  if (config_ ->contains(tag))
-    {
-      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableSscofpmf(flag);
     }
 
   tag = "enable_aia";

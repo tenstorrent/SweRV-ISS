@@ -1395,7 +1395,7 @@ CsRegs<URV>::configCsr(CsrNumber csrNum, bool implemented, URV resetValue,
 
 template <typename URV>
 bool
-CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters)
+CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters, bool cof)
 {
   if (numCounters > 29)
     {
@@ -1410,8 +1410,22 @@ CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters)
   for (unsigned i = 0; i < 29; ++i)
     {
       URV resetValue = 0, mask = ~URV(0), pokeMask = ~URV(0);
+      URV evMask = ~URV(0), evPokeMask = ~URV(0);  // Event regs masks
+
+      if constexpr (sizeof(URV) == 8)
+	{
+	  // If counter overflow is on, then bits 56 and 57 are reserved.
+	  if (cof)
+	    {
+	      MhpmeventFields fields{0};
+	      fields.bits_.res = ~fields.bits_.res;  // Set reserved bits to all ones
+	      evMask &= ~fields.value_;        // Clear reserved bits in mask
+	      evPokeMask &= ~fields.value_;    // Clear reserved bits in mask
+	    }
+	}
+
       if (i >= numCounters)
-	mask = pokeMask = 0;
+	mask = pokeMask = evMask = evPokeMask = 0;
 
       CsrNumber csrNum = advance(CsrNumber::MHPMCOUNTER3, i);
       bool isDebug = false;
@@ -1428,7 +1442,7 @@ CsRegs<URV>::configMachineModePerfCounters(unsigned numCounters)
 	 }
 
       csrNum = advance(CsrNumber::MHPMEVENT3, i);
-      if (not configCsr(csrNum, true, resetValue, mask, pokeMask, isDebug,
+      if (not configCsr(csrNum, true, resetValue, evMask, evPokeMask, isDebug,
                         shared))
 	errors++;
     }
@@ -1458,6 +1472,8 @@ CsRegs<URV>::configUserModePerfCounters(unsigned numCounters)
   unsigned errors = 0;
   bool shared = false;
 
+  // Configure numCouters. These will be tied to the corresponding
+  // machine perf counters in tiePerfCounters.
   for (unsigned i = 0; i < 29; ++i)
     {
       URV resetValue = 0, mask = ~URV(0), pokeMask = ~URV(0);
