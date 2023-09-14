@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -169,13 +169,13 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
 	  if (not hart->peekIntReg(RegGp) and gp)
 	    {
               if (verbose)
-                std::cerr << "Setting register gp to 0x" << std::hex << gp << std::dec << '\n';    
+                std::cerr << "Setting register gp to 0x" << std::hex << gp << std::dec << '\n';
 	      hart->pokeIntReg(RegGp, URV(gp));
 	    }
 	  if (not hart->peekIntReg(RegTp) and tp)
 	    {
               if (verbose)
-                std::cerr << "Setting register tp to 0x" << std::hex << tp << std::dec << '\n';   
+                std::cerr << "Setting register tp to 0x" << std::hex << tp << std::dec << '\n';
 	      hart->pokeIntReg(RegTp, URV(tp));
 	    }
 	  if (entry)
@@ -282,6 +282,7 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
     sparseMem_->getUsedBlocks(usedBlocks);
   else
     syscall.getUsedMemBlocks(usedBlocks);
+
   if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
 
@@ -602,6 +603,19 @@ System<URV>::produceTestSignatureFile(std::string_view outPath) const
     }
 
   return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::getSparseMemUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& usedBlocks) const
+{
+  if (sparseMem_)
+    {
+      sparseMem_->getUsedBlocks(usedBlocks);
+      return true;
+    }
+  return false;
 }
 
 

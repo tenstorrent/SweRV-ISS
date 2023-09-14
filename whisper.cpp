@@ -245,6 +245,7 @@ struct Args
   bool unmappedElfOk = false;
   bool mcm = false;        // Memory consistency checks
   bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
+  bool reportub = false;         // Report used blocks with sparse memory
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
@@ -645,6 +646,10 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	("mcmls", po::value<std::string>(),
 	 "Memory consitency checker merge buffer line size. If set to zero then "
 	 "write operations are not buffered and will happen as soon a received.")
+#ifdef MEM_CALLBACKS
+        ("reportusedblocks", po::bool_switch(&args.reportub),
+         "Report used blocks with sparse memory. Useful for finding memory footprint of program")
+#endif
 	("instcounter", po::value<std::string>(),
 	 "Set instruction counter to given value.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
@@ -1966,6 +1971,17 @@ session(const Args& args, const HartConfig& config)
 
   if (not args.testSignatureFile.empty())
     result = system.produceTestSignatureFile(args.testSignatureFile) and result;
+
+  if (args.reportub)
+    {
+      uint64_t bytes = 0;
+      std::vector<std::pair<uint64_t, uint64_t>> blocks;
+      if (not system.getSparseMemUsedBlocks(blocks))
+        assert(false && "Not compiled with sparse memory");
+      for (const auto& [_, size] : blocks)
+        bytes += size;
+      std::cout << "Used blocks: 0x" << std::hex << bytes << std::endl;
+    }
 
   closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
 
