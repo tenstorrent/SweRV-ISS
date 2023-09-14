@@ -1529,6 +1529,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableClearMtvalOnIllInst(flag);
     }
 
+  tag = "clear_mtval_on_ebreak";
+  if (config_ -> contains(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableClearMtvalOnEbreak(flag);
+    }
+
   tag = "log2_counter_to_time";
   if (config_ ->contains(tag))
   {

@@ -9358,6 +9358,9 @@ Hart<URV>::execEbreak(const DecodedInst*)
   URV savedPc = currPc_;  // Goes into MEPC.
   URV trapInfo = currPc_;  // Goes into MTVAL.
 
+  if (clearMtvalOnEbreak_)
+    trapInfo = 0;
+
   auto cause = ExceptionCause::BREAKP;
   initiateException(cause, savedPc, trapInfo);
 }

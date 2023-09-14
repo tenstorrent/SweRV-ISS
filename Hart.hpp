@@ -1574,6 +1574,11 @@ namespace WdRiscv
     void enableClearMtvalOnIllInst(bool flag)
     { clearMtvalOnIllInst_ = flag; }
 
+    /// Clear MTVAL on illegal instruction exception if flag is true.
+    /// Otherwise, set MTVAL to the opcode of the illegal instruction.
+    void enableClearMtvalOnEbreak(bool flag)
+    { clearMtvalOnEbreak_ = flag; }
+
     /// Disable clearing of reservation set after xRET
     void enableCancelLrOnTrap(bool flag)
     { cancelLrOnTrap_ = flag; }
@@ -4750,6 +4755,7 @@ namespace WdRiscv
     URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
 
     bool clearMtvalOnIllInst_ = true;
+    bool clearMtvalOnEbreak_ = true;
 
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
