@@ -1607,20 +1607,27 @@ Syscall<URV>::mmap_dealloc(uint64_t addr, uint64_t size)
     --curr;
 
   // Check that requested unmap falls within a prevously mapped block.
-  uint64_t orig_length = curr->second.length;
+  auto curr_size = curr->second.length;
   if (addr < curr->first or addr > (curr->first + curr->second.length) or
-      curr->second.free or (addr + size) > (curr->first + orig_length))
+      curr->second.free or (addr + size) > (curr->first + curr_size))
     return -1;
 
   if (addr > curr->first)
     {
       // Deallocating tail part of block.
-      curr->second.length -= addr - curr->first;
-      mmap_blocks_.insert(std::make_pair(addr, blk_t(size, true)));
+      auto next = curr; ++next;  // Block following current
+      curr->second.length -= addr - curr->first; // Trim current block
+      // Create a new free block
+      auto latest = mmap_blocks_.insert(std::make_pair(addr, blk_t(size, true))).first;
+      // Merge new block with block following it if that is free.
+      if (next != mmap_blocks_.end() and next->second.free and addr + size == next->first)
+	{
+	  latest->second.length += size;
+	  mmap_blocks_.erase(next);
+	}
       return 0;
     }
 
-  auto curr_size = curr->second.length;
   assert(not curr->second.free and size <= curr_size);
   curr->second.free = true;
 
