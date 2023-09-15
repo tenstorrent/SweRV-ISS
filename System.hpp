@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <tuple>
 #include <memory>               // For shared_ptr
 #include <functional>
 #include <string_view>
@@ -317,5 +318,9 @@ namespace WdRiscv
     std::string fromHostSym_ = "fromhost";
     std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
     std::vector<std::shared_ptr<IoDevice>> ioDevs_;
+
+    // Name, size, and address in memory of a binary file.
+    typedef std::tuple<std::string, uint64_t, uint64_t> BinaryFile;
+    std::vector<BinaryFile> binaryFiles_;
   };
 }

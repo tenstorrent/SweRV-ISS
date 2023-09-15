@@ -141,7 +141,7 @@ parseCmdLineNumber(const std::string& option,
 }
 
 
-/// Aapter for the parseCmdLineNumber for optionals.
+/// Adapter for the parseCmdLineNumber for optionals.
 template <typename TYPE>
 static
 bool
@@ -474,7 +474,9 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	("binary,b", po::value(&args.binaryFiles)->multitoken(),
 	 "Binary file to load into simulator memory. File path may be suffixed with a colon followed "
 	 "by an address (integer) in which case data will be loaded at address as opposed to zero. "
-	 " Example: -b file1  -b file2:0x1040")
+	 "An addional suffix of :u may be added to write back the file with the contents of memory "
+	 "at the end of the run. "
+	 "Example: -b file1 -b file2:0x1040 -b file3:0x20000:u")
         ("kernel", po::value(&args.kernelFile),
          "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
         "rv32 or 0x200000 for rv64 unless an explicit addresss is specified after a colon suffix "

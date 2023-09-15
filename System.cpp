@@ -16,6 +16,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <boost/algorithm/string.hpp>
 #include "Filesystem.hpp"
 #include "Hart.hpp"
 #include "Core.hpp"
@@ -94,7 +95,31 @@ System<URV>::defineUart(uint64_t addr, uint64_t size)
 
 
 template <typename URV>
-System<URV>::~System() = default;
+System<URV>::~System()
+{
+  // Write back binary files were marked for update.
+  for (auto bf : binaryFiles_)
+    {
+      auto path = std::get<0>(bf);
+      uint64_t addr = std::get<1>(bf);
+      uint64_t size = std::get<2>(bf);
+      std::cerr << "Updating " << path << " from addr: 0x" << std::hex << addr
+		<< std::dec << " size: " << size << '\n';
+      FILE* file = fopen(path.c_str(), "w");
+      if (not file)
+	{
+	  std::cerr << "Failed to open " << path << " for update\n";
+	  continue;
+	}
+      for (uint64_t i = 0; i < size; ++i)
+	{
+	  uint8_t byte = 0;
+	  memory_->peek(addr + i, byte, false);
+	  fputc(byte, file);
+	}
+      fclose(file);
+    }
+}
 
 
 template <typename URV>
@@ -209,32 +234,78 @@ System<URV>::loadHexFiles(const std::vector<std::string>& files, bool verbose)
 
 template <typename URV>
 bool
-System<URV>::loadBinaryFiles(const std::vector<std::string>& files,
+System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 			     uint64_t defOffset, bool verbose)
 {
+  using std::cerr;
   unsigned errors = 0;
 
-  for (const auto& binaryFile : files)
+  for (const auto& spec : fileSpecs)
     {
-      std::string filename = binaryFile;
+      // Split filespec around colons. Spec format: <file>,
+      // <file>:<offset>, or <file>:<offset>:u
+      std::vector<std::string> parts;
+      boost::split(parts, spec, boost::is_any_of(":"));
+
+      if (parts.empty())
+	{
+	  std::cerr << "Error: Empty binary file name\n";
+	  errors++;
+	  continue;
+	}
+
+      std::string filename = parts.at(0);
       uint64_t offset = defOffset;
-      auto end = binaryFile.find(':');
-      if (end != std::string::npos)
+
+      if (parts.size() > 1)
         {
-          filename = binaryFile.substr(0, end);
-          std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
-          offset = strtoull(offsStr.c_str(), nullptr, 0);
+          std::string offsStr = parts.at(1);
+	  if (offsStr.empty())
+	    cerr << "Warning: Empty binary file offset: " << spec << '\n';
+	  else
+	    {
+	      char* tail = nullptr;
+	      offset = strtoull(offsStr.c_str(), &tail, 0);
+	      if (tail and *tail)
+		{
+		  cerr << "Error: Invalid binary file offset: " << spec << '\n';
+		  errors++;
+		  continue;
+		}
+	    }
         }
       else
-        std::cerr << "Binary file " << binaryFile << " does not have an address, will use address 0x"
-		  << std::hex << offset << std::dec << '\n';
+        cerr << "Binary file " << filename << " does not have an address, will use address 0x"
+	     << std::hex << offset << std::dec << '\n';
+
+      bool update = false;
+      if (parts.size() > 2)
+	{
+	  if (parts.at(2) != "u")
+	    {
+	      cerr << "Error: Invalid binary file attribute: " << spec << '\n';
+	      errors++;
+	      continue;
+	    }
+	  update = true;
+	}
 
       if (verbose)
-	std::cerr << "Loading binary " << filename << " at address 0x" << std::hex
-		  << offset << std::dec << '\n';
+	cerr << "Loading binary " << filename << " at address 0x" << std::hex
+	     << offset << std::dec << '\n';
 
       if (not memory_->loadBinaryFile(filename, offset))
-        errors++;
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (update)
+	{
+	  uint64_t size = Filesystem::file_size(filename);
+	  BinaryFile bf = { filename, offset, size };
+	  binaryFiles_.push_back(bf);
+	}
     }
 
   return errors == 0;
