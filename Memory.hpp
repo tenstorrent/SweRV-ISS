@@ -539,7 +539,6 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 
-      // Memory mapped region accessible only with word-size poke.
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.isMemMappedReg())
         {
@@ -581,7 +580,7 @@ namespace WdRiscv
     /// is used to initialize memory. If address is in
     /// memory-mapped-register region, then both mem-mapped-register
     /// and external memory are written.
-    bool specialInitializeByte(uint64_t address, uint8_t value);
+    bool initializeByte(uint64_t address, uint8_t value);
 
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
