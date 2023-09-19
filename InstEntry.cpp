@@ -2454,7 +2454,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.vv ", InstId::vwadd_vv ,
+      { "vwadd.vv", InstId::vwadd_vv ,
         0b110001'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2463,7 +2463,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.vx ", InstId::vwadd_vx ,
+      { "vwadd.vx", InstId::vwadd_vx ,
         0b110001'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2472,7 +2472,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.vv ", InstId::vwsub_vv ,
+      { "vwsub.vv", InstId::vwsub_vv ,
         0b110011'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2481,7 +2481,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.vx ", InstId::vwsub_vx ,
+      { "vwsub.vx", InstId::vwsub_vx ,
         0b110011'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2526,7 +2526,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.wv ", InstId::vwadd_wv ,
+      { "vwadd.wv", InstId::vwadd_wv ,
         0b110101'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2535,7 +2535,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.wx ", InstId::vwadd_wx ,
+      { "vwadd.wx", InstId::vwadd_wx ,
         0b110101'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2544,7 +2544,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.wv ", InstId::vwsub_wv ,
+      { "vwsub.wv", InstId::vwsub_wv ,
         0b110111'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2553,7 +2553,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.wx ", InstId::vwsub_wx ,
+      { "vwsub.wx", InstId::vwsub_wx ,
         0b110111'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
