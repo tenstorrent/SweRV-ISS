@@ -94,14 +94,22 @@ namespace WdRiscv
     /// Return host-machine address of the target-machine page with
     /// the given page number creating such a page (and zeroing it) if
     /// it has never been accessed before.
-    std::vector<uint8_t>& findOrCreatePage(uint64_t pageRank)
+    inline std::vector<uint8_t>& findOrCreatePage(uint64_t pageNum)
+    {
+      auto end = pageMap_.end();
+      auto iter = pageMap_.find(pageNum);
+      if (iter != end)
+	return iter->second;
+
+      return createPage(pageNum);
+    }
+     
+    std::vector<uint8_t>& createPage(uint64_t pageNum)
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      auto iter = pageMap_.find(pageRank);
+      auto iter = pageMap_.find(pageNum);
       if (iter == pageMap_.end())
-        {
-          iter = pageMap_.try_emplace(pageRank, pageSize_, 0).first;
-        }
+	iter = pageMap_.try_emplace(pageNum, pageSize_, 0).first;
       return iter->second;
     }
 
