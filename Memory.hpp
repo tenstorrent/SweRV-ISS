@@ -137,28 +137,27 @@ namespace WdRiscv
     bool readInst(uint64_t address, T& value) const
     {
       Pma pma = pmaMgr_.getPma(address);
-      if (pma.isExec())
+      if (not pma.isExec())
+	return false;
+
+      if (address & (sizeof(T) -1))
 	{
-	  if (address & (sizeof(T) -1))
-	    {
-              // Misaligned address: Check next address.
-              Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
-	      if (pma != pma2)
-                return false;  // Cannot cross an ICCM boundary.
-	    }
+	  // Misaligned address: Check next address.
+	  Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+	  if (not pma2.isExec() or pma.isIccm() != pma2.isIccm())
+	    return false;  // No exec or crossing ICCM boundary.
+	}
 
 #ifdef MEM_CALLBACKS
-          uint64_t val = 0;
-          if (not readCallback_(address, sizeof(T), val))
-            return false;
-          value = val;
+      uint64_t val = 0;
+      if (not readCallback_(address, sizeof(T), val))
+	return false;
+      value = val;
 #else
-          value = *(reinterpret_cast<const T*>(data_ + address));
+      value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
 
-	  return true;
-	}
-      return false;
+      return true;
     }
 
     /// Return true if read will be successful if tried. 
@@ -171,7 +170,7 @@ namespace WdRiscv
       if (address & (readSize - 1))  // If address is misaligned
 	{
           Pma pma2 = pmaMgr_.getPma(address + readSize - 1);
-          if (pma1 != pma2)
+          if (not pma2.isRead())
             return false;
 	}
 
@@ -198,7 +197,7 @@ namespace WdRiscv
       if (address & (writeSize - 1))  // If address is misaligned
 	{
           Pma pma2 = pmaMgr_.getPma(address + writeSize - 1);
-          if (pma1 != pma2)
+          if (not pma2.isWrite())
             return false;
 	}
 
@@ -539,7 +538,6 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 
-      // Memory mapped region accessible only with word-size poke.
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.isMemMappedReg())
         {
@@ -581,7 +579,7 @@ namespace WdRiscv
     /// is used to initialize memory. If address is in
     /// memory-mapped-register region, then both mem-mapped-register
     /// and external memory are written.
-    bool specialInitializeByte(uint64_t address, uint8_t value);
+    bool initializeByte(uint64_t address, uint8_t value);
 
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
