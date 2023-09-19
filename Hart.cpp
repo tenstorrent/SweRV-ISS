@@ -444,7 +444,10 @@ Hart<URV>::updateMemoryProtection()
         }
     }
 
+#ifndef FAST_SLOPPY
   pmpEnabled_ = impCount > 0;
+#endif
+
   pmpManager_.enable(pmpEnabled_);
 }
 
@@ -2268,19 +2271,21 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (isCompressedInst(inst))
     return true;
 
+  // If we cross page boundary, translate address of other page.
   uint64_t physAddr2 = physAddr + 2;
   uint64_t gPhysAddr2 = physAddr2;
-  if (isRvs() and privMode_ != PrivilegeMode::Machine)
-    {
-      auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr2, physAddr2);
-      if (cause != ExceptionCause::NONE)
-        {
-          if (triggerTripped_)
-            return false;
-          initiateException(cause, virtAddr, virtAddr+2, gPhysAddr2);
-          return false;
-        }
-    }
+  if (memory_.getPageIx(physAddr) != memory_.getPageIx(physAddr2))
+    if (isRvs() and privMode_ != PrivilegeMode::Machine)
+      {
+	auto cause = virtMem_.translateForFetch(virtAddr+2, privMode_, virtMode_, gPhysAddr2, physAddr2);
+	if (cause != ExceptionCause::NONE)
+	  {
+	    if (triggerTripped_)
+	      return false;
+	    initiateException(cause, virtAddr, virtAddr+2, gPhysAddr2);
+	    return false;
+	  }
+      }
 
   uint16_t upperHalf;
   if (not memory_.readInst(physAddr2, upperHalf))
