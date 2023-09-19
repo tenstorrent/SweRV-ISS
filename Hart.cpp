@@ -638,6 +638,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   // Enable extensions if corresponding bits are set in the MISA CSR.
   processExtensions();
   csRegs_.reset();
+  peekCsr(CsrNumber::MIE, cachedMie_);
 
   perfControl_ = ~uint32_t(0);
   URV value = 0;
@@ -3091,6 +3092,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       updateTranslationPbmt();
       csRegs_.updateSstc();
     }
+  else if (csr == CN::MIE or csr == CN::SIE or csr == CN::HIE or csr == CN::VSIE)
+    peekCsr(CN::MIE, cachedMie_);
 
   if (csr == CN::STIMECMP)
     {
@@ -4338,7 +4341,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  ++instCounter_;
 
-          if (processExternalInterrupt(traceFile, instStr))
+          if (cachedMie_ and processExternalInterrupt(traceFile, instStr))
 	    continue;  // Next instruction in trap handler.
 	  uint64_t physPc = 0;
           if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
@@ -4571,7 +4574,6 @@ bool
 Hart<URV>::simpleRunWithLimit()
 {
   uint64_t limit = instCountLim_;
-  bool checkInterrupt = isRvs() or isRvu() or hasClint();
   std::string instStr;
 
   bool traceBranchOn = branchBuffer_.max_size() and not branchTraceFile_.empty();
@@ -4584,8 +4586,8 @@ Hart<URV>::simpleRunWithLimit()
       if (mcycleEnabled())
 	++cycleCount_;
 
-      if (checkInterrupt and processExternalInterrupt(nullptr, instStr))
-	continue;
+      if (cachedMie_ and processExternalInterrupt(nullptr, instStr))
+	continue;  // Next instruction in trap handler.
 
       // Fetch/decode unless match in decode cache.
       uint32_t inst = 0;
@@ -4803,7 +4805,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (debugMode_)
     return false;
 
-  URV mie = csRegs_.peekMie();
+  URV mie = cachedMie_;
   URV possible = mie & mip & ~deferredInterrupts_;
   if (possible == 0)
     return false;  // Nothing enabled that is also pending.
