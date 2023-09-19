@@ -2146,7 +2146,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
     if (virtMem_.transAddrNoUpdate(va, privMode_, virtMode_, false, false, true, pa) != ExceptionCause::NONE)
       return false;
 
-  uint16_t low;  // Low 2 bytes of instruction.
+  uint16_t low = 0;  // Low 2 bytes of instruction.
   if (not memory_.readInst(pa, low))
     return false;
 
@@ -2154,7 +2154,7 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
   if ((inst & 0x3) != 3)
     return true;  // Compressed instruction.
 
-  uint16_t high;
+  uint16_t high = 0;
   uint64_t va2 = va + 2, pa2 = pa + 2;
   if (translate and memory_.getPageIx(va) != memory_.getPageIx(va2))
     if (virtMem_.transAddrNoUpdate(va2, privMode_, virtMode_, false, false, true, pa2) != ExceptionCause::NONE)
@@ -2241,7 +2241,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return true;
     }
 
-  uint16_t half;
+  uint16_t half = 0;
   if (not memory_.readInst(physAddr, half))
     {
       if (triggerTripped_)
