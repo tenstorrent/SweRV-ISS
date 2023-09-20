@@ -24,7 +24,7 @@ enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
                           ExitDebug, LoadFinished, CancelDiv, CancelLr,
                           DumpMemory, McmRead, McmInsert, McmWrite,
 			  PageTableWalk, Translate, CheckInterrupt,
-                          SeiPin };
+                          SeiPin, McmBypass };
 
 // Be careful changing this: test-bench file (defines.svh) needs to be
 // updated.

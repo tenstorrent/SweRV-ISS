@@ -1128,6 +1128,16 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           }
         break;
 
+      case McmBypass:
+        if (not system_.mcmBypass(hart, msg.time, msg.instrTag, msg.address,
+				 msg.size, msg.value))
+          reply.type = Invalid;
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
+                  hartId, msg.time, msg.instrTag, msg.address, msg.size,
+                  msg.value);
+        break;
+
       case PageTableWalk:
         doPageTableWalk(hart, reply);
         break;

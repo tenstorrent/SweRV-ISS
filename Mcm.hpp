@@ -115,6 +115,10 @@ namespace WdRiscv
     bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		uint64_t physAddr, unsigned size, uint64_t rtlData);
     
+    /// This is a write operation bypassing the merge buffer.
+    bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
+		  uint64_t physAddr, unsigned size, uint64_t rtlData);
+
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where
     /// all writes are complete are marked complete. Return true on
@@ -264,6 +268,8 @@ namespace WdRiscv
 
     bool checkStoreComplete(const McmInstr& instr) const;
 
+    bool checkStoreData(unsigned hartId, const McmInstr& insrt) const;
+
     bool checkLoadComplete(const McmInstr& instr) const;
 
     void clearMaskBitsForWrite(const McmInstr& storeInstr,
@@ -272,10 +278,10 @@ namespace WdRiscv
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
     bool checkRtlWrite(unsigned hartId, const McmInstr& instr,
-		       const MemoryOp& op);
+		       const MemoryOp& op) const;
 
     bool checkRtlRead(unsigned hartId, const McmInstr& instr,
-		      const MemoryOp& op);
+		      const MemoryOp& op) const;
 
     bool updateTime(const char* method, uint64_t time);
 

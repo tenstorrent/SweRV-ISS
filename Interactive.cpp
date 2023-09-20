@@ -1219,6 +1219,10 @@ printInteractiveHelp()
   cout << "  to whisper data. Addr should be a multiple of cache-line size. If hex\n";
   cout << "  string is smaller than twice the cache-line size, it will be padded with\n";
   cout << "  zeros on the most signficant side.\n\n";
+  cout << "mbbypass tag addr size data\n";
+  cout << "  Perform a memory write operation bypassing the mrege buffer. Given\n";
+  cout << "  data (hexadecimal string) is from a different model (RTL) and is compared\n";
+  cout << "  to whisper data.\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
@@ -1669,6 +1673,15 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "mbbypass" or command == "merge_buffer_bypass")
+    {
+      if (not mbBypassCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "translate")
     {
       if (not translateCommand(hart, line, tokens))
@@ -1917,7 +1930,7 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
   // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
   if (tokens.size() != 5)
     {
-      std::cerr << "Invalid minsert command: " << line << '\n';
+      std::cerr << "Invalid mbinsert command: " << line << '\n';
       std::cerr << "  Expecting: mbinsert <tag> <addr> size> <data>\n";
       return false;
     }
@@ -1944,6 +1957,44 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
     return false;
 
   return system_.mcmMbInsert(hart, this->time_, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
+				  const std::vector<std::string>& tokens)
+{
+  // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
+  if (tokens.size() != 5)
+    {
+      std::cerr << "Invalid mbbypass command: " << line << '\n';
+      std::cerr << "  Expecting: mbbypass <tag> <addr> size> <data>\n";
+      return false;
+    }
+
+  uint64_t tag = 0;
+  if (not parseCmdLineNumber("instruction-tag", tokens.at(1), tag))
+    return false;
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(2), addr))
+    return false;
+
+  uint64_t size = 0;
+  if (not parseCmdLineNumber("size", tokens.at(3), size))
+    return false;
+  if (size > 8 or size == 0)
+    {
+      std::cerr << "Invalid size: << " << size << " -- Expecting 1 to 8\n";
+      return false;
+    }
+
+  uint64_t data = 0;
+  if (not parseCmdLineNumber("data", tokens.at(4), data))
+    return false;
+
+  return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
 }
 
 

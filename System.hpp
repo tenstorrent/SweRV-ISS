@@ -289,6 +289,11 @@ namespace WdRiscv
     bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		     uint64_t addr, unsigned size, uint64_t data);
 
+    /// Initiate a write for a store instruction bypassing the merge
+    /// buffer.
+    bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		   uint64_t addr, unsigned size, uint64_t data);
+
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   const DecodedInst& di);
 

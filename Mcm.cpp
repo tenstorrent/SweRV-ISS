@@ -295,7 +295,6 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   if (not writeOnInsert_)
     hartPendingWrites_.at(hartIx).push_back(op);
 
-  // If corresponding insruction is retired, compare to its data.
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   if (not instr)
     {
@@ -341,9 +340,71 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	}
     }
 
+  // If corresponding insruction is retired, compare to its data.
   if (instr->retired_)
     if (not checkRtlWrite(hart.hartId(), *instr, op))
       result = false;
+
+  return result;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
+		   uint64_t physAddr, unsigned size, uint64_t rtlData)
+{
+  if (not updateTime("Mcm::writeOp", time))
+    return false;
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  MemoryOp op = {};
+  op.time_ = time;
+  op.physAddr_ = physAddr;
+  op.rtlData_ = rtlData;
+  op.instrTag_ = instrTag;
+  op.hartIx_ = hartIx;
+  op.size_ = size;
+  op.isRead_ = false;
+
+  // If corresponding insruction is retired, compare to its data.
+  McmInstr* instr = findOrAddInstr(hartIx, instrTag);
+  if (not instr)
+    {
+      cerr << "Mcm::bypassOp: Error: Unknown instr tag\n";
+      assert(0 && "Mcm::BypassOp: Unknown instr tag");
+      return false;
+    }
+
+  bool result = true;
+
+  // Associate write op with instruction.
+  instr->addMemOp(sysMemOps_.size());
+  sysMemOps_.push_back(op);
+  instr->complete_ = checkStoreComplete(*instr);
+
+  if (instr->retired_)
+    {
+      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
+      if (op.size_ == 1)
+	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
+      else if (op.size_ == 2)
+	hart.pokeMemory(physAddr, uint16_t(rtlData), true);
+      else if (op.size_ == 4)
+	hart.pokeMemory(physAddr, uint32_t(rtlData), true);
+      else if (op.size_ == 8)
+	hart.pokeMemory(physAddr, uint64_t(rtlData), true);
+      else
+	{
+	  cerr << "Mcm::bypassOp: Error: data size not a power of 2\n";
+	  assert(0 && "Mcm::bypassOp: data size not a power of 2");
+	  result = false;
+	}
+
+      if (instr->complete_)
+	result = ppoRule1(hart, *instr) and result;
+    }
 
   return result;
 }
@@ -417,15 +478,23 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 	       << " retired before read op.\n";
 	  ok = false;
 	}
-#if 0
-      if (instrHasWrite(*instr))
+
+      if (not instrHasWrite(*instr))
 	{
-	  cerr << "Error: Amo instruction tag=" << tag
-	       << " retired after write op.\n";
+	  cerr << "Warning: Amo instruction tag=" << tag
+	       << " retired without a write op.\n";
 	  return false;
 	}
-#endif
+
       instr->isStore_ = true;  // AMO is both load and store.
+    }
+
+  if (instr->isStore_)
+    {
+      instr->complete_ = checkStoreComplete(*instr);
+      if (instr->complete_)
+	ok = checkStoreData(hartIx, *instr) and ok;
+      ok = ppoRule1(hart, *instr) and ok;
     }
 
   ok = ppoRule2(hart, *instr) and ok;
@@ -741,7 +810,7 @@ Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
 template <typename URV>
 bool
 Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
-		       const MemoryOp& op)
+		       const MemoryOp& op) const
 {
   if (op.size_ > instr.size_)
     {
@@ -767,7 +836,7 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 template <typename URV>
 bool
 Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
-			const MemoryOp& op)
+			const MemoryOp& op) const
 {
   if (instr.size_ == 0)
     {
@@ -804,6 +873,32 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
        << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
        << " whisper=0x" << data << std::dec << '\n';
   return false;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
+{
+  if (not storeInstr.complete_)
+    return false;
+
+  bool ok = true;
+
+  for (auto opIx : storeInstr.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+
+      const auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	continue;
+
+      if (not checkRtlWrite(hartId, storeInstr, op))
+	ok = false;
+    }
+
+  return ok;
 }
 
 
