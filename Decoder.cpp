@@ -2969,6 +2969,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               case 4:
                 {
                   unsigned top12 = op2;
+		  op2 = 0; // No offset for these instructions.
                   if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
                   if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
                   if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);
@@ -2979,9 +2980,9 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   if (top12 == 0x681) return instTable_.getEntry(InstId::hlv_wu);
                   if (top12 == 0x6c0) return instTable_.getEntry(InstId::hlv_d);
 
-                  unsigned top7 = op2 >> 5;
+                  unsigned top7 = top12 >> 5;
                   unsigned rd = iform.fields.rd;
-                  op0 = op2 & 0x1f;  // rs2 field
+                  op0 = top12 & 0x1f;  // rs2 field
                   if (top7 == 0x31 and rd == 0) return instTable_.getEntry(InstId::hsv_b);
                   if (top7 == 0x33 and rd == 0) return instTable_.getEntry(InstId::hsv_h);
                   if (top7 == 0x35 and rd == 0) return instTable_.getEntry(InstId::hsv_w);
