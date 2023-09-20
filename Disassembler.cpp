@@ -56,6 +56,8 @@ printLdSt(const Disassembler& disas, std::ostream& stream, const DecodedInst& di
 {
   unsigned rd = di.op0(), rs1 = di.op1();
   int32_t imm = di.op2As<int32_t>();
+  if (di.extension() == RvExtension::H)
+    imm = 0;
 
   stream << std::left << std::setw(8) << di.name() << ' ';
 
