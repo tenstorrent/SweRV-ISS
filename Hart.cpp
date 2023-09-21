@@ -1580,8 +1580,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
 	  Pmp pmp2 = pmpManager_.accessPmp(next);
-	  if (not pmp2.isRead(privMode_, mstatusMpp(), mstatusMprv()) or
-	      pmp.pmpIndex() != pmp2.pmpIndex())
+	  if (not pmp2.isRead(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
 	      return EC::LOAD_ACC_FAULT;
@@ -2255,10 +2254,9 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return false;
     }
 
-  Pmp pmp;
   if (pmpEnabled_)
     {
-      pmp = pmpManager_.accessPmp(physAddr);
+      Pmp pmp = pmpManager_.accessPmp(physAddr);
       if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
         {
           if (triggerTripped_)
@@ -2302,8 +2300,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
   if (pmpEnabled_)
     {
       Pmp pmp2 = pmpManager_.accessPmp(physAddr2);
-      if (not pmp2.isExec(privMode_, mstatusMpp(), instMprv) or
-	  pmp.pmpIndex() != pmp2.pmpIndex())
+      if (not pmp2.isExec(privMode_, mstatusMpp(), instMprv))
         {
           if (triggerTripped_)
             return false;
@@ -10344,9 +10341,8 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	{
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-  	  Pmp pmp2 = pmpManager_.accessPmp(next);
-	  if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()) or
-	      pmp.pmpIndex() != pmp2.pmpIndex())
+ 	  Pmp pmp2 = pmpManager_.accessPmp(next);
+	  if (not pmp2.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
 	    {
 	      addr1 = va2;
 	      return EC::LOAD_ACC_FAULT;
