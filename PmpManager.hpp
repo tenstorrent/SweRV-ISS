@@ -94,8 +94,6 @@ namespace WdRiscv
     uint8_t val() const
     { return (locked_ << 7) | (0 << 5) | ((uint8_t(type_) & 3) << 3) | (mode_ & 7); }
 
-  protected:
-
     /// Return the index of the PMP entry from which this object was
     /// created.
     unsigned pmpIndex() const

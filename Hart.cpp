@@ -1575,12 +1575,13 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  addr1 = va1;
 	  return EC::LOAD_ACC_FAULT;
 	}
-      if (misal or addr1 != addr2)
+      if (misal)
 	{
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-	  pmp = pmpManager_.accessPmp(next);
-	  if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
+	  Pmp pmp2 = pmpManager_.accessPmp(next);
+	  if (not pmp2.isRead(privMode_, mstatusMpp(), mstatusMprv()) or
+	      pmp.pmpIndex() != pmp2.pmpIndex())
 	    {
 	      addr1 = va2;
 	      return EC::LOAD_ACC_FAULT;
@@ -2254,9 +2255,10 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return false;
     }
 
+  Pmp pmp;
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(physAddr);
+      pmp = pmpManager_.accessPmp(physAddr);
       if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
         {
           if (triggerTripped_)
@@ -2299,8 +2301,9 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(physAddr2);
-      if (not pmp.isExec(privMode_, mstatusMpp(), instMprv))
+      Pmp pmp2 = pmpManager_.accessPmp(physAddr2);
+      if (not pmp2.isExec(privMode_, mstatusMpp(), instMprv) or
+	  pmp.pmpIndex() != pmp2.pmpIndex())
         {
           if (triggerTripped_)
             return false;
@@ -10341,12 +10344,13 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  addr1 = va1;
 	  return EC::STORE_ACC_FAULT;
 	}
-      if (misal or addr1 != addr2)
+      if (misal)
 	{
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
-  	  pmp = pmpManager_.accessPmp(next);
-	  if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
+  	  Pmp pmp2 = pmpManager_.accessPmp(next);
+	  if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()) or
+	      pmp.pmpIndex() != pmp2.pmpIndex())
 	    {
 	      addr1 = va2;
 	      return EC::LOAD_ACC_FAULT;
