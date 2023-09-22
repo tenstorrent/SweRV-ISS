@@ -3336,10 +3336,16 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
     }
   else if (num == CsrNumber::HVIP)
     {
-      // Poking HVIP injects values into HIP. FIX : Need to
+      // Writing HVIP injects values into HIP. FIX : Need to
       // logical-or external values for VSEIP and VSTIP.
       if (hip)
 	{
+	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+	  HstatusFields<URV> hsf(hsVal);
+	  unsigned vgein = hsf.bits_.VGEIN;
+	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
+	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  value = value | (bit << 10);
 	  hip->poke(value);
 	  hipUpdated = true;
 	  recordWrite(CsrNumber::HIP);
@@ -3476,11 +3482,32 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       // logical-or external values for VSEIP and VSTIP.
       if (hip)
         {
+	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+	  HstatusFields<URV> hsf(hsVal);
+	  unsigned vgein = hsf.bits_.VGEIN;
+	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
+	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  value = value | (bit << 10);
           hip->poke(value);
           hipUpdated = true;
         }
       if (vsip)
         vsip->poke(value >> 1);
+    }
+  else if (num == CsrNumber::HGEIP)
+    {
+      // Updating HGEIP is reflected in HIP
+      if (hip)
+        {
+	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+	  HstatusFields<URV> hsf(hsVal);
+	  unsigned vgein = hsf.bits_.VGEIN;
+	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
+	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  URV mask = bit << 10;
+          hip->poke(hip->read() | mask);
+          hipUpdated = true;
+        }
     }
   else if (num == CsrNumber::VSIP)
     {
