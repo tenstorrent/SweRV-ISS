@@ -10227,9 +10227,18 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 	memRead(pa1, pa2, elem);
       else
         {
-          csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
-          if (ix == 0 or not faultFirst)
-            initiateLoadException(cause, pa1, gpa1);
+	  if (faultFirst)
+	    {
+	      if (ix == 0)
+		initiateLoadException(cause, pa1, gpa1);
+	      else
+		csRegs_.write(CsrNumber::VL, PrivilegeMode::Machine, ix);
+	    }
+	  else
+	    {
+	      csRegs_.write(CsrNumber::VSTART, PrivilegeMode::Machine, ix);
+	      initiateLoadException(cause, pa1, gpa1);
+	    }
           return false;
         }
 
