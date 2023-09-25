@@ -2810,7 +2810,9 @@ CsRegs<URV>::adjustPmpValue(CsrNumber csrn, URV value) const
       if (pmpG_ >= 2)
         {
           unsigned width = rv32_ ? 32 : 64;
-          URV mask = ~URV(0) >> (width - pmpG_ + 1);
+	  URV mask = ~URV(0);
+	  if (width >= pmpG_ - 1)
+	    mask >>= (width - pmpG_ + 1);
           value = value | mask; // Set to 1 least sig G-1 bits
         }
     }
