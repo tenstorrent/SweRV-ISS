@@ -4361,7 +4361,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 		  dumpInitState("dpt", addr, addr);
 	    }
 
-	  if (hasException_ or hasInterrupt_)
+	  if (hasException_)
 	    {
               if (doStats)
                 accumulateInstructionStats(*di);
@@ -4593,7 +4593,7 @@ Hart<URV>::simpleRunWithLimit()
       pc_ += di->instSize();
       execute(di);
 
-      if (not (hasException_ or hasInterrupt_))
+      if (not hasException_)
 	if (minstretEnabled())
 	  ++retiredInsts_;
 
