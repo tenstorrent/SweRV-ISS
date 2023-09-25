@@ -1210,9 +1210,9 @@ namespace WdRiscv
     }
 
     /// Fast peek method for HGEIP.
-    URV peekHgeip() const
+    URV peekHgeie() const
     {
-      const auto& csr = regs_.at(size_t(CsrNumber::HGEIP));
+      const auto& csr = regs_.at(size_t(CsrNumber::HGEIE));
       return csr.read();
     }
 
