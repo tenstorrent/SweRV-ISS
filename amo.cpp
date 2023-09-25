@@ -31,16 +31,20 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
 {
   URV mask = URV(accessSize) - 1;
 
+  bool misal = (addr & mask) != 0;
+  if (misal and misalHasPriority_)
+    {
+      if (misalAtomicCauseAccessFault_)
+	return ExceptionCause::STORE_ACC_FAULT;
+      return ExceptionCause::STORE_ADDR_MISAL;
+    }
+
   uint64_t addr2 = addr;
   uint64_t gaddr2 = gaddr;
   auto cause = determineStoreException(addr, addr2, gaddr, gaddr2, accessSize, false /*hyper*/);
 
-  if (cause == ExceptionCause::STORE_ADDR_MISAL)
-    {
-      if (misalAtomicCauseAccessFault_)
-	return ExceptionCause::STORE_ACC_FAULT;
-      return cause;
-    }
+  if (cause != ExceptionCause::NONE)
+    return cause;
 
   // Address must be word aligned for word access and double-word
   // aligned for double-word access.
