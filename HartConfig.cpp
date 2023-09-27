@@ -1359,9 +1359,20 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   applyPerfEvents(hart, *config_, userMode, cof, verbose) or errors++;
   applyCsrConfig(hart, *config_, verbose) or errors++;
   applyTriggerConfig(hart, *config_) or errors++;
-  applyVectorConfig(hart, *config_) or errors++;
 
   hart.enableSscofpmf(cof);
+
+  tag = "trap_non_zero_vstart";
+  if (config_ ->contains(tag))
+    {
+      std::cerr << "Configuration tag trap_non_zero_vstart should be in vector section.\n";
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ ->at(tag), flag))
+        errors++;
+      else
+        hart.enableTrapNonZeroVstart(flag);
+    }
+  applyVectorConfig(hart, *config_) or errors++;
 
   tag = "even_odd_trigger_chains";
   if (config_ -> contains(tag))
