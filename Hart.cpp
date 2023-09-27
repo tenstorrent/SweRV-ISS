@@ -4953,7 +4953,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	  // Deliver/clear guest external interrupts from IMSIC.
 	  URV gip = imsic_->guestInterrupts();
 	  csRegs_.poke(CsrNumber::HGEIP, gip);
-	  URV gie = csRegs_.peekHgeip();
+	  URV gie = csRegs_.peekHgeie();
 	  if ((gip & gie) != 0)
 	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
 	  else
