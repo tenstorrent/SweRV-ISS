@@ -1914,8 +1914,13 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
 			<< byteStr << '\n';
 	      return false;
 	    }
-	  mask.push_back(value);
+	  for (unsigned j = 0; j < 8; ++j)
+	    {
+	      unsigned bit = (value >> (7-j)) & 1;
+	      mask.push_back(bit);
+	    }
 	}
+      std::reverse(mask.begin(), mask.end());
     }
 
   return system_.mcmMbWrite(hart, this->time_, addr, data, mask);
