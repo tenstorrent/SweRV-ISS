@@ -1434,6 +1434,11 @@ namespace WdRiscv
     bool isRvzfa() const
     { return extensionIsEnabled(RvExtension::Zfa); }
 
+
+    /// Return true if the AIA extension is enabled.
+    bool isRvaia() const
+    { return extensionIsEnabled(RvExtension::Smaia); }
+
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
     bool hasTargetProgramFinished() const
