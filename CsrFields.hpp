@@ -611,4 +611,25 @@ namespace WdRiscv
     } bits_;
   };
 
+
+  union HvictlFields
+  {
+    HvictlFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;
+    struct
+    {
+      unsigned IPRIO  : 8;
+      unsigned IPRIOM : 1;
+      unsigned DPR    : 1;
+      unsigned res0   : 6;
+      unsigned IID    : 12;
+      unsigned res1   : 2;
+      unsigned VTI    : 1;
+      uint64_t res2   : 33;
+    } bits_;
+  };
+
 }

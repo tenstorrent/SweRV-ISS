@@ -1434,6 +1434,11 @@ namespace WdRiscv
     bool isRvzfa() const
     { return extensionIsEnabled(RvExtension::Zfa); }
 
+
+    /// Return true if the AIA extension is enabled.
+    bool isRvaia() const
+    { return extensionIsEnabled(RvExtension::Smaia); }
+
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
     bool hasTargetProgramFinished() const
@@ -2300,7 +2305,7 @@ namespace WdRiscv
 					  unsigned ldSize, bool hyper);
 
     /// Helper to the cache block operation (cbo) instructions.
-    ExceptionCause determineCboException(uint64_t& addr, bool isRead);
+    ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isRead);
 
     /// Implement part of TIF protocol for writing the "tohost" magical
     /// location.

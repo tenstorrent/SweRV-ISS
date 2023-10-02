@@ -355,6 +355,10 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       return true;
     }
 
+  if (num == CsrNumber::MTOPI or num == CsrNumber::STOPI or
+      num == CsrNumber::VSTOPI)
+    return readTopi(num, value);
+
   value = csr->read();
 
   if (num == CN::SIP or num == CN::SIE)
@@ -2584,6 +2588,10 @@ CsRegs<URV>::peek(CsrNumber number, URV& value) const
       return true;
     }
 
+  if (number == CsrNumber::MTOPI or number == CsrNumber::STOPI or
+      number == CsrNumber::VSTOPI)
+    return readTopi(number, value);
+
   value = csr->read();
 
   if (number >= CsrNumber::PMPADDR0 and number <= CsrNumber::PMPADDR63)
@@ -2761,6 +2769,105 @@ CsRegs<URV>::pokeTdata(CsrNumber number, URV value)
 
   if (number == CsrNumber::TDATA3)
     return triggers_.pokeData3(trigger, value);
+
+  return false;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
+{
+  auto mip = getImplementedCsr(CsrNumber::MIP)->read();
+  auto mie = getImplementedCsr(CsrNumber::MIE)->read();
+  auto mideleg = getImplementedCsr(CsrNumber::MIDELEG)->read();
+
+  using IC = InterruptCause;
+
+  uint8_t iidShift = 16;
+  auto highest_prio = [](uint64_t bits) -> unsigned {
+    using IC = InterruptCause;
+
+    for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
+                               IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+                               IC::G_EXTERNAL,
+                               IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER,
+                               IC::LCOF } )
+	{
+          URV mask = URV(1) << unsigned(ic);
+          if (bits & mask)
+            return unsigned(ic);
+        }
+    return 0;
+  };
+
+  value = 0;
+  if (number == CsrNumber::MTOPI)
+    {
+      // We can set IPRIO=1 for read-only zero iprio arrays
+      unsigned iid = highest_prio(mip & mie & ~mideleg);
+      if (iid)
+        value = (iid << iidShift) | 1;
+      return true;
+    }
+
+  if (number == CsrNumber::STOPI or number == CsrNumber::VSTOPI)
+    {
+      auto csr = getImplementedCsr(CsrNumber::HIDELEG);
+      URV hideleg = (csr)? csr->read() : 0;
+
+      if (not virtMode_)
+        {
+          unsigned iid = highest_prio(mip & mie & mideleg & ~hideleg);
+          if (iid)
+            value = (iid << iidShift) | 1;
+          return true;
+        }
+
+      auto vs = mip & mie & mideleg & hideleg & ~(URV(1) << unsigned(IC::G_EXTERNAL));
+      bool external = (vs & (URV(1) << unsigned(IC::VS_EXTERNAL))) != 0;
+
+      // TODO: implement hvictl.VTI
+      csr = getImplementedCsr(CsrNumber::HVICTL);
+      HvictlFields hvictl(csr->read());
+      unsigned iprio = hvictl.bits_.IPRIO;
+      unsigned dpr = hvictl.bits_.DPR;
+      unsigned iid = hvictl.bits_.IID;
+      unsigned sExternal = unsigned(IC::S_EXTERNAL);
+
+      if (external)
+        {
+          unsigned id = 0;
+          if (imsic_)
+            {
+              URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+              HstatusFields<URV> hsf(hsVal);
+              unsigned vgein = hsf.bits_.VGEIN;
+
+             id = imsic_->guestTopId(vgein);
+            }
+          if (id != 0)
+            value = (sExternal << iidShift) | id;
+          else if (iid == sExternal and iprio != 0)
+            value = (sExternal << iidShift) | iprio;
+          else
+            value = (sExternal << iidShift) | 256;
+        }
+
+      bool vti = hvictl.bits_.VTI;
+      if (not vti and not value)
+        {
+          if (vs & (URV(1) << unsigned(IC::VS_SOFTWARE)))
+            value = unsigned(IC::S_SOFTWARE) << iidShift; // TODO: read-only zero hivprio
+          else if (vs & (URV(1) << unsigned(IC::VS_TIMER)))
+            value = unsigned(IC::S_TIMER) << iidShift;
+        }
+      if (vti and iid != sExternal and not (dpr and value))
+          // DPR solely determines priority between candidates
+          value = (iid << iidShift) | iprio;
+
+      return true;
+    }
 
   return false;
 }

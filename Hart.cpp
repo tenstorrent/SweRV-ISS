@@ -4814,9 +4814,9 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
       // Check for interrupts destined for machine-mode (not-delegated).
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER, IC::LCOF,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
 				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-				 IC::VS_TIMER } )
+				 IC::VS_TIMER, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
 	  if ((machine & mask) != 0)
@@ -4835,9 +4835,9 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER, IC::LCOF,
+				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
 				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-				 IC::VS_TIMER } )
+				 IC::VS_TIMER, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
 	  if ((super & mask) != 0)
@@ -4852,18 +4852,34 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 
   // Check for interrupts destined to VS privilege.
   // Possible if pending (mie), enabled (mip), delegated, and h-delegated.
-  URV vs = possible & delegVal & hDelegVal;
-  if ((vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)) and vs != 0)
+  if (isRvaia())
     {
-      for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
-	{
-	  URV mask = URV(1) << unsigned(ic);
-	  if ((vs & mask) != 0)
-	    {
-	      cause = ic;
-	      return true;
-	    }
-	}
+      // TODO: cache this
+      URV vstopi;
+      if (peekCsr(CsrNumber::VSTOPI, vstopi))
+        {
+          if (vstopi != 0 and (vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)))
+            {
+              cause = static_cast<InterruptCause>(vstopi >> 16);
+              return true;
+            }
+        }
+    }
+  else
+    {
+      URV vs = possible & delegVal & hDelegVal;
+      if ((vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)) and vs != 0)
+        {
+          for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
+            {
+              URV mask = URV(1) << unsigned(ic);
+              if ((vs & mask) != 0)
+                {
+                  cause = ic;
+                  return true;
+                }
+            }
+        }
     }
 
   return false;
