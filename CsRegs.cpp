@@ -2825,31 +2825,36 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
       unsigned iprio = hvictl.bits_.IPRIO;
       unsigned dpr = hvictl.bits_.DPR;
       unsigned iid = hvictl.bits_.IID;
+      unsigned sExternal = unsigned(IC::S_EXTERNAL);
 
       if (external)
         {
-          URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-          HstatusFields<URV> hsf(hsVal);
-          unsigned vgein = hsf.bits_.VGEIN;
+          unsigned id = 0;
+          if (imsic_)
+            {
+              URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+              HstatusFields<URV> hsf(hsVal);
+              unsigned vgein = hsf.bits_.VGEIN;
 
-          unsigned id = imsic_->guestTopId(vgein);
+             id = imsic_->guestTopId(vgein);
+            }
           if (id != 0)
-            value = (9 << iidShift) | id;
-          else if (iid == 9 and iprio != 0)
-            value = (9 << iidShift) | iprio;
+            value = (sExternal << iidShift) | id;
+          else if (iid == sExternal and iprio != 0)
+            value = (sExternal << iidShift) | iprio;
           else
-            value = (9 << iidShift) | 256;
+            value = (sExternal << iidShift) | 256;
         }
 
       bool vti = hvictl.bits_.VTI;
       if (not vti and not value)
         {
           if (vs & (URV(1) << unsigned(IC::VS_SOFTWARE)))
-            value = unsigned(IC::VS_SOFTWARE) << iidShift; // TODO: read-only zero hivprio
+            value = unsigned(IC::S_SOFTWARE) << iidShift; // TODO: read-only zero hivprio
           else if (vs & (URV(1) << unsigned(IC::VS_TIMER)))
-            value = unsigned(IC::VS_TIMER) << iidShift;
+            value = unsigned(IC::S_TIMER) << iidShift;
         }
-      if (vti and iid != 9 and not (dpr and value))
+      if (vti and iid != sExternal and not (dpr and value))
           // DPR solely determines priority between candidates
           value = (iid << iidShift) | iprio;
 
