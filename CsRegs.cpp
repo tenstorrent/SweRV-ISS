@@ -2811,7 +2811,8 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
       if (not virtMode_)
         {
           unsigned iid = highest_prio(mip & mie & mideleg & ~hideleg);
-          value = (iid << iidShift) | 1;
+          if (iid)
+            value = (iid << iidShift) | 1;
           return true;
         }
 
