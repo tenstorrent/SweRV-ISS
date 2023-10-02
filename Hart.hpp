@@ -2305,7 +2305,7 @@ namespace WdRiscv
 					  unsigned ldSize, bool hyper);
 
     /// Helper to the cache block operation (cbo) instructions.
-    ExceptionCause determineCboException(uint64_t& addr, bool isRead);
+    ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isRead);
 
     /// Implement part of TIF protocol for writing the "tohost" magical
     /// location.
