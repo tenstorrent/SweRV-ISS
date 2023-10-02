@@ -460,6 +460,14 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 	}
     }
 
+  // Make TM bit read only zero if TIME CSR is not implemented.
+  // This is not explicitly stated in the spec but it is in the lore.
+  URV mask = ~URV(0);
+  if (not isImplemented(CN::TIME))
+    mask &= ~URV(2);
+  regs_[unsigned(CN::MCOUNTEREN)].setReadMask(mask);
+  regs_[unsigned(CN::SCOUNTEREN)].setReadMask(mask);
+
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
   enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
