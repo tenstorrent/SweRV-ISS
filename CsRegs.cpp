@@ -1774,7 +1774,7 @@ CsRegs<URV>::defineMachineRegs()
       c->markAsHighHalf(true);
     }
 
-  val = 0x4000112d;  // MISA: acdfim
+  val = 0x4020112d;  // MISA: acdfimv
   if constexpr (sizeof(URV) == 8)
     val = 0x800000000020112d;  // MISA: acdfimv
   defineCsr("misa", Csrn::MISA, mand, imp, val, rom, rom);
