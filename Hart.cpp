@@ -9686,16 +9686,17 @@ Hart<URV>::execSret(const DecodedInst* di)
 
   // ... and putting it back
   if (not csRegs_.write(CsrNumber::SSTATUS, privMode_, fields.value_))
-    {
-      illegalInst(di);
-      return;
-    }
+    assert(0);
   updateCachedSstatus();
 
   // Clear hstatus.spv if sret executed in M/S modes.
   bool savedVirtMode = hstatus_.bits_.SPV;
-  if (not virtMode_)
-    hstatus_.bits_.SPV = 0;
+  if (not virtMode_ and savedVirtMode)
+    {
+      hstatus_.bits_.SPV = 0;
+      if (not csRegs_.write(CsrNumber::HSTATUS, privMode_, hstatus_.value_))
+	assert(0);
+    }
 
   // Restore program counter from SEPC.
   URV epc;
