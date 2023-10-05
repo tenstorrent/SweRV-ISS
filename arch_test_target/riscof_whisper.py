@@ -92,7 +92,7 @@ class whisper(pluginTemplate):
       # for whisper start building the '--isa' argument. the self.isa is dutname specific and may not be
       # useful for all DUTs
       self.isa = 'rv' + self.xlen
-      for ext in ["I", "M", "F", "D", "C"]:
+      for ext in ["I", "M", "A", "F", "D", "C", "V"]:
           if ext in ispec["ISA"]:
             self.isa += ext.lower()
       for ext in ["Zfa", "Zfh", "Zba", "Zbb", "Zbc", "Zbkb", "Zbkx", "Zbs", "Zknd", "Zkne", "Zknh", "Zksed", "Zksh"]:
