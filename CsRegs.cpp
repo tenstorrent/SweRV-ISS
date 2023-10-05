@@ -598,11 +598,12 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
     mstatus->setReadMask(mask);
   }
 
+  auto csr = findCsr(CN::MIDELEG);
+  auto sgeip = geilen_ ? URV(1) << 12 : 0;  // Bit SGEIP
+
   if (flag)
     {
       // Make VSEIP, VSTIP, and VSSIP read-only one.
-      auto csr = findCsr(CN::MIDELEG);
-      auto sgeip = geilen_ ? URV(1) << 12 : 0;  // Bit SGEIP
       for (auto&& [getMaskFn, setMaskFn] : { std::pair{ &Csr<URV>::getWriteMask, &Csr<URV>::setWriteMask },
                                              std::pair{ &Csr<URV>::getPokeMask,  &Csr<URV>::setPokeMask } })
         {
@@ -619,6 +620,13 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
           if (value != newValue)
             (csr->*setValueFn)(newValue);
         }
+    }
+  else
+    {
+      // Make VSEIP, VSTIP, VSSIP and SGEIP read only zero.
+      auto mask = csr->getReadMask();
+      mask &= ~URV(0x444) & ~sgeip;
+      csr->setReadMask(mask);
     }
 
   updateSstc();  // To activate/deactivate VSTIMECMP.
