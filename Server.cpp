@@ -717,14 +717,15 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   processStepCahnges(hart, inst, pendingChanges, interrupted, hasPre,
 		     hasPost, reply);
 
-  // Send privilege mode, incremental floating point flags, and trap info
-  // in flags: 2 bits for priv mode, 4 bits for fp flags, 1 bit for trap,
-  // 1 bit if target program stopped.
+  // Send privilege mode (2 bits), incremental floating point flags (4 bits),
+  // and trap info (1 bit), stop indicator (1 bit), interrupt (1 bit),
+  // and virtual mode (1 bit).
   unsigned fpFlags = hart.lastFpFlags();
   unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
   unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
+  unsigned virt = hart.lastVirtMode()? 1 : 0;
   reply.flags = ((pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) |
-		 (stop << 7) | (interrupted << 8));
+		 (stop << 7) | (interrupted << 8) | (virt << 9));
 
   if (wasInDebug)
     hart.enterDebugMode(hart.peekPc());
