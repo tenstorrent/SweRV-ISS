@@ -1899,6 +1899,11 @@ namespace WdRiscv
     bool mstatusMprv() const
     { return mstatus_.bits_.MPRV; }
 
+    /// Return the effective privilege mode: if mstatus.mprv then
+    /// it is the privilege mode in mstatus.mpp
+    PrivilegeMode effectivePrivilege() const
+    { return mstatusMprv() ? mstatusMpp() : privMode_; }
+
     /// Read an item that may span 2 physical pages. If pa1 is the
     /// same as pa2 then the item is in one page: do a simple read. If
     /// pa1 is different from pa2, then the item crosses a page

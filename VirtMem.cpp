@@ -572,7 +572,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       if (pmpMgr_.isEnabled())
 	{
 	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode, privMode, false))
+	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
 
@@ -652,7 +652,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  if (pmpMgr_.isEnabled())
 	    {
 	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode, privMode, false))
+	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 
@@ -739,7 +739,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (pmpMgr_.isEnabled())
 	{
 	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode, privMode, false))
+	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
 
@@ -817,7 +817,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  if (pmpMgr_.isEnabled())
 	    {
 	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode, privMode, false))
+	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 
@@ -918,7 +918,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (pmpMgr_.isEnabled())
 	{
 	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode, privMode, false))
+	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
 
@@ -999,7 +999,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  if (pmpMgr_.isEnabled())
 	    {
 	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode, privMode, false))
+	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 

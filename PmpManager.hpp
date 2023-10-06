@@ -50,27 +50,23 @@ namespace WdRiscv
     { }
 
     /// Return true if read (i.e. load instructions) access allowed
-    bool isRead(PrivilegeMode mode, PrivilegeMode prevMode, bool mprv) const
+    bool isRead(PrivilegeMode mode) const
     {
-      if (mprv)
-        mode = prevMode;
       bool check = (mode != PrivilegeMode::Machine) or locked_;
       return check ? mode_ & Read : true;
     }
 
     /// Return true if write (i.e. store instructions) access allowed.
-    bool isWrite(PrivilegeMode mode, PrivilegeMode prevMode, bool mprv) const
+    bool isWrite(PrivilegeMode mode) const
     {
-      bool check = (mode != PrivilegeMode::Machine or locked_ or
-                    (mprv and prevMode != PrivilegeMode::Machine));
+      bool check = (mode != PrivilegeMode::Machine or locked_);
       return check ? mode_ & Write : true;
     }
 
     /// Return true if instruction fecth is allowed.
-    bool isExec(PrivilegeMode mode, PrivilegeMode prevMode, bool mprv) const
+    bool isExec(PrivilegeMode mode) const
     {
-      bool check = (mode != PrivilegeMode::Machine or locked_ or
-                    (mprv and prevMode != PrivilegeMode::Machine));
+      bool check = (mode != PrivilegeMode::Machine or locked_);
       return check ? mode_ & Exec : true;
     }
 

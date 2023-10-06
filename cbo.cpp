@@ -57,7 +57,7 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
 	    {
 	      uint64_t dwa = pa + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
+	      if (not pmp.isRead(effectivePrivilege()))
 		return ExceptionCause::LOAD_ACC_FAULT;
 	    }
 	}
@@ -67,7 +67,7 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
 	    {
 	      uint64_t dwa = pa + i*8;  // Double word address
 	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
+	      if (not pmp.isWrite(effectivePrivilege()))
 		return ExceptionCause::STORE_ACC_FAULT;
 	    }
 	}
