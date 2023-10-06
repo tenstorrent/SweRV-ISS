@@ -1681,6 +1681,14 @@ namespace WdRiscv
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
 
+    /// Return the current virtual mode (V bit).
+    bool virtMode() const
+    { return virtMode_; }
+
+    /// Return the virtual mode before last executed instruction.
+    bool lastVirtMode() const
+    { return lastVirt_; }
+
     /// Return the number of page table walks of the last
     /// executed instruction
     unsigned getNumPageTableWalks(bool isInstr) const
@@ -4743,6 +4751,7 @@ namespace WdRiscv
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
     bool lastVirt_ = false;         // Before current inst.
+    bool lastHyer_ = false;         // Hypervisor mode before current inst.
 
     // These are used to get fast access to the FS and VS bits.
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
