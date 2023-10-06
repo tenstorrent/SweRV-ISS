@@ -1769,7 +1769,7 @@ CsRegs<URV>::defineMachineRegs()
   URV val =  0b0'00000000'0'0'0'0'0'0'00'00'11'00'0'0'0'0'0'0'0'0'0;
   if (not rv32_)
     {
-      mask |= uint64_t(0b0000) << 32;  // Mask for SXL and UXL (currently not writable).
+      // SXL and UXL (currently not writable).
       val |= uint64_t(0b1010) << 32;   // Value of SXL and UXL : sxlen=uxlen=64
     }
   URV pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
@@ -2228,7 +2228,19 @@ CsRegs<URV>::defineHypervisorRegs()
     csr = findCsr(Csrn::HCONTEXT);
   csr->setHypervisor(true);
 
-  csr = defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, 0, wam, wam);
+  // vsstatus
+  //           S R        T T T M S M X  F  M  V  S M U S U M R S U
+  //           D E        S W V X U P S  S  P  S  P P B P P I E I I
+  //             S        R   M R M R       P     P I E I I E S E E
+  //                                V               E   E E
+  mask = 0b0'00000000'0'0'0'1'1'0'11'11'00'11'1'0'0'1'0'0'0'1'0;
+  URV val  = 0b0'00000000'0'0'0'1'1'0'11'11'11'11'1'0'0'1'0'0'0'1'0;
+  pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
+  if (not rv32_)
+    {
+      val |= uint64_t(0b10) << 32;  // Value of UXL: uxlen=64
+    }
+  csr = defineCsr("vsstatus",    Csrn::VSSTATUS,    !mand, !imp, val, mask, pokeMask);
   csr->setHypervisor(true);
 
   mask = pokeMask = 0x222;
