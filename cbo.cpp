@@ -234,6 +234,9 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
 
   // Translate virtual addr and check for exception.
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t mask = uint64_t(cacheLineSize_) - 1;
+  virtAddr = virtAddr & ~mask;  // Make address cache line aligned.
+
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
@@ -241,8 +244,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
   if (cause != ExceptionCause::NONE)
     {
-      uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask, gPhysAddr & ~mask);
+      initiateStoreException(cause, virtAddr, gPhysAddr);
       return;
     }
 
