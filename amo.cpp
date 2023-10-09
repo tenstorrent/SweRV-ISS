@@ -908,6 +908,17 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
 
   uint64_t temp0 = 0, temp1 = 0;
   uint64_t addr = intRegs_.read(rs1);
+
+  URV mask = 0xf;
+  bool misal = (addr & mask) != 0;
+  if (misal and misalHasPriority_)
+    {
+      if (misalAtomicCauseAccessFault_)
+	initiateStoreException(ExceptionCause::STORE_ACC_FAULT, addr, addr);
+      initiateStoreException(ExceptionCause::STORE_ADDR_MISAL, addr, addr);
+      return;
+    }
+
   bool loadOk = (amoLoad64(addr, attrib, temp0) and
 		 amoLoad64(addr + 8, attrib, temp1));
   if (loadOk)
