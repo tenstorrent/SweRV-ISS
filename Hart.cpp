@@ -2595,7 +2595,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 
   URV mtval2 = 0;  // New values of MTVAL2 CSR.
 
-  bool gva = isRvh() and not interrupt and isGvaTrap(origVirtMode, cause);
+  bool gva = isRvh() and not interrupt and (hyperLs_ or isGvaTrap(origVirtMode, cause));
 
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating

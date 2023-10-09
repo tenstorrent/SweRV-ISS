@@ -4756,7 +4756,8 @@ namespace WdRiscv
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
     bool lastVirt_ = false;         // Before current inst.
-    bool lastHyer_ = false;         // Hypervisor mode before current inst.
+    bool lastHyer_ = false;         // Hypervisor extension state before current inst.
+    bool hyperLs_ = false;          // True if last instr is hypervisor load/store.
 
     // These are used to get fast access to the FS and VS bits.
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
