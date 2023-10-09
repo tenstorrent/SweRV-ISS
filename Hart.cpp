@@ -403,6 +403,7 @@ Hart<URV>::processExtensions(bool verbose)
     enableTranslationPbmt(true);
   enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
+  enableExtension(RvExtension::Zacas, isa_.isEnabled(RvExtension::Zacas));
 }
 
 
@@ -8857,6 +8858,18 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::froundnx_d:
       execFroundnx_d(di);
+      return;
+
+    case InstId::amocas_w:
+      execAmocas_w(di);
+      return;
+
+    case InstId::amocas_d:
+      execAmocas_d(di);
+      return;
+
+    case InstId::amocas_q:
+      execAmocas_q(di);
       return;
     }
 

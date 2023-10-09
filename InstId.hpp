@@ -1105,6 +1105,11 @@ namespace WdRiscv
      froundnx_s,
      froundnx_d,
 
-     maxId = froundnx_d
+     // Zacas
+     amocas_w,
+     amocas_d,
+     amocas_q,
+
+     maxId = amocas_q
     };
 }

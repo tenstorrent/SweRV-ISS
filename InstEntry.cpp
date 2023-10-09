@@ -7388,5 +7388,24 @@ InstTable::setupInstVec()
 	RvExtension::Zfa, RvFormat::R,
 	OperandType::FpReg, OperandMode::Write, rdMask,
 	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "amocas.w", InstId::amocas_w, 0x2800202f, 0xf800707f,
+	RvExtension::Zacas, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+      
+      { "amocas.d", InstId::amocas_d, 0x2800302f, 0xf800707f,
+	RvExtension::Zacas, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+      { "amocas.q", InstId::amocas_q, 0x2800402f, 0xf800707f,
+	RvExtension::Zacas, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
     };
 }

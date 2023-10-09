@@ -60,10 +60,8 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad32(uint32_t rs1, Pma::Attrib attrib, URV& value)
+Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 {
-  URV virtAddr = intRegs_.read(rs1);
-
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
@@ -119,10 +117,8 @@ Hart<URV>::amoLoad32(uint32_t rs1, Pma::Attrib attrib, URV& value)
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad64(uint32_t rs1, Pma::Attrib attrib, URV& value)
+Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 {
-  URV virtAddr = intRegs_.read(rs1);
-
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
@@ -433,7 +429,8 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 
   URV loadedValue = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad32(rs1, attrib, loadedValue);
+  URV virtAddr = intRegs_.read(rs1);
+  bool loadOk = amoLoad32(virtAddr, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -635,7 +632,8 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 
   URV loadedValue = 0;
   URV rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad64(rs1, attrib, loadedValue);
+  URV virtAddr = intRegs_.read(rs1);
+  bool loadOk = amoLoad64(virtAddr, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -744,6 +742,198 @@ Hart<URV>::execAmomaxu_d(const DecodedInst* di)
     return std::max(ua, ub);
   };
   execAmo64Op(di, Pma::AmoOther, myMax);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execAmocas_w(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  URV loadedVal = 0;
+  uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+  URV addr = intRegs_.read(rs1);
+  bool loadOk = amoLoad32(addr, Pma::Attrib::AmoArith, loadedVal);
+  uint32_t temp = loadedVal;
+
+  if (loadOk)
+    {
+      URV addr = intRegs_.read(rs1);
+      uint32_t rs2Val = intRegs_.read(rs2);
+      uint32_t rdVal = intRegs_.read(rd);
+
+      bool storeOk = true;
+      if (temp == rdVal)
+	storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val));
+
+      if (storeOk and not triggerTripped_)
+	{
+	  SRV result = int32_t(temp);   // Sign extended in RV64
+	  intRegs_.write(rd, result);
+	}
+    }
+}
+
+
+template <>
+void
+Hart<uint32_t>::execAmocas_d(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+  if ((rd & 1) == 1 or (rs2 & 1) == 1)
+    {
+      illegalInst(di);    // rd and rs2 must be even
+      return;
+    }
+
+  Pma::Attrib attrib = Pma::Attrib::AmoArith;
+
+  uint32_t temp0 = 0, temp1 = 0;
+  uint32_t addr = intRegs_.read(rs1);
+  bool loadOk = (amoLoad32(addr, attrib, temp0) and
+		 amoLoad32(addr + 4, attrib, temp1));
+  if (loadOk)
+    {
+      uint32_t rs2Val0 = intRegs_.read(rs2);
+      uint32_t rs2Val1 = intRegs_.read(rs2 + 1);
+      uint32_t rdVal0 = intRegs_.read(rd);
+      uint32_t rdVal1 = intRegs_.read(rd + 1);
+      if (rs2 == 0)
+	rs2Val1 = 0;
+      if (rd == 0)
+	rdVal1 = 0;
+
+      bool storeOk = true;
+      if (temp0 == rdVal0 and temp1 == rdVal1)
+	{
+	  storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val0));
+	  storeOk = storeOk and store<uint32_t>(addr, false, uint32_t(rs2Val1));
+	}
+
+      if (storeOk and not triggerTripped_ and rd != 0)
+	{
+	  intRegs_.write(rd, temp0);
+	  intRegs_.write(rd+1, temp1);
+	}
+    }
+}
+
+
+template <>
+void
+Hart<uint64_t>::execAmocas_d(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+
+  Pma::Attrib attrib = Pma::Attrib::AmoArith;
+
+  uint64_t temp = 0;
+  uint32_t addr = intRegs_.read(rs1);
+  bool loadOk = amoLoad64(addr, attrib, temp);
+
+  if (loadOk)
+    {
+      uint32_t rs2Val = intRegs_.read(rs2);
+      uint32_t rdVal = intRegs_.read(rd);
+
+      bool storeOk = true;
+      if (temp == rdVal)
+	storeOk = store<uint64_t>(addr, false /*hyper*/, rs2Val);
+
+      if (storeOk and not triggerTripped_)
+	intRegs_.write(rd, temp);
+    }
+}
+
+
+template <>
+void
+Hart<uint32_t>::execAmocas_q(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <>
+void
+Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  uint64_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+  if ((rd & 1) == 1 or (rs2 & 1) == 1)
+    {
+      illegalInst(di);    // rd and rs2 must be even
+      return;
+    }
+
+  Pma::Attrib attrib = Pma::AmoArith;
+
+  uint64_t temp0 = 0, temp1 = 0;
+  uint64_t addr = intRegs_.read(rs1);
+  bool loadOk = (amoLoad64(addr, attrib, temp0) and
+		 amoLoad64(addr + 8, attrib, temp1));
+  if (loadOk)
+    {
+      uint64_t rs2Val0 = intRegs_.read(rs2);
+      uint64_t rs2Val1 = intRegs_.read(rs2 + 1);
+      uint64_t rdVal0 = intRegs_.read(rd);
+      uint64_t rdVal1 = intRegs_.read(rd + 1);
+      if (rs2 == 0)
+	rs2Val1 = 0;
+      if (rd == 0)
+	rdVal1 = 0;
+
+      bool storeOk = true;
+      if (temp0 == rdVal0 and temp1 == rdVal1)
+	{
+	  storeOk = store<uint64_t>(addr, false /*hyper*/, uint64_t(rs2Val0));
+	  storeOk = storeOk and store<uint32_t>(addr, false, uint64_t(rs2Val1));
+	}
+
+      if (storeOk and not triggerTripped_ and rd != 0)
+	{
+	  intRegs_.write(rd, temp0);
+	  intRegs_.write(rd+1, temp1);
+	}
+    }
 }
 
 

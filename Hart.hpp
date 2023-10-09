@@ -1434,10 +1434,13 @@ namespace WdRiscv
     bool isRvzfa() const
     { return extensionIsEnabled(RvExtension::Zfa); }
 
-
     /// Return true if the AIA extension is enabled.
     bool isRvaia() const
     { return extensionIsEnabled(RvExtension::Smaia); }
+
+    /// Return true if the AIA extension is enabled.
+    bool isRvzacas() const
+    { return extensionIsEnabled(RvExtension::Zacas); }
 
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
@@ -2565,7 +2568,7 @@ namespace WdRiscv
     /// the URV value (this is relevant for rv64). The accessed memory
     /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
     /// or access fault.
-    bool amoLoad32(uint32_t rs1, Pma::Attrib attrib, URV& val);
+    bool amoLoad32(uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Do the load value part of a double-word-sized AMO
     /// instruction. Return true on success putting the loaded value
@@ -2573,7 +2576,7 @@ namespace WdRiscv
     /// place in which case val is not modified. The accessed memory
     /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
     /// or access fault.
-    bool amoLoad64(uint32_t rs1, Pma::Attrib attrib, URV& val);
+    bool amoLoad64(uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Invalidate cache entries overlapping the bytes written by a
     /// store.
@@ -4581,6 +4584,11 @@ namespace WdRiscv
     // Zfbfmin
     void execVfwmaccbf16_vv(const DecodedInst*);
     void execVfwmaccbf16_vf(const DecodedInst*);
+
+    // Zacas
+    void execAmocas_w(const DecodedInst*);
+    void execAmocas_d(const DecodedInst*);
+    void execAmocas_q(const DecodedInst*);
 
   private:
 

@@ -2541,6 +2541,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 2 and op2==0)    return instTable_.getEntry(InstId::lr_w);
                 if (top5 == 3)    return instTable_.getEntry(InstId::sc_w);
                 if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_w);
+                if (top5 == 5)    return instTable_.getEntry(InstId::amocas_w);
                 if (top5 == 8)    return instTable_.getEntry(InstId::amoor_w);
                 if (top5 == 0x0c) return instTable_.getEntry(InstId::amoand_w);
                 if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_w);
@@ -2555,6 +2556,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 2 and op2 == 0)    return instTable_.getEntry(InstId::lr_d);
                 if (top5 == 3)    return instTable_.getEntry(InstId::sc_d);
                 if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_d);
+                if (top5 == 5)    return instTable_.getEntry(InstId::amocas_d);
                 if (top5 == 8)    return instTable_.getEntry(InstId::amoor_d);
                 if (top5 == 0xc)  return instTable_.getEntry(InstId::amoand_d);
                 if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_d);
@@ -2562,6 +2564,10 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 0x18) return instTable_.getEntry(InstId::amominu_d);
                 if (top5 == 0x1c) return instTable_.getEntry(InstId::amomaxu_d);
               }
+	    else if (f3 = 4)
+	      {
+		if (top5 == 5)    return instTable_.getEntry(InstId::amocas_q);
+	      }
           }
           return instTable_.getEntry(InstId::illegal);
 
