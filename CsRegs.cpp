@@ -515,22 +515,35 @@ CsRegs<URV>::updateSstc()
 	}
     }
 
-  bool vs = false;
+  bool hstce = false;
   auto henv = getImplementedCsr(CsrNumber::HENVCFG);
   if (henv)
-    vs = henvcfgStce();
+    hstce = henvcfgStce();
 
   flag = flag and hyperEnabled_;
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   vstimecmp->setImplemented(flag);
-  vstimecmp->setHypervisor(!vs);
+  vstimecmp->setHypervisor(!hstce);
   vstimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
       vstimecmph->setImplemented(flag);
-      vstimecmph->setHypervisor(!vs);
+      vstimecmph->setHypervisor(!hstce);
       vstimecmph->setPrivilegeMode(mode);
+    }
+
+  auto hip = findCsr(CsrNumber::HIP);
+  if (hip)
+    {
+      // Update VSTIP bit in HIP. See chapter 3 of SSTC spc.
+      URV mask = hip->getReadMask();
+      URV vstBit = URV(1) << unsigned(InterruptCause::VS_TIMER);
+      if (stce and not hstce)
+	mask = mask & ~vstBit;  // Make read-only zero
+      else
+	mask = mask & vstBit;  // Make readable
+      hip->setReadMask(mask);
     }
 }
 
