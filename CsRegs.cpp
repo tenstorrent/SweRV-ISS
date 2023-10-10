@@ -484,20 +484,21 @@ CsRegs<URV>::updateSstc()
 {
   bool flag = sstcEnabled_;
 
-  bool s = false;
+  bool stce = false;
   auto menv = getImplementedCsr(CsrNumber::MENVCFG);
   if (menv)
-    s = menvcfgStce();
+    stce = menvcfgStce();
+  PrivilegeMode mode = stce? PrivilegeMode::Supervisor : PrivilegeMode::Machine;
 
   flag = flag and superEnabled_;
   auto stimecmp = findCsr(CsrNumber::STIMECMP);
   stimecmp->setImplemented(flag);
-  stimecmp->setPrivilegeMode(s? PrivilegeMode::Supervisor : PrivilegeMode::Machine);
+  stimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto stimecmph = findCsr(CsrNumber::STIMECMPH);
       stimecmph->setImplemented(flag);
-      stimecmph->setPrivilegeMode(s? PrivilegeMode::Supervisor : PrivilegeMode::Machine);
+      stimecmph->setPrivilegeMode(mode);
     }
 
   if (superEnabled_)
@@ -523,11 +524,13 @@ CsRegs<URV>::updateSstc()
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   vstimecmp->setImplemented(flag);
   vstimecmp->setHypervisor(!vs);
+  vstimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
       vstimecmph->setImplemented(flag);
       vstimecmph->setHypervisor(!vs);
+      vstimecmph->setPrivilegeMode(mode);
     }
 }
 
