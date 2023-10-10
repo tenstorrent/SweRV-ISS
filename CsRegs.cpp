@@ -542,7 +542,7 @@ CsRegs<URV>::updateSstc()
       if (stce and not hstce)
 	mask = mask & ~vstBit;  // Make read-only zero
       else
-	mask = mask & vstBit;  // Make readable
+	mask = mask | vstBit;  // Make readable
       hip->setReadMask(mask);
     }
 }
