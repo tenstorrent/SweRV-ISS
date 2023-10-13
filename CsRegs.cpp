@@ -2249,8 +2249,8 @@ CsRegs<URV>::defineHypervisorRegs()
   //           D E        S W V X U P S  S  P  S  P P B P P I E I I
   //             S        R   M R M R       P     P I E I I E S E E
   //                                V               E   E E
-  mask = 0b0'00000000'0'0'0'1'1'0'11'11'00'11'1'0'0'1'0'0'0'1'0;
-  URV val  = 0b0'00000000'0'0'0'1'1'0'11'11'11'11'1'0'0'1'0'0'0'1'0;
+  mask     = 0b0'00000000'0'0'0'1'1'0'11'11'00'11'1'0'0'1'0'0'0'1'0;
+  URV val  = 0b0'00000000'0'0'0'0'0'0'00'00'00'00'0'0'0'0'0'0'0'0'0;
   pokeMask = mask | (URV(1) << (sizeof(URV)*8 - 1));  // Make SD pokable.
   if (not rv32_)
     {
