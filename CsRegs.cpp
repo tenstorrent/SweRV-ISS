@@ -3323,6 +3323,19 @@ CsRegs<URV>::addMachineFields()
         setCsrFields(csrNum, {{"addr", 54}, {"zero", 10}});
     }
 
+  for (unsigned i = 0; i < 64; ++i)
+    {
+      CsrNumber csrNum;
+      if (i < 32)
+        csrNum = advance(CsrNumber::PMACFG0, i);
+      else
+        csrNum = advance(CsrNumber::PMACFG32, i-32);
+      setCsrFields(csrNum,
+      {{"permission",         3},     {"memtype",   2}, {"amotype", 2},
+       {"cache_or_combining", 1},     {"coherency", 1}, {"res1",    3},
+       {"pa",                44},     {"res0",      2}, {"size",    6}});
+    }
+
   for (unsigned i = 3; i <= 31; ++i)
     {
       CsrNumber csrNum = advance(CsrNumber::MHPMCOUNTER3, i - 3);
