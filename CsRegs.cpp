@@ -666,6 +666,19 @@ CsRegs<URV>::enableRvf(bool flag)
       else if (not csr->isImplemented())
         csr->setImplemented(flag);
     }
+
+  // If neither F or S extension is enabled then FS bits in MSTATUS are
+  // read only zero; otherwise, they are readable.
+  auto mstatus = findCsr(CsrNumber::MSTATUS);
+  if (mstatus)
+    {
+      MstatusFields<URV> fields(mstatus->getReadMask());
+      fields.bits_.FS = 0;
+
+      if (flag or superEnabled_)
+	fields.bits_.FS = ~ fields.bits_.FS;
+      mstatus->setReadMask(fields.value_);
+    }
 }
 
 
