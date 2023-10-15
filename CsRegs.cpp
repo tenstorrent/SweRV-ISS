@@ -1288,6 +1288,8 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
     updateVcsrGroupForWrite(num, value);   // vxsat and vrm are part of vcsr
   else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN or num == CN::HCOUNTEREN)
     updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
+  else if (num == CN::HVICTL)
+    updateVirtInterruptCtl();
   else
     hyperWrite(csr);   // Update hypervisor CSR aliased bits.
 
@@ -1323,6 +1325,14 @@ CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
     }
   else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
     return false;
+  else if ((num == CN::STIMECMP or num == CN::STIMECMPH) and virtMode_)
+    {
+      URV val = 0;
+      peek(CsrNumber::HVICTL, val);
+      HvictlFields hvictl(val);
+      if (hvictl.bits_.VTI)
+        return false;
+    }
 
   return true;
 }
@@ -2730,6 +2740,8 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
     }
   else if (num == CN::MCOUNTEREN or num == CN::SCOUNTEREN or num == CN::HCOUNTEREN)
     updateCounterPrivilege();  // Reflect counter accessibility in user/supervisor.
+  else if (num == CN::HVICTL)
+    updateVirtInterruptCtl();
   else
     hyperPoke(csr);    // Update hypervisor CSR aliased bits.
 
@@ -2876,7 +2888,6 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
       auto vs = mip & mie & mideleg & hideleg & ~(URV(1) << unsigned(IC::G_EXTERNAL));
       bool external = (vs & (URV(1) << unsigned(IC::VS_EXTERNAL))) != 0;
 
-      // TODO: implement hvictl.VTI
       csr = getImplementedCsr(CsrNumber::HVICTL);
       HvictlFields hvictl(csr->read());
       unsigned iprio = hvictl.bits_.IPRIO;
@@ -3160,6 +3171,29 @@ CsRegs<URV>::updateCounterPrivilege()
     }
 }
 
+
+template <typename URV>
+void
+CsRegs<URV>::updateVirtInterruptCtl()
+{
+  URV val;
+  peek(CsrNumber::HVICTL, val);
+  HvictlFields hvictl(val);
+  bool vti = hvictl.bits_.VTI;
+
+  auto csr = getImplementedCsr(CsrNumber::VSIP);
+  if (csr)
+    csr->setHypervisor(not vti);
+  csr = getImplementedCsr(CsrNumber::VSIPH);
+  if (csr)
+    csr->setHypervisor(not vti);
+  csr = getImplementedCsr(CsrNumber::VSIE);
+  if (csr)
+    csr->setHypervisor(not vti);
+  csr = getImplementedCsr(CsrNumber::VSIEH);
+  if (csr)
+    csr->setHypervisor(not vti);
+}
 
 
 template <typename URV>

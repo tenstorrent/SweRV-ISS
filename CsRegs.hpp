@@ -1155,8 +1155,12 @@ namespace WdRiscv
     }
 
     /// Update the user level counter privilege. This is called after
-    /// a write/poke to MCOUNTEREN.
+    /// a write/poke to MCOUNTEREN/SCOUNTEREN/HCOUNTEREN.
     void updateCounterPrivilege();
+
+    /// Update the virtual interrupt register control. This is called
+    /// after a write/poke to HVICTL.
+    void updateVirtInterruptCtl();
 
     /// Enter/exit debug mode based given a flag value of true/false.
     void enterDebug(bool flag)
