@@ -4712,7 +4712,6 @@ namespace WdRiscv
     bool eaCompatWithBase_ = false;
 
     bool csvTrace_ = false;      // Print trace in CSV format.
-    bool traceHeaderPrinted_ = false; // True if trace file header printed.
 
     bool instrLineTrace_ = false;
 
