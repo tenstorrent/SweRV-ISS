@@ -2040,19 +2040,13 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
       if (hart and stSize == 4 and (addr & 3) == 0)
 	{
 	  storeVal = storeVal & 1;  // Only bit zero is implemented.
-
-	  URV mipVal = csRegs_.peekMip();
-	  if (storeVal)
-	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
-	  else
-	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
-	  hart->pokeCsr(CsrNumber::MIP, mipVal);
-	  recordCsrWrite(CsrNumber::MIP);
+          hart->setSwInterrupt((1 << 1) | storeVal);
 	  return;
 	}
     }
   else if (addr >= clintStart_ + 0x4000 and addr < clintStart_ + 0xbff8) 
     {
+      // don't expect software to modify clint alarm from two different harts
       unsigned hartIx = (addr - clintStart_ - 0x4000) / 8;
       auto hart = indexToHart_(hartIx);
       if (hart and (stSize == 4 or stSize == 8))
@@ -4934,6 +4928,15 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 		mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
 	    }
 	}
+
+      if (swInterrupt_ & 2)
+        {
+	  if (swInterrupt_ & 1)
+	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
+          setSwInterrupt(0);
+        }
 
       // Deliver/clear supervisor timer from stimecmp CSR.
       if (stimecmpActive_)
