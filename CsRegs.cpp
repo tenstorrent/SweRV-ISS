@@ -3531,15 +3531,15 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto vsip = getImplementedCsr(CsrNumber::VSIP);
 
   bool hipUpdated = num == CsrNumber::HIP;
-  URV vsMask = 0x444;  // VSEIP, VSTIP and VSSIP.
+  URV hieMask = 0x1444; // SGEIP, VSEIP, VSTIP and VSSIP.
 
   if (num == CsrNumber::MIP)
     {
       // Updating MIP is reflected into HIP/VSIP.
-      URV val = mip->read() & vsMask;
+      URV val = mip->read() & hieMask;
       if (hip)
 	{
-	  hip->poke(val | (hip->read() & ~vsMask));
+	  hip->poke(val | (hip->read() & ~hieMask));
 	  hipUpdated = true;
 	  recordWrite(CsrNumber::HIP);
 	}
@@ -3548,11 +3548,11 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
     }
   else if (num == CsrNumber::HIP)
     {
-      URV val = hip->read() & vsMask;
+      URV val = hip->read() & hieMask;
       // Updating HIP is reflected into MIP/VSIP.
       if (mip)
 	{
-	  mip->poke((mip->read() & ~vsMask) | val);
+	  mip->poke((mip->read() & ~hieMask) | val);
 	  recordWrite(CsrNumber::MIP);
 	}
       if (vsip)
@@ -3610,7 +3610,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Updating HIP is reflected in MIP.
       if (mip and num != CsrNumber::MIP)
 	{
-	  URV newVal = (mip->read() & ~vsMask) | (hip->read() & vsMask);
+	  URV newVal = (mip->read() & ~hieMask) | (hip->read() & hieMask);
 	  mip->poke(newVal);
 	  recordWrite(CsrNumber::MIP);
 	}
@@ -3621,10 +3621,10 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
   auto vsie = getImplementedCsr(CsrNumber::VSIE);
   if (num == CsrNumber::HIE)
     {
-      URV val = hie->read() & vsMask;
+      URV val = hie->read() & hieMask;
       if (mie)
 	{
-	  mie->poke((mie->read() & ~vsMask) | val);
+	  mie->poke((mie->read() & ~hieMask) | val);
 	  recordWrite(CsrNumber::MIE);
 	}
       if (vsie)
@@ -3635,10 +3635,10 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
     }
   else if (num == CsrNumber::MIE)
     {
-      URV val = (mie->read() & vsMask);
+      URV val = (mie->read() & hieMask);
       if (hie)
 	{
-	  hie->poke(val | (hie->read() & ~vsMask));
+	  hie->poke(val | (hie->read() & ~hieMask));
 	  recordWrite(CsrNumber::HIE);
 	}
       if (vsie)
@@ -3649,6 +3649,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
     }
   else if (num == CsrNumber::VSIE)
     {
+      URV vsMask = 0x444;  // VSEIP, VSTIP and VSSIP.
       URV val = ((vsie->read() << 1) & vsMask);
       if (mie)
 	{
