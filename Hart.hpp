@@ -1892,6 +1892,13 @@ namespace WdRiscv
     }
 
 
+    void setSwInterrupt(uint8_t flag)
+    {
+      std::lock_guard<std::mutex> lock(swInterruptMutex_);
+      swInterrupt_ = flag;
+    }
+
+
   protected:
 
     // Retun cached value of the mpp field of the mstatus CSR.
@@ -4712,7 +4719,6 @@ namespace WdRiscv
     bool eaCompatWithBase_ = false;
 
     bool csvTrace_ = false;      // Print trace in CSV format.
-    bool traceHeaderPrinted_ = false; // True if trace file header printed.
 
     bool instrLineTrace_ = false;
 
@@ -4899,6 +4905,10 @@ namespace WdRiscv
     // dividing instruction count by 8 (2 to power 3) to produce a
     // timer value.
     unsigned counterToTimeShift_ = 0;
+
+    // Software interrupt for the clint
+    std::mutex swInterruptMutex_;
+    uint8_t swInterrupt_ = false;
   };
 }
 

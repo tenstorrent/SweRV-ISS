@@ -548,10 +548,12 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 {
   // Serialize to avoid jumbled output.
   std::lock_guard<std::mutex> guard(printInstTraceMutex());
+  // True if trace file header printed.
+  static bool traceHeaderPrinted = false;
 
-  if (not traceHeaderPrinted_)
+  if (not traceHeaderPrinted)
     {
-      traceHeaderPrinted_ = true;
+      traceHeaderPrinted = true;
       fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid");
       if (tracePtw_)
 	fprintf(out, ", iptw, dptw");
