@@ -188,6 +188,10 @@ CsRegs<URV>::adjustSipSieValue(URV value) const
 	    value &= (hdeleg->read() >> 1);  // Bit positions in HIDELG are shifted.
 	}
     }
+
+  // Bits SGEIP, VSEIP, VSTIP, VSSIP are read-only zero in SIE/SIP.
+  value &= ~ URV(0x1444);
+
   return value;
 }
 
@@ -950,6 +954,9 @@ CsRegs<URV>::writeSipSie(CsrNumber num, URV value)
           auto hideleg = getImplementedCsr(CN::HIDELEG);
           mask &= hideleg ? hideleg->read() >> 1: 0;
         }
+
+      // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
+      mask &= ~ URV(0x1444);
 
       csr->setWriteMask(mask);
       csr->write(value);
