@@ -2935,7 +2935,6 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
 	attrib |= Pma::Attrib::Rsrv; // Regular memory and cacheable: allow LR/SC
     }
 
-  // TBD FIX : Support aomswap, amological, and amoarithmetic
   unsigned amoType = (val >> 5) & 3;   // Bits 6:5
   if (amoType == 1)
     attrib |= Pma::Attrib::AmoSwap;
@@ -9934,7 +9933,6 @@ Hart<URV>::isCsrWriteable(CsrNumber csr, PrivilegeMode privMode, bool virtMode) 
 
   return true;
 }
-
 
 
 template <typename URV>

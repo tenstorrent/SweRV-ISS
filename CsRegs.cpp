@@ -1275,6 +1275,13 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
+  else if ((num >= CN::PMACFG0 and num <= CN::PMACFG31) or
+	   (num >= CN::PMACFG32 and num <= CN::PMACFG63))
+    {
+      URV prev = 0;
+      peek(num, prev);
+      value = legalizePmacfgValue(prev, value);
+    }
 
   csr->write(value);
   recordWrite(num);
@@ -2714,6 +2721,13 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       peek(num, prev);
       value = legalizePmpcfgValue(prev, value);
     }
+  else if ((num >= CN::PMACFG0 and num <= CN::PMACFG31) or
+	   (num >= CN::PMACFG32 and num <= CN::PMACFG63))
+    {
+      URV prev = 0;
+      peek(num, prev);
+      value = legalizePmacfgValue(prev, value);
+    }
   else if (num == CN::MSTATUS or num == CN::SSTATUS or num == CN::VSSTATUS)
     {
       value &= csr->getPokeMask();
@@ -3039,6 +3053,47 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
     }
 
   return legal;
+}
+
+
+template <typename URV>
+URV
+CsRegs<URV>::legalizePmacfgValue(URV current, URV value) const
+{
+  // If any of the fields are illegal, return current value
+
+  // Recover n = log2 of size.
+  uint64_t val = value;
+  uint64_t n = val >> 58;   // Bits 63:58
+  if (n == 0)
+    return current;
+
+  bool read = (val & 1);       // bit 0
+  bool write = (val & 2);      // bit 1
+  bool exec = (val & 4);       // bit 2
+  bool cacheable = val & 0x80; // Bit 7
+
+  unsigned memType = (val >> 3) & 3;   // Bits 4:3
+  bool io = memType != 0;
+
+  unsigned amo = (val >> 5) & 3;   // Bits 6:5
+
+  if (io)
+    {
+      if (write and !read and !exec)
+	return current;
+      if (amo != 0)
+	return current;  // IO must be amo-none.
+    }
+  else
+    {
+      if (cacheable and amo != 3)
+	return current;   // Cacheable must be amo-arithmetic.
+      if (not cacheable and amo != 0)
+	return current;   // Non-cacheable must be amo-none.
+    }
+
+  return value;
 }
 
 

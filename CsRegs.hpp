@@ -1408,6 +1408,9 @@ namespace WdRiscv
     /// is replaced by the current value. Return the legalized value.
     URV legalizePmpcfgValue(URV current, URV value) const;
 
+    /// Legalize a PMACFG value.
+    URV legalizePmacfgValue(URV current, URV value) const;
+
     /// Legalize scountovf, matching OF bit of given mhpmevent.
     void updateScountovfValue(CsrNumber mhpm, uint64_t value);
 
