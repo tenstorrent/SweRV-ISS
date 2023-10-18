@@ -3087,6 +3087,11 @@ CsRegs<URV>::legalizePmacfgValue(URV current, URV value) const
     }
   else
     {
+      // Either RWX or no access.
+      unsigned count = read + write + exec;
+      if (count != 0 and count != 3)
+	return current;
+
       if (cacheable and amo != 3)
 	return current;   // Cacheable must be amo-arithmetic.
       if (not cacheable and amo != 0)
