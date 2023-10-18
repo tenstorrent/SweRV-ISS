@@ -3058,17 +3058,17 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
 
 template <typename URV>
 URV
-CsRegs<URV>::legalizePmacfgValue(URV current, URV value) const
+CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 {
-  return current;  // Temporary -- Remvoe when RTL is ready.
+  return next;  // Temporary -- Remvoe when RTL is ready.
 
-  // If any of the fields are illegal, return current value
+  // If any of the fields are illegal, keep current value.
 
   // Recover n = log2 of size.
-  uint64_t val = value;
+  uint64_t val = next;
   uint64_t n = val >> 58;   // Bits 63:58
   if (n == 0)
-    return current;
+    return prev;
 
   bool read = (val & 1);       // bit 0
   bool write = (val & 2);      // bit 1
@@ -3083,24 +3083,24 @@ CsRegs<URV>::legalizePmacfgValue(URV current, URV value) const
   if (io)
     {
       if (write and !read and !exec)
-	return current;
+	return prev;
       if (amo != 0)
-	return current;  // IO must be amo-none.
+	return prev;  // IO must be amo-none.
     }
   else
     {
       // Either RWX or no access.
       unsigned count = read + write + exec;
       if (count != 0 and count != 3)
-	return current;
+	return prev;
 
       if (cacheable and amo != 3)
-	return current;   // Cacheable must be amo-arithmetic.
+	return prev;   // Cacheable must be amo-arithmetic.
       if (not cacheable and amo != 0)
-	return current;   // Non-cacheable must be amo-none.
+	return prev;   // Non-cacheable must be amo-none.
     }
 
-  return value;
+  return next;
 }
 
 
