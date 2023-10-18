@@ -984,8 +984,18 @@ Hart<URV>::pokeMemory(uint64_t addr, uint32_t val, bool usePma)
     }
   else if ((addr >= imsicMbase_ and addr < imsicMend_) or
 	   (addr >= imsicSbase_ and addr < imsicSend_))
-    if (imsicWrite_)
-      imsicWrite_(addr, sizeof(val), val);
+    {
+      if (imsicWrite_)
+        imsicWrite_(addr, sizeof(val), val);
+    }
+  else if (pci_ and ((addr >= pciConfigBase_ and addr < pciConfigEnd_) or
+                    (addr >= pciMmioBase_ and addr < pciMmioEnd_)))
+    {
+      if (addr >= pciConfigBase_ and addr < pciConfigEnd_)
+        pci_->config_mmio<uint32_t>(addr, val, true);
+      else
+        pci_->mmio<uint32_t>(addr, val, true);
+    }
 
   if (memory_.poke(addr, val, usePma))
     {
@@ -1730,6 +1740,22 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
       tm = tm >> (addr1 - 0xbff8) * 8;
       narrow = tm;
     }
+  else if (imsic_ and ((addr1 >= imsicMbase_ and addr1 < imsicMend_) or
+	              (addr1 >= imsicSbase_ and addr1 < imsicSend_)))
+    {
+      uint64_t val = 0;
+      if (imsicRead_)
+        imsicRead_(addr1, sizeof(val), val);
+      narrow = val;
+    }
+  else if (pci_ and ((addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_) or
+                    (addr1 >= pciMmioBase_ and addr1 < pciMmioEnd_)))
+    {
+      if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
+        pci_->config_mmio<ULT>(addr1, narrow, false);
+      else
+        pci_->mmio<ULT>(addr1, narrow, false);
+    }
   else
     {
       bool hasMcmVal = false;
@@ -2016,6 +2042,14 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
     {
       imsicWrite_(addr1, sizeof(storeVal), storeVal);
       storeVal = 0;  // Reads from IMSIC space will yield zero.
+    }
+  else if (pci_ and ((addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_) or
+                    (addr1 >= pciMmioBase_ and addr1 < pciMmioEnd_)))
+    {
+      if (addr1 >= pciConfigBase_ and addr1 < pciConfigEnd_)
+        pci_->config_mmio<STORE_TYPE>(addr1, storeVal, true);
+      else
+        pci_->mmio<STORE_TYPE>(addr1, storeVal, true);
     }
 
   memWrite(addr1, addr2, storeVal);

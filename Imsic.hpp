@@ -111,7 +111,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Return the id of the highest priority (smallest id) interrupt
     /// id that is pending and enabled and exceeds the threshold id.
     unsigned topId() const
-    { return threshold_ == 0 ? 0 : std::min(topId_, threshold_ - 1); }
+    { return threshold_ == 0 ? topId_ : std::min(topId_, threshold_ - 1); }
 
     /// Update the id of the highest priority interrupt that is
     /// pending and enabled.
@@ -309,7 +309,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool writeMireg(unsigned select, URV value)
     { return mfile_.iregWrite(select, value); }
-    
+
     /// Called form the associated hart for a CSR write to sireg/vsireg.
     /// Guest field is used if virt is true.
     template <typename URV>
@@ -334,7 +334,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool readMireg(unsigned select, URV value) const
     { return mfile_.iregRead(select, value); }
-    
+
 
     /// Called form the associated hart for a CSR read from sireg/vsireg.
     /// Guest field is used if virt is true.
@@ -537,7 +537,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	return false;
       return imsics_.at(hartIx)->writeMireg(sel, value);
     }
-    
+
     /// Called form hart of given hartIx for a CSR write to sireg/vsireg.
     /// Guest field is used if virt is true.
     template<typename URV>
@@ -573,7 +573,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     bool isSupervisorAddr(uint64_t addr) const
     { return addr >= sbase_ and addr < sbase_ + imsics_.size() * sstride_; }
 
-    /// Set ix to the index of the hart covering the 
+    /// Set ix to the index of the hart covering the
 
   private:
 

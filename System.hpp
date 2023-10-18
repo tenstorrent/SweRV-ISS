@@ -22,6 +22,8 @@
 #include <unordered_map>
 #include "Memory.hpp"
 #include "Imsic.hpp"
+#include "Pci.hpp"
+#include "Blk.hpp"
 
 namespace WdRiscv
 {
@@ -253,6 +255,16 @@ namespace WdRiscv
     /// the merge buffer line size in bytes.
     bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
 
+    /// Configure PCIe host-root-complex and construct associated devices
+    /// which use transport.
+    bool configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots);
+
+    /// Define a virtio-blk device.
+    std::shared_ptr<PciDev> defineVirtioBlk(std::string_view filename, bool ro) const;
+
+    /// Add PCIe devices specified by the user.
+    bool addPciDevices(const std::vector<std::string>& devs);
+
     /// Return true if memory consistency model is enabled.
     bool isMcmEnabled() const
     { return mcm_ != nullptr; }
@@ -323,6 +335,7 @@ namespace WdRiscv
     std::string fromHostSym_ = "fromhost";
     std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
     std::vector<std::shared_ptr<IoDevice>> ioDevs_;
+    std::shared_ptr<Pci> pci_;
 
     // Name, size, and address in memory of a binary file.
     typedef std::tuple<std::string, uint64_t, uint64_t> BinaryFile;
