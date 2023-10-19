@@ -58,7 +58,7 @@ namespace WdRiscv
       unsigned SPP      : 1;  // bit 8
       unsigned VS       : 2;  // bit 9  10
       unsigned MPP      : 2;  // bit 11 12
-      unsigned FS       : 2;  // bit 13 13
+      unsigned FS       : 2;  // bit 13 14
       unsigned XS       : 2;  // bit 15 16
       unsigned MPRV     : 1;  // bit 17
       unsigned SUM      : 1;  // bit 18
