@@ -120,7 +120,8 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::MCYCLEH)->tie(high);
       csRegs_.findCsr(CsrNumber::CYCLEH)->tie(high);
 
-      // TIME is a read-only shadow of MCYCLE.
+      low = reinterpret_cast<URV*>(&instCounter_);
+      high = low + 1;
       csRegs_.findCsr(CsrNumber::TIME)->tie(low);
       csRegs_.findCsr(CsrNumber::TIMEH)->tie(high);
 
@@ -152,7 +153,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::CYCLE)->tie(&cycleCount_);
 
       // TIME is a read-only shadow of MCYCLE.
-      csRegs_.findCsr(CsrNumber::TIME)->tie(&cycleCount_);
+      csRegs_.findCsr(CsrNumber::TIME)->tie(&instCounter_);
 
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
       csRegs_.findCsr(CsrNumber::VSTIMECMP)->tie(&vstimecmp_);
