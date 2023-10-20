@@ -3369,8 +3369,8 @@ Hart<URV>::configMemoryProtectionGrain(uint64_t size)
       ok = false;
     }
 
-  uint64_t limit = sizeof(URV) + 3;
-  if (log2Size > limit)
+  uint64_t limit = sizeof(URV)*8 + 3;
+  if (log2Size > limit)  // This can only happen in RV32.
     {
       std::cerr << "Memory protection grain size (0x" << std::hex
                 << size << ") is larger than 2 to the power "
