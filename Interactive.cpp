@@ -25,6 +25,8 @@
 #include "Hart.hpp"
 #include "linenoise.hpp"
 #include "System.hpp"
+#include "WhisperMessage.h"
+
 
 using namespace WdRiscv;
 
@@ -717,6 +719,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	out << (boost::format("0x%x") % hart.lastFpFlags()) << std::endl;
       else if (addrStr == "trap")
 	out << (hart.lastInstructionTrapped() ? "1" : "0") << std::endl;
+      else if (addrStr == "defi")
+	out << (boost::format("0x%x") % hart.deferredInterrupts()) << std::endl;
       else
 	ok = false;
 
@@ -876,8 +880,27 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
       return false;
     }
 
+  if (resource == "s")
+    {
+      size_t addr = 0;
+      URV val = 0;
+      if (not parseCmdLineNumber("special-resoure", addrStr, addr))
+	return false;
+      if (addrStr == "defi" or
+	  (parseCmdLineNumber("special-resoure", addrStr, addr) and
+	   addr == WhisperSpecialResource::DeferredInterrupts))
+	{
+	  if (not parseCmdLineNumber("value1", tokens.at(3), val))
+	    return false;
+	  hart.setDeferredInterrupts(val);
+	}
+      else
+	std::cerr << "Unknow special resource: " << addrStr << '\n';
+      return true;
+    }
+
   std::cerr << "No such resource: " << resource <<
-    " -- expecting r, c, m or pc\n";
+    " -- expecting r, c, m, s, or pc\n";
   return false;
 }
 
@@ -1673,7 +1696,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
-  if (command == "mbbypass" or command == "merge_buffer_bypass")
+  if (command == "mbypass" or command == "mbbypass" or command == "merge_buffer_bypass")
     {
       if (not mbBypassCommand(hart, line, tokens))
 	return false;
@@ -1812,7 +1835,7 @@ Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
     return false;
   if (size > 8 or size == 0)
     {
-      std::cerr << "Invalid size: << " << size << " -- Expecting 1 to 8\n";
+      std::cerr << "Invalid mread size: " << size << " -- Expecting 1 to 8\n";
       return false;
     }
 
@@ -1953,7 +1976,7 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
     return false;
   if (size > 8 or size == 0)
     {
-      std::cerr << "Invalid size: << " << size << " -- Expecting 1 to 8\n";
+      std::cerr << "Invalid mbinsert size: " << size << " -- Expecting 1 to 8\n";
       return false;
     }
 
@@ -1991,7 +2014,7 @@ Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
     return false;
   if (size > 8 or size == 0)
     {
-      std::cerr << "Invalid size: << " << size << " -- Expecting 1 to 8\n";
+      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 1 to 8\n";
       return false;
     }
 

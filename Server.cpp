@@ -919,18 +919,24 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (commandLog)
           {
             if (msg.resource == 'p')
-              fprintf(commandLog, "hart=%" PRIu32 " poke pc 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
-                      uintmax_t(msg.value), timeStamp.c_str(), msg.tag.data());
+              fprintf(commandLog, "hart=%" PRIu32 " poke pc 0x%" PRIxMAX " # ts=%s tag=%s\n",
+		      hartId, uintmax_t(msg.value), timeStamp.c_str(), msg.tag.data());
+            else if (msg.resource == 's')
+              fprintf(commandLog, "hart=%" PRIu32 " poke s %s 0x%" PRIxMAX " # ts=%s tag=%s\n",
+		      hartId, specialResourceToStr(msg.address), uintmax_t(msg.value),
+		      timeStamp.c_str(), msg.tag.data());
             else if (msg.resource == 'v')
               {
-                fprintf(commandLog, "hart=%" PRIu32 " poke v 0x%" PRIxMAX " 0x", hartId, uintmax_t(msg.address));
+                fprintf(commandLog, "hart=%" PRIu32 " poke v 0x%" PRIxMAX " 0x",
+			hartId, uintmax_t(msg.address));
                 for (uint32_t i = 0; i < msg.size; ++i)
                   fprintf(commandLog, "%02x", uint8_t(msg.buffer[msg.size - 1 - i]));
                 fprintf(commandLog, " # ts=%s tag=%s\n", timeStamp.c_str(), msg.tag.data());
               }
             else
-              fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
-                      msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),
+              fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n",
+		      hartId, msg.resource, uintmax_t(msg.address),
+		      uintmax_t(msg.value),
                       timeStamp.c_str(), msg.tag.data());
           }
         break;
@@ -1134,7 +1140,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 				 msg.size, msg.value))
           reply.type = Invalid;
         if (commandLog)
-          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
         break;

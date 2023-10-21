@@ -425,8 +425,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (instr->retired_)
     {
-      cerr << "Mcm::retire: Error: Instruction tag=" << tag
-	   << " retired multiple times\n";
+      cerr << "Mcm::retire: Error: Time=" << time << " hart-id=" << hartIx << " tag="
+	   << tag << " Instruction retired multiple times\n";
       return false;
     }
 
