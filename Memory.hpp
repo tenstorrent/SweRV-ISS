@@ -532,7 +532,7 @@ namespace WdRiscv
     uint64_t getPageStartAddr(uint64_t addr) const
     { return (addr >> pageShift_) << pageShift_; }
 
-    uint8_t* data(uint64_t addr, size_t len) const
+    uint8_t* data(uint64_t addr, [[maybe_unused]] size_t len) const
     {
 #ifdef MEM_CALLBACKS
       if (mapCallback_)
