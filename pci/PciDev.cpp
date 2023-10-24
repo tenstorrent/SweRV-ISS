@@ -13,8 +13,7 @@ PciDev::write_config(uint8_t offset, T data)
   // probably ok in assuming these will be 4B aligned
   if (offset >= PCI_BASE_ADDRESS_0 and offset <= (PCI_BASE_ADDRESS_5 + 3)) {
     bool io;
-    uint8_t bar = ((offset & ~uint32_t(0x3)) - PCI_BASE_ADDRESS_0) >> 2; // get corresponding bar
-    // probably ok in assuming these will be 4B aligned
+    uint8_t bar = ((offset & ~uint32_t(0x3)) - PCI_BASE_ADDRESS_0) >> 2;
 
     if (not bar_type(bar, io))
       return;

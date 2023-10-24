@@ -17,11 +17,10 @@ class Pci {
     Pci(uint32_t config_base, uint32_t mmio_base, size_t mmio_len, unsigned buses, unsigned slots);
 
     // 2 mechanisms for accessing PCI config - IOPORT and MMIO. It's unclear if IOPORT is an x86 specific feature.
-    // The base address is set on CPU side (config and mmio sit in different regions)
+    // The base address is set on CPU side (config and mmio sit in different regions).
     template <typename T>
     void config_mmio(uint32_t addr, T& data, bool w);
 
-    // TODO: provide mechanism for MMIO access to devices
     template <typename T>
     void mmio(uint32_t addr, T& data, bool w);
 
@@ -65,6 +64,4 @@ class Pci {
 
     std::vector<std::vector<std::shared_ptr<PciDev>>> buses_;
     std::vector<std::shared_ptr<PciDev::mmio_blocks>> mmio_;
-
-    // make async?
 };

@@ -52,10 +52,10 @@ class Virtio : public PciDev {
       uint32_t driver_feature;
       uint16_t msix_config;
       uint16_t num_queues;
-      uint8_t device_status; // TODO: wait for ok
+      uint8_t device_status;
       uint8_t config_generation;
 
-      uint16_t queue_select; // selects specific queue to write to
+      uint16_t queue_select;
       uint16_t queue_size;
       uint16_t queue_msix_vector;
       uint16_t queue_enable;
@@ -86,12 +86,10 @@ class Virtio : public PciDev {
     } __attribute__ ((packed));
 
     struct virtqueue {
-      // The virtring lives in host memory
-      // there is an array of descriptors of queue size
+      // The virtring lives in host memory.
       struct descriptor {
         uint64_t address;
         uint32_t length;
-        // we ignore indirects here (unlikely to be used)
         uint16_t flags;
         uint16_t next;
       } __attribute__((packed));

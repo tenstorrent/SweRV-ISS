@@ -37,7 +37,6 @@ Virtio::setup()
 
   // TODO: support feature selects...  config vector?
   bar->write_cb = [&](uint32_t offset, size_t len) {
-    // assume base is beginning of common
     std::lock_guard<std::mutex> lock(m_);
     uint32_t data;
     uint64_t mask = 0xffffffffULL;
@@ -108,13 +107,10 @@ Virtio::setup()
           notify(true, data);
         }
         break;
-      // assume we don't reset
     }
   };
 
-  // read callbback
   bar->read_cb = [&] (uint32_t offset, uint64_t& data) -> bool {
-    // assume base is beginning of common
     std::lock_guard<std::mutex> lock(m_);
     uint64_t mask = 0xffffffffULL << 32;
     auto& vq = get_vq(queue_selector_);
@@ -232,7 +228,6 @@ Virtio::get_descriptors(const unsigned num, std::vector<virtqueue::descriptor>& 
       read.push_back(descriptor);
   };
 
-  // FIXME: how to handle wrap?
   finished = (++vq.last_avail_idx) == vq.avail->idx;
   return true;
 }
@@ -299,7 +294,8 @@ Virtio::allocate_caps(uint32_t& common_cap_offset)
   notify_cap_->cap.len = sizeof(notify_cap);
   notify_cap_->cap.type = VIRTIO_PCI_CAP_NOTIFY_CFG;
   notify_cap_->cap.bar = 1;
-  notify_cap_->notify_off_multiplier = 0; // we set to 0, so same notify address is used for all queues
+  // we set to 0, so same notify address is used for all queues
+  notify_cap_->notify_off_multiplier = 0;
 
   uint32_t notify_cfg_offset;
   notify_cfg_ = reinterpret_cast<notify_cfg*>(ask_bar_blocks<uint32_t>(1, sizeof(notify_cfg), notify_cfg_offset));
@@ -343,7 +339,8 @@ Virtio::allocate_caps(uint32_t& common_cap_offset)
   device_cap_->bar = 1;
 
   uint32_t device_cfg_offset;
-  device_cfg_ = ask_bar_blocks<uint32_t>(1, 128*sizeof(uint8_t), device_cfg_offset); // device dependent allocation, let's just allocate 128B
+  // device dependent allocation, let's just allocate 128B
+  device_cfg_ = ask_bar_blocks<uint32_t>(1, 128*sizeof(uint8_t), device_cfg_offset);
   if (not device_cfg_) {
     std::cerr << "No more space for VIRTIO device cfg structure" << std::endl;
     return false;
