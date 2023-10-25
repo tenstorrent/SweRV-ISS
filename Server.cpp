@@ -1108,9 +1108,9 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
             std::vector<uint8_t> data(msg.size);
             for (size_t i = 0; i < msg.size; ++i)
               {
-                data.at(i) = msg.buffer[i];
+                data.at(i) = msg.buffer.at(i);
                 if (msg.flags)
-                  mask.at(i) = msg.tag[i/8] & (1 << (i%8));
+                  mask.at(i) = msg.tag.at(i/8) & (1 << (i%8));
               }
 
             if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
@@ -1128,7 +1128,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                     fprintf(commandLog, " 0x");
 		    unsigned n = msg.size / 8;
                     for (unsigned i = 0; i < n; ++i)
-                      fprintf(commandLog, "%02x", msg.tag[n-1-i]);
+                      fprintf(commandLog, "%02x", msg.tag.at(n-1-i) & 0xff);
                   }
                 fprintf(commandLog, "\n");
               }
