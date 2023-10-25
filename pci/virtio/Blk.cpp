@@ -23,14 +23,14 @@ Blk::Blk(const std::string& filename, bool readonly) : Virtio(VIRTIO_ID_BLOCK, 0
 
 
 void
-Blk::task()
+Blk::operator()()
 {
   while (1)
     {
       unsigned vq;
-      wait_for_notify(vq);
+      bool terminate = wait_for_notify(vq);
 
-      if (terminate_)
+      if (terminate)
         return;
 
       std::vector<virtqueue::used_ring::elem> elems;

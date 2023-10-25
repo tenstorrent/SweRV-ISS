@@ -9,6 +9,7 @@
 #include <mutex>
 #include <functional>
 #include <iostream>
+#include <string.h>
 
 // under PCIe, 4096 bytes of configuration space
 #define PCI_CFG_SIZE 4096
@@ -150,6 +151,7 @@ class PciDev {
       {
         auto ptr = memmap(base, size);
         bytes = ptr;
+        memset(bytes, 0, size);
         if (not ptr)
           std::cerr << "Failed to map to addr: " << base << " with size: " << size << std::endl;
       };

@@ -1,4 +1,4 @@
-CXXFLAGS := -g -O3 -std=c++17 -fPIC -pedantic -Wall -Wextra -Werror -Ivirtio -I.
+CXXFLAGS := -O3 -std=c++17 -fPIC -pedantic -Wall -Wextra -Werror -Ivirtio -I.
 DEPFLAGS := -MMD -MP
 
 SRCS := Pci.cpp PciDev.cpp virtio/Virtio.cpp virtio/Blk.cpp

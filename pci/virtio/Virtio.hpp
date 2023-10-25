@@ -4,6 +4,7 @@
 #include <linux/pci_regs.h>
 #include <linux/virtio_pci.h>
 #include <condition_variable>
+#include <thread>
 #include "PciDev.hpp"
 
 #define PCI_DEVICE_ID_VIRTIO_BASE		0x1040
@@ -127,7 +128,16 @@ class Virtio : public PciDev {
 
     Virtio(unsigned subsys_id, unsigned class_code, unsigned num_queues);
 
+    virtual ~Virtio()
+    {
+      terminate_ = true;
+      notify_cond_var_.notify_one();
+      task_thread_.join();
+    };
+
     virtual bool setup();
+    virtual void operator()() = 0;
+    virtual void reset();
 
     void interrupts();
 
@@ -144,7 +154,7 @@ class Virtio : public PciDev {
     auto& get_vq(unsigned num)
     { return vqs_.at(num); }
 
-    // driver should use this to kick off an operation
+    // Driver should use this to kick off an operation
     void notify(bool flag, unsigned vq)
     {
       {
@@ -156,17 +166,16 @@ class Virtio : public PciDev {
       notify_cond_var_.notify_one();
     }
 
-    // device blocking wait until a new notification
-    void wait_for_notify(unsigned& vq)
+    // Device blocking wait until a new notification. Returns true if need to terminate.
+    bool wait_for_notify(unsigned& vq)
     {
       std::unique_lock<std::mutex> lock(notify_mutex_);
-      notify_cond_var_.wait(lock, [this] () -> bool { return notified_; });
+      notify_cond_var_.wait(lock, [this] () -> bool { return notified_ or terminate_; });
       vq = notified_vq_;
       notified_ = false;
       lock.unlock();
+      return terminate_;
     }
-
-    virtual void reset();
 
     template <typename T>
     T* get_device_config()
@@ -210,4 +219,6 @@ class Virtio : public PciDev {
     std::condition_variable notify_cond_var_;
     bool notified_ = false;
     unsigned notified_vq_ = 0;
+    std::thread task_thread_;
+    bool terminate_ = false;
 };

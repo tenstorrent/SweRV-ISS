@@ -38,7 +38,7 @@ Virtio::setup()
   // TODO: support feature selects...  config vector?
   bar->write_cb = [&](uint32_t offset, size_t len) {
     std::lock_guard<std::mutex> lock(m_);
-    uint32_t data;
+    uint32_t data = 0;
     uint64_t mask = 0xffffffffULL;
     auto& vq = get_vq(queue_selector_);
     // probably don't need to read back here?
@@ -147,6 +147,8 @@ Virtio::setup()
     return false;
   };
 
+  // launch task thread
+  task_thread_ = std::thread([this] () { (*this)(); });
   return true;
 }
 
