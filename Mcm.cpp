@@ -567,6 +567,8 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
   for (size_t i = 0; i < pendingWrites.size(); ++i)
     {
       auto& op = pendingWrites.at(i);  // Write op
+      McmInstr* instr = findOrAddInstr(hartIx, op.instrTag_);
+
       bool written = false;  // True if op is actually written
       if (op.physAddr_ >= lineBegin and op.physAddr_ < lineEnd)
 	{
@@ -578,7 +580,6 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
 	      return false;
 	    }
 
-	  McmInstr* instr = findOrAddInstr(hartIx, op.instrTag_);
 	  if (not instr or instr->isCanceled())
 	    {
 	      cerr << "Error: Write for an invalid/speculated store time=" << time
@@ -587,33 +588,40 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
 	      return false;
 	    }
 
-	  // Check if op bytes are all masked or all unmaksed.
-	  unsigned masked = 0;  // Count of masked bytes of op.
-	  for (unsigned opIx = 0; opIx < op.size_; ++opIx)   // Scan op bytes
+	  if (rtlMask.empty())
+	    written = true;  // No masking
+	  else
 	    {
-	      unsigned lineIx = opIx + op.physAddr_ - lineBegin; // Index in line
-	      if (lineIx < rtlMask.size() and rtlMask.at(lineIx))
-		masked++;
-	    }
-	  if (masked != 0)
-	    {
-	      if (masked != op.size_)
+	      // Check if op bytes are all masked or all unmaksed.
+	      unsigned masked = 0;  // Count of masked bytes of op.
+	      for (unsigned opIx = 0; opIx < op.size_; ++opIx)   // Scan op bytes
 		{
-		  cerr << "Error: Write op partially masked time=" << time
-		       << " hart-id=" << hart.hartId() << "tag=" << op.instrTag_
-		       << "addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
-		  return false;
+		  unsigned lineIx = opIx + op.physAddr_ - lineBegin; // Index in line
+		  if (lineIx < rtlMask.size() and rtlMask.at(lineIx))
+		    masked++;
 		}
-
-	      written = true;
-	      op.time_ = time;
-	      instr->addMemOp(sysMemOps_.size());
-	      sysMemOps_.push_back(op);
-	      coveredWrites.push_back(op);
+	      if (masked != 0)
+		{
+		  if (masked != op.size_)
+		    {
+		      cerr << "Error: Write op partially masked time=" << time
+			   << " hart-id=" << hart.hartId() << "tag=" << op.instrTag_
+			   << "addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
+		      return false;
+		    }
+		  written = true;
+		}
 	    }
 	}
 
-      if (not written)
+      if (written)
+	{
+	  op.time_ = time;
+	  instr->addMemOp(sysMemOps_.size());
+	  sysMemOps_.push_back(op);
+	  coveredWrites.push_back(op);
+	}
+      else
 	{
 	  // Op is not written, keep it in pending writes.
 	  if (i != pendingSize)
@@ -686,7 +694,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   
   // Compare our line to RTL line.
   bool result = true;
-  if (checkWholeLine_)
+  if (checkWholeLine_ or rtlMask.empty())
     {
       auto iterPair = std::mismatch(rtlData.begin(), rtlData.end(), line.begin());
       if (iterPair.first != rtlData.end())
