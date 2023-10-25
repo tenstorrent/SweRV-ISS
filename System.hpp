@@ -22,8 +22,8 @@
 #include <unordered_map>
 #include "Memory.hpp"
 #include "Imsic.hpp"
-#include "Pci.hpp"
-#include "Blk.hpp"
+#include "pci/Pci.hpp"
+#include "pci/virtio/Blk.hpp"
 
 namespace WdRiscv
 {

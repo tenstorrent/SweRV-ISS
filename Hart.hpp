@@ -38,7 +38,7 @@
 #include "Disassembler.hpp"
 #include "util.hpp"
 #include "Imsic.hpp"
-#include "Pci.hpp"
+#include "pci/Pci.hpp"
 
 
 namespace WdRiscv

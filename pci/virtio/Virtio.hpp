@@ -5,7 +5,7 @@
 #include <linux/virtio_pci.h>
 #include <condition_variable>
 #include <thread>
-#include "PciDev.hpp"
+#include "../PciDev.hpp"
 
 #define PCI_DEVICE_ID_VIRTIO_BASE		0x1040
 #define PCI_SUBSYS_ID_VIRTIO_BASE		0x0040
@@ -210,7 +210,6 @@ class Virtio : public PciDev {
 
     // For driver configuration
     uint32_t device_feature_selector_;
-    uint32_t driver_feature_selector_;
     uint16_t config_msix_vector_;
     uint16_t queue_selector_ = 0;
     std::vector<virtqueue> vqs_;

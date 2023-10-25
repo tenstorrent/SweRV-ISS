@@ -46,7 +46,6 @@ class PciDev {
 
       fields bits;
       uint8_t data[PCI_CFG_SIZE] = {0};
-
     };
 
     PciDev()

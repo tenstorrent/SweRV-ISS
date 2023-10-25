@@ -2,7 +2,7 @@
 #include <atomic>
 #include <linux/virtio_config.h>
 #include "Virtio.hpp"
-#include "msix.hpp"
+#include "../msix.hpp"
 
 Virtio::Virtio(unsigned subsys_id, unsigned class_code, unsigned num_queues)
   : subsys_id_(subsys_id), class_code_(class_code), num_queues_(num_queues)
@@ -11,7 +11,6 @@ Virtio::Virtio(unsigned subsys_id, unsigned class_code, unsigned num_queues)
   msix::initialize_header(*this);
   vqs_.resize(num_queues);
 
-  // SR_IOV
   features_ = uint64_t(1) << VIRTIO_F_VERSION_1;
 }
 
@@ -50,10 +49,6 @@ Virtio::setup()
       case VIRTIO_PCI_COMMON_DF:
         assert(false);
         break;
-      case VIRTIO_PCI_COMMON_GFSELECT:
-        driver_feature_selector_ = data;
-        break;
-      // ignore GF for now...
       case VIRTIO_PCI_COMMON_MSIX:
         config_msix_vector_ = data;
         break;
@@ -103,9 +98,8 @@ Virtio::setup()
         vq.used_addr = (vq.used_addr & mask) | (uint64_t(data) << 32);
         break;
       case VIRTIO_PCI_COMMON_Q_USEDHI + 4: // notify
-        if (vq.enable) {
+        if (vq.enable)
           notify(true, data);
-        }
         break;
     }
   };
@@ -119,8 +113,6 @@ Virtio::setup()
         data = device_feature_selector_; return true;
       case VIRTIO_PCI_COMMON_DF:
         data = features_ >> (32*device_feature_selector_); return true;
-      case VIRTIO_PCI_COMMON_GFSELECT:
-        data = driver_feature_selector_; return true;
       case VIRTIO_PCI_COMMON_MSIX:
         data = config_msix_vector_; return true;
       case VIRTIO_PCI_COMMON_Q_SELECT:

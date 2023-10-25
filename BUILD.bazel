@@ -15,7 +15,7 @@ hdrs = [
 
 cc_library(
     name          = "tracer_ext",
-    hdrs          = glob(["*.hpp"]),
+    hdrs          = glob(["*.hpp","**/*.hpp"]),
     includes      = ["."],
     visibility    = ["//visibility:public"],
 )

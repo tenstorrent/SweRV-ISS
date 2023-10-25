@@ -33,7 +33,7 @@ endif
 
 PCI := 1
 ifdef PCI
-  override CPPFLAGS += -I$(PWD)/pci -I$(PWD)/pci/virtio
+  override CPPFLAGS += -I$(PWD)/pci
   pci_build := $(wildcard $(PWD)/pci/)
   pci_lib := $(PWD)/pci/libpci.a
 endif

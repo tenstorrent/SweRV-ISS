@@ -25,7 +25,7 @@
 #include "Mcm.hpp"
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
-#include "Blk.hpp"
+#include "pci/virtio/Blk.hpp"
 
 
 using namespace WdRiscv;
