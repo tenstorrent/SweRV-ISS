@@ -239,9 +239,12 @@ namespace WdRiscv
 
     void cancelReplayedReads(McmInstr*);
 
-    // Remove from hartPendingWrites_ the writes matching the RTL line
-    // addresses and place them sorted by instr tag in coveredWrites.
+    /// Remove from hartPendingWrites_ the write ops falling with the given RTL
+    /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place
+    /// them sorted by instr tag in coveredWrites. Write ops may not straddle
+    /// line boundary. Write ops may not be partially masked.
     bool collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,
+			      const std::vector<bool>& rtlMask,
 			      MemoryOpVec& coveredWrites);
 
     /// Forward from a store to a read op. Return true on success.
