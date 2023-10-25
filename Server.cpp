@@ -1128,7 +1128,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                     fprintf(commandLog, " 0x");
 		    unsigned n = msg.size / 8;
                     for (unsigned i = 0; i < n; ++i)
-                      fprintf(commandLog, "%02x", msg.tag.at(n-1-i) & 0xff);
+                      fprintf(commandLog, "%02x", unsigned(msg.tag.at(n-1-i)) & 0xff);
                   }
                 fprintf(commandLog, "\n");
               }
