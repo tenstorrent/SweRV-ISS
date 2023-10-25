@@ -38,6 +38,7 @@
 #include "Disassembler.hpp"
 #include "util.hpp"
 #include "Imsic.hpp"
+#include "Pci.hpp"
 
 
 namespace WdRiscv
@@ -1883,6 +1884,15 @@ namespace WdRiscv
       imsicRead_ = readFunc;
       imsicWrite_ = writeFunc;
       csRegs_.attachImsic(imsic);
+    }
+
+    void attachPci(std::shared_ptr<Pci> pci, uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize)
+    {
+      pci_ = pci;
+      pciConfigBase_ = configBase;
+      pciConfigEnd_ = pciConfigBase_ + (1ULL << 28);
+      pciMmioBase_ = mmioBase;
+      pciMmioEnd_ = mmioBase + mmioSize;
     }
 
     /// Return true if given extension is enabled.
@@ -4850,6 +4860,11 @@ namespace WdRiscv
     uint64_t imsicSend_ = 0;
     std::function<bool(uint64_t, unsigned, uint64_t&)> imsicRead_ = nullptr;
     std::function<bool(uint64_t, unsigned, uint64_t)> imsicWrite_ = nullptr;
+    std::shared_ptr<Pci> pci_;
+    uint64_t pciConfigBase_ = 0;
+    uint64_t pciConfigEnd_ = 0;
+    uint64_t pciMmioBase_ = 0;
+    uint64_t pciMmioEnd_ = 0;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;

@@ -193,6 +193,7 @@ struct Args
                                          // memory. Each target plus args is one string.
   StringVec   isaVec;                    // Isa string split around _ with rv32/rv64 prefix removed.
   std::string targetSep = " ";           // Target program argument separator.
+  StringVec   pciDevs;                   // PCI device list.
 
   std::optional<std::string> toHostSym;
   std::optional<std::string> consoleIoSym;
@@ -652,6 +653,9 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
         ("reportusedblocks", po::bool_switch(&args.reportub),
          "Report used blocks with sparse memory. Useful for finding memory footprint of program")
 #endif
+        ("pcidev", po::value(&args.pciDevs)->multitoken(),
+         "Add PCI device to simulation. Format is <device>:<bus>:<slot>:<device-specific>. "
+         "Currently only supports virtio-blk, which requires a file")
 	("instcounter", po::value<std::string>(),
 	 "Set instruction counter to given value.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
@@ -1903,6 +1907,10 @@ session(const Args& args, const HartConfig& config)
   // Configure memory.
   if (not config.configMemory(system, args.unmappedElfOk))
     return false;
+
+  if (not args.pciDevs.empty())
+    if (not system.addPciDevices(args.pciDevs))
+      return false;
 
   if (not args.dataLines.empty())
     system.enableDataLineTrace(args.dataLines);

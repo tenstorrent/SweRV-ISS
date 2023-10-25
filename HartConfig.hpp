@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -70,7 +70,7 @@ namespace WdRiscv
     /// Apply the memory configuration in this object. Helper to configMemory.
     template<typename URV>
     bool applyMemoryConfig(Hart<URV>&) const;
-    
+
     /// Confgure a core-local-interrupt (CLINT) device in the given
     /// address range: clintStart to  clintEnd - 1. If siOnReset
     /// is true then a software interrupt for hart0 is injected
@@ -84,6 +84,9 @@ namespace WdRiscv
 
     template<typename URV>
     bool applyImsicConfig(System<URV>&) const;
+
+    template<typename URV>
+    bool applyPciConfig(System<URV>&) const;
 
     /// Set xeln to the register width configuration held in this
     /// object returning true on success and false if this object does

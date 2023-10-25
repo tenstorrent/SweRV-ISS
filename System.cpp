@@ -25,6 +25,7 @@
 #include "Mcm.hpp"
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
+#include "Blk.hpp"
 
 
 using namespace WdRiscv;
@@ -76,11 +77,13 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                  return sparseMem_->read(addr, size, value); };
   auto writef = [this](uint64_t addr, unsigned size, uint64_t value) -> bool {
                   return sparseMem_->write(addr, size, value); };
+  auto mapf = [this](uint64_t addr, size_t size) -> uint8_t* {
+                  return sparseMem_->map(addr, size); };
 
   mem.defineReadMemoryCallback(readf);
   mem.defineWriteMemoryCallback(writef);
+  mem.defineMapMemoryCallback(mapf);
 #endif
-
 }
 
 
@@ -544,6 +547,80 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
       hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc);
     }
 
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots)
+{
+  if (mmioBase - configBase < (1ULL << 28))
+    {
+      std::cerr << "PCI config space typically needs 28bits to fully cover entire region" << std::endl;
+      return false;
+    }
+
+  pci_ = std::make_shared<Pci>(configBase, mmioBase, mmioSize, buses, slots);
+
+  for (auto& hart : sysHarts_)
+    hart->attachPci(pci_, configBase, mmioBase, mmioSize);
+  return true;
+}
+
+
+template <typename URV>
+std::shared_ptr<PciDev>
+System<URV>::defineVirtioBlk(std::string_view filename, bool ro) const
+{
+  return std::make_shared<Blk>(std::string(filename), ro);
+}
+
+
+template <typename URV>
+bool
+System<URV>::addPciDevices(const std::vector<std::string>& devs)
+{
+  if (not pci_)
+    return false;
+
+  auto devmapf = [this](uint64_t addr, size_t size) -> uint8_t* {
+    return this->memory_->data(addr, size);
+  };
+
+  auto writef = [this](uint64_t addr, unsigned size, uint64_t data) -> bool {
+    return this->imsicMgr_.write(addr, size, data);
+  };
+
+  for (const auto& devStr : devs)
+    {
+      std::shared_ptr<PciDev> dev;
+      std::vector<std::string> tokens;
+      boost::split(tokens, devStr, boost::is_any_of(":"), boost::token_compress_on);
+
+      if (tokens.size() < 3)
+        {
+          std::cerr << "PCI device string should have at least 3 fields" << std::endl;
+          return false;
+        }
+
+      std::string name = tokens.at(0);
+      unsigned bus = std::stoi(tokens.at(1));
+      unsigned slot = std::stoi(tokens.at(2));
+
+      if (name == "virtio-blk")
+        {
+          if (not (tokens.size() == 4))
+            {
+              std::cerr << "virtio-blk requires backing input file" << std::endl;
+              return false;
+            }
+          dev = defineVirtioBlk(tokens.at(3), false);
+        }
+
+      if (not pci_->register_device(dev, bus, slot, devmapf, writef))
+        return false;
+    }
   return true;
 }
 

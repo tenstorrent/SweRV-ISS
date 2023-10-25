@@ -1,0 +1,7 @@
+cc_library(
+    name = "pci",
+    hdrs = glob(["**/*.hpp"]),
+    srcs = glob(["**/*.cpp"]),
+    includes = ['.'],
+    visibility = ['//:__pkg__'],
+)

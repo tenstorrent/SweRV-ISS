@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -160,7 +160,7 @@ namespace WdRiscv
       return true;
     }
 
-    /// Return true if read will be successful if tried. 
+    /// Return true if read will be successful if tried.
     bool checkRead(uint64_t address, unsigned readSize)
     {
       Pma pma1 = pmaMgr_.getPma(address);
@@ -475,6 +475,10 @@ namespace WdRiscv
     void defineWriteMemoryCallback(std::function<bool(uint64_t, unsigned, uint64_t)> callback)
     { writeCallback_ = std::move(callback); }
 
+    /// Define map memory callback.
+    void defineMapMemoryCallback(std::function<uint8_t*(uint64_t, size_t)> callback)
+    { mapCallback_ = std::move(callback); }
+
     /// Enable tracing of memory data lines referenced by current
     /// run. A memory data line is typically 64-bytes long and corresponds to
     /// a cachable line.
@@ -527,6 +531,18 @@ namespace WdRiscv
     /// Return start address of page containing given address.
     uint64_t getPageStartAddr(uint64_t addr) const
     { return (addr >> pageShift_) << pageShift_; }
+
+    uint8_t* data(uint64_t addr, [[maybe_unused]] size_t len) const
+    {
+#ifdef MEM_CALLBACKS
+      if (mapCallback_)
+        return mapCallback_(addr, len);
+      return nullptr;
+#else
+      // TODO: guard range
+      return data_ + addr;
+#endif
+    }
 
   protected:
 
@@ -655,7 +671,7 @@ namespace WdRiscv
       bool valid_ = false;
       CancelLrCause cause_ = CancelLrCause::NONE;
     };
-      
+
     /// Invalidate LR reservations matching address of poked/written
     /// bytes and belonging to harts other than the given hart-id. The
     /// memory tracks one reservation per hart indexed by local hart
@@ -792,5 +808,8 @@ namespace WdRiscv
 
     /// Callback for write: bool func(uint64_t addr, unsigned size, uint64_t val);
     std::function<bool(uint64_t, unsigned, uint64_t)> writeCallback_ = nullptr;
+
+    /// Callback to obtain pointer to memory; uint8_t*(uint64_t addr, size_t len);
+    std::function<uint8_t*(uint64_t, size_t)> mapCallback_ = nullptr;
   };
 }

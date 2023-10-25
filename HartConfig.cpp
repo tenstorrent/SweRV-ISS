@@ -1805,6 +1805,34 @@ HartConfig::applyImsicConfig(System<URV>& system) const
 
 template<typename URV>
 bool
+HartConfig::applyPciConfig(System<URV>& system) const
+{
+  std::string_view tag = "pci";
+  if (not config_ -> contains(tag))
+    return true;
+
+  auto& pci = config_ -> at(tag);
+  if (not pci.contains("config_base") or not pci.contains("mmio_base") or not pci.contains("mmio_size"))
+    {
+      std::cerr << "Invalid pci entry in config file\n";
+      return false;
+    }
+  uint64_t configBase = 0, mmioBase = 0, mmioSize = 0;
+  if (not getJsonUnsigned(util::join("", tag, ".config_base"), pci.at("config_base"), configBase) or
+      not getJsonUnsigned(util::join("", tag, ".mmio_base"), pci.at("mmio_base"), mmioBase) or
+      not getJsonUnsigned(util::join("", tag, ".mmio_size"), pci.at("mmio_size"), mmioSize))
+    return false;
+  unsigned total_buses = 0, total_slots = 0;
+  if (not getJsonUnsigned(util::join("", tag, ".total_buses"), pci.at("total_buses"), total_buses) or
+      not getJsonUnsigned(util::join("", tag, ".total_slots"), pci.at("total_slots"), total_slots))
+    return false;
+
+  return system.configPci(configBase, mmioBase, mmioSize, total_buses, total_slots);
+}
+
+
+template<typename URV>
+bool
 HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 {
   userMode = userMode or this->userModeEnabled();
@@ -1860,6 +1888,9 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 	return false;
       system.defineUart(addr, size);
     }
+
+  if (not applyPciConfig(system))
+    return false;
 
   return finalizeCsrConfig(system);
 }
