@@ -798,7 +798,6 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::FpFlags:             return "iff";
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
-    default:                                          return "?";
     }
   return "?";
 }
