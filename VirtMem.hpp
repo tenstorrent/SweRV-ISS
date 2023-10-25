@@ -359,9 +359,10 @@ namespace WdRiscv
     void setVsRootPage(uint64_t root)
     { vsRootPage_ = root; }
 
-    /// Set the page table root page for 2nd stage address translation.
+    /// Set the page table root page for 2nd stage address translation after
+    /// clearing the least siginficant 2 bits of the given address.
     void setStage2RootPage(uint64_t root)
-    { rootPageStage2_ = root; }
+    { rootPageStage2_ = (root >> 2) << 2; }
 
     // Change the translation mode to m.
     void setMode(Mode m)
