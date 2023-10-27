@@ -40,9 +40,13 @@ namespace WdRiscv
     std::vector<MemoryOpIx> memOps_;
     uint64_t physAddr_ = 0;   // Data address for ld/store instruction.
     uint64_t data_ = 0;       // Data for load/sore instructions.
+    uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
+    uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
+    McmInstrIx addrProducer_ = 0;
+    McmInstrIx dataProducer_ = 0;
+    DecodedInst di_;
     McmInstrIx tag_ = 0;
     uint8_t size_ = 0;        // Data size for load/store insructions.
-    DecodedInst di_;
     bool retired_ = false;
     bool canceled_ = false;
     bool isLoad_ = false;
@@ -309,6 +313,8 @@ namespace WdRiscv
     }
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
+
+    void setProducerTime(unsigned hartIx, McmInstr& instr);
 
     /// Map register number of operand opIx to a unique integer by adding
     /// an offset: integer register have 0 offset, fp regs have 32, and

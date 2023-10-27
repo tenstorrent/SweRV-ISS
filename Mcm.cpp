@@ -32,7 +32,7 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned mergeBufferSize)
   hartBranchTimes_.resize(hartCount);
   hartBranchProducers_.resize(hartCount);
 
-  // If no merge buffer, then memory is updated on insert messages.
+ // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
 }
 
@@ -273,6 +273,31 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
 
 template <typename URV>
+void
+Mcm<URV>::setProducerTime(unsigned hartIx, McmInstr& instr)
+{
+  auto& di = instr.di_;
+
+  // Set producer of address register.
+  if (di.isLoad() or di.isAmo() or di.isStore())
+    {
+      unsigned addrReg = effectiveRegIx(di, 1);  // Addr reg is operand 1 of instr.
+      instr.addrProducer_ = hartRegProducers_.at(hartIx).at(addrReg);
+      instr.addrTime_ = hartRegTimes_.at(hartIx).at(addrReg);
+    }
+
+  // Set producer of data register.
+  if (di.isStore() or di.isAmo())
+    {
+      unsigned doi = di.isAmo()? 2 : 0;  // Data-regiser operand index
+      unsigned dataReg = effectiveRegIx(di, doi);  // Data operand may be integer/fp/csr
+      instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg);
+      instr.dataTime_ = hartRegTimes_.at(hartIx).at(dataReg);
+    }
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 			    uint64_t physAddr, unsigned size,
@@ -489,6 +514,9 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->isStore_ = true;  // AMO is both load and store.
     }
 
+  setProducerTime(hartIx, *instr);
+  updateDependencies(hart, *instr);
+
   if (instr->isStore_)
     {
       instr->complete_ = checkStoreComplete(*instr);
@@ -507,8 +535,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   ok = ppoRule10(hart, *instr) and ok;
   ok = ppoRule11(hart, *instr) and ok;
   ok = ppoRule12(hart, *instr) and ok;
-
-  updateDependencies(hart, *instr);
 
   return ok;
 }
@@ -1775,23 +1801,19 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   const auto& bdi = instrB.di_;
-  unsigned addrReg = 0;
   if (bdi.isLoad() or bdi.isStore() or bdi.isAmo())
-    addrReg = bdi.op1();  // This is always an integer register.
-
-  uint64_t time = hartRegTimes_.at(hart.sysHartIndex()).at(addrReg);
-
-  for (auto opIx : instrB.memOps_)
     {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      if (sysMemOps_.at(opIx).time_ > time)
-	continue;
+      uint64_t addrTime = instrB.addrTime_;
 
-      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
-	   << hartRegProducers_.at(hart.sysHartIndex()).at(addrReg)
-	   << " tag2=" << instrB.tag_ << '\n';
-      return false;
+      for (auto opIx : instrB.memOps_)
+	{
+	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= addrTime)
+	    {
+	      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
+		   << instrB.addrProducer_ << " tag2=" << instrB.tag_ << '\n';
+	      return false;
+	    }
+	}
     }
 
   return true;
@@ -1811,26 +1833,19 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
     }
 
   const auto& bdi = instrB.di_;
-  if (not bdi.isStore() and not bdi.isAmo())
-    return true;  // Must be a store or amo
-
-  unsigned hartIx = hart.sysHartIndex();
-  unsigned doi = bdi.isAmo()? 2 : 0;  // Data-regiser operand index
-  unsigned dataReg = effectiveRegIx(bdi, doi);  // Data operand may be integer/fp/csr
-
-  uint64_t time = hartRegTimes_.at(hartIx).at(dataReg);
-
-  for (auto opIx : instrB.memOps_)
+  if (bdi.isStore() or bdi.isAmo())
     {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      if (sysMemOps_.at(opIx).time_ > time)
-	continue;
+      uint64_t dataTime = instrB.dataTime_;
 
-      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId() << " tag1="
-	   << hartRegProducers_.at(hartIx).at(dataReg)
-	   << " tag2=" << instrB.tag_ << '\n';
-      return false;
+      for (auto opIx : instrB.memOps_)
+	{
+	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= dataTime)
+	    {
+	      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId() << " tag1="
+		   << instrB.dataProducer_  << " tag2=" << instrB.tag_ << '\n';
+	      return false;
+	    }
+	}
     }
 
   return true;
@@ -1914,12 +1929,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
 	continue;
 
-      unsigned addrReg = effectiveRegIx(mdi, 1); // Address reg is operand 1 of instr.
-      auto apTag = hartRegProducers_.at(hartIx).at(addrReg); // address producer tag
-
-      unsigned doi = mdi.isAmo()? 2 : 0;  // Data-register operand index.
-      unsigned dataReg = effectiveRegIx(mdi, doi);
-      auto dpTag = hartRegProducers_.at(hartIx).at(dataReg); // data producer tag
+      auto apTag = instrM.addrProducer_;
+      auto dpTag = instrM.dataProducer_;
 
       for (auto aTag : { apTag, dpTag } )
 	{
