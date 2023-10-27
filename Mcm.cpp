@@ -1939,7 +1939,9 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
 	      {
 		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag << '\n';
+		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag
+		     << " time1=" << latestOpTime(instrA)
+		     << " time2=" << earliestOpTime(instrB) << '\n';
 		return false;
 	      }
 	}
