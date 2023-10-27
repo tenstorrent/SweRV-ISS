@@ -825,6 +825,22 @@ CsRegs<URV>::enableStateen(bool flag)
 
 template <typename URV>
 void
+CsRegs<URV>::enableSmrnmi(bool flag)
+{
+  using CN = CsrNumber; 
+  for (auto csrn : { CN::MNSCRATCH, CN::MNEPC, CN::MNCAUSE, CN::MNSTATUS })
+    {
+      auto csr = findCsr(csrn);
+      if (not csr)
+	assert(0 && "Undefined CSR in SMRNMI extension");
+      else
+	csr->setImplemented(flag);
+    }
+}
+
+
+template <typename URV>
+void
 CsRegs<URV>::enableVectorExtension(bool flag)
 {
   for (auto csrn : { CsrNumber::VSTART, CsrNumber::VXSAT, CsrNumber::VXRM,
@@ -1925,6 +1941,19 @@ CsRegs<URV>::defineMachineRegs()
       c = defineCsr("minstreth", Csrn::MINSTRETH, mand, imp, 0, wam, wam);
       c->markAsHighHalf(true);
     }
+
+  // Non maskable interrupts.
+  defineCsr("mnscratch", Csrn::MNSCRATCH, !mand, !imp, 0, wam, wam);
+
+  mask = ~URV(1); // Bit 0 of MNEPC is not writeable
+  defineCsr("mnepc", Csrn::MNEPC, !mand, !imp, 0, mask, mask);
+
+  mask = URV(1) << (sizeof(URV)*8 - 1);  // Most sig bit is read-only 1
+  defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, mask, ~mask, ~mask);
+
+  mask = 0b1100010000000;  // Fields MNPV, and MNPP writeable.
+  pokeMask = mask | 0b1000; // Fields NMIE pokeable.
+  defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h
   // as write-anything/read-zero (user can change that in the config

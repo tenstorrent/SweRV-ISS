@@ -72,6 +72,12 @@ namespace WdRiscv
       MENVCFG = 0x30a,
       MENVCFGH = 0x31a,
 
+      // Non maskable interrupts
+      MNSCRATCH = 0x740,
+      MNEPC = 0x741,
+      MNCAUSE = 0x742,
+      MNSTATUS = 0x744,
+
       // Machine Counter/Timers
       MCYCLE = 0xb00,
       MINSTRET = 0xb02,
@@ -1449,21 +1455,35 @@ namespace WdRiscv
     /// Enable/disable F extension.
     void enableRvf(bool flag);
 
+    /// Enable/disable C extension.
+    void enableRvc(bool flag)
+    {
+      // Least sig bit reads zero if C. Least sig 2 bits read zero if not C.
+      URV mask = ~URV(0) << (flag ? 1 : 2);  // 
+      regs_.at(size_t(CsrNumber::MEPC)).setReadMask(mask);
+      regs_.at(size_t(CsrNumber::SEPC)).setReadMask(mask);
+      regs_.at(size_t(CsrNumber::MNEPC)).setReadMask(mask);
+    }
+
     /// Enable/disable counter-overflow extension (sscofpmf)
     void enableSscofpmf(bool flag);
 
     /// Enable/disable access to certain CSRs from non-machine mode.
     void enableStateen(bool flag);
 
-    /// Enable supervisor mode.
+    /// Enable/disable resubale non maskable interrupt extension.
+    void enableSmrnmi(bool flag);
+
+    /// Enable/disable supervisor mode.
     void enableSupervisorMode(bool flag);
 
-    /// Enable hypervisor mode.
+    /// Enable/disable hypervisor mode.
     void enableHypervisorMode(bool flag);
 
-    /// Enable vector extension.
+    /// Enable/disable vector extension.
     void enableVectorExtension(bool flag);
 
+    /// Enable/disable advanced interrupt artchitecture extension.
     void enableAiaExtension(bool flag);
 
     /// Enable/disable virtual supervisor. When enabled, the trap-related
