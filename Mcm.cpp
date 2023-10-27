@@ -262,12 +262,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   for (auto regIx : destRegs)
     {
-      bool update = noSource or time > regTimeVec.at(regIx);
-      if (update)
-	{
-	  regTimeVec.at(regIx) = time;
-	  regProducer.at(regIx) = tag;
-	}
+      regTimeVec.at(regIx) = time;
+      regProducer.at(regIx) = tag;
     }
 }
 
