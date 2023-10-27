@@ -813,15 +813,15 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
 
   std::vector<uint64_t> items;
   if (isAddr)
-    hart.getPageTableWalkAddresses(isInstr, index, items);
+    {
+      std::vector<VirtMem::WalkEntry> addrs;
+      hart.getPageTableWalkAddresses(isInstr, index, addrs);
+      for (auto& addr : addrs)
+        if (addr.type_ == VirtMem::WalkEntry::Type::PA)
+          items.push_back(std::move(addr.addr_));
+    }
   else
     hart.getPageTableWalkEntries(isInstr, index, items);
-  if (items.size() > 5)
-    {
-      std::cerr << "doPageTableWalk: Walk too long: " << items.size() << " entries\n";
-      reply.type = Invalid;
-      return;
-    }
 
   reply.size = items.size();
   if (not items.empty())

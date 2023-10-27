@@ -4382,11 +4382,13 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	  if (initStateFile_)
 	    {
 	      for (const auto& walk : virtMem_.getFetchWalks())
-		for (auto addr : walk)
-		  dumpInitState("ipt", addr, addr);
+		for (auto entry : walk)
+                  if (entry.type_ == VirtMem::WalkEntry::Type::PA)
+                    dumpInitState("ipt", entry.addr_, entry.addr_);
 	      for (const auto& walk : virtMem_.getDataWalks())
-		for (auto addr : walk)
-		  dumpInitState("dpt", addr, addr);
+		for (auto entry : walk)
+                  if (entry.type_ == VirtMem::WalkEntry::Type::PA)
+                    dumpInitState("dpt", entry.addr_, entry.addr_);
 	    }
 
 	  if (hasException_)

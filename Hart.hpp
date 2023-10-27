@@ -1649,10 +1649,6 @@ namespace WdRiscv
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }
 
-    /// Enable address translation trace
-    void enableAddrTransLog(FILE* file)
-    { virtMem_.enableAddrTransLog(file); }
-
     /// Trace the last n branches to the given file. No tracing is
     /// done if n is 0.
     void traceBranches(const std::string& file, uint64_t n)
@@ -1706,7 +1702,7 @@ namespace WdRiscv
     /// instruction/data the page table entries referenced by the
     /// instruction/data page table walk of the last executed
     /// instruction or make it empty if no page table walk took place.
-    void getPageTableWalkAddresses(bool isInstr, unsigned ix, std::vector<uint64_t>& addrs) const
+    void getPageTableWalkAddresses(bool isInstr, unsigned ix, std::vector<VirtMem::WalkEntry>& addrs) const
     { addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix); }
 
     /// Get the paget table entries of the page table walk of the last
@@ -1715,11 +1711,14 @@ namespace WdRiscv
     {
       const auto& addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix);
       ptes.clear();
-      for (auto addr : addrs)
+      for (const auto& addr : addrs)
 	{
-	  URV pte = 0;
-	  peekMemory(addr, pte, true);
-	  ptes.push_back(pte);
+          if (addr.type_ == VirtMem::WalkEntry::Type::PA)
+          {
+            URV pte = 0;
+            peekMemory(addr.addr_, pte, true);
+            ptes.push_back(pte);
+          }
 	}
     }
 
@@ -4655,6 +4654,8 @@ namespace WdRiscv
       ldStWrite_ = false;
       ldStAtomic_ = false;
       lastPageMode_ = virtMem_.mode();
+      lastVsPageMode_ = virtMem_.vsMode();
+      lastPageModeStage2_ = virtMem_.modeStage2();
       clearTraceData();
     }
 
@@ -4797,6 +4798,8 @@ namespace WdRiscv
     bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
+    VirtMem::Mode lastVsPageMode_ = VirtMem::Mode::Bare;
+    VirtMem::Mode lastPageModeStage2_ = VirtMem::Mode::Bare;
 
     bool debugMode_ = false;         // True on debug mode.
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
