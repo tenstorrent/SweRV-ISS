@@ -35,13 +35,19 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (mode != PrivilegeMode::Machine)
+      PrivilegeMode pm = privMode_;
+      bool virt = virtMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	{
+	  pm = mstatusMpp();
+	  virt = mstatus_.bits_.MPV;
+	}
+
+      if (pm != PrivilegeMode::Machine)
         {
           gpa = pa = addr;
 	  bool read = isRead, write = not isRead, exec = false;
-          cause = virtMem_.translate(addr, mode, virtMode_, read, write, exec, gpa,
-                                     pa);
+          cause = virtMem_.translate(addr, pm, virt, read, write, exec, gpa, pa);
           if (cause != ExceptionCause::NONE)
             return cause;
         }

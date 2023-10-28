@@ -17,7 +17,7 @@ namespace WdRiscv
 				      Zvkned, Zvknha, Zvknhb, Zvksed,
                                       Zvksh, Zicond, Zcb, Zfa, Zfbfmin,
                                       Zvfbfmin, Zvfbfwma, Sstc, Svpbmt,
-				      Smaia, Ssaia, Zacas, None };
+				      Smaia, Ssaia, Zacas, Smrnmi, None };
 
   /// Model supported extensions with primary/secondary version numbers.
   class Isa

@@ -1298,6 +1298,11 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
       peek(num, prev);
       value = legalizePmacfgValue(prev, value);
     }
+  else if (num == CN::MNSTATUS)
+    {
+      if ((value & 8) == 0 and (peekMnstatus() & 8) == 1)
+	value |= 8;  // Attempt to clear mnstatus.nmie has no effect
+    }
 
   csr->write(value);
   recordWrite(num);
@@ -1951,8 +1956,7 @@ CsRegs<URV>::defineMachineRegs()
   mask = URV(1) << (sizeof(URV)*8 - 1);  // Most sig bit is read-only 1
   defineCsr("mncause", Csrn::MNCAUSE, !mand, !imp, mask, ~mask, ~mask);
 
-  mask = 0b1100010000000;  // Fields MNPV, and MNPP writeable.
-  pokeMask = mask | 0b1000; // Fields NMIE pokeable.
+  mask = 0b1100010001000;  // Fields MNPV, MNPP, and NMIE writeable.
   defineCsr("mnstatus", Csrn::MNSTATUS, !mand, !imp, 0, mask, pokeMask);
 
   // Define mhpmcounter3/mhpmcounter3h to mhpmcounter31/mhpmcounter31h

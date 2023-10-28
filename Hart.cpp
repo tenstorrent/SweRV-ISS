@@ -402,6 +402,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvsstc(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
+  if (isa_.isEnabled(RvExtension::Smrnmi))
+    enableSmrnmi(true);
   enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
   enableExtension(RvExtension::Zacas, isa_.isEnabled(RvExtension::Zacas));
@@ -857,8 +859,14 @@ template <typename URV>
 void
 Hart<URV>::updateBigEndian()
 {
-  PrivilegeMode pm = mstatusMprv() ? mstatusMpp() : privMode_;
-  bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
+  PrivilegeMode pm = privMode_;
+  bool virt = virtMode_;
+  if (mstatusMprv() and not nmieOverridesMprv())
+    {
+      pm = mstatusMpp();
+      virt = mstatus_.bits_.MPV;
+    }
+
   if (pm == PrivilegeMode::Machine)
     bigEnd_ = mstatus_.bits_.MBE;
   else if (pm == PrivilegeMode::Supervisor)
@@ -1555,17 +1563,23 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
-      bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
+      PrivilegeMode pm = privMode_;
+      bool virt = virtMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	{
+	  pm = mstatusMpp();
+	  virt = mstatus_.bits_.MPV;
+	}
+
       if (hyper)
 	{
 	  assert(not virtMode_);
-	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  virt = true;
 	}
-      if (priv != PM::Machine)
+      if (pm != PM::Machine)
         {
-	  auto cause = virtMem_.translateForLoad2(va1, ldSize, priv, virt, gaddr1, addr1, gaddr2, addr2);
+	  auto cause = virtMem_.translateForLoad2(va1, ldSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
 	    return cause;
         }
@@ -2700,6 +2714,15 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   if (tvecMode == TrapVectorMode::Vectored and interrupt)
     base = base + 4*cause;
 
+  // If exception happened while in an NMI handler, we go to the NMI exception
+  // handler address.
+  if (extensionIsEnabled(RvExtension::Smrnmi) and (csRegs_.peekMnstatus() & 8) == 0)
+    {
+      assert(not interrupt);
+      // base = nmiExceptionHandler();  FiX: enable.
+      assert(0);
+    }
+
   setPc(base);
 
   // Change privilege mode.
@@ -2711,14 +2734,44 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 
 
 template <typename URV>
-void
+bool
 Hart<URV>::initiateNmi(URV cause, URV pcToSave)
 {
+  if (extensionIsEnabled(RvExtension::Smrnmi))
+    {
+      URV mnstatus = 0;
+      peekCsr(CsrNumber::MNSTATUS, mnstatus);
+      if ((mnstatus & 0x8) == 0)
+	return false;  // mnstatus.nmie is off
+      mnstatus &= ~URV(0x8);  // Clrear mstatus.nmie
+
+      pokeCsr(CsrNumber::MNEPC, pcToSave);
+      pokeCsr(CsrNumber::MNCAUSE, cause);
+
+      URV mask = URV(1) << 7; // Mask of mnstatus.mnpv (previous virtual mode)
+      mnstatus &= ~mask;  // Clear mnstatus.nmpv
+      mnstatus |= virtMode_ ? mask : 0;  // Set mnsatatus.nmpv to virtual mode
+      setVirtualMode(false);  // Clear virtual mode
+
+      mask = URV(3) << 11;  // Mask of mnstatus.mnpp (previousl privilege)
+      mnstatus &= mask;     // Clear privilege mode bits
+      mnstatus |= URV(privMode_) << 11;    // Save privilege mode
+      privMode_ = PrivilegeMode::Machine;
+
+      // Update mnstatus
+      pokeCsr(CsrNumber::MNSTATUS, mnstatus);
+
+      // Set the pc to the nmi vector.
+      assert(0);
+      return true;
+    }
+
   URV nextPc = nmiPc_;
   undelegatedInterrupt(cause, pcToSave, nextPc);
   nmiCount_++;
   if (instFreq_)
     accumulateTrapStats(true);
+  return true;
 }
 
 
@@ -5021,10 +5074,10 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
   if (debugMode_ and not dcsrStepIe_)
     return false;
 
-  // If a non-maskable interrupt was signaled by the test-bench, take it.
-  if (nmiPending_)
+  // If a non-maskable interrupt was signaled by the test-bench, consider it.
+  if (nmiPending_ and initiateNmi(URV(nmiCause_), pc_))
     {
-      initiateNmi(URV(nmiCause_), pc_);
+      // NMI was taken.
       nmiPending_ = false;
       nmiCause_ = NmiCause::UNKNOWN;
       uint32_t inst = 0; // Load interrupted inst.
@@ -10365,17 +10418,23 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Address translation
   if (isRvs())     // Supervisor extension
     {
-      PM priv = mstatusMprv() ? mstatusMpp() : privMode_;
-      bool virt = mstatusMprv() ? mstatus_.bits_.MPV : virtMode_;
+      PrivilegeMode pm = privMode_;
+      bool virt = virtMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	{
+	  pm = mstatusMpp();
+	  virt = mstatus_.bits_.MPV;
+	}
+
       if (hyper)
 	{
 	  assert(not virtMode_);
-	  priv = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
+	  pm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
 	  virt = true;
 	}
-      if (priv != PM::Machine)
+      if (pm != PM::Machine)
         {
-	  auto cause = virtMem_.translateForStore2(va1, stSize, priv, virt, gaddr1, addr1, gaddr2, addr2);
+	  auto cause = virtMem_.translateForStore2(va1, stSize, pm, virt, gaddr1, addr1, gaddr2, addr2);
           if (cause != EC::NONE)
 	    return cause;
         }

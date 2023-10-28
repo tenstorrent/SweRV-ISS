@@ -1261,6 +1261,13 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Fast peek method for MNSTATUS.
+    URV peekMnstatus() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MNSTATUS));
+      return csr.read();
+    }
+
     /// Fast peek method for MIDELEG
     URV peekMideleg() const
     {

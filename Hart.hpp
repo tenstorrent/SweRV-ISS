@@ -1084,6 +1084,10 @@ namespace WdRiscv
     void enableSmstaten(bool flag)
     { csRegs_.enableStateen(flag); }
 
+    /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
+    void enableSmrnmi(bool flag)
+    { enableExtension(RvExtension::Smrnmi, flag); csRegs_.enableSmrnmi(flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1923,10 +1927,20 @@ namespace WdRiscv
     bool mstatusMprv() const
     { return mstatus_.bits_.MPRV; }
 
+    /// Return true if the nmie bit of nmstatus overrides the effect of
+    /// mstatus.mprv. See Smrnmi secton in RISCV pivileged spec.
+    bool nmieOverridesMprv() const
+    { return extensionIsEnabled(RvExtension::Smrnmi) and (csRegs_.peekMnstatus() & 8) == 0; }
+
     /// Return the effective privilege mode: if mstatus.mprv then
     /// it is the privilege mode in mstatus.mpp
     PrivilegeMode effectivePrivilege() const
-    { return mstatusMprv() ? mstatusMpp() : privMode_; }
+    {
+      PrivilegeMode pm = privMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	pm = mstatusMpp();
+      return pm;
+    }
 
     /// Read an item that may span 2 physical pages. If pa1 is the
     /// same as pa2 then the item is in one page: do a simple read. If
@@ -2525,8 +2539,9 @@ namespace WdRiscv
     /// Start an asynchronous exception (interrupt).
     void initiateInterrupt(InterruptCause cause, URV pc);
 
-    /// Start a non-maskable interrupt.
-    void initiateNmi(URV cause, URV pc);
+    /// Start a non-maskable interrupt. Return true if successful. Return false
+    /// if Smrnmi and nmis are disabled.
+    bool initiateNmi(URV cause, URV pc);
 
     /// interrupts without considering the delegation registers.
     void undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc);
