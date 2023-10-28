@@ -247,6 +247,7 @@ namespace WdRiscv
      // Privileged
      mret,
      sret,
+     mnret,
      wfi,
 
      // Debug

@@ -1300,8 +1300,13 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
     }
   else if (num == CN::MNSTATUS)
     {
-      if ((value & 8) == 0 and (peekMnstatus() & 8) == 1)
-	value |= 8;  // Attempt to clear mnstatus.nmie has no effect
+      using MNF = MnstatusFields;
+      MNF mnf{value};
+      if (mnf.bits_.NMIE == 0 and MNF{peekMnstatus()}.bits_.NMIE == 1)
+	{
+	  mnf.bits_.NMIE = 1;  // Attempt to clear mnstatus.nmie has no effect
+	  value = mnf.value_;
+	}
     }
 
   csr->write(value);

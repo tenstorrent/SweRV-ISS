@@ -2960,6 +2960,8 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     return instTable_.getEntry(InstId::sret);
                   else if (op2 == 0x302 and op0 == 0 and op1 == 0)
                     return instTable_.getEntry(InstId::mret);
+                  else if (op2 == 0x702 and op0 == 0 and op1 == 0)
+                    return instTable_.getEntry(InstId::mnret);
                   else if (op2 == 0x105 and op0 == 0 and op1 == 0)
                     return instTable_.getEntry(InstId::wfi);
                   else if (op2 == 0x7b2 and op0 == 0 and op1 == 0)

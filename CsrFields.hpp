@@ -236,6 +236,28 @@ namespace WdRiscv
   };
 
 
+  /// Union to pack/unpack the fields of the MNSTATUS register
+  union MnstatusFields
+  {
+    MnstatusFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;
+
+    struct Mnstatus
+    {
+      unsigned res0 : 3;    // Bit 0 to 2
+      unsigned NMIE : 1;    // Bit 3
+      unsigned res1 : 3;    // Bit 4 to 6
+      unsigned MNPV : 1;    // Bit 7
+      unsigned res2 : 3;    // Bit 8 to 10
+      unsigned MNPP : 2;    // Bit 11 to 12
+      unsigned res3 : 19;   // Bit 13 to 31
+    } bits_;
+  };
+
+
   /// Structure used to unpack/pack the fields of the SATP register
   template <typename URV>
   union SatpFields;

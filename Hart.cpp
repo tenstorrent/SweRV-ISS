@@ -2716,11 +2716,11 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 
   // If exception happened while in an NMI handler, we go to the NMI exception
   // handler address.
-  if (extensionIsEnabled(RvExtension::Smrnmi) and (csRegs_.peekMnstatus() & 8) == 0)
+  if (extensionIsEnabled(RvExtension::Smrnmi) and
+      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0)
     {
       assert(not interrupt);
-      // base = nmiExceptionHandler();  FiX: enable.
-      assert(0);
+      base = nmiExceptionPc_;
     }
 
   setPc(base);
@@ -2739,35 +2739,29 @@ Hart<URV>::initiateNmi(URV cause, URV pcToSave)
 {
   if (extensionIsEnabled(RvExtension::Smrnmi))
     {
-      URV mnstatus = 0;
-      peekCsr(CsrNumber::MNSTATUS, mnstatus);
-      if ((mnstatus & 0x8) == 0)
+      MnstatusFields mnf{csRegs_.peekMnstatus()};
+      if (mnf.bits_.NMIE == 0)
 	return false;  // mnstatus.nmie is off
-      mnstatus &= ~URV(0x8);  // Clrear mstatus.nmie
+      mnf.bits_.NMIE = 0;  // Clear mnstatus.mnie
 
       pokeCsr(CsrNumber::MNEPC, pcToSave);
       pokeCsr(CsrNumber::MNCAUSE, cause);
 
-      URV mask = URV(1) << 7; // Mask of mnstatus.mnpv (previous virtual mode)
-      mnstatus &= ~mask;  // Clear mnstatus.nmpv
-      mnstatus |= virtMode_ ? mask : 0;  // Set mnsatatus.nmpv to virtual mode
+      mnf.bits_.MNPV = virtMode_;  // Save virtual mode
       setVirtualMode(false);  // Clear virtual mode
 
-      mask = URV(3) << 11;  // Mask of mnstatus.mnpp (previousl privilege)
-      mnstatus &= mask;     // Clear privilege mode bits
-      mnstatus |= URV(privMode_) << 11;    // Save privilege mode
+      mnf.bits_.MNPP = unsigned(privMode_);  // Save privilege mode
       privMode_ = PrivilegeMode::Machine;
 
       // Update mnstatus
-      pokeCsr(CsrNumber::MNSTATUS, mnstatus);
+      pokeCsr(CsrNumber::MNSTATUS, mnf.value_);
 
       // Set the pc to the nmi vector.
-      assert(0);
-      return true;
+      setPc(nmiPc_);
     }
+  else
+    undelegatedInterrupt(cause, pcToSave, nmiPc_);
 
-  URV nextPc = nmiPc_;
-  undelegatedInterrupt(cause, pcToSave, nextPc);
   nmiCount_++;
   if (instFreq_)
     accumulateTrapStats(true);
@@ -6031,6 +6025,10 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::sret:
       execSret(di);
+      return;
+
+    case InstId::mnret:
+      execMnret(di);
       return;
 
     case InstId::wfi:
@@ -9819,6 +9817,41 @@ Hart<URV>::execSret(const DecodedInst* di)
   privMode_ = savedMode;
 }
 
+
+template <typename URV>
+void
+Hart<URV>::execMnret(const DecodedInst* di)
+{
+  if (not extensionIsEnabled(RvExtension::Smrnmi) or
+      privMode_ < PrivilegeMode::Machine)
+    {
+      illegalInst(di);
+      return;
+    }
+
+  if (triggerTripped_)
+    return;
+
+  // Recover privilege mode and virtual mode.
+  MnstatusFields mnf{csRegs_.peekMnstatus()};
+  PrivilegeMode savedMode = PrivilegeMode{mnf.bits_.MNPP};
+  bool savedVirt = mnf.bits_.MNPV;
+
+  mnf.bits_.NMIE = 1;  // Set mnstatus.mnie
+  pokeCsr(CsrNumber::MNSTATUS, mnf.value_);
+
+  // Restore PC
+  URV epc = 0;
+  csRegs_.read(CsrNumber::MNEPC, privMode_, epc);
+  setPc(epc);
+
+  // Restore virtual mode
+  if (savedMode != PrivilegeMode::Machine)
+    setVirtualMode(savedVirt);
+
+  // Restore privilege mode
+  privMode_ = savedMode;
+}
 
 template <typename URV>
 void

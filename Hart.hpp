@@ -664,6 +664,11 @@ namespace WdRiscv
     void defineNmiPc(URV addr)
     { nmiPc_ = addr; }
 
+    /// Define value of program counter after an exception in non-maskable
+    /// interrupt code.
+    void defineNmiExceptionPc(URV addr)
+    { nmiExceptionPc_ = addr; }
+
     /// Clear/set pending non-maskable-interrupt.
     void setPendingNmi(NmiCause cause = NmiCause::UNKNOWN);
 
@@ -2817,6 +2822,7 @@ namespace WdRiscv
     void execEbreak(const DecodedInst*);
     void execMret(const DecodedInst*);
     void execSret(const DecodedInst*);
+    void execMnret(const DecodedInst*);
     void execWfi(const DecodedInst*);
 
     void execDret(const DecodedInst*);
@@ -4730,6 +4736,7 @@ namespace WdRiscv
     uint64_t interruptor_ = 0;
 
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
+    URV nmiExceptionPc_ = 0;    // For excetpions during NMI and Srmrnmi extension.
     bool nmiPending_ = false;
     NmiCause nmiCause_ = NmiCause::UNKNOWN;
 

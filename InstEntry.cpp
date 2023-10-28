@@ -1504,6 +1504,9 @@ InstTable::setupInstVec()
       { "sret", InstId::sret, 0x10200073, 0xffffffff,
 	RvExtension::I, RvFormat::I },
 
+      { "mnret", InstId::mnret, 0x70200073, 0xffffffff,
+	RvExtension::I, RvFormat::I },
+
       { "wfi", InstId::wfi, 0x10500073, 0xffffffff,
 	RvExtension::I, RvFormat::I },
 
