@@ -173,7 +173,6 @@ struct Args
   std::string instFreqFile;              // Instruction frequency file.
   std::string configFile;                // Configuration (JSON) file.
   std::string bblockFile;                // Basci block file.
-  std::string attFile;                   // Address translation file.
   std::string branchTraceFile;           // Branch trace file.
   std::string tracerLib;                 // Path to tracer extension shared library.
   std::string isa;
@@ -541,8 +540,6 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 			" gdb will work with stdio (default -1).")
 	("profileinst", po::value(&args.instFreqFile),
 	 "Report instruction frequency to file.")
-        ("att", po::value(&args.attFile),
-         "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
         ("tracebranch", po::value(&args.branchTraceFile),
          "Trace branch instructions to the given file.")
         ("branchwindow", po::value<std::string>(),
@@ -1388,7 +1385,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
+	      FILE*& consoleOut, FILE*& bblockFile)
 {
   size_t len = args.traceFile.size();
   bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
@@ -1448,17 +1445,6 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 	}
     }
 
-  if (not args.attFile.empty())
-    {
-      attFile = fopen(args.attFile.c_str(), "w");
-      if (not attFile)
-        {
-          std::cerr << "Failed to open address translation file '"
-                    << args.attFile << "' for output\n";
-          return false;
-        }
-    }
-
   return true;
 }
 
@@ -1467,7 +1453,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 static
 void
 closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
+	       FILE*& consoleOut, FILE*& bblockFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1491,10 +1477,6 @@ closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
   if (bblockFile and bblockFile != stdout)
     fclose(bblockFile);
   bblockFile = nullptr;
-
-  if (attFile and attFile != stdout)
-    fclose(attFile);
-  attFile = nullptr;
 }
 
 
@@ -1929,8 +1911,7 @@ session(const Args& args, const HartConfig& config)
   FILE* commandLog = nullptr;
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
-  FILE* attFile = nullptr;
-  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile))
+  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1947,7 +1928,6 @@ session(const Args& args, const HartConfig& config)
       auto& hart = *system.ithHart(i);
       hart.setConsoleOutput(consoleOut);
       hart.enableBasicBlocks(bblockFile, args.bblockInsts);
-      hart.enableAddrTransLog(attFile);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())
@@ -1993,7 +1973,7 @@ session(const Args& args, const HartConfig& config)
       std::cout << "Used blocks: 0x" << std::hex << bytes << std::endl;
     }
 
-  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
+  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile);
 
   return result;
 }

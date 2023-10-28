@@ -29,12 +29,13 @@ Pci::config_mmio(uint32_t addr, T& data, bool w)
 
   auto slot = find_registered_device(format.bits.bus, format.bits.device, format.bits.function);
   if (slot) {
-    if (w)
+    if (w) {
       slot->write_config<T>((format.bits.reg << 2) | format.bits.offset, data);
-    else {
-      data = -1;
-      slot->read_config<T>((format.bits.reg << 2) | format.bits.offset, data);
+      return;
     }
+
+    data = -1;
+    slot->read_config<T>((format.bits.reg << 2) | format.bits.offset, data);
   }
 }
 
@@ -62,16 +63,16 @@ Pci::mmio(uint32_t addr, T& data, bool w)
           memcpy(p, &data, sizeof(T));
           if (mmio->write_cb)
             mmio->write_cb(offset, sizeof(T));
+          return;
         }
-        else {
-          data = -1;
-          uint64_t tmp;
-          if (mmio->read_cb and mmio->read_cb(offset, tmp)) {
-            data = tmp;
-            return;
-          }
-          memcpy(&data, p, sizeof(T));
+
+        data = -1;
+        uint64_t tmp;
+        if (mmio->read_cb and mmio->read_cb(offset, tmp)) {
+          data = tmp;
+          return;
         }
+        memcpy(&data, p, sizeof(T));
         break;
       }
   }
@@ -141,14 +142,14 @@ Pci::fixup_bars(std::shared_ptr<PciDev> dev)
         dev->bars().at(bar) = mmio_blocks;
         dev->bar_eols().at(bar) = mmio_blocks->bytes;
         mmio_eol_ = base + size;
+        return true;
       }
-      else {
-        std::cerr << "Ran out of MMIO memory" << std::endl;
-        return false;
-      }
+
+      std::cerr << "Ran out of MMIO memory" << std::endl;
+      return false;
     }
-    else
-      dev->header().bits.bar[bar] = 0;
+
+    dev->header().bits.bar[bar] = 0;
   }
   return true;
 }

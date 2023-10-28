@@ -205,23 +205,38 @@ formatFpInstTrace<uint64_t>(FILE* out, uint64_t tag, const Hart<uint64_t>& hart,
 }
 
 
+static
+constexpr std::string_view
+pageTableWalkType(VirtMem::WalkEntry::Type type, bool head)
+{
+  using namespace std::string_view_literals;
+  auto vec = (head)? std::array{"gva: "sv, " gpa: "sv, "  pa: "sv} :
+    std::array{""sv, " "sv, "  "sv};
+  return vec.at(size_t(type));
+}
+
+
 template <typename URV>
 static
 void
 printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
-		   const std::vector<uint64_t>& addresses)
+		   const std::vector<VirtMem::WalkEntry>& entries)
 {
   fputs(tag, out);
   fputs(":", out);
-  const char* sep = "";
-  for (auto addr : addresses)
+  bool head = true;
+  for (auto& entry : entries)
     {
-      URV pte = 0;
-      hart.peekMemory(addr, pte, true);
-      uint64_t pte64 = pte;
-      fputs(sep, out);
-      fprintf(out, "0x%" PRIx64 "=0x%" PRIx64, addr, pte64);
-      sep = ",";
+      fputs("\n", out);
+      fputs(pageTableWalkType(entry.type_, head).data(), out);
+      fprintf(out, "0x%" PRIx64, entry.addr_);
+      if (entry.type_ == VirtMem::WalkEntry::Type::PA)
+        {
+          uint64_t pte;
+          hart.peekMemory(entry.addr_, pte, true);
+          fprintf(out, "=0x%" PRIx64, pte);
+        }
+      head = false;
     }
 }
 
@@ -448,6 +463,13 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
 
   if (tracePtw_)
     {
+      if (virtMem_.getFetchWalks().size() != 0 or virtMem_.getDataWalks().size() != 0)
+        {
+          fprintf(out, "  +\nsatp mode: %4s", VirtMem::to_string(lastPageMode_).data());
+          fprintf(out, "  +\nvsatp mode: %4s", VirtMem::to_string(lastVsPageMode_).data());
+          fprintf(out, "  +\nhgatp mode: %4s", VirtMem::to_string(lastPageModeStage2_).data());
+        }
+
       for (const auto& walk : virtMem_.getFetchWalks())
 	{
 	  fputs("  +\n", out);
@@ -770,25 +792,30 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (tracePtw_)
     {
       buffer.printChar(',');
-      std::vector<uint64_t> addrs, entries;
+      std::vector<VirtMem::WalkEntry> addrs;
+      std::vector<uint64_t> entries;
       getPageTableWalkAddresses(true, 0, addrs);
       getPageTableWalkEntries(true, 0, entries);
+      unsigned entryIx = 0;
       sep = "";
-      uint64_t n = std::min(addrs.size(), entries.size());
-      for (uint64_t i = 0; i < n; ++i)
+      for (uint64_t i = 0; i < addrs.size(); ++i)
 	{
-	  buffer.print(sep).print(addrs.at(i)).printChar('=').print(entries.at(i));
+	  buffer.print(sep).print(addrs.at(i).addr_);
+          if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
+            buffer.printChar('=').print(entries.at(entryIx++));
 	  sep = ";";
 	}
 
       buffer.printChar(',');
       getPageTableWalkAddresses(false, 0, addrs);
       getPageTableWalkEntries(false, 0, entries);
+      entryIx = 0;
       sep = "";
-      n = std::min(addrs.size(), entries.size());
-      for (uint64_t i = 0; i < n; ++i)
+      for (uint64_t i = 0; i < addrs.size(); ++i)
 	{
-	  buffer.print(sep).print(addrs.at(i)).printChar('=').print(entries.at(i));
+	  buffer.print(sep).print(addrs.at(i).addr_);
+          if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
+            buffer.printChar('=').print(entries.at(entryIx++));
 	  sep = ";";
 	}
     }
