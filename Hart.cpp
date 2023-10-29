@@ -4878,6 +4878,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (possible == 0)
     return false;  // Nothing enabled that is also pending.
 
+  // If in a non-maskable interrupt handler, then allinterrupts disabled.
+  if (extensionIsEnabled(RvExtension::Smrnmi) and
+      (MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE) == 0)
+    return false;
+
   using IC = InterruptCause;
   using PM = PrivilegeMode;
 

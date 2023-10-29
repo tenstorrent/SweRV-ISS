@@ -1934,7 +1934,10 @@ namespace WdRiscv
     /// Return true if the nmie bit of nmstatus overrides the effect of
     /// mstatus.mprv. See Smrnmi secton in RISCV pivileged spec.
     bool nmieOverridesMprv() const
-    { return extensionIsEnabled(RvExtension::Smrnmi) and (csRegs_.peekMnstatus() & 8) == 0; }
+    {
+      return (extensionIsEnabled(RvExtension::Smrnmi) and
+	      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0);
+    }
 
     /// Return the effective privilege mode: if mstatus.mprv then
     /// it is the privilege mode in mstatus.mpp

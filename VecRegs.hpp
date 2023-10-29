@@ -514,9 +514,9 @@ namespace WdRiscv
       return (data[byteIx] >> bitIx) & 1;
     }
 
-    /// Return true is element at ix of vector detination is active;
-    /// otherwise, return false and either read element at ix into val
-    /// or set va to all ones depending on mask-agnostic policy.
+    /// Return true if element at index ix of vector detination is active;
+    /// otherwise, return false and either read element at ix into val or set
+    /// val to all ones depending on mask-agnostic policy.
     template<typename T>
     bool isDestActive(unsigned vd, unsigned ix, unsigned emulx8, bool masked, T& val) const
     {
