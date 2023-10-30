@@ -3073,12 +3073,16 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
         nb = cb; // Field is locked. Use byte from current value.
       else
 	{
-	  if (pmpG_ != 0)
+	  unsigned aField = (nb >> 3) & 3;
+	  if (aField == 2)   // NA4
 	    {
-	      // If G is >= 1 then NA4 is not selectable in the A field of
-	      // the new byte.
-	      unsigned aField = (nb >> 3) & 3;
-	      if (aField == 2)
+	      // If G is >= 1 then NA4 is not selectable in the A field.
+	      if (pmpG_ != 0 and aField == 2)
+		nb = (nb & ~0x18) | (cb & 0x18);  // Preserve A field.
+	    }
+	  else if (aField == 1)  // TOR
+	    {
+	      if (not pmpTor_)   // TOR not supported
 		nb = (nb & ~0x18) | (cb & 0x18);  // Preserve A field.
 	    }
 

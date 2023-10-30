@@ -1621,6 +1621,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.tracePmp(flag);
     }
 
+  tag = "enable_pmp_tor";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePmpTor(flag);
+    }
+
   tag = "address_translation_modes";
   if (config_ -> contains(tag))
     {

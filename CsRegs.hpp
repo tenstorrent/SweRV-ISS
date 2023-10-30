@@ -1446,13 +1446,17 @@ namespace WdRiscv
     void setGuestInterruptCount(unsigned value)
     { geilen_ = value; }
 
-    /// Enable user mode.
+    /// Enable/disable user mode.
     void enableUserMode(bool flag)
     { userEnabled_ = flag; }
 
-    /// Enable supervisor time compare.
+    /// Enable/disable supervisor time compare.
     void enableSstc(bool flag)
     { sstcEnabled_ = flag; updateSstc(); }
+
+    /// Enable/disable top-of-range mode in pmp configurations.
+    void enablePmpTor(bool flag)
+    { pmpTor_ = flag; }
 
     /// Update implementation status of Sstc (supervisor timer)
     /// related CSRs.  This is called when Sstc related configuration
@@ -1699,6 +1703,7 @@ namespace WdRiscv
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
+    bool pmpTor_ = true;          // Top-of-range PMP mode enabled
 
     bool recordWrite_ = true;
     bool debugMode_ = false;

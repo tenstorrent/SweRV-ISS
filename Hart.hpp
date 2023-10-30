@@ -1838,6 +1838,10 @@ namespace WdRiscv
     void tracePmp(bool flag)
     { tracePmp_ = flag; }
 
+    /// Enable/disable top-of-range mode in pmp configurations.
+    void enablePmpTor(bool flag)
+    { csRegs_.enablePmpTor(flag); }
+
     Syscall<URV>& getSyscall()
     { return syscall_; }
 
