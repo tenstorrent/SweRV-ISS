@@ -3085,8 +3085,8 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
 	  // w=1 r=0 is not allowed. Preserve the xwr field.
 	  if ((nb & 3) == 2)
 	    {
-	      nb = nb & ~3;   // Set wr to 00
-	      // nb = (nb & ~7) | (cb & 7);  // Preserve xwr field.
+	      // nb = nb & ~3;   // Set wr to 00
+	      nb = (nb & ~7) | (cb & 7);  // Preserve xwr field.
 	    }
 	}
 
