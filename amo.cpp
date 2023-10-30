@@ -198,7 +198,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   ldStPhysAddr1_ = addr2;
 
   // Address outside DCCM causes an exception (this is swerv specific).
-  bool fail = amoInDccmOnly_ and not isAddrInDccm(addr1);
+  bool fail = amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1);
 
   // Access must be naturally aligned.
   if ((addr1 & (ldStSize_ - 1)) != 0)
@@ -309,7 +309,7 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (cause == EC::NONE)
     {
       bool fail = not memory_.pmaMgr_.getPma(addr1).isRsrv();
-      fail = fail or (amoInDccmOnly_ and not isAddrInDccm(addr1));
+      fail = fail or (amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1));
       if (fail)
 	cause = EC::STORE_ACC_FAULT;
     }

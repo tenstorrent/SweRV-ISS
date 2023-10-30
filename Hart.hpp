@@ -1181,34 +1181,6 @@ namespace WdRiscv
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
 
-    /// Return true if given address is in the data closed coupled
-    /// memory of this hart.
-    bool isAddrInDccm(uint64_t addr) const
-    { return memory_.pmaMgr_.isAddrInDccm(addr); }
-
-    /// Return true if given address is in the memory mapped registers
-    /// area of this hart.
-    bool isAddrMemMapped(uint64_t addr) const
-    { return memory_.pmaMgr_.isAddrMemMapped(addr); }
-
-    /// Return true if given address is cacheable.
-    bool isAddrCacheable(uint64_t addr) const
-    { return getPma(addr).isCacheable(); }
-
-    /// Return true if given address is in a readable page.
-    bool isAddrReadable(uint64_t addr) const
-    { return getPma(addr).isRead(); }
-
-    /// Return true if page of given address is in instruction closed
-    /// coupled memory.
-    bool isAddrInIccm(uint64_t addr) const
-    { return getPma(addr).isIccm(); }
-
-    /// Return true if given address is an idempotent region of
-    /// memory.
-    bool isAddrIdempotent(uint64_t addr) const
-    { return getPma(addr).isIdempotent(); }
-
     /// Return true if given data (ld/st) address is external to the hart.
     bool isDataAddressExternal(uint64_t addr) const
     { return memory_.isDataAddressExternal(addr); }
