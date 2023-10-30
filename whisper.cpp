@@ -1370,8 +1370,6 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
   hart.reportInstructionFrequency(outFile);
   hart.reportTrapStat(outFile);
   fprintf(outFile, "\n");
-  hart.reportPmpStat(outFile);
-  fprintf(outFile, "\n");
   hart.reportLrScStat(outFile);
 
   fclose(outFile);

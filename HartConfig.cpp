@@ -1142,7 +1142,7 @@ hasDefinedPmacfgCsr(const nlohmann::json& config)
 	    return true;
 	}
     }
-      
+
   // We could have a specific pmacfg csr (example pmacfg0).
   for (unsigned i = 0; i < 64; ++i)
     {
@@ -1619,6 +1619,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.tracePmp(flag);
+    }
+
+  tag = "trace_pma";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.tracePma(flag);
     }
 
   tag = "address_translation_modes";

@@ -1498,16 +1498,6 @@ Hart<URV>::reportTrapStat(FILE* file) const
 
 template <typename URV>
 void
-Hart<URV>::reportPmpStat(FILE* file) const
-{
-  std::ostringstream oss;
-  pmpManager_.printStats(oss);
-  fprintf(file, "%s", oss.str().c_str());
-}
-
-
-template <typename URV>
-void
 Hart<URV>::reportLrScStat(FILE* file) const
 {
   fprintf(file, "Load-reserve dispatched: %jd\n", uintmax_t(lrCount_));
@@ -1595,7 +1585,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(addr1);
+      Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isRead(effectivePrivilege()))
 	{
 	  addr1 = va1;
@@ -1605,7 +1595,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	{
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
-	  Pmp pmp2 = pmpManager_.accessPmp(next);
+	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isRead(effectivePrivilege()))
 	    {
 	      addr1 = va2;
@@ -2272,7 +2262,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
       if (pmpEnabled_)
         {
-          Pmp pmp = pmpManager_.accessPmp(physAddr);
+          Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
           if (not pmp.isExec(privMode_))
             {
               if (triggerTripped_)
@@ -2299,7 +2289,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(physAddr);
+      Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
       if (not pmp.isExec(privMode_))
         {
           if (triggerTripped_)
@@ -2342,7 +2332,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 
   if (pmpEnabled_)
     {
-      Pmp pmp2 = pmpManager_.accessPmp(physAddr2);
+      Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
       if (not pmp2.isExec(privMode_))
         {
           if (triggerTripped_)
@@ -4041,6 +4031,7 @@ Hart<URV>::clearTraceData()
   vecRegs_.clearTraceData();
   virtMem_.clearPageTableWalk();
   pmpManager_.clearPmpTrace();
+  memory_.pmaMgr_.clearPmaTrace();
   lastBranchTaken_ = false;
   misalignedLdSt_ = false;
 }
@@ -10490,7 +10481,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
-      Pmp pmp = pmpManager_.accessPmp(addr1);
+      Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
       if (not pmp.isWrite(effectivePrivilege()))
 	{
 	  addr1 = va1;
@@ -10500,7 +10491,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	{
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
- 	  Pmp pmp2 = pmpManager_.accessPmp(next);
+ 	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
 	  if (not pmp2.isWrite(effectivePrivilege()))
 	    {
 	      addr1 = va2;

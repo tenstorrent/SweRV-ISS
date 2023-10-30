@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -106,7 +106,7 @@ namespace WdRiscv
     /// is supported.
     bool misalOnMisal() const
     { return isMisalignedOk() and not (attrib_ & MisalAccFault); }
-    
+
     /// Return true if misaligned access generates an access fault
     /// exception in this region. Returns false if misaligned access
     /// is supported.
@@ -159,6 +159,8 @@ namespace WdRiscv
 
     friend class Memory;
 
+    enum AccessReason { None, Fetch, LdSt };
+
     PmaManager(uint64_t memorySize);
 
     /// Return the physical memory attribute associated with the
@@ -173,6 +175,36 @@ namespace WdRiscv
       for (const auto& region : regions_)
 	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pma_;
+
+      if (addr >= memSize_)
+	return noAccessPma_;
+      return defaultPma_;  // rwx amo rsrv idempotent misalok
+    }
+
+    struct PmaTrace
+    {
+      uint32_t pma_;
+      AccessReason reason_;
+    };
+
+    /// Similar to getPma but updates trace associated with each PMA entry
+    inline Pma accessPma(uint64_t addr) const
+    { return accessPma(addr, AccessReason::None); }
+
+    /// Similar to getPma but updates trace associated with each PMA entry
+    inline Pma accessPma(uint64_t addr, AccessReason reason) const
+    {
+      addr = (addr >> 2) << 2; // Make word aligned.
+
+      // Search regions in order. Return first matching.
+      for (const auto& region : regions_)
+	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          {
+            auto pma = region.pma_;
+            if (trace_)
+              pmaTrace_.push_back({pma.attrib_, reason});
+            return pma;
+          }
 
       if (addr >= memSize_)
 	return noAccessPma_;
@@ -247,6 +279,15 @@ namespace WdRiscv
     void clearDefaultPma()
     { defaultPma_.attrib_ = Pma::Attrib::None; }
 
+    const std::vector<PmaTrace>& getPmaTrace() const
+    { return pmaTrace_; }
+
+    void clearPmaTrace()
+    { pmaTrace_.clear(); }
+
+    void enableTrace(bool flag)
+    { trace_ = flag; }
+
   protected:
 
     /// Reset (to zero) all memory mapped registers.
@@ -284,7 +325,7 @@ namespace WdRiscv
       Pma pma_;
       bool valid_ = false;
     };
-    
+
     struct MemMappedReg
     {
       uint32_t value_ = 0;
@@ -293,6 +334,8 @@ namespace WdRiscv
 
     std::vector<Region> regions_;
     std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
+    bool trace_ = false;  // Collect stats if true.
+    mutable std::vector<PmaTrace> pmaTrace_;
 
     Pma defaultPma_{Pma::Attrib::Default};
     Pma noAccessPma_{Pma::Attrib::None};

@@ -306,18 +306,11 @@ namespace WdRiscv
     CancelLrCause cancelLrCause() const
     { return hart_->cancelLrCause(); }
 
-    /// TODO: add support for vector ld/st (multiple PMAs accessed)
-    /// Collect PMAs accessed for previous load stores
-    bool getPmas(Pma& pma) const
-    {
-      uint64_t virtAddr, physAddr;
-      if (hart_->lastLdStAddress(virtAddr, physAddr))
-        {
-          pma = hart_->getPma(physAddr);
-          return true;
-        }
-      return false;
-    }
+    void getPmpsAccessed(std::vector<std::tuple<PmpManager::PmpTrace, Pmp>>& pmps) const
+    { hart_->getPmpsAccessed(pmps); }
+
+    void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const
+    { hart_->getPmasAccessed(pmas); }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
