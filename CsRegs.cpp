@@ -3077,15 +3077,12 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
           // the new byte.
           unsigned aField = (nb >> 3) & 3;
           if (aField == 2)
-            {
-              aField = 3;
-              nb = nb | (aField << 3); // Change A field in new byte to 3.
-            }
+	    nb = (nb & ~0x18) | (cb & 0x18);  // Preserve A field.
         }
 
-      // w=1 r=0 is not allowed, change to w=0 r=0 
+      // w=1 r=0 is not allowed. Preserve the field.
       if ((nb & 3) == 2)
-        nb = (nb >> 2) << 2;
+        nb = (nb & ~3) | (cb & 3);
 
       legal = legal | (URV(nb) << i*8);
     }
