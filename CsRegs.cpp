@@ -3071,18 +3071,24 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
 
       if (cb >> 7)
         nb = cb; // Field is locked. Use byte from current value.
-      else if (pmpG_ != 0)
-        {
-          // If G is >= 1 then NA4 is not selectable in the A field of
-          // the new byte.
-          unsigned aField = (nb >> 3) & 3;
-          if (aField == 2)
-	    nb = (nb & ~0x18) | (cb & 0x18);  // Preserve A field.
-        }
+      else
+	{
+	  if (pmpG_ != 0)
+	    {
+	      // If G is >= 1 then NA4 is not selectable in the A field of
+	      // the new byte.
+	      unsigned aField = (nb >> 3) & 3;
+	      if (aField == 2)
+		nb = (nb & ~0x18) | (cb & 0x18);  // Preserve A field.
+	    }
 
-      // w=1 r=0 is not allowed. Preserve the field.
-      if ((nb & 3) == 2)
-        nb = (nb & ~3) | (cb & 3);
+	  // w=1 r=0 is not allowed. Preserve the xwr field.
+	  if ((nb & 3) == 2)
+	    {
+	      nb = nb & ~3;   // Set wr to 00
+	      // nb = (nb & ~7) | (cb & 7);  // Preserve xwr field.
+	    }
+	}
 
       legal = legal | (URV(nb) << i*8);
     }
