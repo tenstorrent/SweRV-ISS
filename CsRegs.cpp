@@ -3134,6 +3134,8 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 	return prev;  // IO must be amo-none.
       if (cacheable)
 	return prev;
+      if (write and not read)
+	return prev;  // Cannot have write without read.
     }
   else
     {
