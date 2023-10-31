@@ -3119,6 +3119,7 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
   bool write = (val & 2);      // bit 1
   bool exec = (val & 4);       // bit 2
   bool cacheable = val & 0x80; // Bit 7
+  boo coherent = val & 0x100;  // Bit 8
 
   unsigned memType = (val >> 3) & 3;   // Bits 4:3
   bool io = memType != 0;
@@ -3131,6 +3132,8 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 	return prev;
       if (amo != 0)
 	return prev;  // IO must be amo-none.
+      if (cacheable)
+	return prev;
     }
   else
     {
@@ -3143,6 +3146,8 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 	return prev;   // Cacheable must be amo-arithmetic.
       if (not cacheable and amo != 0)
 	return prev;   // Non-cacheable must be amo-none.
+      if (cacheable and not coherent)
+	return prev;
     }
 
   return next;
