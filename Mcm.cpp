@@ -403,11 +403,9 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   // Associate write op with instruction.
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
-  instr->complete_ = checkStoreComplete(*instr);
 
   if (instr->retired_)
     {
-      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
       if (op.size_ == 1)
 	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
       else if (op.size_ == 2)
@@ -423,6 +421,8 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	  result = false;
 	}
 
+      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
+      instr->complete_ = checkStoreComplete(*instr);
       if (instr->complete_)
 	result = ppoRule1(hart, *instr) and result;
     }
@@ -460,7 +460,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->di_ = di;
 
-  // If instruction is a store, save corresponding address and written data.
+  // If instruction is a store, save address, size, and written data.
   uint64_t addr = 0, value = 0;
   unsigned stSize = hart.lastStore(addr, value);
   if (stSize)
@@ -469,6 +469,19 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->physAddr_ = addr;
       instr->data_ = value;
       instr->isStore_ = true;
+      if (instr->complete_)   // Write ops already seen. Commit data.
+	{
+	  if (stSize == 1)
+	    hart.pokeMemory(addr, uint8_t(value), true);
+	  else if (stSize == 2)
+	    hart.pokeMemory(addr, uint16_t(value), true);
+	  else if (stSize == 4)
+	    hart.pokeMemory(addr, uint32_t(value), true);
+	  else if (stSize == 8)
+	    hart.pokeMemory(addr, uint64_t(value), true);
+	  else
+	    assert(0);
+	}
     }
 
   URV hartId = hart.hartId();
