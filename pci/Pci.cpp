@@ -73,7 +73,7 @@ Pci::mmio(uint32_t addr, T& data, bool w)
           return;
         }
         memcpy(&data, p, sizeof(T));
-        break;
+        return;
       }
   }
 }
@@ -142,7 +142,7 @@ Pci::fixup_bars(std::shared_ptr<PciDev> dev)
         dev->bars().at(bar) = mmio_blocks;
         dev->bar_eols().at(bar) = mmio_blocks->bytes;
         mmio_eol_ = base + size;
-        return true;
+        continue;
       }
 
       std::cerr << "Ran out of MMIO memory" << std::endl;
