@@ -1119,9 +1119,6 @@ namespace WdRiscv
     /// Print collected trap stats to the given file.
     void reportTrapStat(FILE* file) const;
 
-    /// Print collected physical memory protection stats on the given file.
-    void reportPmpStat(FILE* file) const;
-
     /// Print collected load-reserve/store-conditional stats on the given file.
     void reportLrScStat(FILE* file) const;
 
@@ -1180,34 +1177,6 @@ namespace WdRiscv
     /// Return physical memory attribute region of a given address.
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
-
-    /// Return true if given address is in the data closed coupled
-    /// memory of this hart.
-    bool isAddrInDccm(uint64_t addr) const
-    { return memory_.pmaMgr_.isAddrInDccm(addr); }
-
-    /// Return true if given address is in the memory mapped registers
-    /// area of this hart.
-    bool isAddrMemMapped(uint64_t addr) const
-    { return memory_.pmaMgr_.isAddrMemMapped(addr); }
-
-    /// Return true if given address is cacheable.
-    bool isAddrCacheable(uint64_t addr) const
-    { return getPma(addr).isCacheable(); }
-
-    /// Return true if given address is in a readable page.
-    bool isAddrReadable(uint64_t addr) const
-    { return getPma(addr).isRead(); }
-
-    /// Return true if page of given address is in instruction closed
-    /// coupled memory.
-    bool isAddrInIccm(uint64_t addr) const
-    { return getPma(addr).isIccm(); }
-
-    /// Return true if given address is an idempotent region of
-    /// memory.
-    bool isAddrIdempotent(uint64_t addr) const
-    { return getPma(addr).isIdempotent(); }
 
     /// Return true if given data (ld/st) address is external to the hart.
     bool isDataAddressExternal(uint64_t addr) const
@@ -1732,15 +1701,22 @@ namespace WdRiscv
     }
 
     /// Get the PMP registers accessed by last executed instruction
-    void getPmpsAccessed(std::vector<std::pair<uint32_t, Pmp>>& pmps) const
+    void getPmpsAccessed(std::vector<std::tuple<PmpManager::PmpTrace, Pmp>>& pmps) const
     {
-      const auto& pmpIxs = pmpManager_.getPmpTrace();
       pmps.clear();
-      for (const auto& ix : pmpIxs)
+      const auto& pmpTrace = pmpManager_.getPmpTrace();
+      for (const auto& entry : pmpTrace)
         {
-          auto pmp = pmpManager_.peekPmp(ix);
-          pmps.emplace_back(ix, pmp);
+          auto pmp = pmpManager_.peekPmp(entry.ix_);
+          pmps.emplace_back(entry, pmp);
         }
+    }
+
+    // Get the PMAs accessed by the last executed instruction
+    void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const
+    {
+      pmas.clear();
+      pmas = memory_.pmaMgr_.getPmaTrace();
     }
 
     /// Invalidate whole cache.
@@ -1834,9 +1810,13 @@ namespace WdRiscv
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
 
-    /// Enable/disable pmp access trace in log
+    /// Enable/disable PMP access trace
     void tracePmp(bool flag)
-    { tracePmp_ = flag; }
+    { pmpManager_.enableTrace(flag); }
+
+    /// Enable/disable PMA access trace
+    void tracePma(bool flag)
+    { memory_.pmaMgr_.enableTrace(flag); }
 
     /// Enable/disable top-of-range mode in pmp configurations.
     void enablePmpTor(bool flag)
@@ -4842,7 +4822,6 @@ namespace WdRiscv
 
     bool targetProgFinished_ = false;
     bool tracePtw_ = false;          // Trace paget table walk.
-    bool tracePmp_ = false;          // Trace PMP accesses
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
     bool seiPin_ = false;            // Supervisor external interrupt pin value.
     unsigned mxlen_ = 8*sizeof(URV);

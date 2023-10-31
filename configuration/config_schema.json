@@ -662,12 +662,37 @@
 		    "description": "number of interrupt identifiers per file (must be a multiple of 64)",
 		}
 	    }
-	},
-        "xlen": {
-            "$id": "xlen",
-            "type": "integer",
-            "enum": [32, 64, 128]
-        }
+      },
+      "pci": {
+          "type" : "object",
+          "properties" : {
+              "config_base": {
+                  "$ref": "#/definitions/int_or_hex_string",
+                  "description": "base address of config region"
+              },
+              "mmio_base": {
+                  "$ref": "#/definitions/int_or_hex_string",
+                  "description": "base address of mmio region"
+              },
+              "mmio_size": {
+                  "$ref": "#/definitions/int_or_hex_string",
+                  "description": "size of mmio region"
+              },
+              "buses": {
+                  "$ref": "integer",
+                  "description": "number of buses"
+              },
+              "slots": {
+                  "$ref": "integer",
+                  "description": "number of slots per bus"
+              }
+          }
+      },
+      "xlen": {
+          "$id": "xlen",
+          "type": "integer",
+          "enum": [32, 64, 128]
+      }
     },
     "required": [
         "isa"

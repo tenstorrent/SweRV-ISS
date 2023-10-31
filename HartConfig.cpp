@@ -1142,7 +1142,7 @@ hasDefinedPmacfgCsr(const nlohmann::json& config)
 	    return true;
 	}
     }
-      
+
   // We could have a specific pmacfg csr (example pmacfg0).
   for (unsigned i = 0; i < 64; ++i)
     {
@@ -1621,6 +1621,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.tracePmp(flag);
     }
 
+  tag = "trace_pma";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.tracePma(flag);
+    }
+
   tag = "enable_pmp_tor";
   if (config_ -> contains(tag))
     {
@@ -1829,12 +1836,12 @@ HartConfig::applyPciConfig(System<URV>& system) const
       not getJsonUnsigned(util::join("", tag, ".mmio_base"), pci.at("mmio_base"), mmioBase) or
       not getJsonUnsigned(util::join("", tag, ".mmio_size"), pci.at("mmio_size"), mmioSize))
     return false;
-  unsigned total_buses = 0, total_slots = 0;
-  if (not getJsonUnsigned(util::join("", tag, ".total_buses"), pci.at("total_buses"), total_buses) or
-      not getJsonUnsigned(util::join("", tag, ".total_slots"), pci.at("total_slots"), total_slots))
+  unsigned buses = 0, slots = 0;
+  if (not getJsonUnsigned(util::join("", tag, ".buses"), pci.at("buses"), buses) or
+      not getJsonUnsigned(util::join("", tag, ".slots"), pci.at("slots"), slots))
     return false;
 
-  return system.configPci(configBase, mmioBase, mmioSize, total_buses, total_slots);
+  return system.configPci(configBase, mmioBase, mmioSize, buses, slots);
 }
 
 

@@ -82,7 +82,7 @@ Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 
   if (cause == ExceptionCause::NONE)
     {
-      Pma pma = memory_.pmaMgr_.getPma(addr);
+      Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
     }
@@ -139,7 +139,7 @@ Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 
   if (cause == ExceptionCause::NONE)
     {
-      Pma pma = memory_.pmaMgr_.getPma(addr);
+      Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
     }
@@ -198,14 +198,14 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   ldStPhysAddr1_ = addr2;
 
   // Address outside DCCM causes an exception (this is swerv specific).
-  bool fail = amoInDccmOnly_ and not isAddrInDccm(addr1);
+  bool fail = amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1);
 
   // Access must be naturally aligned.
   if ((addr1 & (ldStSize_ - 1)) != 0)
     fail = true;
 
   if (cause == ExceptionCause::NONE)
-    fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
+    fail = fail or not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::LOAD_ACC_FAULT;
@@ -308,8 +308,8 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   if (cause == EC::NONE)
     {
-      bool fail = not memory_.pmaMgr_.getPma(addr1).isRsrv();
-      fail = fail or (amoInDccmOnly_ and not isAddrInDccm(addr1));
+      bool fail = not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
+      fail = fail or (amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1));
       if (fail)
 	cause = EC::STORE_ACC_FAULT;
     }

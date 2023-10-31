@@ -582,7 +582,10 @@ bool
 System<URV>::addPciDevices(const std::vector<std::string>& devs)
 {
   if (not pci_)
-    return false;
+    {
+      std::cerr << "Please specify a PCI region in the json" << std::endl;
+      return false;
+    }
 
   auto devmapf = [this](uint64_t addr, size_t size) -> uint8_t* {
     return this->memory_->data(addr, size);

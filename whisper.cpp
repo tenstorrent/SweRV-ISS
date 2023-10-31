@@ -652,6 +652,7 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 #endif
         ("pcidev", po::value(&args.pciDevs)->multitoken(),
          "Add PCI device to simulation. Format is <device>:<bus>:<slot>:<device-specific>. "
+         "This should be combined with the pci option to declare a memory region for these devices. "
          "Currently only supports virtio-blk, which requires a file")
 	("instcounter", po::value<std::string>(),
 	 "Set instruction counter to given value.")
@@ -1369,8 +1370,6 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 
   hart.reportInstructionFrequency(outFile);
   hart.reportTrapStat(outFile);
-  fprintf(outFile, "\n");
-  hart.reportPmpStat(outFile);
   fprintf(outFile, "\n");
   hart.reportLrScStat(outFile);
 

@@ -94,13 +94,13 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 #else
-      Pma pma1 = pmaMgr_.getPma(address);
+      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
       if (not pma1.isRead())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
           if (not pma2.isRead())
             return false;
         }
@@ -136,14 +136,14 @@ namespace WdRiscv
     template <typename T>
     bool readInst(uint64_t address, T& value) const
     {
-      Pma pma = pmaMgr_.getPma(address);
+      Pma pma = pmaMgr_.accessPma(address, PmaManager::AccessReason::Fetch);
       if (not pma.isExec())
 	return false;
 
       if (address & (sizeof(T) -1))
 	{
 	  // Misaligned address: Check next address.
-	  Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+	  Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::Fetch);
 	  if (not pma2.isExec() or pma.isIccm() != pma2.isIccm())
 	    return false;  // No exec or crossing ICCM boundary.
 	}
@@ -241,13 +241,13 @@ namespace WdRiscv
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
-      Pma pma1 = pmaMgr_.getPma(address);
+      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
       if (not pma1.isWrite())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
           if (pma1 != pma2)
 	    return false;
 	}
