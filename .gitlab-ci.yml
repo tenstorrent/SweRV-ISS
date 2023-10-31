@@ -31,6 +31,7 @@ variables:
 stages:
   - build
   - test
+  - upload
   - notify
 
 build-job:
@@ -41,6 +42,10 @@ build-job:
     paths:
       - build-Linux/whisper
     expire_in: 8 hours
+
+
+
+
 
 riscof-job:
   stage: test
@@ -95,6 +100,18 @@ notify-risc-p-cores:
 #   <<: *notify-template
 #   trigger:
 #     project: riscv/dv/rv_tester
+#
+#
+#
+
+upload-release:
+  stage: upload
+  dependencies:
+    - "build-job"
+  script:
+    - bash upload/upload.sh
+  only:
+    - tags
 
 .post-commit-test: # Maybe re-enable this at some point in the future
   stage: test
