@@ -3119,7 +3119,7 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
   bool write = (val & 2);      // bit 1
   bool exec = (val & 4);       // bit 2
   bool cacheable = val & 0x80; // Bit 7
-  boo coherent = val & 0x100;  // Bit 8
+  bool coherent = val & 0x100;  // Bit 8
 
   unsigned memType = (val >> 3) & 3;   // Bits 4:3
   bool io = memType != 0;
