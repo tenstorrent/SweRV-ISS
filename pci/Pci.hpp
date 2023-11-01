@@ -16,7 +16,6 @@ class Pci {
     // config_base refers to base address of PCI config regions. mmio_base refers to base address of PCI MMIO region (for example for BARs).
     Pci(uint32_t config_base, uint32_t mmio_base, size_t mmio_len, unsigned buses, unsigned slots);
 
-    // 2 mechanisms for accessing PCI config - IOPORT and MMIO. It's unclear if IOPORT is an x86 specific feature.
     // The base address is set on CPU side (config and mmio sit in different regions).
     template <typename T>
     void config_mmio(uint32_t addr, T& data, bool w);

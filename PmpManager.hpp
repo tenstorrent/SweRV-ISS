@@ -157,6 +157,7 @@ namespace WdRiscv
     struct PmpTrace
     {
       uint32_t ix_;
+      uint64_t addr;
       AccessReason reason_;
     };
 
@@ -176,10 +177,24 @@ namespace WdRiscv
 	    auto pmp = region.pmp_;
 	    auto ix = pmp.pmpIndex();
 	    if (trace_)
-              pmpTrace_.push_back({ix, reason});
+              pmpTrace_.push_back({ix, addr, reason});
 	    return pmp;
 	  }
       return {};
+    }
+
+    /// Used for tracing to determine if an address matches multiple PMPs.
+    bool matchMultiplePmp(uint64_t addr) const
+    {
+      bool hit = false;
+      for (const auto& region : regions_)
+	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          {
+            if (hit)
+              return true;
+            hit = true;
+          }
+      return false;
     }
 
     /// Enable/disable physical memory protection.

@@ -14,13 +14,6 @@ hdrs = [
 ]
 
 cc_library(
-    name          = "tracer_ext",
-    hdrs          = glob(["*.hpp","**/*.hpp"]),
-    includes      = ["."],
-    visibility    = ["//visibility:public"],
-)
-
-cc_library(
     name          = "rvcore",
     srcs          = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
     hdrs          = hdrs,
