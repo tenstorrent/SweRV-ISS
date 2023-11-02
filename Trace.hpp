@@ -313,10 +313,10 @@ namespace WdRiscv
     { hart_->getPmasAccessed(pmas); }
 
     bool matchMultiplePmp(uint64_t addr) const
-    { hart_->pmpManager().matchMultiplePmp(addr); }
+    { return hart_->pmpManager().matchMultiplePmp(addr); }
 
     bool matchMultiplePma(uint64_t addr) const
-    { hart_->pmaManager().matchMultiiplePma(addr); }
+    { return hart_->pmaManager().matchMultiiplePma(addr); }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
