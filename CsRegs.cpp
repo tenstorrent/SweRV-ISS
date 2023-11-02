@@ -645,7 +645,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
     {
       // Make VSEIP, VSTIP, VSSIP and SGEIP read only zero.
       auto mask = csr->getReadMask();
-      mask &= ~URV(0x444) & ~sgeip;
+      mask &= ~URV(0x1444);
       csr->setReadMask(mask);
     }
 
