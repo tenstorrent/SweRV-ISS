@@ -312,6 +312,12 @@ namespace WdRiscv
     void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const
     { hart_->getPmasAccessed(pmas); }
 
+    bool matchMultiplePmp(uint64_t addr) const
+    { hart_->pmpManager().matchMultiplePmp(addr); }
+
+    bool matchMultiplePma(uint64_t addr) const
+    { hart_->pmaManager().matchMultiiplePma(addr); }
+
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
   };

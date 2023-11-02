@@ -184,6 +184,7 @@ namespace WdRiscv
     struct PmaTrace
     {
       uint32_t pma_;
+      uint64_t addr;
       AccessReason reason_;
     };
 
@@ -202,13 +203,27 @@ namespace WdRiscv
           {
             auto pma = region.pma_;
             if (trace_)
-              pmaTrace_.push_back({pma.attrib_, reason});
+              pmaTrace_.push_back({pma.attrib_, addr, reason});
             return pma;
           }
 
       if (addr >= memSize_)
 	return noAccessPma_;
       return defaultPma_;  // rwx amo rsrv idempotent misalok
+    }
+
+    /// Used for tracing to determine if an address matches multiple PMAs.
+    bool matchMultiplePma(uint64_t addr) const
+    {
+      bool hit = false;
+      for (const auto& region : regions_)
+	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          {
+            if (hit)
+              return true;
+            hit = true;
+          }
+      return false;
     }
 
     /// Define a physical memory attribute region at given index ix

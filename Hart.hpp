@@ -1700,6 +1700,14 @@ namespace WdRiscv
 	}
     }
 
+    /// Return PMP manager associated with this hart.
+    const auto& pmpManager() const
+    { return pmpManager_; }
+
+    /// Return PMA manager associated with this hart.
+    const auto& pmaManager() const
+    { return memory_.pmaMgr_; }
+
     /// Get the PMP registers accessed by last executed instruction
     void getPmpsAccessed(std::vector<std::tuple<PmpManager::PmpTrace, Pmp>>& pmps) const
     {
