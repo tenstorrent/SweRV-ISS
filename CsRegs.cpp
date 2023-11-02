@@ -3107,11 +3107,7 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 {
   // If any of the fields are illegal, keep current value.
 
-  // Recover n = log2 of size.
   uint64_t val = next;
-  uint64_t n = val >> 58;   // Bits 63:58
-  if (n == 0)
-    return prev;
 
   bool read = (val & 1);       // bit 0
   bool write = (val & 2);      // bit 1
