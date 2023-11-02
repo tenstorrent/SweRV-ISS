@@ -1888,6 +1888,56 @@ namespace WdRiscv
       imsicRead_ = readFunc;
       imsicWrite_ = writeFunc;
       csRegs_.attachImsic(imsic);
+
+      using IC = InterruptCause;
+      imsic_->attachMInterrupt([this] (bool flag) {
+          URV mipVal = csRegs_.peekMip();
+          URV prev = mipVal;
+
+          if (flag)
+	    mipVal = mipVal | (URV(1) << URV(IC::M_EXTERNAL));
+          else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::M_EXTERNAL));
+
+          if (mipVal != prev)
+            csRegs_.poke(CsrNumber::MIP, mipVal);
+        });
+
+      imsic_->attachSInterrupt([this] (bool flag) {
+          URV mipVal = csRegs_.peekMip();
+          URV prev = mipVal;
+
+          if (flag)
+	    mipVal = mipVal | (URV(1) << URV(IC::S_EXTERNAL));
+          else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::S_EXTERNAL));
+
+          if (mipVal != prev)
+            csRegs_.poke(CsrNumber::MIP, mipVal);
+        });
+
+      imsic_->attachGInterrupt([this] (bool flag, unsigned guest) {
+          URV mipVal = csRegs_.peekMip();
+          URV prev = mipVal;
+
+	  URV gip;
+          csRegs_.peek(CsrNumber::HGEIP, gip);
+
+          if (flag)
+            gip |= (URV(1) << guest);
+          else
+            gip &= ~(URV(1) << guest);
+
+	  csRegs_.poke(CsrNumber::HGEIP, gip);
+	  URV gie = csRegs_.peekHgeie();
+          if (gip & gie)
+	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::G_EXTERNAL));
+
+          if (mipVal != prev)
+            csRegs_.poke(CsrNumber::MIP, mipVal);
+        });
     }
 
     void attachPci(std::shared_ptr<Pci> pci, uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize)
@@ -1905,12 +1955,8 @@ namespace WdRiscv
       return ext_enabled_.test(static_cast<std::size_t>(ext));
     }
 
-
-    void setSwInterrupt(uint8_t flag)
-    {
-      std::lock_guard<std::mutex> lock(swInterruptMutex_);
-      swInterrupt_ = flag;
-    }
+    void setSwInterrupt(uint8_t value)
+    { swInterrupt_.value_ = value; }
 
 
   protected:
@@ -4944,9 +4990,20 @@ namespace WdRiscv
     // timer value.
     unsigned counterToTimeShift_ = 0;
 
-    // Software interrupt for the clint
-    std::mutex swInterruptMutex_;
-    uint8_t swInterrupt_ = false;
+    // For lockless handling of MIP. We assume the software won't
+    // trigger multiple interrupts while handling. To be cleared when
+    // hart marks relevant bit in MIP.
+    union InterruptAlarm
+    {
+      struct
+      {
+        bool flag_ : 1;
+        bool alarm_ : 1;
+      } bits_;
+
+      uint8_t value_ = 0;
+    };
+    InterruptAlarm swInterrupt_;
   };
 }
 

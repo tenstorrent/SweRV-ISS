@@ -105,13 +105,21 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
   uint32_t word = data;
 
   File* file = nullptr;
+  bool isMachine = false;
+  bool isSupervisor = false;
   bool isGuest = false;
   unsigned guestIx = 0;
 
   if (mfile_.coversAddress(addr))
-    file = &mfile_;
+    {
+      file = &mfile_;
+      isMachine = true;
+    }
   else if (sfile_.coversAddress(addr))
-    file = &sfile_;
+    {
+      file = &sfile_;
+      isSupervisor = true;
+    }
   else
     for (size_t i = 0; i < gfiles_.size(); ++i)
       if (gfiles_.at(i).coversAddress(addr))
@@ -135,8 +143,17 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
       file->setPending(word, true);
     }
 
-  if (isGuest and file->canDeliver() and file->topId())
-    guestInterrupts_ |= uint64_t(1) << guestIx;
+  if (file->canDeliver() and file->topId())
+    {
+      if (isMachine and mInterrupt_)
+        mInterrupt_(true);
+
+      if (isSupervisor and sInterrupt_)
+        sInterrupt_(true);
+
+      if (isGuest and gInterrupt_)
+        gInterrupt_(true, guestIx);
+    }
 
   return true;
 }
