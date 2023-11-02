@@ -129,14 +129,10 @@ class Virtio : public PciDev {
     Virtio(unsigned subsys_id, unsigned class_code, unsigned num_queues);
 
     virtual ~Virtio()
-    {
-      terminate_ = true;
-      notify_cond_var_.notify_one();
-      task_thread_.join();
-    };
+    {};
 
     virtual bool setup();
-    virtual void operator()() = 0;
+    virtual void operator()(unsigned vq) = 0;
     virtual void reset();
 
     void interrupts();
@@ -155,27 +151,8 @@ class Virtio : public PciDev {
     { return vqs_.at(num); }
 
     // Driver should use this to kick off an operation
-    void notify(bool flag, unsigned vq)
-    {
-      {
-        std::lock_guard<std::mutex> lock(notify_mutex_);
-        notified_ = flag;
-        notified_vq_ = vq;
-        __sync_synchronize();
-      }
-      notify_cond_var_.notify_one();
-    }
-
-    // Device blocking wait until a new notification. Returns true if need to terminate.
-    bool wait_for_notify(unsigned& vq)
-    {
-      std::unique_lock<std::mutex> lock(notify_mutex_);
-      notify_cond_var_.wait(lock, [this] () -> bool { return notified_ or terminate_; });
-      vq = notified_vq_;
-      notified_ = false;
-      lock.unlock();
-      return terminate_;
-    }
+    void notify(unsigned vq)
+    { (*this)(vq); }
 
     template <typename T>
     T* get_device_config()
@@ -213,11 +190,4 @@ class Virtio : public PciDev {
     uint16_t config_msix_vector_;
     uint16_t queue_selector_ = 0;
     std::vector<virtqueue> vqs_;
-
-    std::mutex notify_mutex_;
-    std::condition_variable notify_cond_var_;
-    bool notified_ = false;
-    unsigned notified_vq_ = 0;
-    std::thread task_thread_;
-    bool terminate_ = false;
 };

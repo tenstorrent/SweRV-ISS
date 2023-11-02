@@ -19,7 +19,7 @@ class Blk : public Virtio {
 
   private:
 
-    bool setup() override
+    bool setup() final
     {
       Virtio::setup();
 
@@ -31,9 +31,9 @@ class Blk : public Virtio {
       return true;
     };
 
-    void operator()() final;
+    void operator()(unsigned vq) final;
 
-    void reset() override
+    void reset() final
     {
       Virtio::reset();
 
