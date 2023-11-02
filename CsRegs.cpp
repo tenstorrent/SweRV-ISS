@@ -3105,8 +3105,6 @@ template <typename URV>
 URV
 CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 {
-  return next;  // Temporary -- Remvoe when RTL is ready.
-
   // If any of the fields are illegal, keep current value.
 
   // Recover n = log2 of size.
