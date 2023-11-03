@@ -75,8 +75,8 @@ namespace WdRiscv
     {
       if (size_ == 0 or other.size_ == 0)
 	{
-	  std::cerr << "McmInstr::overlaps: Error: zero data size\n";
-	  assert(0 && "McmInstr::overlaps: zero data size\n");
+	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		    << " tag2= " << other.tag_ << " zero data size\n";
 	}
       if (physAddr_ == other.physAddr_)
 	return true;
@@ -89,8 +89,8 @@ namespace WdRiscv
     {
       if (size_ == 0 or op.size_ == 0)
 	{
-	  std::cerr << "McmInstr::overlaps: Error: zero data size\n";
-	  assert(0 && "McmInstr::overlaps: zero data size\n");
+	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		    << " tag2= " << op.instrTag_ << " zero data size\n";
 	}
       if (physAddr_ == op.physAddr_)
 	return true;
