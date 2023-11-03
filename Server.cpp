@@ -1073,23 +1073,23 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case McmRead:
-        if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
-                                msg.size, msg.value))
-          reply.type = Invalid;
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
+        if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
+                                msg.size, msg.value))
+          reply.type = Invalid;
         break;
 
       case McmInsert:
-        if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
-                                    msg.address, msg.size, msg.value))
-          reply.type = Invalid;
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
+        if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
+                                    msg.address, msg.size, msg.value))
+          reply.type = Invalid;
         break;
 
       case McmWrite:
@@ -1112,9 +1112,6 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                   mask.at(i) = msg.tag.at(i/8) & (1 << (i%8));
               }
 
-            if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
-              reply.type = Invalid;
-
             if (commandLog)
               {
                 fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbwrite 0x%" PRIx64 " 0x",
@@ -1131,17 +1128,21 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                   }
                 fprintf(commandLog, "\n");
               }
+
+            if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
+              reply.type = Invalid;
           }
         break;
 
       case McmBypass:
-        if (not system_.mcmBypass(hart, msg.time, msg.instrTag, msg.address,
-				 msg.size, msg.value))
-          reply.type = Invalid;
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
+
+        if (not system_.mcmBypass(hart, msg.time, msg.instrTag, msg.address,
+				 msg.size, msg.value))
+          reply.type = Invalid;
         break;
 
       case PageTableWalk:
