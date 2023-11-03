@@ -508,15 +508,15 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       // Must have a read.  Must not have a write.
       if (not instrHasRead(*instr))
 	{
-	  cerr << "Error: Amo instruction tag=" << tag
-	       << " retired before read op.\n";
+	  cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
+	       << " amo instrution retired before read op.\n";
 	  ok = false;
 	}
 
       if (not instrHasWrite(*instr))
 	{
-	  cerr << "Warning: Amo instruction tag=" << tag
-	       << " retired without a write op.\n";
+	  cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << tag
+	       << " amo instruction retired without a write op.\n";
 	  return false;
 	}
 
