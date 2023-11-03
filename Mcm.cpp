@@ -864,6 +864,17 @@ Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
 
 
 template <typename URV>
+void
+Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t instrTag)
+{
+  McmInstr* instr = findInstr(hart.sysHartIndex(), instrTag);
+  if (not instr or instr->isCanceled())
+    return;
+  cancelInstr(*instr);
+}
+  
+
+template <typename URV>
 bool
 Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 		       const MemoryOp& op) const

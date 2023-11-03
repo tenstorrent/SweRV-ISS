@@ -144,9 +144,10 @@ namespace WdRiscv
 			   uint64_t physAddr, unsigned size,
 			   uint64_t rtlData);
 
-    /// Cancel all the early-read transaction associted with the given
-    /// tag. This is done when a speculative load instruction is canceled.
-    bool cancelRead(unsigned hartId, uint64_t instTag);
+    /// Cancel all the memory operations associted with the given tag. This is
+    /// done when a speculative instruction is canceled or when an instruction
+    /// is trapped.
+    void cancelInstruction(Hart<URV>& hart, uint64_t instrTag);
 
     /// This is called when an instruction is retired.
     bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
@@ -304,10 +305,7 @@ namespace WdRiscv
       for (auto memIx : instr.memOps_)
 	{
 	  if (sysMemOps_.at(memIx).isCanceled())
-	    {
-	      std::cerr << "Mcm::cancelInstr: Error: op already canceled\n";
-	      assert(0 && "Mcm::cancelInstr: op already canceled");
-	    }
+	    std::cerr << "Mcm::cancelInstr: Error: op already canceled\n";
 	  sysMemOps_.at(memIx).cancel();
 	}
     }

@@ -2553,6 +2553,9 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   if (cancelLrOnTrap_)
     cancelLr(CancelLrCause::TRAP);
 
+  if (mcm_)
+    mcm_->cancelInstruction(*this, instCounter_);
+
   bool origVirtMode = virtMode_;
 
   using PM = PrivilegeMode;
