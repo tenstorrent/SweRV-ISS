@@ -5011,9 +5011,9 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    }
 	}
 
-      if (swInterrupt_ & 2)
+      if (swInterrupt_.bits_.alarm_)
         {
-	  if (swInterrupt_ & 1)
+	  if (swInterrupt_.bits_.flag_)
 	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
@@ -5036,29 +5036,6 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
-	}
-
-      // Check IMSCI
-      if (imsic_)
-	{
-	  // Deliver/clear machine external interrupt from IMSIC.
-	  if (imsic_->machineEnabled() and imsic_->machineTopId())
-	    mipVal = mipVal | (URV(1) << URV(IC::M_EXTERNAL));
-	  else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::M_EXTERNAL));
-	  // Deliver/clear supervisor external interrupt from IMSIC.
-	  if (imsic_->supervisorEnabled() and imsic_->supervisorTopId())
-	    mipVal = mipVal | (URV(1) << URV(IC::S_EXTERNAL));
-	  else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::S_EXTERNAL));
-	  // Deliver/clear guest external interrupts from IMSIC.
-	  URV gip = imsic_->guestInterrupts();
-	  csRegs_.poke(CsrNumber::HGEIP, gip);
-	  URV gie = csRegs_.peekHgeie();
-	  if ((gip & gie) != 0)
-	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
-	  else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::G_EXTERNAL));
 	}
 
       if (mipVal != prev)

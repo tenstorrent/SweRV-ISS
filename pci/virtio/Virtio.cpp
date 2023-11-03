@@ -36,7 +36,6 @@ Virtio::setup()
 
   // TODO: support feature selects...  config vector?
   bar->write_cb = [&](uint32_t offset, size_t len) {
-    std::lock_guard<std::mutex> lock(m_);
     uint32_t data = 0;
     uint64_t mask = 0xffffffffULL;
     auto& vq = get_vq(queue_selector_);
@@ -99,13 +98,12 @@ Virtio::setup()
         break;
       case VIRTIO_PCI_COMMON_Q_USEDHI + 4: // notify
         if (vq.enable)
-          notify(true, data);
+          notify(data);
         break;
     }
   };
 
   bar->read_cb = [&] (uint32_t offset, uint64_t& data) -> bool {
-    std::lock_guard<std::mutex> lock(m_);
     uint64_t mask = 0xffffffffULL << 32;
     auto& vq = get_vq(queue_selector_);
     switch (offset) {
@@ -139,8 +137,6 @@ Virtio::setup()
     return false;
   };
 
-  // launch task thread
-  task_thread_ = std::thread([this] () { (*this)(); });
   return true;
 }
 
@@ -161,7 +157,6 @@ Virtio::interrupts()
 void
 Virtio::signal_used(unsigned num, const std::vector<virtqueue::used_ring::elem>& elems)
 {
-  std::lock_guard<std::mutex> lock(m_);
   auto& vq = get_vq(num);
   if (not vq.enable or (elems.size() == 0))
     return;
@@ -187,7 +182,6 @@ Virtio::signal_used(unsigned num, const std::vector<virtqueue::used_ring::elem>&
 void
 Virtio::signal_config()
 {
-  std::lock_guard<std::mutex> lock(m_);
   auto msix = config_msix_vector_;
   if (config_msix_vector_ != VIRTIO_MSI_NO_VECTOR) {
     constexpr unsigned pba_width = 8*sizeof(msix::pba_table_entry);

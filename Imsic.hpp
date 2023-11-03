@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cassert>
 #include <memory>
+#include <functional>
 
 
 namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Controller.
@@ -305,10 +306,52 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return true;
     }
 
+    /// Check if IMSIC should deliver an interrupt.
+    void checkMInterrupt()
+    {
+      if (mInterrupt_)
+        {
+          if (mfile_.canDeliver() and mfile_.topId())
+            mInterrupt_(true);
+          else
+            mInterrupt_(false);
+        }
+    }
+
+    void checkSInterrupt()
+    {
+      if (sInterrupt_)
+        {
+          if (sfile_.canDeliver() and sfile_.topId())
+            sInterrupt_(true);
+          else
+            sInterrupt_(false);
+        }
+    }
+
+    void checkGInterrupt(unsigned guest)
+    {
+      if (guest >= gfiles_.size())
+        return;
+      auto& gfile = gfiles_.at(guest);
+
+      if (gInterrupt_)
+        {
+          if (gfile.canDeliver() and gfile.topId())
+            gInterrupt_(true, guest);
+          else
+            gInterrupt_(false, guest);
+        }
+    }
+
     /// Called form the associated hart for a CSR write to mireg.
     template <typename URV>
     bool writeMireg(unsigned select, URV value)
-    { return mfile_.iregWrite(select, value); }
+    {
+      bool ok = mfile_.iregWrite(select, value);
+      checkMInterrupt();
+      return ok;
+    }
 
     /// Called form the associated hart for a CSR write to sireg/vsireg.
     /// Guest field is used if virt is true.
@@ -321,13 +364,13 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
 	  bool ok = gfile.iregWrite(select, value);
-	  if (gfile.canDeliver() and gfile.topId())
-	    guestInterrupts_ |= (uint64_t(1) << guest);
-	  else
-	    guestInterrupts_ &= ~(uint64_t(1) << guest);
+          checkGInterrupt(guest);
 	  return ok;
 	}
-      return sfile_.iregWrite(select, value);
+
+      bool ok = sfile_.iregWrite(select, value);
+      checkSInterrupt();
+      return ok;
     }
 
     /// Called form the associated hart for a CSR read from mireg.
@@ -381,20 +424,21 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     bool supervisorEnabled() const
     { return sfile_.canDeliver(); }
 
-    /// Return mask with 1 bits set for each guest interrupt file that
-    /// has deliverey enabled and that has a non-zero top interrupt id.
-    uint64_t guestInterrupts() const
-    { return guestInterrupts_; }
-
     /// In the machine file, set/clear the pending bit correponding to
     /// the given interrupt id.
     void setMachinePending(unsigned id, bool flag)
-    { mfile_.setPending(id, flag); }
+    {
+      mfile_.setPending(id, flag);
+      checkMInterrupt();
+    }
 
     /// In the supervisor file, set/clear the pending bit correponding
     /// to the given interrupt id.
     void setSupervisorPending(unsigned id, bool flag)
-    { sfile_.setPending(id, flag); }
+    {
+      sfile_.setPending(id, flag);
+      checkSInterrupt();
+    }
 
     /// In the file of the given guest, set/clear the pending bit
     /// correponding to the given interrupt id.
@@ -402,18 +446,33 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     {
       if (guest < gfiles_.size())
 	gfiles_.at(guest).setPending(id, flag);
+      checkGInterrupt(guest);
     }
 
     /// Return the number of guests configured into this IMSIC.
     size_t guestCount() const
     { return gfiles_.size(); }
 
+    /// Attach interrupt callbacks
+    void attachMInterrupt(const std::function<void(bool)>& cb)
+    { mInterrupt_ = cb; }
+
+    void attachSInterrupt(const std::function<void(bool)>& cb)
+    { sInterrupt_ = cb; }
+
+    void attachGInterrupt(const std::function<void(bool, unsigned)>& cb)
+    { gInterrupt_ = cb; }
+
   private:
 
     File mfile_;
     File sfile_;
     std::vector<File> gfiles_;
-    uint64_t guestInterrupts_ = 0;
+
+    // Callback functions to mark interrupt pending-and-enabled (or not).
+    std::function<void(bool flag)> mInterrupt_;
+    std::function<void(bool flag)> sInterrupt_;
+    std::function<void(bool flag, unsigned guest)> gInterrupt_;
   };
 
 

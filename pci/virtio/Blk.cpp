@@ -23,69 +23,59 @@ Blk::Blk(const std::string& filename, bool readonly) : Virtio(VIRTIO_ID_BLOCK, 0
 
 
 void
-Blk::operator()()
+Blk::operator()(unsigned vq)
 {
-  while (1)
-    {
-      unsigned vq;
-      bool terminate = wait_for_notify(vq);
+  std::vector<virtqueue::used_ring::elem> elems;
+  bool finished = false;
+  while (not finished) {
+    std::vector<virtqueue::descriptor> reads, writes;
+    unsigned head;
 
-      if (terminate)
-        return;
+    if (not get_descriptors(vq, reads, writes, head, finished))
+      break;
 
-      std::vector<virtqueue::used_ring::elem> elems;
-      bool finished = false;
-      while (not finished) {
-        std::vector<virtqueue::descriptor> reads, writes;
-        unsigned head;
-
-        if (not get_descriptors(vq, reads, writes, head, finished))
-          break;
-
-        // order of descriptors is header, buffer, status
-        if ((reads.size() + writes.size()) != 3) {
-          std::cerr << "unexpected descriptors for virtio-blk (expected 3): " << reads.size() + writes.size() << std::endl;
-          break;
-        }
-
-        unsigned read_ptr = 0, write_ptr = 0;
-        auto desc = reads.at(read_ptr++);
-        auto header = reinterpret_cast<virtio_blk_outhdr*>(memmap()(desc.address, desc.length));
-
-        desc = (header->type == VIRTIO_BLK_T_OUT)? reads.at(read_ptr++) : writes.at(write_ptr++);
-        auto buffer = reinterpret_cast<uint8_t*>(memmap()(desc.address, desc.length));
-        auto length = desc.length;
-
-        desc = writes.at(write_ptr++);
-        auto status = reinterpret_cast<uint8_t*>(memmap()(desc.address, desc.length));
-
-        if (header->type != VIRTIO_BLK_T_GET_ID) {
-          if (lseek(fd_, header->sector * 512, SEEK_SET) < 0) {
-            *status = VIRTIO_BLK_S_IOERR;
-            elems.push_back({head, 0});
-            continue;
-          }
-        }
-
-
-        int res = 0;
-        switch (header->type) {
-          case VIRTIO_BLK_T_IN:
-            res = read(fd_, buffer, length);
-            break;
-          case VIRTIO_BLK_T_OUT:
-            res = write(fd_, buffer, length);
-            break;
-          case VIRTIO_BLK_T_GET_ID:
-            buffer[0] = '0';
-            buffer[1] = '\0';
-            break;
-        }
-
-        *status = (res < 0)? VIRTIO_BLK_S_IOERR : VIRTIO_BLK_S_OK;
-        elems.push_back({head, (header->type == VIRTIO_BLK_T_IN)? uint32_t(length): 0});
-      }
-
-      signal_used(vq, elems);
+    // order of descriptors is header, buffer, status
+    if ((reads.size() + writes.size()) != 3) {
+      std::cerr << "unexpected descriptors for virtio-blk (expected 3): " << reads.size() + writes.size() << std::endl;
+      break;
     }
+
+    unsigned read_ptr = 0, write_ptr = 0;
+    auto desc = reads.at(read_ptr++);
+    auto header = reinterpret_cast<virtio_blk_outhdr*>(memmap()(desc.address, desc.length));
+
+    desc = (header->type == VIRTIO_BLK_T_OUT)? reads.at(read_ptr++) : writes.at(write_ptr++);
+    auto buffer = reinterpret_cast<uint8_t*>(memmap()(desc.address, desc.length));
+    auto length = desc.length;
+
+    desc = writes.at(write_ptr++);
+    auto status = reinterpret_cast<uint8_t*>(memmap()(desc.address, desc.length));
+
+    if (header->type != VIRTIO_BLK_T_GET_ID) {
+      if (lseek(fd_, header->sector * 512, SEEK_SET) < 0) {
+        *status = VIRTIO_BLK_S_IOERR;
+        elems.push_back({head, 0});
+        continue;
+      }
+    }
+
+    int res = 0;
+    switch (header->type) {
+      case VIRTIO_BLK_T_IN:
+        res = read(fd_, buffer, length);
+        break;
+      case VIRTIO_BLK_T_OUT:
+        res = write(fd_, buffer, length);
+        break;
+      case VIRTIO_BLK_T_GET_ID:
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        break;
+    }
+
+    *status = (res < 0)? VIRTIO_BLK_S_IOERR : VIRTIO_BLK_S_OK;
+    elems.push_back({head, (header->type == VIRTIO_BLK_T_IN)? uint32_t(length): 0});
+  }
+
+  signal_used(vq, elems);
 }
