@@ -1116,9 +1116,8 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
               {
                 fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbwrite 0x%" PRIx64 " 0x",
                         hartId, msg.time, msg.address);
-                std::reverse(data.begin(), data.end()); // Print lowest address data on the right.
-                for (uint8_t item :  data)
-                  fprintf(commandLog, "%02x", item);
+                for (unsigned i = data.size(); i > 0; --i)
+                  fprintf(commandLog, "%02x", data.at(i-1));
                 if (msg.flags)
                   {    // Print mask with least sig digit on the right
                     fprintf(commandLog, " 0x");

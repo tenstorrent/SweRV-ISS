@@ -2012,9 +2012,9 @@ Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
   uint64_t size = 0;
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
-  if (size > 8 or size == 0)
+  if (size > 8)
     {
-      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 1 to 8\n";
+      std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8\n";
       return false;
     }
 

@@ -442,7 +442,10 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
       bool storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(result));
 
       if (storeOk and not triggerTripped_)
-	intRegs_.write(rd, rdVal);
+	{
+	  intRegs_.write(rd, rdVal);
+	  ldStData_ = result;
+	}
     }
 }
 
@@ -644,7 +647,10 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
       bool storeOk = store<uint64_t>(addr, false /*hyper*/, result);
 
       if (storeOk and not triggerTripped_)
-	intRegs_.write(rd, rdVal);
+	{
+	  intRegs_.write(rd, rdVal);
+	  ldStData_ = result;
+	}
     }
 }
 

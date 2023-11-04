@@ -778,7 +778,7 @@ namespace WdRiscv
     /// store or store got trapped).
     unsigned lastStore(uint64_t& addr, uint64_t& value) const
     {
-      if (not ldStWrite_)
+      if (not ldStWrite_ and not ldStAtomic_)
 	return 0;
       addr = ldStPhysAddr1_;
       value = ldStData_;
