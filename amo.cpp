@@ -444,7 +444,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
       if (storeOk and not triggerTripped_)
 	{
 	  intRegs_.write(rd, rdVal);
-	  ldStData_ = result;
+	  ldStData_ = uint32_t(result);
 	}
     }
 }
