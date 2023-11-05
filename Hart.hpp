@@ -1709,15 +1709,10 @@ namespace WdRiscv
     { return memory_.pmaMgr_; }
 
     /// Get the PMP registers accessed by last executed instruction
-    void getPmpsAccessed(std::vector<std::tuple<PmpManager::PmpTrace, Pmp>>& pmps) const
+    void getPmpsAccessed(std::vector<PmpManager::PmpTrace>& pmps) const
     {
       pmps.clear();
-      const auto& pmpTrace = pmpManager_.getPmpTrace();
-      for (const auto& entry : pmpTrace)
-        {
-          auto pmp = pmpManager_.peekPmp(entry.ix_);
-          pmps.emplace_back(entry, pmp);
-        }
+      pmps = pmpManager_.getPmpTrace();
     }
 
     // Get the PMAs accessed by the last executed instruction

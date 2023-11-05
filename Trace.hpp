@@ -306,7 +306,7 @@ namespace WdRiscv
     CancelLrCause cancelLrCause() const
     { return hart_->cancelLrCause(); }
 
-    void getPmpsAccessed(std::vector<std::tuple<PmpManager::PmpTrace, Pmp>>& pmps) const
+    void getPmpsAccessed(std::vector<PmpManager::PmpTrace>& pmps) const
     { hart_->getPmpsAccessed(pmps); }
 
     void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const

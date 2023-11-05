@@ -158,6 +158,7 @@ namespace WdRiscv
     {
       uint32_t ix_;
       uint64_t addr;
+      uint8_t val;
       AccessReason reason_;
     };
 
@@ -176,8 +177,9 @@ namespace WdRiscv
 	  {
 	    auto pmp = region.pmp_;
 	    auto ix = pmp.pmpIndex();
+	    auto val = pmp.val();
 	    if (trace_)
-              pmpTrace_.push_back({ix, addr, reason});
+              pmpTrace_.push_back({ix, addr, val, reason});
 	    return pmp;
 	  }
       return {};
