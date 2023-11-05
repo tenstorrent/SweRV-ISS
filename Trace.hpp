@@ -316,7 +316,7 @@ namespace WdRiscv
     { return hart_->pmpManager().matchMultiplePmp(addr); }
 
     bool matchMultiplePma(uint64_t addr) const
-    { return hart_->pmaManager().matchMultiiplePma(addr); }
+    { return hart_->pmaManager().matchMultiplePma(addr); }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
