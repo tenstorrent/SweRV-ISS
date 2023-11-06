@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <unordered_set>
+
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 
@@ -317,6 +319,22 @@ namespace WdRiscv
 
     bool matchMultiplePma(uint64_t addr) const
     { return hart_->pmaManager().matchMultiiplePma(addr); }
+
+    /// Return the number of pages accessed by a vector ld/st instruction.
+    bool numVecPagesAccessed() const
+    {
+      if (not isVector())
+        return 0;
+
+      std::unordered_set<uint64_t> pages;
+      const auto& addrs = hart_->vecRegs().ldStAddrs();
+      for (auto& addr : addrs)
+        {
+          unsigned page = hart_->virtMem().pageNumber(addr);
+          pages.emplace(page);
+        }
+      return pages.size();
+    }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;

@@ -10172,10 +10172,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.stData_.clear();
-  vecRegs_.maskedAddr_.clear();
-
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -10325,10 +10321,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStore(const DecodedInst* di, ElementWidth eew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -10534,10 +10526,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoadWholeReg(const DecodedInst* di, ElementWidth eew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   unsigned start = csRegs_.peekVstart();
   unsigned groupX8 = di->vecFieldCount() * 8;
   GroupMultiplier gm = GroupMultiplier::One;
@@ -10664,10 +10652,6 @@ template <typename URV>
 bool
 Hart<URV>::vectorStoreWholeReg(const DecodedInst* di, GroupMultiplier gm)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   unsigned start = csRegs_.peekVstart();
   unsigned groupX8 = VecRegs::groupMultiplierX8(gm);
   ElementWidth eew = ElementWidth::Byte;
@@ -10830,10 +10814,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -10976,10 +10956,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStoreStrided(const DecodedInst* di, ElementWidth eew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11123,10 +11099,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
   uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 
@@ -11342,10 +11314,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStoreIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
   uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 
@@ -11575,10 +11543,6 @@ bool
 Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 			 unsigned fieldCount, uint64_t stride, bool faultFirst)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -11743,10 +11707,6 @@ bool
 Hart<URV>::vectorStoreSeg(const DecodedInst* di, ElementWidth eew,
 			  unsigned fieldCount, uint64_t stride)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   // Compute emul: lmul*eew/sew
   unsigned groupX8 = vecRegs_.groupMultiplierX8();
   groupX8 = groupX8 * VecRegs::elemWidthInBits(eew) / vecRegs_.elemWidthInBits();
@@ -12068,10 +12028,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
   uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 
@@ -12245,10 +12201,6 @@ template <typename ELEM_TYPE>
 bool
 Hart<URV>::vectorStoreSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 {
-  vecRegs_.ldStAddr_.clear();
-  vecRegs_.maskedAddr_.clear();
-  vecRegs_.stData_.clear();
-
   uint32_t elemWidth = vecRegs_.elemWidthInBits();
   uint32_t offsetWidth = VecRegs::elemWidthInBits(offsetEew);
 

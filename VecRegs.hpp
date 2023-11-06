@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -132,7 +132,7 @@ namespace WdRiscv
 
     /// Destructor.
     ~VecRegs();
-    
+
     /// Return count of vector registers. This is independent of group
     /// multiplier.
     uint32_t registerCount() const
@@ -177,7 +177,7 @@ namespace WdRiscv
     }
 
     /// Set the element with given index within the vector register of
-    /// the given number to the given value. Throw an exception 
+    /// the given number to the given value. Throw an exception
     /// if the combination of element index, vector number and group
     /// multiplier (presecaled by 8) is invalid. We require a
     /// pre-scaled multiplier to avoid passing a fraction.
@@ -448,6 +448,9 @@ namespace WdRiscv
         }
       return false;
     }
+
+    const std::vector<uint64_t>& ldStAddrs() const
+    { return ldStAddr_; }
 
   protected:
 
