@@ -619,6 +619,10 @@ namespace WdRiscv
     const VecRegs& vecRegs() const
     { return vecRegs_; }
 
+    /// Return the virtmem associated with this hart.
+    const VirtMem& virtMem() const
+    { return virtMem_; }
+
     /// Locate the ELF function containing the give address returning true
     /// on success and false on failure.  If successful set name to the
     /// corresponding function name and symbol to the corresponding symbol
