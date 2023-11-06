@@ -389,6 +389,12 @@ namespace WdRiscv
     void configMaskAgnosticAllOnes(bool flag)
     { maskAgnOnes_ = flag; }
 
+    /// If flag is true, configure vector engine for writing ones in
+    /// tail destination register elements when tail-agnostic is
+    /// on. Otherwise, preserve tail elements.
+    void configTailAgnosticAllOnes(bool flag)
+    { tailAgnOnes_ = flag; }
+
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
     {
@@ -520,6 +526,14 @@ namespace WdRiscv
     template<typename T>
     bool isDestActive(unsigned vd, unsigned ix, unsigned emulx8, bool masked, T& val) const
     {
+      if (ix >= elemCount())
+	{
+	  if (tailAgn_ and tailAgnOnes_)
+	    setAllBits(val);
+	  else
+	    read(vd, ix, emulx8, val);
+	  return false;
+	}
       if (masked and not isActive(0, ix))
 	{
 	  if (maskAgn_ and maskAgnOnes_)
@@ -536,6 +550,14 @@ namespace WdRiscv
     /// or set val to all ones depending on mask-agnostic policy.
     bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, bool& val) const
     {
+      if (ix >= elemCount())
+	{
+	  if (tailAgn_ and tailAgnOnes_)
+	    val = true;
+	  else
+	    readMaskRegister(vd, ix, val);
+	  return false;
+	}
       if (masked and not isActive(0, ix))
 	{
 	  if (maskAgn_ and maskAgnOnes_)
@@ -674,7 +696,7 @@ namespace WdRiscv
     bool tailAgn_ = false;                         // Cached VTYPE.ta
     bool vill_ = false;                            // Cached VTYPE.VILL
     bool maskAgnOnes_ = true; // True if ones written in masked elems when mask agnostic.
-    bool tailAgnOnes_ = false; // True if ones written in tail elems when mask agnostic.
+    bool tailAgnOnes_ = true; // True if ones written in tail elems when mask agnostic.
 
     uint32_t groupX8_ = 8;    // Group multipler as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).

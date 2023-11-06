@@ -905,12 +905,36 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 	{
 	  std::string val = item.get<std::string>();
 	  if (val == "ones")
-	    hart.configMaksAgnosticAllOnes(true);
+	    hart.configMaskAgnosticAllOnes(true);
 	  else if (val == "undisturb")
-	    hart.configMaksAgnosticAllOnes(false);
+	    hart.configMaskAgnosticAllOnes(false);
 	  else
 	    {
 	      std::cerr << "Error: Configuration file tag vector.mask_agnostic_policy must be 'ones' or 'undisturb'\n";
+	      errors++;
+	    }
+	}
+    }
+
+  tag = "tail_agnostic_policy";
+  if (vconf.contains(tag))
+    {
+      auto& item = vconf.at(tag);
+      if (not item.is_string())
+	{
+	  std::cerr << "Error: Configuration file tag vector.tail_agnostic_policy must have a string value\n";
+	errors++;
+	}
+      else
+	{
+	  std::string val = item.get<std::string>();
+	  if (val == "ones")
+	    hart.configTailAgnosticAllOnes(true);
+	  else if (val == "undisturb")
+	    hart.configTailAgnosticAllOnes(false);
+	  else
+	    {
+	      std::cerr << "Error: Configuration file tag vector.tail_agnostic_policy must be 'ones' or 'undisturb'\n";
 	      errors++;
 	    }
 	}
