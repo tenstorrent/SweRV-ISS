@@ -3930,35 +3930,24 @@ Hart<URV>::execVmop_mm(const DecodedInst* di, OP op)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemCount();
-  if ((elems+7)/8 > vecRegs_.bytesPerRegister())
-    assert(0);
+  unsigned elems = vecRegs_.bitsPerRegister();
 
-  uint8_t* vdData = vecRegs_.getVecData(di->op0());
-  uint8_t* vs1Data = vecRegs_.getVecData(di->op1());
-  uint8_t* vs2Data = vecRegs_.getVecData(di->op2());
-  if (not vs1Data or not vs2Data or not vdData)
-    assert(0);
+  unsigned vd = di->op0(), vs1 = di->op1(), vs2 = di->op2();
 
-  // If bits indices are byte aligned process bytes
-  if ((start & 7) == 0 and (elems & 7) == 0)
+  for (unsigned ix = start; ix < elems; ++ix)
     {
-      start = start >> 3;
-      elems = elems >> 3;
-      for (unsigned i = start; i < elems; ++i)
-        vdData[i] = op(vs1Data[i], vs2Data[i]);
+      bool flag = false;
+      if (vecRegs_.isMaskDestActive(vd, ix, false /*masked*/, flag))
+	{
+	  bool in1 = false, in2 = false;
+	  vecRegs_.readMaskRegister(vs1, ix, in1);
+	  vecRegs_.readMaskRegister(vs2, ix, in2);
+	  flag = op(unsigned(in1), unsigned(in2)) & 1;
+	}
+      vecRegs_.writeMaskRegister(vd, ix, flag);
     }
-  else     // Bit indices are not byte aligned.
-    for (unsigned i = start; i < elems; ++i)
-      {
-        unsigned byteIx = i >> 3;
-        unsigned bitIx = i & 7; // Bit index in byte
-        uint8_t mask = 1 << bitIx;
-        vdData[byteIx] = ( (vdData[byteIx] & ~mask) |
-                           (op(vs1Data[byteIx] , vs2Data[byteIx]) & mask) );
-      }
 
-  vecRegs_.touchMask(di->op0());
+  vecRegs_.touchMask(vd);  // In case nothing was written.
   postVecSuccess();
 }
 
