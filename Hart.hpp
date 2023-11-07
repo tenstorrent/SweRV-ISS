@@ -420,10 +420,15 @@ namespace WdRiscv
 		      std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul, maxSewPerLmul); }
 
-    /// Configure mask agnostic policy. Allones if flag is true,
-    /// undisturb if false.
-    void configMaksAgnosticAllOnes(bool flag)
+    /// Configure mask agnostic policy. Allones if flag is true, undisturb if
+    /// false.
+    void configMaskAgnosticAllOnes(bool flag)
     { vecRegs_.configMaskAgnosticAllOnes(flag); }
+
+    /// Configure tail agnostic policy. Allones if flag is true, undisturb if
+    /// false.
+    void configTailAgnosticAllOnes(bool flag)
+    { vecRegs_.configTailAgnosticAllOnes(flag); }
 
     /// Return currently configured element width
     ElementWidth elemWidth() const
@@ -3174,14 +3179,14 @@ namespace WdRiscv
     template<typename ELEM_TYPE>
     void vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		unsigned start, unsigned elems, bool masked,
-		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op) __attribute((weak));
 
     /// Helper to vector vv instructions (eg vadd.vx, vsub.vx). Operation
     /// to be performed (eg. add, sub) is passed in op.
     template<typename ELEM_TYPE>
     void vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 		unsigned start, unsigned elems, bool masked,
-		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op) __attribute((weak));
 
     /// Helper to vector mask vv instructions (eg vmseq.vv). Operation
     /// to be performed (eg. equal_to) passed in op.
