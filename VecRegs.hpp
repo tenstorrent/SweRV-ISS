@@ -166,8 +166,7 @@ namespace WdRiscv
     /// multiplier (presecaled by 8) is invalid. We require a
     /// pre-scaled group multiplier to avoid passing a fraction.
     template<typename T>
-    void read(uint32_t regNum, uint64_t elemIx, uint32_t groupX8,
-              T& value) const
+    void read(uint32_t regNum, uint64_t elemIx, uint32_t groupX8, T& value) const
     {
       if (not isValidIndex(regNum, elemIx, groupX8, sizeof(T)))
         throw std::runtime_error("invalid vector register index");
@@ -521,49 +520,46 @@ namespace WdRiscv
     }
 
     /// Return true if element at index ix of vector detination is active;
-    /// otherwise, return false and either read element at ix into val or set
-    /// val to all ones depending on mask-agnostic policy.
+    /// otherwise, return false. Set val to the current value of the element if
+    /// active or the expected new value if inactive (either current value or
+    /// all ones depending on the agnostic policy).
     template<typename T>
     bool isDestActive(unsigned vd, unsigned ix, unsigned emulx8, bool masked, T& val) const
     {
+      read(vd, ix, emulx8, val);
+
       if (ix >= elemCount())
 	{
 	  if (tailAgn_ and tailAgnOnes_)
 	    setAllBits(val);
-	  else
-	    read(vd, ix, emulx8, val);
 	  return false;
 	}
       if (masked and not isActive(0, ix))
 	{
 	  if (maskAgn_ and maskAgnOnes_)
 	    setAllBits(val);
-	  else
-	    read(vd, ix, emulx8, val);
 	  return false;
 	}
       return true;
     }
 
-    /// Return true if element at ix of mask destination is active;
-    /// otherwise, return false and either read element at ix into val
-    /// or set val to all ones depending on mask-agnostic policy.
+    /// Return true if element at ix of mask destination is active; otherwise,
+    /// return false and either read element at ix into val or set val to all
+    /// ones depending on mask-agnostic/tail-agnostic policy.
     bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, bool& val) const
     {
+      readMaskRegister(vd, ix, val);
+
       if (ix >= elemCount())
 	{
-	  if (tailAgn_ and tailAgnOnes_)
+	  if (tailAgnOnes_)   // For mask vectors, tail-agnostic is always true.
 	    val = true;
-	  else
-	    readMaskRegister(vd, ix, val);
 	  return false;
 	}
       if (masked and not isActive(0, ix))
 	{
 	  if (maskAgn_ and maskAgnOnes_)
 	    val = true;
-	  else
-	    readMaskRegister(vd, ix, val);
 	  return false;
 	}
       return true;

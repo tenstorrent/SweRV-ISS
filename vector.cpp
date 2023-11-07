@@ -3618,16 +3618,22 @@ Hart<URV>::vcompress_vm(unsigned vd, unsigned vs1, unsigned vs2,
   ELEM_TYPE e1 = 0, dest = 0;
   unsigned destIx = 0;
 
-  elems = vecRegs_.vlmax();
+  elems = vecRegs_.elemCount();
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (vecRegs_.isActive(vs2, ix))
-        {
+	{
 	  vecRegs_.read(vs1, ix, group, e1);
 	  dest = e1;
 	  vecRegs_.write(vd, destIx++, group, dest);
-        }
+	}
     }
+
+  // Remaining elements are treated as tail elements.
+  elems = vecRegs_.vlmax();
+  for (unsigned ix = destIx; ix < elems; ++ix)
+    if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+      vecRegs_.write(vd, ix, group, dest);  // Either copy of original or all ones.
 
   vecRegs_.touchReg(vd, group);  // For logging: in case no element was written.
 }
@@ -4053,7 +4059,7 @@ Hart<URV>::execVcpop_m(const DecodedInst* di)
   unsigned rd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
 
   uint32_t count = 0;
-  elems = vecRegs_.vlmax();
+  elems = vecRegs_.elemCount();
   for (uint32_t ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -4084,7 +4090,6 @@ Hart<URV>::execVfirst_m(const DecodedInst* di)
 
   SRV first = -1;
 
-  elems = vecRegs_.vlmax();
   for (uint32_t ix = start; ix < elems; ++ix)
     {
       if (masked and not vecRegs_.isActive(0, ix))
@@ -4114,7 +4119,7 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
     }
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.elemCount();;
+  unsigned vd = di->op0(),  vs1 = di->op1(),  elems = vecRegs_.vlmax();
 
   if (vd == vs1 or (masked and vd == 0))
     {
@@ -4122,25 +4127,21 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
       return;
     }
 
-  uint8_t* vdData = vecRegs_.getVecData(vd);
-  uint8_t* vs1Data = vecRegs_.getVecData(vs1);
-
   bool found = false;  // true if set bit is found in vs1
 
   elems = vecRegs_.vlmax();
   for (uint32_t ix = start; ix < elems; ++ix)
     {
-      unsigned byteIx = ix >> 3;
-      unsigned bitIx = ix & 7; // Bit index in byte
-      uint8_t mask = 1 << bitIx;
+      bool flag = false;
+      if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
+	{
+	  bool input = false;
+	  vecRegs_.readMaskRegister(vs1, ix, input);
 
-      if (masked and not vecRegs_.isActive(0, ix))
-	continue;
-
-      found = found or (vs1Data[byteIx] & mask);
-      vdData[byteIx] = vdData[byteIx] & ~mask;
-      if (not found)
-	vdData[byteIx] |= mask;
+	  found = found or input;
+	  flag = not found;
+	}
+      vecRegs_.writeMaskRegister(vd, ix, flag);
     }
 
   vecRegs_.touchMask(vd);
@@ -4168,25 +4169,18 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       return;
     }
 
-  uint8_t* vdData = vecRegs_.getVecData(vd);
-  uint8_t* vs1Data = vecRegs_.getVecData(vs1);
-
   bool found = false;  // true if set bit is found in vs1
 
   elems = vecRegs_.vlmax();
   for (uint32_t ix = start; ix < elems; ++ix)
     {
-      unsigned byteIx = ix >> 3;
-      unsigned bitIx = ix & 7; // Bit index in byte
-      uint8_t mask = 1 << bitIx;
-      uint8_t inputByte = vs1Data[byteIx];
-
-      if ((not masked) or vecRegs_.isActive(0, ix))
+      bool flag = false;
+      if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
-	  vdData[byteIx] = vdData[byteIx] & ~mask;
-	  if (not found)
-	    vdData[byteIx] |= mask;
-	  found = found or (inputByte & mask);
+	  vecRegs_.writeMaskRegister(vd, ix, not found);
+	  bool input = false;
+	  vecRegs_.readMaskRegister(vs1, ix, input);
+	  found = found or input;
 	}
     }
 
@@ -4215,35 +4209,41 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
       return;
     }
 
-  uint8_t* vdData = vecRegs_.getVecData(vd);
-  uint8_t* vs1Data = vecRegs_.getVecData(vs1);
-
   bool found = false;  // true if set bit is found in vs1
 
-  elems = vecRegs_.vlmax();
+  elems = vecRegs_.elemCount();
   for (uint32_t ix = start; ix < elems; ++ix)
     {
-      unsigned byteIx = ix >> 3;
-      unsigned bitIx = ix & 7; // Bit index in byte
-      uint8_t mask = 1 << bitIx;
+      bool flag = false;
+      bool active = vecRegs_.isMaskDestActive(vd, ix, masked, flag);
 
-      bool active = (not masked) or vecRegs_.isActive(0, ix);
-      bool inputSet = vs1Data[byteIx] & mask;
+      bool input = false;
+      vecRegs_.readMaskRegister(vs1, ix, input);
 
       if (active)
-	vdData[byteIx] &= ~mask;
+	vecRegs_.writeMaskRegister(vd, ix, false);
 
-      if (found or not inputSet)
+      if (found or not input)
 	continue;
 
       if (active)
 	{
 	  found = true;
-	  vdData[byteIx] |= mask;
+	  vecRegs_.writeMaskRegister(vd, ix, true);
 	}
     }
 
-  vecRegs_.touchMask(vd);
+  // Keep tail elements or set them the ones.
+  elems = vecRegs_.vlmax();
+  for (uint32_t ix = vecRegs_.elemCount(); ix < elems; ++ix)
+    {
+      bool flag = false;
+      vecRegs_.isMaskDestActive(vd, ix, masked, flag);
+      vecRegs_.writeMaskRegister(vd, ix, flag);
+    }
+
+  vecRegs_.touchMask(vd);  // In case nothing was written
+
   postVecSuccess();
 }
 
@@ -4354,7 +4354,7 @@ Hart<URV>::execVid_v(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
 
   bool masked = di->isMasked();
-  unsigned vd = di->op0(),  elems = vecRegs_.elemCount();;
+  unsigned vd = di->op0(),  elems = vecRegs_.vlmax();
 
   if (masked and vd == 0)
     {
@@ -4417,16 +4417,20 @@ Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
 {
   ELEM_TYPE e1 = 0, dest = 0;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
-	  if (ix < amount)
-	    continue;
-	  unsigned from = ix - amount;
-	  vecRegs_.read(vs1, from, group, e1);
-	  dest = e1;
+	  if (ix >= amount)
+	    {
+	      unsigned from = ix - amount;
+	      vecRegs_.read(vs1, from, group, e1);
+	      dest = e1;
+	    }
 	}
       vecRegs_.write(vd, ix, group, dest);
     }
@@ -4593,6 +4597,9 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
                       unsigned start, unsigned elems, bool masked)
 {
   ELEM_TYPE e1 = 0, dest = 0;
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
@@ -7430,12 +7437,15 @@ Hart<URV>::vadc_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned vcin,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
 
-      dest = e1 + e2;
-      if (vecRegs_.isActive(vcin, ix))
-	dest += ELEM_TYPE(1);
+	  dest = e1 + e2;
+	  if (vecRegs_.isActive(vcin, ix))
+	    dest += ELEM_TYPE(1);
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -7452,11 +7462,14 @@ Hart<URV>::vadc_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned vcin,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
 
-      dest = e1 + e2;
-      if (vecRegs_.isActive(vcin, ix))
-	dest += ELEM_TYPE(1);
+	  dest = e1 + e2;
+	  if (vecRegs_.isActive(vcin, ix))
+	    dest += ELEM_TYPE(1);
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -7473,12 +7486,15 @@ Hart<URV>::vsbc_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned vbin,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
 
-      dest = e1 - e2;
-      if (vecRegs_.isActive(vbin, ix))
-	dest -= ELEM_TYPE(1);
+	  dest = e1 - e2;
+	  if (vecRegs_.isActive(vbin, ix))
+	    dest -= ELEM_TYPE(1);
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -7495,11 +7511,14 @@ Hart<URV>::vsbc_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned vbin,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
 
-      dest = e1 - e2;
-      if (vecRegs_.isActive(vbin, ix))
-	dest -= ELEM_TYPE(1);
+	  dest = e1 - e2;
+	  if (vecRegs_.isActive(vbin, ix))
+	    dest -= ELEM_TYPE(1);
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -7516,15 +7535,19 @@ Hart<URV>::vmadc_vvm(unsigned vcout, unsigned vs1, unsigned vs2, bool carry, uns
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
+      bool cout = false;
+      if (vecRegs_.isMaskDestActive(vcout, ix, false /*masked*/, cout))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
 
-      dest = e1 + e2;
-      bool cin = carry and vecRegs_.isActive(vcin, ix);
-      if (cin)
-	dest += ELEM_TYPE(1);
+	  dest = e1 + e2;
+	  bool cin = carry and vecRegs_.isActive(vcin, ix);
+	  if (cin)
+	    dest += ELEM_TYPE(1);
 
-      bool cout = cin? dest <= e1 : dest < e1;
+	  cout = cin? dest <= e1 : dest < e1;
+	}
       vecRegs_.writeMaskRegister(vcout, ix, cout);
     }
 }
@@ -7541,14 +7564,18 @@ Hart<URV>::vmadc_vxm(unsigned vcout, unsigned vs1, ELEM_TYPE e2, bool carry, uns
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
+      bool cout = false;
+      if (vecRegs_.isMaskDestActive(vcout, ix, false /*masked*/, cout))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
 
-      dest = e1 + e2;
-      bool cin = carry and vecRegs_.isActive(vcin, ix);
-      if (cin)
-	dest += ELEM_TYPE(1);
+	  dest = e1 + e2;
+	  bool cin = carry and vecRegs_.isActive(vcin, ix);
+	  if (cin)
+	    dest += ELEM_TYPE(1);
 
-      bool cout = cin? dest <= e1 : dest < e1;
+	  cout = cin? dest <= e1 : dest < e1;
+	}
       vecRegs_.writeMaskRegister(vcout, ix, cout);
     }
 }
@@ -7565,18 +7592,21 @@ Hart<URV>::vmsbc_vvm(unsigned vbout, unsigned vs1, unsigned vs2, bool borrow, un
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
-
-      dest = e1 - e2;
-      bool bout = e1 < e2;
-
-      if (borrow and vecRegs_.isActive(vbin, ix))
+      bool bout = false;
+      if (vecRegs_.isMaskDestActive(vbout, ix, false /*masked*/, bout))
 	{
-	  dest -= ELEM_TYPE(1);
-	  bout = e1 <= e2;
-	}
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
 
+	  dest = e1 - e2;
+	  bout = e1 < e2;
+
+	  if (borrow and vecRegs_.isActive(vbin, ix))
+	    {
+	      dest -= ELEM_TYPE(1);
+	      bout = e1 <= e2;
+	    }
+	}
       vecRegs_.writeMaskRegister(vbout, ix, bout);
     }
 }
@@ -7593,17 +7623,20 @@ Hart<URV>::vmsbc_vxm(unsigned vbout, unsigned vs1, ELEM_TYPE e2, bool borrow, un
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = e1 - e2;
-      bool bout = e1 < e2;
-
-      if (borrow and vecRegs_.isActive(vbin, ix))
+      bool bout = false;
+      if (vecRegs_.isMaskDestActive(vbout, ix, false /*masked*/, bout))
 	{
-	  dest -= ELEM_TYPE(1);
-	  bout = e1 <= e2;
-	}
+	  vecRegs_.read(vs1, ix, group, e1);
 
+	  dest = e1 - e2;
+	  bout = e1 < e2;
+
+	  if (borrow and vecRegs_.isActive(vbin, ix))
+	    {
+	      dest -= ELEM_TYPE(1);
+	      bout = e1 <= e2;
+	    }
+	}
       vecRegs_.writeMaskRegister(vbout, ix, bout);
     }
 }
@@ -7941,10 +7974,13 @@ Hart<URV>::vmerge_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-      vecRegs_.read(vs2, ix, group, e2);
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  vecRegs_.read(vs2, ix, group, e2);
 
-      dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+	  dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -7995,9 +8031,11 @@ Hart<URV>::vmerge_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -8313,9 +8351,11 @@ Hart<URV>::vmv_v_v(unsigned vd, unsigned vs1, unsigned group,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = e1;
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = e1;
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -8363,9 +8403,15 @@ void
 Hart<URV>::vmv_v_x(unsigned vd, ELEM_TYPE e1, unsigned group,
                    unsigned start, unsigned elems)
 {
+  ELEM_TYPE dest = 0;
+
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
-    vecRegs_.write(vd, ix, group, e1);
+    {
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	dest = e1;
+      vecRegs_.write(vd, ix, group, dest);
+    }
 }
 
 
@@ -15607,9 +15653,11 @@ Hart<URV>::vfmerge(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.read(vs1, ix, group, e1);
-
-      dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	{
+	  vecRegs_.read(vs1, ix, group, e1);
+	  dest = vecRegs_.isActive(0, ix) ? e2 : e1;
+	}
       vecRegs_.write(vd, ix, group, dest);
     }
 }
@@ -15667,12 +15715,14 @@ void
 Hart<URV>::vfmv_v_f(unsigned vd, unsigned rs1, unsigned group,
 		    unsigned start, unsigned elems)
 {
-  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(rs1);
+  ELEM_TYPE e1 = fpRegs_.read<ELEM_TYPE>(rs1), dest;
 
   elems = vecRegs_.vlmax();
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      vecRegs_.write(vd, ix, group, e1);
+      if (vecRegs_.isDestActive(vd, ix, group, false /*masked*/, dest))
+	dest = e1;
+      vecRegs_.write(vd, ix, group, dest);
     }
 }
 
@@ -15740,6 +15790,7 @@ Hart<URV>::vmfeq_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 	  vecRegs_.read(vs1, ix, group, e1);
 	  vecRegs_.read(vs2, ix, group, e2);
 
+	  flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
 	      if (isSnan(e1) or isSnan(e2))
@@ -15797,6 +15848,7 @@ Hart<URV>::vmfeq_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 	{
 	  vecRegs_.read(vs1, ix, group, e1);
 
+	  flag = false;
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
 	      if (isSnan(e1) or isSnan(e2))
@@ -15911,6 +15963,7 @@ Hart<URV>::vmfne_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
+	  flag = true;
 	  vecRegs_.read(vs1, ix, group, e1);
 	  if (std::isnan(e1) or std::isnan(e2))
 	    {
@@ -15966,6 +16019,7 @@ Hart<URV>::vmflt_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
+	  flag = false;
 	  vecRegs_.read(vs1, ix, group, e1);
 	  vecRegs_.read(vs2, ix, group, e2);
 
@@ -16021,6 +16075,7 @@ Hart<URV>::vmflt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
+	  flag = false;
 	  vecRegs_.read(vs1, ix, group, e1);
 	  if (std::isnan(e1) or std::isnan(e2))
 	    orFcsrFlags(FpFlags::Invalid);
@@ -16072,6 +16127,7 @@ Hart<URV>::vmfle_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
+	  flag = false;
 	  vecRegs_.read(vs1, ix, group, e1);
 	  vecRegs_.read(vs2, ix, group, e2);
 
@@ -16127,6 +16183,7 @@ Hart<URV>::vmfle_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
+	  flag = false;
 	  vecRegs_.read(vs1, ix, group, e1);
 	  if (std::isnan(e1) or std::isnan(e2))
 	    orFcsrFlags(FpFlags::Invalid);
@@ -16179,6 +16236,7 @@ Hart<URV>::vmfgt_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
+	  flag = false;
 	  vecRegs_.read(vs1, ix, group, e1);
 	  if (std::isnan(e1) or std::isnan(e2))
 	    orFcsrFlags(FpFlags::Invalid);
@@ -16231,6 +16289,7 @@ Hart<URV>::vmfge_vf(unsigned vd, unsigned vs1, unsigned rs2, unsigned group,
 
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
+	  flag = false;
 	  vecRegs_.read(vs1, ix, group, e1);
 	  if (std::isnan(e1) or std::isnan(e2))
 	    orFcsrFlags(FpFlags::Invalid);
