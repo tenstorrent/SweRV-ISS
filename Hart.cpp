@@ -4515,6 +4515,38 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
 template <typename URV>
 bool
+Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
+{
+  // Setup signal handlers. Restore on destruction.
+  SignalHandlers handlers;
+
+  uint64_t limit = instCountLim_;
+  URV stopAddr = stopAddrValid_? stopAddr_ : ~URV(0); // ~URV(0): No-stop PC.
+
+  for (unsigned i = 0; i < steps; i++)
+    {
+      if (instCounter_ >= limit)
+        {
+          std::cerr << "Stopped -- Reached instruction limit\n";
+          return true;
+        }
+      else if (pc_ == stopAddr)
+        {
+          std::cerr << "Stopped -- Reached end address\n";
+          return true;
+        }
+
+      singleStep(traceFile);
+
+      if (hasTargetProgramFinished())
+        return stepResult_;
+    }
+  return true;
+}
+
+
+template <typename URV>
+bool
 Hart<URV>::simpleRun()
 {
   // For speed: do not record/clear CSR changes.
@@ -5194,7 +5226,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       if (dcsrStep_ and not ebreakInstDebug_)
 	enterDebugMode_(DebugModeCause::STEP, pc_);
 
-      logStop(ce, instCounter_, traceFile);
+      stepResult_ = logStop(ce, instCounter_, traceFile);
     }
 }
 
