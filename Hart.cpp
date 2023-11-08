@@ -1677,6 +1677,56 @@ Hart<URV>::dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr)
 }
 
 
+#include <termios.h>
+#undef VSTART
+
+static bool
+hasPendingInput(int fd)
+{
+  static bool firstTime = true;
+
+  if (firstTime)
+    {
+      firstTime = false;
+      if (isatty(fd))
+	{
+	  struct termios term;
+	  tcgetattr(fd, &term);
+	  cfmakeraw(&term);
+	  term.c_lflag &= ~ECHO;
+	  tcsetattr(fd, 0, &term);
+	}
+    }
+
+  struct pollfd inPollfd;
+  inPollfd.fd = fd;
+  inPollfd.events = POLLIN;
+  int code = poll(&inPollfd, 1, 0);
+  return code == 1 and (inPollfd.revents & POLLIN) != 0;
+}
+
+
+static int
+readCharNonBlocking(int fd)
+{
+  if (not hasPendingInput(fd))
+    return 0;
+
+  char c = 0;
+  std::ptrdiff_t code = ::read(fd, &c, sizeof(c));
+  if (code == 1)
+    return c;
+
+  if (code == 0)
+    return 0;
+
+  if (code == -1)
+    std::cerr << "readCharNonBlocking: unexpected fail on read\n";
+
+  return -1;
+}
+
+
 template <typename URV>
 template <typename LOAD_TYPE>
 inline
@@ -1847,56 +1897,6 @@ Hart<URV>::fastStore(URV addr, STORE_TYPE storeVal)
 
   initiateStoreException(ExceptionCause::STORE_ACC_FAULT, addr);
   return false;
-}
-
-
-#include <termios.h>
-#undef VSTART
-
-static bool
-hasPendingInput(int fd)
-{
-  static bool firstTime = true;
-
-  if (firstTime)
-    {
-      firstTime = false;
-      if (isatty(fd))
-	{
-	  struct termios term;
-	  tcgetattr(fd, &term);
-	  cfmakeraw(&term);
-	  term.c_lflag &= ~ECHO;
-	  tcsetattr(fd, 0, &term);
-	}
-    }
-
-  struct pollfd inPollfd;
-  inPollfd.fd = fd;
-  inPollfd.events = POLLIN;
-  int code = poll(&inPollfd, 1, 0);
-  return code == 1 and (inPollfd.revents & POLLIN) != 0;
-}
-  
-
-static int
-readCharNonBlocking(int fd)
-{
-  if (not hasPendingInput(fd))
-    return 0;
-
-  char c = 0;
-  std::ptrdiff_t code = ::read(fd, &c, sizeof(c));
-  if (code == 1)
-    return c;
-
-  if (code == 0)
-    return 0;
-
-  if (code == -1)
-    std::cerr << "readCharNonBlocking: unexpected fail on read\n";
-
-  return -1;
 }
 
 
