@@ -246,8 +246,7 @@ template <typename URV>
 void
 Hart<URV>::processExtensions(bool verbose)
 {
-  URV value = 0;
-  peekCsr(CsrNumber::MISA, value);
+  URV value = peekCsr(CsrNumber::MISA);
 
   bool flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
   enableSupervisorMode(flag);
@@ -477,9 +476,7 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
   locked = config & 0x80;
   mode = getModeFromPmpconfigByte(config);
 
-  URV pmpVal = 0;
-  if (not peekCsr(csrn, pmpVal))
-    return false;   // Unimplemented PMPADDR reg.  Should not happen.
+  URV pmpVal = peekCsr(csrn);
 
   if (type == Pmp::Type::Off)
     return true;   // Entry is off.
@@ -490,10 +487,8 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
     {
       if (entryIx > 0)
         {
-          URV prevVal = 0;
           CsrNumber lowerCsrn = CsrNumber(unsigned(csrn) - 1);
-          peekCsr(lowerCsrn, prevVal);
-          low = prevVal;
+          low = peekCsr(lowerCsrn);
           low = (low >> pmpG) << pmpG;  // Clear least sig G bits.
           low = low << 2;
         }
@@ -641,8 +636,9 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   // Enable extensions if corresponding bits are set in the MISA CSR.
   processExtensions();
+
   csRegs_.reset();
-  peekCsr(CsrNumber::MIE, cachedMie_);
+  cachedMie_ = peekCsr(CsrNumber::MIE);
 
   perfControl_ = ~uint32_t(0);
   URV value = 0;
@@ -775,7 +771,7 @@ namespace WdRiscv
     uint32_t csrVal = csRegs_.peekMstatus();
     mstatus_.value_.low_ = csrVal;
 
-    peekCsr(CsrNumber::MSTATUSH, csrVal);
+    csrVal = peekCsr(CsrNumber::MSTATUSH);
     mstatus_.value_.high_ = csrVal;
 
     virtMem_.setExecReadable(mstatus_.bits_.MXR);
@@ -831,9 +827,7 @@ template <typename URV>
 void
 Hart<URV>::updateCachedVsstatus()
 {
-  URV csrVal = 0;
-  peekCsr(CsrNumber::VSSTATUS, csrVal);
-  vsstatus_.value_ = csrVal;
+  vsstatus_.value_ = peekCsr(CsrNumber::VSSTATUS);
 
   if (virtMode_)
     {
@@ -848,9 +842,7 @@ template <typename URV>
 void
 Hart<URV>::updateCachedHstatus()
 {
-  URV csrVal = 0;
-  peekCsr(CsrNumber::HSTATUS, csrVal);
-  hstatus_.value_ = csrVal;
+  hstatus_.value_ = peekCsr(CsrNumber::HSTATUS);
   updateBigEndian();
 }
 
@@ -2571,9 +2563,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
   // But they can be delegated to supervisor.
   if (isRvs() and origMode != PM::Machine)
     {
-      CsrNumber csrn = interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG;
-      URV delegVal = 0;
-      peekCsr(csrn, delegVal);
+      URV delegVal = peekCsr(interrupt? CsrNumber::MIDELEG : CsrNumber::MEDELEG);
       if (delegVal & (URV(1) << cause))
 	{
 	  nextMode = PM::Supervisor;
@@ -2582,9 +2572,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 	  // except for guest page faults
 	  if (isRvh() and origVirtMode)
 	    {
-	      csrn = interrupt? CsrNumber::HIDELEG : CsrNumber::HEDELEG;
-	      delegVal = 0;
-	      peekCsr(csrn, delegVal);
+	      delegVal = peekCsr(interrupt? CsrNumber::HIDELEG : CsrNumber::HEDELEG);
 	      if (delegVal & (URV(1) << cause))
 		{
 		  virtMode_ = true;
@@ -2912,14 +2900,6 @@ Hart<URV>::pokeIntReg(unsigned ix, URV val)
 
 template <typename URV>
 bool
-Hart<URV>::peekCsr(CsrNumber csrn, URV& val) const
-{ 
-  return csRegs_.peek(csrn, val);
-}
-
-
-template <typename URV>
-bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 		   URV& pokeMask) const
 { 
@@ -3050,8 +3030,8 @@ Hart<URV>::processPmaChange(CsrNumber csr)
   else
     return false;
 
-  URV val = 0; // Value of pmpcfg csr.
-  peekCsr(csr, val);
+  URV val = peekCsr(csr); // Value of pmpcfg csr.
+
   uint64_t low = 0, high = 0;
   Pma pma;
   bool valid = false;
@@ -3154,7 +3134,7 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       csRegs_.updateSstc();
     }
   else if (csr == CN::MIE or csr == CN::SIE or csr == CN::HIE or csr == CN::VSIE)
-    peekCsr(CN::MIE, cachedMie_);
+    cachedMie_ = peekCsr(CN::MIE);
 
   if (csr == CN::STIMECMP)
     {
@@ -3996,8 +3976,7 @@ template <typename URV>
 void
 Hart<URV>::accumulateTrapStats(bool isNmi)
 {
-  URV causeVal = 0;
-  peekCsr(CsrNumber::MCAUSE, causeVal);
+  URV causeVal = peekCsr(CsrNumber::MCAUSE);
 
   // If most sig bit of mcause is 1, we have an interrupt.
   bool isInterrupt = causeVal >> (sizeof(causeVal)*8 - 1);
@@ -9011,7 +8990,7 @@ Hart<URV>::exitDebugMode()
 
   cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
-  peekCsr(CsrNumber::DPC, pc_);  // Restore PC
+  pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
   
   debugMode_ = false;
   csRegs_.enterDebug(false);
@@ -9648,8 +9627,7 @@ namespace WdRiscv
 
     // 1. Restore privilege mode, interrupt enable, and virtual mode.
     uint32_t value = csRegs_.peekMstatus();
-    uint32_t hvalue = 0;
-    peekCsr(CsrNumber::MSTATUSH, hvalue);
+    uint32_t hvalue = peekCsr(CsrNumber::MSTATUSH);
     bool savedVirt = (hvalue >> 7) & 1;
 
     MstatusFields<uint32_t> fields(value);
@@ -9881,7 +9859,7 @@ Hart<URV>::execDret(const DecodedInst* di)
 
   cancelLr(CancelLrCause::EXIT_DEBUG);  // Exiting debug modes loses LR reservation.
 
-  peekCsr(CsrNumber::DPC, pc_);  // Restore PC
+  pc_ = peekCsr(CsrNumber::DPC);  // Restore PC
   
   debugMode_ = false;
   csRegs_.enterDebug(false);

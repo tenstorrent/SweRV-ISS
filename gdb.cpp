@@ -328,7 +328,7 @@ handlePeekRegisterForGdb(WdRiscv::Hart<URV>& hart, unsigned regNum,
       if (csr == 0x1000)
         value = URV(hart.privilegeMode());
       else
-        hart.peekCsr(WdRiscv::CsrNumber(csr), value);
+        ok = hart.peekCsr(WdRiscv::CsrNumber(csr), value);
     }
 
   if (ok)

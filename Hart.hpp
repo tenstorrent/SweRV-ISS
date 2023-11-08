@@ -213,7 +213,18 @@ namespace WdRiscv
     /// Set val to the value of the control and status register csr
     /// returning true on success. Return false leaving val unmodified
     /// if csr is out of bounds.
-    bool peekCsr(CsrNumber csr, URV& val) const;
+    [[nodiscard]] bool peekCsr(CsrNumber csr, URV& val) const
+    { return csRegs_.peek(csr, val); }
+
+    /// Return value of the given csr. Throw exception if csr is
+    /// out of bounds.
+    URV peekCsr(CsrNumber csr) const
+    {
+      URV value = 0;
+      if (not peekCsr(csr, value))
+	throw std::runtime_error("Invalid CSR number in peekCsr");
+      return value;
+    }
 
     /// Set val, reset, writeMask, and pokeMask respectively to the
     /// value, reset-value, write-mask and poke-mask of the control
@@ -1470,11 +1481,7 @@ namespace WdRiscv
 
     /// Return the value of the MHARTID CSR.
     URV hartId() const
-    {
-      URV id = 0;
-      peekCsr(CsrNumber::MHARTID, id);
-      return id;
-    }
+    { return peekCsr(CsrNumber::MHARTID); }
 
     /// Tie the shared CSRs in this hart to the corresponding CSRs in
     /// the target hart making them share the same location for their
@@ -3179,14 +3186,14 @@ namespace WdRiscv
     template<typename ELEM_TYPE>
     void vop_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		unsigned start, unsigned elems, bool masked,
-		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op) __attribute((weak));
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
 
     /// Helper to vector vv instructions (eg vadd.vx, vsub.vx). Operation
     /// to be performed (eg. add, sub) is passed in op.
     template<typename ELEM_TYPE>
     void vop_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 		unsigned start, unsigned elems, bool masked,
-		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op) __attribute((weak));
+		std::function<ELEM_TYPE(ELEM_TYPE, ELEM_TYPE)> op);
 
     /// Helper to vector mask vv instructions (eg vmseq.vv). Operation
     /// to be performed (eg. equal_to) passed in op.

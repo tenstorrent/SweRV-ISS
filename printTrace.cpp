@@ -626,8 +626,7 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   lastCsr(csrns);
   for (auto csrn : csrns)
     {
-      URV val = 0;
-      peekCsr(csrn, val);
+      URV val = peekCsr(csrn);
       if (regCount) buffer.printChar(';');
       buffer.printChar('c').print(std::to_string(unsigned(csrn))).printChar('=').print(val);
       regCount++;
@@ -770,9 +769,9 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     {
       URV cause = 0;
       if (privilegeMode() == PrivilegeMode::Machine)
-        peekCsr(CsrNumber::MCAUSE, cause);
+        cause = peekCsr(CsrNumber::MCAUSE);
       else if (privilegeMode() == PrivilegeMode::Supervisor)
-        peekCsr(CsrNumber::SCAUSE, cause);
+        cause = peekCsr(CsrNumber::SCAUSE);
       buffer.print(uint64_t(cause));
     }
   buffer.printChar(',');

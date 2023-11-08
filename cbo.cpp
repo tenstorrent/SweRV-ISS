@@ -96,12 +96,8 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(peekCsr(CsrNumber::SENVCFG));
 
   if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
        (pm == PM::User and not senvf.bits_.CBCFE) )
@@ -137,12 +133,8 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(peekCsr(CsrNumber::SENVCFG));
 
   if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
        (pm == PM::User and not senvf.bits_.CBCFE) )
@@ -178,12 +170,8 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(peekCsr(CsrNumber::SENVCFG));
 
   if ( (pm != PM::Machine and not menvf.bits_.CBIE) or
        (pm == PM::User and not senvf.bits_.CBIE) )
@@ -224,12 +212,8 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(peekCsr(CsrNumber::SENVCFG));
 
   if ( (pm != PM::Machine and not menvf.bits_.CBZE) or
        (pm == PM::User and not senvf.bits_.CBZE) )

@@ -2090,7 +2090,7 @@ Interactive<URV>::checkInterruptCommand(Hart<URV>& hart, const std::string& line
   // check_interrupt [<mip-value>]
   URV mip = 0;
   if (tokens.size() == 1)
-    hart.peekCsr(CsrNumber::MIP, mip);
+    mip = hart.peekCsr(CsrNumber::MIP);
   else if (tokens.size() == 2)
     {
       if (not parseCmdLineNumber("MIP", tokens.at(1), mip))

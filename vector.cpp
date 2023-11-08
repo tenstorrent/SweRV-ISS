@@ -729,7 +729,7 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
           if (rd != 0 and rs1 == 0)
             elems = vlmax;
           else if (rd == 0 and rs1 == 0)
-            peekCsr(CsrNumber::VL, elems);  // Keep current value of VL.
+            elems = peekCsr(CsrNumber::VL);  // Keep current value of VL.
           else  // strip mining
             {
               URV avl = intRegs_.read(rs1);  // Application vector length.
@@ -9151,8 +9151,7 @@ Hart<URV>::vaadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -9241,8 +9240,7 @@ Hart<URV>::vaadd_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -9334,8 +9332,7 @@ Hart<URV>::vasub_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -9424,8 +9421,7 @@ Hart<URV>::vasub_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -9517,8 +9513,7 @@ Hart<URV>::vsmul_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
@@ -9589,8 +9584,7 @@ Hart<URV>::vsmul_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   using ELEM_TYPE2 = typename makeDoubleWide<ELEM_TYPE>::type; // Double wide
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   static constexpr ELEM_TYPE minVal = std::numeric_limits<ELEM_TYPE>::min();
@@ -9661,8 +9655,7 @@ Hart<URV>::vssr_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 {
   ELEM_TYPE e1 = 0, e2 = 0;
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   unsigned elemBits = integerWidth<ELEM_TYPE> ();
@@ -9723,8 +9716,7 @@ Hart<URV>::vssr_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 {
   ELEM_TYPE e1 = 0;
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   unsigned elemBits = integerWidth<ELEM_TYPE> ();
@@ -9906,8 +9898,7 @@ Hart<URV>::vnclip_wv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   ELEM_TYPE2X e1 = 0;
   ELEM_TYPE e2 = 0;
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   unsigned elemBits = integerWidth<ELEM_TYPE2X> ();
@@ -9992,8 +9983,7 @@ Hart<URV>::vnclip_wx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
 
   ELEM_TYPE2X e1 = 0;
 
-  URV rmVal = 0;
-  peekCsr(CsrNumber::VXRM, rmVal);
+  URV rmVal = peekCsr(CsrNumber::VXRM);
   VecRoundingMode rm = VecRoundingMode(rmVal);
 
   unsigned elemBits = integerWidth<ELEM_TYPE2X> ();

@@ -414,10 +414,13 @@ namespace WdRiscv
       HSTATEEN3H  = 0x61f,
 
       // Ascalon physical memory attributes
-      PMACFG0 = 0x7e0,
+      PMACFG0  = 0x7e0,
       PMACFG31 = 0x7ff,
       PMACFG32 = 0xbe0,
       PMACFG63 = 0xbff,
+
+      // Ascalon matp.
+      MATP = 0x7c7,
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
