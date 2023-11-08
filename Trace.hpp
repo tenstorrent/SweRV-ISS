@@ -83,8 +83,7 @@ namespace WdRiscv
     /// Trap vector mode after last executed instruction
     TrapVectorMode nextTvecMode() const
     {
-      URV tvec = 0;
-      peekCsr(CsrNumber::MTVEC, tvec);
+      URV tvec = peekCsr(CsrNumber::MTVEC);
       auto tvm = TrapVectorMode{tvec&3};
       return tvm;
     }
@@ -101,9 +100,9 @@ namespace WdRiscv
       if (trapped)
         {
           if (nextPrivMode() == PrivilegeMode::Machine)
-            hart_->peekCsr(CsrNumber::MCAUSE, cause);
+            cause = hart_->peekCsr(CsrNumber::MCAUSE);
           else if (nextPrivMode() == PrivilegeMode::Supervisor)
-            hart_->peekCsr(CsrNumber::SCAUSE, cause);
+            cause = hart_->peekCsr(CsrNumber::SCAUSE);
         }
       return trapped;
     }

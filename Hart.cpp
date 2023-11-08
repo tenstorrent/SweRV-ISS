@@ -1718,8 +1718,7 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
   // Loading from console-io does a standard input read.
   if (conIoValid_ and addr1 == conIo_ and enableConIn_ and not triggerTripped_)
     {
-      SRV val = fgetc(stdin);
-      data = val;
+      data = readCharNonBlocking(syscall_.effectiveFd(STDIN_FILENO));
       return true;
     }
 
