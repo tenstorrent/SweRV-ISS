@@ -2690,11 +2690,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 	}
     }
 
-  if (isRvh())
-    {
-      if (not csRegs_.write(CsrNumber::MTVAL2, privMode_, mtval2))
-	assert(0 and "Failed to write MTVAL2 register");
-    }
+  if (isRvh() and not csRegs_.write(CsrNumber::MTVAL2, privMode_, mtval2))
+    assert(0 and "Failed to write MTVAL2 register");
 
   // Set program counter to trap handler address.
   URV tvec = 0;

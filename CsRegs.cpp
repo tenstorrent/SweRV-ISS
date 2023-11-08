@@ -378,6 +378,12 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     value = adjustHstateenValue(num, value);
   else if (num == CN::SCOUNTOVF)
     value = adjustScountovfValue(value);
+  else if (num == CsrNumber::VSIP or num == CsrNumber::VSIE)
+    {
+      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
+      if (hdeleg)
+	value &= hdeleg->read() >> 1;
+    }
 
   return true;
 }
@@ -2649,64 +2655,86 @@ CsRegs<URV>::definePmaRegs()
 
 template <typename URV>
 bool
-CsRegs<URV>::peek(CsrNumber number, URV& value) const
+CsRegs<URV>::peek(CsrNumber num, URV& value) const
 {
-  auto csr = getImplementedCsr(number, virtMode_);
+  using CN = CsrNumber;
+
+  auto csr = getImplementedCsr(num, virtMode_);
   if (not csr)
     return false;
 
-  if (number >= CsrNumber::TDATA1 and number <= CsrNumber::TDATA3)
-    return readTdata(number, PrivilegeMode::Machine, value);
+  if (num >= CN::TDATA1 and num <= CN::TDATA3)
+    return readTdata(num, PrivilegeMode::Machine, value);
 
-  if (number == CsrNumber::FFLAGS or number == CsrNumber::FRM)
+  if (num == CN::FFLAGS or num == CN::FRM)
     {
-      auto fcsr = getImplementedCsr(CsrNumber::FCSR);
+      auto fcsr = getImplementedCsr(CN::FCSR);
       if (not fcsr)
         return false;
       value = fcsr->read();
-      if (number == CsrNumber::FFLAGS)
+      if (num == CN::FFLAGS)
         value = value & URV(FpFlags::FcsrMask);
       else
         value = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
       return true;
     }
 
-  // Value of SIP/SIE is masked by delegation register.
-  if (number == CsrNumber::SIP or number == CsrNumber::SIE)
+  if (num == CN::MTOPEI)
     {
-      value = csr->read();
-      auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
-      if (deleg)
-	{
-	  value &= deleg->read();
-	  if (virtMode_)
-	    {
-	      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
-	      if (hdeleg)
-		value &= hdeleg->read();
-	    }
-	}
+      if (not imsic_)
+	return false;
+      value = imsic_->machineTopId();
+      value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
+      return true;
+    }
+  else if (csr->getNumber() == CN::STOPEI)
+    {
+      if (not imsic_)
+	return false;
+      value = imsic_->supervisorTopId();
+      value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
+      return true;
+    }
+  else if (csr->getNumber() == CN::VSTOPEI)
+    {
+      if (not imsic_)
+	return false;
+      const auto& hs = regs_.at(size_t(CsrNumber::HSTATUS));
+      URV hsVal = hs.read();
+      HstatusFields<URV> hsf(hsVal);
+      unsigned vgein = hsf.bits_.VGEIN;
+      if (vgein >= imsic_->guestCount())
+	return false;
+      value = imsic_->guestTopId(vgein);
+      value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
 
-  // Value of VSIP/VSIE is masked by shifted HIDELG delegation register.
-  if (number == CsrNumber::VSIP or number == CsrNumber::VSIE)
-    {
-      value = csr->read();
-      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
-      if (hdeleg)
-	value &= hdeleg->read() >> 1;
-      return true;
-    }
-
-  if (number == CsrNumber::MTOPI or number == CsrNumber::STOPI or
-      number == CsrNumber::VSTOPI)
-    return readTopi(number, value);
+  if (num == CsrNumber::MTOPI or num == CsrNumber::STOPI or
+      num == CsrNumber::VSTOPI)
+    return readTopi(num, value);
 
   value = csr->read();
 
-  if (number >= CsrNumber::PMPADDR0 and number <= CsrNumber::PMPADDR63)
-    value = adjustPmpValue(number, value);
+  if (num == CN::SIP or num == CN::SIE)
+    value = adjustSipSieValue(value);  // Mask by delegation registers.
+  else if (virtMode_ and (num == CN::TIME or num == CN::TIMEH))
+    value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
+  else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
+    value = adjustPmpValue(num, value);
+  else if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
+    value = adjustSstateenValue(num, value);
+  else if ((num >= CN::HSTATEEN0 and num <= CN::HSTATEEN3) or
+           (num >= CN::HSTATEEN0H and num <= CN::HSTATEEN3H))
+    value = adjustHstateenValue(num, value);
+  else if (num == CN::SCOUNTOVF)
+    value = adjustScountovfValue(value);
+  else if (num == CsrNumber::VSIP or num == CsrNumber::VSIE)
+    {
+      auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
+      if (hdeleg)
+	value &= hdeleg->read() >> 1;
+    }
 
   return true;
 }
