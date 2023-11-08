@@ -617,9 +617,6 @@ jump to this address upon ecountering an exception in debug mode if
 this address is not an all ones bit pattern. Default: all ones bit
 pattern.
 
-### trap_non_zero_vstart
-Causes vector instruction to trap on non-zero vstart. Default is true.
-
 ###  physical_memory_protection_grain
 Defines the G value of the physical memory protection grain. This is
 the log base 2 of the grain minus 2.  The default is G=0 (implying a
@@ -657,17 +654,21 @@ with a range attribute. Example:
 
 ###  vector
 The vector configuration is an object with the following fields:
-* bytes_per_vec: vector size in bytes
+* bytes_per_vec: vector size in bytes.
 * min_bytes_per_elem: narrowest suppoted element size in bytes (default 1).
 * max_bytes_per_elem: widest supported element size in bytes (no default).
 * min_bytes_per_lmul: map of lmul to min-element-width-in bytes (default: no min).
 * mask_agnostic_policy: "ones" or "undisturb" to set behavior of mask-anostic instructions, default is "ones".
+* tail_agnostic_policy: "ones" or "undisturb" to set behavior of tail-anostic instructions, default is "ones".
+* trap_non_zero_vstart: causes vector instruction to trap on non-zero vstart, default is true.
 
 Example:
 ```
     "vector" : {
        "bytes_per_vec" : 16,
-       "max_bytes_per_elem" : 8
+       "max_bytes_per_elem" : 8,
+       "tail_agnositic_policy" : "undisturb",
+       "mask_agnositic_policy" : "ones"
     }
 ```
 ###  reset_vec
