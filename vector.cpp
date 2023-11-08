@@ -4147,11 +4147,12 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
       bool flag = false;
       if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	{
-	  vecRegs_.writeMaskRegister(vd, ix, not found);
+	  flag = not found;
 	  bool input = false;
 	  vecRegs_.readMaskRegister(vs1, ix, input);
 	  found = found or input;
 	}
+      vecRegs_.writeMaskRegister(vd, ix, flag);
     }
 
   vecRegs_.touchMask(vd);
