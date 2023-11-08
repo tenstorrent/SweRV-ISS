@@ -518,6 +518,10 @@ namespace WdRiscv
     /// print run-time and instructions per second.
     bool untilAddress(uint64_t address, FILE* file = nullptr);
 
+    /// Helper to single step N times. Returns false if program terminated
+    /// with failing condition and true otherwise.
+    bool runSteps(uint64_t steps, FILE* file = nullptr);
+
     /// Define the program counter value at which the run method will
     /// stop.
     void setStopAddress(URV address)
@@ -4891,6 +4895,7 @@ namespace WdRiscv
     bool clearMtvalOnEbreak_ = true;
 
     bool targetProgFinished_ = false;
+    bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).
     bool tracePtw_ = false;          // Trace paget table walk.
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
     bool seiPin_ = false;            // Supervisor external interrupt pin value.

@@ -216,6 +216,8 @@ struct Args
   std::optional<uint64_t> branchWindow;
   std::optional<uint64_t> logStart;
   std::optional<unsigned> mcmls;
+  std::optional<uint64_t> deterministic;
+  std::optional<unsigned> seed;
 
   unsigned regWidth = 32;
   unsigned harts = 1;
@@ -427,6 +429,20 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
       auto numStr = varMap["logstart"].as<std::string>();
       if (not parseCmdLineNumber("logstart", numStr, args.logStart))
         ok = false;
+    }
+
+  if (varMap.count("deterministic"))
+    {
+      auto numStr = varMap["deterministic"].as<std::string>();
+      if (not parseCmdLineNumber("deterministic", numStr, args.deterministic))
+	ok = false;
+    }
+
+  if (varMap.count("seed"))
+    {
+      auto numStr = varMap["seed"].as<std::string>();
+      if (not parseCmdLineNumber("seed", numStr, args.seed))
+	ok = false;
     }
 
   if (args.interactive)
@@ -654,6 +670,13 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
          "Add PCI device to simulation. Format is <device>:<bus>:<slot>:<device-specific>. "
          "This should be combined with the pci option to declare a memory region for these devices. "
          "Currently only supports virtio-blk, which requires a file")
+        ("deterministic", po::value<std::string>(),
+         "Used for deterministic multi-hart runs. Define a window size for the amount of instructions "
+         "a hart will execute before switching to the next hart (a value of 0 turns this off). The "
+         "actual amount of instructions is determined by corresponding seed value.")
+        ("seed", po::value<std::string>(),
+         "Corresponding seed for deterministic runs. If this is not specified, but `deterministic` is, whisper will "
+         "generate a seed value based on current time.")
 	("instcounter", po::value<std::string>(),
 	 "Set instruction counter to given value.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
@@ -1490,7 +1513,7 @@ kbdInterruptHandler(int)
 
 template <typename URV>
 static bool
-batchRun(System<URV>& system, FILE* traceFile, bool waitAll)
+batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow, unsigned seed)
 {
   if (system.hartCount() == 0)
     return true;
@@ -1507,42 +1530,80 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll)
 
   // Run each hart in its own thread.
 
-  std::vector<std::thread> threadVec;
-
-  std::atomic<bool> result = true;
-  std::atomic<unsigned> finished = 0;  // Count of finished threads. 
-
-  auto threadFunc = [&traceFile, &result, &finished] (Hart<URV>* hart) {
-		      bool r = hart->run(traceFile);
-		      result = result and r;
-                      finished++;
-		    };
-
-  for (unsigned i = 0; i < system.hartCount(); ++i)
+  if (not stepWindow)
     {
-      Hart<URV>* hart = system.ithHart(i).get();
-      threadVec.emplace_back(std::thread(threadFunc, hart));
-    }                             
+      std::vector<std::thread> threadVec;
 
-  if (waitAll)
-    {
-      for (auto& t : threadVec)
-        t.join();
+      std::atomic<bool> result = true;
+      std::atomic<unsigned> finished = 0;  // Count of finished threads.
+
+      auto threadFunc = [&traceFile, &result, &finished] (Hart<URV>* hart) {
+                          bool r = hart->run(traceFile);
+                          result = result and r;
+                          finished++;
+                        };
+
+      for (unsigned i = 0; i < system.hartCount(); ++i)
+        {
+          Hart<URV>* hart = system.ithHart(i).get();
+          threadVec.emplace_back(std::thread(threadFunc, hart));
+        }
+
+      if (waitAll)
+        {
+          for (auto& t : threadVec)
+            t.join();
+        }
+      else
+        {
+          // First thread to finish terminates run.
+          while (finished == 0)
+            ;
+
+          extern void forceUserStop(int);
+          forceUserStop(0);
+
+          for (auto& t : threadVec)
+            t.join();
+        }
+      return result;
     }
   else
     {
-      // First thread to finish terminates run.
-      while (finished == 0)
-        ;
+      bool result = true;
+      unsigned finished = 0;
+      std::vector<Hart<URV>*> harts;
 
-      extern void forceUserStop(int);
-      forceUserStop(0);
-      
-      for (auto& t : threadVec)
-        t.join();
+      for (unsigned i = 0; i < system.hartCount(); ++i)
+        {
+          Hart<URV>* hart = system.ithHart(i).get();
+          harts.push_back(hart);
+        }
+
+      srand(seed);
+
+      while ((waitAll and finished != system.hartCount()) or
+             (not waitAll and finished == 0))
+        {
+          for (auto it = harts.begin(); it != harts.end();)
+            {
+              unsigned steps = (rand() % stepWindow) + 1;
+              // step N times
+              result = result and (*it)->runSteps(steps, traceFile);
+
+              if ((*it)->hasTargetProgramFinished())
+                {
+                  it = harts.erase(it);
+                  finished++;
+                }
+              else
+                it++;
+            }
+        };
+
+      std::cout << "Deterministic multi-hart run with seed: " << seed << " and steps distribution between 1 and " << stepWindow << "\n";
+      return result;
     }
-
-  return result;
 }
 
 
@@ -1748,7 +1809,9 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
     }
 
   bool waitAll = not args.quitOnAnyHart;
-  return batchRun(system, traceFile, waitAll);
+  uint64_t stepWindow = args.deterministic.value_or(0);
+  unsigned seed = args.seed.value_or(time(NULL));
+  return batchRun(system, traceFile, waitAll, stepWindow, seed);
 }
 
 
