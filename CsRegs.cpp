@@ -646,6 +646,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
           if (value != newValue)
             (csr->*setValueFn)(newValue);
         }
+      csr->setReadMask(csr->getReadMask() | sgeip | 0x444);
     }
   else
     {
