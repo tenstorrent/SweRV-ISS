@@ -445,6 +445,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 	{
 	  intRegs_.write(rd, rdVal);
 	  ldStData_ = uint32_t(result);
+	  ldStWrite_ = true;
 	}
     }
 }
@@ -650,6 +651,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 	{
 	  intRegs_.write(rd, rdVal);
 	  ldStData_ = result;
+	  ldStWrite_ = true;
 	}
     }
 }
