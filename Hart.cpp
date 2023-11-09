@@ -2906,7 +2906,7 @@ Hart<URV>::peekCsr(CsrNumber csrn) const
     {
       std::cerr << "Invalid CSR number in peekCsr: 0x" << std::hex
 		<<  unsigned(csrn) << std::dec << '\n';
-      throw std::runtime_error("Invalid CSR number in peekCsr: 0x");
+      // throw std::runtime_error("Invalid CSR number in peekCsr");
     }
   return value;
 }
