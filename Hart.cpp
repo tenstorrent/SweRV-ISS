@@ -2898,6 +2898,21 @@ Hart<URV>::pokeIntReg(unsigned ix, URV val)
 
 
 template <typename URV>
+URV
+Hart<URV>::peekCsr(CsrNumber csrn) const
+{
+  URV value = 0;
+  if (not peekCsr(csrn, value))
+    {
+      std::cerr << "Invalid CSR number in peekCsr: 0x" << std::hex
+		<<  unsigned(csrn) << std::dec << '\n';
+      throw std::runtime_error("Invalid CSR number in peekCsr: 0x");
+    }
+  return value;
+}
+
+
+template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 		   URV& pokeMask) const

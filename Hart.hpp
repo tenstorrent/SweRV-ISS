@@ -216,15 +216,8 @@ namespace WdRiscv
     [[nodiscard]] bool peekCsr(CsrNumber csr, URV& val) const
     { return csRegs_.peek(csr, val); }
 
-    /// Return value of the given csr. Throw exception if csr is
-    /// out of bounds.
-    URV peekCsr(CsrNumber csr) const
-    {
-      URV value = 0;
-      if (not peekCsr(csr, value))
-	throw std::runtime_error("Invalid CSR number in peekCsr");
-      return value;
-    }
+    /// Return value of the given csr. Throw exception if csr is out of bounds.
+    URV peekCsr(CsrNumber csr) const;
 
     /// Set val, reset, writeMask, and pokeMask respectively to the
     /// value, reset-value, write-mask and poke-mask of the control
