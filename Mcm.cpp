@@ -576,12 +576,20 @@ checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAdd
       return false;
     }
 
+  if ((physAddr % lineSize) + rtlLineSize > lineSize)
+    {
+      cerr << "Merge buffer write: RTL data crosses reference line boundary\n";
+      return false;
+    }
+
+#if 0
   if ((physAddr % lineSize) != 0)
     {
       cerr << "Merge buffer write: address (0x" << std::hex << physAddr << ") "
 	   << "not a multiple of line size (" << std::dec << lineSize << ")\n";
       return false;
     }
+#endif
 
   return true;
 }
@@ -597,7 +605,7 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
   auto& pendingWrites = hartPendingWrites_.at(hartIx);
   size_t pendingSize = 0;  // pendingWrite size after removal of matching writes
 
-  uint64_t lineEnd = lineBegin + lineSize_;
+  uint64_t lineEnd = lineBegin + lineSize_ - (lineBegin % lineSize_);
 
   for (size_t i = 0; i < pendingWrites.size(); ++i)
     {
@@ -694,20 +702,21 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     return false;
 
   // Read our memory corresponding to RTL line addresses.
-  std::vector<uint8_t> line(lineSize_, 0);
-  for (unsigned i = 0; i < lineSize_; ++i)
+  uint64_t lineEnd = physAddr + lineSize_ - (physAddr % lineSize_);
+  std::vector<uint8_t> line;
+  line.reserve(lineSize_);
+  for (uint64_t addr = physAddr; addr < lineEnd; ++addr)
     {
       uint8_t byte = 0;
-      if (not hart.peekMemory(physAddr + i, byte, true /*usePma*/))
+      if (not hart.peekMemory(addr, byte, true /*usePma*/))
 	{
 	  cerr << "Mcm::mergeBufferWrite: Failed to query memory\n";
 	  return false;
 	}
-      line.at(i) = byte;
+      line.push_back(byte);
     }
 
   // Apply pending writes to our line.
-  uint64_t lineEnd = physAddr + lineSize_;
   for (const auto& write : coveredWrites)
     {
       if ((write.physAddr_ < physAddr) or (write.physAddr_ + write.size_ > lineEnd))
@@ -721,12 +730,13 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     }
 
   // Put our line back in memory (use poke words to accomodate clint).
-  for (unsigned i = 0; i < lineSize_; i += 4)
+  assert((line.size() % 4) == 0);
+  for (unsigned i = 0; i < line.size(); i += 4)
     {
       uint32_t word = *((uint32_t*) (line.data() + i));
       hart.pokeMemory(physAddr + i, word, true);
     }
-  
+
   // Compare our line to RTL line.
   bool result = true;
   if (checkWholeLine_ or rtlMask.empty())
@@ -742,7 +752,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     }
   else
     {   // Compare covered writes.
-      for (unsigned i = 0; i < lineSize_; ++i)
+      for (unsigned i = 0; i < line.size(); ++i)
 	if (rtlMask.at(i) and (line.at(i) != rtlData.at(i)))
 	  {
 	    reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,

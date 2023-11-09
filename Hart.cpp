@@ -246,7 +246,9 @@ template <typename URV>
 void
 Hart<URV>::processExtensions(bool verbose)
 {
-  URV value = peekCsr(CsrNumber::MISA);
+  URV value = 0;
+  if (not peekCsr(CsrNumber::MISA, value))
+    std::cerr << "CSR MISA is not defined\n";
 
   bool flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
   enableSupervisorMode(flag);
@@ -476,7 +478,9 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
   locked = config & 0x80;
   mode = getModeFromPmpconfigByte(config);
 
-  URV pmpVal = peekCsr(csrn);
+  URV pmpVal = 0;
+  if (not peekCsr(csrn, pmpVal))
+    return false;  // PMPADDRn not implemented.
 
   if (type == Pmp::Type::Off)
     return true;   // Entry is off.
@@ -488,7 +492,10 @@ Hart<URV>::unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
       if (entryIx > 0)
         {
           CsrNumber lowerCsrn = CsrNumber(unsigned(csrn) - 1);
-          low = peekCsr(lowerCsrn);
+	  URV lowerVal = 0;
+          if (not peekCsr(lowerCsrn, lowerVal))
+	    return false;  // Should not happen
+          low = lowerVal;
           low = (low >> pmpG) << pmpG;  // Clear least sig G bits.
           low = low << 2;
         }
@@ -2898,6 +2905,21 @@ Hart<URV>::pokeIntReg(unsigned ix, URV val)
 
 
 template <typename URV>
+URV
+Hart<URV>::peekCsr(CsrNumber csrn) const
+{
+  URV value = 0;
+  if (not peekCsr(csrn, value))
+    {
+      std::cerr << "Invalid CSR number in peekCsr: 0x" << std::hex
+		<<  unsigned(csrn) << std::dec << '\n';
+      // throw std::runtime_error("Invalid CSR number in peekCsr");
+    }
+  return value;
+}
+
+
+template <typename URV>
 bool
 Hart<URV>::peekCsr(CsrNumber csrn, URV& val, URV& reset, URV& writeMask,
 		   URV& pokeMask) const
@@ -3029,7 +3051,9 @@ Hart<URV>::processPmaChange(CsrNumber csr)
   else
     return false;
 
-  URV val = peekCsr(csr); // Value of pmpcfg csr.
+  URV val = 0;
+  if (not peekCsr(csr, val))
+    return false;
 
   uint64_t low = 0, high = 0;
   Pma pma;

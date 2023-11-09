@@ -1904,11 +1904,6 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
       std::cerr << "Mbwrite data too long -- truncating\n";
       data.resize(lineSize);
     }
-  else if (data.size() < lineSize)
-    {
-      std::cerr << "Mbwrite data too short -- padding\n";
-      data.resize(lineSize);
-    }
 		     
   std::vector<bool> mask;
   if (tokens.size() == 4)
