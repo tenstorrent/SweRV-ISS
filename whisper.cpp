@@ -1589,9 +1589,10 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
             {
               unsigned steps = (rand() % stepWindow) + 1;
               // step N times
-              result = result and (*it)->runSteps(steps, traceFile);
+              auto [terminate, tmp] = (*it)->runSteps(steps, traceFile);
+              result = result and tmp;
 
-              if ((*it)->hasTargetProgramFinished())
+              if (terminate)
                 {
                   it = harts.erase(it);
                   finished++;

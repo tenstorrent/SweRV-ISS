@@ -520,7 +520,7 @@ namespace WdRiscv
 
     /// Helper to single step N times. Returns false if program terminated
     /// with failing condition and true otherwise.
-    bool runSteps(uint64_t steps, FILE* file = nullptr);
+    std::tuple<bool, bool> runSteps(uint64_t steps, FILE* file = nullptr);
 
     /// Define the program counter value at which the run method will
     /// stop.
