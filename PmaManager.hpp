@@ -185,6 +185,8 @@ namespace WdRiscv
     {
       uint32_t pma_;
       uint64_t addr;
+      uint64_t baseAddr;
+      uint64_t lastAddr;
       AccessReason reason_;
     };
 
@@ -203,7 +205,7 @@ namespace WdRiscv
           {
             auto pma = region.pma_;
             if (trace_)
-              pmaTrace_.push_back({pma.attrib_, addr, reason});
+              pmaTrace_.push_back({pma.attrib_, addr, region.firstAddr_, region.lastAddr_, reason});
             return pma;
           }
 
