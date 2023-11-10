@@ -48,9 +48,9 @@ Mcm<URV>::updateTime(const char* method, uint64_t time)
 {
   if (time < time_)
     {
-      cerr << "Error: " << method << ": Backward time: "
+      cerr << "Warning: " << method << ": Backward time: "
 	   << time << " < " << time_ << "\n";
-      return false;
+      return true;
     }
   time_ = time;
   return true;
@@ -562,7 +562,8 @@ reportMismatch(uint64_t hartId, uint64_t time, std::string_view tag, uint64_t ad
 
 
 static bool
-checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAddr)
+checkBufferWriteParams(unsigned hartId, uint64_t time, unsigned lineSize,
+		       uint64_t& rtlLineSize, uint64_t physAddr)
 {
   if (lineSize == 0)
     {
@@ -572,15 +573,19 @@ checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAdd
 
   if (rtlLineSize > lineSize)
     {
-      cerr << "Merge buffer write: RTL line size (" << rtlLineSize << ") greater than"
+      cerr << "Error: Hart-id=" << hartId << " time=" << time
+	   << "RTL merge buffer write line size (" << rtlLineSize << ") greater than"
 	   << " reference line size (" << lineSize << ")\n";
       return false;
     }
 
   if ((physAddr % lineSize) + rtlLineSize > lineSize)
     {
-      cerr << "Merge buffer write: RTL data crosses reference line boundary\n";
-      return false;
+      cerr << "Warning: Hart-id=" << hartId << " time=" << time
+	   << " RTL merge buffer write data at address 0x"
+	   << std::hex << physAddr << " crosses buffer boundary" << std::dec
+	   << " -- truncating RTL data\n";
+	rtlLineSize -= (physAddr % lineSize);
     }
 
 #if 0
@@ -598,15 +603,15 @@ checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAdd
 
 template <typename URV>
 bool
-Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,
-			       const std::vector<bool>& rtlMask,
+Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
+			       uint64_t rtlLineSize, const std::vector<bool>& rtlMask,
 			       MemoryOpVec& coveredWrites)
 {
   unsigned hartIx = hart.sysHartIndex();
   auto& pendingWrites = hartPendingWrites_.at(hartIx);
   size_t pendingSize = 0;  // pendingWrite size after removal of matching writes
 
-  uint64_t lineEnd = lineBegin + lineSize_ - (lineBegin % lineSize_);
+  uint64_t lineEnd = rtlAddr + rtlLineSize;
 
   for (size_t i = 0; i < pendingWrites.size(); ++i)
     {
@@ -614,12 +619,12 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
       McmInstr* instr = findOrAddInstr(hartIx, op.instrTag_);
 
       bool written = false;  // True if op is actually written
-      if (op.physAddr_ >= lineBegin and op.physAddr_ < lineEnd)
+      if (op.physAddr_ >= rtlAddr and op.physAddr_ < lineEnd)
 	{
 	  if (op.physAddr_ + op.size_  > lineEnd)
 	    {
 	      cerr << "Error: Pending store address out of line bounds time=" << time
-		   << " hart-id=" << hart.hartId() << "addr=0x" << std::hex
+		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
 		   << op.physAddr_ << std::dec << "\n";
 	      return false;
 	    }
@@ -640,7 +645,7 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegi
 	      unsigned masked = 0;  // Count of masked bytes of op.
 	      for (unsigned opIx = 0; opIx < op.size_; ++opIx)   // Scan op bytes
 		{
-		  unsigned lineIx = opIx + op.physAddr_ - lineBegin; // Index in line
+		  unsigned lineIx = opIx + op.physAddr_ - rtlAddr; // Index in line
 		  if (lineIx < rtlMask.size() and rtlMask.at(lineIx))
 		    masked++;
 		}
@@ -691,7 +696,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 {
   if (not updateTime("Mcm::mergeBufferWrite", time))
     return false;
-  if (not checkBufferWriteParams(lineSize_, rtlData.size(), physAddr))
+  uint64_t rtlSize = rtlData.size();
+  if (not checkBufferWriteParams(hart.hartId(), time, lineSize_, rtlSize, physAddr))
     return false;
 
   unsigned hartIx = hart.sysHartIndex();
@@ -699,7 +705,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   // Remove from hartPendingWrites_ the writes matching the RTL line
   // address and place them sorted by instr tag in coveredWrites.
   std::vector<MemoryOp> coveredWrites;
-  if (not collectCoveredWrites(hart, time, physAddr, rtlMask, coveredWrites))
+  if (not collectCoveredWrites(hart, time, physAddr, rtlSize, rtlMask, coveredWrites))
     return false;
 
   // Read our memory corresponding to RTL line addresses.

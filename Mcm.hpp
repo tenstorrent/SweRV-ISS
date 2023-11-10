@@ -253,7 +253,7 @@ namespace WdRiscv
     /// them sorted by instr tag in coveredWrites. Write ops may not straddle
     /// line boundary. Write ops may not be partially masked.
     bool collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,
-			      const std::vector<bool>& rtlMask,
+			      uint64_t lineSize, const std::vector<bool>& rtlMask,
 			      MemoryOpVec& coveredWrites);
 
     /// Forward from a store to a read op. Return true on success.
