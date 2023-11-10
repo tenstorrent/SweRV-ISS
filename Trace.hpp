@@ -320,7 +320,7 @@ namespace WdRiscv
     { return hart_->pmaManager().matchMultiplePma(addr); }
 
     /// Return the number of pages accessed by a vector ld/st instruction.
-    bool numVecPagesAccessed() const
+    unsigned numVecPagesAccessed() const
     {
       if (not isVector())
         return 0;
