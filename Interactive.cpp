@@ -884,8 +884,6 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
     {
       size_t addr = 0;
       URV val = 0;
-      if (not parseCmdLineNumber("special-resoure", addrStr, addr))
-	return false;
       if (addrStr == "defi" or
 	  (parseCmdLineNumber("special-resoure", addrStr, addr) and
 	   addr == WhisperSpecialResource::DeferredInterrupts))
@@ -894,8 +892,6 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	    return false;
 	  hart.setDeferredInterrupts(val);
 	}
-      else
-	std::cerr << "Unknow special resource: " << addrStr << '\n';
       return true;
     }
 
