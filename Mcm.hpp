@@ -178,6 +178,8 @@ namespace WdRiscv
 
     bool ppoRule6(Hart<URV>& hart, const McmInstr& instr) const;
 
+    bool ppoRule7(Hart<URV>& hart, const McmInstr& instr) const;
+
     bool ppoRule8(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool ppoRule9(Hart<URV>& hart, const McmInstr& instr) const;
@@ -346,6 +348,8 @@ namespace WdRiscv
     // Check whole merge buffer line if true otherwise check bytes
     // covered by store instructions.
     bool checkWholeLine_ = false;
+
+    bool isTso_ = false;  // True if total-store-ordering model.
 
     std::vector<McmInstrIx> currentInstrTag_;
 

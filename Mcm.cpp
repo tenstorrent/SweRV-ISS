@@ -539,6 +539,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   ok = ppoRule4(hart, *instr) and ok;
   ok = ppoRule5(hart, *instr) and ok;
   ok = ppoRule6(hart, *instr) and ok;
+  ok = ppoRule7(hart, *instr) and ok;
   ok = ppoRule8(hart, *instr) and ok;
   ok = ppoRule9(hart, *instr) and ok;
   ok = ppoRule10(hart, *instr) and ok;
@@ -1418,8 +1419,7 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // Check ppo rule 1 for all the write operations asociated with
-  // the given store instruction B.
+  // Rule 1: B is a store, A and B have overlapping addresses.
   
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
@@ -1434,8 +1434,9 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 
       if (not instrA.isRetired())
 	{
-	  cerr << "Mcm::ppoRule1: Error: Instruction is not retired\n";
-	  assert(0 && "Mcm::ppoRule1: Error: Instruction is not retired");
+	  cerr << "Error: ppoRule1: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
+	       << " instruction of tag1 is not retired\n";
 	  return false;
 	}
 
@@ -1686,7 +1687,12 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	  cerr << "Mcm::ppoRule5: Instruction A invalid/not-retired\n";
 	  assert(0 && "Mcm::ppoRule5: Instruction A invalid/not-retired");
 	}
-      if (not instrA.di_.isAtomicAcquire())
+
+      bool hasAquire = instrA.di_.isAtomicAcquire();
+      if (isTso_)
+	hasAquire = hasAquire or instrA.di_.isLoad() or instrA.di_.isAmo();
+
+      if (not hasAquire)
 	continue;
 
       bool fail = false;
@@ -1720,7 +1726,12 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       cerr << "Mcm::ppoRule6: Instr B canceled/invalid\n";
       assert(0 && "Mcm::ppoRule6: Instr B canceled/invalid");
     }
-  if (not instrB.isMemory() or not instrB.di_.isAtomicRelease())
+
+  bool hasRelease = instrB.di_.isAtomicRelease();
+  if (isTso_)
+    hasRelease = hasRelease or instrB.di_.isStore() or instrB.di_.isAmo();
+
+  if (not instrB.isMemory() or not hasRelease)
     return true;
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
@@ -1754,6 +1765,62 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 
   return true;
 }
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 7: A and B have RCsc annotations.
+  if (instrB.isCanceled() or not instrB.di_.isValid())
+    {
+      cerr << "Mcm::ppoRule7: Instr B canceled/invalid\n";
+      assert(0 && "Mcm::ppoRule7: Instr B canceled/invalid");
+    }
+
+  bool bHasRc = instrB.di_.isAtomicRelease() or instrB.di_.isAtomicAcquire();
+  if (isTso_)
+    bHasRc = bHasRc or instrB.di_.isLoad() or instrB.di_.isStore() or instrB.di_.isAmo();
+
+  if (not instrB.isMemory() or not bHasRc)
+    return true;
+
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
+
+  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag-1);
+      if (instrA.isCanceled() or not instrA.isMemory())
+	continue;
+      if (not instrA.isRetired() or not instrA.di_.isValid())
+	{
+	  cerr << "Mcm::ppoRule7: Instr A invalid/not-retired\n";
+	  assert(0 && "Mcm::ppoRule&: Instr A invalid/not-retired");
+	}
+
+      bool aHasRc = instrA.di_.isAtomicRelease() or instrA.di_.isAtomicAcquire();
+      if (isTso_)
+	aHasRc = bHasRc or instrA.di_.isLoad() or instrA.di_.isStore() or instrA.di_.isAmo();
+      if (not aHasRc)
+	continue;
+
+      bool incomplete = not instrA.complete_ or 
+	(instrA.di_.isAmo() and instrA.memOps_.size() != 2); // Incomplete amo might finish afrer B
+
+      bool fail = (incomplete or     // Incomplete store might finish after B
+		   (not instrB.memOps_.empty() and
+		    earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
+
+      if (fail)
+	{
+	  cerr << "Error: PPO rule 7 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
+	}
+    }
+
+  return true;
+}  
 
 
 template <typename URV>
