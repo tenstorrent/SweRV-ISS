@@ -242,6 +242,10 @@ namespace WdRiscv
     bool isAtomic() const
     { return ext_ == RvExtension::A; }
 
+    /// Return true if this is a hypervisor instruction.
+    bool isHypervisor() const
+    { return ext_ == RvExtension::H; }
+
     /// Return true if this a compressed instruction.
     bool isCompressed() const
     { return isCompressedInst(code_); }

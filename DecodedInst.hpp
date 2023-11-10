@@ -214,6 +214,10 @@ namespace WdRiscv
     bool isAtomic() const
     { return entry_ and entry_->isAtomic(); }
 
+    /// Return true if this is a hypervisor instruction.
+    bool isHypervisor() const
+    { return entry_ and entry_->isHypervisor(); }
+
     /// Return true if this a floating point instruction.
     bool isFp() const
     { return entry_ and entry_->isFp(); }
