@@ -50,24 +50,24 @@ Hart<URV>::execHfence_vvma(const DecodedInst* di)
   auto& tlb = virtMem_.vsTlb_;
 
   // Invalidate whole VS TLB. This is overkill.
-  if (di->op1() == 0 and di->op2() == 0)
-       tlb.invalidate();
-  else if (di->op1() == 0 and di->op2() != 0)
+  if (di->op0() == 0 and di->op1() == 0)
+    tlb.invalidate();
+  else if (di->op0() == 0 and di->op1() != 0)
     {
-      URV asid = intRegs_.read(di->op2());
+      URV asid = intRegs_.read(di->op1());
       tlb.invalidateAsid(asid);
     }
-  else if (di->op1() != 0 and di->op2() == 0)
+  else if (di->op0() != 0 and di->op1() == 0)
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr);
-      URV asid = intRegs_.read(di->op2());
+      URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
@@ -102,25 +102,25 @@ Hart<URV>::execHfence_gvma(const DecodedInst* di)
   auto& tlb = virtMem_.stage2Tlb_;
 
   // Invalidate whole VS TLB. This is overkill.
-  if (di->op1() == 0 and di->op2() == 0)
-       tlb.invalidate();
-  else if (di->op1() == 0 and di->op2() != 0)
+  if (di->op0() == 0 and di->op1() == 0)
+    tlb.invalidate();
+  else if (di->op0() == 0 and di->op1() != 0)
     {
-      URV vmid = intRegs_.read(di->op2());
+      URV vmid = intRegs_.read(di->op1());
       tlb.invalidateVmid(vmid);
     }
-  else if (di->op1() != 0 and di->op2() == 0)
+  else if (di->op0() != 0 and di->op1() == 0)
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       // address is shifted right by 2 bits
       uint64_t vpn = virtMem_.pageNumber(addr << 2);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
-      URV addr = intRegs_.read(di->op1());
+      URV addr = intRegs_.read(di->op0());
       uint64_t vpn = virtMem_.pageNumber(addr << 2);
-      URV vmid = intRegs_.read(di->op2());
+      URV vmid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageVmid(vpn, vmid);
     }
 

@@ -2915,14 +2915,14 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                       if (op0 != 0)
                         return instTable_.getEntry(InstId::illegal);
                       // sfence.vma
-                      op0 = iform.fields.rs1;
+                      op0 = iform.rs1();
                       op1 = iform.rs2();
                       return instTable_.getEntry(InstId::sfence_vma);
                     }
                   else if (funct7 == 0xb and op0 == 0)
                     {
-		      op0 = op1;
-                      op1 = op2 & 0x1f;
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::sinval_vma);
                     }
                   else if (funct7 == 0xc)
@@ -2936,24 +2936,26 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     }
                   else if (funct7 == 0x11 and op0 == 0)
                     {
+                      op0 = iform.rs1();
                       op2 = iform.rs2();
                       return instTable_.getEntry(InstId::hfence_vvma);
                     }
                   else if (funct7 == 0x13 and op0 == 0)
                     {
-		      op0 = op1;
-                      op1 = op2 & 0x1f;
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hinval_vvma);
                     }
                   else if (funct7 == 0x31 and op0 == 0)
                     {
-                      op2 = iform.rs2();
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hfence_gvma);
                     }
                   else if (funct7 == 0x33 and op0 == 0)
                     {
-		      op0 = op1;
-                      op1 = op2 & 0x1f;
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hinval_gvma);
                     }
                   else if (op2 == 0x102 and op0 == 0 and op1 == 0)
