@@ -775,7 +775,6 @@ Hart<URV>::execAmocas_w(const DecodedInst* di)
 
   if (loadOk)
     {
-      URV addr = intRegs_.read(rs1);
       uint32_t rs2Val = intRegs_.read(rs2);
       uint32_t rdVal = intRegs_.read(rd);
 
@@ -865,13 +864,13 @@ Hart<uint64_t>::execAmocas_d(const DecodedInst* di)
   Pma::Attrib attrib = Pma::Attrib::AmoArith;
 
   uint64_t temp = 0;
-  uint32_t addr = intRegs_.read(rs1);
+  uint64_t addr = intRegs_.read(rs1);
   bool loadOk = amoLoad64(addr, attrib, temp);
 
   if (loadOk)
     {
-      uint32_t rs2Val = intRegs_.read(rs2);
-      uint32_t rdVal = intRegs_.read(rd);
+      uint64_t rs2Val = intRegs_.read(rs2);
+      uint64_t rdVal = intRegs_.read(rd);
 
       bool storeOk = true;
       if (temp == rdVal)
