@@ -287,7 +287,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     }
 
   // Serialize to avoid jumbled output.
-  std::lock_guard<std::mutex> guard(printInstTraceMutex());
+  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(printInstTraceMutex());
 
   disassembleInst(di, tmp);
   if (hasInterrupt_)
@@ -303,13 +303,13 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     {
       std::ostringstream oss;
       for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
-	{
-	  if (i > 0)
-	    oss << ";";
-	  oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
-	  if (i < vecRegs_.stData_.size())
-	    oss << '=' << "0x" << vecRegs_.stData_.at(i);
-	}
+        {
+          if (i > 0)
+            oss << ";";
+          oss << "0x" << std::hex << vecRegs_.ldStAddr_.at(i);
+          if (i < vecRegs_.stData_.size())
+            oss << '=' << "0x" << vecRegs_.stData_.at(i);
+        }
       tmp += " [" + oss.str() + "]";
     }
 
@@ -352,24 +352,24 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   if (vecReg >= 0)
     {
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
-	{
-	  if (pending)
-	    fprintf(out, " +\n");
-	  formatVecInstTrace<URV>(out, tag, *this, instSV,
-				  vecReg, vecRegs_.getVecData(vecReg),
-				  vecRegs_.bytesPerRegister(),
-				  tmp);
-	  pending = true;
-	}
+        {
+          if (pending)
+            fprintf(out, " +\n");
+          formatVecInstTrace<URV>(out, tag, *this, instSV,
+                                  vecReg, vecRegs_.getVecData(vecReg),
+                                  vecRegs_.bytesPerRegister(),
+                                  tmp);
+          pending = true;
+        }
     }
 
   // Process memory diff.
   if (ldStWrite_)
     {
       if (pending)
-	fprintf(out, "  +\n");
+        fprintf(out, "  +\n");
       formatInstTrace<URV>(out, tag, *this, instSV, 'm',
-			   URV(ldStAddr_), URV(ldStData_), tmp);
+                           URV(ldStAddr_), URV(ldStData_), tmp);
       pending = true;
     }
 
@@ -408,7 +408,7 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   for (CsrNumber csr : csrs)
     {
       if (not csRegs_.peek(csr, value))
-	continue;
+        continue;
       if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
         continue; // Debug trigger values collected below.
       cvps.push_back(CVP(URV(csr), value));
@@ -420,29 +420,29 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     {
       uint64_t data1(0), data2(0), data3(0);
       if (not peekTrigger(trigger, data1, data2, data3))
-	continue;
+        continue;
 
       // Components of trigger that changed.
       bool t1 = false, t2 = false, t3 = false;
       getTriggerChange(trigger, t1, t2, t3);
 
       if (t1)
-	{
-	  URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA1);
+        {
+          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA1);
           cvps.push_back(CVP(ecsr, data1));
-	}
+        }
 
       if (t2)
         {
-	  URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA2);
+          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA2);
           cvps.push_back(CVP(ecsr, data2));
-	}
+        }
 
       if (t3)
-	{
-	  URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA3);
+        {
+          URV ecsr = (trigger << 16) | URV(CsrNumber::TDATA3);
           cvps.push_back(CVP(ecsr, data3));
-	}
+        }
     }
 
   // Sort by CSR number.
@@ -453,13 +453,13 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     {
       if (pending) fprintf(out, "  +\n");
       formatInstTrace<URV>(out, tag, *this, instSV, 'c',
-			   cvp.first, cvp.second, tmp);
+                           cvp.first, cvp.second, tmp);
       pending = true;
     }
 
   if (not pending)
     formatInstTrace<URV>(out, tag, *this, instSV, 'r', 0, 0,
-			 tmp);  // No change: emit X0 as modified reg.
+                         tmp);  // No change: emit X0 as modified reg.
 
   if (tracePtw_)
     {
@@ -471,16 +471,16 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
         }
 
       for (const auto& walk : virtMem_.getFetchWalks())
-	{
-	  fputs("  +\n", out);
-	  printPageTableWalk(out, *this, "iptw", walk);
-	}
+        {
+          fputs("  +\n", out);
+          printPageTableWalk(out, *this, "iptw", walk);
+        }
 
       for (const auto& walk : virtMem_.getDataWalks())
-	{
-	  fputs("  +\n", out);
-	  printPageTableWalk(out, *this, "dptw", walk);
-	}
+        {
+          fputs("  +\n", out);
+          printPageTableWalk(out, *this, "dptw", walk);
+        }
     }
   fputs("\n", out);
 }
@@ -569,16 +569,14 @@ void
 Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 {
   // Serialize to avoid jumbled output.
-  std::lock_guard<std::mutex> guard(printInstTraceMutex());
-  // True if trace file header printed.
-  static bool traceHeaderPrinted = false;
+  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(printInstTraceMutex());
 
-  if (not traceHeaderPrinted)
+  if (traceHeaderPrinted_)
     {
-      traceHeaderPrinted = true;
+      traceHeaderPrinted_ = true;
       fprintf(out, "pc, inst, modified regs, source operands, memory, inst info, privilege, trap, disassembly, hartid");
       if (tracePtw_)
-	fprintf(out, ", iptw, dptw");
+        fprintf(out, ", iptw, dptw");
       fprintf(out, "\n");
     }
 
@@ -611,13 +609,13 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
     {
       peekFpReg(reg, val64);
       if (not isRvd())
-	val64 = uint32_t(val64);  // Clear top 32 bits if only F extension.
+        val64 = uint32_t(val64);  // Clear top 32 bits if only F extension.
       if (regCount) buffer.printChar(';');
       buffer.print(FpRegs::regName(reg)).printChar('=').print(val64);
       // Print incremental flags since FRM is sticky.
       unsigned fpFlags = lastFpFlags();
       if (fpFlags != 0)
-	buffer.print(";ff=").print(fpFlags);
+        buffer.print(";ff=").print(fpFlags);
       regCount++;
     }
 
@@ -638,19 +636,19 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   if (vecReg >= 0)
     {
       for (unsigned i = 0; i < groupSize; ++i, ++vecReg)
-	{
-	  if (regCount) buffer.printChar(';');
-	  buffer.printChar('v').print(std::to_string(vecReg)).printChar('=');
-	  const uint8_t* data = vecRegs_.getVecData(vecReg);
-	  unsigned byteCount = vecRegs_.bytesPerRegister();
-	  for (unsigned i = 0; i < byteCount; ++i)
-	    {
-	      unsigned byte = data[byteCount - 1 - i];
-	      if (byte < 16) buffer.printChar('0');
-	      buffer.print(byte);
-	    }
-	  regCount++;
-	}
+        {
+          if (regCount) buffer.printChar(';');
+          buffer.printChar('v').print(std::to_string(vecReg)).printChar('=');
+          const uint8_t* data = vecRegs_.getVecData(vecReg);
+          unsigned byteCount = vecRegs_.bytesPerRegister();
+          for (unsigned i = 0; i < byteCount; ++i)
+            {
+              unsigned byte = data[byteCount - 1 - i];
+              if (byte < 16) buffer.printChar('0');
+              buffer.print(byte);
+            }
+          regCount++;
+        }
     }
 
   // Non sequential PC change.
@@ -670,26 +668,26 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       auto mode = instEntry->ithOperandMode(i);
       auto type = instEntry->ithOperandType(i);
       if (mode == OperandMode::Read or mode == OperandMode::ReadWrite or
-	  type == OperandType::Imm)
-	{
-	  unsigned operand = di.ithOperand(i);
-	  if (type ==  OperandType::IntReg)
-	    buffer.print(sep).print(IntRegs<URV>::regName(operand));
-	  else if (type ==  OperandType::FpReg)
-	    buffer.print(sep).print(FpRegs::regName(operand));
-	  else if (type == OperandType::CsReg)
-	    buffer.print(sep).printChar('c').print(std::to_string(operand));
-	  else if (type == OperandType::VecReg)
-	    {
-	      buffer.print(sep).printChar('v').print(std::to_string(operand));
-	      unsigned emul = i < vecRegs_.opsEmul_.size() ? vecRegs_.opsEmul_.at(i) : 1;
-	      if (emul >= 2 and emul <= 8)
-		buffer.printChar('m').print(emul);
-	    }
-	  else if (type == OperandType::Imm)
-	    buffer.print(sep).printChar('i').print(operand);
-	  sep = ";";
-	}
+          type == OperandType::Imm)
+        {
+          unsigned operand = di.ithOperand(i);
+          if (type ==  OperandType::IntReg)
+            buffer.print(sep).print(IntRegs<URV>::regName(operand));
+          else if (type ==  OperandType::FpReg)
+            buffer.print(sep).print(FpRegs::regName(operand));
+          else if (type == OperandType::CsReg)
+            buffer.print(sep).printChar('c').print(std::to_string(operand));
+          else if (type == OperandType::VecReg)
+            {
+              buffer.print(sep).printChar('v').print(std::to_string(operand));
+              unsigned emul = i < vecRegs_.opsEmul_.size() ? vecRegs_.opsEmul_.at(i) : 1;
+              if (emul >= 2 and emul <= 8)
+                buffer.printChar('m').print(emul);
+            }
+          else if (type == OperandType::Imm)
+            buffer.print(sep).printChar('i').print(operand);
+          sep = ";";
+        }
     }
 
   // Print rounding mode with source operands.
@@ -710,22 +708,22 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       load = not store;
       buffer.print(virtDataAddr);
       if (physDataAddr != virtDataAddr)
-	buffer.printChar(':').print(physDataAddr);
+        buffer.printChar(':').print(physDataAddr);
       if (store)
-	buffer.printChar('=').print(ldStData_);
+        buffer.printChar('=').print(ldStData_);
     }
   else if (not vecRegs_.ldStAddr_.empty())
     {
       for (uint64_t i = 0; i < vecRegs_.ldStAddr_.size(); ++i)
-	{
-	  if (i > 0)
-	    buffer.printChar(';');
-	  buffer.print(vecRegs_.ldStAddr_.at(i));
-	  if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
-	    buffer.printChar('m');
-	  if (i < vecRegs_.stData_.size())
-	    buffer.printChar('=').print(vecRegs_.stData_.at(i));
-	}
+        {
+          if (i > 0)
+            buffer.printChar(';');
+          buffer.print(vecRegs_.ldStAddr_.at(i));
+          if (i < vecRegs_.maskedAddr_.size() and vecRegs_.maskedAddr_.at(i))
+            buffer.printChar('m');
+          if (i < vecRegs_.stData_.size())
+            buffer.printChar('=').print(vecRegs_.stData_.at(i));
+        }
     }
 
   // Instruction information.
@@ -740,17 +738,17 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
   else if (instEntry->isBranch())
     {
       if (instEntry->isConditionalBranch())
-	buffer.print(lastBranchTaken_ ? "t" : "nt");
+        buffer.print(lastBranchTaken_ ? "t" : "nt");
       else
-	{
-	  if (di.isBranchToRegister() and
-	      di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
-	    buffer.printChar('r');
-	  else if (di.op0() == IntRegNumber::RegRa)
-	    buffer.printChar('c');
-	  else
-	    buffer.printChar('j');
-	}
+        {
+          if (di.isBranchToRegister() and
+              di.op0() == 0 and di.op1() == IntRegNumber::RegRa and di.op2() == 0)
+            buffer.printChar('r');
+          else if (di.op0() == IntRegNumber::RegRa)
+            buffer.printChar('c');
+          else
+            buffer.printChar('j');
+        }
     }
   else if (type == RvExtension::F or type == RvExtension::D or type == RvExtension::Zfh or
            type == RvExtension::Zfbfmin)
@@ -796,12 +794,12 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       unsigned entryIx = 0;
       sep = "";
       for (uint64_t i = 0; i < addrs.size(); ++i)
-	{
-	  buffer.print(sep).print(addrs.at(i).addr_);
+        {
+          buffer.print(sep).print(addrs.at(i).addr_);
           if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
             buffer.printChar('=').print(entries.at(entryIx++));
-	  sep = ";";
-	}
+          sep = ";";
+        }
 
       buffer.printChar(',');
       getPageTableWalkAddresses(false, 0, addrs);
@@ -809,12 +807,12 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
       entryIx = 0;
       sep = "";
       for (uint64_t i = 0; i < addrs.size(); ++i)
-	{
-	  buffer.print(sep).print(addrs.at(i).addr_);
+        {
+          buffer.print(sep).print(addrs.at(i).addr_);
           if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
             buffer.printChar('=').print(entries.at(entryIx++));
-	  sep = ";";
-	}
+          sep = ";";
+        }
     }
 
   buffer.printChar('\n');
