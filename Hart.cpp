@@ -152,7 +152,6 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::INSTRET)->tie(&retiredInsts_);
       csRegs_.findCsr(CsrNumber::CYCLE)->tie(&cycleCount_);
 
-      // TIME is a read-only shadow of MCYCLE.
       csRegs_.findCsr(CsrNumber::TIME)->tie(&instCounter_);
 
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
@@ -2045,7 +2044,7 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
 
   memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
   if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
   invalidateDecodeCache(virtAddr, ldStSize_);
 
   ldStWrite_ = true;
@@ -4412,8 +4411,8 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	{
           // We want amo instructions to print in the same order as executed.
 	  // This avoid interleaving of amo execution and tracing.
-          static std::mutex execMutex;
-	  std::lock_guard<std::mutex> lock(execMutex);
+	  static std::mutex execMutex;
+	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
           uint32_t inst = 0;
 	  currPc_ = pc_;
