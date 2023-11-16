@@ -2937,7 +2937,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   else if (funct7 == 0x11 and op0 == 0)
                     {
                       op0 = iform.rs1();
-                      op2 = iform.rs2();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hfence_vvma);
                     }
                   else if (funct7 == 0x13 and op0 == 0)
