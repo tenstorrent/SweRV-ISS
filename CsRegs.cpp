@@ -2256,29 +2256,35 @@ CsRegs<URV>::defineHypervisorRegs()
   using Csrn = CsrNumber;
 
   Csr<URV>* csr = nullptr;
-  csr = defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, 0, wam, wam);
+
+  URV reset = 0;
+  URV mask = 0b000000000'1'1'1'00'111111'00'1'1'1'1'1'0000;
+  if constexpr (sizeof(URV) == 8)
+    reset = reset | (URV(2) << 32);  // VSXL = 2 (64-bits).
+  URV pokeMask = mask;
+    
+  csr = defineCsr("hstatus",     Csrn::HSTATUS,     !mand, !imp, reset, mask, pokeMask);
   csr->setHypervisor(true);
 
   using EC = ExceptionCause;
-  URV zero = ((1 << unsigned(EC::S_ENV_CALL))               |
-              (1 << unsigned(EC::VS_ENV_CALL))              |
-              (1 << unsigned(EC::M_ENV_CALL))               |
-              (1 << unsigned(EC::INST_GUEST_PAGE_FAULT))    |
-              (1 << unsigned(EC::LOAD_GUEST_PAGE_FAULT))    |
-              (1 << unsigned(EC::VIRT_INST))                |
-              (1 << unsigned(EC::STORE_GUEST_PAGE_FAULT)))  ;
+  mask = ~((URV(1) << unsigned(EC::S_ENV_CALL))               |
+	   (URV(1) << unsigned(EC::VS_ENV_CALL))              |
+	   (URV(1) << unsigned(EC::M_ENV_CALL))               |
+	   (URV(1) << unsigned(EC::INST_GUEST_PAGE_FAULT))    |
+	   (URV(1) << unsigned(EC::LOAD_GUEST_PAGE_FAULT))    |
+	   (URV(1) << unsigned(EC::VIRT_INST))                |
+	   (URV(1) << unsigned(EC::STORE_GUEST_PAGE_FAULT)))  ;
 
-  URV mask = wam & ~zero;
-  URV pokeMask = mask;
+  pokeMask = mask;
   csr = defineCsr("hedeleg",     Csrn::HEDELEG,     !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 
   using IC = InterruptCause;
-  zero = ((1 << unsigned(IC::S_SOFTWARE))  |
-          (1 << unsigned(IC::S_TIMER))     |
-          (1 << unsigned(IC::S_EXTERNAL))  |
-          (1 << unsigned(IC::G_EXTERNAL))) ;
-  mask = wam & ~zero;
+  mask = ~((URV(1) << unsigned(IC::S_SOFTWARE))  |
+	   (URV(1) << unsigned(IC::S_TIMER))     |
+	   (URV(1) << unsigned(IC::S_EXTERNAL))  |
+	   (URV(1) << unsigned(IC::G_EXTERNAL))) ;
+
   pokeMask = mask;
   csr = defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
