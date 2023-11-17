@@ -251,12 +251,15 @@ Hart<URV>::processExtensions(bool verbose)
     std::cerr << "CSR MISA is not defined\n";
 
   bool flag = value & (URV(1) << ('s' - 'a'));  // Supervisor-mode option.
+  flag = flag and isa_.isEnabled(RvExtension::S);
   enableSupervisorMode(flag);
 
   flag = value & (URV(1) << ('u' - 'a'));  // User-mode option.
+  flag = flag and isa_.isEnabled(RvExtension::U);
   enableUserMode(flag);
 
   flag = value & (URV(1) << ('h' - 'a'));  // Hypervisor.
+  flag = flag and isa_.isEnabled(RvExtension::H);
   enableHypervisorMode(flag);
 
   flag = (value & 1) and isa_.isEnabled(RvExtension::A);   // Atomic
