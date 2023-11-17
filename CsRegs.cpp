@@ -2280,10 +2280,11 @@ CsRegs<URV>::defineHypervisorRegs()
   csr->setHypervisor(true);
 
   using IC = InterruptCause;
-  mask = ~((URV(1) << unsigned(IC::S_SOFTWARE))  |
-	   (URV(1) << unsigned(IC::S_TIMER))     |
-	   (URV(1) << unsigned(IC::S_EXTERNAL))  |
-	   (URV(1) << unsigned(IC::G_EXTERNAL))) ;
+
+  // Bits 10 6 and 2 are writeable.
+  mask = ((URV(1) << unsigned(IC::VS_SOFTWARE))  |
+	  (URV(1) << unsigned(IC::VS_TIMER))     |
+	  (URV(1) << unsigned(IC::VS_EXTERNAL))) ;
 
   pokeMask = mask;
   csr = defineCsr("hideleg",     Csrn::HIDELEG,     !mand, !imp, 0, mask, pokeMask);
