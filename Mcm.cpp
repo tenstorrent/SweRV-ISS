@@ -1681,6 +1681,9 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
+  if (instrB.memOps_.empty())
+    return true;
+
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
@@ -1704,10 +1707,26 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
       bool fail = false;
       if (instrA.di_.isAmo())
 	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
+      else if (not instrA.complete_)
+	fail  = true; // Incomplete store might finish after B
       else
-        fail = (not instrA.complete_ or     // Incomplete store might finish after B
-	        (not instrB.memOps_.empty() and
-	         earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
+	{
+	  auto timeB = earliestOpTime(instrB);
+	  if (timeB <= latestOpTime(instrA))
+	    {
+	      // B peforms before A -- Allow if there is no write overlapping B after B.
+	      for (size_t ix = sysMemOps_.size(); ix != 0 and not fail; ix--)
+		{
+		  const auto& op = sysMemOps_.at(ix-1);
+		  if (op.isCanceled())
+		    continue;
+		  if (op.time_ < timeB)
+		    break;
+		  if (not op.isRead_ and instrB.overlaps(op))
+		    fail = true;
+		}
+	    }
+	}
 
       if (fail)
 	{
