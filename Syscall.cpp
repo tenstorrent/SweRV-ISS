@@ -1029,6 +1029,43 @@ Syscall<URV>::emulate()
         return rc < 0 ? SRV(-errno) : rc;
       }
 
+    case 67:       // pread64
+      {
+	int fd = effectiveFd(SRV(a0));
+	uint64_t buffAddr = a1;
+	size_t count = a2;
+	off_t offset = a3;
+
+	std::vector<uint8_t> temp(count);
+
+	errno = 0;
+	ssize_t rc = pread(fd, temp.data(), count, offset);
+        if (rc < 0)
+          return SRV(-errno);
+
+        ssize_t written = writeHartMemory(hart_, temp, buffAddr, rc);
+        if (written)
+          memChanges_.emplace_back(buffAddr, written);
+	return written == rc? written : SRV(-EINVAL);
+      }
+
+    case 68:       // pwrite64
+      {
+	int fd = effectiveFd(SRV(a0));
+
+	uint64_t buffAddr = a1;
+	size_t count = a2;
+	off_t offset = a3;
+
+        std::vector<uint8_t> temp(count);
+        if (readHartMemory(hart_, buffAddr, temp, count) != count)
+          return SRV(-EINVAL);
+
+	errno = 0;
+	auto rc = pwrite(fd, temp.data(), count, offset);
+	return rc < 0 ? SRV(-errno) : rc;
+      }
+
     case 78:       // readlinat
       {
 	int dirfd = effectiveFd(SRV(a0));
