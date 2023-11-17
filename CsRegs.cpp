@@ -3706,6 +3706,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  vsip->poke(val >> 1);
 	  recordWrite(CsrNumber::VSIP);
 	}
+      hipUpdated = true;
     }
   else if (num == CsrNumber::HVIP)
     {
@@ -3770,7 +3771,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // Writing HIP changes bit VSSIP in HVIP.
       if (hvip and num != CsrNumber::HVIP)
 	{
-	  URV mask = 0x400; // Bit VSSIP
+	  URV mask = 0x4; // Bit VSSIP
 	  URV newVal = (hip->read() & mask) | (hvip->read() & ~mask);
 	  hvip->poke(newVal);
 	  recordWrite(CsrNumber::HVIP);
