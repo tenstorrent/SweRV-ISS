@@ -810,10 +810,10 @@ namespace WdRiscv
   void
   Hart<uint32_t>::writeMstatus()
   {
-    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_.low_))
-      assert(0 and "Failed to write MSTATUS register");
-    if (not csRegs_.write(CsrNumber::MSTATUSH, PrivilegeMode::Machine, mstatus_.value_.high_))
-      assert(0 and "Failed to write MSTATUSH register");
+    csRegs_.poke(CsrNumber::MSTATUS, mstatus_.value_.low_);
+    csRegs_.poke(CsrNumber::MSTATUSH, mstatus_.value_.high_);
+    csRegs_.recordWrite(CsrNumber::MSTATUS);
+    csRegs_.recordWrite(CsrNumber::MSTATUSH);
     updateCachedMstatus();
   }
 
@@ -822,8 +822,8 @@ namespace WdRiscv
   void
   Hart<uint64_t>::writeMstatus()
   {
-    if (not csRegs_.write(CsrNumber::MSTATUS, PrivilegeMode::Machine, mstatus_.value_))
-      assert(0 and "Failed to write MSTATUS register");
+    csRegs_.poke(CsrNumber::MSTATUS, mstatus_.value_);
+    csRegs_.recordWrite(CsrNumber::MSTATUS);
     updateCachedMstatus();
   }
 
