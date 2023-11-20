@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <unordered_set>
 #include "DecodedInst.hpp"
 
 
@@ -165,6 +166,11 @@ namespace WdRiscv
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
     { return lineSize_; }
+
+    /// Skip checking RTL read-op values against this model. This is used
+    /// for items like the CLINT timer where we cannot match the RTL.
+    void skipReadCheck(uint64_t addr)
+    { skipReadCheck_.insert(addr); }
 
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
 
@@ -360,6 +366,8 @@ namespace WdRiscv
     // branch does not depend on a prior memory instruction.
     std::vector<uint64_t> hartBranchTimes_;
     std::vector<uint64_t> hartBranchProducers_;
+
+    std::unordered_set<uint64_t> skipReadCheck_;
   };
 
 }

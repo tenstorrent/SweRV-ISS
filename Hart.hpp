@@ -1815,8 +1815,7 @@ namespace WdRiscv
     { bbFile_ = file; bbLimit_ = instCount; }
 
     /// Enable memory consistency model.
-    void setMcm(std::shared_ptr<Mcm<URV>> mcm)
-    { mcm_ = std::move(mcm); }
+    void setMcm(std::shared_ptr<Mcm<URV>> mcm);
 
     /// Enable instruction line address tracing.
     void enableInstructionLineTrace()

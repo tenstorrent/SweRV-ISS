@@ -4904,6 +4904,18 @@ Hart<URV>::run(FILE* file)
 
 
 template <typename URV>
+void
+Hart<URV>::setMcm(std::shared_ptr<Mcm<URV>> mcm)
+{
+  mcm_ = std::move(mcm);
+
+  // We cannot match the RTL timer value: We skip checking it.
+  if (hasClint())
+    mcm_->skipReadCheck(clintStart_ + 0xbff8);
+}
+
+
+template <typename URV>
 bool
 Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 {

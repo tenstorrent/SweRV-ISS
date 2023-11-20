@@ -906,11 +906,14 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 
   if (op.rtlData_ != op.data_)
     {
-      cerr << "Error: RTL/whisper read mismatch time=" << op.time_
-	   << " hart-id=" << hartId << " instr-tag=" 
-	   << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
-	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
-	   << " whisper=0x" << op.data_ << std::dec << '\n';
+      if (skipReadCheck_.find(op.physAddr_) !=  skipReadCheck_.end())
+	{
+	  cerr << "Error: RTL/whisper read mismatch time=" << op.time_
+	       << " hart-id=" << hartId << " instr-tag=" 
+	       << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
+	       << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
+	       << " whisper=0x" << op.data_ << std::dec << '\n';
+	}
       return false;
     }
   return true;
