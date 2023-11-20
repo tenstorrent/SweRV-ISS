@@ -212,6 +212,9 @@
         "exec_opcode_trigger": {
             "$ref": "#/definitions/bool_or_bool_string"
         },
+        "enable_aia": {
+            "$ref": "#/definitions/bool_or_bool_string"
+        },
         "force_rounding_mode": {
             "type": "string",
             "enum": [
@@ -513,9 +516,6 @@
             "$ref": "#/definitions/bool_or_bool_string",
             "description": "Trace page table walk in log."
         },
-        "trap_non_zero_vstart": {
-            "$ref": "#/definitions/bool_or_bool_string"
-        },
         "triggers": {
             "type": "array",
             "items": {
@@ -614,7 +614,19 @@
                             "$ref": "#/definitions/pow_of_2_int_or_hex_string"
                         }
                     }
-                }
+                },
+		"trap_non_zero_vstart": {
+		    "$ref": "#/definitions/bool_or_bool_string",
+		    "description": "Arithmetic vector instructions will trap on no-zero vstart whent this is true."
+		},
+		"mask_agnostic_policy": {
+		    "description": "Masked off vector elements will be filled with binary all-ones or left undisturbed.",
+		    "type": "string",
+		    "enum": [
+			"ones",
+			"undisturb"
+		    ]
+		}
             },
             "required": [
                 "bytes_per_vec",
@@ -622,14 +634,67 @@
                 "min_bytes_per_elem"
             ]
         },
-        "xlen": {
-            "$id": "xlen",
-            "type": "integer",
-            "enum": [32, 64, 128]
-        }
+	"imsic": {
+            "type": "object",
+	    "properties" : {
+                "mbase": {
+                    "type": "integer",
+		    "description": "base address of machine files",
+		},
+                "mstride": {
+                    "type": "integer",
+		    "description": "offset (in bytes) between machine files",
+		},
+                "sbase": {
+                    "type": "integer",
+		    "description": "supervisor address of machine files",
+		},
+                "sstride": {
+                    "type": "integer",
+		    "description": "offset (in bytes) between supervisor files",
+		},
+                "guests": {
+                    "type": "integer",
+		    "description": "number of guests per hart",
+		},
+                "ids": {
+                    "type": "integer",
+		    "description": "number of interrupt identifiers per file (must be a multiple of 64)",
+		}
+	    }
+      },
+      "pci": {
+          "type" : "object",
+          "properties" : {
+              "config_base": {
+                  "$ref": "#/definitions/int_or_hex_string",
+                  "description": "base address of config region"
+              },
+              "mmio_base": {
+                  "$ref": "#/definitions/int_or_hex_string",
+                  "description": "base address of mmio region"
+              },
+              "mmio_size": {
+                  "$ref": "#/definitions/int_or_hex_string",
+                  "description": "size of mmio region"
+              },
+              "buses": {
+                  "$ref": "integer",
+                  "description": "number of buses"
+              },
+              "slots": {
+                  "$ref": "integer",
+                  "description": "number of slots per bus"
+              }
+          }
+      },
+      "xlen": {
+          "$id": "xlen",
+          "type": "integer",
+          "enum": [32, 64, 128]
+      }
     },
     "required": [
-        "isa",
-        "xlen"
+        "isa"
     ]
 }

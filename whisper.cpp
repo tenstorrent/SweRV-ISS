@@ -141,7 +141,7 @@ parseCmdLineNumber(const std::string& option,
 }
 
 
-/// Aapter for the parseCmdLineNumber for optionals.
+/// Adapter for the parseCmdLineNumber for optionals.
 template <typename TYPE>
 static
 bool
@@ -173,7 +173,6 @@ struct Args
   std::string instFreqFile;              // Instruction frequency file.
   std::string configFile;                // Configuration (JSON) file.
   std::string bblockFile;                // Basci block file.
-  std::string attFile;                   // Address translation file.
   std::string branchTraceFile;           // Branch trace file.
   std::string tracerLib;                 // Path to tracer extension shared library.
   std::string isa;
@@ -193,6 +192,7 @@ struct Args
                                          // memory. Each target plus args is one string.
   StringVec   isaVec;                    // Isa string split around _ with rv32/rv64 prefix removed.
   std::string targetSep = " ";           // Target program argument separator.
+  StringVec   pciDevs;                   // PCI device list.
 
   std::optional<std::string> toHostSym;
   std::optional<std::string> consoleIoSym;
@@ -216,6 +216,8 @@ struct Args
   std::optional<uint64_t> branchWindow;
   std::optional<uint64_t> logStart;
   std::optional<unsigned> mcmls;
+  std::optional<uint64_t> deterministic;
+  std::optional<unsigned> seed;
 
   unsigned regWidth = 32;
   unsigned harts = 1;
@@ -245,6 +247,7 @@ struct Args
   bool unmappedElfOk = false;
   bool mcm = false;        // Memory consistency checks
   bool mcmca = false;      // Memory consistency checks: check all bytes of merge buffer
+  bool reportub = false;         // Report used blocks with sparse memory
   bool quitOnAnyHart = false;    // True if run quits when any hart finishes.
   bool noConInput = false;       // If true console io address is not used for input (ld).
   bool relativeInstCount = false;
@@ -275,7 +278,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 810;
+  unsigned subversion = 816;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -428,6 +431,20 @@ collectCommandLineValues(const boost::program_options::variables_map& varMap,
         ok = false;
     }
 
+  if (varMap.count("deterministic"))
+    {
+      auto numStr = varMap["deterministic"].as<std::string>();
+      if (not parseCmdLineNumber("deterministic", numStr, args.deterministic))
+	ok = false;
+    }
+
+  if (varMap.count("seed"))
+    {
+      auto numStr = varMap["seed"].as<std::string>();
+      if (not parseCmdLineNumber("seed", numStr, args.seed))
+	ok = false;
+    }
+
   if (args.interactive)
     args.trace = true;  // Enable instruction tracing in interactive mode.
 
@@ -473,7 +490,9 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	("binary,b", po::value(&args.binaryFiles)->multitoken(),
 	 "Binary file to load into simulator memory. File path may be suffixed with a colon followed "
 	 "by an address (integer) in which case data will be loaded at address as opposed to zero. "
-	 " Example: -b file1  -b file2:0x1040")
+	 "An addional suffix of :u may be added to write back the file with the contents of memory "
+	 "at the end of the run. "
+	 "Example: -b file1 -b file2:0x1040 -b file3:0x20000:u")
         ("kernel", po::value(&args.kernelFile),
          "Kernel binary file to load into simulator memory. File will be loaded at 0x400000 for "
         "rv32 or 0x200000 for rv64 unless an explicit addresss is specified after a colon suffix "
@@ -537,8 +556,6 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 			" gdb will work with stdio (default -1).")
 	("profileinst", po::value(&args.instFreqFile),
 	 "Report instruction frequency to file.")
-        ("att", po::value(&args.attFile),
-         "Dump implicit memory accesses associated with page table walk (PTE entries) to file.")
         ("tracebranch", po::value(&args.branchTraceFile),
          "Trace branch instructions to the given file.")
         ("branchwindow", po::value<std::string>(),
@@ -645,6 +662,21 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	("mcmls", po::value<std::string>(),
 	 "Memory consitency checker merge buffer line size. If set to zero then "
 	 "write operations are not buffered and will happen as soon a received.")
+#ifdef MEM_CALLBACKS
+        ("reportusedblocks", po::bool_switch(&args.reportub),
+         "Report used blocks with sparse memory. Useful for finding memory footprint of program")
+#endif
+        ("pcidev", po::value(&args.pciDevs)->multitoken(),
+         "Add PCI device to simulation. Format is <device>:<bus>:<slot>:<device-specific>. "
+         "This should be combined with the pci option to declare a memory region for these devices. "
+         "Currently only supports virtio-blk, which requires a file")
+        ("deterministic", po::value<std::string>(),
+         "Used for deterministic multi-hart runs. Define a window size for the amount of instructions "
+         "a hart will execute before switching to the next hart (a value of 0 turns this off). The "
+         "actual amount of instructions is determined by corresponding seed value.")
+        ("seed", po::value<std::string>(),
+         "Corresponding seed for deterministic runs. If this is not specified, but `deterministic` is, whisper will "
+         "generate a seed value based on current time.")
 	("instcounter", po::value<std::string>(),
 	 "Set instruction counter to given value.")
         ("quitany", po::bool_switch(&args.quitOnAnyHart),
@@ -1362,8 +1394,6 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
   hart.reportInstructionFrequency(outFile);
   hart.reportTrapStat(outFile);
   fprintf(outFile, "\n");
-  hart.reportPmpStat(outFile);
-  fprintf(outFile, "\n");
   hart.reportLrScStat(outFile);
 
   fclose(outFile);
@@ -1377,7 +1407,7 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 static
 bool
 openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	      FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
+	      FILE*& consoleOut, FILE*& bblockFile)
 {
   size_t len = args.traceFile.size();
   bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
@@ -1437,17 +1467,6 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 	}
     }
 
-  if (not args.attFile.empty())
-    {
-      attFile = fopen(args.attFile.c_str(), "w");
-      if (not attFile)
-        {
-          std::cerr << "Failed to open address translation file '"
-                    << args.attFile << "' for output\n";
-          return false;
-        }
-    }
-
   return true;
 }
 
@@ -1456,7 +1475,7 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 static
 void
 closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
-	       FILE*& consoleOut, FILE*& bblockFile, FILE*& attFile)
+	       FILE*& consoleOut, FILE*& bblockFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
@@ -1480,10 +1499,6 @@ closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
   if (bblockFile and bblockFile != stdout)
     fclose(bblockFile);
   bblockFile = nullptr;
-
-  if (attFile and attFile != stdout)
-    fclose(attFile);
-  attFile = nullptr;
 }
 
 
@@ -1498,7 +1513,7 @@ kbdInterruptHandler(int)
 
 template <typename URV>
 static bool
-batchRun(System<URV>& system, FILE* traceFile, bool waitAll)
+batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow, unsigned seed)
 {
   if (system.hartCount() == 0)
     return true;
@@ -1515,42 +1530,81 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll)
 
   // Run each hart in its own thread.
 
-  std::vector<std::thread> threadVec;
-
-  std::atomic<bool> result = true;
-  std::atomic<unsigned> finished = 0;  // Count of finished threads. 
-
-  auto threadFunc = [&traceFile, &result, &finished] (Hart<URV>* hart) {
-		      bool r = hart->run(traceFile);
-		      result = result and r;
-                      finished++;
-		    };
-
-  for (unsigned i = 0; i < system.hartCount(); ++i)
+  if (not stepWindow)
     {
-      Hart<URV>* hart = system.ithHart(i).get();
-      threadVec.emplace_back(std::thread(threadFunc, hart));
-    }                             
+      std::vector<std::thread> threadVec;
 
-  if (waitAll)
-    {
-      for (auto& t : threadVec)
-        t.join();
+      std::atomic<bool> result = true;
+      std::atomic<unsigned> finished = 0;  // Count of finished threads.
+
+      auto threadFunc = [&traceFile, &result, &finished] (Hart<URV>* hart) {
+                          bool r = hart->run(traceFile);
+                          result = result and r;
+                          finished++;
+                        };
+
+      for (unsigned i = 0; i < system.hartCount(); ++i)
+        {
+          Hart<URV>* hart = system.ithHart(i).get();
+          threadVec.emplace_back(std::thread(threadFunc, hart));
+        }
+
+      if (waitAll)
+        {
+          for (auto& t : threadVec)
+            t.join();
+        }
+      else
+        {
+          // First thread to finish terminates run.
+          while (finished == 0)
+            ;
+
+          extern void forceUserStop(int);
+          forceUserStop(0);
+
+          for (auto& t : threadVec)
+            t.join();
+        }
+      return result;
     }
   else
     {
-      // First thread to finish terminates run.
-      while (finished == 0)
-        ;
+      bool result = true;
+      unsigned finished = 0;
+      std::vector<Hart<URV>*> harts;
 
-      extern void forceUserStop(int);
-      forceUserStop(0);
-      
-      for (auto& t : threadVec)
-        t.join();
+      for (unsigned i = 0; i < system.hartCount(); ++i)
+        {
+          Hart<URV>* hart = system.ithHart(i).get();
+          harts.push_back(hart);
+        }
+
+      srand(seed);
+
+      while ((waitAll and finished != system.hartCount()) or
+             (not waitAll and finished == 0))
+        {
+          for (auto it = harts.begin(); it != harts.end();)
+            {
+              unsigned steps = (rand() % stepWindow) + 1;
+              // step N times
+              auto [terminate, tmp] = (*it)->runSteps(steps, traceFile);
+              result = result and tmp;
+
+              if (terminate)
+                {
+                  it = harts.erase(it);
+                  finished++;
+                }
+              else
+                it++;
+            }
+        };
+
+      std::cout << "Deterministic multi-hart run with seed: " << seed << " and steps distribution between 1 and " << stepWindow << "\n";
+      return result;
     }
-
-  return result;
 }
 
 
@@ -1756,7 +1810,9 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
     }
 
   bool waitAll = not args.quitOnAnyHart;
-  return batchRun(system, traceFile, waitAll);
+  uint64_t stepWindow = args.deterministic.value_or(0);
+  unsigned seed = args.seed.value_or(time(NULL));
+  return batchRun(system, traceFile, waitAll, stepWindow, seed);
 }
 
 
@@ -1897,6 +1953,10 @@ session(const Args& args, const HartConfig& config)
   if (not config.configMemory(system, args.unmappedElfOk))
     return false;
 
+  if (not args.pciDevs.empty())
+    if (not system.addPciDevices(args.pciDevs))
+      return false;
+
   if (not args.dataLines.empty())
     system.enableDataLineTrace(args.dataLines);
   if (not args.instrLines.empty())
@@ -1914,8 +1974,7 @@ session(const Args& args, const HartConfig& config)
   FILE* commandLog = nullptr;
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
-  FILE* attFile = nullptr;
-  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile))
+  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -1932,7 +1991,6 @@ session(const Args& args, const HartConfig& config)
       auto& hart = *system.ithHart(i);
       hart.setConsoleOutput(consoleOut);
       hart.enableBasicBlocks(bblockFile, args.bblockInsts);
-      hart.enableAddrTransLog(attFile);
       hart.enableNewlib(newlib);
       hart.enableLinux(linux);
       if (not isa.empty())
@@ -1967,7 +2025,18 @@ session(const Args& args, const HartConfig& config)
   if (not args.testSignatureFile.empty())
     result = system.produceTestSignatureFile(args.testSignatureFile) and result;
 
-  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile, attFile);
+  if (args.reportub)
+    {
+      uint64_t bytes = 0;
+      std::vector<std::pair<uint64_t, uint64_t>> blocks;
+      if (not system.getSparseMemUsedBlocks(blocks))
+        assert(false && "Not compiled with sparse memory");
+      for (const auto& [_, size] : blocks)
+        bytes += size;
+      std::cout << "Used blocks: 0x" << std::hex << bytes << std::endl;
+    }
+
+  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile);
 
   return result;
 }

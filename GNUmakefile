@@ -31,6 +31,13 @@ ifdef SOFT_FLOAT
   soft_float_lib := $(soft_float_build)/softfloat.a
 endif
 
+PCI := 1
+ifdef PCI
+  override CPPFLAGS += -I$(PWD)/pci
+  pci_build := $(wildcard $(PWD)/pci/)
+  pci_lib := $(PWD)/pci/libpci.a
+endif
+
 MEM_CALLBACKS := 1
 ifeq ($(MEM_CALLBACKS), 1)
   ifdef FAST_SLOPPY
@@ -91,7 +98,8 @@ $(BUILD_DIR)/%.cpp.o:  %.cpp
 # Main target.(only linking)
 $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
                          $(BUILD_DIR)/librvcore.a \
-			 $(soft_float_lib)
+			 $(soft_float_lib) \
+			 $(pci_lib)
 	$(CXX) -o $@ $(OFLAGS) $^ $(LINK_DIRS) $(LINK_LIBS)
 
 # Rule to make whisper.cpp.o
@@ -136,6 +144,9 @@ $(BUILD_DIR)/librvcore.a: $(OBJS)
 
 $(soft_float_lib):
 	$(MAKE) -C $(soft_float_build)
+
+$(pci_lib):
+	$(MAKE) -C $(pci_build)
 
 install: $(BUILD_DIR)/$(PROJECT)
 	@if test "." -ef "$(INSTALL_DIR)" -o "" == "$(INSTALL_DIR)" ; \

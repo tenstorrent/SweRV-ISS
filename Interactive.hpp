@@ -128,6 +128,9 @@ namespace WdRiscv
     bool mbInsertCommand(Hart<URV>& hart, const std::string& line,
 			 const std::vector<std::string>& tokens);
 
+    bool mbBypassCommand(Hart<URV>& hart, const std::string& line,
+			 const std::vector<std::string>& tokens);
+
     bool translateCommand(Hart<URV>& hart, const std::string& line,
 			  const std::vector<std::string>& tokens);
 

@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,12 +15,15 @@
 
 #pragma once
 
+#include <tuple>
 #include <memory>               // For shared_ptr
 #include <functional>
 #include <string_view>
 #include <unordered_map>
 #include "Memory.hpp"
 #include "Imsic.hpp"
+#include "pci/Pci.hpp"
+#include "pci/virtio/Blk.hpp"
 
 namespace WdRiscv
 {
@@ -239,7 +242,7 @@ namespace WdRiscv
     /// after each supervisor file (supervisor stride must be large
     /// enough). Guest files require supervisor files which require
     /// machine files. The ids parameter denotes the max interrupt
-    /// id and must be a multiple of 64.
+    /// id plus 1 and must be a multiple of 64.
     bool configImsic(uint64_t mbase, uint64_t mstride,
 		     uint64_t sbase, uint64_t sstride,
 		     unsigned guests, unsigned ids);
@@ -251,6 +254,16 @@ namespace WdRiscv
     /// used after execution has started. The mergeBuffserSize is
     /// the merge buffer line size in bytes.
     bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
+
+    /// Configure PCIe host-root-complex and construct associated devices
+    /// which use transport.
+    bool configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots);
+
+    /// Define a virtio-blk device.
+    std::shared_ptr<PciDev> defineVirtioBlk(std::string_view filename, bool ro) const;
+
+    /// Add PCIe devices specified by the user.
+    bool addPciDevices(const std::vector<std::string>& devs);
 
     /// Return true if memory consistency model is enabled.
     bool isMcmEnabled() const
@@ -288,6 +301,11 @@ namespace WdRiscv
     bool mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		     uint64_t addr, unsigned size, uint64_t data);
 
+    /// Initiate a write for a store instruction bypassing the merge
+    /// buffer.
+    bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		   uint64_t addr, unsigned size, uint64_t data);
+
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   const DecodedInst& di);
 
@@ -297,6 +315,8 @@ namespace WdRiscv
     /// riscv-arch-tests project.  The file is written to the
     // path specified in the parameter.
     bool produceTestSignatureFile(std::string_view outPath) const;
+
+    bool getSparseMemUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& usedBlocks) const;
 
   private:
 
@@ -315,5 +335,10 @@ namespace WdRiscv
     std::string fromHostSym_ = "fromhost";
     std::string consoleIoSym_ = "__whisper_console_io";  // ELF symbol to use as console-io addr.
     std::vector<std::shared_ptr<IoDevice>> ioDevs_;
+    std::shared_ptr<Pci> pci_;
+
+    // Name, size, and address in memory of a binary file.
+    typedef std::tuple<std::string, uint64_t, uint64_t> BinaryFile;
+    std::vector<BinaryFile> binaryFiles_;
   };
 }

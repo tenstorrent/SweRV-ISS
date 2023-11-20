@@ -32,7 +32,7 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned mergeBufferSize)
   hartBranchTimes_.resize(hartCount);
   hartBranchProducers_.resize(hartCount);
 
-  // If no merge buffer, then memory is updated on insert messages.
+ // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
 }
 
@@ -48,9 +48,9 @@ Mcm<URV>::updateTime(const char* method, uint64_t time)
 {
   if (time < time_)
     {
-      cerr << "Error: " << method << ": Backward time: "
+      cerr << "Warning: " << method << ": Backward time: "
 	   << time << " < " << time_ << "\n";
-      return false;
+      return true;
     }
   time_ = time;
   return true;
@@ -262,12 +262,33 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   for (auto regIx : destRegs)
     {
-      bool update = noSource or time > regTimeVec.at(regIx);
-      if (update)
-	{
-	  regTimeVec.at(regIx) = time;
-	  regProducer.at(regIx) = tag;
-	}
+      regTimeVec.at(regIx) = time;
+      regProducer.at(regIx) = tag;
+    }
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::setProducerTime(unsigned hartIx, McmInstr& instr)
+{
+  auto& di = instr.di_;
+
+  // Set producer of address register.
+  if (di.isLoad() or di.isAmo() or di.isStore())
+    {
+      unsigned addrReg = effectiveRegIx(di, 1);  // Addr reg is operand 1 of instr.
+      instr.addrProducer_ = hartRegProducers_.at(hartIx).at(addrReg);
+      instr.addrTime_ = hartRegTimes_.at(hartIx).at(addrReg);
+    }
+
+  // Set producer of data register.
+  if (di.isStore() or di.isAmo())
+    {
+      unsigned doi = di.isAmo()? 2 : 0;  // Data-regiser operand index
+      unsigned dataReg = effectiveRegIx(di, doi);  // Data operand may be integer/fp/csr
+      instr.dataProducer_ = hartRegProducers_.at(hartIx).at(dataReg);
+      instr.dataTime_ = hartRegTimes_.at(hartIx).at(dataReg);
     }
 }
 
@@ -295,7 +316,6 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   if (not writeOnInsert_)
     hartPendingWrites_.at(hartIx).push_back(op);
 
-  // If corresponding insruction is retired, compare to its data.
   McmInstr* instr = findOrAddInstr(hartIx, instrTag);
   if (not instr)
     {
@@ -311,15 +331,20 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       // Associate write op with instruction.
       instr->addMemOp(sysMemOps_.size());
       sysMemOps_.push_back(op);
-      if (checkStoreComplete(*instr))
+      instr->complete_ = checkStoreComplete(*instr);
+
+      if (not instr->retired_)
 	{
-	  instr->complete_ = true;
-	  if (instr->retired_)
-	    if (not ppoRule1(hart, *instr))
-	      result = false;
+	  cerr << "Mcm::MergeBufferInsert: Error: Merge buffer write for a non-retired store\n";
+	  return false;
 	}
 
-      // Commit write to memory. 
+      if (not ppoRule1(hart, *instr))
+	result = false;
+
+      // We commit the RTL data to memory but we check them against
+      // whisper data (checkRtlWrite below). This is simpler than
+      // committing part of whisper instruction data.
       if (op.size_ == 1)
 	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
       else if (op.size_ == 2)
@@ -330,14 +355,77 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	hart.pokeMemory(physAddr, uint64_t(rtlData), true);
       else
 	{
-	  cerr << "Mcm::MergeBufferInsert: Error: write size not a power of 2\n";
-	  assert(0 && "Mcm::MergeBufferInsert: write size not a power of 2");
+	  cerr << "Mcm::MergeBufferInsert: Error: data size not a power of 2\n";
+	  assert(0 && "Mcm::MergeBufferInsert: data size not a power of 2");
+	  result = false;
 	}
     }
 
+  // If corresponding insruction is retired, compare to its data.
   if (instr->retired_)
     if (not checkRtlWrite(hart.hartId(), *instr, op))
       result = false;
+
+  return result;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
+		   uint64_t physAddr, unsigned size, uint64_t rtlData)
+{
+  if (not updateTime("Mcm::writeOp", time))
+    return false;
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  MemoryOp op = {};
+  op.time_ = time;
+  op.physAddr_ = physAddr;
+  op.rtlData_ = rtlData;
+  op.instrTag_ = instrTag;
+  op.hartIx_ = hartIx;
+  op.size_ = size;
+  op.isRead_ = false;
+
+  // If corresponding insruction is retired, compare to its data.
+  McmInstr* instr = findOrAddInstr(hartIx, instrTag);
+  if (not instr)
+    {
+      cerr << "Mcm::bypassOp: Error: Unknown instr tag\n";
+      assert(0 && "Mcm::BypassOp: Unknown instr tag");
+      return false;
+    }
+
+  bool result = true;
+
+  // Associate write op with instruction.
+  instr->addMemOp(sysMemOps_.size());
+  sysMemOps_.push_back(op);
+
+  if (instr->retired_)
+    {
+      if (op.size_ == 1)
+	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
+      else if (op.size_ == 2)
+	hart.pokeMemory(physAddr, uint16_t(rtlData), true);
+      else if (op.size_ == 4)
+	hart.pokeMemory(physAddr, uint32_t(rtlData), true);
+      else if (op.size_ == 8)
+	hart.pokeMemory(physAddr, uint64_t(rtlData), true);
+      else
+	{
+	  cerr << "Mcm::bypassOp: Error: data size not a power of 2\n";
+	  assert(0 && "Mcm::bypassOp: data size not a power of 2");
+	  result = false;
+	}
+
+      result = checkRtlWrite(hart.hartId(), *instr, op) and result;
+      instr->complete_ = checkStoreComplete(*instr);
+      if (instr->complete_)
+	result = ppoRule1(hart, *instr) and result;
+    }
 
   return result;
 }
@@ -358,8 +446,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (instr->retired_)
     {
-      cerr << "Mcm::retire: Error: Instruction tag=" << tag
-	   << " retired multiple times\n";
+      cerr << "Mcm::retire: Error: Time=" << time << " hart-id=" << hartIx << " tag="
+	   << tag << " Instruction retired multiple times\n";
       return false;
     }
 
@@ -372,7 +460,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->di_ = di;
 
-  // If instruction is a store, save corresponding address and written data.
+  // If instruction is a store, save address, size, and written data.
   uint64_t addr = 0, value = 0;
   unsigned stSize = hart.lastStore(addr, value);
   if (stSize)
@@ -381,6 +469,19 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->physAddr_ = addr;
       instr->data_ = value;
       instr->isStore_ = true;
+      if (instr->complete_)   // Write ops already seen. Commit data.
+	{
+	  if (stSize == 1)
+	    hart.pokeMemory(addr, uint8_t(value), true);
+	  else if (stSize == 2)
+	    hart.pokeMemory(addr, uint16_t(value), true);
+	  else if (stSize == 4)
+	    hart.pokeMemory(addr, uint32_t(value), true);
+	  else if (stSize == 8)
+	    hart.pokeMemory(addr, uint64_t(value), true);
+	  else
+	    assert(0);
+	}
     }
 
   URV hartId = hart.hartId();
@@ -407,19 +508,30 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       // Must have a read.  Must not have a write.
       if (not instrHasRead(*instr))
 	{
-	  cerr << "Error: Amo instruction tag=" << tag
-	       << " retired before read op.\n";
+	  cerr << "Error: Hart-id=" << hart.hartId() << " tag=" << tag
+	       << " amo instruction retired before read op.\n";
 	  ok = false;
 	}
-#if 0
-      if (instrHasWrite(*instr))
+
+      if (not instrHasWrite(*instr))
 	{
-	  cerr << "Error: Amo instruction tag=" << tag
-	       << " retired after write op.\n";
+	  cerr << "Warning: Hart-id=" << hart.hartId() << " tag=" << tag
+	       << " amo instruction retired without a write op.\n";
 	  return false;
 	}
-#endif
+
       instr->isStore_ = true;  // AMO is both load and store.
+    }
+
+  setProducerTime(hartIx, *instr);
+  updateDependencies(hart, *instr);
+
+  if (instr->isStore_)
+    {
+      instr->complete_ = checkStoreComplete(*instr);
+      if (instr->complete_)
+	ok = checkStoreData(hartIx, *instr) and ok;
+      ok = ppoRule1(hart, *instr) and ok;
     }
 
   ok = ppoRule2(hart, *instr) and ok;
@@ -427,13 +539,12 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   ok = ppoRule4(hart, *instr) and ok;
   ok = ppoRule5(hart, *instr) and ok;
   ok = ppoRule6(hart, *instr) and ok;
+  ok = ppoRule7(hart, *instr) and ok;
   ok = ppoRule8(hart, *instr) and ok;
   ok = ppoRule9(hart, *instr) and ok;
   ok = ppoRule10(hart, *instr) and ok;
   ok = ppoRule11(hart, *instr) and ok;
   ok = ppoRule12(hart, *instr) and ok;
-
-  updateDependencies(hart, *instr);
 
   return ok;
 }
@@ -451,7 +562,8 @@ reportMismatch(uint64_t hartId, uint64_t time, std::string_view tag, uint64_t ad
 
 
 static bool
-checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAddr)
+checkBufferWriteParams(unsigned hartId, uint64_t time, unsigned lineSize,
+		       uint64_t& rtlLineSize, uint64_t physAddr)
 {
   if (lineSize == 0)
     {
@@ -461,17 +573,29 @@ checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAdd
 
   if (rtlLineSize > lineSize)
     {
-      cerr << "Merge buffer write: RTL line size (" << rtlLineSize << ") greater than"
+      cerr << "Error: Hart-id=" << hartId << " time=" << time
+	   << "RTL merge buffer write line size (" << rtlLineSize << ") greater than"
 	   << " reference line size (" << lineSize << ")\n";
       return false;
     }
 
+  if ((physAddr % lineSize) + rtlLineSize > lineSize)
+    {
+      cerr << "Warning: Hart-id=" << hartId << " time=" << time
+	   << " RTL merge buffer write data at address 0x"
+	   << std::hex << physAddr << " crosses buffer boundary" << std::dec
+	   << " -- truncating RTL data\n";
+	rtlLineSize -= (physAddr % lineSize);
+    }
+
+#if 0
   if ((physAddr % lineSize) != 0)
     {
       cerr << "Merge buffer write: address (0x" << std::hex << physAddr << ") "
 	   << "not a multiple of line size (" << std::dec << lineSize << ")\n";
       return false;
     }
+#endif
 
   return true;
 }
@@ -479,40 +603,76 @@ checkBufferWriteParams(unsigned lineSize, unsigned rtlLineSize, uint64_t physAdd
 
 template <typename URV>
 bool
-Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,
+Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
+			       uint64_t rtlLineSize, const std::vector<bool>& rtlMask,
 			       MemoryOpVec& coveredWrites)
 {
   unsigned hartIx = hart.sysHartIndex();
   auto& pendingWrites = hartPendingWrites_.at(hartIx);
   size_t pendingSize = 0;  // pendingWrite size after removal of matching writes
 
-  uint64_t lineEnd = lineBegin + lineSize_;
+  uint64_t lineEnd = rtlAddr + rtlLineSize;
 
   for (size_t i = 0; i < pendingWrites.size(); ++i)
     {
-      auto& write = pendingWrites.at(i);
-      if (write.physAddr_ >= lineBegin and write.physAddr_ < lineEnd)
+      auto& op = pendingWrites.at(i);  // Write op
+      McmInstr* instr = findOrAddInstr(hartIx, op.instrTag_);
+
+      bool written = false;  // True if op is actually written
+      if (op.physAddr_ >= rtlAddr and op.physAddr_ < lineEnd)
 	{
-	  write.time_ = time;
-	  if (write.physAddr_ + write.size_  > lineEnd)
+	  if (op.physAddr_ + op.size_  > lineEnd)
 	    {
-	      cerr << "Mcm::mergeBufferWrite: Error: Pending store address out "
-		   << "of line bounds: 0x" << std::hex << write.physAddr_ << std::dec << "\n";
+	      cerr << "Error: Pending store address out of line bounds time=" << time
+		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
+		   << op.physAddr_ << std::dec << "\n";
 	      return false;
 	    }
-	  McmInstr* instr = findOrAddInstr(hartIx, write.instrTag_);
+
 	  if (not instr or instr->isCanceled())
 	    {
-	      cerr << "Mcm::mergeBufferWrite: Error: Write for an invalid/speculated store: 0x"
-		   << std::hex << write.physAddr_ << std::dec << "\n";
+	      cerr << "Error: Write for an invalid/speculated store time=" << time
+		   << " hart-id=" << hart.hartId() << "tag=" << op.instrTag_
+		   << "addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
 	      return false;
 	    }
+
+	  if (rtlMask.empty())
+	    written = true;  // No masking
+	  else
+	    {
+	      // Check if op bytes are all masked or all unmaksed.
+	      unsigned masked = 0;  // Count of masked bytes of op.
+	      for (unsigned opIx = 0; opIx < op.size_; ++opIx)   // Scan op bytes
+		{
+		  unsigned lineIx = opIx + op.physAddr_ - rtlAddr; // Index in line
+		  if (lineIx < rtlMask.size() and rtlMask.at(lineIx))
+		    masked++;
+		}
+	      if (masked != 0)
+		{
+		  if (masked != op.size_)
+		    {
+		      cerr << "Error: Write op partially masked time=" << time
+			   << " hart-id=" << hart.hartId() << "tag=" << op.instrTag_
+			   << "addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
+		      return false;
+		    }
+		  written = true;
+		}
+	    }
+	}
+
+      if (written)
+	{
+	  op.time_ = time;
 	  instr->addMemOp(sysMemOps_.size());
-	  sysMemOps_.push_back(write);
-	  coveredWrites.push_back(write);
+	  sysMemOps_.push_back(op);
+	  coveredWrites.push_back(op);
 	}
       else
 	{
+	  // Op is not written, keep it in pending writes.
 	  if (i != pendingSize)
 	    pendingWrites.at(pendingSize) = pendingWrites.at(i);
 	  pendingSize++;
@@ -536,33 +696,34 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 {
   if (not updateTime("Mcm::mergeBufferWrite", time))
     return false;
-  if (not checkBufferWriteParams(lineSize_, rtlData.size(), physAddr))
+  uint64_t rtlSize = rtlData.size();
+  if (not checkBufferWriteParams(hart.hartId(), time, lineSize_, rtlSize, physAddr))
     return false;
 
   unsigned hartIx = hart.sysHartIndex();
 
   // Remove from hartPendingWrites_ the writes matching the RTL line
-  // addresses and place them sorted by instr tag in coveredWrites.
+  // address and place them sorted by instr tag in coveredWrites.
   std::vector<MemoryOp> coveredWrites;
-  if (not collectCoveredWrites(hart, time, physAddr, coveredWrites))
+  if (not collectCoveredWrites(hart, time, physAddr, rtlSize, rtlMask, coveredWrites))
     return false;
 
   // Read our memory corresponding to RTL line addresses.
-  std::vector<uint8_t> line(lineSize_, 0);
-  for (unsigned i = 0; i < lineSize_; ++i)
+  uint64_t lineEnd = physAddr + lineSize_ - (physAddr % lineSize_);
+  std::vector<uint8_t> line;
+  line.reserve(lineSize_);
+  for (uint64_t addr = physAddr; addr < lineEnd; ++addr)
     {
       uint8_t byte = 0;
-      if (not hart.peekMemory(physAddr + i, byte, true /*usePma*/))
+      if (not hart.peekMemory(addr, byte, true /*usePma*/))
 	{
 	  cerr << "Mcm::mergeBufferWrite: Failed to query memory\n";
 	  return false;
 	}
-      line.at(i) = byte;
+      line.push_back(byte);
     }
 
-  // Apply pending writes to our line. Compute mask of updated bytes.
-  std::vector<bool> mask(lineSize_);
-  uint64_t lineEnd = physAddr + lineSize_;
+  // Apply pending writes to our line.
   for (const auto& write : coveredWrites)
     {
       if ((write.physAddr_ < physAddr) or (write.physAddr_ + write.size_ > lineEnd))
@@ -572,22 +733,20 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 	}
       unsigned ix = write.physAddr_ - physAddr;
       for (unsigned i = 0; i < write.size_; ++i)
-	{
-	  line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
-	  mask.at(ix+i) = true;
-	}
+	line.at(ix+i) = ((uint8_t*) &(write.rtlData_))[i];
     }
 
   // Put our line back in memory (use poke words to accomodate clint).
-  for (unsigned i = 0; i < lineSize_; i += 4)
+  assert((line.size() % 4) == 0);
+  for (unsigned i = 0; i < line.size(); i += 4)
     {
       uint32_t word = *((uint32_t*) (line.data() + i));
       hart.pokeMemory(physAddr + i, word, true);
     }
-  
+
   // Compare our line to RTL line.
   bool result = true;
-  if (checkWholeLine_)
+  if (checkWholeLine_ or rtlMask.empty())
     {
       auto iterPair = std::mismatch(rtlData.begin(), rtlData.end(), line.begin());
       if (iterPair.first != rtlData.end())
@@ -600,25 +759,14 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     }
   else
     {   // Compare covered writes.
-      for (unsigned i = 0; i < lineSize_; ++i)
-	{
-	  if (mask.at(i) and (line.at(i) != rtlData.at(i)))
-	    {
-	      reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
-			     rtlData.at(i), line.at(i));
-	      result = false;
-	      break;
-	    }
-	  if (not rtlMask.empty() and i < rtlMask.size() and mask.at(i) != rtlMask.at(i))
-	    {
-	      cerr << "Error: Mismatch on merge buffer update mask time=" << time
-		   << " hart-id=" << hart.hartId() << " addr=0x" << std::hex
-		   << (physAddr + i) << std::dec << " rtl=" << rtlMask.at(i)
-		   << " whisper=" << mask.at(i) << '\n';
-	      result = false;
-	      break;
-	    }
-	}
+      for (unsigned i = 0; i < line.size(); ++i)
+	if (rtlMask.at(i) and (line.at(i) != rtlData.at(i)))
+	  {
+	    reportMismatch(hart.hartId(), time, "merge buffer write", physAddr + i,
+			   rtlData.at(i), line.at(i));
+	    result = false;
+	    break;
+	  }
     }
 
   auto& instrVec = hartInstrVecs_.at(hartIx);
@@ -733,9 +881,20 @@ Mcm<URV>::cancelNonRetired(unsigned hartIx, uint64_t instrTag)
 
 
 template <typename URV>
+void
+Mcm<URV>::cancelInstruction(Hart<URV>& hart, uint64_t instrTag)
+{
+  McmInstr* instr = findInstr(hart.sysHartIndex(), instrTag);
+  if (not instr or instr->isCanceled())
+    return;
+  cancelInstr(*instr);
+}
+  
+
+template <typename URV>
 bool
 Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
-		       const MemoryOp& op)
+		       const MemoryOp& op) const
 {
   if (op.size_ > instr.size_)
     {
@@ -747,11 +906,14 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 
   if (op.rtlData_ != op.data_)
     {
-      cerr << "Error: RTL/whisper read mismatch time=" << op.time_
-	   << " hart-id=" << hartId << " instr-tag=" 
-	   << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
-	   << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
-	   << " whisper=0x" << op.data_ << std::dec << '\n';
+      if (skipReadCheck_.find(op.physAddr_) !=  skipReadCheck_.end())
+	{
+	  cerr << "Error: RTL/whisper read mismatch time=" << op.time_
+	       << " hart-id=" << hartId << " instr-tag=" 
+	       << op.instrTag_ << " addr=0x" << std::hex << op.physAddr_
+	       << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
+	       << " whisper=0x" << op.data_ << std::dec << '\n';
+	}
       return false;
     }
   return true;
@@ -761,7 +923,7 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 template <typename URV>
 bool
 Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
-			const MemoryOp& op)
+			const MemoryOp& op) const
 {
   if (instr.size_ == 0)
     {
@@ -798,6 +960,32 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
        << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
        << " whisper=0x" << data << std::dec << '\n';
   return false;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
+{
+  if (not storeInstr.complete_)
+    return false;
+
+  bool ok = true;
+
+  for (auto opIx : storeInstr.memOps_)
+    {
+      if (opIx >= sysMemOps_.size())
+	continue;
+
+      const auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	continue;
+
+      if (not checkRtlWrite(hartId, storeInstr, op))
+	ok = false;
+    }
+
+  return ok;
 }
 
 
@@ -874,8 +1062,8 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	{
 	  if (addr + size > op.physAddr_)
 	    {
-	      mask = expectedMask;
-	      mask = mask << (op.physAddr_ - addr + 1);
+	      mask = (1 << op.size_) - 1;
+	      mask = mask << (op.physAddr_ - addr);
 	    }
 	}
       mask &= expectedMask;
@@ -1240,8 +1428,7 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 {
-  // Check ppo rule 1 for all the write operations asociated with
-  // the given store instruction B.
+  // Rule 1: B is a store, A and B have overlapping addresses.
   
   if (not instrB.complete_)
     return true;  // We will try again when B is complete.
@@ -1256,8 +1443,9 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 
       if (not instrA.isRetired())
 	{
-	  cerr << "Mcm::ppoRule1: Error: Instruction is not retired\n";
-	  assert(0 && "Mcm::ppoRule1: Error: Instruction is not retired");
+	  cerr << "Error: ppoRule1: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
+	       << " instruction of tag1 is not retired\n";
 	  return false;
 	}
 
@@ -1496,6 +1684,10 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isMemory())
     return true;
 
+  if (instrB.memOps_.empty())
+    return true;
+
+  unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
@@ -1508,16 +1700,38 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	  cerr << "Mcm::ppoRule5: Instruction A invalid/not-retired\n";
 	  assert(0 && "Mcm::ppoRule5: Instruction A invalid/not-retired");
 	}
-      if (not instrA.di_.isAtomicAcquire())
+
+      bool hasAquire = instrA.di_.isAtomicAcquire();
+      if (isTso_)
+	hasAquire = hasAquire or instrA.di_.isLoad() or instrA.di_.isAmo();
+
+      if (not hasAquire)
 	continue;
 
       bool fail = false;
       if (instrA.di_.isAmo())
 	fail = instrA.memOps_.size() != 2; // Incomplete amo might finish afrer B
+      else if (not instrA.complete_)
+	fail  = true; // Incomplete store might finish after B
       else
-        fail = (not instrA.complete_ or     // Incomplete store might finish after B
-	        (not instrB.memOps_.empty() and
-	         earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
+	{
+	  auto timeB = earliestOpTime(instrB);
+	  if (timeB <= latestOpTime(instrA))
+	    {
+	      // B peforms before A -- Allow if there is no write overlapping B after B
+	      // from another core.
+	      for (size_t ix = sysMemOps_.size(); ix != 0 and not fail; ix--)
+		{
+		  const auto& op = sysMemOps_.at(ix-1);
+		  if (op.isCanceled())
+		    continue;
+		  if (op.time_ < timeB)
+		    break;
+		  if (not op.isRead_ and instrB.overlaps(op) and op.hartIx_ != hartIx)
+		    fail = true;
+		}
+	    }
+	}
 
       if (fail)
 	{
@@ -1542,7 +1756,12 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
       cerr << "Mcm::ppoRule6: Instr B canceled/invalid\n";
       assert(0 && "Mcm::ppoRule6: Instr B canceled/invalid");
     }
-  if (not instrB.isMemory() or not instrB.di_.isAtomicRelease())
+
+  bool hasRelease = instrB.di_.isAtomicRelease();
+  if (isTso_)
+    hasRelease = hasRelease or instrB.di_.isStore() or instrB.di_.isAmo();
+
+  if (not instrB.isMemory() or not hasRelease)
     return true;
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
@@ -1576,6 +1795,62 @@ Mcm<URV>::ppoRule6(Hart<URV>& hart, const McmInstr& instrB) const
 
   return true;
 }
+
+
+template <typename URV>
+bool
+Mcm<URV>::ppoRule7(Hart<URV>& hart, const McmInstr& instrB) const
+{
+  // Rule 7: A and B have RCsc annotations.
+  if (instrB.isCanceled() or not instrB.di_.isValid())
+    {
+      cerr << "Mcm::ppoRule7: Instr B canceled/invalid\n";
+      assert(0 && "Mcm::ppoRule7: Instr B canceled/invalid");
+    }
+
+  bool bHasRc = instrB.di_.isAtomicRelease() or instrB.di_.isAtomicAcquire();
+  if (isTso_)
+    bHasRc = bHasRc or instrB.di_.isLoad() or instrB.di_.isStore() or instrB.di_.isAmo();
+
+  if (not instrB.isMemory() or not bHasRc)
+    return true;
+
+  const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
+
+  for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
+    {
+      const auto& instrA =  instrVec.at(tag-1);
+      if (instrA.isCanceled() or not instrA.isMemory())
+	continue;
+      if (not instrA.isRetired() or not instrA.di_.isValid())
+	{
+	  cerr << "Mcm::ppoRule7: Instr A invalid/not-retired\n";
+	  assert(0 && "Mcm::ppoRule&: Instr A invalid/not-retired");
+	}
+
+      bool aHasRc = instrA.di_.isAtomicRelease() or instrA.di_.isAtomicAcquire();
+      if (isTso_)
+	aHasRc = bHasRc or instrA.di_.isLoad() or instrA.di_.isStore() or instrA.di_.isAmo();
+      if (not aHasRc)
+	continue;
+
+      bool incomplete = not instrA.complete_ or 
+	(instrA.di_.isAmo() and instrA.memOps_.size() != 2); // Incomplete amo might finish afrer B
+
+      bool fail = (incomplete or     // Incomplete store might finish after B
+		   (not instrB.memOps_.empty() and
+		    earliestOpTime(instrB) <= latestOpTime(instrA)));  // A finishes after B
+
+      if (fail)
+	{
+	  cerr << "Error: PPO rule 7 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
+	  return false;
+	}
+    }
+
+  return true;
+}  
 
 
 template <typename URV>
@@ -1653,23 +1928,19 @@ Mcm<URV>::ppoRule9(Hart<URV>& hart, const McmInstr& instrB) const
     return true;
 
   const auto& bdi = instrB.di_;
-  unsigned addrReg = 0;
   if (bdi.isLoad() or bdi.isStore() or bdi.isAmo())
-    addrReg = bdi.op1();  // This is always an integer register.
-
-  uint64_t time = hartRegTimes_.at(hart.sysHartIndex()).at(addrReg);
-
-  for (auto opIx : instrB.memOps_)
     {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      if (sysMemOps_.at(opIx).time_ > time)
-	continue;
+      uint64_t addrTime = instrB.addrTime_;
 
-      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
-	   << hartRegProducers_.at(hart.sysHartIndex()).at(addrReg)
-	   << " tag2=" << instrB.tag_ << '\n';
-      return false;
+      for (auto opIx : instrB.memOps_)
+	{
+	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= addrTime)
+	    {
+	      cerr << "Error: PPO rule 9 failed: hart-id=" << hart.hartId() << " tag1="
+		   << instrB.addrProducer_ << " tag2=" << instrB.tag_ << '\n';
+	      return false;
+	    }
+	}
     }
 
   return true;
@@ -1689,26 +1960,19 @@ Mcm<URV>::ppoRule10(Hart<URV>& hart, const McmInstr& instrB) const
     }
 
   const auto& bdi = instrB.di_;
-  if (not bdi.isStore() and not bdi.isAmo())
-    return true;  // Must be a store or amo
-
-  unsigned hartIx = hart.sysHartIndex();
-  unsigned doi = bdi.isAmo()? 2 : 0;  // Data-regiser operand index
-  unsigned dataReg = effectiveRegIx(bdi, doi);  // Data operand may be integer/fp/csr
-
-  uint64_t time = hartRegTimes_.at(hartIx).at(dataReg);
-
-  for (auto opIx : instrB.memOps_)
+  if (bdi.isStore() or bdi.isAmo())
     {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      if (sysMemOps_.at(opIx).time_ > time)
-	continue;
+      uint64_t dataTime = instrB.dataTime_;
 
-      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId() << " tag1="
-	   << hartRegProducers_.at(hartIx).at(dataReg)
-	   << " tag2=" << instrB.tag_ << '\n';
-      return false;
+      for (auto opIx : instrB.memOps_)
+	{
+	  if (opIx < sysMemOps_.size() and sysMemOps_.at(opIx).time_ <= dataTime)
+	    {
+	      cerr << "Error: PPO rule 10 failed: hart-id=" << hart.hartId() << " tag1="
+		   << instrB.dataProducer_  << " tag2=" << instrB.tag_ << '\n';
+	      return false;
+	    }
+	}
     }
 
   return true;
@@ -1792,12 +2056,8 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
       if ((not mdi.isStore() and not mdi.isAmo()) or not instrM.overlaps(instrB))
 	continue;
 
-      unsigned addrReg = effectiveRegIx(mdi, 1); // Address reg is operand 1 of instr.
-      auto apTag = hartRegProducers_.at(hartIx).at(addrReg); // address producer tag
-
-      unsigned doi = mdi.isAmo()? 2 : 0;  // Data-register operand index.
-      unsigned dataReg = effectiveRegIx(mdi, doi);
-      auto dpTag = hartRegProducers_.at(hartIx).at(dataReg); // data producer tag
+      auto apTag = instrM.addrProducer_;
+      auto dpTag = instrM.dataProducer_;
 
       for (auto aTag : { apTag, dpTag } )
 	{
@@ -1806,7 +2066,9 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 	    if (not instrA.complete_ or isBeforeInMemoryTime(instrB, instrA))
 	      {
 		cerr << "Error: PPO rule 12 failed: hart-id=" << hart.hartId() << " tag1="
-		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag << '\n';
+		     << aTag << " tag2=" << instrB.tag_ << " mtag=" << mtag
+		     << " time1=" << latestOpTime(instrA)
+		     << " time2=" << earliestOpTime(instrB) << '\n';
 		return false;
 	      }
 	}

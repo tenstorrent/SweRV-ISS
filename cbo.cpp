@@ -23,7 +23,7 @@ using namespace WdRiscv;
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
+Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isRead)
 {
   uint64_t mask = uint64_t(cacheLineSize_) - 1;
   addr &= ~mask;  // Make addr a multiple of cache line size.
@@ -35,17 +35,21 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
   // Address translation
   if (isRvs())
     {
-      PrivilegeMode mode = mstatusMprv() ? mstatusMpp() : privMode_;
-      if (mode != PrivilegeMode::Machine)
+      PrivilegeMode pm = privMode_;
+      bool virt = virtMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	{
+	  pm = mstatusMpp();
+	  virt = mstatus_.bits_.MPV;
+	}
+
+      if (pm != PrivilegeMode::Machine)
         {
-          uint64_t gpa = 0;
-          uint64_t pa = 0;
+          gpa = pa = addr;
 	  bool read = isRead, write = not isRead, exec = false;
-          cause = virtMem_.translate(addr, mode, virtMode_, read, write, exec, gpa,
-                                     pa);
+          cause = virtMem_.translate(addr, pm, virt, read, write, exec, gpa, pa);
           if (cause != ExceptionCause::NONE)
             return cause;
-          addr = pa;
         }
     }
 
@@ -57,9 +61,9 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
 	{
 	  for (uint64_t i = 0; i < cacheLineSize_; i += 8)
 	    {
-	      uint64_t dwa = addr + i*8;  // Double word address
-	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isRead(privMode_, mstatusMpp(), mstatusMprv()))
+	      uint64_t dwa = pa + i*8;  // Double word address
+	      Pmp pmp = pmpManager_.accessPmp(dwa, PmpManager::AccessReason::LdSt);
+	      if (not pmp.isRead(effectivePrivilege()))
 		return ExceptionCause::LOAD_ACC_FAULT;
 	    }
 	}
@@ -67,9 +71,9 @@ Hart<URV>::determineCboException(uint64_t& addr, bool isRead)
 	{
 	  for (uint64_t i = 0; i < cacheLineSize_; i += 8)
 	    {
-	      uint64_t dwa = addr + i*8;  // Double word address
-	      Pmp pmp = pmpManager_.accessPmp(dwa);
-	      if (not pmp.isWrite(privMode_, mstatusMpp(), mstatusMprv()))
+	      uint64_t dwa = pa + i*8;  // Double word address
+	      Pmp pmp = pmpManager_.accessPmp(dwa, PmpManager::AccessReason::LdSt);
+	      if (not pmp.isWrite(effectivePrivilege()))
 		return ExceptionCause::STORE_ACC_FAULT;
 	    }
 	}
@@ -92,12 +96,8 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
        (pm == PM::User and not senvf.bits_.CBCFE) )
@@ -107,14 +107,15 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
     }
 
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
   bool isRead = false;
 
-  auto cause = determineCboException(physAddr, isRead);
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask);
+      initiateStoreException(cause, virtAddr & ~mask, gPhysAddr & ~mask);
     }
 }
 
@@ -132,12 +133,8 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
        (pm == PM::User and not senvf.bits_.CBCFE) )
@@ -147,14 +144,15 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
     }
 
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
   bool isRead = false;
 
-  auto cause = determineCboException(physAddr, isRead);
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask);
+      initiateStoreException(cause, virtAddr & ~mask, gPhysAddr & ~mask);
     }
 }
 
@@ -172,12 +170,8 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBIE) or
        (pm == PM::User and not senvf.bits_.CBIE) )
@@ -193,13 +187,14 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   bool isRead = not isFlush;
 
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  auto cause = determineCboException(physAddr, isRead);
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask);
+      initiateStoreException(cause, virtAddr & ~mask, gPhysAddr & ~mask);
     }
 }
 
@@ -217,12 +212,8 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   using PM = PrivilegeMode;
   PM pm = privilegeMode();
 
-  URV menv = 0, senv = 0;
-  peekCsr(CsrNumber::MENVCFG, menv);
-  peekCsr(CsrNumber::SENVCFG, senv);
-
-  MenvcfgFields<URV> menvf(menv);
-  SenvcfgFields<URV> senvf(senv);
+  MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
+  SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBZE) or
        (pm == PM::User and not senvf.bits_.CBZE) )
@@ -233,14 +224,17 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
 
   // Translate virtual addr and check for exception.
   uint64_t virtAddr = intRegs_.read(di->op0());
+  uint64_t mask = uint64_t(cacheLineSize_) - 1;
+  virtAddr = virtAddr & ~mask;  // Make address cache line aligned.
+
+  uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
   bool isRead = false;
-  auto cause = determineCboException(physAddr, isRead);
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
   if (cause != ExceptionCause::NONE)
     {
-      uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask);
+      initiateStoreException(cause, virtAddr, gPhysAddr);
       return;
     }
 

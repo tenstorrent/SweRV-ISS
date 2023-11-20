@@ -2541,6 +2541,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 2 and op2==0)    return instTable_.getEntry(InstId::lr_w);
                 if (top5 == 3)    return instTable_.getEntry(InstId::sc_w);
                 if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_w);
+                if (top5 == 5)    return instTable_.getEntry(InstId::amocas_w);
                 if (top5 == 8)    return instTable_.getEntry(InstId::amoor_w);
                 if (top5 == 0x0c) return instTable_.getEntry(InstId::amoand_w);
                 if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_w);
@@ -2555,6 +2556,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 2 and op2 == 0)    return instTable_.getEntry(InstId::lr_d);
                 if (top5 == 3)    return instTable_.getEntry(InstId::sc_d);
                 if (top5 == 4)    return instTable_.getEntry(InstId::amoxor_d);
+                if (top5 == 5)    return instTable_.getEntry(InstId::amocas_d);
                 if (top5 == 8)    return instTable_.getEntry(InstId::amoor_d);
                 if (top5 == 0xc)  return instTable_.getEntry(InstId::amoand_d);
                 if (top5 == 0x10) return instTable_.getEntry(InstId::amomin_d);
@@ -2562,6 +2564,10 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                 if (top5 == 0x18) return instTable_.getEntry(InstId::amominu_d);
                 if (top5 == 0x1c) return instTable_.getEntry(InstId::amomaxu_d);
               }
+	    else if (f3 == 4)
+	      {
+		if (top5 == 5)    return instTable_.getEntry(InstId::amocas_q);
+	      }
           }
           return instTable_.getEntry(InstId::illegal);
 
@@ -2909,14 +2915,14 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                       if (op0 != 0)
                         return instTable_.getEntry(InstId::illegal);
                       // sfence.vma
-                      op0 = iform.fields.rs1;
+                      op0 = iform.rs1();
                       op1 = iform.rs2();
                       return instTable_.getEntry(InstId::sfence_vma);
                     }
                   else if (funct7 == 0xb and op0 == 0)
                     {
-		      op0 = op1;
-                      op1 = op2 & 0x1f;
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::sinval_vma);
                     }
                   else if (funct7 == 0xc)
@@ -2930,30 +2936,34 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     }
                   else if (funct7 == 0x11 and op0 == 0)
                     {
-                      op2 = iform.rs2();
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hfence_vvma);
                     }
                   else if (funct7 == 0x13 and op0 == 0)
                     {
-		      op0 = op1;
-                      op1 = op2 & 0x1f;
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hinval_vvma);
                     }
                   else if (funct7 == 0x31 and op0 == 0)
                     {
-                      op2 = iform.rs2();
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hfence_gvma);
                     }
                   else if (funct7 == 0x33 and op0 == 0)
                     {
-		      op0 = op1;
-                      op1 = op2 & 0x1f;
+                      op0 = iform.rs1();
+                      op1 = iform.rs2();
                       return instTable_.getEntry(InstId::hinval_gvma);
                     }
                   else if (op2 == 0x102 and op0 == 0 and op1 == 0)
                     return instTable_.getEntry(InstId::sret);
                   else if (op2 == 0x302 and op0 == 0 and op1 == 0)
                     return instTable_.getEntry(InstId::mret);
+                  else if (op2 == 0x702 and op0 == 0 and op1 == 0)
+                    return instTable_.getEntry(InstId::mnret);
                   else if (op2 == 0x105 and op0 == 0 and op1 == 0)
                     return instTable_.getEntry(InstId::wfi);
                   else if (op2 == 0x7b2 and op0 == 0 and op1 == 0)
@@ -2969,6 +2979,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               case 4:
                 {
                   unsigned top12 = op2;
+		  op2 = 0; // No offset for these instructions.
                   if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
                   if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
                   if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);
@@ -2979,9 +2990,9 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   if (top12 == 0x681) return instTable_.getEntry(InstId::hlv_wu);
                   if (top12 == 0x6c0) return instTable_.getEntry(InstId::hlv_d);
 
-                  unsigned top7 = op2 >> 5;
+                  unsigned top7 = top12 >> 5;
                   unsigned rd = iform.fields.rd;
-                  op0 = op2 & 0x1f;  // rs2 field
+                  op0 = top12 & 0x1f;  // rs2 field
                   if (top7 == 0x31 and rd == 0) return instTable_.getEntry(InstId::hsv_b);
                   if (top7 == 0x33 and rd == 0) return instTable_.getEntry(InstId::hsv_h);
                   if (top7 == 0x35 and rd == 0) return instTable_.getEntry(InstId::hsv_w);

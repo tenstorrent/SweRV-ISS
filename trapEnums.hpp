@@ -111,4 +111,21 @@ namespace WdRiscv
       EBREAK = 1, TRIGGER = 2, DEBUGGER = 3, STEP = 4
     };
 
+
+  /// Reason for canceling an LR/SC reservation.
+  enum class CancelLrCause : uint32_t
+    {
+      NONE,
+      SC,             // Store Conditional from same hart
+      STORE,          // Store/store-conditional from another hart
+      RESET,          // Hart reset
+      TRAP,           // Interrupt or exception
+      ENTER_DEBUG,    // Entered debug mode
+      EXIT_DEBUG,     // Exited debug mode
+      WRS_NTO,        // Executed wait for reservation no timeout
+      WRS_STO,        // Executed wait for reservation short timeout
+      INTERACTIVE,    // Interactive cancel_lr command
+      SERVER          // Server cancel_lr command
+    };
+
 }

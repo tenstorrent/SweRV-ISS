@@ -144,7 +144,7 @@ Memory::loadHexFile(const std::string& fileName)
 	    {
 	      if (not errors)
 		{
-                  if (not specialInitializeByte(addr, value & 0xff))
+                  if (not initializeByte(addr, value & 0xff))
                     {
                       if (unmappedCount == 0)
                         std::cerr << "Failed to copy HEX file byte at address 0x"
@@ -209,7 +209,7 @@ Memory::loadBinaryFile(const std::string& fileName, uint64_t addr)
     {
       if (addr < size_)
         {
-          if (not specialInitializeByte(addr, b))
+          if (not initializeByte(addr, b))
             {
               if (unmappedCount == 0)
                 std::cerr << "Failed to copy binary file byte at address 0x"
@@ -286,7 +286,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
 
       for (size_t i = 0; i < size; ++i)
         {
-          if (not specialInitializeByte(addr + i, secData[i]))
+          if (not initializeByte(addr + i, secData[i]))
             {
               if (unmappedCount == 0)
                 std::cerr << "Failed to copy ELF byte at address 0x"
@@ -323,7 +323,7 @@ Memory::loadElfSegment(ELFIO::elfio& reader, int segIx, uint64_t& end)
   const char* segData = seg->get_data();
   for (size_t i = 0; i < segSize; ++i)
     {
-      if (not specialInitializeByte(paddr + i, segData[i]))
+      if (not initializeByte(paddr + i, segData[i]))
         {
           if (unmappedCount == 0)
             std::cerr << "Failed to copy ELF byte at address 0x"
@@ -1003,14 +1003,14 @@ Memory::saveInstructionAddressTrace(const std::string& path) const
 
 
 bool
-Memory::specialInitializeByte(uint64_t addr, uint8_t value)
+Memory::initializeByte(uint64_t addr, uint8_t value)
 {
   if (addr >= size_)
     return false;
 
   if (pmaMgr_.isAddrMemMapped(addr))
     {
-      if (not pmaMgr_.writeRegisterByte(addr, value))
+      if (not pmaMgr_.pokeRegisterByte(addr, value))
         return false;
     }
 

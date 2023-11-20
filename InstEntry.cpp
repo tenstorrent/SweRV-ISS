@@ -1504,6 +1504,9 @@ InstTable::setupInstVec()
       { "sret", InstId::sret, 0x10200073, 0xffffffff,
 	RvExtension::I, RvFormat::I },
 
+      { "mnret", InstId::mnret, 0x70200073, 0xffffffff,
+	RvExtension::I, RvFormat::I },
+
       { "wfi", InstId::wfi, 0x10500073, 0xffffffff,
 	RvExtension::I, RvFormat::I },
 
@@ -1796,32 +1799,32 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "clz", InstId::clz, 0x60001013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "clzw", InstId::clzw, 0x6000101b, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "cpop", InstId::cpop, 0x60201013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "cpopw", InstId::cpopw, 0x6020101b, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "ctz", InstId::ctz, 0x60101013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "ctzw", InstId::ctzw, 0x6010101b, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
@@ -1850,7 +1853,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "orc.b", InstId::orc_b, 0x28005013, 0xf800707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
@@ -1861,7 +1864,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "rev8", InstId::rev8, 0x69805013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
@@ -1902,12 +1905,12 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "sext.b", InstId::sext_b, 0x60401013, 0xfff0707f,
-        RvExtension::Zbb, RvFormat::R,
+        RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "sext.h", InstId::sext_h, 0x60501013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::R,
+	RvExtension::Zbb, RvFormat::I,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
@@ -2454,7 +2457,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.vv ", InstId::vwadd_vv ,
+      { "vwadd.vv", InstId::vwadd_vv ,
         0b110001'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2463,7 +2466,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.vx ", InstId::vwadd_vx ,
+      { "vwadd.vx", InstId::vwadd_vx ,
         0b110001'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2472,7 +2475,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.vv ", InstId::vwsub_vv ,
+      { "vwsub.vv", InstId::vwsub_vv ,
         0b110011'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2481,7 +2484,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.vx ", InstId::vwsub_vx ,
+      { "vwsub.vx", InstId::vwsub_vx ,
         0b110011'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2526,7 +2529,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.wv ", InstId::vwadd_wv ,
+      { "vwadd.wv", InstId::vwadd_wv ,
         0b110101'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2535,7 +2538,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwadd.wx ", InstId::vwadd_wx ,
+      { "vwadd.wx", InstId::vwadd_wx ,
         0b110101'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2544,7 +2547,7 @@ InstTable::setupInstVec()
         OperandType::IntReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.wv ", InstId::vwsub_wv ,
+      { "vwsub.wv", InstId::vwsub_wv ,
         0b110111'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -2553,7 +2556,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vwsub.wx ", InstId::vwsub_wx ,
+      { "vwsub.wx", InstId::vwsub_wx ,
         0b110111'0'00000'00000'110'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111,
         RvExtension::V, RvFormat::R,
@@ -7388,5 +7391,24 @@ InstTable::setupInstVec()
 	RvExtension::Zfa, RvFormat::R,
 	OperandType::FpReg, OperandMode::Write, rdMask,
 	OperandType::FpReg, OperandMode::Read, rs1Mask },
+
+      { "amocas.w", InstId::amocas_w, 0x2800202f, 0xf800707f,
+	RvExtension::Zacas, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+      
+      { "amocas.d", InstId::amocas_d, 0x2800302f, 0xf800707f,
+	RvExtension::Zacas, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+      { "amocas.q", InstId::amocas_q, 0x2800402f, 0xf800707f,
+	RvExtension::Zacas, RvFormat::R,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
     };
 }

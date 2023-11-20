@@ -24,6 +24,7 @@
 #include "Triggers.hpp"
 #include "PerfRegs.hpp"
 #include "CsrFields.hpp"
+#include "Imsic.hpp"
 #include "util.hpp"
 
 
@@ -64,88 +65,18 @@ namespace WdRiscv
 
       // Machine protection and translation.
       PMPCFG0 = 0x3a0,
-      PMPCFG1 = 0x3a1,
-      PMPCFG2 = 0x3a2,
-      PMPCFG3 = 0x3a3,
-      PMPCFG4 = 0x3a4,
-      PMPCFG5 = 0x3a5,
-      PMPCFG6 = 0x3a6,
-      PMPCFG7 = 0x3a7,
-      PMPCFG8 = 0x3a8,
-      PMPCFG9 = 0x3a9,
-      PMPCFG10 = 0x3aa,
-      PMPCFG11 = 0x3ab,
-      PMPCFG12 = 0x3ac,
-      PMPCFG13 = 0x3ad,
-      PMPCFG14 = 0x3ae,
       PMPCFG15 = 0x3af,
       PMPADDR0 = 0x3b0,
-      PMPADDR1 = 0x3b1,
-      PMPADDR2 = 0x3b2,
-      PMPADDR3 = 0x3b3,
-      PMPADDR4 = 0x3b4,
-      PMPADDR5 = 0x3b5,
-      PMPADDR6 = 0x3b6,
-      PMPADDR7 = 0x3b7,
-      PMPADDR8 = 0x3b8,
-      PMPADDR9 = 0x3b9,
-      PMPADDR10 = 0x3ba,
-      PMPADDR11 = 0x3bb,
-      PMPADDR12 = 0x3bc,
-      PMPADDR13 = 0x3bd,
-      PMPADDR14 = 0x3be,
-      PMPADDR15 = 0x3bf,
-      PMPADDR16 = 0x3c0,
-      PMPADDR17 = 0x3c1,
-      PMPADDR18 = 0x3c2,
-      PMPADDR19 = 0x3c3,
-      PMPADDR20 = 0x3c4,
-      PMPADDR21 = 0x3c5,
-      PMPADDR22 = 0x3c6,
-      PMPADDR23 = 0x3c7,
-      PMPADDR24 = 0x3c8,
-      PMPADDR25 = 0x3c9,
-      PMPADDR26 = 0x3ca,
-      PMPADDR27 = 0x3cb,
-      PMPADDR28 = 0x3cc,
-      PMPADDR29 = 0x3cd,
-      PMPADDR30 = 0x3ce,
-      PMPADDR31 = 0x3cf,
-      PMPADDR32 = 0x3d0,
-      PMPADDR33 = 0x3d1,
-      PMPADDR34 = 0x3d2,
-      PMPADDR35 = 0x3d3,
-      PMPADDR36 = 0x3d4,
-      PMPADDR37 = 0x3d5,
-      PMPADDR38 = 0x3d6,
-      PMPADDR39 = 0x3d7,
-      PMPADDR40 = 0x3d8,
-      PMPADDR41 = 0x3d9,
-      PMPADDR42 = 0x3da,
-      PMPADDR43 = 0x3db,
-      PMPADDR44 = 0x3dc,
-      PMPADDR45 = 0x3dd,
-      PMPADDR46 = 0x3de,
-      PMPADDR47 = 0x3df,
-      PMPADDR48 = 0x3e0,
-      PMPADDR49 = 0x3e1,
-      PMPADDR50 = 0x3e2,
-      PMPADDR51 = 0x3e3,
-      PMPADDR52 = 0x3e4,
-      PMPADDR53 = 0x3e5,
-      PMPADDR54 = 0x3e6,
-      PMPADDR55 = 0x3e7,
-      PMPADDR56 = 0x3e8,
-      PMPADDR57 = 0x3e9,
-      PMPADDR58 = 0x3ea,
-      PMPADDR59 = 0x3eb,
-      PMPADDR60 = 0x3ec,
-      PMPADDR61 = 0x3ed,
-      PMPADDR62 = 0x3ee,
       PMPADDR63 = 0x3ef,
 
       MENVCFG = 0x30a,
       MENVCFGH = 0x31a,
+
+      // Non maskable interrupts
+      MNSCRATCH = 0x740,
+      MNEPC = 0x741,
+      MNCAUSE = 0x742,
+      MNSTATUS = 0x744,
 
       // Machine Counter/Timers
       MCYCLE = 0xb00,
@@ -427,7 +358,7 @@ namespace WdRiscv
       VLENB    = 0xc22,
 
       // Advanced interrupt architecture (AIA)
-      MISELECT   = 0x315,
+      MISELECT   = 0x350,
       MIREG      = 0x351,
       MTOPEI     = 0x35c,
       MTOPI      = 0xFB0,
@@ -481,6 +412,15 @@ namespace WdRiscv
       HSTATEEN1H  = 0x61d,
       HSTATEEN2H  = 0x61e,
       HSTATEEN3H  = 0x61f,
+
+      // Ascalon physical memory attributes
+      PMACFG0  = 0x7e0,
+      PMACFG31 = 0x7ff,
+      PMACFG32 = 0xbe0,
+      PMACFG63 = 0xbff,
+
+      // Ascalon matp.
+      MATP = 0x7c7,
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
@@ -731,7 +671,7 @@ namespace WdRiscv
     { defined_ = flag; }
 
     /// True if this is a hypervisor register. Hypervisor registers
-    /// are not available in VS (virtual-supervisor) mode.
+    /// are not available in VS/VU (virtual-supervisor) mode.
     void setHypervisor(bool flag)
     { hyper_ = flag; }
 
@@ -929,6 +869,10 @@ namespace WdRiscv
       csrNums = lastWrittenRegs_;
       triggers_.getLastWrittenTriggers(triggerNums);
     }
+
+    /// Associate an IMSIC with this register file.
+    void attachImsic(std::shared_ptr<TT_IMSIC::Imsic> imsic)
+    { imsic_ = imsic; }
 
   protected:
 
@@ -1151,13 +1095,15 @@ namespace WdRiscv
     /// at MHPMCOUNTER3/MHPMCOUNTER3H are made read/write. The
     /// remaining counters are made read only. For each counter that
     /// is made read-write the corresponding MHPMEVENT is made
-    /// read-write.
-    bool configMachineModePerfCounters(unsigned numCounters);
+    /// read-write. The cof flag indicates that counter overflow
+    /// extension is enabled.
+    bool configMachineModePerfCounters(unsigned numCounters, bool cof);
 
     /// Configure user mode performance counters returning true on
-    /// success and false on failure. N cannot exceed the number of machine
-    /// mode performance registers. First N performance counters are configured
-    /// as readable, the remaining ones are made read-zero.
+    /// success and false on failure. N cannot exceed the number of
+    /// machine mode performance registers. First N performance
+    /// counters are configured as readable, the remaining ones are
+    /// made read-zero.
     bool configUserModePerfCounters(unsigned numCounters);
 
     /// Helper to write method. Update frm/fflags after fscr is written.
@@ -1203,6 +1149,9 @@ namespace WdRiscv
     /// Helper to construtor. Define Mstateen extension CSRs
     void defineStateEnableRegs();
 
+    /// Helper to constructor. Define PMA CSRs.
+    void definePmaRegs();
+
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.
     bool setStoreErrorAddrCapture(URV value);
@@ -1215,8 +1164,12 @@ namespace WdRiscv
     }
 
     /// Update the user level counter privilege. This is called after
-    /// a write/poke to MCOUNTEREN.
+    /// a write/poke to MCOUNTEREN/SCOUNTEREN/HCOUNTEREN.
     void updateCounterPrivilege();
+
+    /// Update the virtual interrupt register control. This is called
+    /// after a write/poke to HVICTL.
+    void updateVirtInterruptCtl();
 
     /// Enter/exit debug mode based given a flag value of true/false.
     void enterDebug(bool flag)
@@ -1239,6 +1192,8 @@ namespace WdRiscv
     bool writeTdata(CsrNumber number, PrivilegeMode mode, URV value);
 
     bool pokeTdata(CsrNumber number, URV value);
+
+    bool readTopi(CsrNumber number, URV& value) const;
 
     bool setCsrFields(CsrNumber number, const std::vector<typename Csr<URV>::Field>& fields)
     {
@@ -1270,9 +1225,9 @@ namespace WdRiscv
     }
 
     /// Fast peek method for HGEIP.
-    URV peekHgeip() const
+    URV peekHgeie() const
     {
-      const auto& csr = regs_.at(size_t(CsrNumber::HGEIP));
+      const auto& csr = regs_.at(size_t(CsrNumber::HGEIE));
       return csr.read();
     }
 
@@ -1306,6 +1261,13 @@ namespace WdRiscv
     URV peekVstart() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::VSTART));
+      return csr.read();
+    }
+
+    /// Fast peek method for MNSTATUS.
+    URV peekMnstatus() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MNSTATUS));
       return csr.read();
     }
 
@@ -1435,11 +1397,35 @@ namespace WdRiscv
     /// Helper to write method: Mask with MSTATEEN.
     bool writeHstateen(CsrNumber num, URV value);
 
+    /// Helper to write method.
+    bool writeMireg(CsrNumber num, URV value);
+
+    /// Helper to write method.
+    bool writeSireg(CsrNumber num, URV value);
+
+    /// Helper to write method.
+    bool writeVsireg(CsrNumber num, URV value);
+
+    /// Helper to write method.
+    bool writeMtopei();
+
+    /// Helper to write method.
+    bool writeStopei();
+
+    /// Helper to write method.
+    bool writeVstopei();
+
+    /// Helper to read method.
+    bool readMtopei();
+
     /// Legalize the PMPCFG value before updating such a register: If
     /// the grain factor G is greater than or equal to 1, then the NA4
     /// mode is not selectable in the A field. If a field is locked it
     /// is replaced by the current value. Return the legalized value.
     URV legalizePmpcfgValue(URV current, URV value) const;
+
+    /// Legalize a PMACFG value.
+    URV legalizePmacfgValue(URV current, URV value) const;
 
     /// Legalize scountovf, matching OF bit of given mhpmevent.
     void updateScountovfValue(CsrNumber mhpm, uint64_t value);
@@ -1463,13 +1449,17 @@ namespace WdRiscv
     void setGuestInterruptCount(unsigned value)
     { geilen_ = value; }
 
-    /// Enable user mode.
+    /// Enable/disable user mode.
     void enableUserMode(bool flag)
     { userEnabled_ = flag; }
 
-    /// Enable supervisor time compare.
+    /// Enable/disable supervisor time compare.
     void enableSstc(bool flag)
     { sstcEnabled_ = flag; updateSstc(); }
+
+    /// Enable/disable top-of-range mode in pmp configurations.
+    void enablePmpTor(bool flag)
+    { pmpTor_ = flag; }
 
     /// Update implementation status of Sstc (supervisor timer)
     /// related CSRs.  This is called when Sstc related configuration
@@ -1479,20 +1469,36 @@ namespace WdRiscv
     /// Enable/disable F extension.
     void enableRvf(bool flag);
 
+    /// Enable/disable C extension.
+    void enableRvc(bool flag)
+    {
+      // Least sig bit reads zero if C. Least sig 2 bits read zero if not C.
+      URV mask = ~URV(0) << (flag ? 1 : 2);  // 
+      regs_.at(size_t(CsrNumber::MEPC)).setReadMask(mask);
+      regs_.at(size_t(CsrNumber::SEPC)).setReadMask(mask);
+      regs_.at(size_t(CsrNumber::MNEPC)).setReadMask(mask);
+    }
+
     /// Enable/disable counter-overflow extension (sscofpmf)
     void enableSscofpmf(bool flag);
 
     /// Enable/disable access to certain CSRs from non-machine mode.
     void enableStateen(bool flag);
 
-    /// Enable supervisor mode.
+    /// Enable/disable resubale non maskable interrupt extension.
+    void enableSmrnmi(bool flag);
+
+    /// Enable/disable supervisor mode.
     void enableSupervisorMode(bool flag);
 
-    /// Enable hypervisor mode.
+    /// Enable/disable hypervisor mode.
     void enableHypervisorMode(bool flag);
 
-    /// Enable vector extension.
+    /// Enable/disable vector extension.
     void enableVectorExtension(bool flag);
+
+    /// Enable/disable advanced interrupt artchitecture extension.
+    void enableAiaExtension(bool flag);
 
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
@@ -1582,6 +1588,28 @@ namespace WdRiscv
       return fields.bits_.STCE;
     }
 
+    /// Return the ADUE bit of MENVCFG CSR.
+    bool menvcfgAdue()
+    {
+      auto csr = getImplementedCsr(CsrNumber::MENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.ADUE;
+    }
+
+    /// Return the ADUE bit of MENVCFG CSR.
+    bool henvcfgAdue()
+    {
+      auto csr = getImplementedCsr(CsrNumber::HENVCFG);
+      if (not csr)
+	return false;
+      URV value = csr->read();
+      MenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.ADUE;
+    }
+
     /// Set ix to the counter index corresponding to the given
     /// MHPMEVENT CSR number (0 for MHPMEVENT3, 1 for MHPMEVENT4, ...)
     /// Return true on success and false if number does not correspond
@@ -1648,6 +1676,7 @@ namespace WdRiscv
     std::unordered_map<std::string, CsrNumber, util::string_hash, std::equal_to<>> nameToNumber_;
 
     Triggers<URV> triggers_;
+    std::shared_ptr<TT_IMSIC::Imsic> imsic_;
 
     // Register written since most recent clearLastWrittenRegs
     std::vector<CsrNumber> lastWrittenRegs_;
@@ -1677,6 +1706,7 @@ namespace WdRiscv
     bool sstcEnabled_ = false;    // Supervisor time compare
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
+    bool pmpTor_ = true;          // Top-of-range PMP mode enabled
 
     bool recordWrite_ = true;
     bool debugMode_ = false;

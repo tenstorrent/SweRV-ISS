@@ -50,27 +50,23 @@ namespace WdRiscv
     { }
 
     /// Return true if read (i.e. load instructions) access allowed
-    bool isRead(PrivilegeMode mode, PrivilegeMode prevMode, bool mprv) const
+    bool isRead(PrivilegeMode mode) const
     {
-      if (mprv)
-        mode = prevMode;
       bool check = (mode != PrivilegeMode::Machine) or locked_;
       return check ? mode_ & Read : true;
     }
 
     /// Return true if write (i.e. store instructions) access allowed.
-    bool isWrite(PrivilegeMode mode, PrivilegeMode prevMode, bool mprv) const
+    bool isWrite(PrivilegeMode mode) const
     {
-      bool check = (mode != PrivilegeMode::Machine or locked_ or
-                    (mprv and prevMode != PrivilegeMode::Machine));
+      bool check = (mode != PrivilegeMode::Machine or locked_);
       return check ? mode_ & Write : true;
     }
 
     /// Return true if instruction fecth is allowed.
-    bool isExec(PrivilegeMode mode, PrivilegeMode prevMode, bool mprv) const
+    bool isExec(PrivilegeMode mode) const
     {
-      bool check = (mode != PrivilegeMode::Machine or locked_ or
-                    (mprv and prevMode != PrivilegeMode::Machine));
+      bool check = (mode != PrivilegeMode::Machine or locked_);
       return check ? mode_ & Exec : true;
     }
 
@@ -93,8 +89,6 @@ namespace WdRiscv
     /// Return integer representation of the given PMP configuration.
     uint8_t val() const
     { return (locked_ << 7) | (0 << 5) | ((uint8_t(type_) & 3) << 3) | (mode_ & 7); }
-
-  protected:
 
     /// Return the index of the PMP entry from which this object was
     /// created.
@@ -119,6 +113,8 @@ namespace WdRiscv
   public:
 
     friend class Memory;
+
+    enum AccessReason { None, Fetch, LdSt };
 
     /// Constructor. Mark all memory as no access to user/supervisor
     /// (machine mode does access since it is not checked).
@@ -158,9 +154,22 @@ namespace WdRiscv
       return {};
     }
 
+    struct PmpTrace
+    {
+      uint32_t ix_;
+      uint64_t addr;
+      uint8_t val;
+      AccessReason reason_;
+    };
+
     /// Similar to getPmp but it also updates the access count associated with
     /// each PMP entry.
     inline Pmp accessPmp(uint64_t addr) const
+    { return accessPmp(addr, AccessReason::None); }
+
+    /// Similar to getPmp but it also updates the access count associated with
+    /// each PMP entry.
+    inline Pmp accessPmp(uint64_t addr, AccessReason reason) const
     {
       addr = (addr >> 2) << 2;
       for (const auto& region : regions_)
@@ -168,15 +177,26 @@ namespace WdRiscv
 	  {
 	    auto pmp = region.pmp_;
 	    auto ix = pmp.pmpIndex();
+	    auto val = pmp.val();
 	    if (trace_)
-	      {
-		accessCount_.at(ix)++;
-		typeCount_.at(ix)++;
-		pmpTrace_.push_back(ix);
-	      }
+              pmpTrace_.push_back({ix, addr, val, reason});
 	    return pmp;
 	  }
       return {};
+    }
+
+    /// Used for tracing to determine if an address matches multiple PMPs.
+    bool matchMultiplePmp(uint64_t addr) const
+    {
+      bool hit = false;
+      for (const auto& region : regions_)
+	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          {
+            if (hit)
+              return true;
+            hit = true;
+          }
+      return false;
     }
 
     /// Enable/disable physical memory protection.
@@ -199,7 +219,7 @@ namespace WdRiscv
     bool printStats(const std::string& path) const;
 
     /// Return the access count of PMPs used in most recent instruction.
-    const std::vector<uint64_t>& getPmpTrace() const
+    const std::vector<PmpTrace>& getPmpTrace() const
     { return pmpTrace_; }
 
     void clearPmpTrace()
@@ -220,11 +240,9 @@ namespace WdRiscv
 
     std::vector<Region> regions_;
     bool enabled_ = false;
-    bool trace_ = true;   // Collect stats if true.
-    mutable std::vector<uint64_t> accessCount_;  // PMP entry access count.
-    mutable std::vector<uint64_t> typeCount_;  // PMP type access count.
+    bool trace_ = false;   // Collect stats if true.
 
     // PMPs used in most recent instruction
-    mutable std::vector<uint64_t> pmpTrace_;
+    mutable std::vector<PmpTrace> pmpTrace_;
   };
 }

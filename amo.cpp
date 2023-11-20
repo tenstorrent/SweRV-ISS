@@ -31,16 +31,20 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
 {
   URV mask = URV(accessSize) - 1;
 
+  bool misal = (addr & mask) != 0;
+  if (misal and misalHasPriority_)
+    {
+      if (misalAtomicCauseAccessFault_)
+	return ExceptionCause::STORE_ACC_FAULT;
+      return ExceptionCause::STORE_ADDR_MISAL;
+    }
+
   uint64_t addr2 = addr;
   uint64_t gaddr2 = gaddr;
   auto cause = determineStoreException(addr, addr2, gaddr, gaddr2, accessSize, false /*hyper*/);
 
-  if (cause == ExceptionCause::STORE_ADDR_MISAL)
-    {
-      if (misalAtomicCauseAccessFault_)
-	return ExceptionCause::STORE_ACC_FAULT;
-      return cause;
-    }
+  if (cause != ExceptionCause::NONE)
+    return cause;
 
   // Address must be word aligned for word access and double-word
   // aligned for double-word access.
@@ -50,20 +54,14 @@ Hart<URV>::validateAmoAddr(uint64_t& addr, uint64_t& gaddr, unsigned accessSize)
   if (cause != ExceptionCause::NONE)
     return cause;
 
-  Pma pma = memory_.pmaMgr_.getPma(addr);
-  if (not pma.isAmo())
-    return ExceptionCause::STORE_ACC_FAULT;
-
   return cause;
 }
 
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
+Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 {
-  URV virtAddr = intRegs_.read(rs1);
-
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
@@ -81,6 +79,13 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
   auto cause = validateAmoAddr(addr, gaddr, ldStSize_);
   ldStPhysAddr1_ = addr;
   ldStPhysAddr2_ = addr;
+
+  if (cause == ExceptionCause::NONE)
+    {
+      Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      if (not pma.hasAttrib(attrib))
+	cause = ExceptionCause::STORE_ACC_FAULT;
+    }
 
   if (cause != ExceptionCause::NONE)
     {
@@ -112,10 +117,8 @@ Hart<URV>::amoLoad32(uint32_t rs1, URV& value)
 
 template <typename URV>
 bool
-Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
+Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
 {
-  URV virtAddr = intRegs_.read(rs1);
-
   ldStAddr_ = virtAddr;   // For reporting load addr in trace-mode.
   ldStPhysAddr1_ = ldStAddr_;
   ldStPhysAddr2_ = ldStAddr_;
@@ -133,6 +136,13 @@ Hart<URV>::amoLoad64(uint32_t rs1, URV& value)
   auto cause = validateAmoAddr(addr, gaddr, ldStSize_);
   ldStPhysAddr1_ = addr;
   ldStPhysAddr2_ = addr;
+
+  if (cause == ExceptionCause::NONE)
+    {
+      Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
+      if (not pma.hasAttrib(attrib))
+	cause = ExceptionCause::STORE_ACC_FAULT;
+    }
 
   if (cause != ExceptionCause::NONE)
     {
@@ -188,14 +198,14 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   ldStPhysAddr1_ = addr2;
 
   // Address outside DCCM causes an exception (this is swerv specific).
-  bool fail = amoInDccmOnly_ and not isAddrInDccm(addr1);
+  bool fail = amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1);
 
   // Access must be naturally aligned.
   if ((addr1 & (ldStSize_ - 1)) != 0)
     fail = true;
 
   if (cause == ExceptionCause::NONE)
-    fail = fail or not memory_.pmaMgr_.getPma(addr1).isRsrv();
+    fail = fail or not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::LOAD_ACC_FAULT;
@@ -298,8 +308,8 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
 
   if (cause == EC::NONE)
     {
-      bool fail = not memory_.pmaMgr_.getPma(addr1).isRsrv();
-      fail = fail or (amoInDccmOnly_ and not isAddrInDccm(addr1));
+      bool fail = not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
+      fail = fail or (amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1));
       if (fail)
 	cause = EC::STORE_ACC_FAULT;
     }
@@ -383,7 +393,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
   if (not keepReservOnScException_ or not hasException_)
-    cancelLr(); // Clear LR reservation (if any).
+    cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
 
   if (ok)
     {
@@ -405,7 +415,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
 template <typename URV>
 template <typename OP>
 void
-Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
+Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 {
   if (not isRva())
     {
@@ -419,7 +429,8 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
 
   URV loadedValue = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad32(rs1, loadedValue);
+  URV virtAddr = intRegs_.read(rs1);
+  bool loadOk = amoLoad32(virtAddr, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
@@ -431,7 +442,11 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, OP op)
       bool storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(result));
 
       if (storeOk and not triggerTripped_)
-	intRegs_.write(rd, rdVal);
+	{
+	  intRegs_.write(rd, rdVal);
+	  ldStData_ = uint32_t(result);
+	  ldStWrite_ = true;
+	}
     }
 }
 
@@ -440,7 +455,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoadd_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::plus<URV>{});
+  execAmo32Op(di, Pma::AmoOther, std::plus<URV>{});
 }
 
 
@@ -452,7 +467,7 @@ Hart<URV>::execAmoswap_w(const DecodedInst* di)
     return a;
   };
 
-  execAmo32Op(di, getFirst);
+  execAmo32Op(di, Pma::AmoSwap, getFirst);
 }
 
 
@@ -460,7 +475,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoxor_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::bit_xor{});
+  execAmo32Op(di, Pma::AmoLogical, std::bit_xor{});
 }
 
 
@@ -468,7 +483,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoor_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::bit_or{});
+  execAmo32Op(di, Pma::AmoLogical, std::bit_or{});
 }
 
 
@@ -476,7 +491,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoand_w(const DecodedInst* di)
 {
-  execAmo32Op(di, std::bit_and{});
+  execAmo32Op(di, Pma::AmoLogical, std::bit_and{});
 }
 
 
@@ -489,7 +504,7 @@ Hart<URV>::execAmomin_w(const DecodedInst* di)
     auto sb = static_cast<int32_t>(b);
     return std::min(sa, sb);
   };
-  execAmo32Op(di, myMin);
+  execAmo32Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -502,7 +517,7 @@ Hart<URV>::execAmominu_w(const DecodedInst* di)
     auto ub = static_cast<uint32_t>(b);
     return std::min(ua, ub);
   };
-  execAmo32Op(di, myMin);
+  execAmo32Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -515,7 +530,7 @@ Hart<URV>::execAmomax_w(const DecodedInst* di)
     auto sb = static_cast<int32_t>(b);
     return std::max(sa, sb);
   };
-  execAmo32Op(di, myMax);
+  execAmo32Op(di, Pma::AmoOther, myMax);
 }
 
 
@@ -528,7 +543,7 @@ Hart<URV>::execAmomaxu_w(const DecodedInst* di)
     auto ub = static_cast<uint32_t>(b);
     return std::max(ua, ub);
   };
-  execAmo32Op(di, myMax);
+  execAmo32Op(di, Pma::AmoOther, myMax);
 }
 
 
@@ -585,7 +600,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
   // If there is an exception then reservation may/may-not be dropped
   // depending on config.
   if (not keepReservOnScException_ or not hasException_)
-    cancelLr(); // Clear LR reservation (if any).
+    cancelLr(CancelLrCause::SC); // Clear LR reservation (if any).
 
   if (ok)
     {
@@ -607,7 +622,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
 template <typename URV>
 template <typename OP>
 void
-Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
+Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 {
   if (not isRva() or not isRv64())
     {
@@ -621,11 +636,11 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
 
   URV loadedValue = 0;
   URV rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
-  bool loadOk = amoLoad64(rs1, loadedValue);
+  URV virtAddr = intRegs_.read(rs1);
+  bool loadOk = amoLoad64(virtAddr, attrib, loadedValue);
   if (loadOk)
     {
       URV addr = intRegs_.read(rs1);
-
       URV rdVal = loadedValue;
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
@@ -633,7 +648,11 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, OP op)
       bool storeOk = store<uint64_t>(addr, false /*hyper*/, result);
 
       if (storeOk and not triggerTripped_)
-	intRegs_.write(rd, rdVal);
+	{
+	  intRegs_.write(rd, rdVal);
+	  ldStData_ = result;
+	  ldStWrite_ = true;
+	}
     }
 }
 
@@ -642,7 +661,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoadd_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::plus<URV>{});
+  execAmo64Op(di, Pma::AmoOther, std::plus<URV>{});
 }
 
 
@@ -654,7 +673,7 @@ Hart<URV>::execAmoswap_d(const DecodedInst* di)
     return a;
   };
 
-  execAmo64Op(di, getFirst);
+  execAmo64Op(di, Pma::AmoSwap, getFirst);
 }
 
 
@@ -662,7 +681,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoxor_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::bit_xor{});
+  execAmo64Op(di, Pma::AmoLogical, std::bit_xor{});
 }
 
 
@@ -670,7 +689,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoor_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::bit_or{});
+  execAmo64Op(di, Pma::AmoLogical, std::bit_or{});
 }
 
 
@@ -678,7 +697,7 @@ template <typename URV>
 void
 Hart<URV>::execAmoand_d(const DecodedInst* di)
 {
-  execAmo64Op(di, std::bit_and{});
+  execAmo64Op(di, Pma::AmoLogical, std::bit_and{});
 }
 
 
@@ -691,7 +710,7 @@ Hart<URV>::execAmomin_d(const DecodedInst* di)
     auto sb = static_cast<int64_t>(b);
     return std::min(sa, sb);
   };
-  execAmo64Op(di, myMin);
+  execAmo64Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -704,7 +723,7 @@ Hart<URV>::execAmominu_d(const DecodedInst* di)
     auto ub = static_cast<uint64_t>(b);
     return std::min(ua, ub);
   };
-  execAmo64Op(di, myMin);
+  execAmo64Op(di, Pma::AmoOther, myMin);
 }
 
 
@@ -717,7 +736,7 @@ Hart<URV>::execAmomax_d(const DecodedInst* di)
     auto sb = static_cast<int64_t>(b);
     return std::max(sa, sb);
   };
-  execAmo64Op(di, myMax);
+  execAmo64Op(di, Pma::AmoOther, myMax);
 }
 
 
@@ -730,7 +749,209 @@ Hart<URV>::execAmomaxu_d(const DecodedInst* di)
     auto ub = static_cast<uint64_t>(b);
     return std::max(ua, ub);
   };
-  execAmo64Op(di, myMax);
+  execAmo64Op(di, Pma::AmoOther, myMax);
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execAmocas_w(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  URV loadedVal = 0;
+  uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+  URV addr = intRegs_.read(rs1);
+  bool loadOk = amoLoad32(addr, Pma::Attrib::AmoArith, loadedVal);
+  uint32_t temp = loadedVal;
+
+  if (loadOk)
+    {
+      uint32_t rs2Val = intRegs_.read(rs2);
+      uint32_t rdVal = intRegs_.read(rd);
+
+      bool storeOk = true;
+      if (temp == rdVal)
+	storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val));
+
+      if (storeOk and not triggerTripped_)
+	{
+	  SRV result = int32_t(temp);   // Sign extended in RV64
+	  intRegs_.write(rd, result);
+	}
+    }
+}
+
+
+template <>
+void
+Hart<uint32_t>::execAmocas_d(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+  if ((rd & 1) == 1 or (rs2 & 1) == 1)
+    {
+      illegalInst(di);    // rd and rs2 must be even
+      return;
+    }
+
+  Pma::Attrib attrib = Pma::Attrib::AmoArith;
+
+  uint32_t temp0 = 0, temp1 = 0;
+  uint32_t addr = intRegs_.read(rs1);
+  bool loadOk = (amoLoad32(addr, attrib, temp0) and
+		 amoLoad32(addr + 4, attrib, temp1));
+  if (loadOk)
+    {
+      uint32_t rs2Val0 = intRegs_.read(rs2);
+      uint32_t rs2Val1 = intRegs_.read(rs2 + 1);
+      uint32_t rdVal0 = intRegs_.read(rd);
+      uint32_t rdVal1 = intRegs_.read(rd + 1);
+      if (rs2 == 0)
+	rs2Val1 = 0;
+      if (rd == 0)
+	rdVal1 = 0;
+
+      bool storeOk = true;
+      if (temp0 == rdVal0 and temp1 == rdVal1)
+	{
+	  storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val0));
+	  storeOk = storeOk and store<uint32_t>(addr, false, uint32_t(rs2Val1));
+	}
+
+      if (storeOk and not triggerTripped_ and rd != 0)
+	{
+	  intRegs_.write(rd, temp0);
+	  intRegs_.write(rd+1, temp1);
+	}
+    }
+}
+
+
+template <>
+void
+Hart<uint64_t>::execAmocas_d(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+
+  Pma::Attrib attrib = Pma::Attrib::AmoArith;
+
+  uint64_t temp = 0;
+  uint64_t addr = intRegs_.read(rs1);
+  bool loadOk = amoLoad64(addr, attrib, temp);
+
+  if (loadOk)
+    {
+      uint64_t rs2Val = intRegs_.read(rs2);
+      uint64_t rdVal = intRegs_.read(rd);
+
+      bool storeOk = true;
+      if (temp == rdVal)
+	storeOk = store<uint64_t>(addr, false /*hyper*/, rs2Val);
+
+      if (storeOk and not triggerTripped_)
+	intRegs_.write(rd, temp);
+    }
+}
+
+
+template <>
+void
+Hart<uint32_t>::execAmocas_q(const DecodedInst* di)
+{
+  illegalInst(di);
+}
+
+
+template <>
+void
+Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
+{
+  if (not isRva() or not isRvzacas())
+    {
+      illegalInst(di);
+      return;
+    }
+
+  // Lock mutex to serialize AMO instructions. Unlock automatically on
+  // exit from this scope.
+  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+
+  uint64_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
+  if ((rd & 1) == 1 or (rs2 & 1) == 1)
+    {
+      illegalInst(di);    // rd and rs2 must be even
+      return;
+    }
+
+  Pma::Attrib attrib = Pma::AmoArith;
+
+  uint64_t temp0 = 0, temp1 = 0;
+  uint64_t addr = intRegs_.read(rs1);
+
+  URV mask = 0xf;
+  bool misal = (addr & mask) != 0;
+  if (misal and misalHasPriority_)
+    {
+      if (misalAtomicCauseAccessFault_)
+	initiateStoreException(ExceptionCause::STORE_ACC_FAULT, addr, addr);
+      initiateStoreException(ExceptionCause::STORE_ADDR_MISAL, addr, addr);
+      return;
+    }
+
+  bool loadOk = (amoLoad64(addr, attrib, temp0) and
+		 amoLoad64(addr + 8, attrib, temp1));
+  if (loadOk)
+    {
+      uint64_t rs2Val0 = intRegs_.read(rs2);
+      uint64_t rs2Val1 = intRegs_.read(rs2 + 1);
+      uint64_t rdVal0 = intRegs_.read(rd);
+      uint64_t rdVal1 = intRegs_.read(rd + 1);
+      if (rs2 == 0)
+	rs2Val1 = 0;
+      if (rd == 0)
+	rdVal1 = 0;
+
+      bool storeOk = true;
+      if (temp0 == rdVal0 and temp1 == rdVal1)
+	{
+	  storeOk = store<uint64_t>(addr, false /*hyper*/, uint64_t(rs2Val0));
+	  storeOk = storeOk and store<uint32_t>(addr, false, uint64_t(rs2Val1));
+	}
+
+      if (storeOk and not triggerTripped_ and rd != 0)
+	{
+	  intRegs_.write(rd, temp0);
+	  intRegs_.write(rd+1, temp1);
+	}
+    }
 }
 
 

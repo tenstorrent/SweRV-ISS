@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,12 +32,16 @@ namespace WdRiscv
 
     enum Attrib
       {
-       None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8, Amo = 16,
-       Iccm = 32, Dccm = 64, MemMapped = 128, Rsrv = 256, Io = 512,
-       Cacheable = 1024,
-       MisalOk = 2048, // True if misaligned access supported.
-       MisalAccFault = 4096, // Set if misaligned generates access fault.
+       None = 0, Read = 1, Write = 2, Exec = 4, Idempotent = 8,
+       AmoOther = 0x10,  // for amo add/min/max
+       AmoSwap = 0x20, AmoLogical = 0x40,
+       Iccm = 0x80, Dccm = 0x100, MemMapped = 0x200, Rsrv = 0x400,
+       Io = 0x800, Cacheable = 0x1000,
+       MisalOk = 0x2000, // True if misaligned access supported.
+       MisalAccFault = 0x4000, // Set if misaligned generates access fault.
        Mapped = Exec | Read | Write,
+       AmoArith = AmoSwap | AmoOther | AmoLogical,
+       Amo = AmoArith,
        Default = Read | Write | Exec | Idempotent | Amo | Rsrv | MisalOk
       };
 
@@ -102,7 +106,7 @@ namespace WdRiscv
     /// is supported.
     bool misalOnMisal() const
     { return isMisalignedOk() and not (attrib_ & MisalAccFault); }
-    
+
     /// Return true if misaligned access generates an access fault
     /// exception in this region. Returns false if misaligned access
     /// is supported.
@@ -127,6 +131,12 @@ namespace WdRiscv
     void disable(Attrib a)
     { attrib_ &= ~a; }
 
+    /// Return true if this PMA has the given attribute. If given value
+    /// is the or of multiple attributes, then all attributes must be
+    /// present in this PMA.
+    bool hasAttrib(Attrib a) const
+    { return (attrib_ & a) == a; }
+
     /// Convert given string to a Pma object. Return true on success
     /// return false if string does not contain a valid attribute names.
     /// Valid names: none, read, write, execute, idempotent, amo, iccm,
@@ -135,7 +145,7 @@ namespace WdRiscv
 
   private:
 
-    uint32_t attrib_;
+    uint32_t attrib_ = 0;
   };
 
 
@@ -149,6 +159,8 @@ namespace WdRiscv
 
     friend class Memory;
 
+    enum AccessReason { None, Fetch, LdSt };
+
     PmaManager(uint64_t memorySize);
 
     /// Return the physical memory attribute associated with the
@@ -161,7 +173,7 @@ namespace WdRiscv
 
       // Search regions in order. Return first matching.
       for (const auto& region : regions_)
-	if (addr >= region.firstAddr_ and addr <= region.lastAddr_)
+	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
 	  return region.pma_;
 
       if (addr >= memSize_)
@@ -169,18 +181,81 @@ namespace WdRiscv
       return defaultPma_;  // rwx amo rsrv idempotent misalok
     }
 
-    /// Define a physical memory attribute region. Regions must be defined
-    /// in order (if an address is covered by multiple regions, then the
-    /// first defined region applies). The defined region consists of the
-    /// word-aligned words with addresses between fistAddr and lastAddr
-    /// inclusive. For example, if firstAddr is 5 and lastAddr is 13,
-    /// then the defined region consists of the words at 8 and 12 (bytes
-    /// 8 to 15).
-    bool defineRegion(uint64_t firstAddr, uint64_t lastAddr, Pma pma)
+    struct PmaTrace
     {
-      Region region{firstAddr, lastAddr, pma};
-      regions_.push_back(region);
+      uint32_t pma_;
+      uint64_t addr;
+      uint64_t baseAddr;
+      uint64_t lastAddr;
+      AccessReason reason_;
+    };
+
+    /// Similar to getPma but updates trace associated with each PMA entry
+    inline Pma accessPma(uint64_t addr) const
+    { return accessPma(addr, AccessReason::None); }
+
+    /// Similar to getPma but updates trace associated with each PMA entry
+    inline Pma accessPma(uint64_t addr, AccessReason reason) const
+    {
+      addr = (addr >> 2) << 2; // Make word aligned.
+
+      // Search regions in order. Return first matching.
+      for (const auto& region : regions_)
+	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          {
+            auto pma = region.pma_;
+            if (trace_)
+              pmaTrace_.push_back({pma.attrib_, addr, region.firstAddr_, region.lastAddr_, reason});
+            return pma;
+          }
+
+      if (addr >= memSize_)
+	return noAccessPma_;
+      return defaultPma_;  // rwx amo rsrv idempotent misalok
+    }
+
+    /// Used for tracing to determine if an address matches multiple PMAs.
+    bool matchMultiplePma(uint64_t addr) const
+    {
+      bool hit = false;
+      for (const auto& region : regions_)
+	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          {
+            if (hit)
+              return true;
+            hit = true;
+          }
+      return false;
+    }
+
+    /// Define a physical memory attribute region at given index ix
+    /// (indices are 0 to n-1 where n is the region count). Regions
+    /// are checked in order order (if an address is covered by
+    /// multiple regions, then the first defined region applies). The
+    /// defined region consists of the word-aligned words with
+    /// addresses between fistAddr and lastAddr inclusive. For
+    /// example, if firstAddr is 5 and lastAddr is 13, then the
+    /// defined region consists of the words at 8 and 12 (bytes 8 to
+    /// 15).
+    bool defineRegion(unsigned ix, uint64_t firstAddr, uint64_t lastAddr, Pma pma)
+    {
+      Region region{firstAddr, lastAddr, pma, true};
+      if (ix >= 128)
+	return false;  // Arbitrary limit.
+      if (ix >= regions_.size())
+	regions_.resize(ix + 1);
+      regions_.at(ix) = region;
       return true;
+    }
+
+    /// Mark entry at given index as invalid.
+    void invalidateEntry(unsigned ix)
+    {
+      if (ix >= 128)
+	return;  // Arbitrary limit.
+      if (ix >= regions_.size())
+	regions_.resize(ix + 1);
+      regions_.at(ix).valid_ = false;
     }
 
     /// Associate a mask with the word-aligned word at the given
@@ -217,6 +292,19 @@ namespace WdRiscv
 	}
     }
 
+    /// Clear the default PMA (no access).
+    void clearDefaultPma()
+    { defaultPma_.attrib_ = Pma::Attrib::None; }
+
+    const std::vector<PmaTrace>& getPmaTrace() const
+    { return pmaTrace_; }
+
+    void clearPmaTrace()
+    { pmaTrace_.clear(); }
+
+    void enableTrace(bool flag)
+    { trace_ = flag; }
+
   protected:
 
     /// Reset (to zero) all memory mapped registers.
@@ -252,8 +340,9 @@ namespace WdRiscv
       uint64_t firstAddr_ = 0;
       uint64_t lastAddr_ = 0;
       Pma pma_;
+      bool valid_ = false;
     };
-    
+
     struct MemMappedReg
     {
       uint32_t value_ = 0;
@@ -262,6 +351,8 @@ namespace WdRiscv
 
     std::vector<Region> regions_;
     std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
+    bool trace_ = false;  // Collect stats if true.
+    mutable std::vector<PmaTrace> pmaTrace_;
 
     Pma defaultPma_{Pma::Attrib::Default};
     Pma noAccessPma_{Pma::Attrib::None};

@@ -29,7 +29,11 @@ Pma::stringToAttrib(std::string_view str, Pma::Attrib& attrib)
     { "write", Pma::Write },
     { "exec", Pma::Exec },
     { "idempotent", Pma::Idempotent },
-    { "amo", Pma::Amo },
+    { "amoswap", Pma::AmoSwap },
+    { "amological", Pma::AmoLogical },
+    { "amoother", Pma::AmoOther },
+    { "amoarithmetic", Pma::AmoArith },
+    { "amo", Pma::AmoArith },
     { "iccm", Pma::Iccm },
     { "dccm", Pma::Dccm },
     { "mem_mapped", Pma::MemMapped },
@@ -55,6 +59,7 @@ PmaManager::PmaManager(uint64_t memSize)
   : memSize_(memSize)
 {
   noAccessPma_.enable(Pma::Attrib::MisalOk);
+  regions_.reserve(32);
 }
 
 

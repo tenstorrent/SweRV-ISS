@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <unordered_set>
 #include "DecodedInst.hpp"
 
 
@@ -40,9 +41,13 @@ namespace WdRiscv
     std::vector<MemoryOpIx> memOps_;
     uint64_t physAddr_ = 0;   // Data address for ld/store instruction.
     uint64_t data_ = 0;       // Data for load/sore instructions.
+    uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
+    uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
+    McmInstrIx addrProducer_ = 0;
+    McmInstrIx dataProducer_ = 0;
+    DecodedInst di_;
     McmInstrIx tag_ = 0;
     uint8_t size_ = 0;        // Data size for load/store insructions.
-    DecodedInst di_;
     bool retired_ = false;
     bool canceled_ = false;
     bool isLoad_ = false;
@@ -71,8 +76,9 @@ namespace WdRiscv
     {
       if (size_ == 0 or other.size_ == 0)
 	{
-	  std::cerr << "McmInstr::overlaps: Error: zero data size\n";
-	  assert(0 && "McmInstr::overlaps: zero data size\n");
+	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		    << " tag2=" << other.tag_ << " zero data size\n";
+	  // assert(0 && "McmInstr::overlaps: zero data size\n");
 	}
       if (physAddr_ == other.physAddr_)
 	return true;
@@ -85,8 +91,9 @@ namespace WdRiscv
     {
       if (size_ == 0 or op.size_ == 0)
 	{
-	  std::cerr << "McmInstr::overlaps: Error: zero data size\n";
-	  assert(0 && "McmInstr::overlaps: zero data size\n");
+	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		    << " tag2=" << op.instrTag_ << " zero data size\n";
+	  // assert(0 && "McmInstr::overlaps: zero data size\n");
 	}
       if (physAddr_ == op.physAddr_)
 	return true;
@@ -115,6 +122,10 @@ namespace WdRiscv
     bool readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		uint64_t physAddr, unsigned size, uint64_t rtlData);
     
+    /// This is a write operation bypassing the merge buffer.
+    bool bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
+		  uint64_t physAddr, unsigned size, uint64_t rtlData);
+
     /// Initiate a merge buffer write.  All associated store write
     /// transactions are marked completed. Write instructions where
     /// all writes are complete are marked complete. Return true on
@@ -136,9 +147,10 @@ namespace WdRiscv
 			   uint64_t physAddr, unsigned size,
 			   uint64_t rtlData);
 
-    /// Cancel all the early-read transaction associted with the given
-    /// tag. This is done when a speculative load instruction is canceled.
-    bool cancelRead(unsigned hartId, uint64_t instTag);
+    /// Cancel all the memory operations associted with the given tag. This is
+    /// done when a speculative instruction is canceled or when an instruction
+    /// is trapped.
+    void cancelInstruction(Hart<URV>& hart, uint64_t instrTag);
 
     /// This is called when an instruction is retired.
     bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
@@ -155,6 +167,11 @@ namespace WdRiscv
     unsigned mergeBufferLineSize() const
     { return lineSize_; }
 
+    /// Skip checking RTL read-op values against this model. This is used
+    /// for items like the CLINT timer where we cannot match the RTL.
+    void skipReadCheck(uint64_t addr)
+    { skipReadCheck_.insert(addr); }
+
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool ppoRule2(Hart<URV>& hart, const McmInstr& instr) const;
@@ -166,6 +183,8 @@ namespace WdRiscv
     bool ppoRule5(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool ppoRule6(Hart<URV>& hart, const McmInstr& instr) const;
+
+    bool ppoRule7(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool ppoRule8(Hart<URV>& hart, const McmInstr& instr) const;
 
@@ -235,9 +254,12 @@ namespace WdRiscv
 
     void cancelReplayedReads(McmInstr*);
 
-    // Remove from hartPendingWrites_ the writes matching the RTL line
-    // addresses and place them sorted by instr tag in coveredWrites.
+    /// Remove from hartPendingWrites_ the write ops falling with the given RTL
+    /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place
+    /// them sorted by instr tag in coveredWrites. Write ops may not straddle
+    /// line boundary. Write ops may not be partially masked.
     bool collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t lineBegin,
+			      uint64_t lineSize, const std::vector<bool>& rtlMask,
 			      MemoryOpVec& coveredWrites);
 
     /// Forward from a store to a read op. Return true on success.
@@ -264,6 +286,8 @@ namespace WdRiscv
 
     bool checkStoreComplete(const McmInstr& instr) const;
 
+    bool checkStoreData(unsigned hartId, const McmInstr& insrt) const;
+
     bool checkLoadComplete(const McmInstr& instr) const;
 
     void clearMaskBitsForWrite(const McmInstr& storeInstr,
@@ -272,10 +296,10 @@ namespace WdRiscv
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
     bool checkRtlWrite(unsigned hartId, const McmInstr& instr,
-		       const MemoryOp& op);
+		       const MemoryOp& op) const;
 
     bool checkRtlRead(unsigned hartId, const McmInstr& instr,
-		      const MemoryOp& op);
+		      const MemoryOp& op) const;
 
     bool updateTime(const char* method, uint64_t time);
 
@@ -291,15 +315,14 @@ namespace WdRiscv
       for (auto memIx : instr.memOps_)
 	{
 	  if (sysMemOps_.at(memIx).isCanceled())
-	    {
-	      std::cerr << "Mcm::cancelInstr: Error: op already canceled\n";
-	      assert(0 && "Mcm::cancelInstr: op already canceled");
-	    }
+	    std::cerr << "Mcm::cancelInstr: Error: op already canceled\n";
 	  sysMemOps_.at(memIx).cancel();
 	}
     }
 
     void updateDependencies(const Hart<URV>& hart, const McmInstr& instr);
+
+    void setProducerTime(unsigned hartIx, McmInstr& instr);
 
     /// Map register number of operand opIx to a unique integer by adding
     /// an offset: integer register have 0 offset, fp regs have 32, and
@@ -332,6 +355,8 @@ namespace WdRiscv
     // covered by store instructions.
     bool checkWholeLine_ = false;
 
+    bool isTso_ = false;  // True if total-store-ordering model.
+
     std::vector<McmInstrIx> currentInstrTag_;
 
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
@@ -341,6 +366,8 @@ namespace WdRiscv
     // branch does not depend on a prior memory instruction.
     std::vector<uint64_t> hartBranchTimes_;
     std::vector<uint64_t> hartBranchProducers_;
+
+    std::unordered_set<uint64_t> skipReadCheck_;
   };
 
 }

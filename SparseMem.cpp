@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -122,6 +122,18 @@ SparseMem::write(uint64_t addr, unsigned size, uint64_t val)
     }
 
   return false;
+}
+
+
+uint8_t*
+SparseMem::map(uint64_t addr, size_t size)
+{
+  // TODO: need to check addr + size < end
+  if (size > pageSize_)
+    return nullptr;
+  uint64_t pageRank = getPageRank(addr);
+  std::vector<uint8_t>& page = findOrCreatePage(pageRank);
+  return page.data() + (addr & pageMask_);
 }
 
 

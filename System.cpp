@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +16,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <boost/algorithm/string.hpp>
 #include "Filesystem.hpp"
 #include "Hart.hpp"
 #include "Core.hpp"
@@ -24,6 +25,7 @@
 #include "Mcm.hpp"
 #include "Uart8250.hpp"
 #include "Uartsf.hpp"
+#include "pci/virtio/Blk.hpp"
 
 
 using namespace WdRiscv;
@@ -75,11 +77,13 @@ System<URV>::System(unsigned coreCount, unsigned hartsPerCore,
                  return sparseMem_->read(addr, size, value); };
   auto writef = [this](uint64_t addr, unsigned size, uint64_t value) -> bool {
                   return sparseMem_->write(addr, size, value); };
+  auto mapf = [this](uint64_t addr, size_t size) -> uint8_t* {
+                  return sparseMem_->map(addr, size); };
 
   mem.defineReadMemoryCallback(readf);
   mem.defineWriteMemoryCallback(writef);
+  mem.defineMapMemoryCallback(mapf);
 #endif
-
 }
 
 
@@ -94,7 +98,31 @@ System<URV>::defineUart(uint64_t addr, uint64_t size)
 
 
 template <typename URV>
-System<URV>::~System() = default;
+System<URV>::~System()
+{
+  // Write back binary files were marked for update.
+  for (auto bf : binaryFiles_)
+    {
+      auto path = std::get<0>(bf);
+      uint64_t addr = std::get<1>(bf);
+      uint64_t size = std::get<2>(bf);
+      std::cerr << "Updating " << path << " from addr: 0x" << std::hex << addr
+		<< std::dec << " size: " << size << '\n';
+      FILE* file = fopen(path.c_str(), "w");
+      if (not file)
+	{
+	  std::cerr << "Failed to open " << path << " for update\n";
+	  continue;
+	}
+      for (uint64_t i = 0; i < size; ++i)
+	{
+	  uint8_t byte = 0;
+	  memory_->peek(addr + i, byte, false);
+	  fputc(byte, file);
+	}
+      fclose(file);
+    }
+}
 
 
 template <typename URV>
@@ -169,13 +197,13 @@ System<URV>::loadElfFiles(const std::vector<std::string>& files, bool raw, bool 
 	  if (not hart->peekIntReg(RegGp) and gp)
 	    {
               if (verbose)
-                std::cerr << "Setting register gp to 0x" << std::hex << gp << std::dec << '\n';    
+                std::cerr << "Setting register gp to 0x" << std::hex << gp << std::dec << '\n';
 	      hart->pokeIntReg(RegGp, URV(gp));
 	    }
 	  if (not hart->peekIntReg(RegTp) and tp)
 	    {
               if (verbose)
-                std::cerr << "Setting register tp to 0x" << std::hex << tp << std::dec << '\n';   
+                std::cerr << "Setting register tp to 0x" << std::hex << tp << std::dec << '\n';
 	      hart->pokeIntReg(RegTp, URV(tp));
 	    }
 	  if (entry)
@@ -209,32 +237,78 @@ System<URV>::loadHexFiles(const std::vector<std::string>& files, bool verbose)
 
 template <typename URV>
 bool
-System<URV>::loadBinaryFiles(const std::vector<std::string>& files,
+System<URV>::loadBinaryFiles(const std::vector<std::string>& fileSpecs,
 			     uint64_t defOffset, bool verbose)
 {
+  using std::cerr;
   unsigned errors = 0;
 
-  for (const auto& binaryFile : files)
+  for (const auto& spec : fileSpecs)
     {
-      std::string filename = binaryFile;
+      // Split filespec around colons. Spec format: <file>,
+      // <file>:<offset>, or <file>:<offset>:u
+      std::vector<std::string> parts;
+      boost::split(parts, spec, boost::is_any_of(":"));
+
+      if (parts.empty())
+	{
+	  std::cerr << "Error: Empty binary file name\n";
+	  errors++;
+	  continue;
+	}
+
+      std::string filename = parts.at(0);
       uint64_t offset = defOffset;
-      auto end = binaryFile.find(':');
-      if (end != std::string::npos)
+
+      if (parts.size() > 1)
         {
-          filename = binaryFile.substr(0, end);
-          std::string offsStr = binaryFile.substr(end + 1, binaryFile.length());
-          offset = strtoull(offsStr.c_str(), nullptr, 0);
+          std::string offsStr = parts.at(1);
+	  if (offsStr.empty())
+	    cerr << "Warning: Empty binary file offset: " << spec << '\n';
+	  else
+	    {
+	      char* tail = nullptr;
+	      offset = strtoull(offsStr.c_str(), &tail, 0);
+	      if (tail and *tail)
+		{
+		  cerr << "Error: Invalid binary file offset: " << spec << '\n';
+		  errors++;
+		  continue;
+		}
+	    }
         }
       else
-        std::cerr << "Binary file " << binaryFile << " does not have an address, will use address 0x"
-		  << std::hex << offset << std::dec << '\n';
+        cerr << "Binary file " << filename << " does not have an address, will use address 0x"
+	     << std::hex << offset << std::dec << '\n';
+
+      bool update = false;
+      if (parts.size() > 2)
+	{
+	  if (parts.at(2) != "u")
+	    {
+	      cerr << "Error: Invalid binary file attribute: " << spec << '\n';
+	      errors++;
+	      continue;
+	    }
+	  update = true;
+	}
 
       if (verbose)
-	std::cerr << "Loading binary " << filename << " at address 0x" << std::hex
-		  << offset << std::dec << '\n';
+	cerr << "Loading binary " << filename << " at address 0x" << std::hex
+	     << offset << std::dec << '\n';
 
       if (not memory_->loadBinaryFile(filename, offset))
-        errors++;
+	{
+	  errors++;
+	  continue;
+	}
+
+      if (update)
+	{
+	  uint64_t size = Filesystem::file_size(filename);
+	  BinaryFile bf = { filename, offset, size };
+	  binaryFiles_.push_back(bf);
+	}
     }
 
   return errors == 0;
@@ -282,6 +356,7 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
     sparseMem_->getUsedBlocks(usedBlocks);
   else
     syscall.getUsedMemBlocks(usedBlocks);
+
   if (not saveUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
 
@@ -435,7 +510,13 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 
   if ((ids % 64) != 0)
     {
-      cerr << "Error: IMSIC max interrupt id (" << ids << ") is not a multiple of 64.\n";
+      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is not a multiple of 64.\n";
+      return false;
+    }
+
+  if (ids > 2048)
+    {
+      cerr << "Error: IMSIC interrupt id limit (" << ids << ") is larger than 2048.\n";
       return false;
     }
 
@@ -466,6 +547,83 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
       hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc);
     }
 
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots)
+{
+  if (mmioBase - configBase < (1ULL << 28))
+    {
+      std::cerr << "PCI config space typically needs 28bits to fully cover entire region" << std::endl;
+      return false;
+    }
+
+  pci_ = std::make_shared<Pci>(configBase, mmioBase, mmioSize, buses, slots);
+
+  for (auto& hart : sysHarts_)
+    hart->attachPci(pci_, configBase, mmioBase, mmioSize);
+  return true;
+}
+
+
+template <typename URV>
+std::shared_ptr<PciDev>
+System<URV>::defineVirtioBlk(std::string_view filename, bool ro) const
+{
+  return std::make_shared<Blk>(std::string(filename), ro);
+}
+
+
+template <typename URV>
+bool
+System<URV>::addPciDevices(const std::vector<std::string>& devs)
+{
+  if (not pci_)
+    {
+      std::cerr << "Please specify a PCI region in the json" << std::endl;
+      return false;
+    }
+
+  auto devmapf = [this](uint64_t addr, size_t size) -> uint8_t* {
+    return this->memory_->data(addr, size);
+  };
+
+  auto writef = [this](uint64_t addr, unsigned size, uint64_t data) -> bool {
+    return this->imsicMgr_.write(addr, size, data);
+  };
+
+  for (const auto& devStr : devs)
+    {
+      std::shared_ptr<PciDev> dev;
+      std::vector<std::string> tokens;
+      boost::split(tokens, devStr, boost::is_any_of(":"), boost::token_compress_on);
+
+      if (tokens.size() < 3)
+        {
+          std::cerr << "PCI device string should have at least 3 fields" << std::endl;
+          return false;
+        }
+
+      std::string name = tokens.at(0);
+      unsigned bus = std::stoi(tokens.at(1));
+      unsigned slot = std::stoi(tokens.at(2));
+
+      if (name == "virtio-blk")
+        {
+          if (not (tokens.size() == 4))
+            {
+              std::cerr << "virtio-blk requires backing input file" << std::endl;
+              return false;
+            }
+          dev = defineVirtioBlk(tokens.at(3), false);
+        }
+
+      if (not pci_->register_device(dev, bus, slot, devmapf, writef))
+        return false;
+    }
   return true;
 }
 
@@ -524,6 +682,17 @@ System<URV>::mcmMbInsert(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (not mcm_)
     return false;
   return mcm_->mergeBufferInsert(hart, time, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		       uint64_t addr, unsigned size, uint64_t data)
+{
+  if (not mcm_)
+    return false;
+  return mcm_->bypassOp(hart, time, tag, addr, size, data);
 }
 
 
@@ -596,6 +765,19 @@ System<URV>::produceTestSignatureFile(std::string_view outPath) const
     }
 
   return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::getSparseMemUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& usedBlocks) const
+{
+  if (sparseMem_)
+    {
+      sparseMem_->getUsedBlocks(usedBlocks);
+      return true;
+    }
+  return false;
 }
 
 

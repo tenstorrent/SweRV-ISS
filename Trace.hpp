@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <unordered_set>
+
 #include "DecodedInst.hpp"
 #include "Hart.hpp"
 
@@ -81,8 +83,7 @@ namespace WdRiscv
     /// Trap vector mode after last executed instruction
     TrapVectorMode nextTvecMode() const
     {
-      URV tvec = 0;
-      peekCsr(CsrNumber::MTVEC, tvec);
+      URV tvec = peekCsr(CsrNumber::MTVEC);
       auto tvm = TrapVectorMode{tvec&3};
       return tvm;
     }
@@ -99,9 +100,9 @@ namespace WdRiscv
       if (trapped)
         {
           if (nextPrivMode() == PrivilegeMode::Machine)
-            hart_->peekCsr(CsrNumber::MCAUSE, cause);
+            cause = hart_->peekCsr(CsrNumber::MCAUSE);
           else if (nextPrivMode() == PrivilegeMode::Supervisor)
-            hart_->peekCsr(CsrNumber::SCAUSE, cause);
+            cause = hart_->peekCsr(CsrNumber::SCAUSE);
         }
       return trapped;
     }
@@ -297,20 +298,41 @@ namespace WdRiscv
     bool misalignedLdSt(bool& misal) const
     { return hart_->misalignedLdSt(misal); }
 
+    /// Return true if associated hart is holding a reservation
+    /// (obtained thru an LR instruction).
     bool hasLr() const
     { return hart_->hasLr(); }
 
-    /// TODO: add support for vector ld/st (multiple PMAs accessed)
-    /// Collect PMAs accessed for previous load stores
-    bool getPmas(Pma& pma) const
+    /// Return the reason for loss of reservation of the associated hart.
+    CancelLrCause cancelLrCause() const
+    { return hart_->cancelLrCause(); }
+
+    void getPmpsAccessed(std::vector<PmpManager::PmpTrace>& pmps) const
+    { hart_->getPmpsAccessed(pmps); }
+
+    void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const
+    { hart_->getPmasAccessed(pmas); }
+
+    bool matchMultiplePmp(uint64_t addr) const
+    { return hart_->pmpManager().matchMultiplePmp(addr); }
+
+    bool matchMultiplePma(uint64_t addr) const
+    { return hart_->pmaManager().matchMultiplePma(addr); }
+
+    /// Return the number of pages accessed by a vector ld/st instruction.
+    unsigned numVecPagesAccessed() const
     {
-      uint64_t virtAddr, physAddr;
-      if (hart_->lastLdStAddress(virtAddr, physAddr))
+      if (not isVector())
+        return 0;
+
+      std::unordered_set<uint64_t> pages;
+      const auto& addrs = hart_->vecRegs().ldStAddrs();
+      for (auto& addr : addrs)
         {
-          pma = hart_->getPma(physAddr);
-          return true;
+          unsigned page = hart_->virtMem().pageNumber(addr);
+          pages.emplace(page);
         }
-      return false;
+      return pages.size();
     }
 
     const Hart<URV>* hart_ = nullptr;

@@ -38,6 +38,7 @@
 #include "Disassembler.hpp"
 #include "util.hpp"
 #include "Imsic.hpp"
+#include "pci/Pci.hpp"
 
 
 namespace WdRiscv
@@ -212,7 +213,11 @@ namespace WdRiscv
     /// Set val to the value of the control and status register csr
     /// returning true on success. Return false leaving val unmodified
     /// if csr is out of bounds.
-    bool peekCsr(CsrNumber csr, URV& val) const;
+    [[nodiscard]] bool peekCsr(CsrNumber csr, URV& val) const
+    { return csRegs_.peek(csr, val); }
+
+    /// Return value of the given csr. Throw exception if csr is out of bounds.
+    URV peekCsr(CsrNumber csr) const;
 
     /// Set val, reset, writeMask, and pokeMask respectively to the
     /// value, reset-value, write-mask and poke-mask of the control
@@ -237,7 +242,7 @@ namespace WdRiscv
     bool pokeCsr(CsrNumber csr, URV val);
 
     /// Similar to pokeCsr but meant for server/interactive code: Keep
-    /// track of external MIP pokes to avoid cloberring them with internal
+    /// track of external MIP pokes to avoid clobbering them with internal
     /// ones.
     bool externalPokeCsr(CsrNumber csr, URV val)
     { if (csr == CsrNumber::MIP) mipPoked_ = true; return pokeCsr(csr, val); }
@@ -247,9 +252,9 @@ namespace WdRiscv
     /// if reg is out of bounds.
     bool peekVecReg(unsigned reg, std::vector<uint8_t>& value) const;
 
-    /// Put the bytes of the value in the given vector regiser.
+    /// Put the bytes of the value in the given vector register.
     /// The first byte in value should be the most significant.
-    /// If value is smaller than vector regiser size, it is padded
+    /// If value is smaller than vector register size, it is padded
     /// with zeros on the most-significant side.
     bool pokeVecReg(unsigned reg, const std::vector<uint8_t>& value);
 
@@ -308,7 +313,7 @@ namespace WdRiscv
     /// for linux/newlib emulation).
     bool configIsa(std::string_view string, bool updateMisa);
 
-    /// Enable/disable load-data debug triggerring (disabled by default).
+    /// Enable/disable load-data debug triggering (disabled by default).
     void configLoadDataTrigger(bool flag)
     { csRegs_.configLoadDataTrigger(flag); }
 
@@ -327,7 +332,9 @@ namespace WdRiscv
     /// remaining counters are made write-any read-zero. For each
     /// counter that is made read-write the corresponding MHPMEVENT is
     /// made read-write otherwise it is make write-any read-zero.
-    bool configMachineModePerfCounters(unsigned n);
+    /// The cof flag indicates whether or not counter-overflow extension
+    /// is enabled.
+    bool configMachineModePerfCounters(unsigned n, bool cof);
 
     /// Configure user mode performance counters returning true on
     /// success and false on failure. N cannot exceed the number of machine
@@ -351,7 +358,7 @@ namespace WdRiscv
     { csRegs_.configPerfEvents(eventVec); }
 
     /// Map the give user event number to the given internal event id.
-    /// Wehn the given user number is written to an mphpmevent csr, then
+    /// When the given user number is written to an mphpmevent csr, then
     /// the corresponding event-id is associated with the event counter csr.
     void configEventNumber(URV userNumber, EventNumber eventId)
     { csRegs_.mPerfRegs_.configEventNumber(userNumber, eventId); }
@@ -377,6 +384,17 @@ namespace WdRiscv
       if (menv)
 	flag = flag and csRegs_.menvcfgPbmte();
       virtMem_.enablePbmt(flag);
+      if (menv)
+	{
+	  flag = csRegs_.menvcfgAdue();
+	  virtMem_.setFaultOnFirstAccess(not flag);
+	}
+      auto henv = csRegs_.getImplementedCsr(CsrNumber::HENVCFG);
+      if (henv)
+	{
+	  flag = csRegs_.henvcfgAdue();
+	  virtMem_.setFaultOnFirstAccessStage2(not flag);
+	}
     }
 
     /// Enable page translation naturally aligned power of 2 page sizes.
@@ -405,6 +423,16 @@ namespace WdRiscv
                       std::unordered_map<GroupMultiplier, unsigned>* minSewPerLmul,
 		      std::unordered_map<GroupMultiplier, unsigned>* maxSewPerLmul)
     { vecRegs_.config(bytesPerVec, minBytesPerElem, maxBytesPerElem, minSewPerLmul, maxSewPerLmul); }
+
+    /// Configure mask agnostic policy. Allones if flag is true, undisturb if
+    /// false.
+    void configMaskAgnosticAllOnes(bool flag)
+    { vecRegs_.configMaskAgnosticAllOnes(flag); }
+
+    /// Configure tail agnostic policy. Allones if flag is true, undisturb if
+    /// false.
+    void configTailAgnosticAllOnes(bool flag)
+    { vecRegs_.configTailAgnosticAllOnes(flag); }
 
     /// Return currently configured element width
     ElementWidth elemWidth() const
@@ -482,6 +510,10 @@ namespace WdRiscv
     /// Helper to runUntiAddress: Same as runUntilAddress but does not
     /// print run-time and instructions per second.
     bool untilAddress(uint64_t address, FILE* file = nullptr);
+
+    /// Helper to single step N times. Returns false if program terminated
+    /// with failing condition and true otherwise.
+    std::tuple<bool, bool> runSteps(uint64_t steps, FILE* file = nullptr);
 
     /// Define the program counter value at which the run method will
     /// stop.
@@ -600,6 +632,10 @@ namespace WdRiscv
     const VecRegs& vecRegs() const
     { return vecRegs_; }
 
+    /// Return the virtmem associated with this hart.
+    const VirtMem& virtMem() const
+    { return virtMem_; }
+
     /// Locate the ELF function containing the give address returning true
     /// on success and false on failure.  If successful set name to the
     /// corresponding function name and symbol to the corresponding symbol
@@ -644,6 +680,11 @@ namespace WdRiscv
     /// Define value of program counter after a non-maskable interrupt.
     void defineNmiPc(URV addr)
     { nmiPc_ = addr; }
+
+    /// Define value of program counter after an exception in non-maskable
+    /// interrupt code.
+    void defineNmiExceptionPc(URV addr)
+    { nmiExceptionPc_ = addr; }
 
     /// Clear/set pending non-maskable-interrupt.
     void setPendingNmi(NmiCause cause = NmiCause::UNKNOWN);
@@ -774,7 +815,7 @@ namespace WdRiscv
     /// store) setting virtAddr and physAddr to the corresponding virtual and physical
     /// data addresses. Return 0 if last instruction was not a ld/st instruction
     /// leaving virtAddr and physAddr unmodified. The value of physAddr will be zero
-    /// if virtual to physical translation encoutered an exception.
+    /// if virtual to physical translation encountered an exception.
     unsigned lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
     {
       if (ldStSize_ == 0)
@@ -868,6 +909,10 @@ namespace WdRiscv
     void enableRvzba(bool flag)
     { enableExtension(RvExtension::Zba, flag); }
 
+    /// Enable/disable the c (compressed) extension.
+    void enableRvc(bool flag)
+    { enableExtension(RvExtension::C, flag); csRegs_.enableRvc(flag); }
+
     /// Enable/disable the f (floating point) extension.
     void enableRvf(bool flag);
 
@@ -912,7 +957,7 @@ namespace WdRiscv
     { enableExtension(RvExtension::Zbp, flag); }
 
     /// Enable/disable the zbr (bit manipulation crc)
-    /// extension. When disbaled all the instructions in zbr extension
+    /// extension. When disabled all the instructions in zbr extension
     /// result in an illegal instruction exception.
     void enableRvzbr(bool flag)
     { enableExtension(RvExtension::Zbr, flag); }
@@ -1057,6 +1102,14 @@ namespace WdRiscv
     void enableSscofpmf(bool flag)
     { csRegs_.enableSscofpmf(flag); }
 
+    /// Enable/disbale smstaten extension.
+    void enableSmstaten(bool flag)
+    { csRegs_.enableStateen(flag); }
+
+    /// Enable/disable the resumable non maskable interrupt (Smrnmi) extension.
+    void enableSmrnmi(bool flag)
+    { enableExtension(RvExtension::Smrnmi, flag); csRegs_.enableSmrnmi(flag); }
+
     /// Put this hart in debug mode setting the DCSR cause field to
     /// the given cause. Set the debug pc (DPC) to the given pc.
     void enterDebugMode_(DebugModeCause cause, URV pc);
@@ -1082,9 +1135,6 @@ namespace WdRiscv
 
     /// Print collected trap stats to the given file.
     void reportTrapStat(FILE* file) const;
-
-    /// Print collected physical memory protection stats on the given file.
-    void reportPmpStat(FILE* file) const;
 
     /// Print collected load-reserve/store-conditional stats on the given file.
     void reportLrScStat(FILE* file) const;
@@ -1144,34 +1194,6 @@ namespace WdRiscv
     /// Return physical memory attribute region of a given address.
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
-
-    /// Return true if given address is in the data closed coupled
-    /// memory of this hart.
-    bool isAddrInDccm(uint64_t addr) const
-    { return memory_.pmaMgr_.isAddrInDccm(addr); }
-
-    /// Return true if given address is in the memory mapped registers
-    /// area of this hart.
-    bool isAddrMemMapped(uint64_t addr) const
-    { return memory_.pmaMgr_.isAddrMemMapped(addr); }
-
-    /// Return true if given address is cacheable.
-    bool isAddrCacheable(uint64_t addr) const
-    { return getPma(addr).isCacheable(); }
-
-    /// Return true if given address is in a readable page.
-    bool isAddrReadable(uint64_t addr) const
-    { return getPma(addr).isRead(); }
-
-    /// Return true if page of given address is in instruction closed
-    /// coupled memory.
-    bool isAddrInIccm(uint64_t addr) const
-    { return getPma(addr).isIccm(); }
-
-    /// Return true if given address is an idempotent region of
-    /// memory.
-    bool isAddrIdempotent(uint64_t addr) const
-    { return getPma(addr).isIdempotent(); }
 
     /// Return true if given data (ld/st) address is external to the hart.
     bool isDataAddressExternal(uint64_t addr) const
@@ -1286,7 +1308,7 @@ namespace WdRiscv
     bool isRvs() const
     { return extensionIsEnabled(RvExtension::S); }
 
-    /// Return true if rvh (hupervisor) extension is enabled in this hart.
+    /// Return true if rvh (hypervisor) extension is enabled in this hart.
     bool isRvh() const
     { return extensionIsEnabled(RvExtension::H); }
 
@@ -1368,27 +1390,27 @@ namespace WdRiscv
     bool isRvsstc() const
     { return extensionIsEnabled(RvExtension::Sstc); }
 
-    /// Return true if the bit-manip vector extension is enabled.
+    /// Return true if the bit-manip vector extension zvbb is enabled.
     bool isRvzvbb() const
     { return extensionIsEnabled(RvExtension::Zvbb); }
 
-    /// Return true if the bit-manip vector extension is enabled.
+    /// Return true if the bit-manip vector extension zvbc is enabled.
     bool isRvzvbc() const
     { return extensionIsEnabled(RvExtension::Zvbc); }
 
-    /// Return true if the vector ghash extension is enabled.
+    /// Return true if the vector zvkg extension is enabled.
     bool isRvzvkg() const
     { return extensionIsEnabled(RvExtension::Zvkg); }
 
-    /// Return true if the vector ghash extension is enabled.
+    /// Return true if the vector zvkned extension is enabled.
     bool isRvzvkned() const
     { return extensionIsEnabled(RvExtension::Zvkned); }
 
-    /// Return true if the vector secure hash extension is enabled.
+    /// Return true if the vector secure hash zvknha extension is enabled.
     bool isRvzvknha() const
     { return extensionIsEnabled(RvExtension::Zvknha); }
 
-    /// Return true if the vector secure hash extension is enabled.
+    /// Return true if the vector secure hash zvknhb extension is enabled.
     bool isRvzvknhb() const
     { return extensionIsEnabled(RvExtension::Zvknhb); }
 
@@ -1400,7 +1422,7 @@ namespace WdRiscv
     bool isRvzvksh() const
     { return extensionIsEnabled(RvExtension::Zvksh); }
 
-    /// Return true if the zicon extension is enabled.
+    /// Return true if the zicond extension is enabled.
     bool isRvzicond() const
     { return extensionIsEnabled(RvExtension::Zicond); }
 
@@ -1412,7 +1434,15 @@ namespace WdRiscv
     bool isRvzfa() const
     { return extensionIsEnabled(RvExtension::Zfa); }
 
-    /// Return true if current program is considered finihsed (either
+    /// Return true if the AIA extension is enabled.
+    bool isRvaia() const
+    { return extensionIsEnabled(RvExtension::Smaia); }
+
+    /// Return true if the AIA extension is enabled.
+    bool isRvzacas() const
+    { return extensionIsEnabled(RvExtension::Zacas); }
+
+    /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
     bool hasTargetProgramFinished() const
     { return targetProgFinished_; }
@@ -1426,7 +1456,7 @@ namespace WdRiscv
     void setAmoInDccmOnly(bool flag)
     { amoInDccmOnly_ = flag; }
 
-    /// Make atomic memory operations illegal/legal for non cachable
+    /// Make atomic memory operations illegal/legal for non cacheable
     /// memory based on the value of flag (true/false).
     void setAmoInCacheableOnly(bool flag)
     { amoInCacheableOnly_ = flag; }
@@ -1448,11 +1478,7 @@ namespace WdRiscv
 
     /// Return the value of the MHARTID CSR.
     URV hartId() const
-    {
-      URV id = 0;
-      peekCsr(CsrNumber::MHARTID, id);
-      return id;
-    }
+    { return peekCsr(CsrNumber::MHARTID); }
 
     /// Tie the shared CSRs in this hart to the corresponding CSRs in
     /// the target hart making them share the same location for their
@@ -1491,9 +1517,15 @@ namespace WdRiscv
     bool hasLr() const
     { return memory_.hasLr(hartIx_); }
 
-    /// Cancel load reservation held by this hart (if any).
-    void cancelLr()
-    { memory_.invalidateLr(hartIx_); }
+    /// Cancel load reservation held by this hart (if any). Mark
+    /// cause of cancellation which persists until overwritten
+    /// by another cancelLr or until a new reservation is made.
+    void cancelLr(CancelLrCause cause)
+    { memory_.invalidateLr(hartIx_, cause); }
+
+    /// Return the cause of the last LR reservation cancelation.
+    CancelLrCause cancelLrCause() const
+    { return memory_.cancelLrCause(hartIx_); }
 
     /// Report the files opened by the target RISCV program during
     /// current run.
@@ -1534,6 +1566,10 @@ namespace WdRiscv
     /// Enable vector extension.
     void enableVectorExtension(bool flag);
 
+    /// Enable Advance Interrupt Architecture (AIA) extension.
+    void enableAiaExtension(bool flag)
+    { enableExtension(RvExtension::Smaia, flag); csRegs_.enableAiaExtension(flag); }
+
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.
     void enableClearMprvOnRet(bool flag)
@@ -1543,6 +1579,11 @@ namespace WdRiscv
     /// Otherwise, set MTVAL to the opcode of the illegal instruction.
     void enableClearMtvalOnIllInst(bool flag)
     { clearMtvalOnIllInst_ = flag; }
+
+    /// Clear MTVAL on illegal instruction exception if flag is true.
+    /// Otherwise, set MTVAL to the opcode of the illegal instruction.
+    void enableClearMtvalOnEbreak(bool flag)
+    { clearMtvalOnEbreak_ = flag; }
 
     /// Disable clearing of reservation set after xRET
     void enableCancelLrOnTrap(bool flag)
@@ -1599,10 +1640,6 @@ namespace WdRiscv
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }
 
-    /// Enable address translation trace
-    void enableAddrTransLog(FILE* file)
-    { virtMem_.enableAddrTransLog(file); }
-
     /// Trace the last n branches to the given file. No tracing is
     /// done if n is 0.
     void traceBranches(const std::string& file, uint64_t n)
@@ -1611,9 +1648,17 @@ namespace WdRiscv
     /// Write the collected branch traces to the file at the given path.
     bool saveBranchTrace(const std::string& path);
 
-    /// Set behavior if first access to page
+    /// Set behavior of first access to a virtual memory page: Either
+    /// we take a page fault (flag is true) or we update the A/D bits
+    /// of the PTE. When V is on, this applies to the first stage (VS)
+    /// translation.
     void setFaultOnFirstAccess(bool flag)
     { virtMem_.setFaultOnFirstAccess(flag); }
+
+    /// Similar to setFaultOnFirstAccess but applies to the second stage
+    /// of 2-stage translation.
+    void setFaultOnFirstAccessStage2(bool flag)
+    { virtMem_.setFaultOnFirstAccessStage2(flag); }
 
     /// Translate virtual address without updating TLB or
     /// updating/checking A/D bits of PTE. Return ExceptionCause::NONE
@@ -1631,6 +1676,14 @@ namespace WdRiscv
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
 
+    /// Return the current virtual mode (V bit).
+    bool virtMode() const
+    { return virtMode_; }
+
+    /// Return the virtual mode before last executed instruction.
+    bool lastVirtMode() const
+    { return lastVirt_; }
+
     /// Return the number of page table walks of the last
     /// executed instruction
     unsigned getNumPageTableWalks(bool isInstr) const
@@ -1640,7 +1693,7 @@ namespace WdRiscv
     /// instruction/data the page table entries referenced by the
     /// instruction/data page table walk of the last executed
     /// instruction or make it empty if no page table walk took place.
-    void getPageTableWalkAddresses(bool isInstr, unsigned ix, std::vector<uint64_t>& addrs) const
+    void getPageTableWalkAddresses(bool isInstr, unsigned ix, std::vector<VirtMem::WalkEntry>& addrs) const
     { addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix); }
 
     /// Get the paget table entries of the page table walk of the last
@@ -1649,24 +1702,37 @@ namespace WdRiscv
     {
       const auto& addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix);
       ptes.clear();
-      for (auto addr : addrs)
+      for (const auto& addr : addrs)
 	{
-	  URV pte = 0;
-	  peekMemory(addr, pte, true);
-	  ptes.push_back(pte);
+          if (addr.type_ == VirtMem::WalkEntry::Type::PA)
+          {
+            URV pte = 0;
+            peekMemory(addr.addr_, pte, true);
+            ptes.push_back(pte);
+          }
 	}
     }
 
+    /// Return PMP manager associated with this hart.
+    const auto& pmpManager() const
+    { return pmpManager_; }
+
+    /// Return PMA manager associated with this hart.
+    const auto& pmaManager() const
+    { return memory_.pmaMgr_; }
+
     /// Get the PMP registers accessed by last executed instruction
-    void getPmpsAccessed(std::vector<std::pair<uint32_t, Pmp>>& pmps) const
+    void getPmpsAccessed(std::vector<PmpManager::PmpTrace>& pmps) const
     {
-      const auto& pmpIxs = pmpManager_.getPmpTrace();
       pmps.clear();
-      for (const auto& ix : pmpIxs)
-        {
-          auto pmp = pmpManager_.peekPmp(ix);
-          pmps.emplace_back(ix, pmp);
-        }
+      pmps = pmpManager_.getPmpTrace();
+    }
+
+    // Get the PMAs accessed by the last executed instruction
+    void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const
+    {
+      pmas.clear();
+      pmas = memory_.pmaMgr_.getPmaTrace();
     }
 
     /// Invalidate whole cache.
@@ -1674,7 +1740,7 @@ namespace WdRiscv
 
     /// Register a callback to be invoked before a CSR instruction
     /// acceses its target CSR. Callback is invoked with the
-    /// hart-index (hart index in sytstem) and csr number. This is for
+    /// hart-index (hart index in system) and csr number. This is for
     /// the SOC (system on chip) model.
     void registerPreCsrInst(std::function<void(unsigned, CsrNumber)> callback)
     { preCsrInst_ = std::move(callback); }
@@ -1682,7 +1748,7 @@ namespace WdRiscv
     /// Register a callback to be invoked after a CSR accesses its
     /// target CSR, or in the case of an exception, after the CSR
     /// instruction takes the exception.  Callback is invoked with the
-    /// hart-index (hart index in sytstem) and csr number. This is for
+    /// hart-index (hart index in system) and csr number. This is for
     /// the SOC model.
     void registerPostCsrInst(std::function<void(unsigned, CsrNumber)> callback)
     { postCsrInst_ = std::move(callback); }
@@ -1691,11 +1757,21 @@ namespace WdRiscv
     void registerPreInst(std::function<void(Hart<URV>&, bool&, bool&)> callback)
     { preInst_ = std::move(callback); }
 
-    /// Define physical memory attribute region. Region addresses are between
-    /// low and high inclusive. To define a 1024-byte region at address zero
-    /// we would set low to zero and high to 1023.
-    bool definePmaRegion(uint64_t low, uint64_t high, Pma pma)
-    { return memory_.pmaMgr_.defineRegion(low, high, pma); }
+    /// Define physical memory attribute region at index ix. Region
+    /// addresses are between low and high inclusive. To define a
+    /// 1024-byte region at address zero we would set low to zero and
+    /// high to 1023. Region are checked in order and the first
+    /// matching region applies.
+    bool definePmaRegion(unsigned ix, uint64_t low, uint64_t high, Pma pma)
+    { return memory_.pmaMgr_.defineRegion(ix, low, high, pma); }
+
+    /// Mark as invalid entry with the given index.
+    void invalidatePmaEntry(unsigned ix)
+    { memory_.pmaMgr_.invalidateEntry(ix); }
+
+    /// Called after a chance to a PMACFG CSR. Return true on success
+    /// and false if num is not that of PMACFG CSR.
+    bool processPmaChange(CsrNumber num);
 
     /// Associate a mask with the word-aligned word at the given
     /// address. Return true on success and flase if given address is
@@ -1708,7 +1784,7 @@ namespace WdRiscv
     /// PMPADDR0, ... 63 to PMPADDR63). Return true on success setting
     /// type, mode, locked, low and high to the corresponding values
     /// associated with the entry. If entry mode is off the low and
-    /// hight will be set to zero. Return false on failure (entry
+    /// high will be set to zero. Return false on failure (entry
     /// index out of bounds or corresponding CSR not implemented).
     bool unpackMemoryProtection(unsigned entryIx, Pmp::Type& type,
                                 Pmp::Mode& mode, bool& locked,
@@ -1739,8 +1815,7 @@ namespace WdRiscv
     { bbFile_ = file; bbLimit_ = instCount; }
 
     /// Enable memory consistency model.
-    void setMcm(std::shared_ptr<Mcm<URV>> mcm)
-    { mcm_ = std::move(mcm); }
+    void setMcm(std::shared_ptr<Mcm<URV>> mcm);
 
     /// Enable instruction line address tracing.
     void enableInstructionLineTrace()
@@ -1750,9 +1825,17 @@ namespace WdRiscv
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
 
-    /// Enable/disable pmp access trace in log
+    /// Enable/disable PMP access trace
     void tracePmp(bool flag)
-    { tracePmp_ = flag; }
+    { pmpManager_.enableTrace(flag); }
+
+    /// Enable/disable PMA access trace
+    void tracePma(bool flag)
+    { memory_.pmaMgr_.enableTrace(flag); }
+
+    /// Enable/disable top-of-range mode in pmp configurations.
+    void enablePmpTor(bool flag)
+    { csRegs_.enablePmpTor(flag); }
 
     Syscall<URV>& getSyscall()
     { return syscall_; }
@@ -1788,11 +1871,15 @@ namespace WdRiscv
     { debugParkLoop_ = addr; }
 
     /// Configure this hart to set its program counter to the given
-    /// addr on encoutering a trap (except breakpoint) during debug
+    /// addr on encountering a trap (except breakpoint) during debug
     /// mode. If addr bits are all set, then the PC is not changed on
     /// a trap.
     void setDebugTrapAddress(URV addr)
     { debugTrapAddr_ = addr; }
+
+    /// Return true a park loop is defined for debug mode.
+    bool hasDebugParkLoop() const
+    { return debugParkLoop_ != ~URV(0); }
 
     /// Associate given IMSIC with this hart and define the address
     /// space for all IMSICs in the system.
@@ -1807,7 +1894,77 @@ namespace WdRiscv
       imsicSbase_ = sbase; imsicSend_ = send;
       imsicRead_ = readFunc;
       imsicWrite_ = writeFunc;
+      csRegs_.attachImsic(imsic);
+
+      using IC = InterruptCause;
+      imsic_->attachMInterrupt([this] (bool flag) {
+          URV mipVal = csRegs_.peekMip();
+          URV prev = mipVal;
+
+          if (flag)
+	    mipVal = mipVal | (URV(1) << URV(IC::M_EXTERNAL));
+          else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::M_EXTERNAL));
+
+          if (mipVal != prev)
+            csRegs_.poke(CsrNumber::MIP, mipVal);
+        });
+
+      imsic_->attachSInterrupt([this] (bool flag) {
+          URV mipVal = csRegs_.peekMip();
+          URV prev = mipVal;
+
+          if (flag)
+	    mipVal = mipVal | (URV(1) << URV(IC::S_EXTERNAL));
+          else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::S_EXTERNAL));
+
+          if (mipVal != prev)
+            csRegs_.poke(CsrNumber::MIP, mipVal);
+        });
+
+      imsic_->attachGInterrupt([this] (bool flag, unsigned guest) {
+          URV mipVal = csRegs_.peekMip();
+          URV prev = mipVal;
+
+	  URV gip;
+          csRegs_.peek(CsrNumber::HGEIP, gip);
+
+          if (flag)
+            gip |= (URV(1) << guest);
+          else
+            gip &= ~(URV(1) << guest);
+
+	  csRegs_.poke(CsrNumber::HGEIP, gip);
+	  URV gie = csRegs_.peekHgeie();
+          if (gip & gie)
+	    mipVal = mipVal | (URV(1) << URV(IC::G_EXTERNAL));
+	  else
+	    mipVal = mipVal & ~(URV(1) << URV(IC::G_EXTERNAL));
+
+          if (mipVal != prev)
+            csRegs_.poke(CsrNumber::MIP, mipVal);
+        });
     }
+
+    void attachPci(std::shared_ptr<Pci> pci, uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize)
+    {
+      pci_ = pci;
+      pciConfigBase_ = configBase;
+      pciConfigEnd_ = pciConfigBase_ + (1ULL << 28);
+      pciMmioBase_ = mmioBase;
+      pciMmioEnd_ = mmioBase + mmioSize;
+    }
+
+    /// Return true if given extension is enabled.
+    constexpr bool extensionIsEnabled(RvExtension ext) const
+    {
+      return ext_enabled_.test(static_cast<std::size_t>(ext));
+    }
+
+    void setSwInterrupt(uint8_t value)
+    { swInterrupt_.value_ = value; }
+
 
   protected:
 
@@ -1818,6 +1975,24 @@ namespace WdRiscv
     // Retun cached value of the mprv field of the mstatus CSR.
     bool mstatusMprv() const
     { return mstatus_.bits_.MPRV; }
+
+    /// Return true if the nmie bit of nmstatus overrides the effect of
+    /// mstatus.mprv. See Smrnmi secton in RISCV pivileged spec.
+    bool nmieOverridesMprv() const
+    {
+      return (extensionIsEnabled(RvExtension::Smrnmi) and
+	      MnstatusFields{csRegs_.peekMnstatus()}.bits_.NMIE == 0);
+    }
+
+    /// Return the effective privilege mode: if mstatus.mprv then
+    /// it is the privilege mode in mstatus.mpp
+    PrivilegeMode effectivePrivilege() const
+    {
+      PrivilegeMode pm = privMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	pm = mstatusMpp();
+      return pm;
+    }
 
     /// Read an item that may span 2 physical pages. If pa1 is the
     /// same as pa2 then the item is in one page: do a simple read. If
@@ -1992,7 +2167,7 @@ namespace WdRiscv
     // Mark FS field of mstatus as dirty.
     void markFsDirty();
 
-    // Return true if vS field of mstatus is not off.
+    // Return true if VS field of mstatus is not off.
     bool isVecEnabled() const
     {
       unsigned vecOff = unsigned(VecStatus::Off);
@@ -2023,7 +2198,7 @@ namespace WdRiscv
     }
 
     // Return true if it is legal to execute a vector instruction: V
-    // extension must be enabled and VS feild of MSTATUS must not be
+    // extension must be enabled and VS field of MSTATUS must not be
     // OFF.
     bool isVecLegal() const
     { return isRvv() and isVecEnabled(); }
@@ -2078,7 +2253,7 @@ namespace WdRiscv
     /// Simulate a periodic external timer interrupt: Count-down the
     /// periodic counter. Return true if counter reaches zero (and
     /// keep returning true thereafter until timer interrupt is taken).
-    /// If counter reches zero, it is reset to its initial value.
+    /// If counter reaches zero, it is reset to its initial value.
     bool doAlarmCountdown();
 
     /// Return the 8-bit content of the pmpconfig register
@@ -2092,7 +2267,7 @@ namespace WdRiscv
     void updateMemoryProtection();
 
     /// Update the address translation manager. This is called on
-    /// reset or whenever the supervisor address trasnaltion register
+    /// reset or whenever the supervisor address translation register
     /// (SATP) is updated.
     void updateAddressTranslation();
 
@@ -2206,9 +2381,9 @@ namespace WdRiscv
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
     /// etc... for lbu, lhu, etc...
     /// Return true if the load is successful. Return false if an exception
-    /// or a trigger is encoutered. On succes loadd value (sign extended for
+    /// or a trigger is encountered. On success, loaded value (sign extended for
     /// signed type) is placed in value. Updating the destination register is
-    /// the resposibilty of the caller. The hyper flag should be set to true
+    /// the responsibilty of the caller. The hyper flag should be set to true
     /// for hypervisor load/store instruction to select 2-stage address
     /// translation.
     template<typename LOAD_TYPE>
@@ -2218,7 +2393,7 @@ namespace WdRiscv
     template<typename LOAD_TYPE>
     bool fastLoad(uint64_t virtAddr, uint64_t& value);
 
-    /// Helper to load method: Return possible load exception (wihtout
+    /// Helper to load method: Return possible load exception (without
     /// taking any exception). If supervisor mode is enabled, and
     /// address translation is successful, then addr1 is changed to
     /// the translated physical address and addr2 to the physical
@@ -2232,8 +2407,8 @@ namespace WdRiscv
                                           uint64_t& gaddr1, uint64_t& gaddr2,
 					  unsigned ldSize, bool hyper);
 
-    /// Helepr to the cache block operaion (cbo) instructions.
-    ExceptionCause determineCboException(uint64_t& addr, bool isRead);
+    /// Helper to the cache block operation (cbo) instructions.
+    ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isRead);
 
     /// Implement part of TIF protocol for writing the "tohost" magical
     /// location.
@@ -2253,7 +2428,7 @@ namespace WdRiscv
     template<typename STORE_TYPE>
     bool fastStore(URV addr, STORE_TYPE value);
 
-    /// Helper to store method: Return possible exception (wihtout
+    /// Helper to store method: Return possible exception (without
     /// taking any exception). Update stored value by doing memory
     /// mapped register masking.
     ExceptionCause determineStoreException(uint64_t& addr1, uint64_t& addr2,
@@ -2381,7 +2556,7 @@ namespace WdRiscv
     /// physical address corresponding to the given virtual address.
     bool fetchInst(URV virAddr, uint64_t& physAddr, uint32_t& instr);
 
-    /// Heler to the run methods: Fetch an instruction taking debug triggers
+    /// Helper to the run methods: Fetch an instruction taking debug triggers
     /// into consideration. Return true if successful. Return false if
     /// instruction fetch fails (an exception is signaled in that case).
     bool fetchInstWithTrigger(URV addr, uint64_t& physAddr, uint32_t& inst,
@@ -2416,8 +2591,9 @@ namespace WdRiscv
     /// Start an asynchronous exception (interrupt).
     void initiateInterrupt(InterruptCause cause, URV pc);
 
-    /// Start a non-maskable interrupt.
-    void initiateNmi(URV cause, URV pc);
+    /// Start a non-maskable interrupt. Return true if successful. Return false
+    /// if Smrnmi and nmis are disabled.
+    bool initiateNmi(URV cause, URV pc);
 
     /// interrupts without considering the delegation registers.
     void undelegatedInterrupt(URV cause, URV pcToSave, URV nextPc);
@@ -2477,14 +2653,18 @@ namespace WdRiscv
     /// true on success putting the loaded value in val. Return false
     /// if a trigger tripped or an exception took place in which case
     /// val is not modified. The loaded word is sign extended to fill
-    /// the URV value (this is relevant for rv64).
-    bool amoLoad32(uint32_t rs1, URV& val);
+    /// the URV value (this is relevant for rv64). The accessed memory
+    /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
+    /// or access fault.
+    bool amoLoad32(uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Do the load value part of a double-word-sized AMO
     /// instruction. Return true on success putting the loaded value
     /// in val. Return false if a trigger tripped or an exception took
-    /// place in which case val is not modified.
-    bool amoLoad64(uint32_t rs1, URV& val);
+    /// place in which case val is not modified. The accessed memory
+    /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
+    /// or access fault.
+    bool amoLoad64(uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Invalidate cache entries overlapping the bytes written by a
     /// store.
@@ -2517,7 +2697,7 @@ namespace WdRiscv
     /// Called to check if a clint memory mapped register is written.
     /// Clear/set software-interrupt bit in the MIP CSR of
     /// corresponding hart if all the conditions are met. Set timer
-    /// limit if timer-limit regiser is written. Update stVal: if location
+    /// limit if timer-limit register is written. Update stVal: if location
     /// is outside the range of valid harts, set stVal to zero.  If it is
     /// in the software interrupt range then keep it least sig bit and zero
     /// the rest.
@@ -2540,114 +2720,117 @@ namespace WdRiscv
       return 0x1f;
     }
 
-    // Return true if maskable integer vector instruction is legal for
-    // current sew and lmul, current vstart, and mask-register
-    // destination register overlap. Check if vector extension is
-    // enabled. Take an illegal instuction exception and return false
-    // otherwise. This is for non-load, non-mask destination,
-    // non-reduction instructions.
+    /// Return true if maskable integer vector instruction is legal for
+    /// current sew and lmul, current vstart, and mask-register
+    /// destination register overlap. Check if vector extension is
+    /// enabled. Take an illegal instruction exception and return false
+    /// otherwise. This is for non-load, non-mask destination,
+    /// non-reduction instructions.
     bool checkVecIntInst(const DecodedInst* di);
 
-    // Same as above but with explicit group multiplier and element width.
+    /// Same as above but with explicit group multiplier and element width.
     bool checkVecIntInst(const DecodedInst* di, GroupMultiplier gm, ElementWidth eew);
 
-    // Return true if given arithmetic (non load/store) instruction is
-    // legal. Check if vector extension is enabled. Check if the
-    // currnet sew/lmul is legal. Return true if legal. Take an
-    // illegal instruction exception and return false otherwise. This
-    // is for integer instructions.
+    /// Return true if given arithmetic (non load/store) instruction is
+    /// legal. Check if vector extension is enabled. Check if the
+    /// current sew/lmul is legal. Return true if legal. Take an
+    /// illegal instruction exception and return false otherwise. This
+    /// is for integer instructions.
     bool checkSewLmulVstart(const DecodedInst* di);
 
-    // Similar to above but includes check for floating point operations (is F/D/ZFH
-    // enabled ...).
+    /// Similar to above but includes check for floating point operations (is F/D/ZFH
+    /// enabled ...).
     bool checkFpSewLmulVstart(const DecodedInst* di, bool wide = false,
 			      bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
-    // Return true if maskable floating point vecotr instruction is
-    // legal. Take an illegal instuction exception and return false
-    // otherwise.
+    /// Return true if maskable floating point vector instruction is
+    /// legal. Take an illegal instuction exception and return false
+    /// otherwise.
     bool checkVecFpInst(const DecodedInst* di, bool wide = false,
 			bool (Hart::*fp16LegalFn)() const = &Hart::isZvfhLegal);
 
-    // Return true if vector operands are mutliples of the given group
-    // multiplier (scaled by 8). Return false initiating an illegal instruction
-    // trap otherwise.
+    /// Return true if vector operands are multiples of the given group
+    /// multiplier (scaled by 8). Initiating an illegal instruction
+    /// trap and return false otherwise.
     bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 			   unsigned op2, unsigned groupX8);
 
-    // Similar to above but for 2 vector operand instructions.
+    /// Similar to above but for vector instructions with 2 vector operands.
     bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned op1,
 			   unsigned groupX8);
 
-    // Similar to above but for 1 vector operand instructions.
-    bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op0, unsigned groupX8);
+    /// Similar to above but a vector instructions with 1 vector
+    /// operand. This also work for checking one vector operand of a
+    /// multi-operand instruction.
+    bool checkVecOpsVsEmul(const DecodedInst* di, unsigned op, unsigned groupX8);
 
-    // Return if mask producing instruction (e.g. vmseq) is
-    // legal. Check if vector operands are mutliples of the given
-    // group multiplier (scaled by 8). Return true if legal.  Return
-    // false initiating an illegal instruction trap otherwise.
+    /// Return if mask producing instruction (e.g. vmseq) is
+    /// legal. Check if vector operands are multiples of the given
+    /// group multiplier (scaled by 8). Return true if legal.  Return
+    /// false initiating an illegal instruction trap otherwise.
     bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 			  unsigned groupX8);
 
-    // Similar to the above but for 3 vector operand instructions.
+    /// Similar to the above but for 3 vector operand instructions.
     bool checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 			  unsigned op2, unsigned groupX8);
 
 
-    // Similar to the above but for floating point instructions.
+    /// Similar to the above but for floating point instructions.
     bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned groupX8);
 
-    // Similar to the above but for floating point instructions with 3
-    // vector operands.
+    /// Similar to the above but for floating point instructions with 3
+    /// vector operands.
     bool checkVecFpMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
 				 unsigned op2, unsigned groupX8);
 
-    // Check reduction vector operand against the group multiplier. Return true
-    // if operand is a multiple of multiplier and false otherwise. Record group
-    // multiplier for tracing.
+    /// Check reduction vector operand against the group multiplier. Return true
+    /// if operand is a multiple of multiplier and false otherwise. Record group
+    /// multiplier for tracing.
     bool checkRedOpVsEmul(const DecodedInst* di, unsigned op1,
 			  unsigned groupX8, unsigned vstart);
 
-    // Similar to above but 3 vector operands and 1st operand is wide.
+    /// Similar to above but 3 vector operands and 1st operand is wide.
     bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned op2, unsigned groupX8);
 
-    // Similar to above but 2 vector operands and 1st operand is wide.
+    /// Similar to above but 2 vector operands and 1st operand is wide.
     bool checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
-    // Similar to above but 3 vector operands and 1st 2 operands are wide.
+    /// Similar to above but 3 vector operands and 1st 2 operands are wide.
     bool checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0, unsigned op1,
 			       unsigned op2, unsigned groupX8);
 
-    // Similar to above but 2 vector operands and 1st 2 operands are wide.
+    /// Similar to above but 2 vector operands and 1st 2 operands are wide.
     bool checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0, unsigned op1,
 			       unsigned groupX8);
 
-    // Similar to above but 3 vector operands with 2nd operand wide.
+    /// Similar to above but 3 vector operands with 2nd operand wide.
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned op2, unsigned groupX8);
 
-    // Similar to above but 2 vector operands with 2nd operand wide.
+    /// Similar to above but 2 vector operands with 2nd operand wide.
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
-    // Emit a trace record for the given branch instruction in the
-    // branch trace file.
+    /// Emit a trace record for the given branch instruction in the
+    /// branch trace file.
     void traceBranch(const DecodedInst* di);
 
-    // Called at the end of successul vector instruction to clear the vstart
-    // register and mark VS dirty if a vector register was updated.
+    /// Called at the end of successul vector instruction to clear the
+    /// vstart register and mark VS dirty if a vector register was
+    /// updated.
     void postVecSuccess();
 
-    // Called at the end of a trapping vector instruction to mark VS
-    // dirty if a vector register was updated.
+    /// Called at the end of a trapping vector instruction to mark VS
+    /// dirty if a vector register was updated.
     void postVecFail(const DecodedInst* di, bool clearVstart = false);
 
-    // The program counter is adjusted (size of current instruction
-    // added) before any of the following exec methods are called. To
-    // get the address before adjustment, use currPc_.
+    /// The program counter is adjusted (size of current instruction
+    /// added) before any of the following exec methods are called. To
+    /// get the address before adjustment, use currPc_.
 
     void execBeq(const DecodedInst*);
     void execBne(const DecodedInst*);
@@ -2687,6 +2870,7 @@ namespace WdRiscv
     void execEbreak(const DecodedInst*);
     void execMret(const DecodedInst*);
     void execSret(const DecodedInst*);
+    void execMnret(const DecodedInst*);
     void execWfi(const DecodedInst*);
 
     void execDret(const DecodedInst*);
@@ -2854,7 +3038,7 @@ namespace WdRiscv
 
     // atomic
     template <typename OP>
-    void execAmo32Op(const DecodedInst*, OP op);
+    void execAmo32Op(const DecodedInst*, Pma::Attrib attrib, OP op);
     void execAmoadd_w(const DecodedInst*);
     void execAmoswap_w(const DecodedInst*);
     void execLr_w(const DecodedInst*);
@@ -2869,7 +3053,7 @@ namespace WdRiscv
 
     // atmomic + rv64
     template <typename OP>
-    void execAmo64Op(const DecodedInst*, OP op);
+    void execAmo64Op(const DecodedInst*, Pma::Attrib attrib, OP op);
     void execAmoadd_d(const DecodedInst*);
     void execAmoswap_d(const DecodedInst*);
     void execLr_d(const DecodedInst*);
@@ -4490,6 +4674,11 @@ namespace WdRiscv
     void execVfwmaccbf16_vv(const DecodedInst*);
     void execVfwmaccbf16_vf(const DecodedInst*);
 
+    // Zacas
+    void execAmocas_w(const DecodedInst*);
+    void execAmocas_d(const DecodedInst*);
+    void execAmocas_q(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -4534,6 +4723,8 @@ namespace WdRiscv
       ldStWrite_ = false;
       ldStAtomic_ = false;
       lastPageMode_ = virtMem_.mode();
+      lastVsPageMode_ = virtMem_.vsMode();
+      lastPageModeStage2_ = virtMem_.modeStage2();
       clearTraceData();
     }
 
@@ -4541,10 +4732,7 @@ namespace WdRiscv
     void dumpBasicBlocks();
     void dumpInitState(const char* tag, uint64_t vaddr, uint64_t paddr);
 
-    constexpr bool extensionIsEnabled(RvExtension ext) const
-    {
-      return ext_enabled_.test(static_cast<std::size_t>(ext));
-    }
+    /// Enable given extension.
     constexpr void enableExtension(RvExtension ext, bool isEnabled)
     {
       ext_enabled_.set(static_cast<std::size_t>(ext), isEnabled);
@@ -4596,6 +4784,7 @@ namespace WdRiscv
     uint64_t interruptor_ = 0;
 
     URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
+    URV nmiExceptionPc_ = 0;    // For excetpions during NMI and Srmrnmi extension.
     bool nmiPending_ = false;
     NmiCause nmiCause_ = NmiCause::UNKNOWN;
 
@@ -4615,7 +4804,6 @@ namespace WdRiscv
     bool eaCompatWithBase_ = false;
 
     bool csvTrace_ = false;      // Print trace in CSV format.
-    bool traceHeaderPrinted_ = false; // True if trace file header printed.
 
     bool instrLineTrace_ = false;
 
@@ -4635,11 +4823,11 @@ namespace WdRiscv
     uint64_t consecutiveIllegalCount_ = 0;
     uint64_t counterAtLastIllegal_ = 0;
     uint64_t lrCount_ = 0;    // Count of dispatched load-reserve instructions.
-    uint64_t lrSuccess_ = 0;  // Count of successful LR (reservaton acquired).
+    uint64_t lrSuccess_ = 0;  // Count of successful LR (reservation acquired).
     uint64_t scCount_ = 0;    // Count of dispatched store-conditional instructions.
     uint64_t scSuccess_ = 0;  // Count of successful SC (store accomplished).
     unsigned lrResSize_ = sizeof(URV); // LR reservation size.
-    bool keepReservOnScException_ = false; // Keep rservation on SC.W/D exception.
+    bool keepReservOnScException_ = false; // Keep reservation on SC.W/D exception.
 
     bool instFreq_ = false;         // Collection instruction frequencies.
     bool enableCounters_ = false;   // Enable performance monitors.
@@ -4667,16 +4855,21 @@ namespace WdRiscv
 
     bool virtMode_ = false;         // True if virtual (V) mode is on.
     bool lastVirt_ = false;         // Before current inst.
+    bool lastHyer_ = false;         // Hypervisor extension state before current inst.
+    bool hyperLs_ = false;          // True if last instr is hypervisor load/store.
 
     // These are used to get fast access to the FS and VS bits.
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
+    URV cachedMie_ = 0;             // Cached value of mie CSR
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
 
     VirtMem::Mode lastPageMode_ = VirtMem::Mode::Bare;  // Before current inst
+    VirtMem::Mode lastVsPageMode_ = VirtMem::Mode::Bare;
+    VirtMem::Mode lastPageModeStage2_ = VirtMem::Mode::Bare;
 
     bool debugMode_ = false;         // True on debug mode.
     bool dcsrStepIe_ = false;        // True if stepie bit set in dcsr.
@@ -4686,10 +4879,11 @@ namespace WdRiscv
     URV debugTrapAddr_ = ~URV(0);    // Jump to this address on exception in debug mode.
 
     bool clearMtvalOnIllInst_ = true;
+    bool clearMtvalOnEbreak_ = true;
 
     bool targetProgFinished_ = false;
+    bool stepResult_ = false;        // Set by singleStep on caught exception (program success/fail).
     bool tracePtw_ = false;          // Trace paget table walk.
-    bool tracePmp_ = false;          // Trace PMP accesses
     bool mipPoked_ = false;          // Prevent MIP pokes from being clobbered by CLINT.
     bool seiPin_ = false;            // Supervisor external interrupt pin value.
     unsigned mxlen_ = 8*sizeof(URV);
@@ -4743,16 +4937,21 @@ namespace WdRiscv
     uint64_t imsicSend_ = 0;
     std::function<bool(uint64_t, unsigned, uint64_t&)> imsicRead_ = nullptr;
     std::function<bool(uint64_t, unsigned, uint64_t)> imsicWrite_ = nullptr;
+    std::shared_ptr<Pci> pci_;
+    uint64_t pciConfigBase_ = 0;
+    uint64_t pciConfigEnd_ = 0;
+    uint64_t pciMmioBase_ = 0;
+    uint64_t pciMmioEnd_ = 0;
 
     // Callback invoked before a CSR instruction accesses a CSR.
     std::function<void(unsigned, CsrNumber)> preCsrInst_ = nullptr;
 
     // Callback invoked after a CSR instruction accesses a CSR or, in
-    // the case of an exception, after the CSR intruction takes the
+    // the case of an exception, after the CSR instruction takes the
     // exception.
     std::function<void(unsigned, CsrNumber)> postCsrInst_ = nullptr;
 
-    // Callback invoked beofre execution of an instruction. Callback
+    // Callback invoked before execution of an instruction. Callback
     // invoked as follows: preInst_(hart, halt, reset), and upon completion
     // the hart will halt if halt is true and will reset if reset is true.
     // If both halt and reset are true, reset takes precedence.
@@ -4794,10 +4993,25 @@ namespace WdRiscv
     std::unordered_set<uint64_t> initDataLines_;
 
     // Shift executed instruction counter by this amount to produce a
-    // fake timer value. For example, if shift amout is 3, we are
+    // fake timer value. For example, if shift amount is 3, we are
     // dividing instruction count by 8 (2 to power 3) to produce a
     // timer value.
     unsigned counterToTimeShift_ = 0;
+
+    // For lockless handling of MIP. We assume the software won't
+    // trigger multiple interrupts while handling. To be cleared when
+    // hart marks relevant bit in MIP.
+    union InterruptAlarm
+    {
+      struct
+      {
+        bool flag_ : 1;
+        bool alarm_ : 1;
+      } bits_;
+
+      uint8_t value_ = 0;
+    };
+    InterruptAlarm swInterrupt_;
   };
 }
 

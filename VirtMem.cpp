@@ -106,6 +106,7 @@ VirtMem::translateForFetch2(uint64_t va, unsigned size, PrivilegeMode priv,
     gpa1 = gpa2;
     pa1 = pa2 = va2;
   }
+  fetchPageCross_ = true;
 
   return cause;
 }
@@ -116,13 +117,11 @@ VirtMem::transAddrNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 			   bool read, bool write, bool exec, uint64_t& pa)
 {
   auto prevTrace = trace_; trace_ = false;
-  auto* prevFile = attFile_; attFile_ = nullptr;
   accessDirtyCheck_ = false;
 
   auto cause = transNoUpdate(va, priv, twoStage, read, write, exec, pa);
 
   trace_ = prevTrace;
-  attFile_ = prevFile;
   accessDirtyCheck_ = true;
 
   return cause;
@@ -411,7 +410,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
         return stage2PageFaultType(read, write, exec);
       if (not entry->accessed_ or (write and not entry->dirty_))
         {
-          if (faultOnFirstAccess_)
+          if (faultOnFirstAccess2_)
             return stage2PageFaultType(read, write, exec);
           entry->accessed_ = true;
           if (write)
@@ -555,24 +554,24 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
   // Collect PTE addresses used in the translation process.
   auto& walkVec = exec ? fetchWalks_ : dataWalks_;
   if (trace_)
-    walkVec.resize(walkVec.size() + 1);
-
-  if (attFile_)
-    fprintf(attFile_, "VA: 0x%jx\n", uintmax_t(address));
+    {
+      walkVec.resize(walkVec.size() + 1);
+      walkVec.back().emplace_back(address, WalkEntry::Type::GPA);
+    }
 
   while (true)
     {
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
       if (trace_)
-	walkVec.back().push_back(pteAddr);
+	walkVec.back().emplace_back(pteAddr);
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
 	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode, privMode, false))
+	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
 
@@ -581,20 +580,6 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
         return stage1PageFaultType(read, write, exec);
       if (not napotCheck(pte, va))
         return stage1PageFaultType(read, write, exec);
-
-      if (attFile_)
-        {
-          bool leaf = pte.valid() and (pte.read() or pte.exec());
-          fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
-          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
-		  pte.write(), pte.exec(), pte.user(), pte.global(),
-		  pte.accessed(), pte.dirty());
-          fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
-		  uintmax_t(pte.ppn()) * pageSize_);
-	  if (leaf)
-            fprintf(attFile_, " s:%s", pageSize(mode_, ii));
-	  fprintf(attFile_, "\n\n");
-        }
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
@@ -652,7 +637,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 	  if (pmpMgr_.isEnabled())
 	    {
 	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode, privMode, false))
+	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 
@@ -721,10 +706,10 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   // Collect PTE addresses used in the translation process.
   auto& walkVec = exec ? fetchWalks_ : dataWalks_;
   if (trace_)
-    walkVec.resize(walkVec.size() + 1);
-
-  if (attFile_)
-    fprintf(attFile_, "GPA: 0x%jx\n", uintmax_t(address));
+    {
+      walkVec.resize(walkVec.size() + 1);
+      walkVec.back().emplace_back(address, WalkEntry::Type::GPA);
+    }
 
   while (true)
     {
@@ -732,14 +717,14 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
 
       if (trace_)
-	walkVec.back().push_back(pteAddr);
+        walkVec.back().emplace_back(pteAddr);
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
 	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode, privMode, false))
+	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
 
@@ -747,20 +732,6 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         return stage2PageFaultType(read, write, exec);
       if (not napotCheck(pte, va))
         return stage2PageFaultType(read, write, exec);
-
-      if (attFile_)
-        {
-          bool leaf = pte.valid() and (pte.read() or pte.exec());
-          fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
-          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
-		  pte.write(), pte.exec(), pte.user(), pte.global(),
-		  pte.accessed(), pte.dirty());
-          fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
-		  uintmax_t(pte.ppn()) * pageSize_);
-	  if (leaf)
-            fprintf(attFile_, " s:%s", pageSize(modeStage2_, ii));
-	  fprintf(attFile_, "\n\n");
-        }
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
@@ -806,7 +777,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	{
 	  // We have a choice:
 	  // A. Page fault
-	  if (faultOnFirstAccess_)
+	  if (faultOnFirstAccess2_)
 	    return stage2PageFaultType(read, write, exec);  // A
 
 	  // Or B
@@ -817,7 +788,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  if (pmpMgr_.isEnabled())
 	    {
 	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode, privMode, false))
+	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 
@@ -887,19 +858,18 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   // Collect PTE addresses used in the translation process.
   auto& walkVec = exec ? fetchWalks_ : dataWalks_;
   if (trace_)
-    walkVec.resize(walkVec.size() + 1);
-
-  if (attFile_)
-    fprintf(attFile_, "VVA: 0x%jx\n", uintmax_t(address));
+    {
+      walkVec.resize(walkVec.size() + 1);
+      walkVec.back().emplace_back(address, WalkEntry::Type::GVA);
+    }
 
   while (true)
     {
       // 2.
       uint64_t gpteAddr = root + va.vpn(ii)*pteSize; // Guest pte address.
 
-      // TODO: this needs to be fixed, gpteAddr is not a physical address
-      /* if (trace_) */
-      /*   walkVec.back().push_back(gpteAddr); */
+      if (trace_)
+        walkVec.back().emplace_back(gpteAddr, WalkEntry::Type::GPA);
 
       // Translate guest pteAddr to host physical address.
       uint64_t pteAddr = gpteAddr; pa = gpteAddr;
@@ -911,14 +881,14 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	}
 
       if (trace_)
-        walkVec.back().push_back(pteAddr);
+        walkVec.back().emplace_back(pteAddr);
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
       if (pmpMgr_.isEnabled())
 	{
 	  Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	  if (not pmp.isRead(privMode, privMode, false))
+	  if (not pmp.isRead(privMode))
 	    return accessFaultType(read, write, exec);
 	}
 
@@ -926,20 +896,6 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
         return stage1PageFaultType(read, write, exec);
       if (not napotCheck(pte, va))
         return stage1PageFaultType(read, write, exec);
-
-      if (attFile_)
-        {
-          bool leaf = pte.valid() and (pte.read() or pte.exec());
-          fprintf(attFile_, "addr: 0x%jx\n", uintmax_t(pteAddr));
-          fprintf(attFile_, "rwx: %d%d%d, ug: %d%d, ad: %d%d\n", pte.read(),
-		  pte.write(), pte.exec(), pte.user(), pte.global(),
-		  pte.accessed(), pte.dirty());
-          fprintf(attFile_, "leaf: %d, pa:0x%jx", leaf,
-		  uintmax_t(pte.ppn()) * pageSize_);
-	  if (leaf)
-            fprintf(attFile_, " s:%s", pageSize(vsMode_, ii));
-	  fprintf(attFile_, "\n\n");
-        }
 
       // 3.
       if (not pte.valid() or (not pte.read() and pte.write()) or pte.res())
@@ -999,7 +955,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  if (pmpMgr_.isEnabled())
 	    {
 	      Pmp pmp = pmpMgr_.accessPmp(pteAddr);
-	      if (not pmp.isWrite(privMode, privMode, false))
+	      if (not pmp.isWrite(privMode))
 		return accessFaultType(read, write, exec);
 	    }
 

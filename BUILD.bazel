@@ -14,18 +14,11 @@ hdrs = [
 ]
 
 cc_library(
-    name          = "tracer_ext",
-    hdrs          = glob(["*.hpp"]),
-    includes      = ["."],
-    visibility    = ["//visibility:public"],
-)
-
-cc_library(
     name          = "rvcore",
     srcs          = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
     hdrs          = hdrs,
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
-    deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat", "//third_party:linenoise"],
+    deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat", "//third_party:linenoise", "//pci:pci"],
     linkopts      = ["-lpthread", "-lz", "-ldl", "-lrt"],
     visibility    = ["//visibility:public"],
 )

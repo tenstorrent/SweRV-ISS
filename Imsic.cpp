@@ -7,27 +7,27 @@ using namespace TT_IMSIC;
 
 template <typename URV>
 bool
-File::iregRead(URV& val) const
+File::iregRead(unsigned sel, URV& val) const
 {
   using EIC = ExternalInterruptCsr;
 
-  if (select_ == EIC::DELIVERY)
+  if (sel == EIC::DELIVERY)
     val = delivery_;
-  else if (select_ == EIC::THRESHOLD)
+  else if (sel == EIC::THRESHOLD)
     val = threshold_;
   else
     {
       val = 0;
       unsigned offset;
       const std::vector<bool>* it;
-      if (select_ >= EIC::P0 and select_ <= EIC::P63)
+      if (sel >= EIC::P0 and sel <= EIC::P63)
         {
-          offset = select_ - EIC::P0;
+          offset = sel - EIC::P0;
           it = &pending_;
         }
-      else if (select_ >= EIC::E0 and select_ <= EIC::E63)
+      else if (sel >= EIC::E0 and sel <= EIC::E63)
         {
-          offset = select_ - EIC::E0;
+          offset = sel - EIC::E0;
           it = &enabled_;
         }
       else
@@ -52,27 +52,26 @@ File::iregRead(URV& val) const
 
 template <typename URV>
 bool
-File::iregWrite(URV val)
+File::iregWrite(unsigned sel, URV val)
 {
   using EIC = ExternalInterruptCsr;
 
-  if (select_ == EIC::DELIVERY)
+  if (sel == EIC::DELIVERY)
     delivery_ = val;
-  else if (select_ == EIC::THRESHOLD)
+  else if (sel == EIC::THRESHOLD)
     threshold_ = val;
   else
     {
-      val = 0;
       unsigned offset;
       std::vector<bool>* it;
-      if (select_ >= EIC::P0 and select_ <= EIC::P63)
+      if (sel >= EIC::P0 and sel <= EIC::P63)
         {
-          offset = select_ - EIC::P0;
+          offset = sel - EIC::P0;
           it = &pending_;
         }
-      else if (select_ >= EIC::E0 and select_ <= EIC::E63)
+      else if (sel >= EIC::E0 and sel <= EIC::E63)
         {
-          offset = select_ - EIC::E0;
+          offset = sel - EIC::E0;
           it = &enabled_;
         }
       else
@@ -89,6 +88,8 @@ File::iregWrite(URV val)
       // slow, use bitset?
       for (unsigned i = begin; i < end; i++)
         arr[i] = (val >> (i - begin)) & 1;
+
+      updateTopId();
     }
 
   return true;
@@ -104,13 +105,21 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
   uint32_t word = data;
 
   File* file = nullptr;
+  bool isMachine = false;
+  bool isSupervisor = false;
   bool isGuest = false;
   unsigned guestIx = 0;
 
   if (mfile_.coversAddress(addr))
-    file = &mfile_;
+    {
+      file = &mfile_;
+      isMachine = true;
+    }
   else if (sfile_.coversAddress(addr))
-    file = &sfile_;
+    {
+      file = &sfile_;
+      isSupervisor = true;
+    }
   else
     for (size_t i = 0; i < gfiles_.size(); ++i)
       if (gfiles_.at(i).coversAddress(addr))
@@ -134,8 +143,17 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
       file->setPending(word, true);
     }
 
-  if (isGuest and file->canDeliver() and file->topId())
-    guestInterrupts_ |= uint64_t(1) << guestIx;
+  if (file->canDeliver() and file->topId())
+    {
+      if (isMachine and mInterrupt_)
+        mInterrupt_(true);
+
+      if (isSupervisor and sInterrupt_)
+        sInterrupt_(true);
+
+      if (isGuest and gInterrupt_)
+        gInterrupt_(true, guestIx);
+    }
 
   return true;
 }
@@ -203,3 +221,20 @@ ImsicMgr::configureGuests(unsigned n, unsigned ids)
 
   return true;
 }
+
+
+template
+bool
+File::iregRead<uint32_t>(unsigned, uint32_t&) const;
+
+template
+bool
+File::iregRead<uint64_t>(unsigned, uint64_t&) const;
+
+template
+bool
+File::iregWrite<uint32_t>(unsigned, uint32_t);
+
+template
+bool
+File::iregWrite<uint64_t>(unsigned, uint64_t);

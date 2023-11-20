@@ -164,23 +164,39 @@ namespace WdRiscv
       return ix < supportedModes_.size() ? supportedModes_.at(ix) : false;
     }
 
+    struct WalkEntry
+    {
+      enum Type { GVA = 0, GPA = 1, PA = 2};
+
+      WalkEntry(uint64_t addr, Type type)
+        : addr_(addr), type_(type)
+      { assert(type != Type::PA); }
+
+      WalkEntry(uint64_t addr)
+        : addr_(addr), type_(Type::PA)
+      { }
+
+      uint64_t addr_ = 0;
+      Type type_ = Type::PA;
+    };
+
     /// Return the addresses of the instruction page table entries
     /// used in the last page table walk. Return empty vector if the
     /// last executed instruction did not induce an instruction page
     /// table walk.
-    const std::vector<uint64_t>& getFetchWalks(unsigned ix) const
+    const std::vector<WalkEntry>& getFetchWalks(unsigned ix) const
     { return ix < fetchWalks_.size() ? fetchWalks_.at(ix) : emptyWalk_; }
 
     /// Return the addresses of the data page table entries used in
     /// the last page table walk. Return empty vector if the last
     /// executed instruction did not induce a data page table walk.
-    const std::vector<uint64_t>& getDataWalks(unsigned ix) const
+    const std::vector<WalkEntry>& getDataWalks(unsigned ix) const
     { return ix < dataWalks_.size() ? dataWalks_.at(ix) : emptyWalk_; }
 
-    const std::vector<std::vector<uint64_t>>& getFetchWalks() const
+    const std::vector<std::vector<WalkEntry>>& getFetchWalks() const
     { return fetchWalks_; }
 
-    const std::vector<std::vector<uint64_t>>& getDataWalks() const
+    const std::vector<std::vector<WalkEntry>>& getDataWalks() const
     { return dataWalks_; }
 
     /// Clear trace of page table walk
@@ -189,6 +205,8 @@ namespace WdRiscv
       fetchWalks_.clear();
       dataWalks_.clear();
       clearUpdatedPtes();
+      fetchPageCross_ = false;
+      dataPageCross_ = false;
     }
 
     static constexpr const char* pageSize(Mode m, uint32_t level)
@@ -359,9 +377,10 @@ namespace WdRiscv
     void setVsRootPage(uint64_t root)
     { vsRootPage_ = root; }
 
-    /// Set the page table root page for 2nd stage address translation.
+    /// Set the page table root page for 2nd stage address translation after
+    /// clearing the least siginficant 2 bits of the given address.
     void setStage2RootPage(uint64_t root)
-    { rootPageStage2_ = root; }
+    { rootPageStage2_ = (root >> 2) << 2; }
 
     // Change the translation mode to m.
     void setMode(Mode m)
@@ -409,11 +428,6 @@ namespace WdRiscv
     void setVsSum(bool flag)
     { vsSum_ = flag; }
 
-    /// Enable/disable address translation logging (disable if file is
-    /// null). Return previous value of file.
-    FILE* enableAddrTransLog(FILE* file)
-    { FILE* prev = attFile_; attFile_ = file; return prev; }
-
     /// Enable/disable page-based-memory types.
     void enablePbmt(bool flag)
     { pbmtEnabled_ = flag; }
@@ -433,6 +447,12 @@ namespace WdRiscv
     Mode mode() const
     { return mode_; }
 
+    Mode vsMode() const
+    { return vsMode_; }
+
+    Mode modeStage2() const
+    { return modeStage2_; }
+
     /// Return current address space id.
     uint32_t asid() const
     { return asid_; }
@@ -445,9 +465,17 @@ namespace WdRiscv
     uint32_t vmid() const
     { return vmid_; }
 
+    /// Return whether previous translation was page crossing.
+    bool pageCross(bool flag) const
+    { return (flag)? fetchPageCross_ : dataPageCross_; }
+
     /// Set behavior if first access to page or store and page not dirty.
     void setFaultOnFirstAccess(bool flag)
     { faultOnFirstAccess_ = flag; }
+
+    /// Similar to above but applies to 2nd stage translation.
+    void setFaultOnFirstAccessStage2(bool flag)
+    { faultOnFirstAccess2_ = flag; }
 
     /// Clear saved data for updated leaf level PTE.
     void clearUpdatedPtes()
@@ -539,19 +567,22 @@ namespace WdRiscv
     bool sum_ = false;  // Supervisor privilege can access user pages.
     bool vsSum_ = false;  // Supervisor privilege can access user pages for VS mode.
     bool faultOnFirstAccess_ = true;
+    bool faultOnFirstAccess2_ = true;
     bool accessDirtyCheck_ = true;  // To be able to supress AD check
 
     bool xForR_ = false;   // True for hlvx.hu and hlvx.wu instructions: use exec for read
 
-    FILE* attFile_ = nullptr;
-
     std::vector<bool> supportedModes_; // Indexed by Mode.
 
     // Addresses of PTEs used in most recent insruction an data translations.
-    using Walk = std::vector<uint64_t>;
+    using Walk = std::vector<WalkEntry>;
     std::vector<Walk> fetchWalks_;       // Instruction fetch walks of last instruction.
     std::vector<Walk> dataWalks_;    // Data access walks of last instruction.
     const Walk emptyWalk_;
+
+    // Track page crossing information
+    bool fetchPageCross_;
+    bool dataPageCross_;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;

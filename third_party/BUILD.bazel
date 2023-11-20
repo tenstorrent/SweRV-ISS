@@ -43,9 +43,9 @@ cc_library(
 
     includes = ["softfloat/build/RISCV-GCC/", "softfloat/source/RISCV/", "softfloat/source/include"],
     visibility = ['//:__pkg__'],
-    copts = ["-O2"],
+    copts = ["-O2", "-w"],
     local_defines = ["SOFTFLOAT_ROUND_ODD", "INLINE_LEVEL=5", "SOFTFLOAT_FAST_INT64"],
-    features = ["-default_compile_flags", "-treat_warnings_as_errors"],
+    features = ["-default_compile_flags"],
 )
 
 cc_library(

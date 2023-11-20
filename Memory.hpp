@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,6 +23,7 @@
 #include <mutex>
 #include <type_traits>
 #include <cassert>
+#include "trapEnums.hpp"
 #include "PmaManager.hpp"
 #include "IoDevice.hpp"
 #include "util.hpp"
@@ -93,13 +94,13 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 #else
-      Pma pma1 = pmaMgr_.getPma(address);
+      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
       if (not pma1.isRead())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
           if (not pma2.isRead())
             return false;
         }
@@ -135,32 +136,31 @@ namespace WdRiscv
     template <typename T>
     bool readInst(uint64_t address, T& value) const
     {
-      Pma pma = pmaMgr_.getPma(address);
-      if (pma.isExec())
+      Pma pma = pmaMgr_.accessPma(address, PmaManager::AccessReason::Fetch);
+      if (not pma.isExec())
+	return false;
+
+      if (address & (sizeof(T) -1))
 	{
-	  if (address & (sizeof(T) -1))
-	    {
-              // Misaligned address: Check next address.
-              Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
-	      if (pma != pma2)
-                return false;  // Cannot cross an ICCM boundary.
-	    }
+	  // Misaligned address: Check next address.
+	  Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::Fetch);
+	  if (not pma2.isExec() or pma.isIccm() != pma2.isIccm())
+	    return false;  // No exec or crossing ICCM boundary.
+	}
 
 #ifdef MEM_CALLBACKS
-          uint64_t val = 0;
-          if (not readCallback_(address, sizeof(T), val))
-            return false;
-          value = val;
+      uint64_t val = 0;
+      if (not readCallback_(address, sizeof(T), val))
+	return false;
+      value = val;
 #else
-          value = *(reinterpret_cast<const T*>(data_ + address));
+      value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
 
-	  return true;
-	}
-      return false;
+      return true;
     }
 
-    /// Return true if read will be successful if tried. 
+    /// Return true if read will be successful if tried.
     bool checkRead(uint64_t address, unsigned readSize)
     {
       Pma pma1 = pmaMgr_.getPma(address);
@@ -170,7 +170,7 @@ namespace WdRiscv
       if (address & (readSize - 1))  // If address is misaligned
 	{
           Pma pma2 = pmaMgr_.getPma(address + readSize - 1);
-          if (pma1 != pma2)
+          if (not pma2.isRead())
             return false;
 	}
 
@@ -197,7 +197,7 @@ namespace WdRiscv
       if (address & (writeSize - 1))  // If address is misaligned
 	{
           Pma pma2 = pmaMgr_.getPma(address + writeSize - 1);
-          if (pma1 != pma2)
+          if (not pma2.isWrite())
             return false;
 	}
 
@@ -241,13 +241,13 @@ namespace WdRiscv
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
-      Pma pma1 = pmaMgr_.getPma(address);
+      Pma pma1 = pmaMgr_.accessPma(address, PmaManager::AccessReason::LdSt);
       if (not pma1.isWrite())
 	return false;
 
       if (address & (sizeof(T) - 1))  // If address is misaligned
 	{
-          Pma pma2 = pmaMgr_.getPma(address + sizeof(T) - 1);
+          Pma pma2 = pmaMgr_.accessPma(address + sizeof(T) - 1, PmaManager::AccessReason::LdSt);
           if (pma1 != pma2)
 	    return false;
 	}
@@ -475,6 +475,10 @@ namespace WdRiscv
     void defineWriteMemoryCallback(std::function<bool(uint64_t, unsigned, uint64_t)> callback)
     { writeCallback_ = std::move(callback); }
 
+    /// Define map memory callback.
+    void defineMapMemoryCallback(std::function<uint8_t*(uint64_t, size_t)> callback)
+    { mapCallback_ = std::move(callback); }
+
     /// Enable tracing of memory data lines referenced by current
     /// run. A memory data line is typically 64-bytes long and corresponds to
     /// a cachable line.
@@ -528,6 +532,18 @@ namespace WdRiscv
     uint64_t getPageStartAddr(uint64_t addr) const
     { return (addr >> pageShift_) << pageShift_; }
 
+    uint8_t* data(uint64_t addr, [[maybe_unused]] size_t len) const
+    {
+#ifdef MEM_CALLBACKS
+      if (mapCallback_)
+        return mapCallback_(addr, len);
+      return nullptr;
+#else
+      // TODO: guard range
+      return data_ + addr;
+#endif
+    }
+
   protected:
 
     /// Same as write but effects not recorded in last-write info and
@@ -538,7 +554,6 @@ namespace WdRiscv
       if (address + sizeof(T) > size_)
         return false;
 
-      // Memory mapped region accessible only with word-size poke.
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.isMemMappedReg())
         {
@@ -580,7 +595,7 @@ namespace WdRiscv
     /// is used to initialize memory. If address is in
     /// memory-mapped-register region, then both mem-mapped-register
     /// and external memory are written.
-    bool specialInitializeByte(uint64_t address, uint8_t value);
+    bool initializeByte(uint64_t address, uint8_t value);
 
     /// Clear the information associated with last write.
     void clearLastWriteInfo(unsigned sysHartIx)
@@ -654,8 +669,9 @@ namespace WdRiscv
       uint64_t addr_ = 0;
       unsigned size_ = 0;
       bool valid_ = false;
+      CancelLrCause cause_ = CancelLrCause::NONE;
     };
-      
+
     /// Invalidate LR reservations matching address of poked/written
     /// bytes and belonging to harts other than the given hart-id. The
     /// memory tracks one reservation per hart indexed by local hart
@@ -669,26 +685,21 @@ namespace WdRiscv
           auto& res = reservations_[i];
           if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
               (addr < res.addr_ and (res.addr_ - addr) < storeSize))
-            res.valid_ = false;
+	    {
+	      res.valid_ = false;
+	      res.cause_ = CancelLrCause::STORE;
+	    }
         }
     }
 
-    /// Invalidate LR reservations matching address of poked/written
-    /// bytes. The memory tracks one reservation per hart indexed by
-    /// local hart ids.
-    void invalidateLrs(uint64_t addr, unsigned storeSize)
-    {
-      for (auto & res : reservations_)
-        {
-          if ((addr >= res.addr_ and (addr - res.addr_) < res.size_) or
-              (addr < res.addr_ and (res.addr_ - addr) < storeSize))
-            res.valid_ = false;
-        }
-    }
 
     /// Invalidate LR reservation corresponding to the given hart.
-    void invalidateLr(unsigned sysHartIx)
-    { reservations_.at(sysHartIx).valid_ = false; }
+    void invalidateLr(unsigned sysHartIx, CancelLrCause cause)
+    {
+      auto& res = reservations_.at(sysHartIx);
+      res.valid_ = false;
+      res.cause_ = cause;
+    }
 
     /// Make a LR reservation for the given hart.
     void makeLr(unsigned sysHartIx, uint64_t addr, unsigned size)
@@ -697,6 +708,7 @@ namespace WdRiscv
       res.addr_ = addr;
       res.size_ = size;
       res.valid_ = true;
+      res.cause_ = CancelLrCause::NONE;
     }
 
     // returns true if the given hart has a valid LR reservation
@@ -713,6 +725,17 @@ namespace WdRiscv
       const auto& res = reservations_.at(sysHartIx);
       return (res.valid_ and res.addr_ <= addr and
 	      addr + size <= res.addr_ + res.size_);
+    }
+
+    /// Return the cause for the reservation cancleation in the given
+    /// hart. Return NONE if hart index is out of bounds. Return NONE
+    /// if given hart has a valid reservation.
+    CancelLrCause cancelLrCause(unsigned sysHartIx) const
+    {
+      if (sysHartIx >= reservations_.size())
+	return CancelLrCause::NONE;
+      const auto& res = reservations_.at(sysHartIx);
+      return res.valid_ ? CancelLrCause::NONE : res.cause_;
     }
 
     /// Load contents of given ELF segment into memory.
@@ -785,5 +808,8 @@ namespace WdRiscv
 
     /// Callback for write: bool func(uint64_t addr, unsigned size, uint64_t val);
     std::function<bool(uint64_t, unsigned, uint64_t)> writeCallback_ = nullptr;
+
+    /// Callback to obtain pointer to memory; uint8_t*(uint64_t addr, size_t len);
+    std::function<uint8_t*(uint64_t, size_t)> mapCallback_ = nullptr;
   };
 }

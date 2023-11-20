@@ -604,7 +604,7 @@ template <typename URV>
 static
 bool
 applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
-                bool userMode, bool /*verbose*/)
+                bool userMode, bool cof, bool /*verbose*/)
 {
   unsigned errors = 0;
 
@@ -616,7 +616,7 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
         errors++;
       else
         {
-          if (not hart.configMachineModePerfCounters(count))
+          if (not hart.configMachineModePerfCounters(count, cof))
             errors++;
           if (userMode)
             if (not hart.configUserModePerfCounters(count))
@@ -892,6 +892,68 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
     hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
 		      &maxBytesPerLmul);
 
+  tag = "mask_agnostic_policy";
+  if (vconf.contains(tag))
+    {
+      auto& item = vconf.at(tag);
+      if (not item.is_string())
+	{
+	  std::cerr << "Error: Configuration file tag vector.mask_agnostic_policy must have a string value\n";
+	errors++;
+	}
+      else
+	{
+	  std::string val = item.get<std::string>();
+	  if (val == "ones")
+	    hart.configMaskAgnosticAllOnes(true);
+	  else if (val == "undisturb")
+	    hart.configMaskAgnosticAllOnes(false);
+	  else
+	    {
+	      std::cerr << "Error: Configuration file tag vector.mask_agnostic_policy must be 'ones' or 'undisturb'\n";
+	      errors++;
+	    }
+	}
+    }
+
+  tag = "tail_agnostic_policy";
+  if (vconf.contains(tag))
+    {
+      auto& item = vconf.at(tag);
+      if (not item.is_string())
+	{
+	  std::cerr << "Error: Configuration file tag vector.tail_agnostic_policy must have a string value\n";
+	errors++;
+	}
+      else
+	{
+	  std::string val = item.get<std::string>();
+	  if (val == "ones")
+	    hart.configTailAgnosticAllOnes(true);
+	  else if (val == "undisturb")
+	    hart.configTailAgnosticAllOnes(false);
+	  else
+	    {
+	      std::cerr << "Error: Configuration file tag vector.tail_agnostic_policy must be 'ones' or 'undisturb'\n";
+	      errors++;
+	    }
+	}
+    }
+
+  tag = "trap_non_zero_vstart";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.enableTrapNonZeroVstart(flag);
+    }
+
+  if (errors == 0)
+    hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
+		      &maxBytesPerLmul);
+
   return errors == 0;
 }
 
@@ -1059,7 +1121,7 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 	    itemErrors++;
 	  if (not itemErrors)
 	    {
-	      if (not hart.definePmaRegion(low, high, pma))
+	      if (not hart.definePmaRegion(ix, low, high, pma))
 		itemErrors++;
 	      else if (pma.isMemMappedReg())
 		{
@@ -1078,6 +1140,53 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 }
 
 
+/// Return true if config has a defined pmacfg CSR. This is either a
+/// pmacfg with no "exists" attribute or with "exists" attribute set
+/// to true.
+static bool
+hasDefinedPmacfgCsr(const nlohmann::json& config)
+{
+  if (not config.contains("csr"))
+    return false;  // No csr section
+
+  const auto& csrs = config.at("csr");
+  if (not csrs.is_object())
+    return false;  // No csr section in this config.
+
+  // We could have a pmacfg entry with a range of indices.
+  if (csrs.contains("pmacfg"))
+    {
+      const auto& entry = csrs.at("pmacfg");
+      if (entry.is_object())
+	{
+	  if (not entry.contains("exists"))
+	    return true;
+	  bool exists = false;
+	  if (getJsonBoolean("csr.pmacfg", entry.at("exists"), exists) and exists)
+	    return true;
+	}
+    }
+
+  // We could have a specific pmacfg csr (example pmacfg0).
+  for (unsigned i = 0; i < 64; ++i)
+    {
+      std::string name = "pmacfg";
+      name += std::to_string(i);
+      if (csrs.contains(name))
+	{
+	  const auto& entry = csrs.at(name);
+	  if (not entry.contains("exists"))
+	    return true;
+	  bool exists = false;
+	  if (getJsonBoolean(name + ".exists", entry.at("exists"), exists) and exists)
+	    return true;
+	}
+    }
+
+  return false;
+}
+
+
 template<typename URV>
 bool
 HartConfig::applyMemoryConfig(Hart<URV>& hart) const
@@ -1090,8 +1199,15 @@ HartConfig::applyMemoryConfig(Hart<URV>& hart) const
       const auto& memMap = config_ -> at("memmap");
       std::string_view tag = "pma";
       if (memMap.contains(tag))
-	if (not applyPmaConfig(hart, memMap.at(tag)))
-	  errors++;
+	{
+	  if (hasDefinedPmacfgCsr(*config_))
+	    {
+	      std::cerr << "Warning: Configuration file has both memmap pma "
+			<< "and a pmacfg CSR. CSRs will override memmap.\n";
+	    }
+	  if (not applyPmaConfig(hart, memMap.at(tag)))
+	    errors++;
+	}
     }
 
   if (config_ -> contains("cache"))
@@ -1259,9 +1375,27 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
 	cerr << "Config file tag \"" << etag << "\" is no longer supported.\n";
     }
 
-  applyPerfEvents(hart, *config_, userMode, verbose) or errors++;
+  tag = "enable_counter_overflow";
+  bool cof = false;  // Counter overflow: sscofpmf extension
+  if (config_ ->contains(tag))
+    getJsonBoolean(tag, config_ ->at(tag), cof) or errors++;
+
+  applyPerfEvents(hart, *config_, userMode, cof, verbose) or errors++;
   applyCsrConfig(hart, *config_, verbose) or errors++;
   applyTriggerConfig(hart, *config_) or errors++;
+
+  hart.enableSscofpmf(cof);
+
+  tag = "trap_non_zero_vstart";
+  if (config_ ->contains(tag))
+    {
+      std::cerr << "Configuration tag trap_non_zero_vstart should be in vector section.\n";
+      bool flag = false;
+      if (not getJsonBoolean(tag, config_ ->at(tag), flag))
+        errors++;
+      else
+        hart.enableTrapNonZeroVstart(flag);
+    }
   applyVectorConfig(hart, *config_) or errors++;
 
   tag = "even_odd_trigger_chains";
@@ -1379,8 +1513,9 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "page_fault_on_first_access";
   if (config_ -> contains(tag))
     {
+      cerr << "Warning: Config tag page_fault_on_first_access is deprecated -- feature is now controlled by bit 61 of the MENVCFG CSR.\n";
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
-      hart.setFaultOnFirstAccess(flag);
+      // hart.setFaultOnFirstAccess(flag);
     }
 
   tag = "snapshot_periods";
@@ -1434,6 +1569,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
       else
         hart.enableClearMtvalOnIllInst(flag);
+    }
+
+  tag = "clear_mtval_on_ebreak";
+  if (config_ -> contains(tag))
+    {
+      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
+        errors++;
+      else
+        hart.enableClearMtvalOnEbreak(flag);
     }
 
   tag = "log2_counter_to_time";
@@ -1494,21 +1638,25 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.setDebugTrapAddress(addr);
     }
 
-  tag = "trap_non_zero_vstart";
-  if (config_ -> contains(tag))
-    {
-      bool flag = false;
-      if (not getJsonBoolean(tag, config_ -> at(tag), flag))
-        errors++;
-      else
-        hart.enableTrapNonZeroVstart(flag);
-    }
-
   tag = "trace_pmp";
   if (config_ -> contains(tag))
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.tracePmp(flag);
+    }
+
+  tag = "trace_pma";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.tracePma(flag);
+    }
+
+  tag = "enable_pmp_tor";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePmpTor(flag);
     }
 
   tag = "address_translation_modes";
@@ -1591,11 +1739,18 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableRvsstc(flag);
     }
 
-  tag = "enable_counter_overflow";
+  tag = "enable_aia";
   if (config_ ->contains(tag))
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableSscofpmf(flag);
+      hart.enableAiaExtension(flag);
+    }
+
+  tag = "enable_smstateen";
+  if (config_ ->contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enableSmstaten(flag);
     }
 
   return errors == 0;
@@ -1639,6 +1794,13 @@ HartConfig::applyImsicConfig(System<URV>& system) const
   if (not config_ -> contains("imsic"))
     return true;
 
+  auto& hart0 = *system.ithHart(0);
+  if (not hart0.extensionIsEnabled(RvExtension::Smaia))
+    {
+      std::cerr << "Cannot configure IMSIC without enabling Smaia\n";
+      return false;
+    }
+
   auto& imsic = config_ -> at("imsic");
 
   uint64_t mbase = 0, mstride = 0, sbase = 0, sstride = 0;
@@ -1676,6 +1838,34 @@ HartConfig::applyImsicConfig(System<URV>& system) const
       return false;
 
   return system.configImsic(mbase, mstride, sbase, sstride, guests, ids);
+}
+
+
+template<typename URV>
+bool
+HartConfig::applyPciConfig(System<URV>& system) const
+{
+  std::string_view tag = "pci";
+  if (not config_ -> contains(tag))
+    return true;
+
+  auto& pci = config_ -> at(tag);
+  if (not pci.contains("config_base") or not pci.contains("mmio_base") or not pci.contains("mmio_size"))
+    {
+      std::cerr << "Invalid pci entry in config file\n";
+      return false;
+    }
+  uint64_t configBase = 0, mmioBase = 0, mmioSize = 0;
+  if (not getJsonUnsigned(util::join("", tag, ".config_base"), pci.at("config_base"), configBase) or
+      not getJsonUnsigned(util::join("", tag, ".mmio_base"), pci.at("mmio_base"), mmioBase) or
+      not getJsonUnsigned(util::join("", tag, ".mmio_size"), pci.at("mmio_size"), mmioSize))
+    return false;
+  unsigned buses = 0, slots = 0;
+  if (not getJsonUnsigned(util::join("", tag, ".buses"), pci.at("buses"), buses) or
+      not getJsonUnsigned(util::join("", tag, ".slots"), pci.at("slots"), slots))
+    return false;
+
+  return system.configPci(configBase, mmioBase, mmioSize, buses, slots);
 }
 
 
@@ -1736,6 +1926,9 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 	return false;
       system.defineUart(addr, size);
     }
+
+  if (not applyPciConfig(system))
+    return false;
 
   return finalizeCsrConfig(system);
 }

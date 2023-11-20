@@ -110,7 +110,7 @@ namespace WdRiscv
     /// example, in "addi x3, x4, 10", there are 3 operands: 3, 4, and
     /// 10 with types IntReg, IntReg and Imm respectively.
     unsigned operandCount() const
-    { return isValid()? entry_->operandCount() : 0; }
+    { return entry_? entry_->operandCount() : 0; }
 
     /// Return the ith operands or zero if i is out of bounds. For exmaple, if
     /// decode insruction is "addi x3, x4, 10" then the 0th operand would be 3
@@ -125,12 +125,12 @@ namespace WdRiscv
     /// Return the type of the ith operand or None if i is out of
     /// bounds. Object must be valid.
     OperandType ithOperandType(unsigned i) const
-    { return isValid()? entry_->ithOperandType(i) : OperandType::None; }
+    { return entry_? entry_->ithOperandType(i) : OperandType::None; }
 
     /// Return the mode of the ith operand or None if i is out of
     /// bounds. Object must be valid.
     OperandMode ithOperandMode(unsigned i) const
-    { return isValid()? entry_->ithOperandMode(i) : OperandMode::None; }
+    { return entry_? entry_->ithOperandMode(i) : OperandMode::None; }
 
     /// Return true if this object is valid.
     bool isValid() const
@@ -213,6 +213,10 @@ namespace WdRiscv
     /// Return true if this an atomic instruction (amo or lr/sc).
     bool isAtomic() const
     { return entry_ and entry_->isAtomic(); }
+
+    /// Return true if this is a hypervisor instruction.
+    bool isHypervisor() const
+    { return entry_ and entry_->isHypervisor(); }
 
     /// Return true if this a floating point instruction.
     bool isFp() const

@@ -678,9 +678,13 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   // Execute instruction. Determine if an interrupt was taken or if a
   // trigger got tripped.
 
-  bool wasInDebug = hart.inDebugMode();
-  if (wasInDebug)
-    hart.exitDebugMode();
+  bool wasInDebug = false;
+  if (not hart.hasDebugParkLoop())
+    {
+      wasInDebug = hart.inDebugMode();
+      if (wasInDebug)
+	hart.exitDebugMode();
+    }
 
   uint32_t inst = 0;
   hart.readInst(hart.pc(), inst);  // In case instruction is interrupted.
@@ -695,7 +699,8 @@ Server<URV>::stepCommand(const WhisperMessage& req,
       hart.singleStep(di, traceFile);
       if (not di.isValid())
 	assert(hart.lastInstructionTrapped());
-      ok = system_.mcmRetire(hart, req.time, req.instrTag, di);
+      if (not hart.lastInstructionTrapped())
+	ok = system_.mcmRetire(hart, req.time, req.instrTag, di);
     }
   else
     hart.singleStep(di, traceFile);
@@ -713,14 +718,15 @@ Server<URV>::stepCommand(const WhisperMessage& req,
   processStepCahnges(hart, inst, pendingChanges, interrupted, hasPre,
 		     hasPost, reply);
 
-  // Send privilege mode, incremental floating point flags, and trap info
-  // in flags: 2 bits for priv mode, 4 bits for fp flags, 1 bit for trap,
-  // 1 bit if target program stopped.
+  // Send privilege mode (2 bits), incremental floating point flags (4 bits),
+  // and trap info (1 bit), stop indicator (1 bit), interrupt (1 bit),
+  // and virtual mode (1 bit).
   unsigned fpFlags = hart.lastFpFlags();
   unsigned trap = hart.lastInstructionTrapped()? 1 : 0;
   unsigned stop = hart.hasTargetProgramFinished()? 1 : 0;
+  unsigned virt = hart.lastVirtMode()? 1 : 0;
   reply.flags = ((pm & 3) | ((fpFlags & 0xf) << 2) | (trap << 6) |
-		 (stop << 7) | (interrupted << 8));
+		 (stop << 7) | (interrupted << 8) | (virt << 9));
 
   if (wasInDebug)
     hart.enterDebugMode(hart.peekPc());
@@ -793,7 +799,6 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::FpFlags:             return "iff";
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
-    default:                                          return "?";
     }
   return "?";
 }
@@ -809,15 +814,15 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
 
   std::vector<uint64_t> items;
   if (isAddr)
-    hart.getPageTableWalkAddresses(isInstr, index, items);
+    {
+      std::vector<VirtMem::WalkEntry> addrs;
+      hart.getPageTableWalkAddresses(isInstr, index, addrs);
+      for (auto& addr : addrs)
+        if (addr.type_ == VirtMem::WalkEntry::Type::PA)
+          items.push_back(std::move(addr.addr_));
+    }
   else
     hart.getPageTableWalkEntries(isInstr, index, items);
-  if (items.size() > 5)
-    {
-      std::cerr << "doPageTableWalk: Walk too long: " << items.size() << " entries\n";
-      reply.type = Invalid;
-      return;
-    }
 
   reply.size = items.size();
   if (not items.empty())
@@ -914,18 +919,24 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         if (commandLog)
           {
             if (msg.resource == 'p')
-              fprintf(commandLog, "hart=%" PRIu32 " poke pc 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
-                      uintmax_t(msg.value), timeStamp.c_str(), msg.tag.data());
+              fprintf(commandLog, "hart=%" PRIu32 " poke pc 0x%" PRIxMAX " # ts=%s tag=%s\n",
+		      hartId, uintmax_t(msg.value), timeStamp.c_str(), msg.tag.data());
+            else if (msg.resource == 's')
+              fprintf(commandLog, "hart=%" PRIu32 " poke s %s 0x%" PRIxMAX " # ts=%s tag=%s\n",
+		      hartId, specialResourceToStr(msg.address), uintmax_t(msg.value),
+		      timeStamp.c_str(), msg.tag.data());
             else if (msg.resource == 'v')
               {
-                fprintf(commandLog, "hart=%" PRIu32 " poke v 0x%" PRIxMAX " 0x", hartId, uintmax_t(msg.address));
+                fprintf(commandLog, "hart=%" PRIu32 " poke v 0x%" PRIxMAX " 0x",
+			hartId, uintmax_t(msg.address));
                 for (uint32_t i = 0; i < msg.size; ++i)
                   fprintf(commandLog, "%02x", uint8_t(msg.buffer[msg.size - 1 - i]));
                 fprintf(commandLog, " # ts=%s tag=%s\n", timeStamp.c_str(), msg.tag.data());
               }
             else
-              fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n", hartId,
-                      msg.resource, uintmax_t(msg.address), uintmax_t(msg.value),
+              fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n",
+		      hartId, msg.resource, uintmax_t(msg.address),
+		      uintmax_t(msg.value),
                       timeStamp.c_str(), msg.tag.data());
           }
         break;
@@ -1048,7 +1059,7 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
 
       case CancelLr:
         if (checkHart(msg, "cancel_lr", reply))
-          hart.cancelLr();
+          hart.cancelLr(CancelLrCause::SERVER);
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " cancel_lr # ts=%s\n", hartId,
                   timeStamp.c_str());
@@ -1063,23 +1074,23 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         break;
 
       case McmRead:
-        if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
-                                msg.size, msg.value))
-          reply.type = Invalid;
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mread %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
+        if (not system_.mcmRead(hart, msg.time, msg.instrTag, msg.address,
+                                msg.size, msg.value))
+          reply.type = Invalid;
         break;
 
       case McmInsert:
-        if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
-                                    msg.address, msg.size, msg.value))
-          reply.type = Invalid;
         if (commandLog)
           fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbinsert %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
                   hartId, msg.time, msg.instrTag, msg.address, msg.size,
                   msg.value);
+        if (not system_.mcmMbInsert(hart, msg.time, msg.instrTag,
+                                    msg.address, msg.size, msg.value))
+          reply.type = Invalid;
         break;
 
       case McmWrite:
@@ -1097,31 +1108,41 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
             std::vector<uint8_t> data(msg.size);
             for (size_t i = 0; i < msg.size; ++i)
               {
-                data.at(i) = msg.buffer[i];
+                data.at(i) = msg.buffer.at(i);
                 if (msg.flags)
-                  mask.at(i) = msg.tag[i/8] & (1 << (i%8));
+                  mask.at(i) = msg.tag.at(i/8) & (1 << (i%8));
               }
-
-            if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
-              reply.type = Invalid;
 
             if (commandLog)
               {
                 fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbwrite 0x%" PRIx64 " 0x",
                         hartId, msg.time, msg.address);
-                std::reverse(data.begin(), data.end()); // Print lowest address data on the right.
-                for (uint8_t item :  data)
-                  fprintf(commandLog, "%02x", item);
+                for (unsigned i = data.size(); i > 0; --i)
+                  fprintf(commandLog, "%02x", data.at(i-1));
                 if (msg.flags)
                   {    // Print mask with least sig digit on the right
                     fprintf(commandLog, " 0x");
 		    unsigned n = msg.size / 8;
                     for (unsigned i = 0; i < n; ++i)
-                      fprintf(commandLog, "%02x", msg.tag[n-1-i]);
+                      fprintf(commandLog, "%02x", unsigned(msg.tag.at(n-1-i)) & 0xff);
                   }
                 fprintf(commandLog, "\n");
               }
+
+            if (not system_.mcmMbWrite(hart, msg.time, msg.address, data, mask))
+              reply.type = Invalid;
           }
+        break;
+
+      case McmBypass:
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mbbypass %" PRIu64 " 0x%" PRIx64 " %" PRIu32 " 0x%" PRIx64 "\n",
+                  hartId, msg.time, msg.instrTag, msg.address, msg.size,
+                  msg.value);
+
+        if (not system_.mcmBypass(hart, msg.time, msg.instrTag, msg.address,
+				 msg.size, msg.value))
+          reply.type = Invalid;
         break;
 
       case PageTableWalk:

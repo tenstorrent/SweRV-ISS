@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cassert>
 #include <memory>
+#include <functional>
 
 
 namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Controller.
@@ -71,10 +72,13 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (id > 0 and id < pending_.size())
 	{
 	  pending_.at(id) = flag;
-	  if (flag and enabled_.at(id) and id < topId_)
-	    topId_ = id;
-	  else
-	    updateTopId();
+	  if (topId_ == 0 or (id <= topId_ and enabled_.at(id)))
+	    {
+	      if (flag)
+		topId_ = id;
+	      else
+		updateTopId();
+	    }
 	}
     }
 
@@ -85,10 +89,13 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (id > 0 and id < enabled_.size())
 	{
 	  enabled_.at(id) = flag;
-	  if (flag and pending_.at(id) and id < topId_)
-	    topId_ = id;
-	  else
-	    updateTopId();
+	  if (topId_ == 0 or (id <= topId_ and pending_.at(id)))
+	    {
+	      if (flag)
+		topId_ = id;
+	      else
+		updateTopId();
+	    }
 	}
     }
 
@@ -105,7 +112,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Return the id of the highest priority (smallest id) interrupt
     /// id that is pending and enabled and exceeds the threshold id.
     unsigned topId() const
-    { return threshold_ == 0 ? 0 : std::min(topId_, threshold_ - 1); }
+    { return threshold_ == 0 ? topId_ : std::min(topId_, threshold_ - 1); }
 
     /// Update the id of the highest priority interrupt that is
     /// pending and enabled.
@@ -179,19 +186,15 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned pageSize() const
     { return pageSize_; }
 
-    /// Select CSR for *ireg if valid.
-    void select(uint8_t num)
-    { select_ = num; }
-
-    /// Read from selected register by selectRegister. Returns false if
-    /// access would cause an illegal instruction trap and true otherwise.
+    /// Read from selected register into val. Returns false if access
+    /// would cause an illegal instruction trap and true otherwise.
     template <typename URV>
-    bool iregRead(URV& val) const;
+    bool iregRead(unsigned select, URV& val) const;
 
-    /// Write to selected register by selectRegister. Returns false if
-    /// access would cause an illegal instruction trap and true otherwise.
+    /// Write to selected register from val. Returns false if access
+    /// would cause an illegal instruction trap and true otherwise.
     template <typename URV>
-    bool iregWrite(URV val);
+    bool iregWrite(unsigned select, URV val);
 
   private:
 
@@ -203,7 +206,6 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned threshold_ = 0;
     bool config_ = false;
     const unsigned pageSize_ = 1024;
-    uint64_t select_ = 0; // cached value of indirect register select
   };
 
 
@@ -304,48 +306,92 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       return true;
     }
 
-    /// Called from the associated hart for a CSR write to miselect.
-    bool machineSelect(uint8_t num)
-    { mfile_.select(num); return true; }
-
-    /// Called from the associated hart for a CSR write to siselect/vsislect.
-    /// Guest field is used if virt is true (VS privilege).
-    bool supervisorSelect(uint8_t num, bool virt, unsigned guest)
+    /// Check if IMSIC should deliver an interrupt.
+    void checkMInterrupt()
     {
-      if (virt)
-	{
-	  if (guest >= gfiles_.size())
-	    return false;
-	  gfiles_.at(guest).select(num);
-	}
-      else
-	sfile_.select(num);
-      return true;
+      if (mInterrupt_)
+        {
+          if (mfile_.canDeliver() and mfile_.topId())
+            mInterrupt_(true);
+          else
+            mInterrupt_(false);
+        }
+    }
+
+    void checkSInterrupt()
+    {
+      if (sInterrupt_)
+        {
+          if (sfile_.canDeliver() and sfile_.topId())
+            sInterrupt_(true);
+          else
+            sInterrupt_(false);
+        }
+    }
+
+    void checkGInterrupt(unsigned guest)
+    {
+      if (guest >= gfiles_.size())
+        return;
+      auto& gfile = gfiles_.at(guest);
+
+      if (gInterrupt_)
+        {
+          if (gfile.canDeliver() and gfile.topId())
+            gInterrupt_(true, guest);
+          else
+            gInterrupt_(false, guest);
+        }
     }
 
     /// Called form the associated hart for a CSR write to mireg.
     template <typename URV>
-    bool writeMireg(URV value)
-    { return mfile_.iregWrite(value); }
-    
+    bool writeMireg(unsigned select, URV value)
+    {
+      bool ok = mfile_.iregWrite(select, value);
+      checkMInterrupt();
+      return ok;
+    }
+
     /// Called form the associated hart for a CSR write to sireg/vsireg.
     /// Guest field is used if virt is true.
     template <typename URV>
-    bool writeSireg(bool virt, unsigned guest, URV value)
+    bool writeSireg(bool virt, unsigned guest, unsigned select, URV value)
     {
       if (virt)
 	{
 	  if (guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
-	  bool ok = gfile.iregWrite(value);
-	  if (gfile.canDeliver() and gfile.topId())
-	    guestInterrupts_ |= (uint64_t(1) << guest);
-	  else
-	    guestInterrupts_ &= ~(uint64_t(1) << guest);
+	  bool ok = gfile.iregWrite(select, value);
+          checkGInterrupt(guest);
 	  return ok;
 	}
-      return sfile_.iregWrite(value);
+
+      bool ok = sfile_.iregWrite(select, value);
+      checkSInterrupt();
+      return ok;
+    }
+
+    /// Called form the associated hart for a CSR read from mireg.
+    template <typename URV>
+    bool readMireg(unsigned select, URV value) const
+    { return mfile_.iregRead(select, value); }
+
+
+    /// Called form the associated hart for a CSR read from sireg/vsireg.
+    /// Guest field is used if virt is true.
+    template <typename URV>
+    bool readSireg(bool virt, unsigned guest, unsigned select, URV value) const
+    {
+      if (virt)
+	{
+	  if (guest >= gfiles_.size())
+	    return false;
+	  auto& gfile = gfiles_.at(guest);
+	  return gfile.iregRead(select, value);
+	}
+      return sfile_.iregRead(select, value);
     }
 
     /// Return the machine file top pending and enabled interrupt id.
@@ -378,17 +424,55 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     bool supervisorEnabled() const
     { return sfile_.canDeliver(); }
 
-    /// Return mask with 1 bits set for each guest interrupt file that
-    /// has deliverey enabled and that has a non-zero top interrupt id.
-    uint64_t guestInterrupts() const
-    { return guestInterrupts_; }
+    /// In the machine file, set/clear the pending bit correponding to
+    /// the given interrupt id.
+    void setMachinePending(unsigned id, bool flag)
+    {
+      mfile_.setPending(id, flag);
+      checkMInterrupt();
+    }
+
+    /// In the supervisor file, set/clear the pending bit correponding
+    /// to the given interrupt id.
+    void setSupervisorPending(unsigned id, bool flag)
+    {
+      sfile_.setPending(id, flag);
+      checkSInterrupt();
+    }
+
+    /// In the file of the given guest, set/clear the pending bit
+    /// correponding to the given interrupt id.
+    void setGuestPending(unsigned guest, unsigned id, bool flag)
+    {
+      if (guest < gfiles_.size())
+	gfiles_.at(guest).setPending(id, flag);
+      checkGInterrupt(guest);
+    }
+
+    /// Return the number of guests configured into this IMSIC.
+    size_t guestCount() const
+    { return gfiles_.size(); }
+
+    /// Attach interrupt callbacks
+    void attachMInterrupt(const std::function<void(bool)>& cb)
+    { mInterrupt_ = cb; }
+
+    void attachSInterrupt(const std::function<void(bool)>& cb)
+    { sInterrupt_ = cb; }
+
+    void attachGInterrupt(const std::function<void(bool, unsigned)>& cb)
+    { gInterrupt_ = cb; }
 
   private:
 
     File mfile_;
     File sfile_;
     std::vector<File> gfiles_;
-    uint64_t guestInterrupts_ = 0;
+
+    // Callback functions to mark interrupt pending-and-enabled (or not).
+    std::function<void(bool flag)> mInterrupt_;
+    std::function<void(bool flag)> sInterrupt_;
+    std::function<void(bool flag, unsigned guest)> gInterrupt_;
   };
 
 
@@ -455,7 +539,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (isMachineAddr(addr))
 	ix = (addr - mbase_) / mstride_;
       else if (isSupervisorAddr(addr))
-	ix = (addr - mbase_) / mstride_;
+	ix = (addr - sbase_) / sstride_;
       else
 	return false;
 
@@ -474,7 +558,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (isMachineAddr(addr))
 	ix = (addr - mbase_) / mstride_;
       else if (isSupervisorAddr(addr))
-	ix = (addr - mbase_) / mstride_;
+	ix = (addr - sbase_) / sstride_;
       else
 	return false;
 
@@ -504,40 +588,23 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned guestTopId(unsigned hartIx, unsigned guestIx) const
     { return hartIx < imsics_.size()? imsics_.at(hartIx)->guestTopId(guestIx) : 0; }
 
-    /// Called from the associated hart for a CSR write to miselect.
-    bool machineSelect(unsigned hartIx, uint8_t num)
-    {
-      if (hartIx >= imsics_.size())
-	return false;
-      return imsics_.at(hartIx)->machineSelect(num);
-    }
-
-    /// Called from the associated hart for a CSR write to siselect/vsislect.
-    /// Guest field is used if virt is true (VS privilege).
-    bool supervisorSelect(unsigned hartIx, uint8_t num, bool virt, unsigned guest)
-    {
-      if (hartIx >= imsics_.size())
-	return false;
-      return imsics_.at(hartIx)->supervisorSelect(num, virt, guest);
-    }
-
     /// Called form hart of given hartIx for a CSR write to mireg.
     template <typename URV>
-    bool writeMireg(unsigned hartIx, URV value)
+    bool writeMireg(unsigned hartIx, unsigned sel, URV value)
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx)->writeMireg(value);
+      return imsics_.at(hartIx)->writeMireg(sel, value);
     }
-    
+
     /// Called form hart of given hartIx for a CSR write to sireg/vsireg.
     /// Guest field is used if virt is true.
     template<typename URV>
-    bool writeSireg(unsigned hartIx, bool virt, unsigned guest, URV value)
+    bool writeSireg(unsigned hartIx, bool virt, unsigned guest, unsigned sel, URV value)
     {
       if (hartIx >= imsics_.size())
 	return false;
-      return imsics_.at(hartIx)->writeSireg(virt, guest, value);
+      return imsics_.at(hartIx)->writeSireg(virt, guest, sel, value);
     }
 
     /// Return the number of IMSICs in this manager.
@@ -565,7 +632,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     bool isSupervisorAddr(uint64_t addr) const
     { return addr >= sbase_ and addr < sbase_ + imsics_.size() * sstride_; }
 
-    /// Set ix to the index of the hart covering the 
+    /// Set ix to the index of the hart covering the
 
   private:
 

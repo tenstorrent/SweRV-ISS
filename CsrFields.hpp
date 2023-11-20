@@ -47,34 +47,34 @@ namespace WdRiscv
   /// Struct used to pack/unpack MSTATUS in RV64.
   struct Mstatus64
     {
-      unsigned UIE      : 1;
-      unsigned SIE      : 1;
-      unsigned res0     : 1;
-      unsigned MIE      : 1;
-      unsigned UPIE     : 1;
-      unsigned SPIE     : 1;
-      unsigned UBE      : 1;
-      unsigned MPIE     : 1;
-      unsigned SPP      : 1;
-      unsigned VS       : 2;
-      unsigned MPP      : 2;
-      unsigned FS       : 2;
-      unsigned XS       : 2;
-      unsigned MPRV     : 1;
-      unsigned SUM      : 1;
-      unsigned MXR      : 1;
-      unsigned TVM      : 1;
-      unsigned TW       : 1;
-      unsigned TSR      : 1;
-      unsigned res1     : 9;
-      unsigned UXL      : 2;
-      unsigned SXL      : 2;
-      unsigned SBE      : 1;
-      unsigned MBE      : 1;
-      unsigned GVA      : 1;
-      unsigned MPV      : 1;
-      unsigned res2     : 23;  // Reserved
-      unsigned SD       : 1;
+      unsigned UIE      : 1;  // bit 0
+      unsigned SIE      : 1;  // bit 1
+      unsigned res0     : 1;  // bit 2
+      unsigned MIE      : 1;  // bit 3
+      unsigned UPIE     : 1;  // bit 4
+      unsigned SPIE     : 1;  // bit 5
+      unsigned UBE      : 1;  // bit 6
+      unsigned MPIE     : 1;  // bit 7
+      unsigned SPP      : 1;  // bit 8
+      unsigned VS       : 2;  // bit 9  10
+      unsigned MPP      : 2;  // bit 11 12
+      unsigned FS       : 2;  // bit 13 14
+      unsigned XS       : 2;  // bit 15 16
+      unsigned MPRV     : 1;  // bit 17
+      unsigned SUM      : 1;  // bit 18
+      unsigned MXR      : 1;  // bit 19
+      unsigned TVM      : 1;  // bit 20
+      unsigned TW       : 1;  // bit 21
+      unsigned TSR      : 1;  // bit 22
+      unsigned res1     : 9;  // bit 23 to 31
+      unsigned UXL      : 2;  // bit 32 33
+      unsigned SXL      : 2;  // bit 34 35
+      unsigned SBE      : 1;  // bit 36
+      unsigned MBE      : 1;  // bit 37
+      unsigned GVA      : 1;  // bit 38
+      unsigned MPV      : 1;  // bit 39
+      unsigned res2     : 23; // bit 40 to 62
+      unsigned SD       : 1;  // bit 63
     };
 
 
@@ -236,6 +236,28 @@ namespace WdRiscv
   };
 
 
+  /// Union to pack/unpack the fields of the MNSTATUS register
+  union MnstatusFields
+  {
+    MnstatusFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;
+
+    struct Mnstatus
+    {
+      unsigned res0 : 3;    // Bit 0 to 2
+      unsigned NMIE : 1;    // Bit 3
+      unsigned res1 : 3;    // Bit 4 to 6
+      unsigned MNPV : 1;    // Bit 7
+      unsigned res2 : 3;    // Bit 8 to 10
+      unsigned MNPP : 2;    // Bit 11 to 12
+      unsigned res3 : 19;   // Bit 13 to 31
+    } bits_;
+  };
+
+
   /// Structure used to unpack/pack the fields of the SATP register
   template <typename URV>
   union SatpFields;
@@ -310,9 +332,10 @@ namespace WdRiscv
       unsigned CBIE : 2;
       unsigned CBCFE : 1;
       unsigned CBZE : 1;
-      uint64_t reserved1 : 54;
-      unsigned PBMTE : 1;
-      unsigned STCE : 1;
+      uint64_t reserved1 : 53;
+      unsigned ADUE : 1;           // Bit 61
+      unsigned PBMTE : 1;          // Bit 62
+      unsigned STCE : 1;           // Bit 63
     } bits_;
   };
 
@@ -607,6 +630,27 @@ namespace WdRiscv
       unsigned SINH  : 1;  // Supervisor inhibit
       unsigned MINH  : 1;  // Machine inhibit
       unsigned OF    : 1;
+    } bits_;
+  };
+
+
+  union HvictlFields
+  {
+    HvictlFields(uint64_t value = 0)
+      : value_(value)
+    { }
+
+    uint64_t value_;
+    struct
+    {
+      unsigned IPRIO  : 8;
+      unsigned IPRIOM : 1;
+      unsigned DPR    : 1;
+      unsigned res0   : 6;
+      unsigned IID    : 12;
+      unsigned res1   : 2;
+      unsigned VTI    : 1;
+      uint64_t res2   : 33;
     } bits_;
   };
 

@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -46,6 +46,9 @@ namespace WdRiscv
     /// the least sig bits of value. Return true on success and false
     /// on failure (out of bounds address or size).
     bool write(uint64_t addr, unsigned size, uint64_t value);
+
+    /// Return a pointer to an address (assuming it fits within a page).
+    uint8_t* map(uint64_t addr, size_t size);
 
     /// Write the contents of the memory to a verilog hex file. Return
     /// true on success and false on failure.
@@ -94,14 +97,22 @@ namespace WdRiscv
     /// Return host-machine address of the target-machine page with
     /// the given page number creating such a page (and zeroing it) if
     /// it has never been accessed before.
-    std::vector<uint8_t>& findOrCreatePage(uint64_t pageRank)
+    inline std::vector<uint8_t>& findOrCreatePage(uint64_t pageNum)
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      auto iter = pageMap_.find(pageRank);
+      auto end = pageMap_.end();
+      auto iter = pageMap_.find(pageNum);
+      if (iter != end)
+	return iter->second;
+
+      return createPage(pageNum);
+    }
+
+    std::vector<uint8_t>& createPage(uint64_t pageNum)
+    {
+      auto iter = pageMap_.find(pageNum);
       if (iter == pageMap_.end())
-        {
-          iter = pageMap_.try_emplace(pageRank, pageSize_, 0).first;
-        }
+	iter = pageMap_.try_emplace(pageNum, pageSize_, 0).first;
       return iter->second;
     }
 
