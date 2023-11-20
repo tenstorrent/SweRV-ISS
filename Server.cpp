@@ -256,11 +256,15 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       }
       break;
     case 'c':
-      if (hart.peekCsr(CsrNumber(req.address), value))
-	{
-	  reply.value = value;
-	  return true;
-	}
+      {
+	URV reset = 0, mask = 0, pokeMask = 0;
+	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask))
+	  {
+	    reply.value = value;
+	    reply.address = mask;
+	    return true;
+	  }
+      }
       break;
     case 'v':
       {
