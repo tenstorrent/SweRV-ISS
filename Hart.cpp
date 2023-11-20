@@ -1581,7 +1581,16 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
     {
       Pma pma = getPma(addr1);
       if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+	{
+	  addr1 = va1;  // To report virtual address in MTVAL.
+	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+	}
+      pma = getPma(addr2);
+      if (not pma.isMisalignedOk())
+	{
+	  addr1 = va2;  // To report virtual address in MTVAL.
+	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+	}
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
@@ -10488,7 +10497,16 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
     {
       Pma pma = getPma(addr1);
       if (not pma.isMisalignedOk())
-	return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
+	{
+	  addr1 = va1;  // To report virtual address in MTVAL.
+	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
+	}
+      pma = getPma(addr2);
+      if (not pma.isMisalignedOk())
+	{
+	  addr1 = va2;  // To report virtual address in MTVAL.
+	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+	}
     }
 
   // Physical memory protection. Assuming grain size is >= 8.
