@@ -1687,6 +1687,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
   if (instrB.memOps_.empty())
     return true;
 
+  unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
@@ -1717,7 +1718,8 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 	  auto timeB = earliestOpTime(instrB);
 	  if (timeB <= latestOpTime(instrA))
 	    {
-	      // B peforms before A -- Allow if there is no write overlapping B after B.
+	      // B peforms before A -- Allow if there is no write overlapping B after B
+	      // from another core.
 	      for (size_t ix = sysMemOps_.size(); ix != 0 and not fail; ix--)
 		{
 		  const auto& op = sysMemOps_.at(ix-1);
@@ -1725,7 +1727,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 		    continue;
 		  if (op.time_ < timeB)
 		    break;
-		  if (not op.isRead_ and instrB.overlaps(op))
+		  if (not op.isRead_ and instrB.overlaps(op) and op.hartIx_ != hartIx)
 		    fail = true;
 		}
 	    }
