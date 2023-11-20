@@ -2294,6 +2294,7 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("hie",         Csrn::HIE,         !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
 
+  mask = pokeMask = 0xffffffff;  // Only least sig 32 bits writable
   csr = defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
   pokeMask = mask = ~URV(1); // All bits writeable except bit 0
