@@ -138,11 +138,11 @@ namespace WdRiscv
 
     /// Update (count-up) all the performance counters currently
     /// associated with the given event, globally enabled in
-    /// perfControl, and enabled for the given mode.
+    /// perfControl, and enabled for the given privilage-mode and the
+    /// given virtual-mode.
     bool updateCounters(EventNumber event, uint32_t perfControl,
-                        PrivilegeMode mode)
+                        PrivilegeMode mode, bool isVirt)
     {
-      bool isVirt = false;
       uint32_t mask = privModeToMask(mode, isVirt);
 
       for (unsigned counterIx = 0; counterIx < eventOfCounter_.size(); ++counterIx)
