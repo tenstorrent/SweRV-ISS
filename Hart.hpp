@@ -4783,8 +4783,8 @@ namespace WdRiscv
     bool  hasInterruptor_ = false;
     uint64_t interruptor_ = 0;
 
-    URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
-    URV nmiExceptionPc_ = 0;    // For excetpions during NMI and Srmrnmi extension.
+    URV nmiPc_ = 0;             // Non-maskable interrupt handler.
+    URV nmiExceptionPc_ = 0;    // Handler for excetpions during non-maskable interrupts.
     bool nmiPending_ = false;
     NmiCause nmiCause_ = NmiCause::UNKNOWN;
 

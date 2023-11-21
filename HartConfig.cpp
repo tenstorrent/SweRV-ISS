@@ -1279,6 +1279,17 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  // Define exception-pc non-maskable-interrupt
+  tag = "nmi_exception_vec";
+  if (config_ -> contains(tag))
+    {
+      URV pc = 0;
+      if (getJsonUnsigned(tag, config_ -> at(tag), pc))
+        hart.defineNmiExceptionPc(pc);
+      else
+        errors++;
+    }
+
   // Use ABI register names (e.g. sp instead of x2).
   bool flag = false;
   tag = "abi_names";

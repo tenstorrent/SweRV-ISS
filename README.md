@@ -680,7 +680,12 @@ command will change the program counter to the value of reset_vec.
 
 
 ###  nmi_vec
-Defines the PC address after a non-maskable-interrupt.
+Defines the address of the handler of non-maskable interrupts.
+
+###  nmi_exception_vec
+Defines the address of the handler of exceptions encountered while
+handling non-maskable interrupts.
+
 
 ###  enable_triggers
 Enable support for debug triggers when set to true.
