@@ -709,6 +709,10 @@ rules. This feature is enabled by setting the
 using "--mcm" on the command line. Detailed inforation about the PPO
 rules can be found in chapter 17 of the the [RISCV unprivileged specs.](https://github.com/riscv/riscv-isa-manual/releases/download/draft-20221206-b7080e0/riscv-spec.pdf)
 
+By default, we check the ordering rules of the weak memory ordering
+model (RVWMO). If the enable_tso configuration tag is set to true, we
+check the re-ordering rules of the total-store-order memory model.
+
 Whisper expects to be notified about read and write operations and it
 expects such operations to be associated with time stamps. Each memory
 instruction (load/store/amo) is associated with one or more memory
@@ -738,7 +742,6 @@ system. The interactive command for a merge buffer write is:
 ```
    time=<time-stamp> hart=<id> mbwrite <addr> <data>
 ```
-
 Similarly, we provide server mode commands that allows a client
 (typically test bench code running in a verilog simulator) to provide
 whisper information about the time, hart-id, size, instruction tag and

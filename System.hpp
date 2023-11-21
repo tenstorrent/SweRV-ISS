@@ -255,6 +255,9 @@ namespace WdRiscv
     /// the merge buffer line size in bytes.
     bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
 
+    /// Enable/disable total-store-order: Valid only if mcm is enabled.
+    void enableTso(bool);
+
     /// Configure PCIe host-root-complex and construct associated devices
     /// which use transport.
     bool configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots);

@@ -1922,6 +1922,13 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
   if (enableMcm and not system.enableMcm(mbLineSize, checkAll))
     return false;
 
+  tag = "enable_tso";
+  bool enableTso = false;
+  if (config_ -> contains(tag))
+    if (not getJsonBoolean(tag, config_ -> at(tag), enableTso))
+      return false;
+  system.enableTso(enableTso);
+
   tag = "uart";
   if (config_ -> contains(tag))
     {

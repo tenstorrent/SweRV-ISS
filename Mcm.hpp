@@ -172,6 +172,10 @@ namespace WdRiscv
     void skipReadCheck(uint64_t addr)
     { skipReadCheck_.insert(addr); }
 
+    /// Enable/disable total-store-order.
+    void enableTso(bool flag)
+    { isTso_ = flag; }
+
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool ppoRule2(Hart<URV>& hart, const McmInstr& instr) const;
