@@ -405,7 +405,7 @@ private:
 public:
 
   /// Default constructor: value will be zero.
-  constexpr Float16Template() = default;
+  Float16Template() {}
 
   /// Convert this Float16 to another arithmetic type.
   template <typename T>
