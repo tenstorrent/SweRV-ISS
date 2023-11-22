@@ -97,6 +97,10 @@ namespace WdRiscv
     bool isRsrv() const
     { return attrib_ & Rsrv; }
 
+    /// Return true if IO region.
+    bool isIo() const
+    { return attrib_ & Io; }
+
     /// Return true if misaligned data access is supported in this region.
     bool isMisalignedOk() const
     { return attrib_& MisalOk; }

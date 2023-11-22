@@ -100,6 +100,11 @@ System<URV>::defineUart(uint64_t addr, uint64_t size)
 template <typename URV>
 System<URV>::~System()
 {
+  // Final MCM checks
+  if (mcm_)
+    for (const auto& hartPtr : sysHarts_)
+      mcm_->finalChecks(*hartPtr);
+
   // Write back binary files were marked for update.
   for (auto bf : binaryFiles_)
     {

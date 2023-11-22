@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <set>
 #include <unordered_set>
 #include "DecodedInst.hpp"
 
@@ -156,6 +157,9 @@ namespace WdRiscv
     bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		const DecodedInst& di);
 
+    /// Perform PPO checks (e.g. rule 4) on pending instructions.
+    bool finalChecks(Hart<URV>& hart);
+
     bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
 
     /// Return the load value of the current target instruction
@@ -200,6 +204,11 @@ namespace WdRiscv
 
     bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// If given instruction is a fence add it to the set of pending
+    /// fences. If oldest pending fence instruction is within window,
+    /// then remove it from pending set and check rule 4 on it.
+    bool processFence(Hart<URV>& hart, const McmInstr& instr);
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       if (not instr.complete_)
@@ -217,15 +226,13 @@ namespace WdRiscv
     uint64_t earliestOpTime(const McmInstr& instr) const
     {
       if (not instr.complete_ and instr.memOps_.empty())
-	{
-	  std::cerr << "Mcm::earliestOpTime: Called on an incomplete instruction\n";
-	  assert(0 && "Mcm::earliestOpTime: Incomplete instr");
-	}
-      uint64_t time = ~uint64_t(0);
+	return time_;
+
+      uint64_t mt = ~uint64_t(0);
       for (auto opIx : instr.memOps_)
 	if (opIx < sysMemOps_.size())
-	  time = std::min(time, sysMemOps_.at(opIx).time_);
-      return time;
+	  mt = std::min(mt, sysMemOps_.at(opIx).time_);
+      return mt;
     }
 
     bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const
@@ -352,6 +359,7 @@ namespace WdRiscv
 
     uint64_t time_ = 0;
     unsigned lineSize_ = 64; // Merge buffer line size.
+    unsigned windowSize_ = 1000;
 
     bool writeOnInsert_ = false;
 
@@ -365,6 +373,7 @@ namespace WdRiscv
 
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
     std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
+    std::vector<std::set<McmInstrIx>> hartPendingFences_;
 
     // Dependency time of most recent branch in program order or 0 if
     // branch does not depend on a prior memory instruction.

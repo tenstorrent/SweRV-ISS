@@ -32,6 +32,8 @@ Mcm<URV>::Mcm(unsigned hartCount, unsigned mergeBufferSize)
   hartBranchTimes_.resize(hartCount);
   hartBranchProducers_.resize(hartCount);
 
+  hartPendingFences_.resize(hartCount);
+
  // If no merge buffer, then memory is updated on insert messages.
   writeOnInsert_ = (lineSize_ == 0);
 }
@@ -203,8 +205,8 @@ Mcm<URV>::updateDependencies(const Hart<URV>& hart, const McmInstr& instr)
 
   const auto* instEntry = di.instEntry();
 
-  //if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
-  //return; // Destination is x0.
+  if (instEntry->isIthOperandIntRegDest(0) and di.ithOperand(0) == 0)
+    return; // Destination is x0.
 
   uint64_t time = 0, tag = 0;
 
@@ -536,7 +538,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   ok = ppoRule2(hart, *instr) and ok;
   ok = ppoRule3(hart, *instr) and ok;
-  ok = ppoRule4(hart, *instr) and ok;
+  ok = processFence(hart, *instr) and ok;  // ppo rule 4.
   ok = ppoRule5(hart, *instr) and ok;
   ok = ppoRule6(hart, *instr) and ok;
   ok = ppoRule7(hart, *instr) and ok;
@@ -1614,16 +1616,80 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 
 template <typename URV>
 bool
+Mcm<URV>::processFence(Hart<URV>& hart, const McmInstr& instr)
+{
+  if (not instr.retired_ or not instr.di_.isValid())
+    {
+      cerr << "Mcm::processFence: Invalid/undecoded instruction\n";
+      assert(0 && "Mcm::processFence: Invalid/undecoded instruction\n");
+      return false;
+    }
+
+  unsigned hartIx = hart.sysHartIndex();
+
+  auto& pendingFences = hartPendingFences_.at(hartIx);
+  if (instr.di_.isFence())
+    pendingFences.insert(instr.tag_);
+
+  // If head of pending fence instructions is within window, process it.
+  auto iter = pendingFences.begin();
+  if (iter == pendingFences.end())
+    return true;
+
+  auto tag = *iter;
+  if (instr.tag_ - tag < windowSize_)
+    return true;
+
+  pendingFences.erase(iter);
+  auto& instrVec = hartInstrVecs_.at(hartIx);
+  if (tag >= instrVec.size())
+    {
+      assert(0 && "Invalid tag in Mcm::processFence");
+      return false;
+    }
+  const auto& pending = instrVec.at(tag);
+  if (not pending.retired_ or not pending.di_.isValid() or not pending.di_.isFence())
+    {
+      assert(0 && "Invalid fence instruction in Mcm::processFence");
+      return false;
+    }
+
+  return ppoRule4(hart, pending);
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::finalChecks(Hart<URV>& hart)
+{
+  unsigned hartIx = hart.sysHartIndex();
+  auto& pendingFences = hartPendingFences_.at(hartIx);
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
+
+  bool ok = true;
+
+  for (auto fenceIx : pendingFences)
+    {
+      const auto& fence = instrVec.at(fenceIx);
+      ok = ppoRule4(hart, fence) and ok;
+    }
+
+  pendingFences.clear();
+  return ok;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 {
-  return true;  // Temporarily disabled
-
   // Rule 4: There is a fence that orders A before B.
 
   if (not instr.retired_ or not instr.di_.isValid())
     {
       cerr << "Mcm::ppoRule4: Invalid/undecoded instruction\n";
       assert(0 && "Mcm::ppoRule4: Invalid/undecoded instruction\n");
+      return false;
     }
 
   if (not instr.di_.isFence())
@@ -1633,41 +1699,63 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
   bool predWrite = instr.di_.isFencePredWrite();
   bool succRead = instr.di_.isFenceSuccRead();
   bool succWrite = instr.di_.isFenceSuccWrite();
-
-  // In the future we will become smarter. For now, all memory
-  // operations of preceeding (in prog order) instructions must be
-  // finished. No memory operation of succeeding instruction (in prog
-  // order) can exist. In the future we will filter out speculative
-  // operations.
+  bool predIn = instr.di_.isFencePredInput();
+  bool predOut = instr.di_.isFencePredInput();
+  bool succIn = instr.di_.isFencePredInput();
+  bool succOut = instr.di_.isFencePredInput();
 
   unsigned hartIx = hart.sysHartIndex();
+  const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  for (uint64_t i = sysMemOps_.size(); i > 0; --i)
+  McmInstrIx begin = instr.tag_ >= windowSize_ ? instr.tag_ - windowSize_ : 0;
+  McmInstrIx end = instr.tag_ + windowSize_;
+  if (end >= instrVec.size())
+    end = instrVec.size();
+
+  bool ok = true;
+
+  for (McmInstrIx predIx = begin; predIx < instr.tag_; ++predIx)
     {
-      const auto& op = sysMemOps_.at(i-1);
-      if (op.isCanceled() or op.hartIx_ != hartIx)
+      const McmInstr& pred = instrVec.at(predIx);
+      if (instr.canceled_ or not pred.di_.isValid() or not pred.isMemory())
 	continue;
 
-      if ((predRead and op.isRead_) or (predWrite and not op.isRead_))
-	if (op.time_ < time_ and op.instrTag_ > instr.tag_)
-	  {
-	    cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
-		 << " tag1=" << instr.tag_ << " tag2=" << op.instrTag_
-		 << " time1=" << time_ << " time2=" << op.time_ << '\n';
-	    return false;
-	  }
+      Pma predPma = hart.getPma(pred.physAddr_);
 
-      if ((succRead and op.isRead_) or (succWrite and not op.isRead_))
-	if (op.time_ > time_ and op.instrTag_ < instr.tag_)
-	  {
-	    cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
-		 << " tag1=" << op.instrTag_ << " tag2=" << instr.tag_
-		 << " time1=" << op.time_ << " time2=" << time_ << '\n';
-	    return false;
-	  }
+      if (not (predRead and pred.isLoad_)
+	  and not (predWrite and pred.isStore_)
+	  and not (predIn and pred.isLoad_ and predPma.isIo())
+	  and not (predOut and pred.isStore_ and predPma.isIo()))
+	continue;
+
+      for (McmInstrIx succIx = instr.tag_ + 1; succIx < end; ++succIx)
+	{
+	  const McmInstr& succ = instrVec.at(succIx);
+	  if (succ.canceled_ or not succ.di_.isValid() or not succ.isMemory())
+	    continue;
+
+	  Pma succPma = hart.getPma(pred.physAddr_);
+
+	  if (not (succRead and succ.isLoad_)
+	      and not (succWrite and succ.isStore_)
+	      and not (succIn and succ.isLoad_ and succPma.isIo())
+	      and not (succOut and succ.isStore_ and succPma.isIo()))
+	    continue;
+
+	  auto predTime = latestOpTime(pred);
+	  auto succTime = earliestOpTime(succ);
+	  if (predTime >= succTime)
+	    {
+	      cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+		   << " tag1=" << pred.tag_ << " tag2=" << succ.tag_
+		   << " fence-tag=" << instr.tag_
+		   << " time1=" << predTime << " time2=" << succTime << '\n';
+	      ok = false;
+	    }
+	}
     }
 
-  return true;
+  return ok;
 }
 
 
@@ -2078,7 +2166,6 @@ Mcm<URV>::ppoRule12(Hart<URV>& hart, const McmInstr& instrB) const
 
   return true;
 }
-
 
 
 template class WdRiscv::Mcm<uint32_t>;
