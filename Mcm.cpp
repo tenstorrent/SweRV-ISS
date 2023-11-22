@@ -1616,6 +1616,8 @@ template <typename URV>
 bool
 Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 {
+  return true;  // Temporarily disabled
+
   // Rule 4: There is a fence that orders A before B.
 
   if (not instr.retired_ or not instr.di_.isValid())
