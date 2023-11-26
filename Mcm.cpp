@@ -115,6 +115,18 @@ Mcm<URV>::readOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       op.failRead_ = not hart.peekMemory(physAddr, val, true /*usePma*/);
       op.data_ = val;
     }
+  else if (size < 8)
+    {
+      uint8_t val = 0;
+      for (unsigned i = 0; i < size; ++i)
+	if (not hart.peekMemory(physAddr + i, val, true))
+	  {
+	    op.failRead_ = true;
+	    break;
+	  }
+	else
+	  op.data_ = op.data_ | (uint64_t(val) << (8*i));
+    }
   else
     {
       op.failRead_ = true;
@@ -296,6 +308,35 @@ Mcm<URV>::setProducerTime(unsigned hartIx, McmInstr& instr)
 
 
 template <typename URV>
+static bool
+pokeHartMemory(Hart<URV>& hart, uint64_t physAddr, uint64_t data, unsigned size)
+{
+  if (size == 1)
+    return hart.pokeMemory(physAddr, uint8_t(data), true);
+
+  if (size == 2)
+    return hart.pokeMemory(physAddr, uint16_t(data), true);
+
+  if (size == 4)
+    return hart.pokeMemory(physAddr, uint32_t(data), true);
+
+  if (size == 8)
+    return hart.pokeMemory(physAddr, uint64_t(data), true);
+
+  if (size < 8)
+    {
+      for (unsigned i = 0; i < size; ++i)
+	if (not hart.pokeMemory(physAddr + i, uint8_t(data >> (8*i)), true))
+	  return false;
+      return true;
+    }
+
+  cerr << "MCM pokeHartMemory: " << "Invalid data size (" << size << ")\n";
+  return false;
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 			    uint64_t physAddr, unsigned size,
@@ -347,20 +388,8 @@ Mcm<URV>::mergeBufferInsert(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       // We commit the RTL data to memory but we check them against
       // whisper data (checkRtlWrite below). This is simpler than
       // committing part of whisper instruction data.
-      if (op.size_ == 1)
-	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
-      else if (op.size_ == 2)
-	hart.pokeMemory(physAddr, uint16_t(rtlData), true);
-      else if (op.size_ == 4)
-	hart.pokeMemory(physAddr, uint32_t(rtlData), true);
-      else if (op.size_ == 8)
-	hart.pokeMemory(physAddr, uint64_t(rtlData), true);
-      else
-	{
-	  cerr << "Mcm::MergeBufferInsert: Error: data size not a power of 2\n";
-	  assert(0 && "Mcm::MergeBufferInsert: data size not a power of 2");
-	  result = false;
-	}
+      if (not pokeHartMemory(hart, physAddr, rtlData, op.size_))
+	result = false;
     }
 
   // If corresponding insruction is retired, compare to its data.
@@ -408,21 +437,7 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
   if (instr->retired_)
     {
-      if (op.size_ == 1)
-	hart.pokeMemory(physAddr, uint8_t(rtlData), true);
-      else if (op.size_ == 2)
-	hart.pokeMemory(physAddr, uint16_t(rtlData), true);
-      else if (op.size_ == 4)
-	hart.pokeMemory(physAddr, uint32_t(rtlData), true);
-      else if (op.size_ == 8)
-	hart.pokeMemory(physAddr, uint64_t(rtlData), true);
-      else
-	{
-	  cerr << "Mcm::bypassOp: Error: data size not a power of 2\n";
-	  assert(0 && "Mcm::bypassOp: data size not a power of 2");
-	  result = false;
-	}
-
+      result = pokeHartMemory(hart, physAddr, rtlData, op.size_) and result;
       result = checkRtlWrite(hart.hartId(), *instr, op) and result;
       instr->complete_ = checkStoreComplete(*instr);
       if (instr->complete_)
@@ -462,6 +477,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->di_ = di;
 
+  bool ok = true;
+
   // If instruction is a store, save address, size, and written data.
   uint64_t addr = 0, value = 0;
   unsigned stSize = hart.lastStore(addr, value);
@@ -472,23 +489,10 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->data_ = value;
       instr->isStore_ = true;
       if (instr->complete_)   // Write ops already seen. Commit data.
-	{
-	  if (stSize == 1)
-	    hart.pokeMemory(addr, uint8_t(value), true);
-	  else if (stSize == 2)
-	    hart.pokeMemory(addr, uint16_t(value), true);
-	  else if (stSize == 4)
-	    hart.pokeMemory(addr, uint32_t(value), true);
-	  else if (stSize == 8)
-	    hart.pokeMemory(addr, uint64_t(value), true);
-	  else
-	    assert(0);
-	}
+	ok = pokeHartMemory(hart, addr, value, stSize) and ok;
     }
 
   URV hartId = hart.hartId();
-
-  bool ok = true;
 
   // Check read operations of instruction comparing RTL values to
   // memory model (whisper) values.
