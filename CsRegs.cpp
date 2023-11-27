@@ -2258,7 +2258,7 @@ CsRegs<URV>::defineHypervisorRegs()
   Csr<URV>* csr = nullptr;
 
   URV reset = 0;
-  URV mask = 0b000000000'1'1'1'00'111111'00'1'1'1'1'1'0000;
+  URV mask = 0b000000000'1'1'1'00'111111'00'1'1'1'1'1'00000;
   if constexpr (sizeof(URV) == 8)
     reset = reset | (URV(2) << 32);  // VSXL = 2 (64-bits).
   URV pokeMask = mask;
