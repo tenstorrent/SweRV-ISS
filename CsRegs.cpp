@@ -521,7 +521,8 @@ CsRegs<URV>::updateSstc()
 	{
 	  URV mask = mip->getWriteMask();
 	  URV stBit = URV(1) << unsigned(InterruptCause::S_TIMER);
-	  mask = flag? mask & ~stBit : mask | stBit;
+	  bool readOnly = flag and stce;
+	  mask = readOnly? mask & ~stBit : mask | stBit;
 	  mip->setWriteMask(mask);
 	}
     }

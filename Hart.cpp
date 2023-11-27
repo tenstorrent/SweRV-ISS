@@ -4409,7 +4409,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  ++instCounter_;
 
-          if (cachedMie_ and processExternalInterrupt(traceFile, instStr))
+          if (processExternalInterrupt(traceFile, instStr))
 	    continue;  // Next instruction in trap handler.
 	  uint64_t physPc = 0;
           if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
