@@ -75,11 +75,14 @@ namespace WdRiscv
 
     bool overlaps(const McmInstr& other) const
     {
+      // A non-successful store conditional (zero size) does not overlap anything.
+      if ((di_.isSc() and size_ == 0) or (other.di_.isSc() and other.size_ == 0))
+	return false;
+	  
       if (size_ == 0 or other.size_ == 0)
 	{
 	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
 		    << " tag2=" << other.tag_ << " zero data size\n";
-	  // assert(0 && "McmInstr::overlaps: zero data size\n");
 	}
       if (physAddr_ == other.physAddr_)
 	return true;
