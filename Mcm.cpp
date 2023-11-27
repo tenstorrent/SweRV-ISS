@@ -489,6 +489,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       instr->physAddr_ = addr;
       instr->data_ = value;
       instr->isStore_ = true;
+      instr->complete_ = checkStoreComplete(*instr);
       if (instr->complete_)   // Write ops already seen. Commit data.
 	ok = pokeHartMemory(hart, addr, value, stSize) and ok;
     }
@@ -1748,14 +1749,39 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 
 	  auto predTime = latestOpTime(pred);
 	  auto succTime = earliestOpTime(succ);
-	  if (predTime >= succTime)
+	  if (predTime < succTime)
+	    continue;
+
+	  // Successor performs before predecessor -- Allow if successor is a load and
+	  // there is no store from another core to the same cache line in between the
+	  // predecessor and susscessor time.
+	  if (not succ.isStore_)
 	    {
-	      cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
-		   << " tag1=" << pred.tag_ << " tag2=" << succ.tag_
-		   << " fence-tag=" << instr.tag_
-		   << " time1=" << predTime << " time2=" << succTime << '\n';
-	      ok = false;
+	      auto low = std::lower_bound(sysMemOps_.begin(), sysMemOps_.end(), succTime,
+					  [](const MemoryOp& op, const uint64_t& t) -> bool
+					  { return op.time_ < t; });
+
+	      auto high = std::upper_bound(low, sysMemOps_.end(), predTime,
+					   [](const uint64_t& t, const MemoryOp& op) -> bool
+					   { return t < op.time_; });
+
+	      bool fail = false;
+	      for (auto iter = low; iter != high and not fail; ++iter)
+		{
+		  auto& op = *iter;
+		  fail = (not op.isRead_ and op.time_ >= succTime and op.time_ <= predTime
+			  and op.hartIx_ != hartIx
+			  and (op.physAddr_ % lineSize_) == (succ.physAddr_ % lineSize_));
+		}
+	      if (not fail)
+		continue;
 	    }
+
+	  cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+	       << " tag1=" << pred.tag_ << " tag2=" << succ.tag_
+	       << " fence-tag=" << instr.tag_
+	       << " time1=" << predTime << " time2=" << succTime << '\n';
+	  ok = false;
 	}
     }
 
