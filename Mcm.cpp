@@ -435,11 +435,12 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
 
+  instr->complete_ = checkStoreComplete(*instr);
+
   if (instr->retired_)
     {
-      result = pokeHartMemory(hart, physAddr, rtlData, op.size_) and result;
+      result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
       result = checkRtlWrite(hart.hartId(), *instr, op) and result;
-      instr->complete_ = checkStoreComplete(*instr);
       if (instr->complete_)
 	result = ppoRule1(hart, *instr) and result;
     }
@@ -534,7 +535,6 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
   if (instr->isStore_)
     {
-      instr->complete_ = checkStoreComplete(*instr);
       if (instr->complete_)
 	ok = checkStoreData(hartIx, *instr) and ok;
       ok = ppoRule1(hart, *instr) and ok;
