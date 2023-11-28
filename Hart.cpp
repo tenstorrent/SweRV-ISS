@@ -9887,25 +9887,37 @@ Hart<URV>::execWfi(const DecodedInst* di)
   using PM = PrivilegeMode;
   auto pm = privilegeMode();
 
-  if (pm == PM::User and isRvs())
+  if (pm == PM::Machine)
+    return;
+
+  if (mstatus_.bits_.TW)
     {
-      if (virtMode_ and not mstatus_.bits_.TW)
-	virtualInst(di);   // VU mode and TW=0.
-      else
+      // TW is 1 and Executing in privilege less than machine: illegal unless
+      // complete in bounded time.
+      if (wfiTimeout_ == 0)
 	illegalInst(di);
       return;
     }
 
-  if (mstatus_.bits_.TW and pm != PM::Machine)
+  // TW is 0.
+  if (pm == PM::User and isRvs())
     {
-      illegalInst(di);
+      if (wfiTimeout_ == 0)
+	{
+	  if (virtMode_)
+	    virtualInst(di);   // VU mode and TW=0.
+	  else
+	    illegalInst(di);
+	}
       return;
     }
 
+
   // VS mode, VTW=1 and mstatus.TW=0
-  if (virtMode_ and pm == PM::Supervisor and not mstatus_.bits_.TW and hstatus_.bits_.VTW)
+  if (virtMode_ and pm == PM::Supervisor and hstatus_.bits_.VTW)
     {
-      virtualInst(di);
+      if (wfiTimeout_ == 0)
+	virtualInst(di);
       return;
     }
 

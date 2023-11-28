@@ -1764,6 +1764,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableSmstaten(flag);
     }
 
+  tag = "wfi_timeout";
+  if (config_ ->contains(tag))
+    {
+      uint64_t timeout = 0;
+      getJsonUnsigned(tag, config_ ->at(tag), timeout) or errors++;
+      hart.setWfiTimeout(timeout);
+    }
+
   return errors == 0;
 }
 
