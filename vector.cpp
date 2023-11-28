@@ -107,7 +107,7 @@ class WidenedFpScalar
   using ELEM_TYPE2X = typename makeDoubleWide<ELEM_TYPE>::type;
 
   public:
-    constexpr WidenedFpScalar(ELEM_TYPE value): v_{value} {};
+    constexpr WidenedFpScalar(ELEM_TYPE value): v_{value}, vDw_{fpConvertTo<ELEM_TYPE2X, true>(value)} {};
 
     constexpr operator ELEM_TYPE2X()
     {
