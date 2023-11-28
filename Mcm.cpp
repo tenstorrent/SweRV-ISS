@@ -1771,7 +1771,7 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 		  auto& op = *iter;
 		  fail = (not op.isRead_ and op.time_ >= succTime and op.time_ <= predTime
 			  and op.hartIx_ != hartIx
-			  and (op.physAddr_ % lineSize_) == (succ.physAddr_ % lineSize_));
+			  and (op.physAddr_ / lineSize_) == (succ.physAddr_ / lineSize_));
 		}
 	      if (not fail)
 		continue;
