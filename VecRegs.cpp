@@ -157,7 +157,7 @@ VecRegs::config(unsigned bytesPerReg, unsigned minBytesPerElem,
       // Make current elem width illegal for LMUL < SEWmin/ELEN.
       for (unsigned lmulx8 = 1; lmulx8 < minLmul; lmulx8 *= 2)
 	{
-	  GroupMultiplier group;
+	  GroupMultiplier group = GroupMultiplier::One;
 	  if (not groupNumberX8ToSymbol(lmulx8, group))
 	    assert(0);
 	  groupFlags.at(size_t(group)) = false;
