@@ -232,7 +232,7 @@ namespace WdRiscv
     /// Return true if a floating point instruction (fadd.s, fadd.d ...)
     bool isFp() const
     { return ext_ == RvExtension::F or ext_ == RvExtension::D or
-	ext_ == RvExtension::Zfh; }
+	ext_ == RvExtension::Zfh or ext_ == RvExtension::Zfbfmin; }
 
     /// Return true if this is a CSR instruction.
     bool isCsr() const
