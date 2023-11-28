@@ -10526,7 +10526,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va2;  // To report virtual address in MTVAL.
-	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
 	}
     }
 
