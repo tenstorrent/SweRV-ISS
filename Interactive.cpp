@@ -1220,13 +1220,8 @@ printInteractiveHelp()
   cout << "  List all the symbols in the loaded ELF file(s).\n\n";
   cout << "pagetable\n";
   cout << "  Print the entries of the address tanslation table.\n\n";
-  cout << "exception inst [<offset>]\n";
-  cout << "  Take an instruction access fault on the subsequent step command. Given\n";
-  cout << "  offset (defaults to zero) is added to the instruction PC to form the address\n";
-  cout << "  responsible for the fault (that address is placed in the mtval CSR).\n\n";
-  cout << "exception data [<offset>]\n";
-  cout << "  Take a data access fault on the subsequent load/store instruction executed\n";
-  cout << "  by a step command. The offset value is currently not used.\n\n";
+  cout << "nmi [<cause-number>]\n";
+  cout << "  Post a non-maskable interrupt with a given cause number (default 0).\n\n";
   cout << "mread tag addr size data i|e\n";
   cout << "  Perform a memory model (out of order) read for load/amo instruction with\n";
   cout << "  given tag. Data is the RTL data to be compared with whisper data\n";
@@ -1654,6 +1649,17 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "pagetable")
     {
       hart.printPageTable(std::cout);
+      return true;
+    }
+
+  if (command == "nmi")
+    {
+      uint32_t cause = 0;
+      if (tokens.size() > 1 and not parseCmdLineNumber("nmi-cause", tokens.at(1), cause))
+	return false;
+      hart.setPendingNmi(NmiCause(cause));
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
       return true;
     }
 

@@ -20,18 +20,11 @@
 
 
 enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
-                          Quit, Invalid, Reset, Exception, EnterDebug,
+                          Quit, Invalid, Reset, Nmi, EnterDebug,
                           ExitDebug, LoadFinished, CancelDiv, CancelLr,
                           DumpMemory, McmRead, McmInsert, McmWrite,
 			  PageTableWalk, Translate, CheckInterrupt,
                           SeiPin, McmBypass };
-
-// Be careful changing this: test-bench file (defines.svh) needs to be
-// updated.
-enum WhisperExceptionType { InstAccessFault, DataAccessFault,
-                            ImpreciseStoreFault, ImpreciseLoadFault,
-                            PreciseStoreFault, PreciseLoadFault, 
-                            NonMaskableInterrupt };
 
 /// Resource identifiers for peek special.
 enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap, DeferredInterrupts };
