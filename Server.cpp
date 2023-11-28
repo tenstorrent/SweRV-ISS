@@ -1037,10 +1037,11 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
       case Nmi:
 	{
 	  if (checkHart(msg, "nmi", reply))
-	    hart.setPendingNmi(NmiCause(msg.address));
+	    hart.setPendingNmi(NmiCause(msg.value));
 	  if (commandLog)
             fprintf(commandLog, "hart=%" PRIu32 " nmi 0x%x # ts=%s\n", hartId,
-		    uint32_t(msg.address), timeStamp.c_str());
+		    uint32_t(msg.value), timeStamp.c_str());
+	  break;
 	}
 
       case EnterDebug:
