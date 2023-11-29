@@ -55,14 +55,19 @@ namespace WdRiscv
     bool isStore_ = false;
     bool complete_ = false;
 
+    /// Return true if this a load/store isntruction.
     bool isMemory() const { return isLoad_ or isStore_; }
 
+    /// Return true if this instruction is retired.
     bool isRetired() const { return retired_; }
 
+    /// Return true if this instruction is canceled.
     bool isCanceled() const { return canceled_; }
 
+    /// Mark instruction as canceled.
     void cancel() { canceled_ = true; }
 
+    /// Associated given memory operation index with this instruction.
     void addMemOp(MemoryOpIx memOpIx)
     {
       if (std::find(memOps_.begin(), memOps_.end(), memOpIx) != memOps_.end())
@@ -73,6 +78,8 @@ namespace WdRiscv
       memOps_.push_back(memOpIx);
     }
 
+    /// Return true if data memory referenced by this instruction
+    /// overlaps that of the given other instruction.
     bool overlaps(const McmInstr& other) const
     {
       // A non-successful store conditional (zero size) does not overlap anything.
@@ -91,6 +98,8 @@ namespace WdRiscv
       return physAddr_ - other.physAddr_ < other.size_;
     }
 
+    /// Return true if the data memory referenced by this instruction
+    /// overlpas that of the given memory operation.
     bool overlaps(const MemoryOp& op) const
     {
       if (size_ == 0 or op.size_ == 0)
@@ -105,6 +114,12 @@ namespace WdRiscv
 	return op.physAddr_ - physAddr_ < size_;
       return physAddr_ - op.physAddr_ < op.size_;
     }
+
+    /// Return true if address of the data memory referenced by this
+    /// instruction is aligned.
+    bool isAligned() const
+    { return (physAddr_ & (size_ - 1)) == 0; }
+
   };
 
 
@@ -183,6 +198,15 @@ namespace WdRiscv
     void enableTso(bool flag)
     { isTso_ = flag; }
 
+    /// Return the earliest memory time for the byte at the given
+    /// address. Return 0 if address is not covered by given instruction.
+    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return the latest memory time for the byte at the given
+    /// address. Return max value if address is not covered by given
+    /// instruction.
+    uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
+
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
 
     bool ppoRule2(Hart<URV>& hart, const McmInstr& instr) const;
@@ -226,6 +250,7 @@ namespace WdRiscv
       return time;
     }
 
+    /// Return the smallest time of the memory operations of given instruction.
     uint64_t earliestOpTime(const McmInstr& instr) const
     {
       if (not instr.complete_ and instr.memOps_.empty())
@@ -238,6 +263,7 @@ namespace WdRiscv
       return mt;
     }
 
+    /// Return true if instruction a is before b in memory time.
     bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const
     {
       // if (a.complete_ and not b.complete_)

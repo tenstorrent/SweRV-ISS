@@ -1432,6 +1432,50 @@ Mcm<URV>::instrHasWrite(const McmInstr& instr) const
 
 
 template <typename URV>
+uint64_t
+Mcm<URV>::earliestByteTime(const McmInstr& instr, uint64_t addr) const
+{
+  uint64_t time = 0;
+  bool found = false;
+
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	const auto& op = sysMemOps_.at(opIx);
+	if (op.physAddr_ <= addr and addr < op.physAddr_ + op.size_)
+	  {
+	    time = found? std::min(time, op.time_) : op.time_;
+	    found = true;
+	  }
+      }
+
+  return time;
+}
+
+
+template <typename URV>
+uint64_t
+Mcm<URV>::latestByteTime(const McmInstr& instr, uint64_t addr) const
+{
+  uint64_t time = ~uint64_t(0);
+  bool found = false;
+
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	const auto& op = sysMemOps_.at(opIx);
+	if (op.physAddr_ <= addr and addr < op.physAddr_ + op.size_)
+	  {
+	    time = found? std::max(time, op.time_) : op.time_;
+	    found = true;
+	  }
+      }
+
+  return time;
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 {
@@ -1459,8 +1503,28 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.isMemory() or not instrA.overlaps(instrB))
 	continue;
 
-      if (isBeforeInMemoryTime(instrA, instrB))
-	continue;
+      if (instrA.isAligned() and instrB.isAligned())
+	{
+	  if (isBeforeInMemoryTime(instrA, instrB))
+	    continue;
+	}
+      else
+	{
+	  // Check overlapped bytes.
+	  bool ok = true;
+	  for (unsigned i = 0; i < instrB.size_ and ok; ++i)
+	    {
+	      uint64_t byteAddr = instrB.physAddr_ + i;
+	      if (instrA.physAddr_ <= byteAddr and byteAddr < instrA.physAddr_ + instrA.size_)
+		{
+		  uint64_t ta = latestByteTime(instrA, byteAddr);
+		  uint64_t tb = earliestByteTime(instrB, byteAddr);
+		  ok = ta < tb or (ta == tb and instrA.isStore_);
+		}
+	    }
+	  if (ok)
+	    continue;
+	}
 
       cerr << "Error: PPO rule 1 failed: hart-id=" << hart.hartId() << " tag1="
 	   << instrA.tag_ << " tag2=" << instrB.tag_ << '\n';
