@@ -368,6 +368,8 @@ Hart<URV>::processExtensions(bool verbose)
     enableRvzicbom(true);
   if (isa_.isEnabled(RvExtension::Zicboz))
     enableRvzicboz(true);
+  if (isa_.isEnabled(RvExtension::Zicbop))
+    enableRvzicbop(true);
   if (isa_.isEnabled(RvExtension::Zawrs))
     enableRvzawrs(true);
   if (isa_.isEnabled(RvExtension::Zmmul))
@@ -8747,6 +8749,18 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::cbo_zero:
       execCbo_zero(di);
+      return;
+
+    case InstId::prefetch_i:
+      execPrefetch_i(di);
+      return;
+
+    case InstId::prefetch_r:
+      execPrefetch_r(di);
+      return;
+
+    case InstId::prefetch_w:
+      execPrefetch_w(di);
       return;
 
     case InstId::wrs_nto:

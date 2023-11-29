@@ -454,6 +454,18 @@ printCbo(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 
 static
 void
+printPrefetch(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
+{
+  std::string name = di.name();
+  unsigned width = std::max(size_t(9), name.size() + 1);
+  out << std::left << std::setw(static_cast<int>(width)) << name;
+  out << di.op1() << '(' << disas.intRegName(di.op0()) << ")";
+}
+
+
+
+static
+void
 printLfi(const Disassembler& disas, std::ostream& out, const DecodedInst& di)
 {
   std::string name = di.name();
@@ -837,6 +849,12 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out) cons
     case InstId::cbo_inval:
     case InstId::cbo_zero:
       printCbo(*this, out, di);
+      break;
+
+    case InstId::prefetch_i:
+    case InstId::prefetch_r:
+    case InstId::prefetch_w:
+      printPrefetch(*this, out, di);
       break;
 
     case InstId::fli_h:

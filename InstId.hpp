@@ -1039,6 +1039,11 @@ namespace WdRiscv
      // Cache block zero (zicboz)
      cbo_zero,
 
+     // Cache block prefetch (zicbop)
+     prefetch_i,
+     prefetch_r,
+     prefetch_w,
+
      // Zawrs
      wrs_nto,
      wrs_sto,

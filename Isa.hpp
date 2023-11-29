@@ -12,7 +12,7 @@ namespace WdRiscv
                                       Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp,
                                       Zbr, Zbs, Zbt, Zfh, Zfhmin, Zlsseg,
                                       Zknd, Zkne, Zknh, Zbkb, Zbkx, Zksed, Zksh,
-                                      Svinval, Zicbom, Zicboz, Zawrs, Zmmul,
+                                      Svinval, Zicbom, Zicboz, Zicbop, Zawrs, Zmmul,
                                       Zvfh, Zvfhmin, Zvbb, Zvbc, Zvkg,
 				      Zvkned, Zvknha, Zvknhb, Zvksed,
                                       Zvksh, Zicond, Zcb, Zfa, Zfbfmin,

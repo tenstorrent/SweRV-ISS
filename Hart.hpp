@@ -1022,6 +1022,10 @@ namespace WdRiscv
     void enableRvzicboz(bool flag)
     { enableExtension(RvExtension::Zicboz, flag); }
 
+    /// Enable/disable the zicbop (cache block prefetch) extension.
+    void enableRvzicbop(bool flag)
+    { enableExtension(RvExtension::Zicbop, flag); }
+
     /// Enable/disable the zawrs (wait reservation store) extension.
     void enableRvzawrs(bool flag)
     { enableExtension(RvExtension::Zawrs, flag); }
@@ -1267,6 +1271,10 @@ namespace WdRiscv
     /// Return true if the zicboz extension (cache block zero) is enabled.
     bool isRvzicboz() const
     { return extensionIsEnabled(RvExtension::Zicboz); }
+
+    /// Return true if the zicbop extension (cache block prefetch) is enabled.
+    bool isRvzicbop() const
+    { return extensionIsEnabled(RvExtension::Zicbop); }
 
     /// Return true if the zawrs extension (wait reservation store) is enabled.
     bool isRvzawrs() const
@@ -4612,6 +4620,9 @@ namespace WdRiscv
     void execCbo_flush(const DecodedInst*);
     void execCbo_inval(const DecodedInst*);
     void execCbo_zero(const DecodedInst*);
+    void execPrefetch_i(const DecodedInst*);
+    void execPrefetch_r(const DecodedInst*);
+    void execPrefetch_w(const DecodedInst*);
 
     void execWrs_nto(const DecodedInst*);
     void execWrs_sto(const DecodedInst*);
