@@ -397,7 +397,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
 
   if (ok)
     {
-      memory_.invalidateOtherHartLr(hartIx_, addr, 4);
+      memory_.invalidateOtherHartLr(hartIx_, ldStPhysAddr1_, 4);
       intRegs_.write(rd, 0); // success
       scSuccess_++;
 
@@ -604,7 +604,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
 
   if (ok)
     {
-      memory_.invalidateOtherHartLr(hartIx_, addr, 8);
+      memory_.invalidateOtherHartLr(hartIx_, ldStPhysAddr1_, 8);
       intRegs_.write(rd, 0); // success
       scSuccess_++;
 

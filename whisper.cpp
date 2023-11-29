@@ -1582,6 +1582,8 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
 
       srand(seed);
 
+      std::cout << "Deterministic multi-hart run with seed: " << seed << " and steps distribution between 1 and " << stepWindow << "\n";
+
       while ((waitAll and finished != system.hartCount()) or
              (not waitAll and finished == 0))
         {
@@ -1601,8 +1603,6 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
                 it++;
             }
         };
-
-      std::cout << "Deterministic multi-hart run with seed: " << seed << " and steps distribution between 1 and " << stepWindow << "\n";
       return result;
     }
 }

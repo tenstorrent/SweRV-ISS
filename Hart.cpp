@@ -2439,6 +2439,9 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
   hasInterrupt_ = true;
   interruptCount_++;
 
+  if (cause == InterruptCause::M_SOFTWARE)
+    setSwInterrupt(0);
+
   if (not enableCounters_)
     return;
 
@@ -5077,7 +5080,6 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
-          setSwInterrupt(0);
         }
 
       // Deliver/clear supervisor timer from stimecmp CSR.
