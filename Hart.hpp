@@ -1199,10 +1199,6 @@ namespace WdRiscv
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
 
-    /// Return true if given data (ld/st) address is external to the hart.
-    bool isDataAddressExternal(uint64_t addr) const
-    { return memory_.isDataAddressExternal(addr); }
-
     /// Return true if given extension is statically enabled (enabled my
     /// --isa but may be turned off by the MSTATUS/MISA CSRs).
     bool hasIsaExtension(RvExtension ext) const

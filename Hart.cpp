@@ -1582,12 +1582,22 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   if (misal)
     {
       Pma pma = getPma(addr1);
+      if (not pma.isRead())
+	{
+	  addr1 = va1;
+	  return EC::LOAD_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
 	}
       pma = getPma(addr2);
+      if (not pma.isRead())
+	{
+	  addr1 = va2;
+	  return EC::LOAD_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va2;  // To report virtual address in MTVAL.
@@ -3702,16 +3712,12 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
       pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_, lastVirt_);
       if (misalignedLdSt_)
 	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_, lastPriv_, lastVirt_);
-      if (isDataAddressExternal(ldStAddr_))
-	pregs.updateCounters(EventNumber::BusLoad, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isPerfStore())
     {
       pregs.updateCounters(EventNumber::Store, prevPerfControl_, lastPriv_, lastVirt_);
       if (misalignedLdSt_)
 	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_, lastPriv_, lastVirt_);
-      if (isDataAddressExternal(ldStAddr_))
-	pregs.updateCounters(EventNumber::BusStore, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isBitManipulation())
     {
@@ -10531,12 +10537,22 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   if (misal)
     {
       Pma pma = getPma(addr1);
+      if (not pma.isWrite())
+	{
+	  addr1 = va1;
+	  return EC::STORE_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
 	}
       pma = getPma(addr2);
+      if (not pma.isWrite())
+	{
+	  addr1 = va2;
+	  return EC::STORE_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va2;  // To report virtual address in MTVAL.
