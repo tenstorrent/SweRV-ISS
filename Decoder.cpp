@@ -2450,6 +2450,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 	      {
 		if (op0 != 0) return instTable_.getEntry(InstId::ori);
 
+#if 0
 		unsigned rs2 = iform.rs2();
 		if (rs2 == 0 or rs2 == 1 or rs2 == 3)
 		  {
@@ -2459,6 +2460,7 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
 		    if (iform.rs2() == 1) return instTable_.getEntry(InstId::prefetch_r);
 		    if (iform.rs2() == 3) return instTable_.getEntry(InstId::prefetch_w);
 		  }
+#endif
 		return instTable_.getEntry(InstId::ori);
 	      }
             else if (funct3 == 7)  return instTable_.getEntry(InstId::andi);
