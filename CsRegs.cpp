@@ -301,6 +301,51 @@ CsRegs<URV>::adjustScountovfValue(URV value) const
 
 template <typename URV>
 bool
+CsRegs<URV>::readMireg(CsrNumber num, URV& value) const
+{
+  URV sel = 0;
+  peek(CsrNumber::MISELECT, sel);
+  if (imsic_)
+    {
+      auto csr = getImplementedCsr(num, virtMode_);
+      if (not csr)
+	return false;
+
+      return imsic_->readMireg(sel, value);
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
+{
+  URV sel = 0;
+  peek(CsrNumber::SISELECT, sel);
+  if (imsic_)
+    {
+      auto csr = getImplementedCsr(num, virtMode_);
+      if (not csr)
+	return false;
+
+      unsigned guest = 0;
+      if (virtMode_)
+	{
+	  URV hs = 0;
+	  peek(CsrNumber::HSTATUS, hs);
+	  HstatusFields<URV> hsf(hs);
+	  guest = hsf.bits_.VGEIN;
+	}
+
+      return imsic_->readSireg(virtMode_, guest, sel, value);
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
 CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
 {
   using CN = CsrNumber;
@@ -327,7 +372,10 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
         value = (value & URV(RoundingMode::FcsrMask)) >> URV(RoundingMode::FcsrShift);
       return true;
     }
-
+  else if (num == CN::MIREG)
+    return readMireg(num, value);
+  else if (num == CN::SIREG)
+    return readSireg(num, value);
   if (num == CN::MTOPEI)
     {
       if (not imsic_)
@@ -1120,7 +1168,11 @@ CsRegs<URV>::writeSireg(CsrNumber num, URV value)
 
       unsigned guest = 0;
       if (virtMode_)
-	assert(0 && "get guest from hstatus");
+	{
+	  URV hs = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+	  HstatusFields<URV> hsf(hs);
+	  guest = hsf.bits_.VGEIN;
+	}
 
       if (imsic_->writeSireg(virtMode_, guest, sel, value))
 	{
@@ -1149,7 +1201,11 @@ CsRegs<URV>::writeVsireg(CsrNumber num, URV value)
 
       unsigned guest = 0;
       if (virtMode_)
-	assert(0 && "get guest from hstatus");
+	{
+	  URV hs = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+	  HstatusFields<URV> hsf(hs);
+	  guest = hsf.bits_.VGEIN;
+	}
 
       if (imsic_->writeSireg(virtMode_, guest, sel, value))
 	{

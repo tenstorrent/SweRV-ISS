@@ -1386,6 +1386,12 @@ namespace WdRiscv
     // Adjust the value of SCOUNTOVF by masking with MCOUNTEREN/HCOUNTEREN
     URV adjustScountovfValue(URV value) const;
 
+    /// Heler to read method.
+    bool readMireg(CsrNumber num, URV& value) const;
+
+    /// Heler to read method.
+    bool readSireg(CsrNumber num, URV& value) const;
+
     /// Helper to write method: Mask with MIP/MIE/MIDELEG.
     bool writeSipSie(CsrNumber num, URV value);
 

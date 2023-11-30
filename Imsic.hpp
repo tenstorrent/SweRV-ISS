@@ -375,14 +375,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     /// Called form the associated hart for a CSR read from mireg.
     template <typename URV>
-    bool readMireg(unsigned select, URV value) const
+    bool readMireg(unsigned select, URV& value) const
     { return mfile_.iregRead(select, value); }
 
 
     /// Called form the associated hart for a CSR read from sireg/vsireg.
     /// Guest field is used if virt is true.
     template <typename URV>
-    bool readSireg(bool virt, unsigned guest, unsigned select, URV value) const
+    bool readSireg(bool virt, unsigned guest, unsigned select, URV& value) const
     {
       if (virt)
 	{
