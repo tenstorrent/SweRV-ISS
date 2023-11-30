@@ -20,6 +20,7 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <shared_mutex>
 #include <mutex>
 #include <type_traits>
 #include <cassert>
@@ -778,7 +779,7 @@ namespace WdRiscv
     unsigned regionShift_ = 28;                 // Shift address by this to get region no.
     unsigned regionMask_  = 0xf;                // This should depend on mem size.
 
-    std::mutex amoMutex_;
+    std::shared_mutex amoMutex_;
     std::mutex lrMutex_;
 
     bool checkUnmappedElf_ = true;

@@ -2435,7 +2435,7 @@ namespace WdRiscv
     /// be set to true for hypervisor load/store instruction to select
     /// 2-stage address translation.
     template<typename STORE_TYPE>
-    bool store(URV addr, bool hyper, STORE_TYPE value);
+    bool store(URV addr, bool hyper, STORE_TYPE value, bool amoLock = true);
 
     /// For use by performance model. 
     template<typename STORE_TYPE>
