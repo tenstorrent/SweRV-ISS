@@ -834,7 +834,7 @@ void setAllBits(Float16& x)
   union
   {
     uint16_t u;
-    Float16 f{0.0};
+    Float16 f{0};
   } uf;
   uf.u = 0xffff;
   x = uf.f;
@@ -844,8 +844,13 @@ void setAllBits(Float16& x)
 inline
 void setAllBits(BFloat16& x)
 {
-  uint16_t u = 0xffff;
-  x = *(reinterpret_cast<BFloat16*>(&u));
+ union
+  {
+    uint16_t u;
+    BFloat16 f{0};
+  } uf;
+  uf.u = 0xffff;
+  x = uf.f;
 };
 
 
