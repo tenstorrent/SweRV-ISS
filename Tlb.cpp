@@ -1,13 +1,17 @@
 #include <cmath>
 #include <iomanip>
+#include <iostream>
 #include "VirtMem.hpp"
 
 using namespace WdRiscv;
 
 
 Tlb::Tlb(unsigned size)
-  : entries_(size)
 {
+  if ((size & (size - 1)) != 0)
+    std::cerr << "TLB size must be a power of 2\n";
+  else
+    entries_.resize(size);
 }
 
 
@@ -15,27 +19,30 @@ bool
 Tlb::insertEntry(uint64_t virtPageNum, uint64_t physPageNum, uint32_t asid,
                  bool global, bool isUser, bool read, bool write, bool exec)
 {
-  TlbEntry* best = nullptr;
-  for (auto& entry : entries_)
+  auto* entry = getEntry(virtPageNum);
+
+  if (not entry)
+    return false;
+
+  if (entry->valid_ and entry->counter_ & 2)
     {
-      if (not entry.valid_ or (best and entry.time_ < best->time_))
-        best = &entry;
+      --entry->counter_;
+      return false;
     }
-  if (best)
+  else
     {
-      best->valid_ = true;
-      best->virtPageNum_ = virtPageNum;
-      best->physPageNum_ = physPageNum;
-      best->time_ = time_++;
-      best->asid_ = asid;
-      best->global_ = global;
-      best->user_ = isUser;
-      best->read_ = read;
-      best->write_ = write;
-      best->exec_ = exec;
+      entry->valid_ = true;
+      entry->virtPageNum_ = virtPageNum;
+      entry->physPageNum_ = physPageNum;
+      entry->counter_ = 0;
+      entry->asid_ = asid;
+      entry->global_ = global;
+      entry->user_ = isUser;
+      entry->read_ = read;
+      entry->write_ = write;
+      entry->exec_ = exec;
       return true;
     }
-  return false;
 }
 
 
@@ -66,23 +73,20 @@ Tlb::printEntry(std::ostream& ost, const TlbEntry& te)
 bool
 Tlb::insertEntry(const TlbEntry& te)
 {
-  TlbEntry* best = nullptr;
-  for (auto& entry : entries_)
-    {
-      if (not entry.valid_)
-        {
-          best = &entry;
-          break;
-        }
-      if (not best or entry.time_ < best->time_)
-        best = &entry;
-    }
+  auto* entry = getEntry(te.virtPageNum_);
 
-  if (best)
+  if (not entry)
+    return false;
+
+  if (entry->valid_ and entry->counter_ & 2)
     {
-      *best = te;
-      best->time_ = time_++;
+      --entry->counter_;
+      return false;
+    }
+  else
+    {
+      *entry = te;
+      entry->counter_ = 0;
       return true;
     }
-  return false;
 }

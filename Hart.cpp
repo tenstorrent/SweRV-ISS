@@ -1975,15 +1975,14 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, bool amoLock)
+Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
 #ifdef FAST_SLOPPY
   return fastStore(virtAddr, storeVal);
 #else
 
-
   auto lock = (amoLock)? std::shared_lock<std::shared_mutex>(memory_.amoMutex_) :
-                          std::shared_lock<std::shared_mutex>();
+                         std::shared_lock<std::shared_mutex>();
   std::lock_guard<std::mutex> lock2(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.

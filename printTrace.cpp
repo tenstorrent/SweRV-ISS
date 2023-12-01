@@ -569,11 +569,11 @@ void
 Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
 {
   static Whisper::PrintBuffer sharedBuffer;
-  static std::unordered_map<unsigned, Whisper::PrintBuffer> buffers;
+  static std::unordered_map<unsigned, Whisper::PrintBuffer> ownedBuffers;
 
   // Serialize to avoid jumbled output.
   auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(printInstTraceMutex());
-  auto buffer = (ownTrace_)? ((buffers.count(sysHartIndex()))? (buffers.at(sysHartIndex())) : buffers[sysHartIndex()]) : sharedBuffer;
+  auto buffer = (ownTrace_)? ownedBuffers[sysHartIndex()] : sharedBuffer;
 
   if (not traceHeaderPrinted_)
     {
