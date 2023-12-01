@@ -1674,7 +1674,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mread" or command == "memory_model_read")
     {
-      if (not mReadCommand(hart, line, tokens))
+      if (not mreadCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1683,7 +1683,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mbwrite" or command == "merge_buffer_write")
     {
-      if (not mbWriteCommand(hart, line, tokens))
+      if (not mbwriteCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1692,7 +1692,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mbinsert" or command == "merge_buffer_insert")
     {
-      if (not mbInsertCommand(hart, line, tokens))
+      if (not mbinsertCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1701,7 +1701,25 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mbypass" or command == "mbbypass" or command == "merge_buffer_bypass")
     {
-      if (not mbBypassCommand(hart, line, tokens))
+      if (not mbbypassCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "mifetch")
+    {
+      if (not mifetchCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "mievict")
+    {
+      if (not mievictCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1814,7 +1832,7 @@ Interactive<URV>::replayCommand(const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
   // Format: [hart=<number>] [time=<number>] mread <instruction-tag> <physical-address> <size> <rtl-data> <i>|<é>
@@ -1852,7 +1870,7 @@ Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
 				 const std::vector<std::string>& tokens)
 {
   // Format: mbwrite <physical-address> <rtl-data> [<mask>]
@@ -1950,7 +1968,7 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
 				  const std::vector<std::string>& tokens)
 {
   // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
@@ -1988,10 +2006,10 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
 				  const std::vector<std::string>& tokens)
 {
-  // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
+  // Format: mbbypass <instr-tag> <physical-address> <size> <data>
   if (tokens.size() != 5)
     {
       std::cerr << "Invalid mbbypass command: " << line << '\n';
@@ -2010,6 +2028,7 @@ Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
   uint64_t size = 0;
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
+
   if (size > 8)
     {
       std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8\n";
@@ -2021,6 +2040,48 @@ Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
     return false;
 
   return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mifetchCommand(Hart<URV>& hart, const std::string& line,
+				 const std::vector<std::string>& tokens)
+{
+  // Format: mifetch <physical-address>
+  if (tokens.size() != 2)
+    {
+      std::cerr << "Invalid mifetch command: " << line << '\n';
+      std::cerr << "  Expecting: mifetch <addr>\n";
+      return false;
+    }
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(1), addr))
+    return false;
+
+  return system_.mcmIFetch(hart, this->time_, addr);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mievictCommand(Hart<URV>& hart, const std::string& line,
+				 const std::vector<std::string>& tokens)
+{
+  // Format: mievict <physical-address>
+  if (tokens.size() != 2)
+    {
+      std::cerr << "Invalid mievict command: " << line << '\n';
+      std::cerr << "  Expecting: mievict <addr>\n";
+      return false;
+    }
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(1), addr))
+    return false;
+
+  return system_.mcmIEvict(hart, this->time_, addr);
 }
 
 

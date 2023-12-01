@@ -1159,6 +1159,22 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           reply.type = Invalid;
         break;
 
+      case McmIFetch:
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mifetch %" PRIu64 "\n",
+                  hartId, msg.time, msg.address);
+        if (not system_.mcmIFetch(hart, msg.time, msg.address))
+          reply.type = Invalid;
+	break;
+
+      case McmIEvict:
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mievict %" PRIu64 "\n",
+                  hartId, msg.time, msg.address);
+        if (not system_.mcmIEvict(hart, msg.time, msg.address))
+          reply.type = Invalid;
+	break;
+
       case PageTableWalk:
         doPageTableWalk(hart, reply);
         break;

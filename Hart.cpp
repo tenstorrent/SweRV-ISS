@@ -2272,7 +2272,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return false;
     }
 
-  if ((physAddr & 3) == 0)   // Word aligned
+  if ((physAddr & 3) == 0 and not mcm_)   // Word aligned
     {
       if (not memory_.readInst(physAddr, inst))
         {
@@ -2300,15 +2300,6 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return true;
     }
 
-  uint16_t half = 0;
-  if (not memory_.readInst(physAddr, half))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-      return false;
-    }
-
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
@@ -2319,6 +2310,19 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
           initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
           return false;
         }
+    }
+
+  uint16_t half = 0;
+  bool done = false;
+  if (mcm_)
+    done = readInstFromFetchCache(physAddr, half);
+
+  if (not done and not memory_.readInst(physAddr, half))
+    {
+      if (triggerTripped_)
+        return false;
+      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
+      return false;
     }
 
   if (initStateFile_)
@@ -2343,15 +2347,6 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 	  }
       }
 
-  uint16_t upperHalf;
-  if (not memory_.readInst(physAddr2, upperHalf))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
-      return false;
-    }
-
   if (pmpEnabled_)
     {
       Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
@@ -2362,6 +2357,19 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
           initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
           return false;
         }
+    }
+
+  uint16_t upperHalf = 0;
+  done = false;
+  if (mcm_)
+    done = readInstFromFetchCache(physAddr2, upperHalf);
+
+  if (not done and not memory_.readInst(physAddr2, upperHalf))
+    {
+      if (triggerTripped_)
+        return false;
+      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
+      return false;
     }
 
   if (initStateFile_)

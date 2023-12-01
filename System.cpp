@@ -712,6 +712,26 @@ System<URV>::mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
 
 template <typename URV>
 bool
+System<URV>::mcmIFetch(Hart<URV>& hart, uint64_t /*time*/, uint64_t addr)
+{
+  if (not mcm_)
+    return false;
+  return hart.mcmIFetch(addr);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmIEvict(Hart<URV>& hart, uint64_t /*time*/, uint64_t addr)
+{
+  if (not mcm_)
+    return false;
+  return hart.mcmIEvict(addr);
+}
+
+
+template <typename URV>
+bool
 System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		       const DecodedInst& di)
 {

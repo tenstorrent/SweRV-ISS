@@ -309,6 +309,14 @@ namespace WdRiscv
     bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   uint64_t addr, unsigned size, uint64_t data);
 
+    /// Initiate a fetch of a line from memory into the isntruction
+    /// cache.
+    bool mcmIFetch(Hart<URV>& hart, uint64_t time, uint64_t addr);
+
+    /// Initiate an eviction of a line from the instruction cache.
+    bool mcmIEvict(Hart<URV>& hart, uint64_t time, uint64_t addr);
+
+    /// Initiate an instruction retire.
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   const DecodedInst& di);
 

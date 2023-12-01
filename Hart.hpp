@@ -38,6 +38,7 @@
 #include "Disassembler.hpp"
 #include "util.hpp"
 #include "Imsic.hpp"
+#include "FetchCache.hpp"
 #include "pci/Pci.hpp"
 
 
@@ -1971,9 +1972,25 @@ namespace WdRiscv
       return ext_enabled_.test(static_cast<std::size_t>(ext));
     }
 
+    /// Post a software interrupt to this hart.
     void setSwInterrupt(uint8_t value)
     { swInterrupt_.value_ = value; }
 
+    /// Fetch an instruction cache line.
+    bool mcmIFetch(uint64_t addr)
+    {
+      auto readMem =  [this](uint64_t addr, uint32_t& value) -> bool {
+	return this->memory_.read(addr, value);
+      };
+      return fetchCache_.addLine(addr, readMem);
+    }
+
+    /// Evict an instruction cache line.
+    bool mcmIEvict(uint64_t addr)
+    { fetchCache_.removeLine(addr); return true; }
+
+    bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
+    { return fetchCache_.read(addr, inst); }
 
   protected:
 
@@ -4985,6 +5002,8 @@ namespace WdRiscv
     uint64_t bbCacheHit_ = 0;
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;            // Basic block file.
+
+    TT_FETCH_CACHE::FetchCache fetchCache_;
 
     std::string branchTraceFile_;       // Branch trace file.
     struct BranchRecord
