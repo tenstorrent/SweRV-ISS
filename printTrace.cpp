@@ -297,6 +297,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
     {
       std::ostringstream oss;
       oss << "0x" << std::hex << ldStAddr_;
+      if (ldStPhysAddr1_ != ldStAddr_)
+	oss << ":0x" << ldStPhysAddr1_;
       tmp += " [" + oss.str() + "]";
     }
   else if (not vecRegs_.ldStAddr_.empty())
