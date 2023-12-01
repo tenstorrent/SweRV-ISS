@@ -22,10 +22,11 @@ namespace TT_FETCH_CACHE
     bool addLine(uint64_t addr, std::function<bool(uint64_t, uint32_t&)> readMem)
     {
       uint64_t lineNum = addr >> lineShift_;
-      auto& vec = data_.at(lineNum);
+      auto& vec = data_[lineNum];
       vec.resize(lineSize_);
       bool ok = true;
       unsigned words = lineSize_ / 4;
+      addr = lineNum << lineShift_;
       for (unsigned i = 0; i < words; ++i, addr += 4)
 	{
 	  uint32_t val = 0;
