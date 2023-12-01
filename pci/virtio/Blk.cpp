@@ -52,6 +52,7 @@ Blk::operator()(unsigned vq)
     auto status = reinterpret_cast<uint8_t*>(memmap()(desc.address, desc.length));
 
     if (header->type != VIRTIO_BLK_T_GET_ID) {
+      // TODO: use pread/pwrite instead
       if (lseek(fd_, header->sector * 512, SEEK_SET) < 0) {
         *status = VIRTIO_BLK_S_IOERR;
         elems.push_back({head, 0});

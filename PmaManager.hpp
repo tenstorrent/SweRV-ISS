@@ -187,10 +187,10 @@ namespace WdRiscv
 
     struct PmaTrace
     {
-      uint32_t pma_;
-      uint64_t addr;
-      uint64_t baseAddr;
-      uint64_t lastAddr;
+      unsigned ix_;
+      uint64_t addr_;
+      uint64_t baseAddr_;
+      uint64_t lastAddr_;
       AccessReason reason_;
     };
 
@@ -204,14 +204,17 @@ namespace WdRiscv
       addr = (addr >> 2) << 2; // Make word aligned.
 
       // Search regions in order. Return first matching.
-      for (const auto& region : regions_)
-	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
-          {
-            auto pma = region.pma_;
-            if (trace_)
-              pmaTrace_.push_back({pma.attrib_, addr, region.firstAddr_, region.lastAddr_, reason});
-            return pma;
-          }
+      for (unsigned ix = 0; ix < regions_.size(); ++ix)
+        {
+          const auto& region = regions_.at(ix);
+          if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+            {
+              auto pma = region.pma_;
+              if (trace_)
+                pmaTrace_.push_back({ix, addr, region.firstAddr_, region.lastAddr_, reason});
+              return pma;
+            }
+        }
 
       if (addr >= memSize_)
 	return noAccessPma_;
