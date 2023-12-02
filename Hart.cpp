@@ -152,7 +152,6 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::INSTRET)->tie(&retiredInsts_);
       csRegs_.findCsr(CsrNumber::CYCLE)->tie(&cycleCount_);
 
-      // TIME is a read-only shadow of MCYCLE.
       csRegs_.findCsr(CsrNumber::TIME)->tie(&instCounter_);
 
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
@@ -1976,13 +1975,15 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
+Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
 #ifdef FAST_SLOPPY
   return fastStore(virtAddr, storeVal);
 #else
 
-  std::lock_guard<std::mutex> lock(memory_.lrMutex_);
+  auto lock = (amoLock)? std::shared_lock<std::shared_mutex>(memory_.amoMutex_) :
+                         std::shared_lock<std::shared_mutex>();
+  std::lock_guard<std::mutex> lock2(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
@@ -2045,7 +2046,7 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
 
   memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
   if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
   invalidateDecodeCache(virtAddr, ldStSize_);
 
   ldStWrite_ = true;
@@ -4420,8 +4421,8 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	{
           // We want amo instructions to print in the same order as executed.
 	  // This avoid interleaving of amo execution and tracing.
-          static std::mutex execMutex;
-	  std::lock_guard<std::mutex> lock(execMutex);
+	  static std::mutex execMutex;
+	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
           uint32_t inst = 0;
 	  currPc_ = pc_;
@@ -11431,35 +11432,35 @@ WdRiscv::Hart<uint64_t>::load<uint64_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint8_t>(uint32_t, bool, uint8_t);
+WdRiscv::Hart<uint32_t>::store<uint8_t>(uint32_t, bool, uint8_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, bool, uint16_t);
+WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, bool, uint16_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, bool, uint32_t);
+WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, bool, uint32_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, bool, uint64_t);
+WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, bool, uint64_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint8_t>(uint64_t, bool, uint8_t);
+WdRiscv::Hart<uint64_t>::store<uint8_t>(uint64_t, bool, uint8_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, bool, uint16_t);
+WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, bool, uint16_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, bool, uint32_t);
+WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, bool, uint32_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, bool, uint64_t);
+WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, bool, uint64_t, bool);
 
 
 template class WdRiscv::Hart<uint32_t>;

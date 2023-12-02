@@ -1561,7 +1561,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       if (not getJsonUnsigned(tag, config_ -> at(tag), size))
         errors++;
       else
-        hart.setTlbSize(size);
+      {
+        if ((size & (size - 1)) != 0)
+          {
+            cerr << "TLB size must be a power of 2\n";
+            errors++;
+          }
+        else
+          hart.setTlbSize(size);
+      }
     }
 
   tag = "clear_mprv_on_ret";

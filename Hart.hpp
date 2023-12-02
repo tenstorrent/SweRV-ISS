@@ -554,6 +554,10 @@ namespace WdRiscv
     void setLogStart(uint64_t rank)
     { logStart_ = rank; }
 
+    /// Set whether this hart owns its trace file.
+    void setOwnTrace(bool flag)
+    { ownTrace_ = flag; }
+
     /// Define memory mapped locations for CLINT.
     void configClint(uint64_t clintStart, uint64_t clintEnd,
 		     bool softwareInterruptOnReset,
@@ -2448,7 +2452,7 @@ namespace WdRiscv
     /// be set to true for hypervisor load/store instruction to select
     /// 2-stage address translation.
     template<typename STORE_TYPE>
-    bool store(URV addr, bool hyper, STORE_TYPE value);
+    bool store(URV addr, bool hyper, STORE_TYPE value, bool amoLock = true);
 
     /// For use by performance model. 
     template<typename STORE_TYPE>
@@ -5030,6 +5034,9 @@ namespace WdRiscv
     // dividing instruction count by 8 (2 to power 3) to produce a
     // timer value.
     unsigned counterToTimeShift_ = 0;
+
+    bool traceHeaderPrinted_ = false;
+    bool ownTrace_ = false;
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when
