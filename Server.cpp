@@ -184,14 +184,41 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       {
         bool usePma = false; // Ignore phsical memory attributes.
 
-        if constexpr (sizeof(URV) == 4)
-          {
-            // Poke a word in 32-bit harts.
-            if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
-              return true;
-          }
-        else if (hart.pokeMemory(req.address, req.value, usePma))
-          return true;
+	if (req.size == 0)
+	  {
+	    if constexpr (sizeof(URV) == 4)
+	      {
+		// Poke a word in 32-bit harts.
+		if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
+		  return true;
+	      }
+	    else if (hart.pokeMemory(req.address, req.value, usePma))
+	      return true;
+	  }
+	else
+	  {
+	    switch (req.size)
+	      {
+	      case 1:
+		if (hart.pokeMemory(req.address, uint8_t(req.value), usePma))
+		  return true;
+		break;
+	      case 2:
+		if (hart.pokeMemory(req.address, uint16_t(req.value), usePma))
+		  return true;
+		break;
+	      case 4:
+		if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
+		  return true;
+		break;
+	      case 8:
+		if (hart.pokeMemory(req.address, uint64_t(req.value), usePma))
+		  return true;
+		break;
+	      default:
+		break;
+	      }
+	  }
       }
       break;
 
@@ -938,10 +965,15 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                 fprintf(commandLog, " # ts=%s tag=%s\n", timeStamp.c_str(), msg.tag.data());
               }
             else
-              fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n",
-		      hartId, msg.resource, uintmax_t(msg.address),
-		      uintmax_t(msg.value),
-                      timeStamp.c_str(), msg.tag.data());
+	      {
+		fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s",
+			hartId, msg.resource, uintmax_t(msg.address),
+			uintmax_t(msg.value),
+			timeStamp.c_str(), msg.tag.data());
+		if (msg.resource == 'm' and msg.size != 0)
+		  fprintf(commandLog, " %d", int(msg.size));
+		fprintf(commandLog, "\n");
+	      }
           }
         break;
 

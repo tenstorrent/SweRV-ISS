@@ -766,7 +766,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
     }
 
   size_t count = tokens.size();
-  if ((resource == "t" and count != 6) or (resource != "t" and count != 4))
+  if ((resource == "t" and count < 6) or (resource != "t" and count < 4))
     {
       std::cerr << "Invalid poke command: " << line << '\n';
       std::cerr << "  Expecting: poke <resource> <address> <value>\n";
@@ -870,13 +870,36 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 
   if (resource == "m")
     {
+      unsigned size = sizeof(URV);
+      if (tokens.size() > 4)
+	if (not parseCmdLineNumber("size", tokens.at(4), size))
+	  return false;
       size_t addr = 0;
       if (not parseCmdLineNumber("address", addrStr, addr))
 	return false;
       bool usePma = false; // Ignore physical memory attributes.
-      uint32_t word = value; // Memory peek/poke in words.
-      if (hart.pokeMemory(addr, word, usePma))
-	return true;
+      switch (size)
+	{
+	case 1:
+	  if (hart.pokeMemory(addr, uint8_t(value), usePma))
+	    return true;
+	  break;
+	case 2:
+	  if (hart.pokeMemory(addr, uint16_t(value), usePma))
+	    return true;
+	  break;
+	case 4:
+	  if (hart.pokeMemory(addr, uint32_t(value), usePma))
+	    return true;
+	  break;
+	case 8:
+	  if (hart.pokeMemory(addr, value, usePma))
+	    return true;
+	  break;
+	default:
+	  std::cerr << "Imvalid poke memory size " << size << '\n';
+	  return false;
+	}
       std::cerr << "Address out of bounds: " << addrStr << '\n';
       return false;
     }
