@@ -201,6 +201,21 @@ namespace WdRiscv
     bool isLoad() const
     { return isLoad_; }
 
+    /// Return true if this is a load instruction (lb, lh, flw, lr ...)
+    bool isLoad(bool& isUnsigned) const
+    {
+      if (not isLoad_)
+	return false;
+      if (isHypervisor())
+	isUnsigned = (code_ >> 20) & 1;
+      else
+	{
+	  unsigned f3 = (code_ >> 12) & 7;
+	  isUnsigned = (f3 & 4) == 4;
+	}
+      return true;
+    }
+
     /// Return true if this is a store instruction (sb, sh, fsw, sc ...)
     bool isStore() const
     { return isStore_; }

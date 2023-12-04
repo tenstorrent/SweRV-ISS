@@ -256,9 +256,17 @@ namespace WdRiscv
     { return entry_ and entry_->isDivide(); }
 
     /// Return true if this is a load instruction. This includes
-    /// floating point load and load-reserve but not AMOs.
+    /// floating point load, load-reserve, and hypervisor load, but
+    /// not AMOs.
     bool isLoad() const
     { return entry_ and entry_->isLoad(); }
+
+    /// Return true if this is a load instruction. This includes
+    /// floating point load, load-reserve, and hypervisor load, but
+    /// not AMOs. If successful, set isUnsigned to true if the load
+    /// is unsigned.
+    bool isLoad(bool& isUnsigned) const
+    { return entry_ and entry_->isLoad(isUnsigned); }
 
     /// Return true if this is a store instruction. This includes
     /// floating point store and store-conditional but not AMOs.
