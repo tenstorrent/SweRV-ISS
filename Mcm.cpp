@@ -1181,7 +1181,7 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 	  else
 	    {
 	      mask = expectedMask;
-	      mask = mask << (op.physAddr_ - addr + 1);
+	      mask = mask << (op.physAddr_ - addr);
 	    }
 	}
 
