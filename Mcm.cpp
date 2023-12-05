@@ -1180,7 +1180,7 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 	    cancel = true;  // Read op does no overlap instruction.
 	  else
 	    {
-	      mask = expectedMask;
+	      mask = (1 << op.size_) - 1;
 	      mask = mask << (op.physAddr_ - addr);
 	    }
 	}
