@@ -2997,15 +2997,15 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   unsigned top12 = op2;
                   RFormInst rform(inst);
                   op2 = rform.bits.rs2;
-                  # mop.rr although are I format seem to have rs2 as well.
-                  if (top == 0x820) return instTable_.getEntry(InstId::mop_rr_0);
-                  if (top == 0x860) return instTable_.getEntry(InstId::mop_rr_1);
-                  if (top == 0x8a0) return instTable_.getEntry(InstId::mop_rr_2);
-                  if (top == 0x8e0) return instTable_.getEntry(InstId::mop_rr_3);
-                  if (top == 0xc20) return instTable_.getEntry(InstId::mop_rr_4);
-                  if (top == 0xc60) return instTable_.getEntry(InstId::mop_rr_5);
-                  if (top == 0xca0) return instTable_.getEntry(InstId::mop_rr_6);
-                  if (top == 0xce0) return instTable_.getEntry(InstId::mop_rr_7);
+                  // mop.rr, although are I format seem to have rs2 as well.
+                  if (top12 == 0x820) return instTable_.getEntry(InstId::mop_rr_0);
+                  if (top12 == 0x860) return instTable_.getEntry(InstId::mop_rr_1);
+                  if (top12 == 0x8a0) return instTable_.getEntry(InstId::mop_rr_2);
+                  if (top12 == 0x8e0) return instTable_.getEntry(InstId::mop_rr_3);
+                  if (top12 == 0xc20) return instTable_.getEntry(InstId::mop_rr_4);
+                  if (top12 == 0xc60) return instTable_.getEntry(InstId::mop_rr_5);
+                  if (top12 == 0xca0) return instTable_.getEntry(InstId::mop_rr_6);
+                  if (top12 == 0xce0) return instTable_.getEntry(InstId::mop_rr_7);
 
 
                   op2 = 0; // No offset for these instructions.
