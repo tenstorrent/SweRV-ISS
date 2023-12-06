@@ -908,12 +908,6 @@ namespace WdRiscv
     void enableTrapNonZeroVstart(bool flag)
     { trapNonZeroVstart_ = flag; }
 
-    /// Enable/disable the zba (bit manipulation base) extension. When
-    /// disabled all the instructions in zba extension result in an
-    /// illegal instruction exception.
-    void enableRvzba(bool flag)
-    { enableExtension(RvExtension::Zba, flag); }
-
     /// Enable/disable the c (compressed) extension.
     void enableRvc(bool flag)
     { enableExtension(RvExtension::C, flag); csRegs_.enableRvc(flag); }
@@ -924,18 +918,6 @@ namespace WdRiscv
     /// Enable/disable the d (double-precision floating point) extension.
     void enableRvd(bool flag)
     { enableExtension(RvExtension::D, flag); }
-
-    /// Enable/disable the zbb (bit manipulation base) extension. When
-    /// disabled all the instructions in zbb extension result in an
-    /// illegal instruction exception.
-    void enableRvzbb(bool flag)
-    { enableExtension(RvExtension::Zbb, flag); }
-
-    /// Enable/disable the zbc (bit manipulation carryless multiply)
-    /// extension. When disabled all the instructions in zbc extension
-    /// result in an illegal instruction exception.
-    void enableRvzbc(bool flag)
-    { enableExtension(RvExtension::Zbc, flag); }
 
     /// Enable/disable the zbe (bit manipulation) extension. When
     /// disabled all the instructions in zbe extension result in an
@@ -967,141 +949,11 @@ namespace WdRiscv
     void enableRvzbr(bool flag)
     { enableExtension(RvExtension::Zbr, flag); }
 
-    /// Enable/disable the zbs (bit manipulation single)
-    /// extension. When disabled all the instructions in zbs extension
-    /// result in an illegal instruction exception.
-    void enableRvzbs(bool flag)
-    { enableExtension(RvExtension::Zbs, flag); }
-
     /// Enable/disable the zbt (bit manipulation ternary)
     /// extension. When disabled all the instructions in zbt extension
     /// result in an illegal instruction exception.
     void enableRvzbt(bool flag)
     { enableExtension(RvExtension::Zbt, flag); }
-
-    /// Enable/disable the half-precision floating point extension.
-    void enableRvzfh(bool flag)
-    { enableExtension(RvExtension::Zfh, flag); }
-
-    /// Enable/disable the minimal half-precision floating point extension.
-    void enableRvzfhmin(bool flag)
-    { enableExtension(RvExtension::Zfhmin, flag); }
-
-    /// Enable/disable the crypto zknd (nist decryption) extension.
-    void enableRvzknd(bool flag)
-    { enableExtension(RvExtension::Zknd, flag); }
-
-    /// Enable/disable the crypto zkne (nist encryption) extension.
-    void enableRvzkne(bool flag)
-    { enableExtension(RvExtension::Zkne, flag); }
-
-    /// Enable/disable the crypto zknh (nist hash) extension.
-    void enableRvzknh(bool flag)
-    { enableExtension(RvExtension::Zknh, flag); }
-
-    /// Enable/disable the crypto zbkb (crypto bit manip) extension.
-    void enableRvzbkb(bool flag)
-    { enableExtension(RvExtension::Zbkb, flag); }
-
-    /// Enable/disable the crypto zbkx (crypto bit manip) extension.
-    void enableRvzbkx(bool flag)
-    { enableExtension(RvExtension::Zbkx, flag); }
-
-    /// Enable/disable the crypto zksed (sm4 block cipher) extension.
-    void enableRvzksed(bool flag)
-    { enableExtension(RvExtension::Zksed, flag); }
-
-    /// Enable/disable the crypto zksed (sm3 block hash) extension.
-    void enableRvzksh(bool flag)
-    { enableExtension(RvExtension::Zksh, flag); }
-
-    /// Enable/disable the svinval (TLB invalidation) extension.
-    void enableRvsvinval(bool flag)
-    { enableExtension(RvExtension::Svinval, flag); }
-
-    /// Enable/disable the zicbom (cache block management) extension.
-    void enableRvzicbom(bool flag)
-    { enableExtension(RvExtension::Zicbom, flag); }
-
-    /// Enable/disable the zicboz (cache block zero) extension.
-    void enableRvzicboz(bool flag)
-    { enableExtension(RvExtension::Zicboz, flag); }
-
-    /// Enable/disable the zicbop (cache block prefetch) extension.
-    void enableRvzicbop(bool flag)
-    { enableExtension(RvExtension::Zicbop, flag); }
-
-    /// Enable/disable the zawrs (wait reservation store) extension.
-    void enableRvzawrs(bool flag)
-    { enableExtension(RvExtension::Zawrs, flag); }
-
-    /// Enable/disable the zmmul (multiply) extension.
-    void enableRvzmmul(bool flag)
-    { enableExtension(RvExtension::Zmmul, flag); }
-
-    /// Enable/disable the half-precision floating point vector extension.
-    void enableRvzvfh(bool flag)
-    { enableExtension(RvExtension::Zvfh, flag); }
-
-    /// Enable/disable the minimal half-precision floating point vector extension.
-    void enableRvzvfhmin(bool flag)
-    { enableExtension(RvExtension::Zvfhmin, flag); }
-
-    /// Enable/disable the vector bit-manip extension part of vector cryptography.
-    void enableRvzvbb(bool flag)
-    { enableExtension(RvExtension::Zvbb, flag); }
-
-    /// Enable/disable the vector bit-manip extension part of vector cryptography.
-    void enableRvzvbc(bool flag)
-    { enableExtension(RvExtension::Zvbc, flag); }
-
-    /// Enable/disable the vector ghash extension part of vector cryptography.
-    void enableRvzvkg(bool flag)
-    { enableExtension(RvExtension::Zvkg, flag); }
-
-    /// Enable/disable the aes final round extension part of vector cryptography.
-    void enableRvzvkned(bool flag)
-    { enableExtension(RvExtension::Zvkned, flag); }
-
-    /// Enable/disable the zvknha (vector secure hash) extension part of vector cryptography.
-    void enableRvzvknha(bool flag)
-    { enableExtension(RvExtension::Zvknha, flag); }
-
-    /// Enable/disable the zvknhb (vector secure hash) extension part of vector cryptography.
-    void enableRvzvknhb(bool flag)
-    { enableExtension(RvExtension::Zvknhb, flag); }
-
-    /// Enable/disable the zvksed (vector ShangMi) extension part of vector cryptography.
-    void enableRvzvksed(bool flag)
-    { enableExtension(RvExtension::Zvksed, flag); }
-
-    /// Enable/disable the zvksh vector cryptography extension.
-    void enableRvzvksh(bool flag)
-    { enableExtension(RvExtension::Zvksh, flag); }
-
-    /// Enable/disable the zicond extension.
-    void enableRvzicond(bool flag)
-    { enableExtension(RvExtension::Zicond, flag); }
-
-    /// Enable/disable the zcb extension.
-    void enableRvzcb(bool flag)
-    { enableExtension(RvExtension::Zcb, flag); }
-
-    /// Enable/disable the zfa extension.
-    void enableRvzfa(bool flag)
-    { enableExtension(RvExtension::Zfa, flag); }
-
-    /// Enable/disable the scalar BF16 conversion extension (Zfbfmin).
-    void enableRvzfbfmin(bool flag)
-    { enableExtension(RvExtension::Zfbfmin, flag); }
-
-    /// Enable/disable the vector bfloat conversions extension (Zvfbfmin).
-    void enableRvzvfbfmin(bool flag)
-    { enableExtension(RvExtension::Zvfbfmin, flag); }
-
-    /// Enable/disable the vector BF16 widening mul-add extension (Zvfbfwma).
-    void enableRvzvfbfwma(bool flag)
-    { enableExtension(RvExtension::Zvfbfwma, flag); }
 
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)

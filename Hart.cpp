@@ -332,87 +332,57 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  flag = isRvsstc();
-  csRegs_.enableSstc(flag);
-  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
-  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
-  enableRvzba(isa_.isEnabled(RvExtension::Zba));
-  enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
-  enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
-  enableRvzbs(isa_.isEnabled(RvExtension::Zbs));
+  enableExtension(RvExtension::Zba,      isa_.isEnabled(RvExtension::Zba));
+  enableExtension(RvExtension::Zbb,      isa_.isEnabled(RvExtension::Zbb));
+  enableExtension(RvExtension::Zbc,      isa_.isEnabled(RvExtension::Zbc));
+  enableExtension(RvExtension::Zbs,      isa_.isEnabled(RvExtension::Zbs));
+  enableExtension(RvExtension::Zfbfmin,  isa_.isEnabled(RvExtension::Zfbfmin));
+  enableExtension(RvExtension::Zfh,      isa_.isEnabled(RvExtension::Zfh));
+  enableExtension(RvExtension::Zfhmin,   isa_.isEnabled(RvExtension::Zfhmin));
+  enableExtension(RvExtension::Zknd,     isa_.isEnabled(RvExtension::Zknd));
+  enableExtension(RvExtension::Zkne,     isa_.isEnabled(RvExtension::Zkne));
+  enableExtension(RvExtension::Zknh,     isa_.isEnabled(RvExtension::Zknh));
+  enableExtension(RvExtension::Zbkb,     isa_.isEnabled(RvExtension::Zbkb));
+  enableExtension(RvExtension::Zbkx,     isa_.isEnabled(RvExtension::Zbkx));
+  enableExtension(RvExtension::Zksed,    isa_.isEnabled(RvExtension::Zksed));
+  enableExtension(RvExtension::Zksh,     isa_.isEnabled(RvExtension::Zksh));
+  enableExtension(RvExtension::Svinval,  isa_.isEnabled(RvExtension::Svinval));
+  enableExtension(RvExtension::Zicbom,   isa_.isEnabled(RvExtension::Zicbom));
+  enableExtension(RvExtension::Zicboz,   isa_.isEnabled(RvExtension::Zicboz));
+  enableExtension(RvExtension::Zicbop,   isa_.isEnabled(RvExtension::Zicbop));
+  enableExtension(RvExtension::Zawrs,    isa_.isEnabled(RvExtension::Zawrs));
+  enableExtension(RvExtension::Zmmul,    isa_.isEnabled(RvExtension::Zmmul));
+  enableExtension(RvExtension::Zvbb,     isa_.isEnabled(RvExtension::Zvbb));
+  enableExtension(RvExtension::Zvbc,     isa_.isEnabled(RvExtension::Zvbc));
+  enableExtension(RvExtension::Zvfbfmin, isa_.isEnabled(RvExtension::Zvfbfmin));
+  enableExtension(RvExtension::Zvfbfwma, isa_.isEnabled(RvExtension::Zvfbfwma));
+  enableExtension(RvExtension::Zvfh,     isa_.isEnabled(RvExtension::Zvfh));
+  enableExtension(RvExtension::Zvfhmin,  isa_.isEnabled(RvExtension::Zvfhmin));
+  enableExtension(RvExtension::Zvkg,     isa_.isEnabled(RvExtension::Zvkg));
+  enableExtension(RvExtension::Zvkned,   isa_.isEnabled(RvExtension::Zvkned));
+  enableExtension(RvExtension::Zvknha,   isa_.isEnabled(RvExtension::Zvknha));
+  enableExtension(RvExtension::Zvknhb,   isa_.isEnabled(RvExtension::Zvknhb));
+  enableExtension(RvExtension::Zvksed,   isa_.isEnabled(RvExtension::Zvksed));
+  enableExtension(RvExtension::Zvksh,    isa_.isEnabled(RvExtension::Zvksh));
+  enableExtension(RvExtension::Zicond,   isa_.isEnabled(RvExtension::Zicond));
+  enableExtension(RvExtension::Zcb,      isa_.isEnabled(RvExtension::Zcb));
+  enableExtension(RvExtension::Zfa,      isa_.isEnabled(RvExtension::Zfa));
+  enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
+  enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
+  enableExtension(RvExtension::Zacas,    isa_.isEnabled(RvExtension::Zacas));
+  enableExtension(RvExtension::Zimop, isa_.isEnabled(RvExtension::Zimop));
 
-  if (isa_.isEnabled(RvExtension::Zfbfmin))
-    enableRvzfbfmin(true);
-  if (isa_.isEnabled(RvExtension::Zfh))
-    enableRvzfh(true);
-  if (isa_.isEnabled(RvExtension::Zfhmin))
-    enableRvzfhmin(true);
-  if (isa_.isEnabled(RvExtension::Zknd))
-    enableRvzknd(true);
-  if (isa_.isEnabled(RvExtension::Zkne))
-    enableRvzkne(true);
-  if (isa_.isEnabled(RvExtension::Zknh))
-    enableRvzknh(true);
-  if (isa_.isEnabled(RvExtension::Zbkb))
-    enableRvzbkb(true);
-  if (isa_.isEnabled(RvExtension::Zbkx))
-    enableRvzbkx(true);
-  if (isa_.isEnabled(RvExtension::Zksed))
-    enableRvzksed(true);
-  if (isa_.isEnabled(RvExtension::Zksh))
-    enableRvzksh(true);
-  if (isa_.isEnabled(RvExtension::Svinval))
-    enableRvsvinval(true);
-  if (isa_.isEnabled(RvExtension::Zicbom))
-    enableRvzicbom(true);
-  if (isa_.isEnabled(RvExtension::Zicboz))
-    enableRvzicboz(true);
-  if (isa_.isEnabled(RvExtension::Zicbop))
-    enableRvzicbop(true);
-  if (isa_.isEnabled(RvExtension::Zawrs))
-    enableRvzawrs(true);
-  if (isa_.isEnabled(RvExtension::Zmmul))
-    enableRvzmmul(true);
-  if (isa_.isEnabled(RvExtension::Zvbb))
-    enableRvzvbb(true);
-  if (isa_.isEnabled(RvExtension::Zvbc))
-    enableRvzvbc(true);
-  if (isa_.isEnabled(RvExtension::Zvfbfmin))
-    enableRvzvfbfmin(true);
-  if (isa_.isEnabled(RvExtension::Zvfbfwma))
-    enableRvzvfbfwma(true);
-  if (isa_.isEnabled(RvExtension::Zvfh))
-    enableRvzvfh(true);
-  if (isa_.isEnabled(RvExtension::Zvfhmin))
-    enableRvzvfhmin(true);
-  if (isa_.isEnabled(RvExtension::Zvkg))
-    enableRvzvkg(true);
-  if (isa_.isEnabled(RvExtension::Zvkned))
-    enableRvzvkned(true);
-  if (isa_.isEnabled(RvExtension::Zvknha))
-    enableRvzvknha(true);
-  if (isa_.isEnabled(RvExtension::Zvknhb))
-    enableRvzvknhb(true);
-  if (isa_.isEnabled(RvExtension::Zvksed))
-    enableRvzvksed(true);
-  if (isa_.isEnabled(RvExtension::Zvksh))
-    enableRvzvksh(true);
-  if (isa_.isEnabled(RvExtension::Zicond))
-    enableRvzicond(true);
-  if (isa_.isEnabled(RvExtension::Zcb))
-    enableRvzcb(true);
-  if (isa_.isEnabled(RvExtension::Zfa))
-    enableRvzfa(true);
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
     enableSmrnmi(true);
-  enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
-  enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
-  enableExtension(RvExtension::Zacas, isa_.isEnabled(RvExtension::Zacas));
-  enableExtension(RvExtension::Zimop, isa_.isEnabled(RvExtension::Zimop));
+
+  csRegs_.enableSstc(isRvsstc());
+
+  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
+  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
 }
 
 
