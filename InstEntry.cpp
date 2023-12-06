@@ -7427,5 +7427,211 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
+      { "mop.r.0", InstId::mop_r_0, 0x81c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.1", InstId::mop_r_1,0x81d04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.2", InstId::mop_r_2,0x81e04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.3", InstId::mop_r_3,0x81f04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.4", InstId::mop_r_4,0x85c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.5", InstId::mop_r_5,0x85d04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.6", InstId::mop_r_6,0x85e04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.7", InstId::mop_r_7,0x85f04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.8", InstId::mop_r_8,0x89c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.9", InstId::mop_r_9,0x89d04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.10", InstId::mop_r_10,0x89e04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.11", InstId::mop_r_11,0x89f04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.12", InstId::mop_r_12,0x8dc04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.13", InstId::mop_r_13,0x8dd04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.14", InstId::mop_r_14,0x8de04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.15", InstId::mop_r_15,0x8df04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.16", InstId::mop_r_16,0xc1c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.17", InstId::mop_r_17,0xc1d04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.18", InstId::mop_r_18,0xc1e04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.19", InstId::mop_r_19,0xc1f04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.20", InstId::mop_r_20,0xc5c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.21", InstId::mop_r_21,0xc5d04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.22", InstId::mop_r_22,0xc5e04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.23", InstId::mop_r_23,0xc5f04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.24", InstId::mop_r_24,0xc9c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.25", InstId::mop_r_25,0xc9d04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.26", InstId::mop_r_26,0xc9e04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.27", InstId::mop_r_27,0xc9f04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.28", InstId::mop_r_28,0xcdc04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.29", InstId::mop_r_29,0xcdd04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.30", InstId::mop_r_30,0xcde04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.r.31", InstId::mop_r_31,0xcdf04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.rr.0", InstId::mop_rr_0,0x82004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.rr.1", InstId::mop_rr_1, 0x86004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+    { "mop.rr.2", InstId::mop_rr_2, 0x8a004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+    { "mop.rr.3", InstId::mop_rr_3, 0x8e004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+    { "mop.rr.4", InstId::mop_rr_4, 0xc2004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+    { "mop.rr.5", InstId::mop_rr_5, 0xc6004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+    { "mop.rr.6", InstId::mop_rr_6, 0xca004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
+
+    { "mop.rr.7", InstId::mop_rr_7, 0xce004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::IntReg, OperandMode::Read, rs2Mask },
     };
 }

@@ -9017,8 +9017,54 @@ Hart<URV>::execute(const DecodedInst* di)
       execAmocas_d(di);
       return;
 
-    case InstId::amocas_q:
+    case instid::amocas_q:
       execAmocas_q(di);
+      return;
+
+    case instid::mop_r_0:
+    case instid::mop_r_1:
+    case instid::mop_r_2:
+    case instid::mop_r_3:
+    case instid::mop_r_4:
+    case instid::mop_r_5:
+    case instid::mop_r_6:
+    case instid::mop_r_7:
+    case instid::mop_r_8:
+    case instid::mop_r_9:
+    case instid::mop_r_10:
+    case instid::mop_r_11:
+    case instid::mop_r_12:
+    case instid::mop_r_13:
+    case instid::mop_r_14:
+    case instid::mop_r_15:
+    case instid::mop_r_16:
+    case instid::mop_r_17:
+    case instid::mop_r_18:
+    case instid::mop_r_19:
+    case instid::mop_r_20:
+    case instid::mop_r_21:
+    case instid::mop_r_22:
+    case instid::mop_r_23:
+    case instid::mop_r_24:
+    case instid::mop_r_25:
+    case instid::mop_r_26:
+    case instid::mop_r_27:
+    case instid::mop_r_28:
+    case instid::mop_r_29:
+    case instid::mop_r_30:
+    case instid::mop_r_31:
+      execMop_r(di);
+      return;
+
+    case instid::mop_rr_0:
+    case instid::mop_rr_1:
+    case instid::mop_rr_2:
+    case instid::mop_rr_3:
+    case instid::mop_rr_4:
+    case instid::mop_rr_5:
+    case instid::mop_rr_6:
+    case instid::mop_rr_7:
+      execMop_rr(di);
       return;
     }
 
@@ -11372,6 +11418,30 @@ Hart<URV>::execC_zext_h(const DecodedInst* di)
   intRegs_.write(di->op0(), value);
 }
 
+template <typename URV>
+void
+Hart<URV>::execMop_r(const DecodedInst* di)
+{
+    if (not isRvzimop()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
+template <typename URV>
+void
+Hart<URV>::execMop_rr(const DecodedInst* di)
+{
+    if (not isRvzimop()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
 
 template
 bool

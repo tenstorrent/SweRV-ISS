@@ -2995,7 +2995,55 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               case 4:
                 {
                   unsigned top12 = op2;
-		  op2 = 0; // No offset for these instructions.
+                  RFormInst rform(inst);
+                  op2 = rform.bits.rs2;
+                  # mop.rr although are I format seem to have rs2 as well.
+                  if (top == 0x820) return instTable_.getEntry(InstId::mop_rr_0);
+                  if (top == 0x860) return instTable_.getEntry(InstId::mop_rr_1);
+                  if (top == 0x8a0) return instTable_.getEntry(InstId::mop_rr_2);
+                  if (top == 0x8e0) return instTable_.getEntry(InstId::mop_rr_3);
+                  if (top == 0xc20) return instTable_.getEntry(InstId::mop_rr_4);
+                  if (top == 0xc60) return instTable_.getEntry(InstId::mop_rr_5);
+                  if (top == 0xca0) return instTable_.getEntry(InstId::mop_rr_6);
+                  if (top == 0xce0) return instTable_.getEntry(InstId::mop_rr_7);
+
+
+                  op2 = 0; // No offset for these instructions.
+                  if (top12 == 0x81C) return instTable_.getEntry(InstId::mop_r_0);
+                  if (top12 == 0x81d) return instTable_.getEntry(InstId::mop_r_1);
+                  if (top12 == 0x81e) return instTable_.getEntry(InstId::mop_r_2);
+                  if (top12 == 0x81f) return instTable_.getEntry(InstId::mop_r_3);
+                  if (top12 == 0x85c) return instTable_.getEntry(InstId::mop_r_4);
+                  if (top12 == 0x85d) return instTable_.getEntry(InstId::mop_r_5);
+                  if (top12 == 0x85e) return instTable_.getEntry(InstId::mop_r_6);
+                  if (top12 == 0x85f) return instTable_.getEntry(InstId::mop_r_7);
+                  if (top12 == 0x89c) return instTable_.getEntry(InstId::mop_r_8);
+                  if (top12 == 0x89d) return instTable_.getEntry(InstId::mop_r_9);
+                  if (top12 == 0x89e) return instTable_.getEntry(InstId::mop_r_10);
+                  if (top12 == 0x89f) return instTable_.getEntry(InstId::mop_r_11);
+                  if (top12 == 0x8dc) return instTable_.getEntry(InstId::mop_r_12);
+                  if (top12 == 0x8dd) return instTable_.getEntry(InstId::mop_r_13);
+                  if (top12 == 0x8de) return instTable_.getEntry(InstId::mop_r_14);
+                  if (top12 == 0x8df) return instTable_.getEntry(InstId::mop_r_15);
+                  if (top12 == 0xc1c) return instTable_.getEntry(InstId::mop_r_16);
+                  if (top12 == 0xc1d) return instTable_.getEntry(InstId::mop_r_17);
+                  if (top12 == 0xc1e) return instTable_.getEntry(InstId::mop_r_18);
+                  if (top12 == 0xc1f) return instTable_.getEntry(InstId::mop_r_19);
+                  if (top12 == 0xc5c) return instTable_.getEntry(InstId::mop_r_20);
+                  if (top12 == 0xc5d) return instTable_.getEntry(InstId::mop_r_21);
+                  if (top12 == 0xc5e) return instTable_.getEntry(InstId::mop_r_22);
+                  if (top12 == 0xc5f) return instTable_.getEntry(InstId::mop_r_23);
+                  if (top12 == 0xc9c) return instTable_.getEntry(InstId::mop_r_24);
+                  if (top12 == 0xc9d) return instTable_.getEntry(InstId::mop_r_25);
+                  if (top12 == 0xc9e) return instTable_.getEntry(InstId::mop_r_26);
+                  if (top12 == 0xc9f) return instTable_.getEntry(InstId::mop_r_27);
+                  if (top12 == 0xcdc) return instTable_.getEntry(InstId::mop_r_28);
+                  if (top12 == 0xcdd) return instTable_.getEntry(InstId::mop_r_29);
+                  if (top12 == 0xcde) return instTable_.getEntry(InstId::mop_r_30);
+                  if (top12 == 0xcdf) return instTable_.getEntry(InstId::mop_r_31);
+
+                  if (top12 == 0xcdf) return instTable_.getEntry(InstId::mop_rr_0);
+  
                   if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
                   if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
                   if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);

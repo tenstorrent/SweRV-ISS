@@ -4712,6 +4712,10 @@ namespace WdRiscv
     void execAmocas_d(const DecodedInst*);
     void execAmocas_q(const DecodedInst*);
 
+    //Zimop
+    void execMop_r(const DecodedInst*);
+    void execMop_rr(const DecodedInst*);
+
   private:
 
     // We model non-blocking load buffer in order to undo load
