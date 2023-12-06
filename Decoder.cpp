@@ -3042,8 +3042,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   if (top12 == 0xcde) return instTable_.getEntry(InstId::mop_r_30);
                   if (top12 == 0xcdf) return instTable_.getEntry(InstId::mop_r_31);
 
-                  if (top12 == 0xcdf) return instTable_.getEntry(InstId::mop_rr_0);
-  
                   if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
                   if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
                   if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);
