@@ -1526,6 +1526,9 @@ namespace WdRiscv
     bool hasLr() const
     { return memory_.hasLr(hartIx_); }
 
+    bool isVirtualMode() const
+    { return virtMode_; }
+
     /// Cancel load reservation held by this hart (if any). Mark
     /// cause of cancellation which persists until overwritten
     /// by another cancelLr or until a new reservation is made.
