@@ -3206,6 +3206,10 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 
   uint64_t val = next;
 
+  uint64_t n = val >> 58;
+  if (n > 0 and n < 12)
+    return prev;
+
   bool read = (val & 1);       // bit 0
   bool write = (val & 2);      // bit 1
   bool exec = (val & 4);       // bit 2
