@@ -412,6 +412,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
   enableExtension(RvExtension::Zacas, isa_.isEnabled(RvExtension::Zacas));
+  enableExtension(RvExtension::Zimop, isa_.isEnabled(RvExtension::Zimop));
 }
 
 
