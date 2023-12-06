@@ -9022,49 +9022,11 @@ Hart<URV>::execute(const DecodedInst* di)
       execAmocas_q(di);
       return;
 
-    case InstId::mop_r_0:
-    case InstId::mop_r_1:
-    case InstId::mop_r_2:
-    case InstId::mop_r_3:
-    case InstId::mop_r_4:
-    case InstId::mop_r_5:
-    case InstId::mop_r_6:
-    case InstId::mop_r_7:
-    case InstId::mop_r_8:
-    case InstId::mop_r_9:
-    case InstId::mop_r_10:
-    case InstId::mop_r_11:
-    case InstId::mop_r_12:
-    case InstId::mop_r_13:
-    case InstId::mop_r_14:
-    case InstId::mop_r_15:
-    case InstId::mop_r_16:
-    case InstId::mop_r_17:
-    case InstId::mop_r_18:
-    case InstId::mop_r_19:
-    case InstId::mop_r_20:
-    case InstId::mop_r_21:
-    case InstId::mop_r_22:
-    case InstId::mop_r_23:
-    case InstId::mop_r_24:
-    case InstId::mop_r_25:
-    case InstId::mop_r_26:
-    case InstId::mop_r_27:
-    case InstId::mop_r_28:
-    case InstId::mop_r_29:
-    case InstId::mop_r_30:
-    case InstId::mop_r_31:
+    case InstId::mop_r:
       execMop_r(di);
       return;
 
-    case InstId::mop_rr_0:
-    case InstId::mop_rr_1:
-    case InstId::mop_rr_2:
-    case InstId::mop_rr_3:
-    case InstId::mop_rr_4:
-    case InstId::mop_rr_5:
-    case InstId::mop_rr_6:
-    case InstId::mop_rr_7:
+    case InstId::mop_rr:
       execMop_rr(di);
       return;
     }
