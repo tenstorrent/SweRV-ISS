@@ -335,6 +335,9 @@ namespace WdRiscv
       return pages.size();
     }
 
+    bool isVirtualMode() const
+    { return hart_->isVirtualMode();  }
+
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;
   };
