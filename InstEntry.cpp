@@ -7427,5 +7427,15 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
+      { "mop.r", InstId::mop_r, 0x81c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.rr", InstId::mop_rr,0x82004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
     };
 }

@@ -412,6 +412,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
   enableExtension(RvExtension::Zacas, isa_.isEnabled(RvExtension::Zacas));
+  enableExtension(RvExtension::Zimop, isa_.isEnabled(RvExtension::Zimop));
 }
 
 
@@ -9020,6 +9021,14 @@ Hart<URV>::execute(const DecodedInst* di)
     case InstId::amocas_q:
       execAmocas_q(di);
       return;
+
+    case InstId::mop_r:
+      execMop_r(di);
+      return;
+
+    case InstId::mop_rr:
+      execMop_rr(di);
+      return;
     }
 
   assert(0 && "Shouldn't be able to get here if all cases above returned");
@@ -11372,6 +11381,30 @@ Hart<URV>::execC_zext_h(const DecodedInst* di)
   intRegs_.write(di->op0(), value);
 }
 
+template <typename URV>
+void
+Hart<URV>::execMop_r(const DecodedInst* di)
+{
+    if (not isRvzimop()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
+template <typename URV>
+void
+Hart<URV>::execMop_rr(const DecodedInst* di)
+{
+    if (not isRvzimop()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
 
 template
 bool

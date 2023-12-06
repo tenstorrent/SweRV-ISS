@@ -1116,6 +1116,10 @@ namespace WdRiscv
      amocas_d,
      amocas_q,
 
-     maxId = amocas_q
+     //Zimop
+     mop_r,
+     mop_rr,
+
+     maxId = mop_rr
     };
 }
