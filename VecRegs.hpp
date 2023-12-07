@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstddef>
@@ -382,6 +383,13 @@ namespace WdRiscv
       return gm8*bytesPerReg_/eewInBits;
     }
 
+    /// Return the maximum of the VLMAX and VLEN/SEW for tail elements
+    /// when LMUL < 1.
+    uint32_t elemMax() const
+    {
+      return std::max(vlmax(), 8*bytesPerReg_/sewInBits_);
+    }
+
     /// If flag is true, configure vector engine for writing ones in
     /// inactive destination register elements when mask-agnostic is
     /// on. Otherwise, preserve inactive elements.
@@ -543,6 +551,7 @@ namespace WdRiscv
 	    setAllBits(val);
 	  return false;
 	}
+
       return true;
     }
 
