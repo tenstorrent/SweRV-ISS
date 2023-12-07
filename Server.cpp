@@ -289,6 +289,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  {
 	    reply.value = value;
 	    reply.address = mask;
+	    reply.time = reset;
 	    return true;
 	  }
       }

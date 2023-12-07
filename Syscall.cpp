@@ -1153,6 +1153,7 @@ Syscall<URV>::emulate()
             rc = progBreak_;
           else
             {
+	      newBrk += 16;
               for (URV addr = progBreak_; addr < newBrk; addr++)
                 hart_.pokeMemory(addr, uint8_t(0), true /*usePma*/);
               rc = progBreak_ = newBrk;
@@ -1240,6 +1241,19 @@ Syscall<URV>::emulate()
     case 94:  // exit_group
       {
 	throw CoreException(CoreException::Exit, "", 0, a0);
+	return 0;
+      }
+
+    case 113:  // clock_gettime
+      {
+	clockid_t clk_id = a0;
+	uint64_t rvBuff = a1;
+
+	struct timespec tp;
+	if (clock_gettime(clk_id, &tp) != 0)
+	  return SRV(-errno);
+	if (not hart_.pokeMemory(rvBuff, uint64_t(tp.tv_sec), true))
+	  return SRV(-1);
 	return 0;
       }
 
