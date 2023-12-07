@@ -346,7 +346,6 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zbkx,     isa_.isEnabled(RvExtension::Zbkx));
   enableExtension(RvExtension::Zksed,    isa_.isEnabled(RvExtension::Zksed));
   enableExtension(RvExtension::Zksh,     isa_.isEnabled(RvExtension::Zksh));
-  enableExtension(RvExtension::Svinval,  isa_.isEnabled(RvExtension::Svinval));
   enableExtension(RvExtension::Zicbom,   isa_.isEnabled(RvExtension::Zicbom));
   enableExtension(RvExtension::Zicboz,   isa_.isEnabled(RvExtension::Zicboz));
   enableExtension(RvExtension::Zicbop,   isa_.isEnabled(RvExtension::Zicbop));
@@ -367,13 +366,16 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zicond,   isa_.isEnabled(RvExtension::Zicond));
   enableExtension(RvExtension::Zcb,      isa_.isEnabled(RvExtension::Zcb));
   enableExtension(RvExtension::Zfa,      isa_.isEnabled(RvExtension::Zfa));
+  enableExtension(RvExtension::Zacas,    isa_.isEnabled(RvExtension::Zacas));
+  enableExtension(RvExtension::Zimop,    isa_.isEnabled(RvExtension::Zimop));
+  enableExtension(RvExtension::Zcmop,    isa_.isEnabled(RvExtension::Zcmop));
   enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
-  enableExtension(RvExtension::Zacas,    isa_.isEnabled(RvExtension::Zacas));
-  enableExtension(RvExtension::Zimop, isa_.isEnabled(RvExtension::Zimop));
 
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
+  if (isa_.isEnabled(RvExtension::Svinval))
+    enableSvinval(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
@@ -8999,6 +9001,10 @@ Hart<URV>::execute(const DecodedInst* di)
     case InstId::mop_rr:
       execMop_rr(di);
       return;
+
+    case InstId::c_mop:
+      execCmop(di);
+      return;
     }
 
   assert(0 && "Shouldn't be able to get here if all cases above returned");
@@ -11363,11 +11369,25 @@ Hart<URV>::execMop_r(const DecodedInst* di)
     URV value = 0;
     intRegs_.write(di->op0(), value);
 }
+
 template <typename URV>
 void
 Hart<URV>::execMop_rr(const DecodedInst* di)
 {
     if (not isRvzimop()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
+
+template <typename URV>
+void
+Hart<URV>::execCmop(const DecodedInst* di)
+{
+    if (not isRvzcmop() || not isRvc()) 
       {
         illegalInst(di);
         return;

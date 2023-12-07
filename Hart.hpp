@@ -1306,6 +1306,9 @@ namespace WdRiscv
     bool isRvzimop() const
     { return extensionIsEnabled(RvExtension::Zimop); }
 
+    bool isRvzcmop() const
+    { return extensionIsEnabled(RvExtension::Zcmop); }
+
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
     bool hasTargetProgramFinished() const
@@ -4574,6 +4577,8 @@ namespace WdRiscv
     void execMop_r(const DecodedInst*);
     void execMop_rr(const DecodedInst*);
 
+    //Zcmop
+    void execCmop(const DecodedInst*);
   private:
 
     // We model non-blocking load buffer in order to undo load

@@ -1120,6 +1120,9 @@ namespace WdRiscv
      mop_r,
      mop_rr,
 
-     maxId = mop_rr
+     //Zcmop
+     c_mop,
+
+     maxId = c_mop
     };
 }
