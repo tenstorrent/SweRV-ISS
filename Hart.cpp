@@ -346,7 +346,6 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zbkx,     isa_.isEnabled(RvExtension::Zbkx));
   enableExtension(RvExtension::Zksed,    isa_.isEnabled(RvExtension::Zksed));
   enableExtension(RvExtension::Zksh,     isa_.isEnabled(RvExtension::Zksh));
-  enableExtension(RvExtension::Svinval,  isa_.isEnabled(RvExtension::Svinval));
   enableExtension(RvExtension::Zicbom,   isa_.isEnabled(RvExtension::Zicbom));
   enableExtension(RvExtension::Zicboz,   isa_.isEnabled(RvExtension::Zicboz));
   enableExtension(RvExtension::Zicbop,   isa_.isEnabled(RvExtension::Zicbop));
@@ -367,14 +366,16 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zicond,   isa_.isEnabled(RvExtension::Zicond));
   enableExtension(RvExtension::Zcb,      isa_.isEnabled(RvExtension::Zcb));
   enableExtension(RvExtension::Zfa,      isa_.isEnabled(RvExtension::Zfa));
-  enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
-  enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
   enableExtension(RvExtension::Zacas,    isa_.isEnabled(RvExtension::Zacas));
   enableExtension(RvExtension::Zimop,    isa_.isEnabled(RvExtension::Zimop));
   enableExtension(RvExtension::Zcmop,    isa_.isEnabled(RvExtension::Zcmop));
+  enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
+  enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
 
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
+  if (isa_.isEnabled(RvExtension::Svinval))
+    enableSvinval(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
