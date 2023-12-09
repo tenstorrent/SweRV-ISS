@@ -741,6 +741,9 @@ namespace WdRiscv
     void setFields(const std::vector<Field>& fields)
     { fields_ = fields; }
 
+    std::vector<Field> getFields() const
+    { return fields_; }
+
     bool field(std::string_view field, URV& val) const
     {
       unsigned start = 0;
@@ -1203,6 +1206,16 @@ namespace WdRiscv
       return true;
     }
 
+    bool getCsrFields(CsrNumber number, std::vector<typename Csr<URV>::Field>& fields)
+    {
+      auto csr = findCsr(number);
+      if (not csr)
+        return false;
+
+      fields = csr->getFields();
+      return true;
+    }
+
     /// Clear VSTART CSR. Record write if value changes.
     void clearVstart()
     {
@@ -1536,6 +1549,9 @@ namespace WdRiscv
 
     /// helper to add fields of fp CSRs
     void addFpFields();
+
+    /// helper to add fields of hypervisor CSRs
+    void addHypervisorFields();
 
     /// Return true if given CSR is a hypervisor CSR.
     bool isHypervisor(CsrNumber csrn) const

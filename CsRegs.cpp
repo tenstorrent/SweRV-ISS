@@ -2465,6 +2465,8 @@ CsRegs<URV>::defineHypervisorRegs()
       csr->setWriteMask(csr->getWriteMask() | 0x444);
       csr->setPokeMask(csr->getPokeMask() | 0x444);
     }
+
+  addHypervisorFields();
 }
 
 
@@ -3727,6 +3729,114 @@ CsRegs<URV>::addFpFields()
     {{"NX", 1}, {"UF", 1}, {"OF", 1}, {"DZ", 1}, {"NV", 1}});
   setCsrFields(CsrNumber::FRM, {{"frm", 3}});
   setCsrFields(CsrNumber::FCSR, {{"fflags", 5}, {"frm", 3}, {"res0", 24}});
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::addHypervisorFields()
+{
+  using Csrn = CsrNumber;
+  constexpr unsigned xlen = sizeof(URV)*8;
+  // TODO: fix this to compile-time fields
+  setCsrFields(Csrn::HEDELEG, {{"hedeleg", xlen}});
+  setCsrFields(Csrn::HIDELEG, {{"hideleg", xlen}});
+  setCsrFields(Csrn::HVIP,
+      {{"zero", 2}, {"VSSIP", 1}, {"zero", 3}, {"VSTIP", 1},
+       {"zero", 3}, {"VSEIP", 1}, {"zero", 5}});
+  setCsrFields(Csrn::HIE,
+      {{"zero", 2}, {"VSSIE", 1}, {"zero", 3}, {"VSTIE", 1}, {"zero", 3},
+       {"VSEIE", 1}, {"zero", 1}, {"SGEIE", 1}, {"zero", xlen - 14}});
+  setCsrFields(Csrn::HIP,
+      {{"zero", 2}, {"VSSIP", 1}, {"zero", 3}, {"VSTIP", 1}, {"zero", 3},
+       {"VSEIP", 1}, {"zero", 1}, {"SGEIP", 1}, {"zero", xlen - 14}});
+  setCsrFields(Csrn::HGEIE, {{"zero", 1}, {"hgeie", xlen - 1}});
+  setCsrFields(Csrn::HGEIP, {{"zero", 1}, {"hgeie", xlen - 1}});
+
+  std::vector<typename Csr<URV>::Field> hcount = {{"CY", 1}, {"TM", 1}, {"IR", 1}};
+  std::vector<typename Csr<URV>::Field> hpm;
+  for (unsigned i = 3; i <= 31; ++i)
+    hpm.push_back({"HPM" + std::to_string(i), 1});
+  hcount.insert(hcount.end(), hpm.begin(), hpm.end());
+  setCsrFields(Csrn::HCOUNTEREN, hcount);
+  setCsrFields(Csrn::HTIMEDELTA, {{"htimedelta", xlen}});
+  setCsrFields(Csrn::HTVAL, {{"htval", xlen}});
+  setCsrFields(Csrn::HTINST, {{"htinst", xlen}});
+
+  setCsrFields(Csrn::VSTVEC, {{"MODE", 2}, {"BASE", xlen - 2}});
+  setCsrFields(Csrn::VSSCRATCH, {{"sscratch", xlen}});
+  setCsrFields(Csrn::VSEPC, {{"sepc", xlen}});
+  setCsrFields(Csrn::VSCAUSE, {{"CODE", xlen - 1}, {"INT", 1}});
+  setCsrFields(Csrn::VSTVAL, {{"stval", xlen}});
+  setCsrFields(Csrn::VSIE,
+    {{"zero", 1}, {"SSIE", 1}, {"zero", 3}, {"STIE", 1},
+     {"zero", 3}, {"SEIE", 1}, {"zero", xlen - 10}});
+  setCsrFields(Csrn::VSIP,
+    {{"zero", 1}, {"SSIP", 1}, {"zero", 3}, {"STIP", 1},
+     {"zero", 3}, {"SEIP", 1}, {"zero", xlen - 10}});
+
+  setCsrFields(Csrn::MTVAL2, {{"mtval2", xlen}});
+  setCsrFields(Csrn::MTINST, {{"mtinst", xlen}});
+
+  std::vector<typename Csr<URV>::Field> fields;
+  if (getCsrFields(Csrn::MIP, fields))
+    {
+      fields.at(2) = {"VSSIP", 1};
+      fields.at(6) = {"VSTIP", 1};
+      fields.at(10) = {"VSEIP", 1};
+      setCsrFields(Csrn::MIP, fields);
+    }
+
+  if (getCsrFields(Csrn::MIE, fields))
+    {
+      fields.at(2) = {"VSSIE", 1};
+      fields.at(6) = {"VSTIE", 1};
+      fields.at(10) = {"VSEIE", 1};
+      setCsrFields(Csrn::MIE, fields);
+    }
+
+  if (rv32_)
+    {
+      setCsrFields(Csrn::HSTATUS,
+        {{"res0", 5}, {"VSBE", 1}, {"GVA", 1},   {"SPV", 1},  {"SPVP", 1},
+         {"HU", 1},   {"res1", 2}, {"VGEIN", 6}, {"res2", 2}, {"VTVM", 1},
+         {"VTW", 1},  {"VTSR", 1}, {"res3", 9}});
+      setCsrFields(Csrn::HENVCFG,
+        {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
+         {"res1", xlen - 8}});
+      setCsrFields(Csrn::HENVCFGH,
+        {{"res0", 30}, {"PBMTE", 1}, {"VSTCE", 1}});
+      setCsrFields(Csrn::HTIMEDELTAH, {{"htimedeltah", xlen}});
+      setCsrFields(Csrn::HGATP,
+        {{"PPN", 22}, {"VMID", 7}, {"zero", 2}, {"MODE", 1}});
+      setCsrFields(Csrn::VSSTATUS,
+        {{"res0", 1}, {"SIE",  1}, {"res1",  3}, {"SPIE", 1},
+         {"UBE",  1}, {"res2", 1}, {"SPP",   1}, {"VS",   2},
+         {"res3", 2}, {"FS",   2}, {"XS",    2}, {"res4", 1},
+         {"SUM",  1}, {"MXR",  1}, {"res5", 11}, {"SD",   1}});
+      setCsrFields(Csrn::VSATP,
+        {{"PPN", 22}, {"ASID", 9}, {"MODE", 1}});
+    }
+  else
+    {
+      setCsrFields(Csrn::HSTATUS,
+        {{"res0", 5}, {"VSBE", 1}, {"GVA", 1},   {"SPV", 1},  {"SPVP", 1},
+         {"HU", 1},   {"res1", 2}, {"VGEIN", 6}, {"res2", 2}, {"VTVM", 1},
+         {"VTW", 1},  {"VTSR", 1}, {"res3", 9},  {"VSXL", 2}, {"res4", 30}});
+      setCsrFields(Csrn::HENVCFG,
+        {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
+         {"res1", 54}, {"PBMTE", 1}, {"VSTCE", 1}});
+      setCsrFields(Csrn::HGATP,
+        {{"PPN", 44}, {"VMID", 14}, {"zero", 4}, {"MODE", 4}});
+      setCsrFields(Csrn::VSSTATUS,
+        {{"res0",  1}, {"SIE",  1}, {"res1",  3}, {"SPIE",  1},
+         {"UBE",   1}, {"res2", 1}, {"SPP",   1}, {"VS",    2},
+         {"res3",  2}, {"FS",   2}, {"XS",    2}, {"res4",  1},
+         {"SUM",   1}, {"MXR",  1}, {"res5", 12}, {"UXL",   2},
+         {"res6", 29}, {"SD",   1}});
+      setCsrFields(Csrn::VSATP,
+        {{"PPN", 44}, {"ASID", 16}, {"MODE", 4}});
+    }
 }
 
 
