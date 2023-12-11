@@ -1153,7 +1153,6 @@ Syscall<URV>::emulate()
             rc = progBreak_;
           else
             {
-	      newBrk += 16;
               for (URV addr = progBreak_; addr < newBrk; addr++)
                 hart_.pokeMemory(addr, uint8_t(0), true /*usePma*/);
               rc = progBreak_ = newBrk;
@@ -1253,6 +1252,8 @@ Syscall<URV>::emulate()
 	if (clock_gettime(clk_id, &tp) != 0)
 	  return SRV(-errno);
 	if (not hart_.pokeMemory(rvBuff, uint64_t(tp.tv_sec), true))
+	  return SRV(-1);
+	if (not hart_.pokeMemory(rvBuff + 8, uint64_t(tp.tv_nsec), true))
 	  return SRV(-1);
 	return 0;
       }
