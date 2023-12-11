@@ -1789,10 +1789,6 @@ namespace WdRiscv
           URV mipVal = csRegs_.peekMip();
           URV prev = mipVal;
 
-          if (flag)
-	    mipVal = mipVal | (URV(1) << URV(IC::S_EXTERNAL));
-          else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::S_EXTERNAL));
 	  setSeiPin(flag);
           if (mipVal != prev)
             csRegs_.poke(CsrNumber::MIP, mipVal);
