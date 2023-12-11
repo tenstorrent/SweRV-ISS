@@ -10399,14 +10399,16 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-      if (skip and ix >= vecRegs_.elemCount())
+      if (ix < vecRegs_.elemCount())
+        {
+          vecRegs_.maskedAddr_.push_back(skip);
+          vecRegs_.ldStAddr_.push_back(addr);
+        }
+      if (skip)
 	{
 	  vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
-
-      vecRegs_.maskedAddr_.push_back(skip);
-      vecRegs_.ldStAddr_.push_back(addr);
 
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Phys addrs or faulting virtual address.
@@ -11048,14 +11050,16 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-      if (skip and ix >= vecRegs_.elemCount())
+      if (ix < vecRegs_.elemCount())
+        {
+          vecRegs_.ldStAddr_.push_back(addr);
+          vecRegs_.maskedAddr_.push_back(skip);
+        }
+      if (skip)
 	{
 	  vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
-
-      vecRegs_.ldStAddr_.push_back(addr);
-      vecRegs_.maskedAddr_.push_back(skip);
 
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
@@ -11332,19 +11336,22 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
+      uint64_t vaddr;
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-      if (skip and ix >= vecRegs_.elemCount())
+      if (ix < vecRegs_.elemCount())
+        {
+          uint64_t offset = 0;
+          vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
+          vaddr = addr + offset;
+          vecRegs_.ldStAddr_.push_back(vaddr);
+          vecRegs_.maskedAddr_.push_back(skip);
+        }
+      if (skip)
 	{
 	  vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
-
-      uint64_t offset = 0;
-      vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
-      uint64_t vaddr = addr + offset;
-      vecRegs_.ldStAddr_.push_back(vaddr);
-      vecRegs_.maskedAddr_.push_back(skip);
 
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = vaddr, gpa2 = vaddr;
@@ -11770,14 +11777,16 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  ELEM_TYPE elem(0);
 	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-	  if (skip and ix >= vecRegs_.elemCount())
+          if (ix < vecRegs_.elemCount())
+            {
+              vecRegs_.ldStAddr_.push_back(faddr);
+              vecRegs_.maskedAddr_.push_back(skip);
+            }
+	  if (skip)
 	    {
 	      vecRegs_.write(dvg, ix, destGroup, elem);
 	      continue;
 	    }
-
-          vecRegs_.ldStAddr_.push_back(faddr);
-          vecRegs_.maskedAddr_.push_back(skip);
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
           uint64_t gpa1 = faddr, gpa2 = faddr;
@@ -12252,23 +12261,25 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
     {
       for (unsigned field = 0; field < fieldCount; ++field)
 	{
+          uint64_t faddr;
 	  unsigned dvg = vd + field*eg;  // Destination vector grop.
 	  ELEM_TYPE elem = 0;
 	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-	  if (skip and ix >= vecRegs_.elemCount())
+          if (ix < vecRegs_.elemCount())
+            {
+              uint64_t offset = 0;
+              if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
+                assert(0);
+
+              faddr = addr + offset + field*elemSize;
+              vecRegs_.ldStAddr_.push_back(faddr);
+              vecRegs_.maskedAddr_.push_back(skip);
+            }
+	  if (skip)
 	    {
 	      vecRegs_.write(dvg, ix, destGroup, elem);
 	      continue;
 	    }
-
-
-          uint64_t offset = 0;
-          if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-            assert(0);
-
-          uint64_t faddr = addr + offset + field*elemSize;
-	  vecRegs_.ldStAddr_.push_back(faddr);
-	  vecRegs_.maskedAddr_.push_back(skip);
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
           uint64_t gpa1 = faddr, gpa2 = faddr;
