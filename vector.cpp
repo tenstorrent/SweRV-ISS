@@ -1272,6 +1272,7 @@ Hart<URV>::vwadd_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
   ELEM_TYPE e1 = 0, e2 = 0;
   DWT dest = 0;
 
+  // We take the max of lmul == 1 to compensate for tail elements.
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
   for (unsigned ix = start; ix < elems; ++ix)
@@ -1296,9 +1297,9 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1306,7 +1307,7 @@ Hart<URV>::execVwaddu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1332,9 +1333,9 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1342,7 +1343,7 @@ Hart<URV>::execVwadd_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1394,9 +1395,9 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1404,7 +1405,7 @@ Hart<URV>::execVwaddu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1432,9 +1433,9 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1442,7 +1443,7 @@ Hart<URV>::execVwadd_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1496,9 +1497,9 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1506,7 +1507,7 @@ Hart<URV>::execVwsubu_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1534,9 +1535,9 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1544,7 +1545,7 @@ Hart<URV>::execVwsub_vx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -1599,9 +1600,9 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1609,7 +1610,7 @@ Hart<URV>::execVwsubu_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1635,9 +1636,9 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1645,7 +1646,7 @@ Hart<URV>::execVwsub_vv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -1699,9 +1700,9 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1709,7 +1710,7 @@ Hart<URV>::execVwaddu_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -1735,9 +1736,9 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1745,7 +1746,7 @@ Hart<URV>::execVwadd_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -1771,9 +1772,9 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1781,7 +1782,7 @@ Hart<URV>::execVwaddu_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -1816,9 +1817,9 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1826,7 +1827,7 @@ Hart<URV>::execVwadd_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -1862,9 +1863,9 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1872,7 +1873,7 @@ Hart<URV>::execVwsubu_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -1908,9 +1909,9 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1918,7 +1919,7 @@ Hart<URV>::execVwsub_wx(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, group))
     return;
@@ -1982,9 +1983,9 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -1992,7 +1993,7 @@ Hart<URV>::execVwsubu_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -2018,9 +2019,9 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -2028,7 +2029,7 @@ Hart<URV>::execVwsub_wv(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned elems = vecRegs_.elemMax(dsew), start = csRegs_.peekVstart();
 
   if (not checkVecOpsVsEmulW0W1(di, vd, vs1, vs2, group))
     return;
@@ -4421,16 +4422,14 @@ Hart<URV>::vslideup(unsigned vd, unsigned vs1, URV amount, unsigned group,
   if (start >= vecRegs_.elemCount())
     return;
 
-  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
 	  if (ix >= amount)
 	    {
 	      unsigned from = ix - amount;
-	      vecRegs_.read(vs1, from, destGroup, e1);
+	      vecRegs_.read(vs1, from, group, e1);
 	      dest = e1;
 	    }
 	}
@@ -4450,7 +4449,7 @@ Hart<URV>::execVslideup_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -4488,7 +4487,7 @@ Hart<URV>::execVslideup_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -4525,7 +4524,7 @@ Hart<URV>::execVslide1up_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -4603,11 +4602,9 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
   if (start >= vecRegs_.elemCount())
     return;
 
-  unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
-
   for (unsigned ix = start; ix < elems; ++ix)
     {
-      if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
+      if (vecRegs_.isDestActive(vd, ix, group, masked, dest))
 	{
 	  e1 = 0;
 	  if (amount < vecRegs_.bytesInRegisterFile())
@@ -4618,7 +4615,7 @@ Hart<URV>::vslidedown(unsigned vd, unsigned vs1, URV amount, unsigned group,
 	    }
 	  dest = e1;
 	}
-      vecRegs_.write(vd, ix, destGroup, dest);
+      vecRegs_.write(vd, ix, group, dest);
     }
 }
 
@@ -4633,7 +4630,7 @@ Hart<URV>::execVslidedown_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   URV amount = intRegs_.read(rs2);
@@ -4665,7 +4662,7 @@ Hart<URV>::execVslidedown_vi(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(), imm = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   URV amount = imm;
@@ -4696,7 +4693,7 @@ Hart<URV>::execVslide1down_vx(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
@@ -4752,7 +4749,7 @@ Hart<URV>::execVfslide1up_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (hasDestSourceOverlap(vd, group, vs1, group))
@@ -4825,7 +4822,7 @@ Hart<URV>::execVfslide1down_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(), rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.vlmax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (not checkVecOpsVsEmul(di, vd, vs1, group))
@@ -5668,15 +5665,16 @@ Hart<URV>::execVwmulu_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   // Double wide legal.
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -5731,14 +5729,15 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -5796,15 +5795,16 @@ Hart<URV>::execVwmul_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   // Double wide legal.
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -5860,15 +5860,16 @@ Hart<URV>::execVwmul_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   // Double wide legal.
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -5929,14 +5930,15 @@ Hart<URV>::execVwmulsu_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -5994,14 +5996,15 @@ Hart<URV>::execVwmulsu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -6057,17 +6060,19 @@ Hart<URV>::execVwmaccu_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned start = csRegs_.peekVstart();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -6126,14 +6131,15 @@ Hart<URV>::execVwmaccu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -6161,18 +6167,20 @@ Hart<URV>::execVwmacc_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned start = csRegs_.peekVstart();
 
   // Double wide legal.
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -6229,14 +6237,15 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax();
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -6296,17 +6305,19 @@ Hart<URV>::execVwmaccsu_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
-  unsigned elems = vecRegs_.elemMax(), start = csRegs_.peekVstart();
+  unsigned start = csRegs_.peekVstart();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -6367,14 +6378,15 @@ Hart<URV>::execVwmaccsu_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -6437,14 +6449,15 @@ Hart<URV>::execVwmaccus_vx(const DecodedInst* di)
   unsigned vd = di->op0(),  rs1 = di->op1(),  vs2 = di->op2();
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -10375,7 +10388,7 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
   if (not checkVecOpsVsEmul(di, vd, groupX8))
     return false;
 
-  unsigned elemCount = vecRegs_.elemMax();
+  unsigned elemCount = vecRegs_.elemMax(eew);
   uint64_t addr = intRegs_.read(rs1) + start*sizeof(ELEM_TYPE);
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
@@ -10386,13 +10399,14 @@ Hart<URV>::vectorLoad(const DecodedInst* di, ElementWidth eew, bool faultFirst)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-      vecRegs_.maskedAddr_.push_back(skip);
-      vecRegs_.ldStAddr_.push_back(addr);
-      if (skip)
+      if (skip and ix >= vecRegs_.elemCount())
 	{
 	  vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
+
+      vecRegs_.maskedAddr_.push_back(skip);
+      vecRegs_.ldStAddr_.push_back(addr);
 
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Phys addrs or faulting virtual address.
@@ -11023,7 +11037,7 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
 
   uint64_t stride = intRegs_.read(rs2);
   unsigned start = csRegs_.peekVstart();
-  unsigned elemCount = vecRegs_.elemMax();
+  unsigned elemCount = vecRegs_.elemMax(eew);
   uint64_t addr = intRegs_.read(rs1) + start*stride;
 
   vecRegs_.ldStSize_ = sizeof(ELEM_TYPE);
@@ -11034,13 +11048,14 @@ Hart<URV>::vectorLoadStrided(const DecodedInst* di, ElementWidth eew)
     {
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-      vecRegs_.ldStAddr_.push_back(addr);
-      vecRegs_.maskedAddr_.push_back(skip);
-      if (skip)
+      if (skip and ix >= vecRegs_.elemCount())
 	{
 	  vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
+
+      vecRegs_.ldStAddr_.push_back(addr);
+      vecRegs_.maskedAddr_.push_back(skip);
 
       auto cause = ExceptionCause::NONE;
       uint64_t pa1 = addr, pa2 = addr; // Physical addresses or faulting virtual addresses.
@@ -11317,19 +11332,19 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
-      uint64_t offset = 0;
-      vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
-
-      uint64_t vaddr = addr + offset;
       ELEM_TYPE elem = 0;
       bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-      vecRegs_.ldStAddr_.push_back(vaddr);
-      vecRegs_.maskedAddr_.push_back(skip);
-      if (skip)
+      if (skip and ix >= vecRegs_.elemCount())
 	{
 	  vecRegs_.write(vd, ix, destGroup, elem);
 	  continue;
 	}
+
+      uint64_t offset = 0;
+      vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset);
+      uint64_t vaddr = addr + offset;
+      vecRegs_.ldStAddr_.push_back(vaddr);
+      vecRegs_.maskedAddr_.push_back(skip);
 
       uint64_t pa1 = vaddr, pa2 = vaddr; // Physical addresses or faulting virtual addresses.
       uint64_t gpa1 = vaddr, gpa2 = vaddr;
@@ -11342,7 +11357,7 @@ Hart<URV>::vectorLoadIndexed(const DecodedInst* di, ElementWidth offsetEew)
       if (cause == ExceptionCause::NONE)
 	{
 	  memRead(pa1, pa2, elem);
-	  vecRegs_.write(vd, ix, groupX8, elem);
+	  vecRegs_.write(vd, ix, destGroup, elem);
 	}
       else
         {
@@ -11731,7 +11746,7 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 
   unsigned start = csRegs_.peekVstart();
   uint64_t addr = intRegs_.read(rs1) + start*stride;
-  unsigned elemCount = vecRegs_.elemMax();
+  unsigned elemCount = vecRegs_.elemMax(eew);
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
 
   // Used registers must not exceed 32.
@@ -11755,13 +11770,14 @@ Hart<URV>::vectorLoadSeg(const DecodedInst* di, ElementWidth eew,
 	  unsigned dvg = vd + field*eg;   // Destination vector gorup.
 	  ELEM_TYPE elem(0);
 	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-	  vecRegs_.ldStAddr_.push_back(faddr);
-	  vecRegs_.maskedAddr_.push_back(skip);
-	  if (skip)
+	  if (skip and ix >= vecRegs_.elemCount())
 	    {
 	      vecRegs_.write(dvg, ix, destGroup, elem);
 	      continue;
 	    }
+
+          vecRegs_.ldStAddr_.push_back(faddr);
+          vecRegs_.maskedAddr_.push_back(skip);
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
           uint64_t gpa1 = faddr, gpa2 = faddr;
@@ -12234,24 +12250,25 @@ Hart<URV>::vectorLoadSegIndexed(const DecodedInst* di, ElementWidth offsetEew)
 
   for (unsigned ix = start; ix < elemCount; ++ix)
     {
-      uint64_t offset = 0;
-      if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
-	assert(0);
-
-      uint64_t faddr = addr + offset;
-
-      for (unsigned field = 0; field < fieldCount; ++field, faddr += elemSize)
+      for (unsigned field = 0; field < fieldCount; ++field)
 	{
 	  unsigned dvg = vd + field*eg;  // Destination vector grop.
 	  ELEM_TYPE elem = 0;
 	  bool skip = not vecRegs_.isDestActive(vd, ix, destGroup, masked, elem);
-	  vecRegs_.ldStAddr_.push_back(faddr);
-	  vecRegs_.maskedAddr_.push_back(skip);
-	  if (skip)
+	  if (skip and ix >= vecRegs_.elemCount())
 	    {
 	      vecRegs_.write(dvg, ix, destGroup, elem);
 	      continue;
 	    }
+
+
+          uint64_t offset = 0;
+          if (not vecRegs_.readStride(vi, ix, offsetEew, offsetGroupX8, offset))
+            assert(0);
+
+          uint64_t faddr = addr + offset + field*elemSize;
+	  vecRegs_.ldStAddr_.push_back(faddr);
+	  vecRegs_.maskedAddr_.push_back(skip);
 
 	  uint64_t pa1 = faddr, pa2 = faddr; // Physical addresses or faulting virtual addresses.
           uint64_t gpa1 = faddr, gpa2 = faddr;
@@ -13369,11 +13386,11 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13383,7 +13400,7 @@ Hart<URV>::execVfwadd_vv(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -13436,11 +13453,11 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13450,7 +13467,7 @@ Hart<URV>::execVfwadd_vf(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -13502,11 +13519,11 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13516,7 +13533,7 @@ Hart<URV>::execVfwsub_vv(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -13569,11 +13586,11 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13583,7 +13600,7 @@ Hart<URV>::execVfwsub_vf(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -13634,11 +13651,11 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13648,7 +13665,7 @@ Hart<URV>::execVfwadd_wv(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -13700,11 +13717,11 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13714,7 +13731,7 @@ Hart<URV>::execVfwadd_wf(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -13765,11 +13782,11 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13779,7 +13796,7 @@ Hart<URV>::execVfwsub_wv(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -13829,11 +13846,11 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
     return;
 
   unsigned group = vecRegs_.groupMultiplierX8();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
@@ -13843,7 +13860,7 @@ Hart<URV>::execVfwsub_wf(const DecodedInst* di)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -14131,15 +14148,16 @@ Hart<URV>::execVfwmul_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   // Double wide legal. Destination register multiple of emul.
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -14195,15 +14213,16 @@ Hart<URV>::execVfwmul_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
   // Double wide legal. Destination register multiple of emul.
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -15135,14 +15154,15 @@ Hart<URV>::execVfwmacc_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -15200,14 +15220,15 @@ Hart<URV>::execVfwmacc_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -15266,14 +15287,15 @@ Hart<URV>::execVfwnmacc_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -15330,14 +15352,15 @@ Hart<URV>::execVfwnmacc_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -15396,14 +15419,15 @@ Hart<URV>::execVfwmsac_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -15460,14 +15484,15 @@ Hart<URV>::execVfwmsac_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -15526,14 +15551,15 @@ Hart<URV>::execVfwnmsac_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -15591,14 +15617,15 @@ Hart<URV>::execVfwnmsac_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
@@ -16716,14 +16743,15 @@ Hart<URV>::execVfwcvt_xu_f_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -16780,14 +16808,15 @@ Hart<URV>::execVfwcvt_x_f_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -16817,14 +16846,15 @@ Hart<URV>::execVfwcvt_rtz_xu_f_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -16853,14 +16883,15 @@ Hart<URV>::execVfwcvt_rtz_x_f_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -16920,14 +16951,15 @@ Hart<URV>::execVfwcvt_f_xu_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -16997,14 +17029,15 @@ Hart<URV>::execVfwcvt_f_x_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -17075,14 +17108,15 @@ Hart<URV>::execVfwcvt_f_f_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -18701,14 +18735,15 @@ Hart<URV>::execVfwcvtbf16_f_f_v(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -18736,14 +18771,15 @@ Hart<URV>::execVfwmaccbf16_vv(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs2, group))
     return;
@@ -18768,14 +18804,15 @@ Hart<URV>::execVfwmaccbf16_vf(const DecodedInst* di)
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  fs1 = di->op1(),  vs2 = di->op2();
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
-  ElementWidth sew = vecRegs_.elemWidth();
+  ElementWidth dsew, sew = vecRegs_.elemWidth();
 
-  if (not vecRegs_.isDoubleWideLegal(sew, group))
+  if (not vecRegs_.isDoubleWideLegal(sew, dsew, group))
     {
       postVecFail(di);
       return;
     }
+
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
