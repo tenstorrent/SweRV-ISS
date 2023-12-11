@@ -813,11 +813,9 @@ Hart<URV>::updateCachedVsstatus()
 {
   vsstatus_.value_ = peekCsr(CsrNumber::VSSTATUS);
 
-  if (virtMode_)
-    {
-      virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
-      virtMem_.setVsSum(vsstatus_.bits_.SUM);
-    }
+  virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
+  virtMem_.setVsSum(vsstatus_.bits_.SUM);
+
   updateBigEndian();
 }
 
