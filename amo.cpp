@@ -296,15 +296,19 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   bool misal = virtAddr & alignMask;
   misalignedLdSt_ = misal;
 
+  using EC = ExceptionCause;
+  if (misal and misalHasPriority_)
+    {
+      auto cause = misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
+      initiateStoreException(cause, virtAddr, virtAddr);
+      return false;
+    }
+
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
   uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
   auto cause = determineStoreException(addr1, addr2, gaddr1, gaddr2, sizeof(storeVal), false /*hyper*/);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
-
-  using EC = ExceptionCause;
-  if (misal and cause != EC::STORE_ACC_FAULT)
-    cause =  misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
 
   if (cause == EC::NONE)
     {
