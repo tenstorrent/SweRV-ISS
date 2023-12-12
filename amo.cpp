@@ -325,6 +325,9 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   if (triggerTripped_)
     return false;
 
+  if (cause == EC::NONE and misal)
+    cause = misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
+
   if (cause != EC::NONE)
     {
       initiateStoreException(cause, virtAddr, gaddr1);
