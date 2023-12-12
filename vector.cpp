@@ -395,6 +395,25 @@ checkDestSourceOverlap(unsigned dest, unsigned destWidth, unsigned destGroupX8,
 }
 
 
+/// Return true if source/source overlap is allowed. No overlap is allowed
+/// if element widths are different. Source vetor numbers are s1 and s2.
+static
+bool
+checkSourceOverlap(unsigned s1, unsigned eew1, unsigned group1X8,
+		   unsigned s2, unsigned eew2, unsigned group2X8)
+{
+  if (eew1 == eew2)
+    return true;
+
+  unsigned g1 = group1X8 >= 8 ? group1X8/8 : 1;
+  unsigned g2 = group2X8 >= 8 ? group2X8/8 : 1;
+
+  if (s1 >= s2 + g2 or s2 >= s1 + g1)
+    return true;  // No overlap.
+  return false;   // Overlap and different EEWs.
+}
+
+
 /// Return true if destination and source groups do overlap.
 static constexpr
 bool
@@ -497,24 +516,24 @@ bool
 Hart<URV>::checkVecOpsVsEmulW0(const DecodedInst* di, unsigned op0,
 			       unsigned op1, unsigned op2, unsigned groupX8)
 {
-  unsigned wideGroupX8 = 2*groupX8;
+  unsigned wgroupX8 = 2*groupX8;  // Wide group x 8.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
-  unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
+  unsigned eg2 = wgroupX8 >= 8 ? wgroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
 
   unsigned sew = vecRegs_.elemWidthInBits();
-  unsigned sewx2 = sew * 2;
+  unsigned wsew = sew * 2;  // Wide sew
 
   // Destination EEW > source EEW, no overlap except in highest destination
   // register and only if source EEW >= 1.
-  bool overlapOk = checkDestSourceOverlap(op0, sewx2, wideGroupX8, op1, sew, groupX8);
+  bool ok = checkDestSourceOverlap(op0, wsew, wgroupX8, op1, sew, groupX8);
   if (op1 != op2)
-    overlapOk = overlapOk and checkDestSourceOverlap(op0, sewx2, wideGroupX8, op2, sew, groupX8);
+    ok = ok and checkDestSourceOverlap(op0, wsew, wgroupX8, op2, sew, groupX8);
 
   unsigned op = op1 | op2;
 
-  if (overlapOk and (op0 & mask2) == 0 and (op & mask) == 0)
+  if (ok and (op0 & mask2) == 0 and (op & mask) == 0)
     {
       vecRegs_.setOpEmul(eg2, eg, eg);  // Track operand group for logging
       return true;
@@ -538,13 +557,14 @@ Hart<URV>::checkVecOpsVsEmulW0W1(const DecodedInst* di, unsigned op0,
   unsigned mask2 = eg2 - 1;
 
   unsigned sew = vecRegs_.elemWidthInBits();
-  unsigned sewx2 = 2*sew;
+  unsigned wsew = 2*sew;  // Wide sew
 
-  bool overlapOk = checkDestSourceOverlap(op0, sewx2, wideGroupX8, op2, sew, groupX8);
+  bool ok = checkDestSourceOverlap(op0, wsew, wideGroupX8, op2, sew, groupX8);
+  ok = ok and checkSourceOverlap(op1, wsew, wideGroupX8, op2, sew, groupX8);
 
   unsigned opw = op0 | op1;
 
-  if (overlapOk and (opw & mask2) == 0 and (op2 & mask) == 0)
+  if (ok and (opw & mask2) == 0 and (op2 & mask) == 0)
     {
       vecRegs_.setOpEmul(eg2, eg2, eg);  // Track operand group for logging
       return true;
@@ -584,20 +604,21 @@ bool
 Hart<URV>::checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0,
 			       unsigned op1, unsigned op2, unsigned groupX8)
 {
-  unsigned wideGroupX8 = 2*groupX8;
+  unsigned wgroupX8 = 2*groupX8;  // Wide group x 8.
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;
-  unsigned eg2 = wideGroupX8 >= 8 ? wideGroupX8 / 8 : 1;
+  unsigned eg2 = wgroupX8 >= 8 ? wgroupX8 / 8 : 1;
   unsigned mask2 = eg2 - 1;
   
   unsigned sew = vecRegs_.elemWidthInBits();
-  unsigned sewx2 = 2*sew;
+  unsigned wsew = 2*sew;  // Wide sew.
 
-  bool overlapOk = checkDestSourceOverlap(op0, sew, groupX8, op1, sewx2, wideGroupX8);
+  bool ok = checkDestSourceOverlap(op0, sew, groupX8, op1, wsew, wgroupX8);
+  ok = ok and checkSourceOverlap(op1, wsew, wgroupX8, op2, sew, groupX8);
 
   unsigned op = op0 | op2;
 
-  if (overlapOk and (op & mask) == 0 and (op1 & mask2) == 0)
+  if (ok and (op & mask) == 0 and (op1 & mask2) == 0)
     {
       vecRegs_.setOpEmul(eg, eg2, eg);  // Track operand group for logging
       return true;
