@@ -5737,7 +5737,7 @@ Hart<URV>::execVwmulu_vx(const DecodedInst* di)
       return;
     }
 
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs1, vs1, group))
     return;
@@ -6245,7 +6245,7 @@ Hart<URV>::execVwmacc_vx(const DecodedInst* di)
       return;
     }
 
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.elemMax(dsew);
 
   if (not checkVecOpsVsEmulW0(di, vd, vs2, vs2, group))
     return;
