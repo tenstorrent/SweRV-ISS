@@ -313,17 +313,6 @@ Hart<URV>::processExtensions(bool verbose)
   flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorExtension(flag);
 
-  URV epcMask = extensionIsEnabled(RvExtension::C)? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
-  auto epc = csRegs_.findCsr(CsrNumber::MEPC);
-  if (epc)
-    epc->setReadMask(epcMask);
-  epc = csRegs_.findCsr(CsrNumber::SEPC);
-  if (epc)
-    epc->setReadMask(epcMask);
-  epc = csRegs_.findCsr(CsrNumber::VSEPC);
-  if (epc)
-    epc->setReadMask(epcMask);
-
   if (verbose and hartIx_ == 0)
     for (auto ec : { 'j', 'k', 'l', 'n', 'o', 'p',
 		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )

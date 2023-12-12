@@ -1494,6 +1494,7 @@ namespace WdRiscv
       regs_.at(size_t(CsrNumber::MEPC)).setReadMask(mask);
       regs_.at(size_t(CsrNumber::SEPC)).setReadMask(mask);
       regs_.at(size_t(CsrNumber::MNEPC)).setReadMask(mask);
+      regs_.at(size_t(CsrNumber::VSEPC)).setReadMask(mask);
     }
 
     /// Enable/disable counter-overflow extension (sscofpmf)
