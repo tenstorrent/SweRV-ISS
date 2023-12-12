@@ -320,6 +320,9 @@ Hart<URV>::processExtensions(bool verbose)
   epc = csRegs_.findCsr(CsrNumber::SEPC);
   if (epc)
     epc->setReadMask(epcMask);
+  epc = csRegs_.findCsr(CsrNumber::VSEPC);
+  if (epc)
+    epc->setReadMask(epcMask);
 
   if (verbose and hartIx_ == 0)
     for (auto ec : { 'j', 'k', 'l', 'n', 'o', 'p',
