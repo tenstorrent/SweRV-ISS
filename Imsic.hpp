@@ -72,7 +72,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (id > 0 and id < pending_.size())
 	{
 	  pending_.at(id) = flag;
-	  if (topId_ == 0 or (id <= topId_ and enabled_.at(id)))
+	  if (enabled_.at(id) and ( topId_ == 0 or id <= topId_ ))
 	    {
 	      if (flag)
 		topId_ = id;
