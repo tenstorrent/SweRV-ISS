@@ -530,6 +530,7 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
     mask &= ~URV(2);
   regs_[unsigned(CN::MCOUNTEREN)].setReadMask(mask);
   regs_[unsigned(CN::SCOUNTEREN)].setReadMask(mask);
+  regs_[unsigned(CN::HCOUNTEREN)].setReadMask(mask);
 
   updateSstc();  // To activate/deactivate STIMECMP.
   enableSscofpmf(cofEnabled_);  // To activate/deactivate SCOUNTOVF.
@@ -1958,7 +1959,8 @@ CsRegs<URV>::defineMachineRegs()
   mask = ~URV(2);
   defineCsr("mtvec", Csrn::MTVEC, mand, imp, 0, mask, mask);
 
-  defineCsr("mcounteren", Csrn::MCOUNTEREN, !mand, imp, 0, wam, wam);
+  mask = pokeMask = 0xffffffff;  // Only least sig 32 bits writable
+  defineCsr("mcounteren", Csrn::MCOUNTEREN, !mand, imp, 0, mask, pokeMask);
 
   mask = 0xfffffffd;  // Least sig 32 bis writable except for bit 1.
   defineCsr("mcountinhibit", Csrn::MCOUNTINHIBIT, !mand, imp, 0, mask, mask);
@@ -2187,6 +2189,8 @@ CsRegs<URV>::defineSupervisorRegs()
     sstatus->tie(mstatus->valuePtr_);
 
   defineCsr("stvec",      Csrn::STVEC,      !mand, !imp, 0, wam, wam);
+
+  mask = pokeMask = 0xffffffff;  // Only least sig 32 bits writable
   defineCsr("scounteren", Csrn::SCOUNTEREN, !mand, !imp, 0, wam, wam);
 
   // Supervisor Trap Handling 
@@ -2357,7 +2361,7 @@ CsRegs<URV>::defineHypervisorRegs()
   csr->setHypervisor(true);
 
   mask = pokeMask = 0xffffffff;  // Only least sig 32 bits writable
-  csr = defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, wam, wam);
+  csr = defineCsr("hcounteren",  Csrn::HCOUNTEREN,  !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
   pokeMask = mask = ~URV(1); // All bits writeable except bit 0
   csr = defineCsr("hgeie",       Csrn::HGEIE,       !mand, !imp, 0, mask, pokeMask);
