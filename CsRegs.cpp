@@ -707,6 +707,15 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setReadMask(mask);
     }
 
+  // Bit VSSIE is writeable if hypervisor is enabled, otherwise it is not
+  csr = findCsr(CN::MIP);
+  if (csr)
+    {
+      auto mask = csr->getWriteMask();
+      mask = flag? mask | URV(4) : mask & ~URV(4);
+      csr->setWriteMask(mask);
+    }
+
   updateSstc();  // To activate/deactivate VSTIMECMP.
   enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
 }
@@ -2456,18 +2465,20 @@ CsRegs<URV>::defineHypervisorRegs()
   csr = defineCsr("mtval2",      Csrn::MTVAL2,      !mand, !imp, 0, wam, wam);
   csr = defineCsr("mtinst",      Csrn::MTINST,      !mand, !imp, 0, wam, wam);
 
-  // In MIE/MIP bits corresponding to VSEIP/VSTIP/VSSIP are writeable pokeable.
+  // In MIP bits corresponding to SGEIP/VSEIP/VSTIP/VSSIP are pokeable.
   csr = findCsr(Csrn::MIP);
   if (csr)
     {
-      csr->setWriteMask(csr->getWriteMask() | 0x444);
-      csr->setPokeMask(csr->getPokeMask() | 0x444);
+      csr->setPokeMask(csr->getPokeMask() | 0x1444);
+      csr->setWriteMask(csr->getWriteMask() | 0x4);  // Bit VSSIP is writeable.
     }
+
+  // In MIE bits corresponding to SGEIP/VSEIP/VSTIP/VSSIP are pokeable/writeable.
   csr = findCsr(Csrn::MIE);
   if (csr)
     {
-      csr->setWriteMask(csr->getWriteMask() | 0x444);
-      csr->setPokeMask(csr->getPokeMask() | 0x444);
+      csr->setWriteMask(csr->getWriteMask() | 0x1444);
+      csr->setPokeMask(csr->getPokeMask() | 0x1444);
     }
 
   addHypervisorFields();
