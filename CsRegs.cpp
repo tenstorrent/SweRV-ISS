@@ -707,7 +707,9 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setReadMask(mask);
     }
 
-  // Bit VSSIE is writeable if hypervisor is enabled, otherwise it is not
+  // Bit VSSIP is writeable if hypervisor is enabled, otherwise it is not
+#if 0
+  // Temporariy disabled.
   csr = findCsr(CN::MIP);
   if (csr)
     {
@@ -715,6 +717,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       mask = flag? mask | URV(4) : mask & ~URV(4);
       csr->setWriteMask(mask);
     }
+#endif
 
   updateSstc();  // To activate/deactivate VSTIMECMP.
   enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
