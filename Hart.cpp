@@ -9908,13 +9908,10 @@ Hart<URV>::execWfi(const DecodedInst* di)
   // TW is 0.
   if (pm == PM::User and isRvs())
     {
+      if (virtMode_)
+	virtualInst(di);   // VU mode and TW=0. Section 9.6 of privilege spec.
       if (wfiTimeout_ == 0)
-	{
-	  if (virtMode_)
-	    virtualInst(di);   // VU mode and TW=0.
-	  else
-	    illegalInst(di);
-	}
+	illegalInst(di);
       return;
     }
 
