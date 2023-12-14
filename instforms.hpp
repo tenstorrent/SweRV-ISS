@@ -842,7 +842,7 @@ namespace WdRiscv
     { return bits.uimm >> 1; }
 
     unsigned immed() const
-    { return bits.uimm >> 1 | bits.uimm << 1; }
+    { return bits.uimm >> 1 | (bits.uimm & 1) << 1; }
 
     uint32_t code;
 
