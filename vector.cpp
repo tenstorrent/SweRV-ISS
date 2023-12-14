@@ -166,15 +166,28 @@ Hart<URV>::checkVecIntInst(const DecodedInst* di)
 template <typename URV>
 bool
 Hart<URV>::checkVecIntInst(const DecodedInst* di, GroupMultiplier /*gm*/,
-			     ElementWidth /*eew*/)
+			   ElementWidth /*eew*/)
 {
   if (not checkSewLmulVstart(di))
     return false;
 
-  if (di->isMasked() and di->op0() == 0)  // Dest register cannot overlap mask register v0
+  // Dest register cannot overlap mask register v0.
+  if (di->isMasked() and di->op0() == 0)
     {
       postVecFail(di);
       return false;
+    }
+
+  // None of the vector source registers can overlap mask regiser v0.
+  // Section 5.2 of vector spec version 1.1.
+  if (di->isMasked())
+    {
+      for (unsigned i = 1; i < di->operandCount(); ++i)
+	if (di->ithOperand(i) == 0 and di->ithOperandType(i) == OperandType::VecReg)
+	  {
+	    postVecFail(di);
+	    return false;
+	  }
     }
 
 #if 0
