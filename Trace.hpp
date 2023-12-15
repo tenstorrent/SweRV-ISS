@@ -327,10 +327,19 @@ namespace WdRiscv
 
       std::unordered_set<uint64_t> pages;
       const auto& addrs = hart_->vecRegs().ldStAddrs();
-      for (auto& addr : addrs)
+      const auto& masked = hart_->vecRegs().maskedAddrs();
+      assert(addrs.size() == masked.size());
+
+      for (unsigned i = 0; i < addrs.size(); ++i)
         {
-          unsigned page = hart_->virtMem().pageNumber(addr);
-          pages.emplace(page);
+          const auto& addr = addrs.at(i);
+          const auto& mask = masked.at(i);
+
+          if (not mask)
+            {
+              unsigned page = hart_->virtMem().pageNumber(addr);
+              pages.emplace(page);
+            }
         }
       return pages.size();
     }
