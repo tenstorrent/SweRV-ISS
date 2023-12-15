@@ -1395,7 +1395,25 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
   csr->write(value);
   recordWrite(num);
 
-  if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
+  if (num == CN::MENVCFG)
+    {
+      // MENVCFG.STCE off make HENVCFG.STCE read-only zero.
+      bool stce = menvcfgStce();
+      if (rv32_)
+	{
+	  uint32_t mask = uint32_t(regs_.at(size_t(CN::HENVCFGH)).getReadMask());
+	  HenvcfghFields<uint32_t> hf{mask};
+	  hf.bits_.STCE = stce;
+	  regs_.at(size_t(CN::HENVCFGH)).setReadMask(hf.value_);
+	}
+      else
+	{
+	  HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
+	  hf.bits_.STCE = stce;
+	  regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
+	}
+    }
+  else if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
     {
       updateCounterControl(num);
