@@ -286,13 +286,13 @@ namespace WdRiscv
     }
 
     /// TODO: add support for vector ld/st
-    bool lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
-    { return hart_->lastLdStAddress(virtAddr, physAddr); }
+    unsigned lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
+    { return hart_->lastLdStAddress(virtAddr, physAddr); /* this returns the size of the last ld/st*/ }
 
-    bool lastStVal(uint64_t& value) const
+    unsigned lastStVal(uint64_t& value) const
     {
       uint64_t addr;
-      return hart_->lastStore(addr, value);
+      return hart_->lastStore(addr, value); /* this returns the size of the last ld/st */
     }
 
     bool misalignedLdSt(bool& misal) const
