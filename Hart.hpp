@@ -699,7 +699,7 @@ namespace WdRiscv
 
     /// Set/clear Supervisor external interrupt pin.
     void setSeiPin(bool flag)
-    { seiPin_ = flag; }
+    { seiPin_ = flag; csRegs_.setSeiPin(flag); }
 
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
@@ -1783,12 +1783,7 @@ namespace WdRiscv
         });
 
       imsic_->attachSInterrupt([this] (bool flag) {
-          URV mipVal = csRegs_.peekMip();
-          URV prev = mipVal;
-
 	  setSeiPin(flag);
-          if (mipVal != prev)
-            csRegs_.poke(CsrNumber::MIP, mipVal);
         });
 
       imsic_->attachGInterrupt([this] (bool flag, unsigned guest) {

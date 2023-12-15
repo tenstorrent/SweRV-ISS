@@ -659,12 +659,15 @@ namespace WdRiscv
     void setIsShared(bool flag)
     { shared_ = flag; }
 
+    /// Mark register as implemented.
     void setImplemented(bool flag)
     { implemented_ = flag; }
 
+    /// Set initial value.
     void setInitialValue(URV v)
     { initialValue_ = v; }
 
+    /// Mark register as defined.
     void setDefined(bool flag)
     { defined_ = flag; }
 
@@ -1156,6 +1159,10 @@ namespace WdRiscv
     /// Set the store error address capture register. Return true on
     /// success and false if register is not implemented.
     bool setStoreErrorAddrCapture(URV value);
+
+    /// The the supervisor interruppt externa pin.
+    void setSeiPin(bool flag)
+    { seiPin_ = flag; }
 
     /// Return true if given number corresponds to an implemented CSR.
     bool isImplemented(CsrNumber num) const
@@ -1732,5 +1739,7 @@ namespace WdRiscv
     bool recordWrite_ = true;
     bool debugMode_ = false;
     bool virtMode_ = false;       // True if hart virtual (V) mode is on.
+
+    bool seiPin_ = false;
   };
 }

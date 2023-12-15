@@ -1194,7 +1194,7 @@ CsRegs<URV>::writeSireg(CsrNumber num, URV value)
 
       if (imsic_->writeSireg(virtMode_, guest, sel, value))
 	{
-	  imsic_->readMireg(sel, value);
+	  imsic_->readSireg(virtMode_, guest, sel, value);
 	  csr->write(value);
 	  recordWrite(num);
 	  return true;
@@ -3020,11 +3020,14 @@ template <typename URV>
 bool
 CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
 {
+  using IC = InterruptCause;
+
   auto mip = getImplementedCsr(CsrNumber::MIP)->read();
+  if (seiPin_)
+    mip |= URV(1) << URV(IC::S_EXTERNAL);
+
   auto mie = getImplementedCsr(CsrNumber::MIE)->read();
   auto mideleg = getImplementedCsr(CsrNumber::MIDELEG)->read();
-
-  using IC = InterruptCause;
 
   uint8_t iidShift = 16;
   auto highest_prio = [](uint64_t bits) -> unsigned {
