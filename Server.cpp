@@ -236,7 +236,9 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
         URV val = static_cast<URV>(req.value);
         if (req.address == WhisperSpecialResource::DeferredInterrupts)
           hart.setDeferredInterrupts(val);
-        else
+        else if (req.address == WhisperSpecialResource::SeiPin)
+	  hart.setSeiPin(val);
+	else
           ok = false;
         if (ok)
           return true;
@@ -321,22 +323,30 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       return true;
     case 's':
       {
-	bool ok = true;
-        if (req.address == WhisperSpecialResource::PrivMode)
-          reply.value = unsigned(hart.privilegeMode());
-        else if (req.address == WhisperSpecialResource::PrevPrivMode)
-          reply.value = unsigned(hart.lastPrivMode());
-        else if (req.address == WhisperSpecialResource::FpFlags)
-          reply.value = hart.lastFpFlags();
-        else if (req.address == WhisperSpecialResource::Trap)
-          reply.value = hart.lastInstructionTrapped()? 1 : 0;
-        else if (req.address == WhisperSpecialResource::DeferredInterrupts)
-          reply.value = hart.deferredInterrupts();
-        else
-          ok = false;
-        if (ok)
-          return true;
-        break;
+	switch(req.address)
+	  {
+	  case WhisperSpecialResource::PrivMode:
+	    reply.value = unsigned(hart.privilegeMode());
+	    return true;
+	  case WhisperSpecialResource::PrevPrivMode:
+	    reply.value = unsigned(hart.lastPrivMode());
+	    return true;
+	  case WhisperSpecialResource::FpFlags:
+	    reply.value = hart.lastFpFlags();
+	    return true;
+	  case WhisperSpecialResource::Trap:
+	    reply.value = hart.lastInstructionTrapped()? 1 : 0;
+	    return true;
+	  case WhisperSpecialResource::DeferredInterrupts:
+	    reply.value = hart.deferredInterrupts();
+	    return true;
+	  case WhisperSpecialResource::SeiPin:
+	    reply.value = hart.getSeiPin();
+	    return true;
+	  default:
+	    break;
+	  }
+	break;
       }
     case 'i':
       {
@@ -831,6 +841,7 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::FpFlags:             return "iff";
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
+    case WhisperSpecialResource::SeiPin:              return "seipin";
     }
   return "?";
 }
@@ -1245,16 +1256,6 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                     uintmax_t(msg.address));
         }
         break;
-
-      case SeiPin:
-        {
-          bool val = msg.value;
-          hart.setSeiPin(val);
-          if (commandLog)
-            fprintf(commandLog, "hart=%" PRIu32 " sei_pin %d\n", hartId, unsigned(val));
-        }
-        break;
-
 
       default:
         std::cerr << "Unknown command\n";

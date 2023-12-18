@@ -722,6 +722,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	out << (hart.lastInstructionTrapped() ? "1" : "0") << std::endl;
       else if (addrStr == "defi")
 	out << (boost::format("0x%x") % hart.deferredInterrupts()) << std::endl;
+      else if (addrStr == "seipin")
+	out << (boost::format("%d") % hart.getSeiPin()) << std::endl;
       else
 	ok = false;
 
@@ -915,6 +917,12 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	  if (not parseCmdLineNumber("value1", tokens.at(3), val))
 	    return false;
 	  hart.setDeferredInterrupts(val);
+	}
+      else if (addrStr == "seipin")
+	{
+	  if (not parseCmdLineNumber("value1", tokens.at(3), val))
+	    return false;
+	  hart.setSeiPin(val);
 	}
       return true;
     }
@@ -1761,15 +1769,6 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "check_interrupt")
     {
       if (not checkInterruptCommand(hart, line, tokens))
-	return false;
-      if (commandLog)
-	fprintf(commandLog, "%s\n", line.c_str());
-      return true;
-    }
-
-  if (command == "sei_pin")
-    {
-      if (not seiPinCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());

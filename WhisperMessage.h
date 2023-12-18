@@ -24,11 +24,12 @@ enum WhisperMessageType { Peek, Poke, Step, Until, Change, ChangeCount,
                           ExitDebug, LoadFinished, CancelDiv, CancelLr,
                           DumpMemory, McmRead, McmInsert, McmWrite,
 			  PageTableWalk, Translate, CheckInterrupt,
-                          SeiPin, McmBypass, McmIFetch, McmIEvict
+                          McmBypass, McmIFetch, McmIEvict
  };
 
 /// Resource identifiers for peek special.
-enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap, DeferredInterrupts };
+enum WhisperSpecialResource { PrivMode, PrevPrivMode, FpFlags, Trap, DeferredInterrupts,
+			      SeiPin };
 
 
 /// Structure used to communicate with the whisper program using

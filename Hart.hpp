@@ -701,6 +701,10 @@ namespace WdRiscv
     void setSeiPin(bool flag)
     { seiPin_ = flag; csRegs_.setSeiPin(flag); }
 
+    /// Return the current state of the Supervisor external interrupt pin.
+    bool getSeiPin() const
+    { return seiPin_; }
+
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
     /// address of the instruction is identical to the given address.
