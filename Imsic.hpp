@@ -110,9 +110,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     { return threshold_; }
 
     /// Return the id of the highest priority (smallest id) interrupt
-    /// id that is pending and enabled and exceeds the threshold id.
+    /// id that is pending and enabled and is below the threshold id.
     unsigned topId() const
-    { return threshold_ == 0 ? topId_ : std::min(topId_, threshold_ - 1); }
+    { return threshold_ == 0 ? topId_ : (topId_ >= threshold ? 0 : topId_);
 
     /// Update the id of the highest priority interrupt that is
     /// pending and enabled.
