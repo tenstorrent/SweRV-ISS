@@ -482,6 +482,9 @@ namespace WdRiscv
     const std::vector<uint64_t>& ldStAddrs() const
     { return ldStAddr_; }
 
+    const std::vector<bool>& maskedAddrs() const
+    { return maskedAddr_; }
+
   protected:
 
     /// Clear load/address and store data used for logging/tracing.
