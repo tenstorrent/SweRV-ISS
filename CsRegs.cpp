@@ -1218,16 +1218,13 @@ CsRegs<URV>::writeVsireg(CsrNumber num, URV value)
 	return false;
 
       unsigned guest = 0;
-      if (virtMode_)
-	{
-	  URV hs = regs_.at(size_t(CsrNumber::HSTATUS)).read();
-	  HstatusFields<URV> hsf(hs);
-	  guest = hsf.bits_.VGEIN;
-	}
+      URV hs = regs_.at(size_t(CsrNumber::HSTATUS)).read();
+      HstatusFields<URV> hsf(hs);
+      guest = hsf.bits_.VGEIN;
 
-      if (imsic_->writeSireg(virtMode_, guest, sel, value))
+      if (imsic_->writeSireg(true, guest, sel, value))
 	{
-	  imsic_->readSireg(virtMode_, guest, sel, value);
+	  imsic_->readSireg(true, guest, sel, value);
 	  csr->write(value);
 	  recordWrite(num);
 	  return true;
@@ -1287,7 +1284,7 @@ CsRegs<URV>::writeVstopei()
   unsigned id = imsic_->guestTopId(vgein);
   if (id)
     imsic_->setGuestPending(vgein, id, false);
-  return false;
+  return true;
 }
 
 
