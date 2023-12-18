@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstddef>
@@ -271,19 +272,28 @@ namespace WdRiscv
 
     /// Return true if double the given element-width/group-multiplier
     /// is legal (multipler is prescaled by 8). We check if the
-    /// combination sew*2 and groupX8*2 is legal.
-    bool isDoubleWideLegal(ElementWidth sew, uint32_t groupX8) const
+    /// combination sew*2 and groupX8*2 is legal. Sets dsew to double
+    /// the element width (eew) if legal.
+    bool isDoubleWideLegal(ElementWidth sew, ElementWidth& dsew, uint32_t groupX8) const
     {
       uint32_t wideGroup = groupX8 * 2;
       GroupMultiplier emul = GroupMultiplier::One;
       if (not groupNumberX8ToSymbol(wideGroup, emul))
         return false;
 
-      ElementWidth eew = sew;
-      if (not doubleSew(sew, eew))
+      if (not doubleSew(sew, dsew))
         return false;
 
-      return legalConfig(eew, emul);
+      return legalConfig(dsew, emul);
+    }
+
+    /// Return true if double the given element-width/group-multiplier
+    /// is legal (multipler is prescaled by 8). We check if the
+    /// combination sew*2 and groupX8*2 is legal.
+    bool isDoubleWideLegal(ElementWidth sew, uint32_t groupX8) const
+    {
+      ElementWidth eew = sew;
+      return isDoubleWideLegal(sew, eew, groupX8);
     }
 
     /// Set ix to the number of the register corresponding to the
@@ -382,6 +392,21 @@ namespace WdRiscv
       return gm8*bytesPerReg_/eewInBits;
     }
 
+    /// Return the maximum of the VLMAX and VLEN/EEW for tail elements
+    /// when LMUL < 1.
+    uint32_t elemMax(ElementWidth eew) const
+    {
+      uint32_t eewInBits = elemWidthInBits(eew);
+      return std::max(vlmax(), 8*bytesPerReg_/eewInBits);
+    }
+
+    /// Return the maximum of the VLMAX and VLEN/SEW for tail elements
+    /// when LMUL < 1.
+    uint32_t elemMax() const
+    {
+      return elemMax(sew_);
+    }
+
     /// If flag is true, configure vector engine for writing ones in
     /// inactive destination register elements when mask-agnostic is
     /// on. Otherwise, preserve inactive elements.
@@ -456,6 +481,9 @@ namespace WdRiscv
 
     const std::vector<uint64_t>& ldStAddrs() const
     { return ldStAddr_; }
+
+    const std::vector<bool>& maskedAddrs() const
+    { return maskedAddr_; }
 
   protected:
 
@@ -543,6 +571,7 @@ namespace WdRiscv
 	    setAllBits(val);
 	  return false;
 	}
+
       return true;
     }
 

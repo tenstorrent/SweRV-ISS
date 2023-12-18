@@ -152,7 +152,6 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::INSTRET)->tie(&retiredInsts_);
       csRegs_.findCsr(CsrNumber::CYCLE)->tie(&cycleCount_);
 
-      // TIME is a read-only shadow of MCYCLE.
       csRegs_.findCsr(CsrNumber::TIME)->tie(&instCounter_);
 
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
@@ -314,14 +313,6 @@ Hart<URV>::processExtensions(bool verbose)
   flag = flag and isa_.isEnabled(RvExtension::V);
   enableVectorExtension(flag);
 
-  URV epcMask = extensionIsEnabled(RvExtension::C)? ~URV(1) : ~URV(3);  // Least sig 1/2 bits read 0 with/without C extension
-  auto epc = csRegs_.findCsr(CsrNumber::MEPC);
-  if (epc)
-    epc->setReadMask(epcMask);
-  epc = csRegs_.findCsr(CsrNumber::SEPC);
-  if (epc)
-    epc->setReadMask(epcMask);
-
   if (verbose and hartIx_ == 0)
     for (auto ec : { 'j', 'k', 'l', 'n', 'o', 'p',
 		     'q', 'r', 't', 'w', 'x', 'y', 'z' } )
@@ -333,84 +324,59 @@ Hart<URV>::processExtensions(bool verbose)
 		    << "-- ignored\n";
       }
 
-  flag = isRvsstc();
-  csRegs_.enableSstc(flag);
-  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
-  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
-  enableRvzba(isa_.isEnabled(RvExtension::Zba));
-  enableRvzbb(isa_.isEnabled(RvExtension::Zbb));
-  enableRvzbc(isa_.isEnabled(RvExtension::Zbc));
-  enableRvzbs(isa_.isEnabled(RvExtension::Zbs));
+  enableExtension(RvExtension::Zba,      isa_.isEnabled(RvExtension::Zba));
+  enableExtension(RvExtension::Zbb,      isa_.isEnabled(RvExtension::Zbb));
+  enableExtension(RvExtension::Zbc,      isa_.isEnabled(RvExtension::Zbc));
+  enableExtension(RvExtension::Zbs,      isa_.isEnabled(RvExtension::Zbs));
+  enableExtension(RvExtension::Zfbfmin,  isa_.isEnabled(RvExtension::Zfbfmin));
+  enableExtension(RvExtension::Zfh,      isa_.isEnabled(RvExtension::Zfh));
+  enableExtension(RvExtension::Zfhmin,   isa_.isEnabled(RvExtension::Zfhmin));
+  enableExtension(RvExtension::Zknd,     isa_.isEnabled(RvExtension::Zknd));
+  enableExtension(RvExtension::Zkne,     isa_.isEnabled(RvExtension::Zkne));
+  enableExtension(RvExtension::Zknh,     isa_.isEnabled(RvExtension::Zknh));
+  enableExtension(RvExtension::Zbkb,     isa_.isEnabled(RvExtension::Zbkb));
+  enableExtension(RvExtension::Zbkx,     isa_.isEnabled(RvExtension::Zbkx));
+  enableExtension(RvExtension::Zksed,    isa_.isEnabled(RvExtension::Zksed));
+  enableExtension(RvExtension::Zksh,     isa_.isEnabled(RvExtension::Zksh));
+  enableExtension(RvExtension::Zicbom,   isa_.isEnabled(RvExtension::Zicbom));
+  enableExtension(RvExtension::Zicboz,   isa_.isEnabled(RvExtension::Zicboz));
+  enableExtension(RvExtension::Zicbop,   isa_.isEnabled(RvExtension::Zicbop));
+  enableExtension(RvExtension::Zawrs,    isa_.isEnabled(RvExtension::Zawrs));
+  enableExtension(RvExtension::Zmmul,    isa_.isEnabled(RvExtension::Zmmul));
+  enableExtension(RvExtension::Zvbb,     isa_.isEnabled(RvExtension::Zvbb));
+  enableExtension(RvExtension::Zvbc,     isa_.isEnabled(RvExtension::Zvbc));
+  enableExtension(RvExtension::Zvfbfmin, isa_.isEnabled(RvExtension::Zvfbfmin));
+  enableExtension(RvExtension::Zvfbfwma, isa_.isEnabled(RvExtension::Zvfbfwma));
+  enableExtension(RvExtension::Zvfh,     isa_.isEnabled(RvExtension::Zvfh));
+  enableExtension(RvExtension::Zvfhmin,  isa_.isEnabled(RvExtension::Zvfhmin));
+  enableExtension(RvExtension::Zvkg,     isa_.isEnabled(RvExtension::Zvkg));
+  enableExtension(RvExtension::Zvkned,   isa_.isEnabled(RvExtension::Zvkned));
+  enableExtension(RvExtension::Zvknha,   isa_.isEnabled(RvExtension::Zvknha));
+  enableExtension(RvExtension::Zvknhb,   isa_.isEnabled(RvExtension::Zvknhb));
+  enableExtension(RvExtension::Zvksed,   isa_.isEnabled(RvExtension::Zvksed));
+  enableExtension(RvExtension::Zvksh,    isa_.isEnabled(RvExtension::Zvksh));
+  enableExtension(RvExtension::Zicond,   isa_.isEnabled(RvExtension::Zicond));
+  enableExtension(RvExtension::Zcb,      isa_.isEnabled(RvExtension::Zcb));
+  enableExtension(RvExtension::Zfa,      isa_.isEnabled(RvExtension::Zfa));
+  enableExtension(RvExtension::Zacas,    isa_.isEnabled(RvExtension::Zacas));
+  enableExtension(RvExtension::Zimop,    isa_.isEnabled(RvExtension::Zimop));
+  enableExtension(RvExtension::Zcmop,    isa_.isEnabled(RvExtension::Zcmop));
+  enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
+  enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
 
-  if (isa_.isEnabled(RvExtension::Zfbfmin))
-    enableRvzfbfmin(true);
-  if (isa_.isEnabled(RvExtension::Zfh))
-    enableRvzfh(true);
-  if (isa_.isEnabled(RvExtension::Zfhmin))
-    enableRvzfhmin(true);
-  if (isa_.isEnabled(RvExtension::Zknd))
-    enableRvzknd(true);
-  if (isa_.isEnabled(RvExtension::Zkne))
-    enableRvzkne(true);
-  if (isa_.isEnabled(RvExtension::Zknh))
-    enableRvzknh(true);
-  if (isa_.isEnabled(RvExtension::Zbkb))
-    enableRvzbkb(true);
-  if (isa_.isEnabled(RvExtension::Zbkx))
-    enableRvzbkx(true);
-  if (isa_.isEnabled(RvExtension::Zksed))
-    enableRvzksed(true);
-  if (isa_.isEnabled(RvExtension::Zksh))
-    enableRvzksh(true);
-  if (isa_.isEnabled(RvExtension::Svinval))
-    enableRvsvinval(true);
-  if (isa_.isEnabled(RvExtension::Zicbom))
-    enableRvzicbom(true);
-  if (isa_.isEnabled(RvExtension::Zicboz))
-    enableRvzicboz(true);
-  if (isa_.isEnabled(RvExtension::Zawrs))
-    enableRvzawrs(true);
-  if (isa_.isEnabled(RvExtension::Zmmul))
-    enableRvzmmul(true);
-  if (isa_.isEnabled(RvExtension::Zvbb))
-    enableRvzvbb(true);
-  if (isa_.isEnabled(RvExtension::Zvbc))
-    enableRvzvbc(true);
-  if (isa_.isEnabled(RvExtension::Zvfbfmin))
-    enableRvzvfbfmin(true);
-  if (isa_.isEnabled(RvExtension::Zvfbfwma))
-    enableRvzvfbfwma(true);
-  if (isa_.isEnabled(RvExtension::Zvfh))
-    enableRvzvfh(true);
-  if (isa_.isEnabled(RvExtension::Zvfhmin))
-    enableRvzvfhmin(true);
-  if (isa_.isEnabled(RvExtension::Zvkg))
-    enableRvzvkg(true);
-  if (isa_.isEnabled(RvExtension::Zvkned))
-    enableRvzvkned(true);
-  if (isa_.isEnabled(RvExtension::Zvknha))
-    enableRvzvknha(true);
-  if (isa_.isEnabled(RvExtension::Zvknhb))
-    enableRvzvknhb(true);
-  if (isa_.isEnabled(RvExtension::Zvksed))
-    enableRvzvksed(true);
-  if (isa_.isEnabled(RvExtension::Zvksh))
-    enableRvzvksh(true);
-  if (isa_.isEnabled(RvExtension::Zicond))
-    enableRvzicond(true);
-  if (isa_.isEnabled(RvExtension::Zcb))
-    enableRvzcb(true);
-  if (isa_.isEnabled(RvExtension::Zfa))
-    enableRvzfa(true);
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
+  if (isa_.isEnabled(RvExtension::Svinval))
+    enableSvinval(true);
   if (isa_.isEnabled(RvExtension::Svpbmt))
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
     enableSmrnmi(true);
-  enableExtension(RvExtension::Smaia, isa_.isEnabled(RvExtension::Smaia));
-  enableExtension(RvExtension::Ssaia, isa_.isEnabled(RvExtension::Ssaia));
-  enableExtension(RvExtension::Zacas, isa_.isEnabled(RvExtension::Zacas));
+
+  csRegs_.enableSstc(isRvsstc());
+
+  stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
+  vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
 }
 
 
@@ -839,11 +805,9 @@ Hart<URV>::updateCachedVsstatus()
 {
   vsstatus_.value_ = peekCsr(CsrNumber::VSSTATUS);
 
-  if (virtMode_)
-    {
-      virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
-      virtMem_.setVsSum(vsstatus_.bits_.SUM);
-    }
+  virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
+  virtMem_.setVsSum(vsstatus_.bits_.SUM);
+
   updateBigEndian();
 }
 
@@ -1580,12 +1544,22 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   if (misal)
     {
       Pma pma = getPma(addr1);
+      if (not pma.isRead())
+	{
+	  addr1 = va1;
+	  return EC::LOAD_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
 	}
       pma = getPma(addr2);
+      if (not pma.isRead())
+	{
+	  addr1 = va2;
+	  return EC::LOAD_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va2;  // To report virtual address in MTVAL.
@@ -1964,13 +1938,15 @@ template <typename URV>
 template <typename STORE_TYPE>
 inline
 bool
-Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
+Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal, [[maybe_unused]] bool amoLock)
 {
 #ifdef FAST_SLOPPY
   return fastStore(virtAddr, storeVal);
 #else
 
-  std::lock_guard<std::mutex> lock(memory_.lrMutex_);
+  auto lock = (amoLock)? std::shared_lock<std::shared_mutex>(memory_.amoMutex_) :
+                         std::shared_lock<std::shared_mutex>();
+  std::lock_guard<std::mutex> lock2(memory_.lrMutex_);
 
   ldStAddr_ = virtAddr;   // For reporting ld/st addr in trace-mode.
   ldStPhysAddr1_ = ldStPhysAddr2_ = ldStAddr_;
@@ -2033,7 +2009,7 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal)
 
   memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
   if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
   invalidateDecodeCache(virtAddr, ldStSize_);
 
   ldStWrite_ = true;
@@ -2260,7 +2236,7 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return false;
     }
 
-  if ((physAddr & 3) == 0)   // Word aligned
+  if ((physAddr & 3) == 0 and not mcm_)   // Word aligned
     {
       if (not memory_.readInst(physAddr, inst))
         {
@@ -2288,15 +2264,6 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
       return true;
     }
 
-  uint16_t half = 0;
-  if (not memory_.readInst(physAddr, half))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
-      return false;
-    }
-
   if (pmpEnabled_)
     {
       Pmp pmp = pmpManager_.accessPmp(physAddr, PmpManager::AccessReason::Fetch);
@@ -2307,6 +2274,19 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
           initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
           return false;
         }
+    }
+
+  uint16_t half = 0;
+  bool done = false;
+  if (mcm_)
+    done = readInstFromFetchCache(physAddr, half);
+
+  if (not done and not memory_.readInst(physAddr, half))
+    {
+      if (triggerTripped_)
+        return false;
+      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr);
+      return false;
     }
 
   if (initStateFile_)
@@ -2331,15 +2311,6 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
 	  }
       }
 
-  uint16_t upperHalf;
-  if (not memory_.readInst(physAddr2, upperHalf))
-    {
-      if (triggerTripped_)
-        return false;
-      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
-      return false;
-    }
-
   if (pmpEnabled_)
     {
       Pmp pmp2 = pmpManager_.accessPmp(physAddr2, PmpManager::AccessReason::Fetch);
@@ -2350,6 +2321,19 @@ Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)
           initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
           return false;
         }
+    }
+
+  uint16_t upperHalf = 0;
+  done = false;
+  if (mcm_)
+    done = readInstFromFetchCache(physAddr2, upperHalf);
+
+  if (not done and not memory_.readInst(physAddr2, upperHalf))
+    {
+      if (triggerTripped_)
+        return false;
+      initiateException(ExceptionCause::INST_ACC_FAULT, virtAddr, virtAddr + 2);
+      return false;
     }
 
   if (initStateFile_)
@@ -2427,16 +2411,19 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
   hasInterrupt_ = true;
   interruptCount_++;
 
+  if (cause == InterruptCause::M_SOFTWARE)
+    setSwInterrupt(0);
+
   if (not enableCounters_)
     return;
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
   if (cause == InterruptCause::M_EXTERNAL)
     pregs.updateCounters(EventNumber::ExternalInterrupt, prevPerfControl_,
-                         lastPriv_);
+                         lastPriv_, lastVirt_);
   else if (cause == InterruptCause::M_TIMER)
     pregs.updateCounters(EventNumber::TimerInterrupt, prevPerfControl_,
-                         lastPriv_);
+                         lastPriv_, lastVirt_);
 }
 
 
@@ -2486,7 +2473,7 @@ Hart<URV>::initiateException(ExceptionCause cause, URV pc, URV info, URV info2)
   PerfRegs& pregs = csRegs_.mPerfRegs_;
   if (enableCounters_)
     pregs.updateCounters(EventNumber::Exception, prevPerfControl_,
-                         lastPriv_);
+                         lastPriv_, lastVirt_);
 }
 
 
@@ -3663,104 +3650,97 @@ Hart<URV>::updatePerformanceCounters(uint32_t inst, const InstEntry& info,
 
   PerfRegs& pregs = csRegs_.mPerfRegs_;
 
-  pregs.updateCounters(EventNumber::InstCommited, prevPerfControl_,
-                       lastPriv_);
+  pregs.updateCounters(EventNumber::InstCommited, prevPerfControl_, lastPriv_, lastVirt_);
 
   if (isCompressedInst(inst))
-    pregs.updateCounters(EventNumber::Inst16Commited, prevPerfControl_,
-                         lastPriv_);
+    pregs.updateCounters(EventNumber::Inst16Commited, prevPerfControl_, lastPriv_, lastVirt_);
   else
-    pregs.updateCounters(EventNumber::Inst32Commited, prevPerfControl_,
-                         lastPriv_);
+    pregs.updateCounters(EventNumber::Inst32Commited, prevPerfControl_, lastPriv_, lastVirt_);
 
   if (info.extension() == RvExtension::I)
     {
       if (id == InstId::ebreak or id == InstId::c_ebreak)
-	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Ebreak, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::ecall)
-	pregs.updateCounters(EventNumber::Ecall, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Ecall, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::fence)
-	pregs.updateCounters(EventNumber::Fence, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Fence, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::fence_i)
-	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Fencei, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::mret)
-	pregs.updateCounters(EventNumber::Mret, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Mret, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id != InstId::illegal)
-	pregs.updateCounters(EventNumber::Alu, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Alu, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isMultiply())
     {
-      pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_);
-      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::Mult, prevPerfControl_, lastPriv_, lastVirt_);
+      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isDivide())
     {
-      pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_);
-      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::Div, prevPerfControl_, lastPriv_, lastVirt_);
+      pregs.updateCounters(EventNumber::MultDiv, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isPerfLoad())
     {
-      pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::Load, prevPerfControl_, lastPriv_, lastVirt_);
       if (misalignedLdSt_)
-	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_, lastPriv_);
-      if (isDataAddressExternal(ldStAddr_))
-	pregs.updateCounters(EventNumber::BusLoad, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::MisalignLoad, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isPerfStore())
     {
-      pregs.updateCounters(EventNumber::Store, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::Store, prevPerfControl_, lastPriv_, lastVirt_);
       if (misalignedLdSt_)
-	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_, lastPriv_);
-      if (isDataAddressExternal(ldStAddr_))
-	pregs.updateCounters(EventNumber::BusStore, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::MisalignStore, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isBitManipulation())
     {
-      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::Bitmanip, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isAtomic())
     {
       if (id == InstId::lr_w or id == InstId::lr_d)
-	pregs.updateCounters(EventNumber::Lr, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Lr, prevPerfControl_, lastPriv_, lastVirt_);
       else if (id == InstId::sc_w or id == InstId::sc_d)
-	pregs.updateCounters(EventNumber::Sc, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Sc, prevPerfControl_, lastPriv_, lastVirt_);
       else
-	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::Atomic, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isCsr() and not hasException_)
     {
       if ((id == InstId::csrrw or id == InstId::csrrwi))
 	{
 	  if (op0 == 0)
-	    pregs.updateCounters(EventNumber::CsrWrite, prevPerfControl_, lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrWrite, prevPerfControl_, lastPriv_, lastVirt_);
 	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_, lastVirt_);
 	}
       else
 	{
 	  if (op1 == 0)
-	    pregs.updateCounters(EventNumber::CsrRead, prevPerfControl_, lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrRead, prevPerfControl_, lastPriv_, lastVirt_);
 	  else
-	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_);
+	    pregs.updateCounters(EventNumber::CsrReadWrite, prevPerfControl_, lastPriv_, lastVirt_);
 	}
-      pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::Csr, prevPerfControl_, lastPriv_, lastVirt_);
     }
   else if (info.isBranch())
     {
-      pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_);
+      pregs.updateCounters(EventNumber::Branch, prevPerfControl_, lastPriv_, lastVirt_);
       if (lastBranchTaken_)
-	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_);
+	pregs.updateCounters(EventNumber::BranchTaken, prevPerfControl_, lastPriv_, lastVirt_);
     }
 
   // Some insts (e.g. flw) can be both load/store and FP
   if (info.extension() == RvExtension::F)
-    pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_);
+    pregs.updateCounters(EventNumber::FpSingle, prevPerfControl_, lastPriv_, lastVirt_);
   else if (info.extension() == RvExtension::D)
-    pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_, lastPriv_);
+    pregs.updateCounters(EventNumber::FpDouble, prevPerfControl_, lastPriv_, lastVirt_);
   else if (info.extension() == RvExtension::Zfh)
-    pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_);
+    pregs.updateCounters(EventNumber::FpHalf, prevPerfControl_, lastPriv_, lastVirt_);
   else if (info.extension() == RvExtension::V)
-    pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_);
+    pregs.updateCounters(EventNumber::Vector, prevPerfControl_, lastPriv_, lastVirt_);
 }
 
 
@@ -4404,15 +4384,15 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	{
           // We want amo instructions to print in the same order as executed.
 	  // This avoid interleaving of amo execution and tracing.
-          static std::mutex execMutex;
-	  std::lock_guard<std::mutex> lock(execMutex);
+	  static std::mutex execMutex;
+	  auto lock = (ownTrace_)? std::unique_lock<std::mutex>() : std::unique_lock<std::mutex>(execMutex);
 
           uint32_t inst = 0;
 	  currPc_ = pc_;
 
 	  ++instCounter_;
 
-          if (cachedMie_ and processExternalInterrupt(traceFile, instStr))
+          if (processExternalInterrupt(traceFile, instStr))
 	    continue;  // Next instruction in trap handler.
 	  uint64_t physPc = 0;
           if (not fetchInstWithTrigger(pc_, physPc, inst, traceFile))
@@ -5072,7 +5052,6 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
-          setSwInterrupt(0);
         }
 
       // Deliver/clear supervisor timer from stimecmp CSR.
@@ -8752,6 +8731,18 @@ Hart<URV>::execute(const DecodedInst* di)
       execCbo_zero(di);
       return;
 
+    case InstId::prefetch_i:
+      execPrefetch_i(di);
+      return;
+
+    case InstId::prefetch_r:
+      execPrefetch_r(di);
+      return;
+
+    case InstId::prefetch_w:
+      execPrefetch_w(di);
+      return;
+
     case InstId::wrs_nto:
       execWrs_nto(di);
       return;
@@ -8991,6 +8982,18 @@ Hart<URV>::execute(const DecodedInst* di)
 
     case InstId::amocas_q:
       execAmocas_q(di);
+      return;
+
+    case InstId::mop_r:
+      execMop_r(di);
+      return;
+
+    case InstId::mop_rr:
+      execMop_rr(di);
+      return;
+
+    case InstId::c_mop:
+      execCmop(di);
       return;
     }
 
@@ -9890,25 +9893,34 @@ Hart<URV>::execWfi(const DecodedInst* di)
   using PM = PrivilegeMode;
   auto pm = privilegeMode();
 
-  if (pm == PM::User and isRvs())
+  if (pm == PM::Machine)
+    return;
+
+  if (mstatus_.bits_.TW)
     {
-      if (virtMode_ and not mstatus_.bits_.TW)
-	virtualInst(di);   // VU mode and TW=0.
-      else
+      // TW is 1 and Executing in privilege less than machine: illegal unless
+      // complete in bounded time.
+      if (wfiTimeout_ == 0)
 	illegalInst(di);
       return;
     }
 
-  if (mstatus_.bits_.TW and pm != PM::Machine)
+  // TW is 0.
+  if (pm == PM::User and isRvs())
     {
-      illegalInst(di);
+      if (virtMode_)
+	virtualInst(di);   // VU mode and TW=0. Section 9.6 of privilege spec.
+      if (wfiTimeout_ == 0)
+	illegalInst(di);
       return;
     }
 
+
   // VS mode, VTW=1 and mstatus.TW=0
-  if (virtMode_ and pm == PM::Supervisor and not mstatus_.bits_.TW and hstatus_.bits_.VTW)
+  if (virtMode_ and pm == PM::Supervisor and hstatus_.bits_.VTW)
     {
-      virtualInst(di);
+      if (wfiTimeout_ == 0)
+	virtualInst(di);
       return;
     }
 
@@ -10198,7 +10210,7 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   URV next = intRegs_.read(di->op1());
 
   // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
+  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
     prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, next, di->op0(), prev);
@@ -10232,7 +10244,7 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
   URV next = prev | intRegs_.read(di->op1());
 
   // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
+  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
     prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   if (di->op1() == 0)
@@ -10275,7 +10287,7 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   URV next = prev & (~ intRegs_.read(di->op1()));
 
   // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
+  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
     prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   if (di->op1() == 0)
@@ -10316,7 +10328,7 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
       }
 
   // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
+  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
     prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   doCsrWrite(di, csr, di->op1(), di->op0(), prev);
@@ -10352,7 +10364,7 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
   URV next = prev | imm;
 
   // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
+  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
     prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   if (imm == 0)
@@ -10397,7 +10409,7 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
   URV next = prev & (~ imm);
 
   // MIP read value is ored with supervisor external interrupt pin.
-  if (csr == CsrNumber::MIP)
+  if (csr == CsrNumber::MIP or csr == CsrNumber::SIP)
     prev |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
 
   if (imm == 0)
@@ -10508,16 +10520,26 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   if (misal)
     {
       Pma pma = getPma(addr1);
+      if (not pma.isWrite())
+	{
+	  addr1 = va1;
+	  return EC::STORE_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va1;  // To report virtual address in MTVAL.
 	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
 	}
       pma = getPma(addr2);
+      if (not pma.isWrite())
+	{
+	  addr1 = va2;
+	  return EC::STORE_ACC_FAULT;
+	}
       if (not pma.isMisalignedOk())
 	{
 	  addr1 = va2;  // To report virtual address in MTVAL.
-	  return pma.misalOnMisal()? EC::LOAD_ADDR_MISAL : EC::LOAD_ACC_FAULT;
+	  return pma.misalOnMisal()? EC::STORE_ADDR_MISAL : EC::STORE_ACC_FAULT;
 	}
     }
 
@@ -11322,6 +11344,44 @@ Hart<URV>::execC_zext_h(const DecodedInst* di)
   intRegs_.write(di->op0(), value);
 }
 
+template <typename URV>
+void
+Hart<URV>::execMop_r(const DecodedInst* di)
+{
+    if (not isRvzimop()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
+
+template <typename URV>
+void
+Hart<URV>::execMop_rr(const DecodedInst* di)
+{
+    if (not isRvzimop()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
+
+template <typename URV>
+void
+Hart<URV>::execCmop(const DecodedInst* di)
+{
+    if (not isRvzcmop() || not isRvc()) 
+      {
+        illegalInst(di);
+        return;
+      }
+    URV value = 0;
+    intRegs_.write(di->op0(), value);
+}
 
 template
 bool
@@ -11382,35 +11442,35 @@ WdRiscv::Hart<uint64_t>::load<uint64_t>(uint64_t, bool, uint64_t&);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint8_t>(uint32_t, bool, uint8_t);
+WdRiscv::Hart<uint32_t>::store<uint8_t>(uint32_t, bool, uint8_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, bool, uint16_t);
+WdRiscv::Hart<uint32_t>::store<uint16_t>(uint32_t, bool, uint16_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, bool, uint32_t);
+WdRiscv::Hart<uint32_t>::store<uint32_t>(uint32_t, bool, uint32_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, bool, uint64_t);
+WdRiscv::Hart<uint32_t>::store<uint64_t>(uint32_t, bool, uint64_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint8_t>(uint64_t, bool, uint8_t);
+WdRiscv::Hart<uint64_t>::store<uint8_t>(uint64_t, bool, uint8_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, bool, uint16_t);
+WdRiscv::Hart<uint64_t>::store<uint16_t>(uint64_t, bool, uint16_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, bool, uint32_t);
+WdRiscv::Hart<uint64_t>::store<uint32_t>(uint64_t, bool, uint32_t, bool);
 
 template
 bool
-WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, bool, uint64_t);
+WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, bool, uint64_t, bool);
 
 
 template class WdRiscv::Hart<uint32_t>;

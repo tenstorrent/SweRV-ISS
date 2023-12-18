@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <ostream>
 #include <vector>
+#include <algorithm>
 
 namespace WdRiscv
 {
@@ -26,7 +27,7 @@ namespace WdRiscv
   {
     uint64_t virtPageNum_ = 0;
     uint64_t physPageNum_ = 0;
-    uint64_t time_ = 0;      // Access time (we use order to approximate time).
+    uint64_t counter_ = 0;   // 2-bit counter for replacement.
     uint32_t asid_ = 0;      // Address space identifier.
     uint32_t vmid_ = 0;      // Virtual machine identifier.
     bool valid_ = false;
@@ -54,10 +55,11 @@ namespace WdRiscv
     /// Return nullptr if no such entry.
     TlbEntry* findEntry(uint64_t pageNum, uint32_t asid)
     {
-      for (auto& entry : entries_)
-        if (entry.valid_ and entry.virtPageNum_ == pageNum)
-          if (entry.global_ or entry.asid_ == asid)
-              return &entry;
+      auto* entry = getEntry(pageNum);
+
+      if (entry and entry->valid_ and entry->virtPageNum_ == pageNum)
+        if (entry->global_ or entry->asid_ == asid)
+            return entry;
       return nullptr;
     }
 
@@ -66,10 +68,11 @@ namespace WdRiscv
     /// Return nullptr if no such entry.
     TlbEntry* findEntry(uint64_t pageNum, uint32_t asid, uint32_t vmid)
     {
-      for (auto& entry : entries_)
-        if (entry.valid_ and entry.virtPageNum_ == pageNum)
-          if (entry.global_ or (entry.asid_ == asid and entry.vmid_ == vmid))
-              return &entry;
+      auto* entry = getEntry(pageNum);
+
+      if (entry and entry->valid_ and entry->virtPageNum_ == pageNum)
+        if (entry->global_ or (entry->asid_ == asid and entry->vmid_ == vmid))
+            return entry;
       return nullptr;
     }
 
@@ -81,7 +84,10 @@ namespace WdRiscv
     {
       auto* entry = findEntry(pageNum, asid);
       if (entry)
-	entry->time_ = time_++;
+        {
+          ++entry->counter_;
+          entry->counter_ = std::clamp(entry->counter_, 0UL, 3UL);
+        }
       return entry;
     }
 
@@ -93,7 +99,10 @@ namespace WdRiscv
     {
       auto* entry = findEntry(pageNum, asid, vmid);
       if (entry)
-	entry->time_ = time_++;
+        {
+          ++entry->counter_;
+          entry->counter_ = std::clamp(entry->counter_, 0UL, 3UL);
+        }
       return entry;
     }
 
@@ -123,7 +132,10 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
 	if (entry.asid_ == asid and not entry.global_)
-	  entry.valid_ = false;
+          {
+            entry.valid_ = false;
+            entry.counter_ = 0;
+          }
     }
 
     /// Invalidate every entry matching given virtual mahine identifier.
@@ -131,7 +143,10 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
 	if (entry.vmid_ == vmid)
-	  entry.valid_ = false;
+          {
+            entry.valid_ = false;
+            entry.counter_ = 0;
+          }
     }
 
     /// Invalidate every entry matching given virtual page number.
@@ -139,7 +154,10 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
 	if (entry.virtPageNum_ == vpn)
-	  entry.valid_ = false;
+          {
+            entry.valid_ = false;
+            entry.counter_ = 0;
+          }
     }
 
     /// Invalidate every entry matching given virtual page number and
@@ -148,7 +166,10 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
         if (entry.virtPageNum_ == vpn and entry.asid_ == asid and not entry.global_)
-          entry.valid_ = false;
+          {
+            entry.valid_ = false;
+            entry.counter_ = 0;
+          }
     }
 
     /// Invalidate every entry matching given virtual page number and
@@ -157,19 +178,35 @@ namespace WdRiscv
     {
       for (auto& entry : entries_)
         if (entry.virtPageNum_ == vpn and entry.vmid_ == vmid and not entry.global_)
-          entry.valid_ = false;
+          {
+            entry.valid_ = false;
+            entry.counter_ = 0;
+          }
     }
 
     /// Invalidate all entries.
     void invalidate()
-    { for (auto& entry : entries_) entry.valid_ = false; }
+    {
+      for (auto& entry : entries_)
+        {
+          entry.valid_ = false;
+          entry.counter_ = 0;
+        }
+    }
 
   protected:
 
   private:
 
+    /// Return reference to TLB entry associated with given virtual page
+    /// number.
+    inline TlbEntry* getEntry(uint64_t pageNum)
+    {
+      unsigned ix = pageNum & (entries_.size() - 1);
+      return (entries_.size())? &entries_.at(ix) : nullptr;
+    }
+
     std::vector<TlbEntry> entries_;
-    uint64_t time_ = 0;  // Access time (we use access order as approximation).
   };
 }
 

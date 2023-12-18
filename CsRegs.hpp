@@ -413,14 +413,12 @@ namespace WdRiscv
       HSTATEEN2H  = 0x61e,
       HSTATEEN3H  = 0x61f,
 
-      // Ascalon physical memory attributes
-      PMACFG0  = 0x7e0,
+      // Tenstorrent Ascalon CSRs
+      PMACFG0  = 0x7e0,   // Physical memory protection
       PMACFG31 = 0x7ff,
       PMACFG32 = 0xbe0,
       PMACFG63 = 0xbff,
-
-      // Ascalon matp.
-      MATP = 0x7c7,
+      MATP     = 0x7c7,   // Machine address translation and protection
 
       MAX_CSR_ = 0xfff,
       MIN_CSR_ = 0      // csr with smallest number
@@ -661,12 +659,15 @@ namespace WdRiscv
     void setIsShared(bool flag)
     { shared_ = flag; }
 
+    /// Mark register as implemented.
     void setImplemented(bool flag)
     { implemented_ = flag; }
 
+    /// Set initial value.
     void setInitialValue(URV v)
     { initialValue_ = v; }
 
+    /// Mark register as defined.
     void setDefined(bool flag)
     { defined_ = flag; }
 
@@ -742,6 +743,9 @@ namespace WdRiscv
 
     void setFields(const std::vector<Field>& fields)
     { fields_ = fields; }
+
+    std::vector<Field> getFields() const
+    { return fields_; }
 
     bool field(std::string_view field, URV& val) const
     {
@@ -1156,6 +1160,10 @@ namespace WdRiscv
     /// success and false if register is not implemented.
     bool setStoreErrorAddrCapture(URV value);
 
+    /// The the supervisor interruppt externa pin.
+    void setSeiPin(bool flag)
+    { seiPin_ = flag; }
+
     /// Return true if given number corresponds to an implemented CSR.
     bool isImplemented(CsrNumber num) const
     {
@@ -1202,6 +1210,16 @@ namespace WdRiscv
         return false;
 
       csr->setFields(fields);
+      return true;
+    }
+
+    bool getCsrFields(CsrNumber number, std::vector<typename Csr<URV>::Field>& fields)
+    {
+      auto csr = findCsr(number);
+      if (not csr)
+        return false;
+
+      fields = csr->getFields();
       return true;
     }
 
@@ -1388,6 +1406,12 @@ namespace WdRiscv
     // Adjust the value of SCOUNTOVF by masking with MCOUNTEREN/HCOUNTEREN
     URV adjustScountovfValue(URV value) const;
 
+    /// Heler to read method.
+    bool readMireg(CsrNumber num, URV& value) const;
+
+    /// Heler to read method.
+    bool readSireg(CsrNumber num, URV& value) const;
+
     /// Helper to write method: Mask with MIP/MIE/MIDELEG.
     bool writeSipSie(CsrNumber num, URV value);
 
@@ -1477,6 +1501,7 @@ namespace WdRiscv
       regs_.at(size_t(CsrNumber::MEPC)).setReadMask(mask);
       regs_.at(size_t(CsrNumber::SEPC)).setReadMask(mask);
       regs_.at(size_t(CsrNumber::MNEPC)).setReadMask(mask);
+      regs_.at(size_t(CsrNumber::VSEPC)).setReadMask(mask);
     }
 
     /// Enable/disable counter-overflow extension (sscofpmf)
@@ -1532,6 +1557,9 @@ namespace WdRiscv
 
     /// helper to add fields of fp CSRs
     void addFpFields();
+
+    /// helper to add fields of hypervisor CSRs
+    void addHypervisorFields();
 
     /// Return true if given CSR is a hypervisor CSR.
     bool isHypervisor(CsrNumber csrn) const
@@ -1711,5 +1739,7 @@ namespace WdRiscv
     bool recordWrite_ = true;
     bool debugMode_ = false;
     bool virtMode_ = false;       // True if hart virtual (V) mode is on.
+
+    bool seiPin_ = false;
   };
 }

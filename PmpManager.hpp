@@ -157,8 +157,8 @@ namespace WdRiscv
     struct PmpTrace
     {
       uint32_t ix_;
-      uint64_t addr;
-      uint8_t val;
+      uint64_t addr_;
+      uint8_t val_;
       AccessReason reason_;
     };
 

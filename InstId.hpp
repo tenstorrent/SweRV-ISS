@@ -1039,6 +1039,11 @@ namespace WdRiscv
      // Cache block zero (zicboz)
      cbo_zero,
 
+     // Cache block prefetch (zicbop)
+     prefetch_i,
+     prefetch_r,
+     prefetch_w,
+
      // Zawrs
      wrs_nto,
      wrs_sto,
@@ -1111,6 +1116,13 @@ namespace WdRiscv
      amocas_d,
      amocas_q,
 
-     maxId = amocas_q
+     //Zimop
+     mop_r,
+     mop_rr,
+
+     //Zcmop
+     c_mop,
+
+     maxId = c_mop
     };
 }

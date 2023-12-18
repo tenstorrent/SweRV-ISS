@@ -1279,6 +1279,17 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         errors++;
     }
 
+  // Define exception-pc non-maskable-interrupt
+  tag = "nmi_exception_vec";
+  if (config_ -> contains(tag))
+    {
+      URV pc = 0;
+      if (getJsonUnsigned(tag, config_ -> at(tag), pc))
+        hart.defineNmiExceptionPc(pc);
+      else
+        errors++;
+    }
+
   // Use ABI register names (e.g. sp instead of x2).
   bool flag = false;
   tag = "abi_names";
@@ -1550,7 +1561,15 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       if (not getJsonUnsigned(tag, config_ -> at(tag), size))
         errors++;
       else
-        hart.setTlbSize(size);
+      {
+        if ((size & (size - 1)) != 0)
+          {
+            cerr << "TLB size must be a power of 2\n";
+            errors++;
+          }
+        else
+          hart.setTlbSize(size);
+      }
     }
 
   tag = "clear_mprv_on_ret";
@@ -1753,6 +1772,14 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enableSmstaten(flag);
     }
 
+  tag = "wfi_timeout";
+  if (config_ ->contains(tag))
+    {
+      uint64_t timeout = 0;
+      getJsonUnsigned(tag, config_ ->at(tag), timeout) or errors++;
+      hart.setWfiTimeout(timeout);
+    }
+
   return errors == 0;
 }
 
@@ -1910,6 +1937,13 @@ HartConfig::configHarts(System<URV>& system, bool userMode, bool verbose) const
 
   if (enableMcm and not system.enableMcm(mbLineSize, checkAll))
     return false;
+
+  tag = "enable_tso";
+  bool enableTso = false;
+  if (config_ -> contains(tag))
+    if (not getJsonBoolean(tag, config_ -> at(tag), enableTso))
+      return false;
+  system.enableTso(enableTso);
 
   tag = "uart";
   if (config_ -> contains(tag))

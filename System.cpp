@@ -100,6 +100,11 @@ System<URV>::defineUart(uint64_t addr, uint64_t size)
 template <typename URV>
 System<URV>::~System()
 {
+  // Final MCM checks
+  if (mcm_)
+    for (const auto& hartPtr : sysHarts_)
+      mcm_->finalChecks(*hartPtr);
+
   // Write back binary files were marked for update.
   for (auto bf : binaryFiles_)
     {
@@ -652,6 +657,15 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 
 
 template <typename URV>
+void
+System<URV>::enableTso(bool flag)
+{
+  if (mcm_)
+    mcm_->enableTso(flag);
+}
+
+
+template <typename URV>
 bool
 System<URV>::mcmRead(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		     uint64_t addr, unsigned size, uint64_t data)
@@ -693,6 +707,26 @@ System<URV>::mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
   if (not mcm_)
     return false;
   return mcm_->bypassOp(hart, time, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmIFetch(Hart<URV>& hart, uint64_t /*time*/, uint64_t addr)
+{
+  if (not mcm_)
+    return false;
+  return hart.mcmIFetch(addr);
+}
+
+
+template <typename URV>
+bool
+System<URV>::mcmIEvict(Hart<URV>& hart, uint64_t /*time*/, uint64_t addr)
+{
+  if (not mcm_)
+    return false;
+  return hart.mcmIEvict(addr);
 }
 
 

@@ -242,5 +242,42 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
     pokeMemory(physAddr + i, uint64_t(0), true /*usePma*/);
 }
 
+
+template <typename URV>
+void
+Hart<URV>::execPrefetch_i(const DecodedInst* di)
+{
+  if (not isRvzicbop())
+    {
+      illegalInst(di);
+      return;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execPrefetch_r(const DecodedInst* di)
+{
+  if (not isRvzicbop())
+    {
+      illegalInst(di);
+      return;
+    }
+}
+
+
+template <typename URV>
+void
+Hart<URV>::execPrefetch_w(const DecodedInst* di)
+{
+  if (not isRvzicbop())
+    {
+      illegalInst(di);
+      return;
+    }
+}
+
+
 template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;

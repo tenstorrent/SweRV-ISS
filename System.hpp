@@ -255,6 +255,9 @@ namespace WdRiscv
     /// the merge buffer line size in bytes.
     bool enableMcm(unsigned mergeBufferSize, bool mbLineCheckAll);
 
+    /// Enable/disable total-store-order: Valid only if mcm is enabled.
+    void enableTso(bool);
+
     /// Configure PCIe host-root-complex and construct associated devices
     /// which use transport.
     bool configPci(uint64_t configBase, uint64_t mmioBase, uint64_t mmioSize, unsigned buses, unsigned slots);
@@ -306,6 +309,14 @@ namespace WdRiscv
     bool mcmBypass(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   uint64_t addr, unsigned size, uint64_t data);
 
+    /// Initiate a fetch of a line from memory into the isntruction
+    /// cache.
+    bool mcmIFetch(Hart<URV>& hart, uint64_t time, uint64_t addr);
+
+    /// Initiate an eviction of a line from the instruction cache.
+    bool mcmIEvict(Hart<URV>& hart, uint64_t time, uint64_t addr);
+
+    /// Initiate an instruction retire.
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		   const DecodedInst& di);
 

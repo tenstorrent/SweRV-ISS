@@ -831,16 +831,26 @@ void setAllBits(double& x)
 inline
 void setAllBits(Float16& x)
 {
-  uint16_t u = 0xffff;
-  x = *(reinterpret_cast<Float16*>(&u));
+  union
+  {
+    uint16_t u;
+    Float16 f{0};
+  } uf;
+  uf.u = 0xffff;
+  x = uf.f;
 };
 
 /// Set to 1 all the bis of x.
 inline
 void setAllBits(BFloat16& x)
 {
-  uint16_t u = 0xffff;
-  x = *(reinterpret_cast<BFloat16*>(&u));
+ union
+  {
+    uint16_t u;
+    BFloat16 f{0};
+  } uf;
+  uf.u = 0xffff;
+  x = uf.f;
 };
 
 

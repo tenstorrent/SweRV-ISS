@@ -38,6 +38,7 @@
 #include "Disassembler.hpp"
 #include "util.hpp"
 #include "Imsic.hpp"
+#include "FetchCache.hpp"
 #include "pci/Pci.hpp"
 
 
@@ -553,6 +554,10 @@ namespace WdRiscv
     void setLogStart(uint64_t rank)
     { logStart_ = rank; }
 
+    /// Set whether this hart owns its trace file.
+    void setOwnTrace(bool flag)
+    { ownTrace_ = flag; }
+
     /// Define memory mapped locations for CLINT.
     void configClint(uint64_t clintStart, uint64_t clintEnd,
 		     bool softwareInterruptOnReset,
@@ -694,7 +699,11 @@ namespace WdRiscv
 
     /// Set/clear Supervisor external interrupt pin.
     void setSeiPin(bool flag)
-    { seiPin_ = flag; }
+    { seiPin_ = flag; csRegs_.setSeiPin(flag); }
+
+    /// Return the current state of the Supervisor external interrupt pin.
+    bool getSeiPin() const
+    { return seiPin_; }
 
     /// Define address to which a write will stop the simulator. An
     /// sb, sh, or sw instruction will stop the simulator if the write
@@ -903,12 +912,6 @@ namespace WdRiscv
     void enableTrapNonZeroVstart(bool flag)
     { trapNonZeroVstart_ = flag; }
 
-    /// Enable/disable the zba (bit manipulation base) extension. When
-    /// disabled all the instructions in zba extension result in an
-    /// illegal instruction exception.
-    void enableRvzba(bool flag)
-    { enableExtension(RvExtension::Zba, flag); }
-
     /// Enable/disable the c (compressed) extension.
     void enableRvc(bool flag)
     { enableExtension(RvExtension::C, flag); csRegs_.enableRvc(flag); }
@@ -919,18 +922,6 @@ namespace WdRiscv
     /// Enable/disable the d (double-precision floating point) extension.
     void enableRvd(bool flag)
     { enableExtension(RvExtension::D, flag); }
-
-    /// Enable/disable the zbb (bit manipulation base) extension. When
-    /// disabled all the instructions in zbb extension result in an
-    /// illegal instruction exception.
-    void enableRvzbb(bool flag)
-    { enableExtension(RvExtension::Zbb, flag); }
-
-    /// Enable/disable the zbc (bit manipulation carryless multiply)
-    /// extension. When disabled all the instructions in zbc extension
-    /// result in an illegal instruction exception.
-    void enableRvzbc(bool flag)
-    { enableExtension(RvExtension::Zbc, flag); }
 
     /// Enable/disable the zbe (bit manipulation) extension. When
     /// disabled all the instructions in zbe extension result in an
@@ -962,137 +953,11 @@ namespace WdRiscv
     void enableRvzbr(bool flag)
     { enableExtension(RvExtension::Zbr, flag); }
 
-    /// Enable/disable the zbs (bit manipulation single)
-    /// extension. When disabled all the instructions in zbs extension
-    /// result in an illegal instruction exception.
-    void enableRvzbs(bool flag)
-    { enableExtension(RvExtension::Zbs, flag); }
-
     /// Enable/disable the zbt (bit manipulation ternary)
     /// extension. When disabled all the instructions in zbt extension
     /// result in an illegal instruction exception.
     void enableRvzbt(bool flag)
     { enableExtension(RvExtension::Zbt, flag); }
-
-    /// Enable/disable the half-precision floating point extension.
-    void enableRvzfh(bool flag)
-    { enableExtension(RvExtension::Zfh, flag); }
-
-    /// Enable/disable the minimal half-precision floating point extension.
-    void enableRvzfhmin(bool flag)
-    { enableExtension(RvExtension::Zfhmin, flag); }
-
-    /// Enable/disable the crypto zknd (nist decryption) extension.
-    void enableRvzknd(bool flag)
-    { enableExtension(RvExtension::Zknd, flag); }
-
-    /// Enable/disable the crypto zkne (nist encryption) extension.
-    void enableRvzkne(bool flag)
-    { enableExtension(RvExtension::Zkne, flag); }
-
-    /// Enable/disable the crypto zknh (nist hash) extension.
-    void enableRvzknh(bool flag)
-    { enableExtension(RvExtension::Zknh, flag); }
-
-    /// Enable/disable the crypto zbkb (crypto bit manip) extension.
-    void enableRvzbkb(bool flag)
-    { enableExtension(RvExtension::Zbkb, flag); }
-
-    /// Enable/disable the crypto zbkx (crypto bit manip) extension.
-    void enableRvzbkx(bool flag)
-    { enableExtension(RvExtension::Zbkx, flag); }
-
-    /// Enable/disable the crypto zksed (sm4 block cipher) extension.
-    void enableRvzksed(bool flag)
-    { enableExtension(RvExtension::Zksed, flag); }
-
-    /// Enable/disable the crypto zksed (sm3 block hash) extension.
-    void enableRvzksh(bool flag)
-    { enableExtension(RvExtension::Zksh, flag); }
-
-    /// Enable/disable the svinval (TLB invalidation) extension.
-    void enableRvsvinval(bool flag)
-    { enableExtension(RvExtension::Svinval, flag); }
-
-    /// Enable/disable the zicbom (cache block management) extension.
-    void enableRvzicbom(bool flag)
-    { enableExtension(RvExtension::Zicbom, flag); }
-
-    /// Enable/disable the zicboz (cache block zero) extension.
-    void enableRvzicboz(bool flag)
-    { enableExtension(RvExtension::Zicboz, flag); }
-
-    /// Enable/disable the zawrs (wait reservation store) extension.
-    void enableRvzawrs(bool flag)
-    { enableExtension(RvExtension::Zawrs, flag); }
-
-    /// Enable/disable the zmmul (multiply) extension.
-    void enableRvzmmul(bool flag)
-    { enableExtension(RvExtension::Zmmul, flag); }
-
-    /// Enable/disable the half-precision floating point vector extension.
-    void enableRvzvfh(bool flag)
-    { enableExtension(RvExtension::Zvfh, flag); }
-
-    /// Enable/disable the minimal half-precision floating point vector extension.
-    void enableRvzvfhmin(bool flag)
-    { enableExtension(RvExtension::Zvfhmin, flag); }
-
-    /// Enable/disable the vector bit-manip extension part of vector cryptography.
-    void enableRvzvbb(bool flag)
-    { enableExtension(RvExtension::Zvbb, flag); }
-
-    /// Enable/disable the vector bit-manip extension part of vector cryptography.
-    void enableRvzvbc(bool flag)
-    { enableExtension(RvExtension::Zvbc, flag); }
-
-    /// Enable/disable the vector ghash extension part of vector cryptography.
-    void enableRvzvkg(bool flag)
-    { enableExtension(RvExtension::Zvkg, flag); }
-
-    /// Enable/disable the aes final round extension part of vector cryptography.
-    void enableRvzvkned(bool flag)
-    { enableExtension(RvExtension::Zvkned, flag); }
-
-    /// Enable/disable the zvknha (vector secure hash) extension part of vector cryptography.
-    void enableRvzvknha(bool flag)
-    { enableExtension(RvExtension::Zvknha, flag); }
-
-    /// Enable/disable the zvknhb (vector secure hash) extension part of vector cryptography.
-    void enableRvzvknhb(bool flag)
-    { enableExtension(RvExtension::Zvknhb, flag); }
-
-    /// Enable/disable the zvksed (vector ShangMi) extension part of vector cryptography.
-    void enableRvzvksed(bool flag)
-    { enableExtension(RvExtension::Zvksed, flag); }
-
-    /// Enable/disable the zvksh vector cryptography extension.
-    void enableRvzvksh(bool flag)
-    { enableExtension(RvExtension::Zvksh, flag); }
-
-    /// Enable/disable the zicond extension.
-    void enableRvzicond(bool flag)
-    { enableExtension(RvExtension::Zicond, flag); }
-
-    /// Enable/disable the zcb extension.
-    void enableRvzcb(bool flag)
-    { enableExtension(RvExtension::Zcb, flag); }
-
-    /// Enable/disable the zfa extension.
-    void enableRvzfa(bool flag)
-    { enableExtension(RvExtension::Zfa, flag); }
-
-    /// Enable/disable the scalar BF16 conversion extension (Zfbfmin).
-    void enableRvzfbfmin(bool flag)
-    { enableExtension(RvExtension::Zfbfmin, flag); }
-
-    /// Enable/disable the vector bfloat conversions extension (Zvfbfmin).
-    void enableRvzvfbfmin(bool flag)
-    { enableExtension(RvExtension::Zvfbfmin, flag); }
-
-    /// Enable/disable the vector BF16 widening mul-add extension (Zvfbfwma).
-    void enableRvzvfbfwma(bool flag)
-    { enableExtension(RvExtension::Zvfbfwma, flag); }
 
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
@@ -1195,10 +1060,6 @@ namespace WdRiscv
     Pma getPma(uint64_t addr) const
     { return memory_.pmaMgr_.getPma(addr); }
 
-    /// Return true if given data (ld/st) address is external to the hart.
-    bool isDataAddressExternal(uint64_t addr) const
-    { return memory_.isDataAddressExternal(addr); }
-
     /// Return true if given extension is statically enabled (enabled my
     /// --isa but may be turned off by the MSTATUS/MISA CSRs).
     bool hasIsaExtension(RvExtension ext) const
@@ -1267,6 +1128,10 @@ namespace WdRiscv
     /// Return true if the zicboz extension (cache block zero) is enabled.
     bool isRvzicboz() const
     { return extensionIsEnabled(RvExtension::Zicboz); }
+
+    /// Return true if the zicbop extension (cache block prefetch) is enabled.
+    bool isRvzicbop() const
+    { return extensionIsEnabled(RvExtension::Zicbop); }
 
     /// Return true if the zawrs extension (wait reservation store) is enabled.
     bool isRvzawrs() const
@@ -1438,9 +1303,15 @@ namespace WdRiscv
     bool isRvaia() const
     { return extensionIsEnabled(RvExtension::Smaia); }
 
-    /// Return true if the AIA extension is enabled.
+    /// Return true if the Zacas extension is enabled.
     bool isRvzacas() const
     { return extensionIsEnabled(RvExtension::Zacas); }
+
+    bool isRvzimop() const
+    { return extensionIsEnabled(RvExtension::Zimop); }
+
+    bool isRvzcmop() const
+    { return extensionIsEnabled(RvExtension::Zcmop); }
 
     /// Return true if current program is considered finished (either
     /// reached stop address or executed exit limit).
@@ -1550,6 +1421,11 @@ namespace WdRiscv
 
     /// Set the max number of guest external interrupts.
     bool configGuestInterruptCount(unsigned n);
+
+    /// Set timeout of wfi instruction. A non-zero timeout will make wfi succeed
+    /// if it can succeed within a boundd timeout.
+    void setWfiTimeout(uint64_t t)
+    { wfiTimeout_ = t; }
 
     /// Enable user mode.
     void enableUserMode(bool flag)
@@ -1911,16 +1787,7 @@ namespace WdRiscv
         });
 
       imsic_->attachSInterrupt([this] (bool flag) {
-          URV mipVal = csRegs_.peekMip();
-          URV prev = mipVal;
-
-          if (flag)
-	    mipVal = mipVal | (URV(1) << URV(IC::S_EXTERNAL));
-          else
-	    mipVal = mipVal & ~(URV(1) << URV(IC::S_EXTERNAL));
-
-          if (mipVal != prev)
-            csRegs_.poke(CsrNumber::MIP, mipVal);
+	  setSeiPin(flag);
         });
 
       imsic_->attachGInterrupt([this] (bool flag, unsigned guest) {
@@ -1962,9 +1829,25 @@ namespace WdRiscv
       return ext_enabled_.test(static_cast<std::size_t>(ext));
     }
 
+    /// Post a software interrupt to this hart.
     void setSwInterrupt(uint8_t value)
     { swInterrupt_.value_ = value; }
 
+    /// Fetch an instruction cache line.
+    bool mcmIFetch(uint64_t addr)
+    {
+      auto readMem =  [this](uint64_t addr, uint32_t& value) -> bool {
+	return this->memory_.read(addr, value);
+      };
+      return fetchCache_.addLine(addr, readMem);
+    }
+
+    /// Evict an instruction cache line.
+    bool mcmIEvict(uint64_t addr)
+    { fetchCache_.removeLine(addr); return true; }
+
+    bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
+    { return fetchCache_.read(addr, inst); }
 
   protected:
 
@@ -2422,7 +2305,7 @@ namespace WdRiscv
     /// be set to true for hypervisor load/store instruction to select
     /// 2-stage address translation.
     template<typename STORE_TYPE>
-    bool store(URV addr, bool hyper, STORE_TYPE value);
+    bool store(URV addr, bool hyper, STORE_TYPE value, bool amoLock = true);
 
     /// For use by performance model. 
     template<typename STORE_TYPE>
@@ -4607,6 +4490,9 @@ namespace WdRiscv
     void execCbo_flush(const DecodedInst*);
     void execCbo_inval(const DecodedInst*);
     void execCbo_zero(const DecodedInst*);
+    void execPrefetch_i(const DecodedInst*);
+    void execPrefetch_r(const DecodedInst*);
+    void execPrefetch_w(const DecodedInst*);
 
     void execWrs_nto(const DecodedInst*);
     void execWrs_sto(const DecodedInst*);
@@ -4679,6 +4565,12 @@ namespace WdRiscv
     void execAmocas_d(const DecodedInst*);
     void execAmocas_q(const DecodedInst*);
 
+    //Zimop
+    void execMop_r(const DecodedInst*);
+    void execMop_rr(const DecodedInst*);
+
+    //Zcmop
+    void execCmop(const DecodedInst*);
   private:
 
     // We model non-blocking load buffer in order to undo load
@@ -4783,8 +4675,8 @@ namespace WdRiscv
     bool  hasInterruptor_ = false;
     uint64_t interruptor_ = 0;
 
-    URV nmiPc_ = 0;              // Non-maskable interrupt handler address.
-    URV nmiExceptionPc_ = 0;    // For excetpions during NMI and Srmrnmi extension.
+    URV nmiPc_ = 0;             // Non-maskable interrupt handler.
+    URV nmiExceptionPc_ = 0;    // Handler for excetpions during non-maskable interrupts.
     bool nmiPending_ = false;
     NmiCause nmiCause_ = NmiCause::UNKNOWN;
 
@@ -4915,6 +4807,8 @@ namespace WdRiscv
     uint64_t alarmLimit_ = ~uint64_t(0); // Timer interrupt when inst counter reaches this.
     uint64_t logStart_ = 0; // Start logging at this instruction rank.
 
+    uint64_t wfiTimeout_ = 1;  // If non-zero wfi will succeed.
+
     bool misalDataOk_ = true;
     bool misalHasPriority_ = true;
     bool trapNonZeroVstart_ = true;  // Trap if vstart > 0 in arithmetic vec instructions
@@ -4972,6 +4866,8 @@ namespace WdRiscv
     std::unordered_map<uint64_t, BbStat> basicBlocks_; // Map pc to basic-block frequency.
     FILE* bbFile_ = nullptr;            // Basic block file.
 
+    TT_FETCH_CACHE::FetchCache fetchCache_;
+
     std::string branchTraceFile_;       // Branch trace file.
     struct BranchRecord
     {
@@ -4997,6 +4893,9 @@ namespace WdRiscv
     // dividing instruction count by 8 (2 to power 3) to produce a
     // timer value.
     unsigned counterToTimeShift_ = 0;
+
+    bool traceHeaderPrinted_ = false;
+    bool ownTrace_ = false;
 
     // For lockless handling of MIP. We assume the software won't
     // trigger multiple interrupts while handling. To be cleared when

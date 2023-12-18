@@ -72,7 +72,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       if (id > 0 and id < pending_.size())
 	{
 	  pending_.at(id) = flag;
-	  if (topId_ == 0 or (id <= topId_ and enabled_.at(id)))
+	  if (enabled_.at(id) and ( topId_ == 0 or id <= topId_ ))
 	    {
 	      if (flag)
 		topId_ = id;
@@ -110,9 +110,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     { return threshold_; }
 
     /// Return the id of the highest priority (smallest id) interrupt
-    /// id that is pending and enabled and exceeds the threshold id.
+    /// id that is pending and enabled and is below the threshold id.
     unsigned topId() const
-    { return threshold_ == 0 ? topId_ : std::min(topId_, threshold_ - 1); }
+    { return threshold_ == 0 ? topId_ : (topId_ >= threshold_ ? 0 : topId_); }
 
     /// Update the id of the highest priority interrupt that is
     /// pending and enabled.
@@ -375,14 +375,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     /// Called form the associated hart for a CSR read from mireg.
     template <typename URV>
-    bool readMireg(unsigned select, URV value) const
+    bool readMireg(unsigned select, URV& value) const
     { return mfile_.iregRead(select, value); }
 
 
     /// Called form the associated hart for a CSR read from sireg/vsireg.
     /// Guest field is used if virt is true.
     template <typename URV>
-    bool readSireg(bool virt, unsigned guest, unsigned select, URV value) const
+    bool readSireg(bool virt, unsigned guest, unsigned select, URV& value) const
     {
       if (virt)
 	{

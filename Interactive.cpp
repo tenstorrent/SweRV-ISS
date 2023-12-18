@@ -722,6 +722,8 @@ Interactive<URV>::peekCommand(Hart<URV>& hart, const std::string& line,
 	out << (hart.lastInstructionTrapped() ? "1" : "0") << std::endl;
       else if (addrStr == "defi")
 	out << (boost::format("0x%x") % hart.deferredInterrupts()) << std::endl;
+      else if (addrStr == "seipin")
+	out << (boost::format("%d") % hart.getSeiPin()) << std::endl;
       else
 	ok = false;
 
@@ -766,7 +768,7 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
     }
 
   size_t count = tokens.size();
-  if ((resource == "t" and count != 6) or (resource != "t" and count != 4))
+  if ((resource == "t" and count < 6) or (resource != "t" and count < 4))
     {
       std::cerr << "Invalid poke command: " << line << '\n';
       std::cerr << "  Expecting: poke <resource> <address> <value>\n";
@@ -870,13 +872,36 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 
   if (resource == "m")
     {
+      unsigned size = sizeof(URV);
+      if (tokens.size() > 4)
+	if (not parseCmdLineNumber("size", tokens.at(4), size))
+	  return false;
       size_t addr = 0;
       if (not parseCmdLineNumber("address", addrStr, addr))
 	return false;
       bool usePma = false; // Ignore physical memory attributes.
-      uint32_t word = value; // Memory peek/poke in words.
-      if (hart.pokeMemory(addr, word, usePma))
-	return true;
+      switch (size)
+	{
+	case 1:
+	  if (hart.pokeMemory(addr, uint8_t(value), usePma))
+	    return true;
+	  break;
+	case 2:
+	  if (hart.pokeMemory(addr, uint16_t(value), usePma))
+	    return true;
+	  break;
+	case 4:
+	  if (hart.pokeMemory(addr, uint32_t(value), usePma))
+	    return true;
+	  break;
+	case 8:
+	  if (hart.pokeMemory(addr, value, usePma))
+	    return true;
+	  break;
+	default:
+	  std::cerr << "Imvalid poke memory size " << size << '\n';
+	  return false;
+	}
       std::cerr << "Address out of bounds: " << addrStr << '\n';
       return false;
     }
@@ -892,6 +917,12 @@ Interactive<URV>::pokeCommand(Hart<URV>& hart, const std::string& line,
 	  if (not parseCmdLineNumber("value1", tokens.at(3), val))
 	    return false;
 	  hart.setDeferredInterrupts(val);
+	}
+      else if (addrStr == "seipin")
+	{
+	  if (not parseCmdLineNumber("value1", tokens.at(3), val))
+	    return false;
+	  hart.setSeiPin(val);
 	}
       return true;
     }
@@ -1220,13 +1251,8 @@ printInteractiveHelp()
   cout << "  List all the symbols in the loaded ELF file(s).\n\n";
   cout << "pagetable\n";
   cout << "  Print the entries of the address tanslation table.\n\n";
-  cout << "exception inst [<offset>]\n";
-  cout << "  Take an instruction access fault on the subsequent step command. Given\n";
-  cout << "  offset (defaults to zero) is added to the instruction PC to form the address\n";
-  cout << "  responsible for the fault (that address is placed in the mtval CSR).\n\n";
-  cout << "exception data [<offset>]\n";
-  cout << "  Take a data access fault on the subsequent load/store instruction executed\n";
-  cout << "  by a step command. The offset value is currently not used.\n\n";
+  cout << "nmi [<cause-number>]\n";
+  cout << "  Post a non-maskable interrupt with a given cause number (default 0).\n\n";
   cout << "mread tag addr size data i|e\n";
   cout << "  Perform a memory model (out of order) read for load/amo instruction with\n";
   cout << "  given tag. Data is the RTL data to be compared with whisper data\n";
@@ -1657,6 +1683,17 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "nmi")
+    {
+      uint32_t cause = 0;
+      if (tokens.size() > 1 and not parseCmdLineNumber("nmi-cause", tokens.at(1), cause))
+	return false;
+      hart.setPendingNmi(NmiCause(cause));
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "dump_memory")
     {
       if (not dumpMemoryCommand(line, tokens))
@@ -1668,7 +1705,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mread" or command == "memory_model_read")
     {
-      if (not mReadCommand(hart, line, tokens))
+      if (not mreadCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1677,7 +1714,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mbwrite" or command == "merge_buffer_write")
     {
-      if (not mbWriteCommand(hart, line, tokens))
+      if (not mbwriteCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1686,7 +1723,7 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mbinsert" or command == "merge_buffer_insert")
     {
-      if (not mbInsertCommand(hart, line, tokens))
+      if (not mbinsertCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1695,7 +1732,25 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
 
   if (command == "mbypass" or command == "mbbypass" or command == "merge_buffer_bypass")
     {
-      if (not mbBypassCommand(hart, line, tokens))
+      if (not mbbypassCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "mifetch")
+    {
+      if (not mifetchCommand(hart, line, tokens))
+	return false;
+      if (commandLog)
+	fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "mievict")
+    {
+      if (not mievictCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1714,15 +1769,6 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
   if (command == "check_interrupt")
     {
       if (not checkInterruptCommand(hart, line, tokens))
-	return false;
-      if (commandLog)
-	fprintf(commandLog, "%s\n", line.c_str());
-      return true;
-    }
-
-  if (command == "sei_pin")
-    {
-      if (not seiPinCommand(hart, line, tokens))
 	return false;
       if (commandLog)
 	fprintf(commandLog, "%s\n", line.c_str());
@@ -1808,7 +1854,7 @@ Interactive<URV>::replayCommand(const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mreadCommand(Hart<URV>& hart, const std::string& line,
 			       const std::vector<std::string>& tokens)
 {
   // Format: [hart=<number>] [time=<number>] mread <instruction-tag> <physical-address> <size> <rtl-data> <i>|<é>
@@ -1846,7 +1892,7 @@ Interactive<URV>::mReadCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mbwriteCommand(Hart<URV>& hart, const std::string& line,
 				 const std::vector<std::string>& tokens)
 {
   // Format: mbwrite <physical-address> <rtl-data> [<mask>]
@@ -1944,7 +1990,7 @@ Interactive<URV>::mbWriteCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mbinsertCommand(Hart<URV>& hart, const std::string& line,
 				  const std::vector<std::string>& tokens)
 {
   // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
@@ -1982,10 +2028,10 @@ Interactive<URV>::mbInsertCommand(Hart<URV>& hart, const std::string& line,
 
 template <typename URV>
 bool
-Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
+Interactive<URV>::mbbypassCommand(Hart<URV>& hart, const std::string& line,
 				  const std::vector<std::string>& tokens)
 {
-  // Format: mbinsert <instr-tag> <physical-address> <size> <rtl-data>
+  // Format: mbbypass <instr-tag> <physical-address> <size> <data>
   if (tokens.size() != 5)
     {
       std::cerr << "Invalid mbbypass command: " << line << '\n';
@@ -2004,6 +2050,7 @@ Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
   uint64_t size = 0;
   if (not parseCmdLineNumber("size", tokens.at(3), size))
     return false;
+
   if (size > 8)
     {
       std::cerr << "Invalid mbbypass size: " << size << " -- Expecting 0 to 8\n";
@@ -2015,6 +2062,48 @@ Interactive<URV>::mbBypassCommand(Hart<URV>& hart, const std::string& line,
     return false;
 
   return system_.mcmBypass(hart, this->time_, tag, addr, size, data);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mifetchCommand(Hart<URV>& hart, const std::string& line,
+				 const std::vector<std::string>& tokens)
+{
+  // Format: mifetch <physical-address>
+  if (tokens.size() != 2)
+    {
+      std::cerr << "Invalid mifetch command: " << line << '\n';
+      std::cerr << "  Expecting: mifetch <addr>\n";
+      return false;
+    }
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(1), addr))
+    return false;
+
+  return system_.mcmIFetch(hart, this->time_, addr);
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::mievictCommand(Hart<URV>& hart, const std::string& line,
+				 const std::vector<std::string>& tokens)
+{
+  // Format: mievict <physical-address>
+  if (tokens.size() != 2)
+    {
+      std::cerr << "Invalid mievict command: " << line << '\n';
+      std::cerr << "  Expecting: mievict <addr>\n";
+      return false;
+    }
+
+  uint64_t addr = 0;
+  if (not parseCmdLineNumber("address", tokens.at(1), addr))
+    return false;
+
+  return system_.mcmIEvict(hart, this->time_, addr);
 }
 
 

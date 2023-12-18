@@ -201,6 +201,21 @@ namespace WdRiscv
     bool isLoad() const
     { return isLoad_; }
 
+    /// Return true if this is a load instruction (lb, lh, flw, lr ...)
+    bool isLoad(bool& isUnsigned) const
+    {
+      if (not isLoad_)
+	return false;
+      if (isHypervisor())
+	isUnsigned = (code_ >> 20) & 1;
+      else
+	{
+	  unsigned f3 = (code_ >> 12) & 7;
+	  isUnsigned = (f3 & 4) == 4;
+	}
+      return true;
+    }
+
     /// Return true if this is a store instruction (sb, sh, fsw, sc ...)
     bool isStore() const
     { return isStore_; }
@@ -232,7 +247,7 @@ namespace WdRiscv
     /// Return true if a floating point instruction (fadd.s, fadd.d ...)
     bool isFp() const
     { return ext_ == RvExtension::F or ext_ == RvExtension::D or
-	ext_ == RvExtension::Zfh; }
+	ext_ == RvExtension::Zfh or ext_ == RvExtension::Zfbfmin; }
 
     /// Return true if this is a CSR instruction.
     bool isCsr() const

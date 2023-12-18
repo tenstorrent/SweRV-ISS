@@ -6974,7 +6974,6 @@ InstTable::setupInstVec()
       },
 
       // Cache block management (zicbom)
-
       { "cbo.clean", InstId::cbo_clean, 0x0010200f, 0xfff07fff,
 	RvExtension::Zicbom, RvFormat::I,
 	OperandType::IntReg, OperandMode::Read, rs1Mask
@@ -6991,10 +6990,28 @@ InstTable::setupInstVec()
       },
 
       // Cache block zero (zicboz)
-
       { "cbo.zero", InstId::cbo_zero, 0x0040200f, 0xfff07fff,
 	RvExtension::Zicboz, RvFormat::I,
 	OperandType::IntReg, OperandMode::Read, rs1Mask
+      },
+
+      // Cache block prefetch.
+      { "prefetch.i", InstId::prefetch_i, 0x00006013, 0x01f07fff,
+	RvExtension::Zicbop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::Imm, OperandMode::None, 0xfe000000
+      },
+
+      { "prefetch.r", InstId::prefetch_r, 0x00106013, 0x01f07fff,
+	RvExtension::Zicbop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::Imm, OperandMode::None, 0xfe000000
+      },
+
+      { "prefetch.w", InstId::prefetch_w, 0x00306013, 0x01f07fff,
+	RvExtension::Zicbop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Read, rs1Mask,
+	OperandType::Imm, OperandMode::None, 0xfe000000
       },
 
       // Zawrs
@@ -7410,5 +7427,19 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
+      { "mop.r", InstId::mop_r, 0x81c04073, 0xfff0707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "mop.rr", InstId::mop_rr, 0x82004073, 0xfe00707f,
+	RvExtension::Zimop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
+
+    { "cmop", InstId::c_mop, 0x6081, 0x6781,
+	RvExtension::Zcmop, RvFormat::I,
+	OperandType::IntReg, OperandMode::Write, rdMask,
+	OperandType::IntReg, OperandMode::Read, rs1Mask },
     };
 }

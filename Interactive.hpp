@@ -116,20 +116,23 @@ namespace WdRiscv
 		       FILE* traceFile, FILE* commandLog,
 		       std::ifstream& replayStream, bool& done);
 
-    bool mReadCommand(Hart<URV>& hart, const std::string& line,
+    bool mreadCommand(Hart<URV>& hart, const std::string& line,
 		     const std::vector<std::string>& tokens);
 
-    bool mWriteCommand(Hart<URV>& hart, const std::string& line,
-		       const std::vector<std::string>& tokens);
-
-    bool mbWriteCommand(Hart<URV>& hart, const std::string& line,
+    bool mbwriteCommand(Hart<URV>& hart, const std::string& line,
 			const std::vector<std::string>& tokens);
 
-    bool mbInsertCommand(Hart<URV>& hart, const std::string& line,
+    bool mbinsertCommand(Hart<URV>& hart, const std::string& line,
 			 const std::vector<std::string>& tokens);
 
-    bool mbBypassCommand(Hart<URV>& hart, const std::string& line,
+    bool mbbypassCommand(Hart<URV>& hart, const std::string& line,
 			 const std::vector<std::string>& tokens);
+
+    bool mifetchCommand(Hart<URV>& hart, const std::string& line,
+			const std::vector<std::string>& tokens);
+
+    bool mievictCommand(Hart<URV>& hart, const std::string& line,
+			const std::vector<std::string>& tokens);
 
     bool translateCommand(Hart<URV>& hart, const std::string& line,
 			  const std::vector<std::string>& tokens);

@@ -296,15 +296,19 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
   bool misal = virtAddr & alignMask;
   misalignedLdSt_ = misal;
 
+  using EC = ExceptionCause;
+  if (misal and misalHasPriority_)
+    {
+      auto cause = misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
+      initiateStoreException(cause, virtAddr, virtAddr);
+      return false;
+    }
+
   uint64_t addr1 = virtAddr, addr2 = virtAddr;
   uint64_t gaddr1 = virtAddr, gaddr2 = virtAddr;
   auto cause = determineStoreException(addr1, addr2, gaddr1, gaddr2, sizeof(storeVal), false /*hyper*/);
   ldStPhysAddr1_ = addr1;
   ldStPhysAddr2_ = addr2;
-
-  using EC = ExceptionCause;
-  if (misal and cause != EC::STORE_ACC_FAULT)
-    cause =  misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
 
   if (cause == EC::NONE)
     {
@@ -320,6 +324,9 @@ Hart<URV>::storeConditional(URV virtAddr, STORE_TYPE storeVal)
       triggerTripped_ = true;
   if (triggerTripped_)
     return false;
+
+  if (cause == EC::NONE and misal)
+    cause = misalAtomicCauseAccessFault_ ? EC::STORE_ACC_FAULT : EC::STORE_ADDR_MISAL;
 
   if (cause != EC::NONE)
     {
@@ -397,7 +404,7 @@ Hart<URV>::execSc_w(const DecodedInst* di)
 
   if (ok)
     {
-      memory_.invalidateOtherHartLr(hartIx_, addr, 4);
+      memory_.invalidateOtherHartLr(hartIx_, ldStPhysAddr1_, 4);
       intRegs_.write(rd, 0); // success
       scSuccess_++;
 
@@ -425,7 +432,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 
   // Lock mutex to serialize AMO instructions. Unlock automatically on
   // exit from this scope.
-  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+  std::unique_lock lock(memory_.amoMutex_);
 
   URV loadedValue = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
@@ -439,7 +446,7 @@ Hart<URV>::execAmo32Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(result));
+      bool storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(result), false);
 
       if (storeOk and not triggerTripped_)
 	{
@@ -604,7 +611,7 @@ Hart<URV>::execSc_d(const DecodedInst* di)
 
   if (ok)
     {
-      memory_.invalidateOtherHartLr(hartIx_, addr, 8);
+      memory_.invalidateOtherHartLr(hartIx_, ldStPhysAddr1_, 8);
       intRegs_.write(rd, 0); // success
       scSuccess_++;
 
@@ -632,7 +639,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
 
   // Lock mutex to serialize AMO instructions. Unlock automatically on
   // exit from this scope.
-  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+  std::unique_lock lock(memory_.amoMutex_);
 
   URV loadedValue = 0;
   URV rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
@@ -645,7 +652,7 @@ Hart<URV>::execAmo64Op(const DecodedInst* di, Pma::Attrib attrib, OP op)
       URV rs2Val = intRegs_.read(rs2);
       URV result = op(rs2Val, rdVal);
 
-      bool storeOk = store<uint64_t>(addr, false /*hyper*/, result);
+      bool storeOk = store<uint64_t>(addr, false /*hyper*/, result, false);
 
       if (storeOk and not triggerTripped_)
 	{
@@ -765,7 +772,7 @@ Hart<URV>::execAmocas_w(const DecodedInst* di)
 
   // Lock mutex to serialize AMO instructions. Unlock automatically on
   // exit from this scope.
-  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+  std::unique_lock lock(memory_.amoMutex_);
 
   URV loadedVal = 0;
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
@@ -780,7 +787,7 @@ Hart<URV>::execAmocas_w(const DecodedInst* di)
 
       bool storeOk = true;
       if (temp == rdVal)
-	storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val));
+	storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val), false);
 
       if (storeOk and not triggerTripped_)
 	{
@@ -803,7 +810,7 @@ Hart<uint32_t>::execAmocas_d(const DecodedInst* di)
 
   // Lock mutex to serialize AMO instructions. Unlock automatically on
   // exit from this scope.
-  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+  std::unique_lock lock(memory_.amoMutex_);
 
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
   if ((rd & 1) == 1 or (rs2 & 1) == 1)
@@ -832,8 +839,8 @@ Hart<uint32_t>::execAmocas_d(const DecodedInst* di)
       bool storeOk = true;
       if (temp0 == rdVal0 and temp1 == rdVal1)
 	{
-	  storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val0));
-	  storeOk = storeOk and store<uint32_t>(addr, false, uint32_t(rs2Val1));
+	  storeOk = store<uint32_t>(addr, false /*hyper*/, uint32_t(rs2Val0), false);
+	  storeOk = storeOk and store<uint32_t>(addr, false, uint32_t(rs2Val1), false);
 	}
 
       if (storeOk and not triggerTripped_ and rd != 0)
@@ -857,7 +864,7 @@ Hart<uint64_t>::execAmocas_d(const DecodedInst* di)
 
   // Lock mutex to serialize AMO instructions. Unlock automatically on
   // exit from this scope.
-  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+  std::unique_lock lock(memory_.amoMutex_);
 
   uint32_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
 
@@ -874,7 +881,7 @@ Hart<uint64_t>::execAmocas_d(const DecodedInst* di)
 
       bool storeOk = true;
       if (temp == rdVal)
-	storeOk = store<uint64_t>(addr, false /*hyper*/, rs2Val);
+	storeOk = store<uint64_t>(addr, false /*hyper*/, rs2Val, false);
 
       if (storeOk and not triggerTripped_)
 	intRegs_.write(rd, temp);
@@ -902,7 +909,7 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
 
   // Lock mutex to serialize AMO instructions. Unlock automatically on
   // exit from this scope.
-  std::lock_guard<std::mutex> lock(memory_.amoMutex_);
+  std::unique_lock lock(memory_.amoMutex_);
 
   uint64_t rd = di->op0(), rs1 = di->op1(), rs2 = di->op2();
   if ((rd & 1) == 1 or (rs2 & 1) == 1)
@@ -942,8 +949,8 @@ Hart<uint64_t>::execAmocas_q(const DecodedInst* di)
       bool storeOk = true;
       if (temp0 == rdVal0 and temp1 == rdVal1)
 	{
-	  storeOk = store<uint64_t>(addr, false /*hyper*/, uint64_t(rs2Val0));
-	  storeOk = storeOk and store<uint32_t>(addr, false, uint64_t(rs2Val1));
+	  storeOk = store<uint64_t>(addr, false /*hyper*/, uint64_t(rs2Val0), false);
+	  storeOk = storeOk and store<uint32_t>(addr, false, uint64_t(rs2Val1), false);
 	}
 
       if (storeOk and not triggerTripped_ and rd != 0)

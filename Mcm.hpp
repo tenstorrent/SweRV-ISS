@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <set>
 #include <unordered_set>
 #include "DecodedInst.hpp"
 
@@ -54,14 +55,19 @@ namespace WdRiscv
     bool isStore_ = false;
     bool complete_ = false;
 
+    /// Return true if this a load/store isntruction.
     bool isMemory() const { return isLoad_ or isStore_; }
 
+    /// Return true if this instruction is retired.
     bool isRetired() const { return retired_; }
 
+    /// Return true if this instruction is canceled.
     bool isCanceled() const { return canceled_; }
 
+    /// Mark instruction as canceled.
     void cancel() { canceled_ = true; }
 
+    /// Associated given memory operation index with this instruction.
     void addMemOp(MemoryOpIx memOpIx)
     {
       if (std::find(memOps_.begin(), memOps_.end(), memOpIx) != memOps_.end())
@@ -72,13 +78,18 @@ namespace WdRiscv
       memOps_.push_back(memOpIx);
     }
 
+    /// Return true if data memory referenced by this instruction
+    /// overlaps that of the given other instruction.
     bool overlaps(const McmInstr& other) const
     {
+      // A non-successful store conditional (zero size) does not overlap anything.
+      if ((di_.isSc() and size_ == 0) or (other.di_.isSc() and other.size_ == 0))
+	return false;
+	  
       if (size_ == 0 or other.size_ == 0)
 	{
 	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
 		    << " tag2=" << other.tag_ << " zero data size\n";
-	  // assert(0 && "McmInstr::overlaps: zero data size\n");
 	}
       if (physAddr_ == other.physAddr_)
 	return true;
@@ -87,6 +98,8 @@ namespace WdRiscv
       return physAddr_ - other.physAddr_ < other.size_;
     }
 
+    /// Return true if the data memory referenced by this instruction
+    /// overlpas that of the given memory operation.
     bool overlaps(const MemoryOp& op) const
     {
       if (size_ == 0 or op.size_ == 0)
@@ -101,6 +114,12 @@ namespace WdRiscv
 	return op.physAddr_ - physAddr_ < size_;
       return physAddr_ - op.physAddr_ < op.size_;
     }
+
+    /// Return true if address of the data memory referenced by this
+    /// instruction is aligned.
+    bool isAligned() const
+    { return (physAddr_ & (size_ - 1)) == 0; }
+
   };
 
 
@@ -156,6 +175,9 @@ namespace WdRiscv
     bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 		const DecodedInst& di);
 
+    /// Perform PPO checks (e.g. rule 4) on pending instructions.
+    bool finalChecks(Hart<URV>& hart);
+
     bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
 
     /// Return the load value of the current target instruction
@@ -171,6 +193,19 @@ namespace WdRiscv
     /// for items like the CLINT timer where we cannot match the RTL.
     void skipReadCheck(uint64_t addr)
     { skipReadCheck_.insert(addr); }
+
+    /// Enable/disable total-store-order.
+    void enableTso(bool flag)
+    { isTso_ = flag; }
+
+    /// Return the earliest memory time for the byte at the given
+    /// address. Return 0 if address is not covered by given instruction.
+    uint64_t earliestByteTime(const McmInstr& instr, uint64_t addr) const;
+
+    /// Return the latest memory time for the byte at the given
+    /// address. Return max value if address is not covered by given
+    /// instruction.
+    uint64_t latestByteTime(const McmInstr& instr, uint64_t addr) const;
 
     bool ppoRule1(Hart<URV>& hart, const McmInstr& instr) const;
 
@@ -196,6 +231,11 @@ namespace WdRiscv
 
     bool ppoRule12(Hart<URV>& hart, const McmInstr& instr) const;
 
+    /// If given instruction is a fence add it to the set of pending
+    /// fences. If oldest pending fence instruction is within window,
+    /// then remove it from pending set and check rule 4 on it.
+    bool processFence(Hart<URV>& hart, const McmInstr& instr);
+
     uint64_t latestOpTime(const McmInstr& instr) const
     {
       if (not instr.complete_)
@@ -210,20 +250,20 @@ namespace WdRiscv
       return time;
     }
 
+    /// Return the smallest time of the memory operations of given instruction.
     uint64_t earliestOpTime(const McmInstr& instr) const
     {
       if (not instr.complete_ and instr.memOps_.empty())
-	{
-	  std::cerr << "Mcm::earliestOpTime: Called on an incomplete instruction\n";
-	  assert(0 && "Mcm::earliestOpTime: Incomplete instr");
-	}
-      uint64_t time = ~uint64_t(0);
+	return time_;
+
+      uint64_t mt = ~uint64_t(0);
       for (auto opIx : instr.memOps_)
 	if (opIx < sysMemOps_.size())
-	  time = std::min(time, sysMemOps_.at(opIx).time_);
-      return time;
+	  mt = std::min(mt, sysMemOps_.at(opIx).time_);
+      return mt;
     }
 
+    /// Return true if instruction a is before b in memory time.
     bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const
     {
       // if (a.complete_ and not b.complete_)
@@ -348,6 +388,7 @@ namespace WdRiscv
 
     uint64_t time_ = 0;
     unsigned lineSize_ = 64; // Merge buffer line size.
+    unsigned windowSize_ = 1000;
 
     bool writeOnInsert_ = false;
 
@@ -361,6 +402,7 @@ namespace WdRiscv
 
     std::vector<RegTimeVec> hartRegTimes_;  // One vector per hart.
     std::vector<RegProducer> hartRegProducers_;  // One vector per hart.
+    std::vector<std::set<McmInstrIx>> hartPendingFences_;
 
     // Dependency time of most recent branch in program order or 0 if
     // branch does not depend on a prior memory instruction.

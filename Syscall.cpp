@@ -1243,6 +1243,21 @@ Syscall<URV>::emulate()
 	return 0;
       }
 
+    case 113:  // clock_gettime
+      {
+	clockid_t clk_id = a0;
+	uint64_t rvBuff = a1;
+
+	struct timespec tp;
+	if (clock_gettime(clk_id, &tp) != 0)
+	  return SRV(-errno);
+	if (not hart_.pokeMemory(rvBuff, uint64_t(tp.tv_sec), true))
+	  return SRV(-1);
+	if (not hart_.pokeMemory(rvBuff + 8, uint64_t(tp.tv_nsec), true))
+	  return SRV(-1);
+	return 0;
+      }
+
     case 153: // times
       {
 	URV rvBuff = a0;

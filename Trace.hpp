@@ -286,13 +286,13 @@ namespace WdRiscv
     }
 
     /// TODO: add support for vector ld/st
-    bool lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
-    { return hart_->lastLdStAddress(virtAddr, physAddr); }
+    unsigned lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
+    { return hart_->lastLdStAddress(virtAddr, physAddr); /* this returns the size of the last ld/st*/ }
 
-    bool lastStVal(uint64_t& value) const
+    unsigned lastStVal(uint64_t& value) const
     {
       uint64_t addr;
-      return hart_->lastStore(addr, value);
+      return hart_->lastStore(addr, value); /* this returns the size of the last ld/st */
     }
 
     bool misalignedLdSt(bool& misal) const
@@ -327,13 +327,28 @@ namespace WdRiscv
 
       std::unordered_set<uint64_t> pages;
       const auto& addrs = hart_->vecRegs().ldStAddrs();
-      for (auto& addr : addrs)
+      const auto& masked = hart_->vecRegs().maskedAddrs();
+      assert(addrs.size() == masked.size());
+
+      for (unsigned i = 0; i < addrs.size(); ++i)
         {
-          unsigned page = hart_->virtMem().pageNumber(addr);
-          pages.emplace(page);
+          const auto& addr = addrs.at(i);
+          const auto& mask = masked.at(i);
+
+          if (not mask)
+            {
+              unsigned page = hart_->virtMem().pageNumber(addr);
+              pages.emplace(page);
+            }
         }
       return pages.size();
     }
+
+    bool virtualMode() const
+    { return hart_->lastVirtMode();  }
+
+    bool nextVirtualMode() const
+    { return hart_->virtMode();  }
 
     const Hart<URV>* hart_ = nullptr;
     const DecodedInst& di_;

@@ -1492,8 +1492,16 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
 	{
 	  CiFormInst cif(inst);
 	  int immed16 = cif.addi16spImmed();
-	  if (immed16 == 0)
-	    return instTable_.getEntry(InstId::illegal);
+      if (immed16 == 0)
+        { // could be c.mop
+          if (cif.bits.rd & 1)
+            {
+              op0 = cif.bits.rd ; op1 = cif.addiImmed(); op2 = 0;
+              return instTable_.getEntry(InstId::c_mop);
+            } 
+          else
+            return instTable_.getEntry(InstId::illegal);
+        }
 	  if (cif.bits.rd == RegSp)  // c.addi16sp
 	    {
 	      op0 = cif.bits.rd; op1 = cif.bits.rd; op2 = immed16;
@@ -2446,7 +2454,23 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                     return instTable_.getEntry(InstId::grevi);
                   }
               }
-            else if (funct3 == 6)  return instTable_.getEntry(InstId::ori);
+            else if (funct3 == 6)
+	      {
+		if (op0 != 0) return instTable_.getEntry(InstId::ori);
+
+#if 0
+		unsigned rs2 = iform.rs2();
+		if (rs2 == 0 or rs2 == 1 or rs2 == 3)
+		  {
+		    op0 = iform.fields.rs1;
+		    op1 = iform.immed() >> 5;
+		    if (iform.rs2() == 0) return instTable_.getEntry(InstId::prefetch_i);
+		    if (iform.rs2() == 1) return instTable_.getEntry(InstId::prefetch_r);
+		    if (iform.rs2() == 3) return instTable_.getEntry(InstId::prefetch_w);
+		  }
+#endif
+		return instTable_.getEntry(InstId::ori);
+	      }
             else if (funct3 == 7)  return instTable_.getEntry(InstId::andi);
           }
           return instTable_.getEntry(InstId::illegal);
@@ -2979,7 +3003,53 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               case 4:
                 {
                   unsigned top12 = op2;
-		  op2 = 0; // No offset for these instructions.
+                  RFormInst rform(inst);
+                  op2 = rform.bits.rs2;
+                  // mop.rr, although are I format seem to have rs2 as well.
+                  if (top12 == 0x820) return instTable_.getEntry(InstId::mop_rr);
+                  if (top12 == 0x860) return instTable_.getEntry(InstId::mop_rr);
+                  if (top12 == 0x8a0) return instTable_.getEntry(InstId::mop_rr);
+                  if (top12 == 0x8e0) return instTable_.getEntry(InstId::mop_rr);
+                  if (top12 == 0xc20) return instTable_.getEntry(InstId::mop_rr);
+                  if (top12 == 0xc60) return instTable_.getEntry(InstId::mop_rr);
+                  if (top12 == 0xca0) return instTable_.getEntry(InstId::mop_rr);
+                  if (top12 == 0xce0) return instTable_.getEntry(InstId::mop_rr);
+
+
+                  op2 = 0; // No offset for these instructions.
+                  if (top12 == 0x81C) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x81d) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x81e) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x81f) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x85c) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x85d) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x85e) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x85f) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x89c) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x89d) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x89e) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x89f) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x8dc) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x8dd) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x8de) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0x8df) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc1c) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc1d) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc1e) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc1f) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc5c) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc5d) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc5e) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc5f) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc9c) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc9d) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc9e) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xc9f) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xcdc) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xcdd) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xcde) return instTable_.getEntry(InstId::mop_r);
+                  if (top12 == 0xcdf) return instTable_.getEntry(InstId::mop_r);
+
                   if (top12 == 0x600) return instTable_.getEntry(InstId::hlv_b);
                   if (top12 == 0x601) return instTable_.getEntry(InstId::hlv_bu);
                   if (top12 == 0x640) return instTable_.getEntry(InstId::hlv_h);

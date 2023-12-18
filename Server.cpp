@@ -184,14 +184,41 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       {
         bool usePma = false; // Ignore phsical memory attributes.
 
-        if constexpr (sizeof(URV) == 4)
-          {
-            // Poke a word in 32-bit harts.
-            if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
-              return true;
-          }
-        else if (hart.pokeMemory(req.address, req.value, usePma))
-          return true;
+	if (req.size == 0)
+	  {
+	    if constexpr (sizeof(URV) == 4)
+	      {
+		// Poke a word in 32-bit harts.
+		if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
+		  return true;
+	      }
+	    else if (hart.pokeMemory(req.address, req.value, usePma))
+	      return true;
+	  }
+	else
+	  {
+	    switch (req.size)
+	      {
+	      case 1:
+		if (hart.pokeMemory(req.address, uint8_t(req.value), usePma))
+		  return true;
+		break;
+	      case 2:
+		if (hart.pokeMemory(req.address, uint16_t(req.value), usePma))
+		  return true;
+		break;
+	      case 4:
+		if (hart.pokeMemory(req.address, uint32_t(req.value), usePma))
+		  return true;
+		break;
+	      case 8:
+		if (hart.pokeMemory(req.address, uint64_t(req.value), usePma))
+		  return true;
+		break;
+	      default:
+		break;
+	      }
+	  }
       }
       break;
 
@@ -209,7 +236,9 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
         URV val = static_cast<URV>(req.value);
         if (req.address == WhisperSpecialResource::DeferredInterrupts)
           hart.setDeferredInterrupts(val);
-        else
+        else if (req.address == WhisperSpecialResource::Seipin)
+	  hart.setSeiPin(val);
+	else
           ok = false;
         if (ok)
           return true;
@@ -256,11 +285,16 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       }
       break;
     case 'c':
-      if (hart.peekCsr(CsrNumber(req.address), value))
-	{
-	  reply.value = value;
-	  return true;
-	}
+      {
+	URV reset = 0, mask = 0, pokeMask = 0;
+	if (hart.peekCsr(CsrNumber(req.address), value, reset, mask, pokeMask))
+	  {
+	    reply.value = value;
+	    reply.address = mask;
+	    reply.time = pokeMask;
+	    return true;
+	  }
+      }
       break;
     case 'v':
       {
@@ -289,22 +323,30 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
       return true;
     case 's':
       {
-	bool ok = true;
-        if (req.address == WhisperSpecialResource::PrivMode)
-          reply.value = unsigned(hart.privilegeMode());
-        else if (req.address == WhisperSpecialResource::PrevPrivMode)
-          reply.value = unsigned(hart.lastPrivMode());
-        else if (req.address == WhisperSpecialResource::FpFlags)
-          reply.value = hart.lastFpFlags();
-        else if (req.address == WhisperSpecialResource::Trap)
-          reply.value = hart.lastInstructionTrapped()? 1 : 0;
-        else if (req.address == WhisperSpecialResource::DeferredInterrupts)
-          reply.value = hart.deferredInterrupts();
-        else
-          ok = false;
-        if (ok)
-          return true;
-        break;
+	switch(req.address)
+	  {
+	  case WhisperSpecialResource::PrivMode:
+	    reply.value = unsigned(hart.privilegeMode());
+	    return true;
+	  case WhisperSpecialResource::PrevPrivMode:
+	    reply.value = unsigned(hart.lastPrivMode());
+	    return true;
+	  case WhisperSpecialResource::FpFlags:
+	    reply.value = hart.lastFpFlags();
+	    return true;
+	  case WhisperSpecialResource::Trap:
+	    reply.value = hart.lastInstructionTrapped()? 1 : 0;
+	    return true;
+	  case WhisperSpecialResource::DeferredInterrupts:
+	    reply.value = hart.deferredInterrupts();
+	    return true;
+	  case WhisperSpecialResource::Seipin:
+	    reply.value = hart.getSeiPin();
+	    return true;
+	  default:
+	    break;
+	  }
+	break;
       }
     case 'i':
       {
@@ -799,6 +841,7 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::FpFlags:             return "iff";
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
+    case WhisperSpecialResource::Seipin:              return "seipin";
     }
   return "?";
 }
@@ -934,10 +977,15 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                 fprintf(commandLog, " # ts=%s tag=%s\n", timeStamp.c_str(), msg.tag.data());
               }
             else
-              fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s\n",
-		      hartId, msg.resource, uintmax_t(msg.address),
-		      uintmax_t(msg.value),
-                      timeStamp.c_str(), msg.tag.data());
+	      {
+		fprintf(commandLog, "hart=%" PRIu32 " poke %c 0x%" PRIxMAX " 0x%" PRIxMAX " # ts=%s tag=%s",
+			hartId, msg.resource, uintmax_t(msg.address),
+			uintmax_t(msg.value),
+			timeStamp.c_str(), msg.tag.data());
+		if (msg.resource == 'm' and msg.size != 0)
+		  fprintf(commandLog, " %d", int(msg.size));
+		fprintf(commandLog, "\n");
+	      }
           }
         break;
 
@@ -1029,6 +1077,16 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
             }
         }
         break;
+
+      case Nmi:
+	{
+	  if (checkHart(msg, "nmi", reply))
+	    hart.setPendingNmi(NmiCause(msg.value));
+	  if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " nmi 0x%x # ts=%s\n", hartId,
+		    uint32_t(msg.value), timeStamp.c_str());
+	  break;
+	}
 
       case EnterDebug:
         {
@@ -1145,6 +1203,22 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
           reply.type = Invalid;
         break;
 
+      case McmIFetch:
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mifetch %" PRIu64 "\n",
+                  hartId, msg.time, msg.address);
+        if (not system_.mcmIFetch(hart, msg.time, msg.address))
+          reply.type = Invalid;
+	break;
+
+      case McmIEvict:
+        if (commandLog)
+          fprintf(commandLog, "hart=%" PRIu32 " time=%" PRIu64 " mievict %" PRIu64 "\n",
+                  hartId, msg.time, msg.address);
+        if (not system_.mcmIEvict(hart, msg.time, msg.address))
+          reply.type = Invalid;
+	break;
+
       case PageTableWalk:
         doPageTableWalk(hart, reply);
         break;
@@ -1182,16 +1256,6 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
                     uintmax_t(msg.address));
         }
         break;
-
-      case SeiPin:
-        {
-          bool val = msg.value;
-          hart.setSeiPin(val);
-          if (commandLog)
-            fprintf(commandLog, "hart=%" PRIu32 " sei_pin %d\n", hartId, unsigned(val));
-        }
-        break;
-
 
       default:
         std::cerr << "Unknown command\n";

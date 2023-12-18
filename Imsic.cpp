@@ -18,17 +18,17 @@ File::iregRead(unsigned sel, URV& val) const
   else
     {
       val = 0;
-      unsigned offset;
-      const std::vector<bool>* it;
+      unsigned offset = 0;
+      const std::vector<bool>* vecPtr = nullptr;
       if (sel >= EIC::P0 and sel <= EIC::P63)
         {
           offset = sel - EIC::P0;
-          it = &pending_;
+          vecPtr = &pending_;
         }
       else if (sel >= EIC::E0 and sel <= EIC::E63)
         {
           offset = sel - EIC::E0;
-          it = &enabled_;
+          vecPtr = &enabled_;
         }
       else
         return true;
@@ -37,13 +37,13 @@ File::iregRead(unsigned sel, URV& val) const
         if (offset & 1)
           return false;
 
-      constexpr size_t bits = 8*sizeof(URV);
-      const auto& arr = *it;
-      unsigned begin = offset*bits;
-      unsigned end = std::min((offset + 1)*bits, arr.size());
+      const auto& vec = *vecPtr;
+      constexpr size_t bits = sizeof(URV)*8;
+      unsigned begin = offset*32;
+      unsigned end = std::min(begin + bits, vec.size());
       // slow, use bitset?
       for (unsigned i = begin; i < end; i++)
-        val |= arr.at(i) << (i - begin);
+        val |= uint64_t(vec.at(i)) << (i - begin);
     }
 
   return true;
@@ -62,17 +62,17 @@ File::iregWrite(unsigned sel, URV val)
     threshold_ = val;
   else
     {
-      unsigned offset;
-      std::vector<bool>* it;
+      unsigned offset = 0;
+      std::vector<bool>* vecPtr = nullptr;
       if (sel >= EIC::P0 and sel <= EIC::P63)
         {
           offset = sel - EIC::P0;
-          it = &pending_;
+          vecPtr = &pending_;
         }
       else if (sel >= EIC::E0 and sel <= EIC::E63)
         {
           offset = sel - EIC::E0;
-          it = &enabled_;
+          vecPtr = &enabled_;
         }
       else
         return true;
@@ -81,13 +81,13 @@ File::iregWrite(unsigned sel, URV val)
         if (offset & 1)
           return false;
 
-      constexpr size_t bits = 8*sizeof(URV);
-      auto& arr = *it;
-      unsigned begin = offset*bits;
-      unsigned end = std::min((offset + 1)*bits, arr.size());
+      auto& vec = *vecPtr;
+      constexpr size_t bits = sizeof(URV)*8;
+      unsigned begin = offset*32;
+      unsigned end = std::min(begin + bits, vec.size());
       // slow, use bitset?
       for (unsigned i = begin; i < end; i++)
-        arr[i] = (val >> (i - begin)) & 1;
+        vec[i] = (val >> (i - begin)) & 1;
 
       updateTopId();
     }

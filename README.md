@@ -680,7 +680,12 @@ command will change the program counter to the value of reset_vec.
 
 
 ###  nmi_vec
-Defines the PC address after a non-maskable-interrupt.
+Defines the address of the handler of non-maskable interrupts.
+
+###  nmi_exception_vec
+Defines the address of the handler of exceptions encountered while
+handling non-maskable interrupts.
+
 
 ###  enable_triggers
 Enable support for debug triggers when set to true.
@@ -703,6 +708,10 @@ rules. This feature is enabled by setting the
 "enable_memory_consitency" to "true" in the configuration file or by
 using "--mcm" on the command line. Detailed inforation about the PPO
 rules can be found in chapter 17 of the the [RISCV unprivileged specs.](https://github.com/riscv/riscv-isa-manual/releases/download/draft-20221206-b7080e0/riscv-spec.pdf)
+
+By default, we check the ordering rules of the weak memory ordering
+model (RVWMO). If the enable_tso configuration tag is set to true, we
+check the re-ordering rules of the total-store-order memory model.
 
 Whisper expects to be notified about read and write operations and it
 expects such operations to be associated with time stamps. Each memory
@@ -733,7 +742,6 @@ system. The interactive command for a merge buffer write is:
 ```
    time=<time-stamp> hart=<id> mbwrite <addr> <data>
 ```
-
 Similarly, we provide server mode commands that allows a client
 (typically test bench code running in a verilog simulator) to provide
 whisper information about the time, hart-id, size, instruction tag and

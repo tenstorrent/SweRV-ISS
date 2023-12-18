@@ -253,6 +253,7 @@ struct Args
   bool relativeInstCount = false;
   bool tracePtw = false;   // Enable printing of page table walk info in log.
   bool shm = false;        // Enable shared memory IPC for server mode (default is socket).
+  bool logPerHart = false; // Enable separate log files for each hart.
 
   // Expand each target program string into program name and args.
   void expandTargets();
@@ -278,7 +279,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 816;
+  unsigned subversion = 820;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -566,6 +567,8 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
          "as C symbol tracerExtensionArgs (ex. tracer.so or tracer.so:hello42).")
 	("logstart", po::value<std::string>(),
 	 "Start logging at given instruction rank.")
+	("logperhart", po::bool_switch(&args.logPerHart),
+	 "Use a separate log per hart. This allows a faster trace by reducing lock contention on the logfile.")
 	("setreg", po::value(&args.regInits)->multitoken(),
 	 "Initialize registers. Apply to all harts unless specific prefix "
 	 "present (hart is 1 in 1:x3=0xabc). Example: --setreg x1=4 x2=0xff "
@@ -988,6 +991,7 @@ getIsaStringFromCsr(const Hart<URV>& hart)
   return res;
 }
 
+
 /// Apply command line arguments: Load ELF and HEX files, set
 /// start/end/tohost. Return true on success and false on failure.
 template<typename URV>
@@ -1055,6 +1059,9 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (args.logStart)
     hart.setLogStart(*args.logStart);
+
+  if (args.logPerHart)
+    hart.setOwnTrace(args.logPerHart);
 
   if (not args.loadFrom.empty())
     {
@@ -1406,32 +1413,46 @@ reportInstructionFrequency(Hart<URV>& hart, const std::string& outPath)
 /// if any specified file fails to open.
 static
 bool
-openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
+openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLog,
 	      FILE*& consoleOut, FILE*& bblockFile)
 {
-  size_t len = args.traceFile.size();
-  bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
-
-  if (not args.traceFile.empty())
+  unsigned ix = 0;
+  for (auto& traceFile : traceFiles)
     {
-      if (doGzip)
-	{
-	  std::string cmd = "/usr/bin/gzip -c > ";
-	  cmd += args.traceFile;
-	  traceFile = popen(cmd.c_str(), "w");
-	}
-      else
-	traceFile = fopen(args.traceFile.c_str(), "w");
-      if (not traceFile)
-	{
-	  std::cerr << "Failed to open trace file '" << args.traceFile
-		    << "' for output\n";
-	  return false;
-	}
-    }
+      size_t len = args.traceFile.size();
+      bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
 
-  if (args.trace and traceFile == nullptr)
-    traceFile = stdout;
+      if (not args.traceFile.empty())
+        {
+          std::string name = args.traceFile;
+          if (args.logPerHart)
+            {
+              if (not doGzip)
+                name.append(std::to_string(ix));
+              else
+                name.insert(len - 3, std::to_string(ix));
+            }
+
+          if (doGzip)
+            {
+              std::string cmd = "/usr/bin/gzip -c > ";
+              cmd += name;
+              traceFile = popen(cmd.c_str(), "w");
+            }
+          else
+            traceFile = fopen(name.c_str(), "w");
+          if (not traceFile)
+            {
+              std::cerr << "Failed to open trace file '" << name
+                        << "' for output\n";
+              return false;
+            }
+        }
+
+      if (args.trace and traceFile == nullptr)
+        traceFile = stdout;
+      ++ix;
+    }
 
   if (not args.commandLogFile.empty())
     {
@@ -1474,23 +1495,26 @@ openUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
 /// Counterpart to openUserFiles: Close any open user file.
 static
 void
-closeUserFiles(const Args& args, FILE*& traceFile, FILE*& commandLog,
+closeUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLog,
 	       FILE*& consoleOut, FILE*& bblockFile)
 {
   if (consoleOut and consoleOut != stdout)
     fclose(consoleOut);
   consoleOut = nullptr;
 
-  if (traceFile and traceFile != stdout)
+  for (auto traceFile : traceFiles)
     {
-      size_t len = args.traceFile.size();
-      bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
-      if (doGzip)
-	pclose(traceFile);
-      else
-	fclose(traceFile);
+      if (traceFile and traceFile != stdout)
+        {
+          size_t len = args.traceFile.size();
+          bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
+          if (doGzip)
+            pclose(traceFile);
+          else
+            fclose(traceFile);
+        }
+      traceFile = nullptr;
     }
-  traceFile = nullptr;
 
   if (commandLog and commandLog != stdout)
     fclose(commandLog);
@@ -1513,7 +1537,7 @@ kbdInterruptHandler(int)
 
 template <typename URV>
 static bool
-batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow, unsigned seed)
+batchRun(System<URV>& system, std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow, unsigned seed)
 {
   if (system.hartCount() == 0)
     return true;
@@ -1521,7 +1545,7 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
   if (system.hartCount() == 1)
     {
       auto& hart = *system.ithHart(0);
-      bool ok = hart.run(traceFile);
+      bool ok = hart.run(traceFiles.at(0));
 #ifdef FAST_SLOPPY
       hart.reportOpenedFiles(std::cout);
 #endif
@@ -1537,7 +1561,7 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
       std::atomic<bool> result = true;
       std::atomic<unsigned> finished = 0;  // Count of finished threads.
 
-      auto threadFunc = [&traceFile, &result, &finished] (Hart<URV>* hart) {
+      auto threadFunc = [&result, &finished] (Hart<URV>* hart, FILE* traceFile) {
                           bool r = hart->run(traceFile);
                           result = result and r;
                           finished++;
@@ -1546,7 +1570,7 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
       for (unsigned i = 0; i < system.hartCount(); ++i)
         {
           Hart<URV>* hart = system.ithHart(i).get();
-          threadVec.emplace_back(std::thread(threadFunc, hart));
+          threadVec.emplace_back(std::thread(threadFunc, hart, traceFiles.at(i)));
         }
 
       if (waitAll)
@@ -1582,6 +1606,8 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
 
       srand(seed);
 
+      std::cout << "Deterministic multi-hart run with seed: " << seed << " and steps distribution between 1 and " << stepWindow << "\n";
+
       while ((waitAll and finished != system.hartCount()) or
              (not waitAll and finished == 0))
         {
@@ -1589,7 +1615,8 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
             {
               unsigned steps = (rand() % stepWindow) + 1;
               // step N times
-              auto [terminate, tmp] = (*it)->runSteps(steps, traceFile);
+              unsigned ix = (*it)->sysHartIndex();
+              auto [terminate, tmp] = (*it)->runSteps(steps, traceFiles.at(ix));
               result = result and tmp;
 
               if (terminate)
@@ -1601,8 +1628,6 @@ batchRun(System<URV>& system, FILE* traceFile, bool waitAll, uint64_t stepWindow
                 it++;
             }
         };
-
-      std::cout << "Deterministic multi-hart run with seed: " << seed << " and steps distribution between 1 and " << stepWindow << "\n";
       return result;
     }
 }
@@ -1767,7 +1792,7 @@ loadTracerLibrary(const std::string& tracerLib)
 template <typename URV>
 static
 bool
-sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
+sessionRun(System<URV>& system, const Args& args, std::vector<FILE*>& traceFiles, FILE* cmdLog)
 {
   if (not loadTracerLibrary<URV>(args.tracerLib))
     return false;
@@ -1785,8 +1810,8 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
     }
 
   if (serverMode)
-    return (args.shm)? runServerShm(system, args.serverFile, traceFile, cmdLog) :
-                       runServer(system, args.serverFile, traceFile, cmdLog);
+    return (args.shm)? runServerShm(system, args.serverFile, traceFiles.at(0), cmdLog) :
+                       runServer(system, args.serverFile, traceFiles.at(0), cmdLog);
 
   if (args.interactive)
     {
@@ -1799,20 +1824,20 @@ sessionRun(System<URV>& system, const Args& args, FILE* traceFile, FILE* cmdLog)
       sigaction(SIGINT, &newAction, nullptr);
 
       Interactive interactive(system);
-      return interactive.interact(traceFile, cmdLog);
+      return interactive.interact(traceFiles.at(0), cmdLog);
     }
 
   if (not args.snapshotPeriods.empty())
     {
       if (system.hartCount() == 1)
-        return snapshotRun(system, traceFile, args.snapshotDir, args.snapshotPeriods);
+        return snapshotRun(system, traceFiles.at(0), args.snapshotDir, args.snapshotPeriods);
       std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
     }
 
   bool waitAll = not args.quitOnAnyHart;
   uint64_t stepWindow = args.deterministic.value_or(0);
   unsigned seed = args.seed.value_or(time(NULL));
-  return batchRun(system, traceFile, waitAll, stepWindow, seed);
+  return batchRun(system, traceFiles, waitAll, stepWindow, seed);
 }
 
 
@@ -1970,11 +1995,11 @@ session(const Args& args, const HartConfig& config)
       return false;
     }
 
-  FILE* traceFile = nullptr;
+  std::vector<FILE*> traceFiles(system.hartCount(), nullptr);
   FILE* commandLog = nullptr;
   FILE* consoleOut = stdout;
   FILE* bblockFile = nullptr;
-  if (not openUserFiles(args, traceFile, commandLog, consoleOut, bblockFile))
+  if (not openUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile))
     return false;
 
   bool newlib = false, linux = false;
@@ -2016,7 +2041,7 @@ session(const Args& args, const HartConfig& config)
 	return false;
     }
 
-  bool result = sessionRun(system, args, traceFile, commandLog);
+  bool result = sessionRun(system, args, traceFiles, commandLog);
 
   auto& hart0 = *system.ithHart(0);
   if (not args.instFreqFile.empty())
@@ -2036,7 +2061,7 @@ session(const Args& args, const HartConfig& config)
       std::cout << "Used blocks: 0x" << std::hex << bytes << std::endl;
     }
 
-  closeUserFiles(args, traceFile, commandLog, consoleOut, bblockFile);
+  closeUserFiles(args, traceFiles, commandLog, consoleOut, bblockFile);
 
   return result;
 }
