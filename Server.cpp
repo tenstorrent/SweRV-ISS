@@ -236,7 +236,7 @@ Server<URV>::pokeCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
         URV val = static_cast<URV>(req.value);
         if (req.address == WhisperSpecialResource::DeferredInterrupts)
           hart.setDeferredInterrupts(val);
-        else if (req.address == WhisperSpecialResource::SeiPin)
+        else if (req.address == WhisperSpecialResource::Seipin)
 	  hart.setSeiPin(val);
 	else
           ok = false;
@@ -340,7 +340,7 @@ Server<URV>::peekCommand(const WhisperMessage& req, WhisperMessage& reply, Hart<
 	  case WhisperSpecialResource::DeferredInterrupts:
 	    reply.value = hart.deferredInterrupts();
 	    return true;
-	  case WhisperSpecialResource::SeiPin:
+	  case WhisperSpecialResource::Seipin:
 	    reply.value = hart.getSeiPin();
 	    return true;
 	  default:
@@ -841,7 +841,7 @@ specialResourceToStr(uint64_t v)
     case WhisperSpecialResource::FpFlags:             return "iff";
     case WhisperSpecialResource::Trap:                return "trap";
     case WhisperSpecialResource::DeferredInterrupts:  return "defi";
-    case WhisperSpecialResource::SeiPin:              return "seipin";
+    case WhisperSpecialResource::Seipin:              return "seipin";
     }
   return "?";
 }
