@@ -285,6 +285,59 @@ namespace WdRiscv
         }
     }
 
+    using SVP = std::pair<URV, uint64_t>;  // select-value pair
+    void getModifiedImsicCsrs(std::vector<SVP>& mcvps,
+                              std::vector<SVP>& scvps,
+                              std::vector<std::vector<SVP>>& gcvps) const
+    {
+      if (not hart_->imsic())
+        return;
+
+      const auto& imsic = (*hart_->imsic());
+
+      std::vector<std::pair<unsigned, unsigned>> mselects, sselects;
+      std::vector<std::vector<std::pair<unsigned, unsigned>>> gselects;
+
+      imsic.fileTraces(mselects, sselects, gselects);
+
+      bool ok; uint64_t value;
+      for (auto [select, size] : mselects)
+        {
+          if (size == 4)
+            ok = imsic.template readMireg<uint32_t>(select, value);
+          else
+            ok = imsic.readMireg(select, value);
+          if (ok)
+            mcvps.emplace_back(select, value);
+        }
+
+      for (auto [select, size] : sselects)
+        {
+          if (size == 4)
+            ok = imsic.template readSireg<uint32_t>(false, 0 /* guest */, select, value);
+          else
+            ok = imsic.readSireg(false, 0 /* guest */, select, value);
+          if (ok)
+            scvps.emplace_back(select, value);
+        }
+
+      for (unsigned i = 0; i < gselects.size(); ++i)
+        {
+          std::vector<SVP> tmp;
+          for (auto [select, size] : gselects.at(i))
+            {
+              if (size == 4)
+                ok = imsic.template readSireg<uint32_t>(true, i, select, value);
+              else
+                ok = imsic.readSireg(true, i, select, value);
+
+              if (ok)
+                tmp.emplace_back(select, value);
+            }
+          gcvps.push_back(std::move(tmp));
+        }
+    }
+
     /// TODO: add support for vector ld/st
     unsigned lastLdStAddress(uint64_t& virtAddr, uint64_t& physAddr) const
     { return hart_->lastLdStAddress(virtAddr, physAddr); /* this returns the size of the last ld/st*/ }

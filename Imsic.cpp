@@ -56,6 +56,9 @@ File::iregWrite(unsigned sel, URV val)
 {
   using EIC = ExternalInterruptCsr;
 
+  if (trace_)
+    selects_.emplace_back(sel, sizeof(URV));
+
   if (sel == EIC::DELIVERY)
     delivery_ = val;
   else if (sel == EIC::THRESHOLD)

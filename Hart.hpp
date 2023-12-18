@@ -642,6 +642,10 @@ namespace WdRiscv
     const VirtMem& virtMem() const
     { return virtMem_; }
 
+    /// Return the IMSIC associated with this hart.
+    const std::shared_ptr<TT_IMSIC::Imsic> imsic() const
+    { return imsic_; }
+
     /// Locate the ELF function containing the give address returning true
     /// on success and false on failure.  If successful set name to the
     /// corresponding function name and symbol to the corresponding symbol
@@ -1713,6 +1717,13 @@ namespace WdRiscv
     /// Enable/disable PMA access trace
     void tracePma(bool flag)
     { memory_.pmaMgr_.enableTrace(flag); }
+
+    /// Enable/disable IMSIC trace
+    void traceImsic(bool flag)
+    {
+      if (imsic_)
+        imsic_->enableTrace(flag);
+    }
 
     /// Enable/disable top-of-range mode in pmp configurations.
     void enablePmpTor(bool flag)

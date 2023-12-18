@@ -65,8 +65,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     { return config_ and id < enabled_.size() and enabled_.at(id); }
 
     /// Mark the given interrupt id as pending/not-pending. Marking id 0
-    /// or an out of bounds id has no effect. Update the highest priority
-    /// enabled top id.
+    /// or an out of bounds id has no effect.
+    /// Update the highest priority enabled top id.
     void setPending(unsigned id, bool flag)
     {
       if (id > 0 and id < pending_.size())
@@ -79,6 +79,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	      else
 		updateTopId();
 	    }
+
+          // We trace the 8B base address
+          if (trace_)
+            selects_.emplace_back(id >> 6, sizeof(uint64_t));
 	}
     }
 
@@ -96,6 +100,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	      else
 		updateTopId();
 	    }
+
+          // We trace the 8B base address
+          if (trace_)
+            selects_.emplace_back(id >> 6, sizeof(uint64_t));
 	}
     }
 
@@ -197,6 +205,16 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool iregWrite(unsigned select, URV val);
 
+    void enableTrace(bool flag)
+    { trace_ = flag; }
+
+    void iregModified(std::vector<std::pair<unsigned, unsigned>>& selects) const
+    { selects = selects_; }
+
+    /// Clear trace related information.
+    void clearTrace()
+    { selects_.clear(); }
+
   private:
 
     uint64_t addr_ = 0;
@@ -207,6 +225,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned threshold_ = 0;
     bool config_ = false;
     unsigned pageSize_ = 4096;
+
+    // For coverage information
+    bool trace_ = false;
+    std::vector<std::pair<unsigned, unsigned>> selects_;
   };
 
 
@@ -463,6 +485,40 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     void attachGInterrupt(const std::function<void(bool, unsigned)>& cb)
     { gInterrupt_ = cb; }
+
+    void enableTrace(bool flag)
+    {
+      mfile_.enableTrace(flag);
+      sfile_.enableTrace(flag);
+      for (auto& g : gfiles_)
+        g.enableTrace(flag);
+    }
+
+    void fileTraces(std::vector<std::pair<unsigned, unsigned>>& mselects,
+                    std::vector<std::pair<unsigned, unsigned>>& sselects,
+                    std::vector<std::vector<std::pair<unsigned, unsigned>>>& gselects) const
+    {
+      mselects.clear();
+      sselects.clear();
+      gselects.clear();
+
+      mfile_.iregModified(mselects);
+      sfile_.iregModified(sselects);
+      for (auto& g : gfiles_)
+        {
+          std::vector<std::pair<unsigned, unsigned>> tmp;
+          g.iregModified(tmp);
+          gselects.push_back(std::move(tmp));
+        }
+    }
+
+    void clearTrace()
+    {
+      mfile_.clearTrace();
+      sfile_.clearTrace();
+      for (auto& g : gfiles_)
+        g.clearTrace();
+    }
 
   private:
 
