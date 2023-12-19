@@ -1913,6 +1913,16 @@ CsRegs<URV>::recordWrite(CsrNumber num)
   auto& lwr = lastWrittenRegs_;
   if (std::find(lwr.begin(), lwr.end(), num) == lwr.end())
     lwr.push_back(num);
+  unsigned ix = unsigned(num);
+
+  // When CSR with corresponds virtual CSR is written (e.g. stval and
+  // vstval), mark the virtual CSR so that it gets reported as modified.
+  if (virtMode_ and ix < regs_.size() and regs_.at(ix).mapsToVirtual())
+    {
+      CsrNumber vnum = advance(num, 0x100);  // Get VCSR corresponding to CSR
+      if (std::find(lwr.begin(), lwr.end(), vnum) == lwr.end())
+	lwr.push_back(vnum);
+    }
 }
 
 
