@@ -9989,7 +9989,9 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     {
       if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
 	{
-	  virtualInst(di);  // Section 2.3 of AIA.
+	  if (virtMode_)
+	    virtualInst(di);  // Section 2.3 of AIA.
+	  illegalInst(di);
 	  return false;
 	}
 
@@ -10111,7 +10113,9 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
     {
       if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
 	{
-	  virtualInst(di);  // Section 2.3 of AIA.
+	  if (virtMode_)
+	    virtualInst(di);  // Section 2.3 of AIA.
+	  illegalInst(di);
 	  return;
 	}
 
