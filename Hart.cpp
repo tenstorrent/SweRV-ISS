@@ -4446,7 +4446,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    countBasicBlocks(di);
 
 	  if (instrLineTrace_)
-	    memory_.traceInstructionLine(currPc_);
+	    memory_.traceInstructionLine(physPc);
 
 	  if (doStats)
 	    accumulateInstructionStats(*di);
@@ -4692,7 +4692,7 @@ Hart<URV>::simpleRunWithLimit()
 	  ++retiredInsts_;
 
       if (instrLineTrace_)
-	memory_.traceInstructionLine(currPc_);
+	memory_.traceInstructionLine(physPc);
 
       if (bbFile_)
 	countBasicBlocks(di);
