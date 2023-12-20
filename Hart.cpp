@@ -10564,7 +10564,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  if (not pmp2.isWrite(effectivePrivilege()))
 	    {
 	      addr1 = va2;
-	      return EC::LOAD_ACC_FAULT;
+	      return EC::STORE_ACC_FAULT;
 	    }
 	}
     }
