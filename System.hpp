@@ -119,7 +119,10 @@ namespace WdRiscv
     /// 0, 1, 1, 2, 1 and the compresses addresse reported will be
     /// 0, 2, 1.
     void enableDataLineTrace(const std::string& path)
-    { memory_->enableDataLineTrace(path); }
+    {
+      memory_->enableDataLineTrace(path);
+      for (auto hart : sysHarts_)  hart->enableDataLineTrace();
+    }
 
     /// Similar to enableDataLineTrace but for instructions.
     void enableInstructionLineTrace(const std::string& path)

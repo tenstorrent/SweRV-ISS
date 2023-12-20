@@ -1821,6 +1821,9 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
 	dumpInitState("load", virtAddr + ldStSize_, addr2 + ldStSize_);
     }
 
+  if (dataLineTrace_)
+    memory_.traceDataLine(virtAddr, addr1);
+
   // Check for load-data-trigger.
   if (hasActiveTrigger())
     {
@@ -2043,6 +2046,9 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal,
     }
 
   memWrite(addr1, addr2, storeVal);
+
+  if (dataLineTrace_)
+    memory_.traceDataLine(virtAddr, addr1);
 
   STORE_TYPE temp = 0;
   memPeek(addr1, addr2, temp, false /*usePma*/);
@@ -4446,7 +4452,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    countBasicBlocks(di);
 
 	  if (instrLineTrace_)
-	    memory_.traceInstructionLine(physPc);
+	    memory_.traceInstructionLine(currPc_, physPc);
 
 	  if (doStats)
 	    accumulateInstructionStats(*di);
@@ -4692,7 +4698,7 @@ Hart<URV>::simpleRunWithLimit()
 	  ++retiredInsts_;
 
       if (instrLineTrace_)
-	memory_.traceInstructionLine(physPc);
+	memory_.traceInstructionLine(currPc_, physPc);
 
       if (bbFile_)
 	countBasicBlocks(di);

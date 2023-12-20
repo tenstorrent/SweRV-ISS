@@ -948,7 +948,7 @@ Memory::loadSnapshot(const std::string & filename,
 
 bool
 Memory::saveAddressTrace(std::string_view tag,
-			 const std::unordered_map<uint64_t, uint64_t>& lineMap,
+			 const LineMap& lineMap,
 			 const std::string& path)
 {
   std::ofstream out(path, std::ios::trunc);
@@ -970,13 +970,19 @@ Memory::saveAddressTrace(std::string_view tag,
 
   std::sort(addrVec.begin(), addrVec.end(),
 	    [&lineMap](uint64_t a, uint64_t b) {
-	      return lineMap.at(a) < lineMap.at(b);
+	      return lineMap.at(a).order < lineMap.at(b).order;
 	    });
 
   out << std::hex;
 
-  for (auto a : addrVec)
-    out << a << '\n';
+  for (auto vaddr : addrVec)
+    {
+      out << vaddr;
+      uint64_t paddr = lineMap.at(vaddr).paddr;
+      if (paddr != vaddr)
+	out << ':' << paddr;
+      out << '\n';
+    }
 
   out << std::dec;
 

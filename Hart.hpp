@@ -1697,6 +1697,10 @@ namespace WdRiscv
     void enableInstructionLineTrace()
     { instrLineTrace_ = true; }
 
+    /// Enable instruction line address tracing.
+    void enableDataLineTrace()
+    { dataLineTrace_ = true; }
+
     /// Enable/disable page-table-walk info in log.
     void tracePtw(bool flag)
     { tracePtw_ = flag; }
@@ -4698,6 +4702,7 @@ namespace WdRiscv
     bool csvTrace_ = false;      // Print trace in CSV format.
 
     bool instrLineTrace_ = false;
+    bool dataLineTrace_ = false;
 
     unsigned cacheLineSize_ = 64;
 

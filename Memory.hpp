@@ -125,9 +125,6 @@ namespace WdRiscv
       value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
 
-      if (dataLineTrace_)
-	traceDataLine(address);
-
       return true;
     }
 
@@ -237,8 +234,6 @@ namespace WdRiscv
 #ifdef FAST_SLOPPY
       if (address + sizeof(T) > size_)
         return false;
-      if (dataLineTrace_)
-	traceDataLine(address);
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
@@ -261,8 +256,6 @@ namespace WdRiscv
           return writeRegister(sysHartIx, address, value);
 	}
 
-      if (dataLineTrace_)
-	traceDataLine(address);
   #ifdef MEM_CALLBACKS
       uint64_t val = value;
       if (not writeCallback_(address, sizeof(T), val))
@@ -749,17 +742,25 @@ namespace WdRiscv
     /// Helper to loadElfFile: Collet ELF sections.
     void collectElfSections(ELFIO::elfio& reader);
 
+    /// Structure to track data lines referenced by a run.
+    struct LineEntry
+    {
+      uint64_t paddr = 0;   // Physical line number.
+      uint64_t order = 0;   // Reference order.
+    };
+    typedef std::unordered_map<uint64_t, LineEntry> LineMap;
+
     static bool saveAddressTrace(std::string_view tag,
-                                 const std::unordered_map<uint64_t, uint64_t>& lineMap,
+                                 const LineMap& lineMap,
                                  const std::string& path);
 
     /// Add line of given address to the data line address trace.
-    void traceDataLine(uint64_t addr) const
-    { dataLineMap_[addr >> lineShift_] = memRefCount_++; }
+    void traceDataLine(uint64_t vaddr, uint64_t paddr)
+    { dataLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
 
     /// Add line of given address to the instruction line address trace.
-    void traceInstructionLine(uint64_t addr) const
-    { instrLineMap_[addr >> lineShift_] = memRefCount_++; }
+    void traceInstructionLine(uint64_t vaddr, uint64_t paddr)
+    { instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
 
   private:
 
@@ -798,9 +799,9 @@ namespace WdRiscv
     std::string dataLineFile_;
     std::string instrLineFile_;
     unsigned lineShift_ = 6;   // log2 of line size.
-    mutable uint64_t memRefCount_ = 0;
-    mutable std::unordered_map<uint64_t, uint64_t> dataLineMap_;  // Map line addr to order
-    mutable std::unordered_map<uint64_t, uint64_t> instrLineMap_;  // Map line addr to order
+    uint64_t memRefCount_ = 0;
+    LineMap dataLineMap_;   // Map virt data line addr to phys line and order.
+    LineMap instrLineMap_;  // Map virt instr line line addr to phys line and order.
 
     std::vector<std::shared_ptr<IoDevice>> ioDevs_;
 
