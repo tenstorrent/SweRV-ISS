@@ -977,10 +977,8 @@ Memory::saveAddressTrace(std::string_view tag,
 
   for (auto vaddr : addrVec)
     {
-      out << vaddr;
       uint64_t paddr = lineMap.at(vaddr).paddr;
-      if (paddr != vaddr)
-	out << ':' << paddr;
+      out << vaddr << ':' << paddr;
       out << '\n';
     }
 
