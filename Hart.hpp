@@ -40,6 +40,7 @@
 #include "Imsic.hpp"
 #include "FetchCache.hpp"
 #include "pci/Pci.hpp"
+#include "Stee.hpp"
 
 
 namespace WdRiscv
@@ -1852,6 +1853,18 @@ namespace WdRiscv
 
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
+
+    void configSteeZeroMask(uint64_t mask)
+    { stee_.configZeroMask(mask); }
+
+    void configSteeSecureMask(uint64_t mask)
+    { stee_.configSecureMask(mask); }
+
+    void configSteeSecureRegion(uint64_t low, uint64_t high)
+    { stee_.configSecureRegion(low, high); }
+
+    void enableStee(bool flag)
+    { steeEnabled_ = flag; }
 
   protected:
 
@@ -4824,6 +4837,10 @@ namespace WdRiscv
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.
     PmpManager pmpManager_;
+
+    // Static tee (truseted execution environment).
+    bool steeEnabled_ = false;
+    TT_STEE::Stee stee_;
 
     VirtMem virtMem_;
     Isa isa_;

@@ -958,6 +958,62 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
 }
 
 
+template <typename URV>
+static
+bool
+applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
+{
+  if (not config.contains("stee"))
+    return true;  // Nothing to apply
+
+  unsigned errors = 0;
+  const auto& sconf = config.at("stee");
+  
+  std::string tag = "zero_mask";
+  if (sconf.contains(tag))
+    {
+      uint64_t mask = 0;
+      if (not getJsonUnsigned(tag, sconf.at(tag), mask))
+	errors++;
+      else
+	hart.configSteeZeroMask(mask);
+    }
+
+  tag = "secure_mask";
+  if (sconf.contains(tag))
+    {
+      uint64_t mask = 0;
+      if (not getJsonUnsigned(tag, sconf.at(tag), mask))
+	errors++;
+      else
+	hart.configSteeSecureMask(mask);
+    }
+
+  tag = "secure_region";
+  if (sconf.contains(tag))
+    {
+      std::vector<uint64_t> vec;
+      if (not getJsonUnsignedVec(tag, sconf.at(tag), vec))
+	errors++;
+      else
+	{
+	  if (vec.size() != 2)
+	    {
+	      std::cerr << "Invalid config file stee.secure_region: Expecting an array of 2 integers\n";
+	      errors++;
+	    }
+	  else
+	    hart.configSteeSecureRegion(vec.at(0), vec.at(1));
+	}
+    }
+
+  if (not errors)
+    hart.enableStee(true);
+
+  return errors == 0;
+}
+
+
 /// Collect the physical memory attributes from the given json object
 /// (tagged "attribs") and add them to the given Pma object.  Return
 /// true on success and false on failure. Path is the hierarchical
@@ -1408,6 +1464,8 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableTrapNonZeroVstart(flag);
     }
   applyVectorConfig(hart, *config_) or errors++;
+
+  applySteeConfig(hart, *config_) or errors++;
 
   tag = "even_odd_trigger_chains";
   if (config_ -> contains(tag))

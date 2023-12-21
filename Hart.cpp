@@ -663,7 +663,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   updateTranslationPbmt();
   csRegs_.updateSstc();
 
-  // If any PMPCFG CSR is defined, change the default PMA to no access.
+  // If any PMACFG CSR is defined, change the default PMA to no access.
   bool hasPmacfg = false;
   using CN = CsrNumber;
   for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG31); ++ix)
@@ -1587,6 +1587,14 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
+    }
+
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
+	return EC::LOAD_ACC_FAULT;
     }
 
   if (not misal)
@@ -10573,6 +10581,14 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	      return EC::STORE_ACC_FAULT;
 	    }
 	}
+    }
+
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, stSize))
+	return EC::STORE_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
+	return EC::STORE_ACC_FAULT;
     }
 
   if (not misal)
