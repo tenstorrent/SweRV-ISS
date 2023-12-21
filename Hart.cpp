@@ -9916,7 +9916,7 @@ Hart<URV>::execWfi(const DecodedInst* di)
     {
       if (virtMode_)
 	virtualInst(di);   // VU mode and TW=0. Section 9.6 of privilege spec.
-      if (wfiTimeout_ == 0)
+      else if (wfiTimeout_ == 0)
 	illegalInst(di);
       return;
     }
