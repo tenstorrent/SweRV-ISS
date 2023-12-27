@@ -961,7 +961,9 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
   if (data == op.rtlData_)
     return true;
 
-  cerr << "Error: RTL/whisper write mismatch time=" << op.time_
+  const char* tag = instr.di_.isAmo()? " AMO " : " ";
+
+  cerr << "Error: RTL/whisper" << tag << "write mismatch time=" << op.time_
        << " hart-id=" << hartId << " instr-tag="
        << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
        << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
