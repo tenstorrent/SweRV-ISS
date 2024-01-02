@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "internals.h"
 #include "softfloat.h"
 
+/** sig last significant bit is sig[7], the 7 LSBs will be used for rounding */
 bfloat16_t
  softfloat_roundPackToBF16( bool sign, int_fast16_t exp, uint_fast16_t sig )
 {
@@ -72,9 +73,7 @@ bfloat16_t
             isTiny =
                 (softfloat_detectTininess == softfloat_tininess_beforeRounding)
                     || (exp < -1) || (sig + roundIncrement < 0x8000);
-            if (sig & 0x4000) {
-                sig = softfloat_shiftRightJam32( sig, -exp );
-            }
+            sig = softfloat_shiftRightJam32( sig, -exp );
             exp = 0;
             roundBits = sig & 0x7F;
             if ( isTiny && roundBits ) {
