@@ -598,7 +598,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x10: return instTable_.getEntry(InstId::vadc_vim);
         case 0x11: return instTable_.getEntry(InstId::vmadc_vim);
 	case 0x14: return instTable_.getEntry(InstId::vror_vi); // Bit 26 is zero.
-	case 0x15: op2 = uimm | 0x2f; return instTable_.getEntry(InstId::vror_vi); // Bit 26 is 1.
+	case 0x15: op2 = uimm | 0x20; return instTable_.getEntry(InstId::vror_vi); // Bit 26 is 1.
 	case 0x17:
           if (vm == 0) return instTable_.getEntry(InstId::vmerge_vim);
           if (vm == 1)
