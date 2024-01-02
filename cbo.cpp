@@ -23,14 +23,16 @@ using namespace WdRiscv;
 
 template <typename URV>
 ExceptionCause
-Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isRead)
+Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isZero)
 {
   uint64_t mask = uint64_t(cacheLineSize_) - 1;
   addr &= ~mask;  // Make addr a multiple of cache line size.
 
   addr = URV(addr);   // Truncate to 32 bits in 32-bit mode.
 
-  ExceptionCause cause = ExceptionCause::NONE;
+  using EC = ExceptionCause;
+
+  EC cause = EC::NONE;
 
   // Address translation
   if (isRvs())
@@ -46,10 +48,29 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
       if (pm != PrivilegeMode::Machine)
         {
           gpa = pa = addr;
-	  bool read = isRead, write = not isRead, exec = false;
-          cause = virtMem_.translate(addr, pm, virt, read, write, exec, gpa, pa);
-          if (cause != ExceptionCause::NONE)
-            return cause;
+	  if (isZero)
+	    {
+	      bool read = false, write = true, exec = false;
+	      cause = virtMem_.translate(addr, pm, virt, read, write, exec, gpa, pa);
+	      if (cause != EC::NONE)
+		return cause;
+	    }
+	  else
+	    {
+	      // If load or store is allowed CBO is allowed.
+	      bool read = true, write = false, exec = false;
+	      cause = virtMem_.translate(addr, pm, virt, read, write, exec, gpa, pa);
+	      if (cause != EC::NONE)
+		{
+		  if (cause == EC::LOAD_ACC_FAULT)
+		    return EC::STORE_ACC_FAULT;
+		  if (cause == EC::LOAD_PAGE_FAULT)
+		    return EC::STORE_PAGE_FAULT;
+		  if (cause == EC::LOAD_GUEST_PAGE_FAULT)
+		    return EC::STORE_GUEST_PAGE_FAULT;
+		  return cause;
+		}
+	    }
         }
     }
 
@@ -57,29 +78,23 @@ Hart<URV>::determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, boo
   if (pmpEnabled_)
     {
       assert((cacheLineSize_ % 8) == 0);
-      if (isRead)
+      auto ep = effectivePrivilege();
+
+      for (uint64_t i = 0; i < cacheLineSize_; i += 8)
 	{
-	  for (uint64_t i = 0; i < cacheLineSize_; i += 8)
+	  uint64_t dwa = pa + i*8;  // Double word address
+	  Pmp pmp = pmpManager_.accessPmp(dwa, PmpManager::AccessReason::LdSt);
+	  if (isZero)
 	    {
-	      uint64_t dwa = pa + i*8;  // Double word address
-	      Pmp pmp = pmpManager_.accessPmp(dwa, PmpManager::AccessReason::LdSt);
-	      if (not pmp.isRead(effectivePrivilege()))
-		return ExceptionCause::LOAD_ACC_FAULT;
+	      if (not pmp.isWrite(ep))
+		return EC::STORE_ACC_FAULT;
 	    }
-	}
-      else
-	{
-	  for (uint64_t i = 0; i < cacheLineSize_; i += 8)
-	    {
-	      uint64_t dwa = pa + i*8;  // Double word address
-	      Pmp pmp = pmpManager_.accessPmp(dwa, PmpManager::AccessReason::LdSt);
-	      if (not pmp.isWrite(effectivePrivilege()))
-		return ExceptionCause::STORE_ACC_FAULT;
-	    }
+	  else if (not pmp.isRead(ep) and not pmp.isWrite(ep))
+	    return EC::STORE_ACC_FAULT;
 	}
     }
 
-  return ExceptionCause::NONE;
+  return EC::NONE;
 }
 
 
@@ -98,20 +113,31 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
 
   MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
   SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
+  HenvcfgFields<URV> henvf(isRvh()? peekCsr(CsrNumber::HENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
-       (pm == PM::User and not senvf.bits_.CBCFE) )
+       (not virtMode_ and pm == PM::User and not senvf.bits_.CBCFE) )
     {
       illegalInst(di);
       return;
     }
 
+  if (virtMode_)
+    {
+      if ( (pm == PM::Supervisor and not henvf.bits_.CBCFE) or
+	   (pm == PM::User and not (henvf.bits_.CBCFE and senvf.bits_.CBCFE)) )
+	{
+	  virtualInst(di);
+	  return;
+	}
+    }
+
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
-  bool isRead = false;
+  bool isZero = false;
 
-  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
@@ -135,20 +161,31 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
 
   MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
   SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
+  SenvcfgFields<URV> henvf(isRvs()? peekCsr(CsrNumber::HENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
-       (pm == PM::User and not senvf.bits_.CBCFE) )
+       (not virtMode_ and pm == PM::User and not senvf.bits_.CBCFE) )
     {
       illegalInst(di);
       return;
     }
 
+  if (virtMode_)
+    {
+      if ( (pm == PM::Supervisor and not henvf.bits_.CBCFE) or
+	   (pm == PM::User and not (henvf.bits_.CBCFE and senvf.bits_.CBCFE)) )
+	{
+	  virtualInst(di);
+	  return;
+	}
+    }
+
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
-  bool isRead = false;
+  bool isZero = false;
 
-  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
@@ -172,25 +209,49 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
 
   MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
   SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
+  HenvcfgFields<URV> henvf(isRvh()? peekCsr(CsrNumber::HENVCFG) : 0);
 
-  if ( (pm != PM::Machine and not menvf.bits_.CBIE) or
-       (pm == PM::User and not senvf.bits_.CBIE) )
+  if ( (pm != PM::Machine and menvf.bits_.CBIE == 0) or
+       (not virtMode_ and pm == PM::User and senvf.bits_.CBIE == 0) )
     {
       illegalInst(di);
       return;
     }
 
+  if (virtMode_)
+    {
+      if ( (pm == PM::Supervisor and henvf.bits_.CBIE == 0) or
+	   (pm == PM::User and (henvf.bits_.CBIE == 0 or senvf.bits_.CBIE == 0)) )
+	{
+	  virtualInst(di);
+	  return;
+	}
+    }
+							   
+
+#if 0
   // If we are doing a flush then we require write access. If we are
   // doing an invalidate then we only require read access.
-  bool isFlush = ( (pm != PM::Machine and menvf.bits_.CBIE) or
-		   (pm == PM::User and senvf.bits_.CBIE) );
-  bool isRead = not isFlush;
+  bool isFlush = false;
+  if (not virtMode_)
+    {
+      isFlush = ( (pm != PM::Machine and menvf.bits_.CBIE == 1) or
+		  (pm == PM::User and senvf.bits_.CBIE == 1) );
+    }
+  else
+    {
+      isFlush = ( (pm == PM::Supervisor and henvf.bits_.CBIE == 1) or
+		  (pm == PM::User and (henvf.bits_.CBIE == 1 or senvf.bits_.CBIE == 1)) );
+    }
+#endif
+
+  bool isZero = false;
 
   uint64_t virtAddr = intRegs_.read(di->op0());
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
@@ -214,12 +275,23 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
 
   MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
   SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
+  HenvcfgFields<URV> henvf(isRvh()? peekCsr(CsrNumber::HENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBZE) or
-       (pm == PM::User and not senvf.bits_.CBZE) )
+       (not virtMode_ and pm == PM::User and not senvf.bits_.CBZE) )
     {
       illegalInst(di);
       return;
+    }
+
+  if (virtMode_)
+    {
+      if ( (pm == PM::Supervisor and not henvf.bits_.CBZE) or
+	   (pm == PM::User and not (henvf.bits_.CBZE and senvf.bits_.CBZE)) )
+	{
+	  virtualInst(di);
+	  return;
+	}
     }
 
   // Translate virtual addr and check for exception.
@@ -230,8 +302,8 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   uint64_t gPhysAddr = virtAddr;
   uint64_t physAddr = virtAddr;
 
-  bool isRead = false;
-  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isRead);
+  bool isZero = true;
+  auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     {
       initiateStoreException(cause, virtAddr, gPhysAddr);
