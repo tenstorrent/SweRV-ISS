@@ -584,15 +584,19 @@ CsRegs<URV>::updateSstc()
   flag = flag and hyperEnabled_;
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   vstimecmp->setImplemented(flag);
-  vstimecmp->setHypervisor(!hstce);
+  vstimecmp->setHypervisor(true);
   vstimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
       vstimecmph->setImplemented(flag);
-      vstimecmph->setHypervisor(!hstce);
+      vstimecmph->setHypervisor(true);
       vstimecmph->setPrivilegeMode(mode);
     }
+
+  stimecmp->setHypervisor(!hstce);
+  if (rv32_)
+    findCsr(CsrNumber::STIMECMPH)->setHypervisor(!hstce);
 
   auto hip = findCsr(CsrNumber::HIP);
   if (hip)
@@ -1430,6 +1434,9 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
     updateVirtInterruptCtl();
   else
     hyperWrite(csr);   // Update hypervisor CSR aliased bits.
+
+  if (num == CN::MENVCFG or num == CN::HENVCFG)
+    updateSstc();
 
   return true;
 }
@@ -2951,6 +2958,9 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
   else
     hyperPoke(csr);    // Update hypervisor CSR aliased bits.
 
+  if (num == CN::MENVCFG or num == CN::HENVCFG)
+    updateSstc();
+
   return true;
 }
 
@@ -3425,13 +3435,13 @@ CsRegs<URV>::updateCounterPrivilege()
     {
       if (csr)
         {
-          if ((mMask & 2) == 0)  // TM bit set in mcounteren.
+          if ((mMask & 2) == 0)  // TM bit clear in mcounteren.
             csr->setPrivilegeMode(PrivilegeMode::Machine);
           else if (superEnabled_)
             csr->setPrivilegeMode(PrivilegeMode::Supervisor);
 
-          if (((hMask & 2) == 0) or ((mMask & 2) == 0)) // TM set in both mcounteren/hcounteren
-            csr->setHypervisor(true);
+          if (((hMask & 2) == 0) or ((mMask & 2) == 0)) // TM clear in either mcounteren/hcounteren
+            csr->setHypervisor(true);  // CSR is for HS mode.
           else
             csr->setHypervisor(false);
         }
