@@ -346,6 +346,29 @@ CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
 
 template <typename URV>
 bool
+CsRegs<URV>::readVsireg(CsrNumber num, URV& value) const
+{
+  URV sel = 0;
+  peek(CsrNumber::SISELECT, sel);
+  if (imsic_)
+    {
+      auto csr = getImplementedCsr(num, virtMode_);
+      if (not csr)
+	return false;
+
+      URV hs = 0;
+      peek(CsrNumber::HSTATUS, hs);
+      HstatusFields<URV> hsf(hs);
+      unsigned guest = hsf.bits_.VGEIN;
+
+      return imsic_->readSireg(virtMode_, guest, sel, value);
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
 CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
 {
   using CN = CsrNumber;
@@ -376,6 +399,9 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     return readMireg(num, value);
   else if (num == CN::SIREG)
     return readSireg(num, value);
+  else if (num == CN::SIREG)
+    return readVsireg(num, value);
+
   if (num == CN::MTOPEI)
     {
       if (not imsic_)
