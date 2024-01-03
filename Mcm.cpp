@@ -1087,7 +1087,7 @@ template <typename URV>
 bool
 Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
 {
-  if (instr.isCanceled() or not instr.isLoad_)
+  if (instr.isCanceled() or not instr.isLoad_ or instr.size_ == 0)
     return false;
 
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
@@ -1182,6 +1182,8 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 	    cancel = true;  // Read op does no overlap instruction.
 	  else
 	    {
+	      if (op.physAddr_ + op.size_ > addr + size)
+		op.size_ = addr + size - op.physAddr_;  // Trim wide ops.
 	      mask = (1 << op.size_) - 1;
 	      mask = mask << (op.physAddr_ - addr);
 	    }
@@ -1243,7 +1245,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
   instr->size_ = size;
   instr->physAddr_ = addr;
 
-  // Cancel early read ops that are covered by later ones.
+  // Cancel early read ops that are covered by later ones. Trim wide reads.
   cancelReplayedReads(instr);
 
   uint64_t mergeMask = 0;
