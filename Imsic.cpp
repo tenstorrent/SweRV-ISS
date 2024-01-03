@@ -121,7 +121,7 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
       isSupervisor = true;
     }
   else
-    for (size_t i = 0; i < gfiles_.size(); ++i)
+    for (size_t i = 1; i < gfiles_.size(); ++i)
       if (gfiles_.at(i).coversAddress(addr))
 	{
 	  file = &gfiles_.at(i);

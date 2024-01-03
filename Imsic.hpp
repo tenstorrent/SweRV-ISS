@@ -245,12 +245,12 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       assert(g <= 64);
       assert(sfile_.isConfigured());
       gfiles_.clear();
-      gfiles_.resize(g);
+      gfiles_.resize(g + 1);
       assert(sfile_.pageSize() == pageSize);
       uint64_t addr = sfile_.address() + pageSize;
-      for (auto& file : gfiles_)
+      for (size_t i = 1; i < gfiles_.size(); ++i)
 	{
-	  file.configure(addr, n, pageSize);
+	  gfiles_.at(i).configure(addr, n, pageSize);
 	  addr += pageSize;
 	}
     }
