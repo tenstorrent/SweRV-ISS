@@ -183,7 +183,7 @@ ImsicMgr::configureMachine(uint64_t addr, uint64_t stride, unsigned ids)
   mstride_ = stride;
   for (auto imsic : imsics_)
     {
-      imsic->configureMachine(addr, ids);
+      imsic->configureMachine(addr, ids, pageSize_);
       addr += stride;
     }
   return true;
@@ -203,7 +203,7 @@ ImsicMgr::configureSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
   sstride_ = stride;
   for (auto imsic : imsics_)
     {
-      imsic->configureSupervisor(addr, ids);
+      imsic->configureSupervisor(addr, ids, pageSize_);
       addr += stride;
     }
   return true;
@@ -217,7 +217,7 @@ ImsicMgr::configureGuests(unsigned n, unsigned ids)
     return false;  // No enough space.
 
   for (auto imsic : imsics_)
-    imsic->configureGuests(n, ids);
+    imsic->configureGuests(n, ids, pageSize_);
 
   return true;
 }

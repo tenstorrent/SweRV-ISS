@@ -161,8 +161,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// count: interrupts ids are 1 to idCount - 1 inclusive.  All
     /// previous enable/pending state is lost. Given address must be
     /// page aligned and idCount must be a multiple of 64.
-    void configure(uint64_t addr, unsigned idCount)
+    void configure(uint64_t addr, unsigned idCount, unsigned pageSize)
     {
+      pageSize_ = pageSize;
       assert((addr % pageSize_) == 0);
       assert((idCount % 64) == 0);
       topId_ = 0;
@@ -205,7 +206,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned delivery_ = 0;
     unsigned threshold_ = 0;
     bool config_ = false;
-    const unsigned pageSize_ = 1024;
+    unsigned pageSize_ = 4096;
   };
 
 
@@ -224,32 +225,32 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// with the given count of interrupt ids (idCount is the highest
     /// interrupt id plus 1 and must be a multiple of 64). All
     /// previous state enabled/pending state is lost.
-    void configureMachine(uint64_t addr, unsigned idCount)
-    { mfile_.configure(addr, idCount); }
+    void configureMachine(uint64_t addr, unsigned idCount, unsigned pageSize)
+    { mfile_.configure(addr, idCount, pageSize); }
 
     /// Configure the supervisor privilege file at the given address
     /// and with the given count of interrupt ids (idCount is the
     /// highest interrupt id plus 1 and must be a multiple of 64).
     /// All previous state enabled/pending state is lost.
-    void configureSupervisor(uint64_t addr, unsigned idCount)
-    { sfile_.configure(addr, idCount); }
+    void configureSupervisor(uint64_t addr, unsigned idCount, unsigned pageSize)
+    { sfile_.configure(addr, idCount, pageSize); }
 
     /// Configure g guest files of n-1 interrupt ids each. The guest
     /// addresses will be s+p, s+2p, s+3p, ... where s is the
     /// supervisor file address and p is the page size. A supervisor
     /// file must be configured before the guests files are
     /// configured. The parameter g must not exceed 64.
-    void configureGuests(unsigned g, unsigned n)
+    void configureGuests(unsigned g, unsigned n, unsigned pageSize)
     {
       assert(g <= 64);
       assert(sfile_.isConfigured());
       gfiles_.clear();
       gfiles_.resize(g);
-      unsigned pageSize = sfile_.pageSize();
+      assert(sfile_.pageSize() == pageSize);
       uint64_t addr = sfile_.address() + pageSize;
       for (auto& file : gfiles_)
 	{
-	  file.configure(addr, n);
+	  file.configure(addr, n, pageSize);
 	  addr += pageSize;
 	}
     }
