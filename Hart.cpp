@@ -4040,6 +4040,8 @@ Hart<URV>::clearTraceData()
   virtMem_.clearPageTableWalk();
   pmpManager_.clearPmpTrace();
   memory_.pmaMgr_.clearPmaTrace();
+  if (imsic_)
+    imsic_->clearTrace();
   lastBranchTaken_ = false;
   misalignedLdSt_ = false;
 }
