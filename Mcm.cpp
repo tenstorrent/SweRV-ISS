@@ -905,10 +905,9 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 {
   if (op.size_ > instr.size_)
     {
-      cerr << "Error: Read operation size (" << unsigned(op.size_) << ") larger than "
+      cerr << "Warning: Read operation size (" << unsigned(op.size_) << ") larger than "
 	   << "instruction data size (" << unsigned(instr.size_) << "): Hart-id="
 	   << hartId << " time=" << op.time_ << " tag=" << instr.tag_ << '\n';
-      return false;
     }
 
   if (op.rtlData_ != op.data_)
@@ -1171,6 +1170,8 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 	    cancel = true;  // Read op does not overlap instruction.
 	  else
 	    {
+	      if (op.physAddr_ + op.size_ > addr + size)
+		op.size_ = addr + size - op.physAddr_;  // Trim wide ops.
 	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
 	      assert(overlap > 0 and overlap <= 8);
 	      mask = (1 << overlap) - 1;
