@@ -1135,17 +1135,107 @@ Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 }
 
 
+/// Compute a mask of the instruction data bytes covered by the given
+/// memory operation. Return 0 if the operation doesnot overlap the
+/// given instruction.
+template <typename URV>
+unsigned
+Mcm<URV>::determineOpMask(McmInstr* instr, MemoryOp& op, uint64_t addr1, uint64_t addr2)
+{
+  unsigned size = instr->size_;
+  unsigned mask = 0;
+  if (size == 0)
+    return mask;
+
+  if (addr1 == addr2)
+    {
+      if (op.physAddr_ <= addr1)
+	{
+	  if (op.physAddr_ + op.size_ <= addr1)
+	    return mask;  // Read op does not overlap instruction.
+
+	  if (op.physAddr_ + op.size_ > addr1 + size)
+	    op.size_ = addr1 + size - op.physAddr_;  // Trim wide ops.
+	  uint64_t overlap = op.physAddr_ + op.size_ - addr1;
+	  assert(overlap > 0 and overlap <= 8);
+	  mask = (1 << overlap) - 1;
+	}
+      else
+	{
+	  if (addr1 + size <= op.physAddr_)
+	    return mask;  // Read op does no overlap instruction.
+
+	  if (op.physAddr_ + op.size_ > addr1 + size)
+	    op.size_ = addr1 + size - op.physAddr_;  // Trim wide ops.
+	  mask = (1 << op.size_) - 1;
+	  mask = mask << (op.physAddr_ - addr1);
+	}
+    }
+  else
+    {
+      unsigned size1 = 4096 - (addr1 % 4096);
+
+      if (pageNum(op.physAddr_) == pageNum(addr1))
+	{
+	  assert(size1 < size);
+
+	  if (op.physAddr_ <= addr1)
+	    {
+	      if (op.physAddr_ + op.size_ <= addr1)
+		return mask;  // Read op does not overlap instruction.
+	      if (op.physAddr_ + op.size_ > addr1 + size1)
+		op.size_ = addr1 + size1 - op.physAddr_;  // Trim wide ops.
+	      uint64_t overlap = op.physAddr_ + op.size_ - addr1;
+	      assert(overlap > 0 and overlap <= 8);
+	      mask = (1 << overlap) - 1;
+	    }
+	  else
+	    {
+	      if (addr1 + size <= op.physAddr_)
+		return mask;  // Read op does no overlap instruction.
+	      if (op.physAddr_ + op.size_ > addr1 + size1)
+		op.size_ = addr1 + size1 - op.physAddr_;  // Trim wide ops.
+	      mask = (1 << op.size_) - 1;
+	      mask = mask << (op.physAddr_ - addr1);
+	    }
+	}
+      else if (pageNum(op.physAddr_) == pageNum(addr2))
+	{
+	  unsigned size2 = size - size1;
+
+	  if (op.physAddr_ == addr2)
+	    {
+	      if (op.physAddr_ + op.size_ > addr2 + size2)
+		op.size_ = addr2 + size2 - op.physAddr_;  // Trim wide ops.
+	      uint64_t overlap = op.physAddr_ + op.size_ - addr2;
+	      assert(overlap > 0 and overlap <= 8);
+	      mask = ((1 << overlap) - 1) << size1;
+	    }
+	  else
+	    {
+	      if (addr2 + size2 <= op.physAddr_)
+		return mask;  // Read op does no overlap instruction.
+	      if (op.physAddr_ + op.size_ > addr2 + size2)
+		op.size_ = addr2 + size2 - op.physAddr_;  // Trim wide ops.
+	      mask = (1 << op.size_) - 1;
+	      mask = mask << ((op.physAddr_ - addr2) + size1);
+	    }
+	}
+    }
+
+  return mask;
+}
+
+
 template <typename URV>
 void
-Mcm<URV>::cancelReplayedReads(McmInstr* instr)
+Mcm<URV>::cancelReplayedReads(McmInstr* instr, uint64_t addr1, uint64_t addr2)
 {
   size_t nops = instr->memOps_.size();
   assert(instr->size_ > 0 and instr->size_ <= 8);
   unsigned expectedMask = (1 << instr->size_) - 1;  // Mask of bytes covered by instruction.
   unsigned readMask = 0;    // Mask of bytes covered by read operations.
 
-  uint64_t addr = instr->physAddr_;
-  unsigned size = instr->size_;
   auto& ops = instr->memOps_;
 
   // Process read ops in reverse order so that later reads take precedence.
@@ -1160,41 +1250,17 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
       instr->isLoad_ = true;
 
-      bool cancel = false;
-      unsigned mask = 0;
-      if (readMask == expectedMask)
-	cancel = true;
-      else if (op.physAddr_ <= addr)
+      bool cancel = (readMask == expectedMask);
+      if (not cancel)
 	{
-	  if (op.physAddr_ + op.size_ <= addr)
-	    cancel = true;  // Read op does not overlap instruction.
+	  unsigned mask = determineOpMask(instr, op, addr1, addr2);
+	  mask &= expectedMask;
+	  if ((mask & readMask) == mask)
+	    cancel = true;  // Read op already covered by other read ops
 	  else
-	    {
-	      if (op.physAddr_ + op.size_ > addr + size)
-		op.size_ = addr + size - op.physAddr_;  // Trim wide ops.
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = (1 << overlap) - 1;
-	    }
-	}
-      else
-	{
-	  if (addr + size <= op.physAddr_)
-	    cancel = true;  // Read op does no overlap instruction.
-	  else
-	    {
-	      if (op.physAddr_ + op.size_ > addr + size)
-		op.size_ = addr + size - op.physAddr_;  // Trim wide ops.
-	      mask = (1 << op.size_) - 1;
-	      mask = mask << (op.physAddr_ - addr);
-	    }
+	    readMask |= mask;
 	}
 
-      mask &= expectedMask;
-      if ((mask & readMask) == mask)
-	cancel = true;  // Read op already covered by other read ops
-      else
-	readMask |= mask;
       if (cancel)
 	op.cancel();
     }
@@ -1217,7 +1283,7 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
 			      unsigned size, uint64_t& value)
 {
   value = 0;
@@ -1244,10 +1310,10 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
     }
 
   instr->size_ = size;
-  instr->physAddr_ = addr;
+  instr->physAddr_ = addr1;
 
   // Cancel early read ops that are covered by later ones. Trim wide reads.
-  cancelReplayedReads(instr);
+  cancelReplayedReads(instr, addr1, addr2);
 
   uint64_t mergeMask = 0;
   uint64_t merged = 0;
@@ -1267,21 +1333,37 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
 
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
-      if (op.physAddr_ <= addr)
+      if (pageNum(op.physAddr_) == pageNum(addr1))
 	{
-	  uint64_t offset = addr - op.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  opVal >>= offset*8;
-	  mask >>= offset*8;
+	  if (op.physAddr_ <= addr1)
+	    {
+	      uint64_t offset = addr1 - op.physAddr_;
+	      if (offset > 8)
+		offset = 8;
+	      opVal >>= offset*8;
+	      mask >>= offset*8;
+	    }
+	  else
+	    {
+	      uint64_t offset = op.physAddr_ - addr1;
+	      if (offset > 8)
+		offset = 8;
+	      opVal <<= offset*8;
+	      mask <<= offset*8;
+	    }
 	}
-      else
+      else if (pageNum(op.physAddr_) == pageNum(addr2))
 	{
-	  uint64_t offset = op.physAddr_ - addr;
-	  if (offset > 8)
-	    offset = 8;
-	  opVal <<= offset*8;
-	  mask <<= offset*8;
+	  if (op.physAddr_ == addr2)
+	    {
+	      uint64_t offset = 4096 - (addr1 % 4096);
+	      if (offset > 8)
+		offset = 8;
+	      opVal <<= offset*8;
+	      mask <<= offset*8;
+	    }
+	  else
+	    assert(0);
 	}
       merged |= (opVal & mask);
       mergeMask |= mask;

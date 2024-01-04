@@ -1808,7 +1808,7 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
       if (mcm_)
 	{
 	  uint64_t mcmVal = 0;
-	  if (mcm_->getCurrentLoadValue(*this, addr1, ldStSize_, mcmVal))
+	  if (mcm_->getCurrentLoadValue(*this, addr1, addr2, ldStSize_, mcmVal))
 	    {
 	      narrow = mcmVal;
 	      hasMcmVal = true;

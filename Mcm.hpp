@@ -180,10 +180,13 @@ namespace WdRiscv
 
     bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
 
-    /// Return the load value of the current target instruction
-    /// (set with setCurrentInstruction).
-    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t addr, unsigned size,
-			     uint64_t& value);
+    /// Return the load value of the current target instruction which
+    /// must be a load instruction (set with setCurrentInstruction).
+    /// Addr1 is the physical address of the loaded data. Addr2 is
+    /// the same as addr1 except for page corssing loads where addr2
+    /// is the physical address of the second page.
+    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
+			     unsigned size, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
@@ -292,7 +295,13 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
-    void cancelReplayedReads(McmInstr*);
+    void cancelReplayedReads(McmInstr*, uint64_t addr1, uint64_t addr2);
+
+    unsigned determineOpMask(McmInstr*, MemoryOp& op, uint64_t addr1, uint64_t addr2);
+
+    /// Return the page number corresponding to the given address
+    uint64_t pageNum(uint64_t addr) const
+    { return addr >> 12; }
 
     /// Remove from hartPendingWrites_ the write ops falling with the given RTL
     /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place
