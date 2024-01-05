@@ -132,6 +132,9 @@ Hart<URV>::vbrev_v(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
@@ -199,6 +202,9 @@ Hart<URV>::vbrev8_v(unsigned vd, unsigned vs1, unsigned group,
   ELEM_TYPE e1 = 0, dest = 0;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -268,6 +274,9 @@ Hart<URV>::vrev8_v(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
@@ -335,6 +344,9 @@ Hart<URV>::vclz_v(unsigned vd, unsigned vs1, unsigned group,
   ELEM_TYPE e1 = 0, dest = 0;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -404,6 +416,9 @@ Hart<URV>::vctz_v(unsigned vd, unsigned vs1, unsigned group,
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
@@ -471,6 +486,9 @@ Hart<URV>::vcpop_v(unsigned vd, unsigned vs1, unsigned group,
   ELEM_TYPE e1 = 0, dest = 0;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group);
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -784,6 +802,9 @@ Hart<URV>::vwsll_vv(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   for (unsigned ix = start; ix < elems; ++ix)
     {
       if (vecRegs_.isDestActive(vd, ix, destGroup, masked, dest))
@@ -864,6 +885,9 @@ Hart<URV>::vwsll_vx(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned group,
   MySll mySll;
 
   unsigned destGroup = std::max(vecRegs_.groupMultiplierX8(GroupMultiplier::One), group*2);
+
+  if (start >= vecRegs_.elemCount())
+    return;
 
   for (unsigned ix = start; ix < elems; ++ix)
     {
@@ -1169,6 +1193,9 @@ Hart<URV>::execVghsh_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1230,6 +1257,9 @@ Hart<URV>::execVgmul_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1289,6 +1319,9 @@ Hart<URV>::execVaesdf_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1336,6 +1369,9 @@ Hart<URV>::execVaesdf_vs(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1388,6 +1424,9 @@ Hart<URV>::execVaesef_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1435,6 +1474,9 @@ Hart<URV>::execVaesef_vs(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1487,6 +1529,9 @@ Hart<URV>::execVaesem_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1535,6 +1580,9 @@ Hart<URV>::execVaesem_vs(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1588,6 +1636,9 @@ Hart<URV>::execVaesdm_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1636,6 +1687,9 @@ Hart<URV>::execVaesdm_vs(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1692,6 +1746,9 @@ Hart<URV>::execVaeskf1_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1744,6 +1801,9 @@ Hart<URV>::execVaeskf2_vi(const DecodedInst* di)
     round ^= 0x8; // Flip bit 3.
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1802,6 +1862,9 @@ Hart<URV>::execVaesz_vs(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -1850,6 +1913,9 @@ Hart<URV>::execVsha2ms_vv(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1921,6 +1987,9 @@ Hart<URV>::execVsha2ch_vv(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -1996,6 +2065,9 @@ Hart<URV>::execVsha2cl_vv(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, vs2, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -2084,6 +2156,9 @@ Hart<URV>::execVsm4k_vi(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   uint32_t rnd = imm & 7; // Lower 3 bits
   unsigned destGroup = group*8;
@@ -2147,6 +2222,9 @@ Hart<URV>::execVsm4r_vv(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -2214,6 +2292,9 @@ Hart<URV>::execVsm4r_vs(const DecodedInst* di)
   unsigned vd = di->op0(),  vs1 = di->op1();
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs, egStart = start / egs;
@@ -2303,6 +2384,9 @@ Hart<URV>::execVsm3me_vv(const DecodedInst* di)
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
     return;
 
+  if (start >= vecRegs_.elemCount())
+    return;
+
   unsigned egLen = elems / egs, egStart = start / egs;
   unsigned destGroup = group*8;
 
@@ -2390,6 +2474,9 @@ Hart<URV>::execVsm3c_vi(const DecodedInst* di)
     }
 
   if (not checkVecOpsVsEmul(di, vd, vs1, groupx8))
+    return;
+
+  if (start >= vecRegs_.elemCount())
     return;
 
   unsigned egLen = elems / egs,  egStart = start / egs,  rnds = imm;
