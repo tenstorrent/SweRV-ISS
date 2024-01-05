@@ -107,6 +107,10 @@ namespace WdRiscv
       return cores_.at(i);
     }
 
+    /// Return pointer to memory.
+    std::shared_ptr<Memory> memory() const
+    { return memory_; }
+
     /// With a true flag, when loading ELF files, error out if ELF
     /// file refers to unmapped memory. With a false flag, ignore
     /// unmapped memory in the ELF file.
@@ -341,7 +345,7 @@ namespace WdRiscv
     std::vector< std::shared_ptr<CoreClass> > cores_;
     std::vector< std::shared_ptr<HartClass> > sysHarts_; // All harts in system.
     std::unordered_map<URV, unsigned> hartIdToIndex_;
-    std::unique_ptr<Memory> memory_;
+    std::shared_ptr<Memory> memory_;
     std::unique_ptr<SparseMem> sparseMem_;
     std::shared_ptr<Mcm<URV>> mcm_;
     unsigned mbSize_ = 64;  // Merge buffer size.

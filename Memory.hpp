@@ -538,8 +538,6 @@ namespace WdRiscv
 #endif
     }
 
-  protected:
-
     /// Same as write but effects not recorded in last-write info and
     /// physical memory attributes are ignored if usePma is false.
     template <typename T>
@@ -583,6 +581,8 @@ namespace WdRiscv
       *(reinterpret_cast<T*>(data_ + address)) = value;
       return true;
     }
+
+  protected:
 
     /// Write byte to given address without write-access check. Return
     /// true on success. Return false if address is not mapped. This
