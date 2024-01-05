@@ -481,12 +481,13 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   bool ok = true;
 
   // If instruction is a store, save address, size, and written data.
-  uint64_t addr = 0, value = 0;
-  unsigned stSize = hart.lastStore(addr, value);
+  uint64_t addr = 0, addr2 = 0, value = 0;
+  unsigned stSize = hart.lastStore(addr, addr2, value);
   if (stSize)
     {
       instr->size_ = stSize;
       instr->physAddr_ = addr;
+      instr->physAddr2_ = addr2;
       instr->data_ = value;
       instr->isStore_ = true;
       instr->complete_ = checkStoreComplete(*instr);
@@ -814,7 +815,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 
 template <typename URV>
 bool
-Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
+Mcm<URV>::forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
+		    unsigned isize, MemoryOp& readOp, uint64_t& mask)
 {
   if (mask == 0)
     return true;  // No bytes left to forward.
@@ -823,7 +825,7 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
     return false;
 
   uint64_t rol = readOp.physAddr_, roh = readOp.physAddr_ + readOp.size_ - 1;
-  uint64_t il = instr.physAddr_, ih = instr.physAddr_ + instr.size_ - 1;
+  uint64_t il = iaddr, ih = il + isize - 1;
   if (roh < il or rol > ih)
     return false;  // no overlap
 
@@ -855,7 +857,7 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
       if (departed)
 	continue;
       
-      uint8_t byteVal = instr.data_ >> (byteAddr - il)*8;
+      uint8_t byteVal = idata >> (byteAddr - il)*8;
       uint64_t aligned = uint64_t(byteVal) << 8*rix;
 	
       readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
@@ -1396,8 +1398,21 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
   for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
     {
       const auto& instr = instrVec.at(ix-1);
-      if (not forwardTo(instr, op, mask))
+      if (instr.isCanceled() or not instr.isRetired() or not instr.isStore_)
 	continue;
+
+      if (not forwardTo(instr, instr.physAddr_, instr.data_, instr.size_, op, mask))
+	{
+	  if (instr.physAddr_ == instr.physAddr2_)
+	    continue;
+
+	  unsigned size1 = 4096 - (instr.physAddr_ % 4096);
+	  unsigned size2 = instr.size_ - size1;
+	  assert(size2 > 0 and size2 < 8);
+	  uint64_t data2 = instr.data_ >> size1 * 8;
+	  if (not forwardTo(instr, instr.physAddr2_, data2, size2, op, mask))
+	    continue;
+	}
 
       const auto& di = instr.di_;
       if (di.instEntry()->isAtomic())

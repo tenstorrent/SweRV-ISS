@@ -816,6 +816,19 @@ namespace WdRiscv
       return ldStSize_;
     }
 
+    /// Similar to the previous lastStore but for page crossing stores, addr2
+    /// will be set to the phsical address of the second page. If store did
+    /// not cross a page boundary addr2 will be the same as addr1.
+    unsigned lastStore(uint64_t& addr1, uint64_t& addr2, uint64_t& value) const
+    {
+      if (not ldStWrite_)
+	return 0;
+      addr1 = ldStPhysAddr1_;
+      addr2 = ldStPhysAddr2_;
+      value = ldStData_;
+      return ldStSize_;
+    }
+
     bool getLastVectorMemory(std::vector<uint64_t>& addresses,
 			     std::vector<uint64_t>& data,
 			     unsigned& elementSize) const

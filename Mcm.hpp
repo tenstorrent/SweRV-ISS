@@ -41,6 +41,7 @@ namespace WdRiscv
     // memOps contains indices into an array of MemoryOp items.
     std::vector<MemoryOpIx> memOps_;
     uint64_t physAddr_ = 0;   // Data address for ld/store instruction.
+    uint64_t physAddr2_ = 0;  // Additional data address for page crossing stores.
     uint64_t data_ = 0;       // Data for load/sore instructions.
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
     uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
@@ -318,7 +319,8 @@ namespace WdRiscv
     /// forward (bypass) operartion and is updated (bits cleared) if
     /// some parts of op, covered by the mask, are successfully
     /// updated.
-    bool forwardTo(const McmInstr& instr, MemoryOp& op, uint64_t& mask);
+    bool forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
+		   unsigned isize, MemoryOp& op, uint64_t& mask);
 
     /// Forward to the given read op from the stores of the retired
     /// instructions ahead of tag.
