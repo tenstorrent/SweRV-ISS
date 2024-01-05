@@ -1,6 +1,7 @@
 INSTALL_DIR := .
 
 PROJECT := whisper
+PY_PROJECT := $(PROJECT)$(shell python3-config --extension-suffix)
 
 # For Dynamic linking to Boost Library use:
 # make STATIC_LINK=0
@@ -102,11 +103,21 @@ $(BUILD_DIR)/$(PROJECT): $(BUILD_DIR)/whisper.cpp.o \
 			 $(pci_lib)
 	$(CXX) -o $@ $(OFLAGS) $^ $(LINK_DIRS) $(LINK_LIBS)
 
+$(BUILD_DIR)/$(PY_PROJECT): $(BUILD_DIR)/py-bindings.cpp.o \
+			    $(BUILD_DIR)/librvcore.a \
+			    $(soft_float_lib) \
+			    $(pci_lib)
+	$(CXX) -shared -o $@ $(OFLAGS) $^ $(LINK_DIRS) $(LINK_LIBS)
+
 # Rule to make whisper.cpp.o
 $(BUILD_DIR)/whisper.cpp.o:  .FORCE
 	@if [ ! -d "$(dir $@)" ]; then $(MKDIR_P) $(dir $@); fi
 	sha=`git rev-parse --verify HEAD || echo unknown`; \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DGIT_SHA="$$sha" -c -o $@ whisper.cpp
+
+# Rule to make PY_PROJECT .so
+$(BUILD_DIR)/py-bindings.cpp.o: .FORCE
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(shell python3 -m pybind11 --includes) -c -o $@ py-bindings.cpp
 
 # List of all CPP sources needed for librvcore.a
 RVCORE_SRCS := IntRegs.cpp CsRegs.cpp FpRegs.cpp instforms.cpp \
@@ -148,19 +159,27 @@ $(soft_float_lib):
 $(pci_lib):
 	$(MAKE) -C $(pci_build)
 
+all: $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/$(PY_PROJECT)
+
 install: $(BUILD_DIR)/$(PROJECT)
 	@if test "." -ef "$(INSTALL_DIR)" -o "" == "$(INSTALL_DIR)" ; \
          then echo "INSTALL_DIR is not set or is same as current dir" ; \
          else echo cp $^ $(INSTALL_DIR); cp $^ $(INSTALL_DIR); \
          fi
 
+install-py: $(BUILD_DIR)/$(PY_PROJECT)
+	@if test "." -ef "$(INSTALL_DIR)" -o "" == "$(INSTALL_DIR)" ; \
+         then echo "INSTALL_DIR is not set or is same as current dir" ; \
+         else echo cp $^ $(INSTALL_DIR); cp $^ $(INSTALL_DIR); \
+         fi
+
 clean:
-	$(RM) $(BUILD_DIR)/$(PROJECT) $(OBJS_GEN) $(BUILD_DIR)/librvcore.a $(DEPS_FILES) ; \
+	$(RM) $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/$(PY_PROJECT) $(OBJS_GEN) $(BUILD_DIR)/librvcore.a $(DEPS_FILES) ; \
   $(if $(soft_float_build),$(MAKE) -C $(soft_float_build) clean ;,) \
   $(if $(pci_build),$(MAKE) -C $(pci_build) clean,)
 
 help:
-	@echo "Possible targets: $(BUILD_DIR)/$(PROJECT) install clean"
+	@echo "Possible targets: $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/$(PY_PROJECT) all install install-py clean"
 	@echo "To compile for debug: make OFLAGS=-g"
 	@echo "To install: make INSTALL_DIR=<target> install"
 	@echo "To browse source code: make cscope"
@@ -170,5 +189,5 @@ cscope:
 
 .FORCE:
 
-.PHONY: install clean help cscope .FORCE
+.PHONY: all install install-py clean help cscope .FORCE
 
