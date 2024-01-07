@@ -300,7 +300,7 @@ namespace WdRiscv
 
       imsic.fileTraces(mselects, sselects, gselects);
 
-      bool ok; uint64_t value;
+      bool ok; unsigned int value;
       for (auto [select, size] : mselects)
         {
           if (size == 4)
