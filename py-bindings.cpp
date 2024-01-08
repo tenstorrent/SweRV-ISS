@@ -316,12 +316,12 @@ static void defineHart(M m)
   // We mark Hart class' "holder" type as shared_ptr to prevent double frees
   auto hartName = concat<T>("Hart");
   py::class_<Hart<T>, std::shared_ptr<Hart<T>>>(m_hart, hartName.data())
-    .def("step", [](Hart<T>& self, File file) {
-          self.singleStep(file.file_);
-        }, py::arg("file") = File(nullptr), py::doc("Step a single instruction."))
-    .def("run", [](Hart<T>& self, File file) {
-          self.run(file.file_);
-        }, py::arg("file") = File(nullptr), py::doc("Run until hart reaches stopping point."))
+    .def("step", [](Hart<T>& self, bool verbose, File file) {
+          self.singleStep(verbose? file.file_ : nullptr);
+        }, py::arg("verbose") = false, py::arg("file") = File(stdout), py::doc("Step a single instruction."))
+    .def("run", [](Hart<T>& self, bool verbose, File file) {
+          self.run(verbose? file.file_ : nullptr);
+        }, py::arg("verbose") = false, py::arg("file") = File(stdout), py::doc("Run until hart reaches stopping point."))
     .def("__getattr__", py::overload_cast<Hart<T>&, const std::string&>(&attr<T>))
     .def("__setattr__", py::overload_cast<Hart<T>&, const std::string&, const py::object&>(&attr<T>));
 };
