@@ -322,6 +322,11 @@ static void defineHart(M m)
     .def("run", [](Hart<T>& self, bool verbose, File file) {
           self.run(verbose? file.file_ : nullptr);
         }, py::arg("verbose") = false, py::arg("file") = File(stdout), py::doc("Run until hart reaches stopping point."))
+    .def("disass_inst", [](Hart<T>& self, uint32_t inst) {
+          std::string str;
+          self.disassembleInst(inst, str);
+          return str;
+        }, py::arg("inst"), py::doc("Disassemble 32-bit instruction."))
     .def("__getattr__", py::overload_cast<Hart<T>&, const std::string&>(&attr<T>))
     .def("__setattr__", py::overload_cast<Hart<T>&, const std::string&, const py::object&>(&attr<T>));
 };
