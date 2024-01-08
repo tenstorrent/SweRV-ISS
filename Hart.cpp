@@ -2596,7 +2596,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 		{
 		  virtMode_ = true;
 		  // Remap the cause to non-VS cause (e.g. VSTIME becomes STIME).
-		  if (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER) or cause == URV(IC::VS_SOFTWARE))
+		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER) or cause == URV(IC::VS_SOFTWARE)))
 		    cause--;
 		}
 	    }
