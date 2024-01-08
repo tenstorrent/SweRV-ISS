@@ -1433,14 +1433,18 @@ openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLo
                 name.insert(len - 3, std::to_string(ix));
             }
 
-          if (doGzip)
-            {
-              std::string cmd = "/usr/bin/gzip -c > ";
-              cmd += name;
-              traceFile = popen(cmd.c_str(), "w");
-            }
+          if ((ix == 0) || args.logPerHart)
+            if (doGzip)
+              {
+                std::string cmd = "/usr/bin/gzip -c > ";
+                cmd += name;
+                traceFile = popen(cmd.c_str(), "w");
+              }
+            else
+              traceFile = fopen(name.c_str(), "w");
           else
-            traceFile = fopen(name.c_str(), "w");
+              traceFile = traceFiles.at(0);   // point the same File pointer to each hart
+
           if (not traceFile)
             {
               std::cerr << "Failed to open trace file '" << name
@@ -1502,18 +1506,24 @@ closeUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandL
     fclose(consoleOut);
   consoleOut = nullptr;
 
+
+  unsigned ix = 0;
   for (auto traceFile : traceFiles)
     {
-      if (traceFile and traceFile != stdout)
+      if (args.logPerHart or (ix == 0))
         {
-          size_t len = args.traceFile.size();
-          bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
-          if (doGzip)
-            pclose(traceFile);
-          else
-            fclose(traceFile);
+          if (traceFile and traceFile != stdout)
+          {
+            size_t len = args.traceFile.size();
+            bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
+            if (doGzip)
+              pclose(traceFile);
+            else
+              fclose(traceFile);
+          }
+          traceFile = nullptr;
         }
-      traceFile = nullptr;
+      ++ix;
     }
 
   if (commandLog and commandLog != stdout)
