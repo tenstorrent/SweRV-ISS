@@ -1875,6 +1875,12 @@ namespace WdRiscv
     bool mcmIEvict(uint64_t addr)
     { fetchCache_.removeLine(addr); return true; }
 
+    /// Config vector engine for updating whole mask register for mask-producing
+    /// instructions (if flag is false, we only update body and tail elements; otherwise,
+    /// we update body, tail, and elements within VLEN beyond tail).
+    void configVectorUpdateWholeMask(bool flag)
+    { vecRegs_.configUpdateWholeMask(flag); }
+
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
 

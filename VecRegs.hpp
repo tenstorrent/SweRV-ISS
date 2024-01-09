@@ -413,6 +413,16 @@ namespace WdRiscv
     bool isTailAgnosticOnes() const
     { return tailAgnOnes_; }
 
+    /// Return true if mask-producing instrctions should update the
+    /// whole destination register.
+    bool updateWholeMask() const
+    { return updateWholeMask_; }
+
+    /// Return true if mask-producing instrctions should update the
+    /// whole destination register.
+    void configUpdateWholeMask(bool flag)
+    { updateWholeMask_ = flag; }
+
     /// If flag is true, configure vector engine for writing ones in
     /// inactive destination register elements when mask-agnostic is
     /// on. Otherwise, preserve inactive elements.
@@ -731,6 +741,7 @@ namespace WdRiscv
     bool vill_ = false;                            // Cached VTYPE.VILL
     bool maskAgnOnes_ = true; // True if ones written in masked elems when mask agnostic.
     bool tailAgnOnes_ = true; // True if ones written in tail elems when mask agnostic.
+    bool updateWholeMask_ = false;  // True if mask instructions update whole mask reg.
 
     uint32_t groupX8_ = 8;    // Group multipler as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).

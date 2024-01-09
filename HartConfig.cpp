@@ -954,6 +954,17 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
     hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
 		      &maxBytesPerLmul);
 
+  tag = "update_whole_mask";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorUpdateWholeMask(flag);
+    }
+
+
   return errors == 0;
 }
 
