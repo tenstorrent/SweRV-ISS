@@ -462,7 +462,7 @@ Hart<URV>::execPack(const DecodedInst* di)
   bool legal = isRvzbe() or isRvzbf() or isRvzbp() or isRvzbkb();
   legal = legal or (isRv64() and isRvzbm());
   if (zext_h)
-    legal = legal or isRvzbb();
+    legal = legal or (not isRv64() and isRvzbb());
 
   if (not legal)
     {

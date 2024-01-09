@@ -403,9 +403,15 @@ namespace WdRiscv
     /// Return the maximum of the VLMAX and VLEN/SEW for tail elements
     /// when LMUL < 1.
     uint32_t elemMax() const
-    {
-      return elemMax(sew_);
-    }
+    { return elemMax(sew_); }
+
+    /// Return true if tail-agnostic is set.
+    bool isTailAgnostic() const
+    { return tailAgn_; }
+
+    /// Return true if tail-agnostic-policy is set to all-ones.
+    bool isTailAgnosticOnes() const
+    { return tailAgnOnes_; }
 
     /// If flag is true, configure vector engine for writing ones in
     /// inactive destination register elements when mask-agnostic is
