@@ -20,6 +20,8 @@ Whisper
 
 [Enabling Code Coverage](#Coverage)
 
+[Python Support](#Python)
+
 [Limitations](#Limitations)
 
 [Running riscv-arch-test Tests with RISCOF](#RISCOF)
@@ -764,6 +766,24 @@ To enable and collect C++ code coverage:
 4. (optional) Generate an html report using `genhtml`.  `genhtml` should be invoked using `-o [collateral output directory] [coverage report file from step 3]`.  The index.html page in the output directory can then be opened using a web browser.
 
 Note that for any test defined using bazel and run with `bazel test`, steps 2 and 3 will be handled automatically by bazel, and the final coverage report should exist inside bazel-out/_coverage.
+
+<a name="Python" />
+
+# Python Support
+
+There is basic support for python bindings with [pybind11](https://pybind11.readthedocs.io/en/stable/) and its corresponding [Bazel support](https://github.com/pybind/pybind11_bazel). The shared library can be built with `make all`.
+
+Example:
+```
+    import whisper
+
+    s = whisper.system.System64("config.json")
+    h = s.harts()[0]
+    h.step()
+    print(h.x1)
+```
+
+The hart registers are exposed as class attributes and implement step/run functionality.
 
 <a name="Limitations"/>
 

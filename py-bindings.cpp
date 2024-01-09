@@ -392,11 +392,6 @@ static void defineSystem(M m)
             harts.push_back(self.ithHart(i));
           return harts;
         }, py::doc("Get all of the harts in the system in a list."))
-    .def("harts", [](System<T>& self, unsigned id) {
-          if (id >= self.hartCount())
-            throw std::invalid_argument("Hart id out of bounds");
-          return self.ithHart(id);
-        }, py::arg("id"), py::doc("Get the ith hart in the system."))
     .def("memory", &System<T>::memory, py::doc("Get memory instance from system."));
 }
 
