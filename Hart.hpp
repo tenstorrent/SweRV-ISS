@@ -1918,6 +1918,16 @@ namespace WdRiscv
       return pm;
     }
 
+    /// Return the effective virtual mode: if mstatus.mprv then it is
+    /// the vritual mode in mstatus.mpv
+    bool effectiveVirtualMode() const
+    {
+      bool virt = virtMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	virt = mstatus_.bits_.MPV;
+      return virt;
+    }
+
     /// Read an item that may span 2 physical pages. If pa1 is the
     /// same as pa2 then the item is in one page: do a simple read. If
     /// pa1 is different from pa2, then the item crosses a page
