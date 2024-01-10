@@ -1049,7 +1049,7 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
   unsigned writeMask = 0;   // Mask of bytes covered by write operations.
-  uint64_t addr = instr.physAddr_, size = instr.size_;
+  uint64_t addr = instr.physAddr_, addr2 = instr.physAddr2_, size = instr.size_;
   for (auto opIx : instr.memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -1059,21 +1059,44 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	continue;
 
       unsigned mask = 0;
-      if (op.physAddr_ <= addr)
+      if (pageNum(op.physAddr_) == pageNum(addr))
 	{
-	  if (op.physAddr_ + op.size_ > addr)
+	  if (op.physAddr_ <= addr)
 	    {
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = (1 << overlap) - 1;
+	      if (op.physAddr_ + op.size_ > addr)
+		{
+		  uint64_t overlap = op.physAddr_ + op.size_ - addr;
+		  assert(overlap > 0 and overlap <= 8);
+		  mask = (1 << overlap) - 1;
+		}
+	    }
+	  else
+	    {
+	      if (addr + size > op.physAddr_)
+		{
+		  mask = (1 << op.size_) - 1;
+		  mask = mask << (op.physAddr_ - addr);
+		}
 	    }
 	}
-      else
+      else if (addr != addr2 and pageNum(op.physAddr_) == pageNum(addr2))
 	{
-	  if (addr + size > op.physAddr_)
+	  unsigned size1 = 4096 - (addr % 4096);
+
+	  if (op.physAddr_ == addr2)
 	    {
-	      mask = (1 << op.size_) - 1;
-	      mask = mask << (op.physAddr_ - addr);
+	      uint64_t overlap = op.physAddr_ + op.size_ - addr2;
+	      assert(overlap > 0 and overlap <= 8);
+	      mask = ((1 << overlap) - 1) << size1;
+	    }
+	  else
+	    {
+	      unsigned size2 = size - size1;
+	      if (addr2 + size2 > op.physAddr_)
+		{
+		  mask = (1 << op.size_) - 1;
+		  mask = mask << ((op.physAddr_ - addr2) + size1);
+		}
 	    }
 	}
 
