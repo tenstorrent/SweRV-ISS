@@ -2783,6 +2783,7 @@ namespace WdRiscv
     void execJal(const DecodedInst*);
     void execLui(const DecodedInst*);
     void execAuipc(const DecodedInst*);
+    void execC_li(const DecodedInst*);
     void execAddi(const DecodedInst*);
     void execSlli(const DecodedInst*);
     void execSlti(const DecodedInst*);

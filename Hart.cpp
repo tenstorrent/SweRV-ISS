@@ -1102,6 +1102,13 @@ Hart<URV>::execBne(const DecodedInst* di)
     }
 }
 
+template <typename URV>
+inline
+void
+Hart<URV>::execC_li(const DecodedInst* di)
+{
+  intRegs_.write(di->op0(), di->op1As<SRV>());
+}
 
 template <typename URV>
 inline
@@ -6123,6 +6130,9 @@ Hart<URV>::execute(const DecodedInst* di)
       return;
 
     case InstId::c_li:
+      if (not isRvc()) illegalInst(di); else execC_li(di);
+      return;
+
     case InstId::c_addi16sp:
       if (not isRvc()) illegalInst(di); else execAddi(di);
       return;

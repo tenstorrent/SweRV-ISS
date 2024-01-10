@@ -1484,7 +1484,7 @@ Decoder::decode16(uint16_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2) co
       if (funct3 == 2)  // c.li
 	{
 	  CiFormInst cif(inst);
-	  op0 = cif.bits.rd; op1 = RegX0; op2 = cif.addiImmed();
+	  op0 = cif.bits.rd; op1 = cif.addiImmed(); op2 = 0;
 	  return instTable_.getEntry(InstId::c_li);
 	}
 

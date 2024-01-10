@@ -641,7 +641,7 @@ Disassembler::disassembleUncached(const DecodedInst& di, std::ostream& out) cons
       break;
 
     case InstId::c_li:
-      printRegImm(*this, out, "c.li", di.op0(), di.op2As<int32_t>());
+      printRegImm(*this, out, "c.li", di.op0(), di.op1As<int32_t>());
       break;
 
     case InstId::c_addi16sp:
