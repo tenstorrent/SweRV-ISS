@@ -364,6 +364,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
   enableExtension(RvExtension::Zicsr,    true /*isa_.isEnabled(RvExtension::Zicsr)*/);
+  enableExtension(RvExtension::Zifencei, true /*isa_.isEnabled(RvExtension::Zifencei)*/);
 
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
@@ -9451,8 +9452,14 @@ Hart<URV>::execFence_tso(const DecodedInst*)
 
 template <typename URV>
 void
-Hart<URV>::execFencei(const DecodedInst*)
+Hart<URV>::execFencei(const DecodedInst* di)
 {
+  if (not extensionIsEnabled(RvExtension::Zifencei))
+    {
+      illegalInst(di);
+      return;
+    }
+
   // invalidateDecodeCache();  // No need for this. We invalidate on each write.
 }
 
