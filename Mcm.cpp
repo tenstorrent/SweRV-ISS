@@ -640,8 +640,8 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	  if (not instr or instr->isCanceled())
 	    {
 	      cerr << "Error: Write for an invalid/speculated store time=" << time
-		   << " hart-id=" << hart.hartId() << "tag=" << op.instrTag_
-		   << "addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
+		   << " hart-id=" << hart.hartId() << " tag=" << op.instrTag_
+		   << " addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
 	      return false;
 	    }
 
