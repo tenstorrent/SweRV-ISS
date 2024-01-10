@@ -1691,13 +1691,13 @@ InstTable::setupInstVec()
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Read, 0x380,
 	OperandType::IntReg, OperandMode::Read, 0,
-	OperandType::Imm, OperandMode::None, 0xc7c },
+	OperandType::Imm, OperandMode::None, 0x1c7c },
 
       { "c.bnez", InstId::c_bnez, 0xe001, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Read, 0x380,
 	OperandType::IntReg, OperandMode::Read, 0,
-	OperandType::Imm, OperandMode::None, 0xc7c },
+	OperandType::Imm, OperandMode::None, 0x1c7c },
 
       { "c.slli", InstId::c_slli, 0x0002, 0xf003,
 	RvExtension::I, RvFormat::None,
