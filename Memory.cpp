@@ -1069,27 +1069,3 @@ Memory::resetMemoryMappedRegisters()
 {
   pmaMgr_.resetMemMapped();
 }
-
-
-bool
-Memory::defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask)
-{
-  if ((addr & 3) != 0)
-    {
-      std::cerr << "Memory mapped register address 0x" << std::hex << addr
-                << std::dec << " is not word aligned\n";
-      return false;
-    }
-
-  Pma pma = pmaMgr_.getPma(addr);
-  if (not pma.isMemMappedReg())
-    {
-      std::cerr << "Memory mapped register address 0x" << std::hex << addr
-                << std::dec << " is outside any memory mapped register area\n";
-      return false;
-    }
-
-  pmaMgr_.setMemMappedMask(addr, mask);
-
-  return true;
-}

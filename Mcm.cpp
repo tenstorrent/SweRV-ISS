@@ -1076,6 +1076,7 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	      mask = mask << (op.physAddr_ - addr);
 	    }
 	}
+
       mask &= expectedMask;
       writeMask |= mask;
     }

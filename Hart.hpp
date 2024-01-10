@@ -894,10 +894,6 @@ namespace WdRiscv
     uint64_t getInstructionCount() const 
     { return instCounter_; }
 
-    /// Define a memory mapped register. Address must be within an
-    /// area already defined using defineMemoryMappedRegisterArea.
-    bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
-
     /// Return count of traps (exceptions or interrupts) seen by this
     /// hart.
     uint64_t getTrapCount() const
@@ -1669,9 +1665,10 @@ namespace WdRiscv
 
     /// Associate a mask with the word-aligned word at the given
     /// address. Return true on success and flase if given address is
-    /// not in a memory mapped region.
-    bool setMemMappedMask(uint64_t addr, uint32_t mask)
-    { return memory_.pmaMgr_.setMemMappedMask(addr, mask); }
+    /// not in a memory mapped region. The size must be 4 or 8. The
+    /// address must be word/double-word aligned if size is 4/8.
+    bool setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
+    { return memory_.pmaMgr_.setMemMappedMask(addr, mask, size); }
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to

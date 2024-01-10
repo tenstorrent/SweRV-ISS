@@ -2214,14 +2214,6 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
 
 
 template <typename URV>
-bool
-Hart<URV>::defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask)
-{
-  return memory_.defineMemoryMappedRegisterWriteMask(addr, mask);
-}
-
-
-template <typename URV>
 inline
 bool
 Hart<URV>::fetchInst(URV virtAddr, uint64_t& physAddr, uint32_t& inst)

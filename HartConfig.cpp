@@ -1076,10 +1076,10 @@ template <typename URV>
 static
 bool
 processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::json& masks,
-		      uint64_t low, uint64_t high)
+		      uint64_t low, uint64_t high, unsigned size)
 {
   // Parse an array of entries, each entry is an array containing low
-  // address, high address, and maks.
+  // address, high address, and mask.
   unsigned ix = 0;
   unsigned errors = 0;
   for (auto maskIter = masks.begin(); maskIter != masks.end(); ++maskIter, ++ix)
@@ -1111,9 +1111,9 @@ processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::js
 	  continue;
 	}
 
-      uint32_t mask = vec.at(2);
-      for (uint64_t addr = vec.at(0); addr <= vec.at(1); addr += 4)
-	if (not hart.setMemMappedMask(addr, mask))
+      uint64_t mask = vec.at(2);
+      for (uint64_t addr = vec.at(0); addr <= vec.at(1); addr += size)
+	if (not hart.setMemMappedMask(addr, mask, size))
 	  {
 	    std::cerr << "Error: Failed to configure mask for config item "
 		      << entryPath << " at address 0x" << std::hex << addr
@@ -1192,9 +1192,31 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 		itemErrors++;
 	      else if (pma.isMemMappedReg())
 		{
-		  tag = "masks";
+		  unsigned size = 4;
+		  tag = "register_size";
 		  if (item.contains(tag))
-		    if (not processMemMappedMasks(hart, path, item.at(tag), low, high))
+		    {
+		      auto path2 = util::join(".", path, tag);
+		      if (not getJsonUnsigned(path2, item.at(tag), size))
+			itemErrors++;
+		      else if (size != 4 and size != 8)
+			{
+			  cerr << "Error: Invalid size in config item " << path2 << '\n';
+			  itemErrors++;
+			}
+		    }  
+
+		  if ((low & (size - 1)) != 0 and not itemErrors)
+		    {
+		      cerr << "Error: Memory mapped region address (0x" << std::hex
+			   << low << std::dec << ") must be aligned to its size ("
+			   << size << '\n';
+		      itemErrors++;
+		    }
+
+		  tag = "masks";
+		  if (item.contains(tag) and not itemErrors)
+		    if (not processMemMappedMasks(hart, path, item.at(tag), low, high, size))
 		      itemErrors++;
 		}
 	    }

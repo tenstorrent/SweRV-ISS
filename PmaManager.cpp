@@ -64,23 +64,29 @@ PmaManager::PmaManager(uint64_t memSize)
 
 
 bool
-PmaManager::setMemMappedMask(uint64_t addr, uint32_t mask)
+PmaManager::setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
 {
-  addr = (addr >> 2) << 2;
+  if (size != 4 and size != 8)
+    return false;
+
+  if ((addr & (size - 1)) != 0)
+    return false;   // Not aligned.
+
   if (not isAddrMemMapped(addr))
     return false;
+
   memMappedRegs_[addr].mask_ = mask;
+  memMappedRegs_[addr].size_ = size;
   return true;
 }
 
 
-uint32_t
+uint64_t
 PmaManager::getMemMappedMask(uint64_t addr) const
 {
-  addr = (addr >> 2) << 2;
   auto iter = memMappedRegs_.find(addr);
   if (iter == memMappedRegs_.end())
-    return ~uint32_t(0);
+    return ~uint64_t(0);
   return iter->second.mask_;
 }
 
@@ -88,31 +94,65 @@ PmaManager::getMemMappedMask(uint64_t addr) const
 bool
 PmaManager::readRegister(uint64_t addr, uint32_t& value) const
 {
-  addr = (addr >> 2) << 2;
+  if ((addr & 3) != 0)
+    return false;  // Not word aligned.
+
   auto iter = memMappedRegs_.find(addr);
   if (iter == memMappedRegs_.end())
     return false;
+
+  if (iter->second.size_ != 4)
+    return false;
+
   value = iter->second.value_;
   return true;
 }
 
 
 bool
-PmaManager::writeRegister(uint64_t addr, uint32_t value)
+PmaManager::readRegister(uint64_t addr, uint64_t& value) const
 {
-  addr = (addr >> 2) << 2;
+  if ((addr & 7) != 0)
+    return false;   // Not double-word aligned.
+
   auto iter = memMappedRegs_.find(addr);
   if (iter == memMappedRegs_.end())
     return false;
+
+  if (iter->second.size_ != 8)
+    return false;
+
+  value = iter->second.value_;
+  return true;
+}
+
+
+bool
+PmaManager::writeRegister(uint64_t addr, uint64_t value)
+{
+  auto iter = memMappedRegs_.find(addr);
+  if (iter == memMappedRegs_.end())
+    return false;
+
   iter->second.value_ = value & iter->second.mask_;
   return true;
 }
 
 
 bool
-PmaManager::pokeRegister(uint64_t addr, uint32_t value)
+PmaManager::checkRegisterWrite(uint64_t addr, unsigned size) const
 {
-  addr = (addr >> 2) << 2;
+  auto iter = memMappedRegs_.find(addr);
+  if (iter == memMappedRegs_.end())
+    return false;
+
+  return iter->second.size_ == size;
+}
+
+
+bool
+PmaManager::pokeRegister(uint64_t addr, uint64_t value)
+{
   auto iter = memMappedRegs_.find(addr);
   if (iter == memMappedRegs_.end())
     return false;
@@ -125,14 +165,13 @@ bool
 PmaManager::writeRegisterByte(uint64_t addr, uint8_t value)
 {
   unsigned byteIx = addr & 3;
-  addr = (addr >> 2) << 2;
   auto iter = memMappedRegs_.find(addr);
   if (iter == memMappedRegs_.end())
     return false;
 
   unsigned shift = byteIx * 8;
   uint32_t byteMask = 0xff << shift;
-  uint32_t shiftedByte = (uint32_t(value) << shift) & iter->second.mask_;
+  uint32_t shiftedByte = (uint64_t(value) << shift) & iter->second.mask_;
   iter->second.value_ = iter->second.value_ & ~byteMask;
   iter->second.value_ = iter->second.value_ | shiftedByte;
   return true;
@@ -150,7 +189,7 @@ PmaManager::pokeRegisterByte(uint64_t addr, uint8_t value)
 
   unsigned shift = byteIx * 8;
   uint32_t byteMask = 0xff << shift;
-  uint32_t shiftedByte = uint32_t(value) << shift;
+  uint32_t shiftedByte = uint64_t(value) << shift;
   iter->second.value_ = iter->second.value_ & ~byteMask;
   iter->second.value_ = iter->second.value_ | shiftedByte;
   return true;

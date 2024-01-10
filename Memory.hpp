@@ -108,12 +108,8 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size read.
       if (pma1.isMemMappedReg())
-        {
-          if constexpr (sizeof(T) == 4)
-            return readRegister(address, value);
-          else
-            return false;
-        }
+	return readRegister(address, value);
+
 #endif
 
 #ifdef MEM_CALLBACKS
@@ -175,9 +171,9 @@ namespace WdRiscv
       // Memory mapped region accessible only with word-size read.
       if (pma1.isMemMappedReg())
         {
-          if (readSize != 4)
+          if (readSize != 4 and readSize != 8)
             return false;
-          if ((address & 3) != 0)
+          if ((address & (readSize-1)) != 0)
             return false;
         }
 
@@ -201,12 +197,7 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size write.
       if (pma1.isMemMappedReg())
-        {
-          if (writeSize != 4)
-            return false;
-          if ((address & 3) != 0)
-            return false;
-        }
+	return pmaMgr_.checkRegisterWrite(address, writeSize);
 
       return true;
     }
@@ -250,11 +241,7 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size write.
       if (pma1.isMemMappedReg())
-        {
-          if constexpr (sizeof(T) != 4)
-	    return false;
-          return writeRegister(sysHartIx, address, value);
-	}
+	return writeRegister(sysHartIx, address, value);
 
   #ifdef MEM_CALLBACKS
       uint64_t val = value;
@@ -332,12 +319,7 @@ namespace WdRiscv
       // Memory mapped region accessible only with word-size read.
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.isMemMappedReg())
-        {
-          if constexpr (sizeof(T) == 4)
-            return readRegister(address, value);
-          else
-            return false;
-        }
+	return readRegister(address, value);
 
       if (usePma)
         {
@@ -606,16 +588,9 @@ namespace WdRiscv
     /// Reset (to zero) all memory mapped registers.
     void resetMemoryMappedRegisters();
 
-    /// Define write mask for a memory-mapped register with given
-    /// address.  Return true on success and false if the address is
-    /// not within a memory-mapped area.
-    bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
-
-    /// Read a memory mapped register.
-    bool readRegister(uint64_t addr, uint32_t& value) const
-    {
-      return pmaMgr_.readRegister(addr, value);
-    }
+    /// Read a memory mapped register word.
+    bool readRegister(uint64_t addr, auto& value) const
+    { return pmaMgr_.readRegister(addr, value); }
 
     /// Return memory mapped mask associated with the word containing
     /// the given address. Return all 1 if given address is not a
@@ -633,7 +608,7 @@ namespace WdRiscv
     }
 
     /// Write a memory mapped register.
-    bool writeRegister(unsigned sysHartIx, uint64_t addr, uint32_t value)
+    bool writeRegister(unsigned sysHartIx, uint64_t addr, auto value)
     {
       value = doRegisterMasking(addr, value);
       auto& lwd = lastWriteData_.at(sysHartIx);
@@ -644,7 +619,7 @@ namespace WdRiscv
 	  return false;
 	}
 
-      lwd.size_ = 4;
+      lwd.size_ = sizeof(value);
       lwd.addr_ = addr;
       lwd.value_ = value;
       return true;
