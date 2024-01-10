@@ -1314,6 +1314,9 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
   instr->size_ = size;
   instr->physAddr_ = addr1;
 
+  if (addr2 == addr1 and pageNum(addr1 + size - 1) != pageNum(addr1))
+    addr2 = pageAddress(pageNum(addr2) + 1);
+
   // Cancel early read ops that are covered by later ones. Trim wide reads.
   cancelReplayedReads(instr, addr1, addr2);
 

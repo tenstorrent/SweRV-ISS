@@ -304,6 +304,10 @@ namespace WdRiscv
     uint64_t pageNum(uint64_t addr) const
     { return addr >> 12; }
 
+    /// Return the address of the page with the given page number.
+    uint64_t pageAddress(uint64_t pageNum) const
+    { return pageNum << 12; }
+
     /// Remove from hartPendingWrites_ the write ops falling with the given RTL
     /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place
     /// them sorted by instr tag in coveredWrites. Write ops may not straddle

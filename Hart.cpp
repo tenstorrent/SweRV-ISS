@@ -363,6 +363,7 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zcmop,    isa_.isEnabled(RvExtension::Zcmop));
   enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
+  enableExtension(RvExtension::Zicsr,    true /*isa_.isEnabled(RvExtension::Zicsr)*/);
 
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
@@ -10214,6 +10215,12 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
+
   CsrNumber csr = CsrNumber(di->op2());
 
   if (preCsrInst_)
@@ -10247,6 +10254,12 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
 
   CsrNumber csr = CsrNumber(di->op2());
 
@@ -10291,6 +10304,12 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
+
   CsrNumber csr = CsrNumber(di->op2());
 
   if (preCsrInst_)
@@ -10334,6 +10353,12 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
+
   CsrNumber csr = CsrNumber(di->op2());
 
   if (preCsrInst_)
@@ -10365,6 +10390,12 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
 
   CsrNumber csr = CsrNumber(di->op2());
 
@@ -10410,6 +10441,12 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
 
   CsrNumber csr = CsrNumber(di->op2());
 
