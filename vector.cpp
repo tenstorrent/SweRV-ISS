@@ -18174,7 +18174,7 @@ Hart<URV>::execVfncvt_rod_f_f_w(const DecodedInst* di)
 template <typename URV>
 template<typename ELEM_TYPE>
 void
-Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+Hart<URV>::vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		       unsigned start, unsigned elems, bool masked)
 {
   ELEM_TYPE e2{};
@@ -18208,7 +18208,7 @@ Hart<URV>::vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 template <typename URV>
 void
-Hart<URV>::execVfredsum_vs(const DecodedInst* di)
+Hart<URV>::execVfredusum_vs(const DecodedInst* di)
 {
   if (not checkFpSewLmulVstart(di))
     return;
@@ -18228,9 +18228,9 @@ Hart<URV>::execVfredsum_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Half:  vfredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vfredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word2: vfredsum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vfredusum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfredusum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word2: vfredusum_vs<double> (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Byte:  // Fallthrough to invalid case
     default:        postVecFail(di); return;
     }
@@ -18423,7 +18423,7 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
 template <typename URV>
 template<typename ELEM_TYPE>
 void
-Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+Hart<URV>::vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 			unsigned start, unsigned elems, bool masked)
 {
   if (elems == 0)
@@ -18462,7 +18462,7 @@ Hart<URV>::vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 
 template <typename URV>
 void
-Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
+Hart<URV>::execVfwredusum_vs(const DecodedInst* di)
 {
   if (not checkFpSewLmulVstart(di, true))
     return;
@@ -18480,8 +18480,8 @@ Hart<URV>::execVfwredsum_vs(const DecodedInst* di)
   using EW = ElementWidth;
   switch (sew)
     {
-    case EW::Half:  vfwredsum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
-    case EW::Word:  vfwredsum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Half:  vfwredusum_vs<Float16>(vd, vs1, vs2, group, start, elems, masked); break;
+    case EW::Word:  vfwredusum_vs<float>  (vd, vs1, vs2, group, start, elems, masked); break;
     case EW::Byte:  // Fallthrough to invalid case
     case EW::Word2: // Fallthrough to invalid case
     default:        postVecFail(di); return;

@@ -910,11 +910,11 @@ namespace WdRiscv
      vfncvt_f_f_w,
      vfncvt_rod_f_f_w,
 
-     vfredsum_vs,
+     vfredusum_vs,
      vfredosum_vs,
      vfredmin_vs,
      vfredmax_vs,
-     vfwredsum_vs,
+     vfwredusum_vs,
      vfwredosum_vs,
 
      vfrsqrt7_v,

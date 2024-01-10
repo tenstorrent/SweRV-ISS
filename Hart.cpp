@@ -8354,8 +8354,8 @@ Hart<URV>::execute(const DecodedInst* di)
       execVfncvt_rod_f_f_w(di);
       return;
 
-    case InstId::vfredsum_vs:
-      execVfredsum_vs(di);
+    case InstId::vfredusum_vs:
+      execVfredusum_vs(di);
       return;
 
     case InstId::vfredosum_vs:
@@ -8370,8 +8370,8 @@ Hart<URV>::execute(const DecodedInst* di)
       execVfredmax_vs(di);
       return;
 
-    case InstId::vfwredsum_vs:
-      execVfwredsum_vs(di);
+    case InstId::vfwredusum_vs:
+      execVfwredusum_vs(di);
       return;
 
     case InstId::vfwredosum_vs:

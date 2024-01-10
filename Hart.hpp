@@ -4345,9 +4345,9 @@ namespace WdRiscv
     void execVfncvt_rod_f_f_w(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked);
-    void execVfredsum_vs(const DecodedInst*);
+    void execVfredusum_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
@@ -4365,9 +4365,9 @@ namespace WdRiscv
     void execVfredmax_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked);
-    void execVfwredsum_vs(const DecodedInst*);
+    void execVfwredusum_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
