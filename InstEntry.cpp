@@ -7098,13 +7098,13 @@ InstTable::setupInstVec()
 
       { "hlv.wu", InstId::hlv_wu, 0x68104073, 0xfff0707f,
 	RvExtension::H, RvFormat::I,
-	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Write, rs2Mask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask
       },
 
       { "hlv.d", InstId::hlv_d, 0x6c004073, 0xfff0707f,
 	RvExtension::H, RvFormat::I,
-	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Write, rs2Mask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask
       },
 
