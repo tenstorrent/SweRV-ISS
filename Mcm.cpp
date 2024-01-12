@@ -451,6 +451,39 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
 template <typename URV>
 bool
+Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
+{
+  uint64_t vaddr = 0, paddr = 0, paddr2 = 0, value = 0;
+  unsigned stSize = hart.lastStore(vaddr, paddr, paddr2, value);
+  if (not stSize)
+    return true;   // Not a store.
+
+  instr.size_ = stSize;
+  instr.virtAddr_ = vaddr;
+  instr.physAddr_ = paddr;
+  instr.physAddr2_ = paddr2;
+  instr.data_ = value;
+  instr.isStore_ = true;
+  instr.complete_ = checkStoreComplete(instr);
+  if (not instr.complete_)
+    return true;
+
+  if (paddr == paddr2)
+    return pokeHartMemory(hart, paddr, value, stSize);
+
+  unsigned size1 = offsetToNextPage(paddr);
+  bool ok = pokeHartMemory(hart, paddr, value, size1);
+
+  unsigned size2 = stSize - size1;
+  uint64_t value2 = value >> (size1 * 8);
+  ok = pokeHartMemory(hart, paddr2, value2, size2) and ok;
+
+  return ok;
+}
+
+
+template <typename URV>
+bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
 		 const DecodedInst& di)
 {
@@ -478,22 +511,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->di_ = di;
 
-  bool ok = true;
-
   // If instruction is a store, save address, size, and written data.
-  uint64_t addr = 0, addr2 = 0, value = 0;
-  unsigned stSize = hart.lastStore(addr, addr2, value);
-  if (stSize)
-    {
-      instr->size_ = stSize;
-      instr->physAddr_ = addr;
-      instr->physAddr2_ = addr2;
-      instr->data_ = value;
-      instr->isStore_ = true;
-      instr->complete_ = checkStoreComplete(*instr);
-      if (instr->complete_)   // Write ops already seen. Commit data.
-	ok = pokeHartMemory(hart, addr, value, stSize) and ok;
-    }
+  bool ok = retireStore(hart, *instr);
 
   URV hartId = hart.hartId();
 
@@ -1074,7 +1093,7 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	}
       else if (addr != addr2 and pageNum(op.physAddr_) == pageNum(addr2))
 	{
-	  unsigned size1 = 4096 - (addr % 4096);
+	  unsigned size1 = offsetToNextPage(addr);
 
 	  if (op.physAddr_ == addr2)
 	    {
@@ -1192,7 +1211,7 @@ Mcm<URV>::determineOpMask(McmInstr* instr, MemoryOp& op, uint64_t addr1, uint64_
     }
   else
     {
-      unsigned size1 = 4096 - (addr1 % 4096);
+      unsigned size1 = offsetToNextPage(addr1);
 
       if (pageNum(op.physAddr_) == pageNum(addr1))
 	{
@@ -1302,8 +1321,8 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr, uint64_t addr1, uint64_t addr2)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
-			      unsigned size, uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
+			      uint64_t paddr2, unsigned size, uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
@@ -1329,13 +1348,14 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
     }
 
   instr->size_ = size;
-  instr->physAddr_ = addr1;
-
-  if (addr2 == addr1 and pageNum(addr1 + size - 1) != pageNum(addr1))
-    addr2 = pageAddress(pageNum(addr2) + 1);
+  instr->virtAddr_ = vaddr;
+  instr->physAddr_ = paddr1;
+  if (paddr2 == paddr1 and pageNum(paddr1 + size - 1) != pageNum(paddr1))
+    paddr2 = pageAddress(pageNum(paddr2) + 1);
+  instr->physAddr2_ = paddr2;
 
   // Cancel early read ops that are covered by later ones. Trim wide reads.
-  cancelReplayedReads(instr, addr1, addr2);
+  cancelReplayedReads(instr, paddr1, paddr2);
 
   uint64_t mergeMask = 0;
   uint64_t merged = 0;
@@ -1355,11 +1375,11 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
 
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
-      if (pageNum(op.physAddr_) == pageNum(addr1))
+      if (pageNum(op.physAddr_) == pageNum(paddr1))
 	{
-	  if (op.physAddr_ <= addr1)
+	  if (op.physAddr_ <= paddr1)
 	    {
-	      uint64_t offset = addr1 - op.physAddr_;
+	      uint64_t offset = paddr1 - op.physAddr_;
 	      if (offset > 8)
 		offset = 8;
 	      opVal >>= offset*8;
@@ -1367,18 +1387,18 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
 	    }
 	  else
 	    {
-	      uint64_t offset = op.physAddr_ - addr1;
+	      uint64_t offset = op.physAddr_ - paddr1;
 	      if (offset > 8)
 		offset = 8;
 	      opVal <<= offset*8;
 	      mask <<= offset*8;
 	    }
 	}
-      else if (pageNum(op.physAddr_) == pageNum(addr2))
+      else if (pageNum(op.physAddr_) == pageNum(paddr2))
 	{
-	  if (op.physAddr_ == addr2)
+	  if (op.physAddr_ == paddr2)
 	    {
-	      uint64_t offset = 4096 - (addr1 % 4096);
+	      uint64_t offset = offsetToNextPage(paddr1);
 	      if (offset > 8)
 		offset = 8;
 	      opVal <<= offset*8;
@@ -1426,7 +1446,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	  if (instr.physAddr_ == instr.physAddr2_)
 	    continue;
 
-	  unsigned size1 = 4096 - (instr.physAddr_ % 4096);
+	  unsigned size1 = offsetToNextPage(instr.physAddr_);
 	  unsigned size2 = instr.size_ - size1;
 	  assert(size2 > 0 and size2 < 8);
 	  uint64_t data2 = instr.data_ >> size1 * 8;

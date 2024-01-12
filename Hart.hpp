@@ -816,15 +816,17 @@ namespace WdRiscv
       return ldStSize_;
     }
 
-    /// Similar to the previous lastStore but for page crossing stores, addr2
+    /// Similar to the previous lastStore but for page crossing stores, paddr2
     /// will be set to the phsical address of the second page. If store did
-    /// not cross a page boundary addr2 will be the same as addr1.
-    unsigned lastStore(uint64_t& addr1, uint64_t& addr2, uint64_t& value) const
+    /// not cross a page boundary paddr2 will be the same as paddr1. Vaddr is
+    /// the virtual address of the store data.
+    unsigned lastStore(uint64_t& vaddr, uint64_t& paddr1, uint64_t& paddr2, uint64_t& value) const
     {
       if (not ldStWrite_)
 	return 0;
-      addr1 = ldStPhysAddr1_;
-      addr2 = ldStPhysAddr2_;
+      vaddr = ldStAddr_;
+      paddr1 = ldStPhysAddr1_;
+      paddr2 = ldStPhysAddr2_;
       value = ldStData_;
       return ldStSize_;
     }

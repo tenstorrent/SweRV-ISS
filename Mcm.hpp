@@ -40,7 +40,8 @@ namespace WdRiscv
   {
     // memOps contains indices into an array of MemoryOp items.
     std::vector<MemoryOpIx> memOps_;
-    uint64_t physAddr_ = 0;   // Data address for ld/store instruction.
+    uint64_t virtAddr_ = 0;   // Virtual data address for ld/st instructions.
+    uint64_t physAddr_ = 0;   // Phusical data address for ld/st instruction.
     uint64_t physAddr2_ = 0;  // Additional data address for page crossing stores.
     uint64_t data_ = 0;       // Data for load/sore instructions.
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
@@ -79,8 +80,9 @@ namespace WdRiscv
       memOps_.push_back(memOpIx);
     }
 
-    /// Return true if data memory referenced by this instruction
-    /// overlaps that of the given other instruction.
+    /// Return true if data memory referenced by this instruction overlaps that
+    /// of the given other instruction. Both instructions must be memory
+    /// instructions.  Both instructions must be retired.
     bool overlaps(const McmInstr& other) const
     {
       // A non-successful store conditional (zero size) does not overlap anything.
@@ -88,15 +90,18 @@ namespace WdRiscv
 	return false;
 	  
       if (size_ == 0 or other.size_ == 0)
-	{
-	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
-		    << " tag2=" << other.tag_ << " zero data size\n";
-	}
-      if (physAddr_ == other.physAddr_)
+	std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		  << " tag2=" << other.tag_ << " zero data size\n";
+
+      if (not retired_ or not other.retired_)
+	std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		  << " tag2=" << other.tag_ << " non-retired instruction\n";
+
+      if (virtAddr_ == other.virtAddr_)
 	return true;
-      if (physAddr_ < other.physAddr_)
-	return other.physAddr_ - physAddr_ < size_;
-      return physAddr_ - other.physAddr_ < other.size_;
+      if (virtAddr_ < other.virtAddr_)
+	return other.virtAddr_ - virtAddr_ < size_;
+      return virtAddr_ - other.virtAddr_ < other.size_;
     }
 
     /// Return true if the data memory referenced by this instruction
@@ -183,11 +188,12 @@ namespace WdRiscv
 
     /// Return the load value of the current target instruction which
     /// must be a load instruction (set with setCurrentInstruction).
-    /// Addr1 is the physical address of the loaded data. Addr2 is
-    /// the same as addr1 except for page corssing loads where addr2
-    /// is the physical address of the second page.
-    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t addr1, uint64_t addr2,
-			     unsigned size, uint64_t& value);
+    /// Paddr1 is the physical address of the loaded data. Paddr2 is
+    /// the same as paddr1 except for page corssing loads where paddr2
+    /// is the physical address of the second page. Vaddr is the virtual
+    /// address of the load data.
+    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
+			     uint64_t paddr2, unsigned size, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
@@ -300,6 +306,11 @@ namespace WdRiscv
 
     unsigned determineOpMask(McmInstr*, MemoryOp& op, uint64_t addr1, uint64_t addr2);
 
+    /// Helper to retire method: Capture paramters of store instruction and
+    /// commit its data to memory. Return true on success and false on failure.
+    /// Return true if instuction is not a a store.
+    bool retireStore(Hart<URV>& hart, McmInstr& instr);
+
     /// Return the page number corresponding to the given address
     uint64_t pageNum(uint64_t addr) const
     { return addr >> 12; }
@@ -386,13 +397,17 @@ namespace WdRiscv
     /// csr regs have 64.
     unsigned effectiveRegIx(const DecodedInst& di, unsigned opIx) const;
 
+    /// Return the difference between the next page boundary and the
+    /// current address. Return 0 if address is on a page boundary.
+    unsigned offsetToNextPage(uint64_t addr) const
+    { return pageSize_ - (addr & (pageSize_ - 1)); }
+
   private:
 
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned csRegOffset_ = 64;
     const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
-
 
     using McmInstrVec = std::vector<McmInstr>;
 
@@ -406,6 +421,7 @@ namespace WdRiscv
     uint64_t time_ = 0;
     unsigned lineSize_ = 64; // Merge buffer line size.
     unsigned windowSize_ = 1000;
+    unsigned pageSize_ = 4096;
 
     bool writeOnInsert_ = false;
 

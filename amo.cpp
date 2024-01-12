@@ -100,7 +100,7 @@ Hart<URV>::amoLoad32(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
   if (mcm_)
     {
       uint64_t mcmVal = 0;
-      if (mcm_->getCurrentLoadValue(*this, addr, addr, ldStSize_, mcmVal))
+      if (mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, mcmVal))
 	{
 	  uval = mcmVal;
 	  hasMcmVal = true;
@@ -152,7 +152,7 @@ Hart<URV>::amoLoad64(uint64_t virtAddr, Pma::Attrib attrib, URV& value)
     }
 
   uint64_t uval = 0;
-  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, addr, addr, ldStSize_, uval);
+  bool hasMcm = mcm_ and mcm_->getCurrentLoadValue(*this, virtAddr, addr, addr, ldStSize_, uval);
 
   if (not hasMcm)
     memRead(addr, addr, uval);
@@ -221,7 +221,7 @@ Hart<URV>::loadReserve(uint32_t rd, uint32_t rs1)
   if (mcm_)
     {
       uint64_t mcmVal = 0;
-      if (mcm_->getCurrentLoadValue(*this, addr1, addr1, ldStSize_, mcmVal))
+      if (mcm_->getCurrentLoadValue(*this, virtAddr, addr1, addr1, ldStSize_, mcmVal))
 	{
 	  uval = mcmVal;
 	  hasMcmVal = true;
