@@ -1024,10 +1024,11 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store,
       return;
     }
   
-  uint64_t overlap = target.physAddr_ + target.size_ - store.physAddr_;
+  uint64_t end = std::min(target.physAddr_ + target.size_, store.physAddr_ + store.size_);
+  uint64_t overlap = end - store.physAddr_;
   unsigned bits = overlap*8;
-  uint64_t m = (1 << (bits + 1)) - 1;
-  m = m << (store.size_ - target.size_);
+  uint64_t m = (1 << bits) - 1;
+  m = m << ((store.physAddr_ - target.physAddr_) * 8);
   mask = mask & ~m;
 }
 
