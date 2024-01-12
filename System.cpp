@@ -645,7 +645,7 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 	return false;
       }
 
-  mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), mbLineSize);
+  mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), pageSize(), mbLineSize);
   mbSize_ = mbLineSize;
   mcm_->setCheckWholeMbLine(mbLineCheckAll);
 

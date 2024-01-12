@@ -117,7 +117,7 @@ namespace WdRiscv
   {
   public:
 
-    Mcm(unsigned hartCount, unsigned mergeBufferSize);
+    Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize);
 
     ~Mcm();
 
@@ -429,9 +429,9 @@ namespace WdRiscv
     std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
 
     uint64_t time_ = 0;
+    unsigned pageSize_ = 4096;
     unsigned lineSize_ = 64; // Merge buffer line size.
     unsigned windowSize_ = 1000;
-    unsigned pageSize_ = 4096;
 
     bool writeOnInsert_ = false;
 

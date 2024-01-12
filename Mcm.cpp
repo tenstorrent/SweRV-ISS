@@ -9,8 +9,8 @@ using std::cerr;
 
 
 template <typename URV>
-Mcm<URV>::Mcm(unsigned hartCount, unsigned mergeBufferSize)
-  : lineSize_(mergeBufferSize)
+Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
+  : pageSize_(pageSize), lineSize_(mergeBufferSize)
 {
   sysMemOps_.reserve(200000);
 
