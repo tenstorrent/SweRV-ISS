@@ -104,23 +104,6 @@ namespace WdRiscv
       return virtAddr_ - other.virtAddr_ < other.size_;
     }
 
-    /// Return true if the data memory referenced by this instruction
-    /// overlpas that of the given memory operation.
-    bool overlaps(const MemoryOp& op) const
-    {
-      if (size_ == 0 or op.size_ == 0)
-	{
-	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
-		    << " tag2=" << op.instrTag_ << " zero data size\n";
-	  // assert(0 && "McmInstr::overlaps: zero data size\n");
-	}
-      if (physAddr_ == op.physAddr_)
-	return true;
-      if (physAddr_ < op.physAddr_)
-	return op.physAddr_ - physAddr_ < size_;
-      return physAddr_ - op.physAddr_ < op.size_;
-    }
-
     /// Return true if address of the data memory referenced by this
     /// instruction is aligned.
     bool isAligned() const
@@ -346,6 +329,33 @@ namespace WdRiscv
     void identifyRegisters(const DecodedInst& di,
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
+
+    /// Return true if the data memory referenced by given instruction overlpas
+    /// that of the given memory operation.
+    bool overlaps(const McmInstr& instr, const MemoryOp& op) const
+    {
+      if (instr.size_ == 0 or op.size_ == 0)
+	std::cerr << "Mcm::overlaps: Error: tag1=" << instr.tag_
+		  << " tag2=" << op.instrTag_ << " zero data size\n";
+
+      if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
+	return rangesOverlap(instr.physAddr_, instr.size_, op.physAddr_, op.size_);
+
+      // Page crossing.
+      unsigned size1 = offsetToNextPage(instr.physAddr_);
+      if (rangesOverlap(instr.physAddr_, size1, op.physAddr_, op.size_))
+	return true;
+      unsigned size2 = instr.size_ - size1;
+      return rangesOverlap(instr.physAddr2_, size2, op.physAddr_, op.size_);
+    }
+
+    /// Return true if the given address ranges overlap one another.
+    bool rangesOverlap(uint64_t addr1, unsigned size1, uint64_t addr2, unsigned size2) const
+    {
+      if (addr1 <= addr2)
+	return addr2 - addr1 < size1;
+      return addr1 - addr2 < size2;
+    }
 
     bool instrHasRead(const McmInstr& instr) const;
     bool instrHasWrite(const McmInstr& instr) const;

@@ -1726,7 +1726,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	  const MemoryOp& op = sysMemOps_.at(ix);
 	  if (op.isCanceled())
 	    continue;
-	  if (op.hartIx_ != hartIx and not op.isRead_ and instrB.overlaps(op))
+	  if (op.hartIx_ != hartIx and not op.isRead_ and overlaps(instrB, op))
 	    {
 	      unsigned shift = 8*(8 - op.size_);
 	      uint64_t opMask = ~uint64_t(0);
@@ -2050,7 +2050,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 		    continue;
 		  if (op.time_ < timeB)
 		    break;
-		  if (not op.isRead_ and instrB.overlaps(op) and op.hartIx_ != hartIx)
+		  if (not op.isRead_ and overlaps(instrB, op) and op.hartIx_ != hartIx)
 		    fail = true;
 		}
 	    }
