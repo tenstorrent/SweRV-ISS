@@ -1001,42 +1001,34 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
 
 template <typename URV>
 void
-Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
+Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store,
 				const McmInstr& target, uint64_t& mask) const
 {
-  /// Clear in the given mask, bits corresponding to the target instruction
-  /// bytes covered by the given store instruction writes.
-  uint64_t storeMask = 0; // Mask of bits written by store.
-  for (auto opIx : storeInstr.memOps_)
-    {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      const auto& op = sysMemOps_.at(opIx);
-      if (op.isRead_)
-	continue;
+  if (not store.isStore_)
+    return;
 
-      uint64_t opMask = ~uint64_t(0);
-      if (op.physAddr_ <= target.physAddr_)
-	{
-	  uint64_t offset = target.physAddr_ - op.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  opMask >>= offset*8;
-	}
+  if ((store.physAddr_ + store.size_ <= target.physAddr_) or
+      (target.physAddr_ + target.size_ <= store.physAddr_))
+    return;  // No overlap
+
+  if (store.physAddr_ <= target.physAddr_)
+    {
+      uint64_t overlap = store.physAddr_ + store.size_ - target.physAddr_;
+      if (overlap >= target.size_)
+	mask = 0;
       else
 	{
-	  uint64_t offset = op.physAddr_ - target.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  opMask <<= offset*8;
+	  unsigned shift = overlap * 8;
+	  mask = (mask >> shift) << shift;
 	}
-      storeMask |= opMask;
+      return;
     }
-
-  unsigned unused = (8 - storeInstr.size_)*8;  // Unwritten upper bits of store.
-  storeMask = (storeMask << unused) >> unused;
-
-  mask &= ~storeMask;
+  
+  uint64_t overlap = target.physAddr_ + target.size_ - store.physAddr_;
+  unsigned bits = overlap*8;
+  uint64_t m = (1 << (bits + 1)) - 1;
+  m = m << (store.size_ - target.size_);
+  mask = mask & ~m;
 }
 
 
@@ -1686,17 +1678,14 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
-      if (instrA.isCanceled() or not instrA.isLoad_)
-	continue;
-
-      if (not instrA.overlaps(instrB))
+      if (instrA.isCanceled() or not instrA.isMemory() or not instrA.overlaps(instrB))
 	continue;
 
       clearMaskBitsForWrite(instrA, instrB, mask);
       if (mask == 0)
 	return true; // All bytes of B written by preceeding stores.
 
-      if (isBeforeInMemoryTime(instrA, instrB))
+      if (not instrA.isLoad_ or isBeforeInMemoryTime(instrA, instrB))
 	continue;
 
       // Is there a remote write between A and B memory time that

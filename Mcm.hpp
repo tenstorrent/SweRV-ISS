@@ -345,6 +345,8 @@ namespace WdRiscv
 
     bool checkLoadComplete(const McmInstr& instr) const;
 
+    /// Clear in the given mask, bits corresponding to the target
+    /// instruction bytes covered by the given store instruction.
     void clearMaskBitsForWrite(const McmInstr& storeInstr,
 			       const McmInstr& target, uint64_t& mask) const;
 
