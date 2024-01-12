@@ -1020,19 +1020,18 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
 
 template <typename URV>
 void
-Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store,
-				const McmInstr& target, uint64_t& mask) const
+Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store, const McmInstr& target,
+				uint64_t& mask) const
 {
-  if (not store.isStore_)
+  if (not store.isStore_ or not target.isMemory() or not store.overlaps(target))
     return;
 
-  if ((store.physAddr_ + store.size_ <= target.physAddr_) or
-      (target.physAddr_ + target.size_ <= store.physAddr_))
-    return;  // No overlap
+  if (not store.isRetired() or not target.isRetired())
+    return;
 
-  if (store.physAddr_ <= target.physAddr_)
+  if (store.virtAddr_ <= target.virtAddr_)
     {
-      uint64_t overlap = store.physAddr_ + store.size_ - target.physAddr_;
+      uint64_t overlap = store.virtAddr_ + store.size_ - target.virtAddr_;
       if (overlap >= target.size_)
 	mask = 0;
       else
@@ -1043,12 +1042,44 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store,
       return;
     }
   
-  uint64_t end = std::min(target.physAddr_ + target.size_, store.physAddr_ + store.size_);
-  uint64_t overlap = end - store.physAddr_;
+  uint64_t end = std::min(target.virtAddr_ + target.size_, store.virtAddr_ + store.size_);
+  uint64_t overlap = end - store.virtAddr_;
   unsigned bits = overlap*8;
   uint64_t m = (1 << bits) - 1;
-  m = m << ((store.physAddr_ - target.physAddr_) * 8);
+  m = m << ((store.virtAddr_ - target.virtAddr_) * 8);
   mask = mask & ~m;
+}
+
+
+/// Return a mask where the ith bit is set if addr + i is in the range
+/// [cover, cover + coverSize - 1]
+unsigned
+maskCoveredBytes(uint64_t addr, unsigned size, uint64_t cover, unsigned coverSize)
+{
+  if (cover <= addr)
+    {
+      if (cover + coverSize > addr)
+	{
+	  uint64_t overlap = cover + coverSize - addr;
+	  if (overlap > size)
+	    overlap = size;
+	  assert(overlap > 0 and overlap <= 8);
+	  return (1 << overlap) - 1;
+	}
+
+      return 0;  // No overlap.
+    }
+
+  if (addr + size > cover)
+    {
+      uint64_t overlap = addr + size - cover;
+      assert(overlap > 0 and overlap <= 8);
+      unsigned mask = (1 << overlap) - 1;
+      mask = mask << (overlap - addr);
+      return mask;
+    }
+
+  return 0;  // No overlap.
 }
 
 
@@ -1072,44 +1103,13 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 
       unsigned mask = 0;
       if (pageNum(op.physAddr_) == pageNum(addr))
-	{
-	  if (op.physAddr_ <= addr)
-	    {
-	      if (op.physAddr_ + op.size_ > addr)
-		{
-		  uint64_t overlap = op.physAddr_ + op.size_ - addr;
-		  assert(overlap > 0 and overlap <= 8);
-		  mask = (1 << overlap) - 1;
-		}
-	    }
-	  else
-	    {
-	      if (addr + size > op.physAddr_)
-		{
-		  mask = (1 << op.size_) - 1;
-		  mask = mask << (op.physAddr_ - addr);
-		}
-	    }
-	}
+	mask = maskCoveredBytes(op.physAddr_, op.size_, addr, size);
       else if (addr != addr2 and pageNum(op.physAddr_) == pageNum(addr2))
 	{
 	  unsigned size1 = offsetToNextPage(addr);
-
-	  if (op.physAddr_ == addr2)
-	    {
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr2;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = ((1 << overlap) - 1) << size1;
-	    }
-	  else
-	    {
-	      unsigned size2 = size - size1;
-	      if (addr2 + size2 > op.physAddr_)
-		{
-		  mask = (1 << op.size_) - 1;
-		  mask = mask << ((op.physAddr_ - addr2) + size1);
-		}
-	    }
+	  unsigned size2 = size - size1;
+	  mask = maskCoveredBytes(op.physAddr_, op.size_, addr2, size2);
+	  mask = mask << size1;
 	}
 
       mask &= expectedMask;
