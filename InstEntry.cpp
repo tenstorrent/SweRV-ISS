@@ -1603,6 +1603,7 @@ InstTable::setupInstVec()
       { "c.li", InstId::c_li, 0x4001, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Write, 0xf80,
+	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0x107c },
 
       { "c.addi16sp", InstId::c_addi16sp, 0x6101, 0xef83,
