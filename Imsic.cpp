@@ -84,6 +84,9 @@ File::iregWrite(unsigned sel, URV val)
         if (offset & 1)
           return false;
 
+      if (sel == EIC::P0 or sel == EIC::E0)
+	val = (val >> 1) << 1;   // Bit corresponding to id 0 is not writable.
+
       auto& vec = *vecPtr;
       constexpr size_t bits = sizeof(URV)*8;
       unsigned begin = offset*32;
