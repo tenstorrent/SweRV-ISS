@@ -376,6 +376,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   auto csr = getImplementedCsr(num, virtMode_);
   if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode))
     return false;
+  num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
@@ -410,7 +411,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::STOPEI)
+  else if (num == CN::STOPEI)
     {
       if (not imsic_)
 	return false;
@@ -418,7 +419,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::VSTOPEI)
+  else if (num == CN::VSTOPEI)
     {
       if (not imsic_)
 	return false;
@@ -1328,6 +1329,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
   if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode) or
       csr->isReadOnly())
     return false;
+  num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
@@ -1384,15 +1386,15 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
   if (num == CN::MIREG)
     return writeMireg(num, value);
-  else if (csr->getNumber() == CN::SIREG)
+  else if (num == CN::SIREG)
     return writeSireg(num, value);
-  else if (csr->getNumber() == CN::VSIREG)
+  else if (num == CN::VSIREG)
     return writeVsireg(num, value);
   else if (num == CN::MTOPEI)
     return writeMtopei();
-  else if (csr->getNumber() == CN::STOPEI)
+  else if (num == CN::STOPEI)
     return writeStopei();
-  else if (csr->getNumber() == CN::VSTOPEI)
+  else if (num == CN::VSTOPEI)
     return writeVstopei();
 
   if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
@@ -2813,6 +2815,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
   auto csr = getImplementedCsr(num, virtMode_);
   if (not csr)
     return false;
+  num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
     return readTdata(num, PrivilegeMode::Machine, value);
@@ -2838,7 +2841,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::STOPEI)
+  else if (num == CN::STOPEI)
     {
       if (not imsic_)
 	return false;
@@ -2846,7 +2849,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::VSTOPEI)
+  else if (num == CN::VSTOPEI)
     {
       if (not imsic_)
 	return false;
