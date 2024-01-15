@@ -1178,17 +1178,16 @@ Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 }
 
 
-/// Compute a mask of the instruction data bytes covered by the given
-/// memory operation. Return 0 if the operation doesnot overlap the
-/// given instruction.
 template <typename URV>
 unsigned
-Mcm<URV>::determineOpMask(McmInstr* instr, MemoryOp& op, uint64_t addr1, uint64_t addr2)
+Mcm<URV>::determineOpMask(McmInstr* instr, MemoryOp& op)
 {
   unsigned size = instr->size_;
   unsigned mask = 0;
   if (size == 0)
     return mask;
+
+  uint64_t addr1 = instr->physAddr_, addr2 = instr->physAddr2_;
 
   if (addr1 == addr2)
     {
@@ -1272,7 +1271,7 @@ Mcm<URV>::determineOpMask(McmInstr* instr, MemoryOp& op, uint64_t addr1, uint64_
 
 template <typename URV>
 void
-Mcm<URV>::cancelReplayedReads(McmInstr* instr, uint64_t addr1, uint64_t addr2)
+Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 {
   size_t nops = instr->memOps_.size();
   assert(instr->size_ > 0 and instr->size_ <= 8);
@@ -1296,7 +1295,7 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr, uint64_t addr1, uint64_t addr2)
       bool cancel = (readMask == expectedMask);
       if (not cancel)
 	{
-	  unsigned mask = determineOpMask(instr, op, addr1, addr2);
+	  unsigned mask = determineOpMask(instr, op);
 	  mask &= expectedMask;
 	  if ((mask & readMask) == mask)
 	    cancel = true;  // Read op already covered by other read ops
@@ -1360,7 +1359,7 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
   instr->physAddr2_ = paddr2;
 
   // Cancel early read ops that are covered by later ones. Trim wide reads.
-  cancelReplayedReads(instr, paddr1, paddr2);
+  cancelReplayedReads(instr);
 
   uint64_t mergeMask = 0;
   uint64_t merged = 0;

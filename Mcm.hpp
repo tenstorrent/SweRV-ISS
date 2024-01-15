@@ -285,9 +285,12 @@ namespace WdRiscv
 
     using MemoryOpVec = std::vector<MemoryOp>;
 
-    void cancelReplayedReads(McmInstr*, uint64_t addr1, uint64_t addr2);
+    void cancelReplayedReads(McmInstr*);
 
-    unsigned determineOpMask(McmInstr*, MemoryOp& op, uint64_t addr1, uint64_t addr2);
+    /// Compute a mask of the instruction data bytes covered by the
+    /// given memory operation. Return 0 if the operation does not
+    /// overlap the given instruction.
+    unsigned determineOpMask(McmInstr*, MemoryOp& op);
 
     /// Helper to retire method: Capture paramters of store instruction and
     /// commit its data to memory. Return true on success and false on failure.
