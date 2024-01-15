@@ -2651,7 +2651,10 @@ Hart<URV>::execFli_h(const DecodedInst* di)
       return;
     }
 
-  Float16 res = valueTable.at(di->op1());
+  unsigned ix = di->op1();
+  if (ix == 29)
+    ix = 30;   // Per spec entry 29 gets infinity just like entry 30.
+  Float16 res = valueTable.at(ix);
 
   fpRegs_.writeHalf(di->op0(), res);
   markFsDirty();
