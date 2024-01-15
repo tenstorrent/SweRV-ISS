@@ -815,5 +815,148 @@ System<URV>::getSparseMemUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& 
 }
 
 
+extern void forceUserStop(int);
+
+
+template <typename URV>
+bool
+System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow)
+{
+  if (hartCount() == 0)
+    return true;
+
+  if (hartCount() == 1)
+    {
+      auto& hart = *ithHart(0);
+      bool ok = hart.run(traceFiles.at(0));
+#ifdef FAST_SLOPPY
+      hart.reportOpenedFiles(std::cout);
+#endif
+      return ok;
+    }
+
+  if (not stepWindow)
+    {
+      // Run each hart in its own thread.
+      std::vector<std::thread> threadVec;
+      std::atomic<bool> result = true;
+      std::atomic<unsigned> finished = 0;  // Count of finished threads.
+
+      auto threadFunc = [&result, &finished] (Hart<URV>* hart, FILE* traceFile) {
+                          bool r = hart->run(traceFile);
+                          result = result and r;
+                          finished++;
+                        };
+
+      for (unsigned i = 0; i < hartCount(); ++i)
+        {
+          Hart<URV>* hart = ithHart(i).get();
+          threadVec.emplace_back(std::thread(threadFunc, hart, traceFiles.at(i)));
+        }
+
+      if (not waitAll)
+        {
+          // First thread to finish terminates run.
+          while (finished == 0)
+            sleep(1);
+          forceUserStop(0);
+        }
+
+      for (auto& t : threadVec)
+	t.join();
+      return result;
+    }
+
+  // Run all harts in one thread round-robin.
+  bool result = true;
+  unsigned finished = 0;
+
+  while ((waitAll and finished != hartCount()) or
+	 (not waitAll and finished == 0))
+    {
+      for (auto hptr : sysHarts_)
+	{
+	  if (hptr->hasTargetProgramFinished())
+	    continue;
+	  unsigned steps = (rand() % stepWindow) + 1;
+	  // step N times
+	  unsigned ix = hptr->sysHartIndex();
+	  result = hptr->runSteps(steps, traceFiles.at(ix)) and result;
+	  if (hptr->hasTargetProgramFinished())
+	    finished++;
+        }
+    }
+
+  return result;
+}
+
+
+/// Run producing a snapshot after each snapPeriod instructions. Each
+/// snapshot goes into its own directory names <dir><n> where <dir> is
+/// the string in snapDir and <n> is a sequential integer starting at
+/// 0. Return true on success and false on failure.
+template <typename URV>
+bool
+System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snapDir,
+			 const std::vector<uint64_t>& periods)
+{
+  if (hartCount() == 0)
+    return true;
+
+  if (hartCount() != 1)
+    {
+      std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
+      return false;
+    }
+
+  Hart<URV>& hart = *ithHart(0);
+
+  uint64_t globalLimit = hart.getInstructionCountLimit();
+
+  for (size_t ix = 0; true; ++ix)
+    {
+      uint64_t nextLimit = globalLimit;
+      if (not periods.empty())
+	{
+	  if (periods.size() == 1)
+	    nextLimit = hart.getInstructionCount() + periods.at(0);
+	  else
+	    nextLimit = ix < periods.size() ? periods.at(ix) : globalLimit;
+	}
+
+      nextLimit = std::min(nextLimit, globalLimit);
+      hart.setInstructionCountLimit(nextLimit);
+      uint64_t tag = ix;
+      if (periods.size() > 1)
+	tag = ix < periods.size() ? periods.at(ix) : nextLimit;
+      std::string pathStr = snapDir + std::to_string(tag);
+      Filesystem::path path = pathStr;
+      if (not Filesystem::is_directory(path) and not Filesystem::create_directories(path))
+	{
+	  std::cerr << "Error: Failed to create snapshot directory " << pathStr << '\n';
+	  return false;
+	}
+
+      batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindow*/);
+
+      if (hart.hasTargetProgramFinished() or nextLimit >= globalLimit)
+	{
+	  Filesystem::remove_all(path);
+	  break;
+	}
+
+      if (not saveSnapshot(hart, pathStr))
+	{
+	  std::cerr << "Error: Failed to save a snapshot\n";
+	  return false;
+	}
+    }
+
+  hart.traceBranches(std::string(), 0);  // Turn off branch tracing.
+
+  return true;
+}
+
+
 template class WdRiscv::System<uint32_t>;
 template class WdRiscv::System<uint64_t>;

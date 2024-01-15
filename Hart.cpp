@@ -4520,7 +4520,7 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
 
 template <typename URV>
-std::tuple<bool, bool>
+bool
 Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
 {
   // Setup signal handlers. Restore on destruction.
@@ -4534,20 +4534,20 @@ Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
       if (instCounter_ >= limit)
         {
           std::cerr << "Stopped -- Reached instruction limit\n";
-          return std::make_tuple(true, true);
+          return true;
         }
       else if (pc_ == stopAddr)
         {
           std::cerr << "Stopped -- Reached end address\n";
-          return std::make_tuple(true, true);
+          return true;
         }
 
       singleStep(traceFile);
 
       if (hasTargetProgramFinished())
-        return std::make_tuple(true, stepResult_);
+        return stepResult_;
     }
-  return std::make_tuple(false, true);
+  return true;
 }
 
 

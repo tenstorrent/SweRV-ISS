@@ -336,6 +336,22 @@ namespace WdRiscv
 
     bool getSparseMemUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& usedBlocks) const;
 
+    /// Run the simulated harts. Return true on sucess or false if
+    /// target program ends with a non-zero exit. If stepWindow is
+    /// non-zero run the harts in a single simulator thread
+    /// round-robin with each hart executing n instructions where n is
+    /// a random number in the range [1, stepWindow]. If stepWindow is
+    /// zero, each hart runs in its own simulator thread independent of
+    /// the other harts.
+    bool batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow);
+
+    /// Run producing a snapshot after each snapPeriod instructions. Each
+    /// snapshot goes into its own directory names <dir><n> where <dir> is
+    /// the string in snapDir and <n> is a sequential integer starting at
+    /// 0. Return true on success and false on failure.
+    bool snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snapDir,
+		     const std::vector<uint64_t>& periods);
+
   private:
 
     unsigned hartCount_;
