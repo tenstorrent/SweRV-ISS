@@ -1321,15 +1321,15 @@ CsRegs<URV>::writeVstopei()
 
 template <typename URV>
 bool
-CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
+CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 {
   using CN = CsrNumber;
 
-  Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode) or
+  Csr<URV>* csr = getImplementedCsr(csrn, virtMode_);
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(csrn, mode) or
       csr->isReadOnly())
     return false;
-  num = csr->getNumber();  // CSR may have been remapped from S to VS
+  CN num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
@@ -1422,7 +1422,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
     }
 
   csr->write(value);
-  recordWrite(num);
+  recordWrite(csrn);
 
   if (num == CN::MENVCFG)
     {
