@@ -357,7 +357,26 @@ namespace WdRiscv
       return addr1 - addr2 < size2;
     }
 
+    /// Return true if given instruction data addresses overlap the
+    /// given address. Return false if instruction is not a memory
+    /// instruction. Instruction must be retired.
+    bool instrOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
+    {
+      if (not instr.isMemory())
+	return false;
+      assert(instr.isRetired());
+      if (instr.physAddr_ == instr.physAddr2_)
+	return instr.physAddr_ <= addr and addr - instr.physAddr_ < instr.size_;
+
+      unsigned size1 = offsetToNextPage(instr.physAddr_);
+      if (pageNum(instr.physAddr_) == pageNum(addr))
+	return instr.physAddr_ <= addr and addr - instr.physAddr_ < size1;
+      unsigned size2 = instr.size_ - size1;
+      return instr.physAddr2_ <= addr and addr - instr.physAddr2_ < size2;
+    }
+
     bool instrHasRead(const McmInstr& instr) const;
+
     bool instrHasWrite(const McmInstr& instr) const;
 
     bool checkStoreComplete(const McmInstr& instr) const;

@@ -1073,9 +1073,11 @@ maskCoveredBytes(uint64_t addr, unsigned size, uint64_t cover, unsigned coverSiz
   if (addr + size > cover)
     {
       uint64_t overlap = addr + size - cover;
+      if (overlap > coverSize)
+	overlap = coverSize;
       assert(overlap > 0 and overlap <= 8);
       unsigned mask = (1 << overlap) - 1;
-      mask = mask << (overlap - addr);
+      mask = mask << (cover - addr);
       return mask;
     }
 
@@ -1102,14 +1104,19 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	continue;
 
       unsigned mask = 0;
-      if (pageNum(op.physAddr_) == pageNum(addr))
-	mask = maskCoveredBytes(op.physAddr_, op.size_, addr, size);
-      else if (addr != addr2 and pageNum(op.physAddr_) == pageNum(addr2))
+      if (addr == addr2)
+	mask = maskCoveredBytes(addr, size, op.physAddr_, op.size_);
+      else
 	{
 	  unsigned size1 = offsetToNextPage(addr);
-	  unsigned size2 = size - size1;
-	  mask = maskCoveredBytes(op.physAddr_, op.size_, addr2, size2);
-	  mask = mask << size1;
+	  if (pageNum(op.physAddr_) == pageNum(addr))
+	    mask = maskCoveredBytes(addr, size1, op.physAddr_, op.size_);
+	  else
+	    {
+	      unsigned size2 = size - size1;
+	      mask = maskCoveredBytes(addr2, size2, op.physAddr_, op.size_);
+	      mask = mask << size1;
+	    }
 	}
 
       mask &= expectedMask;
@@ -1139,14 +1146,19 @@ Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
 	continue;
 
       unsigned mask = 0;
-      if (pageNum(op.physAddr_) == pageNum(addr))
-	mask = maskCoveredBytes(op.physAddr_, op.size_, addr, size);
-      else if (addr != addr2 and pageNum(op.physAddr_) == pageNum(addr2))
+      if (addr == addr2)
+	mask = maskCoveredBytes(addr, size, op.physAddr_, op.size_);
+      else
 	{
 	  unsigned size1 = offsetToNextPage(addr);
-	  unsigned size2 = size - size1;
-	  mask = maskCoveredBytes(op.physAddr_, op.size_, addr2, size2);
-	  mask = mask << size1;
+	  if (pageNum(op.physAddr_) == pageNum(addr))
+	    mask = maskCoveredBytes(addr, size1, op.physAddr_, op.size_);
+	  else
+	    {
+	      unsigned size2 = size - size1;
+	      mask = maskCoveredBytes(addr2, size2, op.physAddr_, op.size_);
+	      mask = mask << size1;
+	    }
 	}
 
       mask &= expectedMask;
@@ -1647,16 +1659,45 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 	{
 	  // Check overlapped bytes.
 	  bool ok = true;
-	  for (unsigned i = 0; i < instrB.size_ and ok; ++i)
-	    {
-	      uint64_t byteAddr = instrB.physAddr_ + i;
-	      if (instrA.physAddr_ <= byteAddr and byteAddr < instrA.physAddr_ + instrA.size_)
+	  if (instrB.physAddr_ == instrB.physAddr2_)
+	    {    // Non-page crossing.
+	      for (unsigned i = 0; i < instrB.size_ and ok; ++i)
 		{
-		  uint64_t ta = latestByteTime(instrA, byteAddr);
-		  uint64_t tb = earliestByteTime(instrB, byteAddr);
-		  ok = ta < tb or (ta == tb and instrA.isStore_);
+		  uint64_t byteAddr = instrB.physAddr_ + i;
+		  if (instrOverlapsPhysAddr(instrA, byteAddr))
+		    {
+		      uint64_t ta = latestByteTime(instrA, byteAddr);
+		      uint64_t tb = earliestByteTime(instrB, byteAddr);
+		      ok = ta < tb or (ta == tb and instrA.isStore_);
+		    }
 		}
 	    }
+	  else
+	    {    // Page crossing.
+	      unsigned size1 = offsetToNextPage(instrB.physAddr_);
+	      unsigned size2 = instrB.size_ - size1;
+	      for (unsigned i = 0; i < size1 and ok; ++i)
+		{
+		  uint64_t byteAddr = instrB.physAddr_ + i;
+		  if (instrOverlapsPhysAddr(instrA, byteAddr))
+		    {
+		      uint64_t ta = latestByteTime(instrA, byteAddr);
+		      uint64_t tb = earliestByteTime(instrB, byteAddr);
+		      ok = ta < tb or (ta == tb and instrA.isStore_);
+		    }
+		}
+	      for (unsigned i = 0; i < size2 and ok; ++i)
+		{
+		  uint64_t byteAddr = instrB.physAddr2_ + i;
+		  if (instrOverlapsPhysAddr(instrA, byteAddr))
+		    {
+		      uint64_t ta = latestByteTime(instrA, byteAddr);
+		      uint64_t tb = earliestByteTime(instrB, byteAddr);
+		      ok = ta < tb or (ta == tb and instrA.isStore_);
+		    }
+		}
+	    }
+
 	  if (ok)
 	    continue;
 	}
@@ -1942,6 +1983,14 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 	      and not (succIn and succ.isLoad_ and succPma.isIo())
 	      and not (succOut and succ.isStore_ and succPma.isIo()))
 	    continue;
+
+	  if (not pred.complete_ or not pred.retired_)
+	    {
+	      cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+		   << " tag1=" << pred.tag_ << " fence-tag=" << instr.tag_
+		   << " memory instruction before fence is not retired/complate\n";
+	      return false;
+	    }
 
 	  auto predTime = latestOpTime(pred);
 	  auto succTime = earliestOpTime(succ);
