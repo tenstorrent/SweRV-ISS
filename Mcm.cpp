@@ -1178,91 +1178,33 @@ Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 }
 
 
-template <typename URV>
+/// Return a mask of the bytes of the given address range that are
+/// covered by the given memory operation. Bit i of the returned mask
+/// will be set if byte at addr+i is covered by op.
 unsigned
-Mcm<URV>::determineOpMask(McmInstr* instr, MemoryOp& op)
+getMask(uint64_t addr, unsigned size, const MemoryOp& op)
 {
-  unsigned size = instr->size_;
   unsigned mask = 0;
-  if (size == 0)
-    return mask;
 
-  uint64_t addr1 = instr->physAddr_, addr2 = instr->physAddr2_;
-
-  if (addr1 == addr2)
+  if (op.physAddr_ <= addr)
     {
-      if (op.physAddr_ <= addr1)
-	{
-	  if (op.physAddr_ + op.size_ <= addr1)
-	    return mask;  // Read op does not overlap instruction.
-
-	  if (op.physAddr_ + op.size_ > addr1 + size)
-	    op.size_ = addr1 + size - op.physAddr_;  // Trim wide ops.
-	  uint64_t overlap = op.physAddr_ + op.size_ - addr1;
-	  assert(overlap > 0 and overlap <= 8);
-	  mask = (1 << overlap) - 1;
-	}
-      else
-	{
-	  if (addr1 + size <= op.physAddr_)
-	    return mask;  // Read op does no overlap instruction.
-
-	  if (op.physAddr_ + op.size_ > addr1 + size)
-	    op.size_ = addr1 + size - op.physAddr_;  // Trim wide ops.
-	  mask = (1 << op.size_) - 1;
-	  mask = mask << (op.physAddr_ - addr1);
-	}
+      if (op.physAddr_ + op.size_ <= addr)
+	return mask;  // Op does not overlap address range.
+      uint64_t overlap = op.physAddr_ + op.size_ - addr;
+      if (overlap > size)
+	overlap = size;
+      assert(overlap > 0 and overlap <= 8);
+      mask = (1 << overlap) - 1;
     }
   else
     {
-      unsigned size1 = offsetToNextPage(addr1);
-
-      if (pageNum(op.physAddr_) == pageNum(addr1))
-	{
-	  assert(size1 < size);
-
-	  if (op.physAddr_ <= addr1)
-	    {
-	      if (op.physAddr_ + op.size_ <= addr1)
-		return mask;  // Read op does not overlap instruction.
-	      if (op.physAddr_ + op.size_ > addr1 + size1)
-		op.size_ = addr1 + size1 - op.physAddr_;  // Trim wide ops.
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr1;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = (1 << overlap) - 1;
-	    }
-	  else
-	    {
-	      if (addr1 + size <= op.physAddr_)
-		return mask;  // Read op does no overlap instruction.
-	      if (op.physAddr_ + op.size_ > addr1 + size1)
-		op.size_ = addr1 + size1 - op.physAddr_;  // Trim wide ops.
-	      mask = (1 << op.size_) - 1;
-	      mask = mask << (op.physAddr_ - addr1);
-	    }
-	}
-      else if (pageNum(op.physAddr_) == pageNum(addr2))
-	{
-	  unsigned size2 = size - size1;
-
-	  if (op.physAddr_ == addr2)
-	    {
-	      if (op.physAddr_ + op.size_ > addr2 + size2)
-		op.size_ = addr2 + size2 - op.physAddr_;  // Trim wide ops.
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr2;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = ((1 << overlap) - 1) << size1;
-	    }
-	  else
-	    {
-	      if (addr2 + size2 <= op.physAddr_)
-		return mask;  // Read op does no overlap instruction.
-	      if (op.physAddr_ + op.size_ > addr2 + size2)
-		op.size_ = addr2 + size2 - op.physAddr_;  // Trim wide ops.
-	      mask = (1 << op.size_) - 1;
-	      mask = mask << ((op.physAddr_ - addr2) + size1);
-	    }
-	}
+      if (addr + size <= op.physAddr_)
+	return mask;  // Op does not overlap address range.
+      uint64_t overlap = addr + size - op.physAddr_;
+      if (overlap > op.size_)
+	overlap = op.size_;
+      mask = (1 << overlap) - 1;
+      mask = mask << (op.physAddr_ - addr);
     }
 
   return mask;
@@ -1270,17 +1212,97 @@ Mcm<URV>::determineOpMask(McmInstr* instr, MemoryOp& op)
 
 
 template <typename URV>
+unsigned
+Mcm<URV>::determineOpMask(const McmInstr& instr, const MemoryOp& op) const
+{
+  unsigned size = instr.size_;
+  uint64_t addr1 = instr.physAddr_, addr2 = instr.physAddr2_;
+
+  if (addr1 == addr2)
+    return getMask(addr1, size, op);
+
+  unsigned size1 = offsetToNextPage(addr1);
+
+  if (pageNum(op.physAddr_) == pageNum(addr1))
+    {
+      assert(size1 < size);
+      return getMask(addr1, size1, op);
+    }
+
+  if (pageNum(op.physAddr_) == pageNum(addr2))
+    {
+      unsigned size2 = size - size1;
+      unsigned mask = getMask(addr2, size2, op);
+      mask = mask << size1;
+      return mask;
+    }
+
+  return 0;  // no overlap.
+}
+
+
+/// If given memory operation overlaps the given address range then
+/// set its high end to the end of the address range.
+void
+trimOp(MemoryOp& op, uint64_t addr, unsigned size)
+{
+  if (op.physAddr_ <= addr)
+    {
+      if (op.physAddr_ + op.size_ <= addr)
+	return;  // Op does not overlap instruction.
+      if (op.physAddr_ + op.size_ > addr + size)
+	op.size_ = addr + size - op.physAddr_;  // Trim wide op.
+    }
+  else
+    {
+      if (addr + size <= op.physAddr_)
+	return;  // Op does no overlap instruction.
+      if (op.physAddr_ + op.size_ > addr + size)
+	op.size_ = addr + size - op.physAddr_;  // Trim wide op.
+    }
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::trimMemoryOp(const McmInstr& instr, MemoryOp& op)
+{
+  unsigned size = instr.size_;
+  uint64_t addr1 = instr.physAddr_, addr2 = instr.physAddr2_;
+
+  if (addr1 == addr2)
+    trimOp(op, addr1, size);
+  else
+    {
+      unsigned size1 = offsetToNextPage(addr1);
+      if (pageNum(op.physAddr_) == pageNum(addr1))
+	{
+	  assert(size1 < size);
+	  trimOp(op, addr1, size1);
+	}
+      else if (pageNum(op.physAddr_) == pageNum(addr2))
+	{
+	  unsigned size2 = size - size1;
+	  trimOp(op, addr2, size2);
+	}
+    }
+}
+
+
+template <typename URV>
 void
 Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 {
-  size_t nops = instr->memOps_.size();
   assert(instr->size_ > 0 and instr->size_ <= 8);
   unsigned expectedMask = (1 << instr->size_) - 1;  // Mask of bytes covered by instruction.
   unsigned readMask = 0;    // Mask of bytes covered by read operations.
 
   auto& ops = instr->memOps_;
+  for (auto& opIx : ops)
+    trimMemoryOp(*instr, sysMemOps_.at(opIx));
 
   // Process read ops in reverse order so that later reads take precedence.
+  size_t nops = instr->memOps_.size();
   for (size_t j = 0; j < nops; ++j)
     {
       auto opIx = ops.at(nops - 1 - j);
@@ -1295,7 +1317,7 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
       bool cancel = (readMask == expectedMask);
       if (not cancel)
 	{
-	  unsigned mask = determineOpMask(instr, op);
+	  unsigned mask = determineOpMask(*instr, op);
 	  mask &= expectedMask;
 	  if ((mask & readMask) == mask)
 	    cancel = true;  // Read op already covered by other read ops

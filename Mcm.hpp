@@ -290,7 +290,11 @@ namespace WdRiscv
     /// Compute a mask of the instruction data bytes covered by the
     /// given memory operation. Return 0 if the operation does not
     /// overlap the given instruction.
-    unsigned determineOpMask(McmInstr*, MemoryOp& op);
+    unsigned determineOpMask(const McmInstr& instr, const MemoryOp& op) const;
+
+    /// If op overlaps instruction then trim high end of op to the
+    /// boundary of the instruction.
+    void trimMemoryOp(const McmInstr& instr, MemoryOp& op);
 
     /// Helper to retire method: Capture paramters of store instruction and
     /// commit its data to memory. Return true on success and false on failure.
