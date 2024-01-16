@@ -1021,7 +1021,7 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
 template <typename URV>
 void
 Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store, const McmInstr& target,
-				uint64_t& mask) const
+				unsigned& mask) const
 {
   if (not store.isStore_ or not target.isMemory() or not store.overlaps(target))
     return;
@@ -1036,17 +1036,16 @@ Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store, const McmInstr& target,
 	mask = 0;
       else
 	{
-	  unsigned shift = overlap * 8;
-	  mask = (mask >> shift) << shift;
+	  unsigned m = (1 << overlap) - 1;
+	  mask = mask & ~m;
 	}
       return;
     }
   
   uint64_t end = std::min(target.virtAddr_ + target.size_, store.virtAddr_ + store.size_);
   uint64_t overlap = end - store.virtAddr_;
-  unsigned bits = overlap*8;
-  uint64_t m = (1 << bits) - 1;
-  m = m << ((store.virtAddr_ - target.virtAddr_) * 8);
+  unsigned m = (1 << overlap) - 1;
+  m = m << (store.virtAddr_ - target.virtAddr_);
   mask = mask & ~m;
 }
 
@@ -1747,9 +1746,9 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  uint64_t mask = ~uint64_t(0);  // Bits of B not-written by preceeding stores.
-  unsigned shift = (8 - instrB.size_) * 8;
-  mask = (mask << shift) >> shift;
+  // Bit i of mask is 1 if byte i of data of instruction B is not
+  // written by a preceeding store.
+  unsigned mask = (1 << instrB.size_) - 1;
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
@@ -1783,13 +1782,7 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	    continue;
 	  if (op.hartIx_ != hartIx and not op.isRead_ and overlaps(instrB, op))
 	    {
-	      unsigned shift = 8*(8 - op.size_);
-	      uint64_t opMask = ~uint64_t(0);
-	      opMask = (opMask << shift) >> shift;
-	      if (op.physAddr_ <= instrB.physAddr_)
-		opMask >>= (instrB.physAddr_ - op.physAddr_)*8;
-	      else
-		opMask <<= (op.physAddr_- instrB.physAddr_)*8;
+	      unsigned opMask = determineOpMask(instrB, op);
 	      if ((opMask & mask) != 0)
 		{
 		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
@@ -1831,9 +1824,9 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
-  uint64_t mask = ~uint64_t(0);  // Bits of B not-written by preceeding non-atomic stores.
-  unsigned shift = (8 - instrB.size_) * 8;
-  mask = (mask << shift) >> shift;
+  // Bit i of mask is 1 if byte i of data of instruction B is not
+  // written by a preceeding store.
+  unsigned mask = (1 << instrB.size_) - 1;
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
@@ -1861,7 +1854,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	{
 	  clearMaskBitsForWrite(instrA, instrB, mask);
 	  if (mask == 0)
-	    return true;
+	    return true;   // All bytes of B written by non-atomic stores.
 	}
       else if (not isBeforeInMemoryTime(instrA, instrB))
 	{
