@@ -1730,13 +1730,6 @@ namespace WdRiscv
     void tracePma(bool flag)
     { memory_.pmaMgr_.enableTrace(flag); }
 
-    /// Enable/disable IMSIC trace
-    void traceImsic(bool flag)
-    {
-      if (imsic_)
-        imsic_->enableTrace(flag);
-    }
-
     /// Enable/disable top-of-range mode in pmp configurations.
     void enablePmpTor(bool flag)
     { csRegs_.enablePmpTor(flag); }
@@ -1791,13 +1784,15 @@ namespace WdRiscv
 		     uint64_t mbase, uint64_t mend,
 		     uint64_t sbase, uint64_t send,
 		     std::function<bool(uint64_t, unsigned, uint64_t&)> readFunc,
-		     std::function<bool(uint64_t, unsigned, uint64_t)> writeFunc)
+		     std::function<bool(uint64_t, unsigned, uint64_t)> writeFunc,
+                     bool trace)
     {
       imsic_ = imsic;
       imsicMbase_ = mbase; imsicMend_ = mend;
       imsicSbase_ = sbase; imsicSend_ = send;
       imsicRead_ = readFunc;
       imsicWrite_ = writeFunc;
+      imsic_->enableTrace(trace);
       csRegs_.attachImsic(imsic);
 
       using IC = InterruptCause;

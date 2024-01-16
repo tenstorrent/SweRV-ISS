@@ -1399,13 +1399,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.tracePtw(flag);
     }
 
-  tag = "trace_imsic";
-  if (config_ -> contains(tag))
-    {
-      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.traceImsic(flag);
-    }
-
   // Reservation size in bytes for the load-reserve (LR) instruction.
   // Default is 4 for rv32 and 8 for rv64. A reservation size smaller
   // than default has no effect.
@@ -1961,7 +1954,13 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
       return false;
 
-  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids);
+  bool trace = false;
+  tag = "trace";
+  if (imsic.contains(tag))
+    if (not getJsonBoolean("imsic.trace", imsic.at(tag), trace))
+      return false;
+
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, trace);
 }
 
 

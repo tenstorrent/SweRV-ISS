@@ -451,7 +451,8 @@ template <typename URV>
 bool
 System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 			 uint64_t sbase, uint64_t sstride,
-			 unsigned guests, unsigned ids)
+			 unsigned guests, unsigned ids,
+                         bool trace)
 {
   using std::cerr;
 
@@ -549,7 +550,7 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
     {
       auto hart = ithHart(i);
       auto imsic = imsicMgr_.ithImsic(i);
-      hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc);
+      hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc, trace);
     }
 
   return true;
