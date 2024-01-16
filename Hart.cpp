@@ -2127,8 +2127,29 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	  return;
 	}
     }
-  else if (addr - clintStart_ >= 0xbff8)
-    return;  // Timer.
+  else if (addr - clintStart_ >= 0xbff8 and addr <= clintStart_ + 0xbfff)
+    {
+      // TODO: fix this for multicore -- need to update other harts' instCounter_
+      if (stSize == 4)
+        {
+          if ((addr & 7) == 0)
+            {
+              instCounter_ = (instCounter_ >> 32) << 32; // Clear low 32
+              instCounter_ |= uint32_t(storeVal) << counterToTimeShift_; // Fake time: instr count
+            }
+          else if ((addr & 3) == 0)
+            {
+              instCounter_ = (instCounter_ << 32) >> 32; // Clear high 32
+              instCounter_ |= (uint64_t(storeVal) << counterToTimeShift_) << 32; // Fake time: instr count
+            }
+        }
+      else if (stSize == 8)
+        {
+          if ((addr & 7) == 0)
+            instCounter_ = storeVal << counterToTimeShift_; // Fake time: instr count
+        }
+      return;  // Timer.
+    }
 
   // Address did not match any hart entry in clint.
   storeVal = 0;
