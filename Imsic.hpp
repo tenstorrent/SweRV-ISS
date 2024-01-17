@@ -21,6 +21,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     enum ExternalInterruptCsr
     {
+      IPRIO0 = 0x30,
+      IPRIO15 = 0x3F,
+
       DELIVERY = 0x70,
       THRESHOLD = 0x72,
 
@@ -381,9 +384,12 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool writeSireg(bool virt, unsigned guest, unsigned select, URV value)
     {
+      using EIC = ExternalInterruptCsr;
       if (virt)
 	{
-	  if (guest >= gfiles_.size())
+          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+            return false;
+	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
 	  bool ok = gfile.iregWrite(select, value);
@@ -409,7 +415,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     {
       if (virt)
 	{
-	  if (guest >= gfiles_.size())
+          /// The guest file marks the prio array as inaccessible.
+          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+            return false;
+	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
 	  return gfile.iregRead(select, value);

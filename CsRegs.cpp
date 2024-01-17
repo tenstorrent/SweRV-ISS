@@ -427,7 +427,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       URV hsVal = hs.read();
       HstatusFields<URV> hsf(hsVal);
       unsigned vgein = hsf.bits_.VGEIN;
-      if (vgein >= imsic_->guestCount())
+      if (not vgein or vgein >= imsic_->guestCount())
 	return false;
       value = imsic_->guestTopId(vgein);
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
@@ -1316,7 +1316,7 @@ CsRegs<URV>::writeVstopei()
   HstatusFields<URV> hsf(hsVal);
 
   unsigned vgein = hsf.bits_.VGEIN;
-  if (vgein >= imsic_->guestCount())
+  if (not vgein or vgein >= imsic_->guestCount())
     return false;
 
   unsigned id = imsic_->guestTopId(vgein);
@@ -1499,7 +1499,7 @@ CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
 	  URV hsVal = hs.read();
 	  HstatusFields<URV> hsf(hsVal);
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  if (vgein >= imsic_->guestCount())
+	  if (not vgein or vgein >= imsic_->guestCount())
 	    return false;
 	}
     }
@@ -1539,7 +1539,7 @@ CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode mode ) const
 	  URV hsVal = hs.read();
 	  HstatusFields<URV> hsf(hsVal);
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  if (vgein >= imsic_->guestCount())
+	  if (not vgein or vgein >= imsic_->guestCount())
 	    return false;
 	}
     }
@@ -2870,7 +2870,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
       URV hsVal = hs.read();
       HstatusFields<URV> hsf(hsVal);
       unsigned vgein = hsf.bits_.VGEIN;
-      if (vgein >= imsic_->guestCount())
+      if (not vgein or vgein >= imsic_->guestCount())
 	return false;
       value = imsic_->guestTopId(vgein);
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
@@ -3165,7 +3165,9 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
               HstatusFields<URV> hsf(hsVal);
               unsigned vgein = hsf.bits_.VGEIN;
 
-             id = imsic_->guestTopId(vgein);
+              if (not vgein or vgein >= imsic_->guestCount())
+                return false;
+              id = imsic_->guestTopId(vgein);
             }
           if (id != 0)
             value = (sExternal << iidShift) | id;
