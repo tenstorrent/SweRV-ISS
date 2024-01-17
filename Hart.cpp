@@ -78,9 +78,10 @@ parseNumber(std::string_view numberStr, TYPE& number)
 
 
 template <typename URV>
-Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
+Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time)
   : hartIx_(hartIx), memory_(memory), intRegs_(32),
     fpRegs_(32), syscall_(*this),
+    time_(time),
     pmpManager_(memory.size(), UINT64_C(1024)*1024),
     virtMem_(hartIx, memory, memory.pageSize(), pmpManager_, 16)
 {
@@ -120,7 +121,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::MCYCLEH)->tie(high);
       csRegs_.findCsr(CsrNumber::CYCLEH)->tie(high);
 
-      low = reinterpret_cast<URV*>(&instCounter_);
+      low = reinterpret_cast<URV*>(&time_);
       high = low + 1;
       csRegs_.findCsr(CsrNumber::TIME)->tie(low);
       csRegs_.findCsr(CsrNumber::TIMEH)->tie(high);
@@ -152,7 +153,7 @@ Hart<URV>::Hart(unsigned hartIx, URV hartId, Memory& memory)
       csRegs_.findCsr(CsrNumber::INSTRET)->tie(&retiredInsts_);
       csRegs_.findCsr(CsrNumber::CYCLE)->tie(&cycleCount_);
 
-      csRegs_.findCsr(CsrNumber::TIME)->tie(&instCounter_);
+      csRegs_.findCsr(CsrNumber::TIME)->tie(&time_);
 
       csRegs_.findCsr(CsrNumber::STIMECMP)->tie(&stimecmp_);
       csRegs_.findCsr(CsrNumber::VSTIMECMP)->tie(&vstimecmp_);
@@ -650,7 +651,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
 
   csRegs_.updateCounterPrivilege();
 
-  alarmLimit_ = alarmInterval_? alarmInterval_ + instCounter_ : ~uint64_t(0);
+  alarmLimit_ = alarmInterval_? alarmInterval_ + time_ : ~uint64_t(0);
   consecutiveIllegalCount_ = 0;
 
   // Trigger software interrupt in hart 0 on reset.
@@ -1789,7 +1790,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   ULT narrow = 0;   // Unsigned narrow loaded value
   if (addr1 >= clintStart_ and addr1 < clintEnd_ and addr1 - clintStart_ >= 0xbff8)
     {
-      uint64_t tm = instCounter_ >> counterToTimeShift_; // Fake time: instr count
+      uint64_t tm = time_ >> counterToTimeShift_; // Fake time: instr count
       tm = tm >> (addr1 - 0xbff8) * 8;
       narrow = tm;
     }
@@ -2135,24 +2136,29 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
     }
   else if (addr - clintStart_ >= 0xbff8 and addr <= clintStart_ + 0xbfff)
     {
-      // TODO: fix this for multicore -- need to update other harts' instCounter_
+      uint64_t tm;
       if (stSize == 4)
         {
           if ((addr & 7) == 0)
             {
-              instCounter_ = (instCounter_ >> 32) << 32; // Clear low 32
-              instCounter_ |= uint32_t(storeVal) << counterToTimeShift_; // Fake time: instr count
+              tm = (time_ >> 32) << 32; // Clear low 32
+              tm |= uint32_t(storeVal) << counterToTimeShift_; // Fake time: instr count
+              time_ = tm;
             }
           else if ((addr & 3) == 0)
             {
-              instCounter_ = (instCounter_ << 32) >> 32; // Clear high 32
-              instCounter_ |= (uint64_t(storeVal) << counterToTimeShift_) << 32; // Fake time: instr count
+              tm = (time_ << 32) >> 32; // Clear high 32
+              tm |= (uint64_t(storeVal) << counterToTimeShift_) << 32; // Fake time: instr count
+              time_ = tm;
             }
         }
       else if (stSize == 8)
         {
           if ((addr & 7) == 0)
-            instCounter_ = storeVal << counterToTimeShift_; // Fake time: instr count
+            {
+              tm = storeVal << counterToTimeShift_; // Fake time: instr count
+              time_ = tm;
+            }
         }
       return;  // Timer.
     }
@@ -4509,6 +4515,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 
 	  ++instCounter_;
 
+          if (not hartIx_)
+            ++time_;
+
           if (processExternalInterrupt(traceFile, instStr))
 	    continue;  // Next instruction in trap handler.
 	  uint64_t physPc = 0;
@@ -4785,6 +4794,10 @@ Hart<URV>::simpleRunWithLimit()
       hasException_ = hasInterrupt_ = lastBranchTaken_ = false;
       currPc_ = pc_;
       ++instCounter_;
+
+      if (not hartIx_)
+        ++time_;
+
       if (mcycleEnabled())
 	++cycleCount_;
 
@@ -5147,7 +5160,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       if (hasClint())
 	{
 	  // Deliver/clear machine timer interrupt from clint.
-	  if ((instCounter_ >> counterToTimeShift_) >= clintAlarm_)
+	  if ((time_ >> counterToTimeShift_) >= clintAlarm_)
 	    mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
@@ -5158,7 +5171,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
 	  bool hasAlarm = alarmLimit_ != ~uint64_t(0);
 	  if (hasAlarm)
 	    {
-	      if (instCounter_ >= alarmLimit_)
+	      if (time_ >= alarmLimit_)
 		{
 		  alarmLimit_ += alarmInterval_;
 		  mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
@@ -5179,7 +5192,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear supervisor timer from stimecmp CSR.
       if (stimecmpActive_)
 	{
-	  if ((instCounter_ >> counterToTimeShift_) >= stimecmp_)
+	  if ((time_ >> counterToTimeShift_) >= stimecmp_)
 	    mipVal = mipVal | (URV(1) << URV(IC::S_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::S_TIMER));
@@ -5188,7 +5201,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear virtual supervisor timer from vstimecmp CSR.
       if (vstimecmpActive_)
 	{
-	  if ((instCounter_ >> counterToTimeShift_) >= (vstimecmp_ - htimedelta_))
+	  if ((time_ >> counterToTimeShift_) >= (vstimecmp_ - htimedelta_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));
@@ -5293,6 +5306,9 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       resetExecInfo();
 
       ++instCounter_;
+
+      if (not hartIx_)
+        ++time_;
 
       if (processExternalInterrupt(traceFile, instStr))
 	return;  // Next instruction in interrupt handler.
