@@ -2752,34 +2752,40 @@ CsRegs<URV>::defineStateEnableRegs()
 {
   bool mand = true;  // Mndatory
   bool imp = true;   // Implemented
-  URV wam = ~URV(0);  // Write-all mask: all bits writeable.
 
-  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, wam, wam);
-  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, wam, wam);
-  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, wam, wam);
-  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, wam, wam);
+  // Default: none of the staten CSRs are writable.
+  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, 0, 0);
 
-  defineCsr("mstateen0", CsrNumber::MSTATEEN0,  !mand, !imp, 0, wam, wam);
-  defineCsr("mstateen1", CsrNumber::MSTATEEN1,  !mand, !imp, 0, wam, wam);
-  defineCsr("mstateen2", CsrNumber::MSTATEEN2,  !mand, !imp, 0, wam, wam);
-  defineCsr("mstateen3", CsrNumber::MSTATEEN3,  !mand, !imp, 0, wam, wam);
+  URV mask = 0;  // Default: nothing writable.
 
-  defineCsr("hstateen0", CsrNumber::HSTATEEN0,  !mand, !imp, 0, wam, wam);
-  defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, wam, wam);
-  defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, wam, wam);
-  defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, wam, wam);
+  if constexpr (sizeof(URV) == 8)
+    mask = uint64_t(0b1101111) << 57;   // Bits 57 to 63
+
+  defineCsr("mstateen0", CsrNumber::MSTATEEN0,  !mand, !imp, 0, mask, mask);
+  defineCsr("mstateen1", CsrNumber::MSTATEEN1,  !mand, !imp, 0, 0, 0);
+  defineCsr("mstateen2", CsrNumber::MSTATEEN2,  !mand, !imp, 0, 0, 0);
+  defineCsr("mstateen3", CsrNumber::MSTATEEN3,  !mand, !imp, 0, 0, 0);
+
+  defineCsr("hstateen0", CsrNumber::HSTATEEN0,  !mand, !imp, 0, mask, mask);
+  defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, 0, 0);
+  defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, 0, 0);
+  defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, 0, 0);
 
   if (sizeof(URV) == 4)
     {
-      defineCsr("sstateen0h", CsrNumber::MSTATEEN0H,  !mand, !imp, 0, wam, wam);
-      defineCsr("sstateen1h", CsrNumber::MSTATEEN1H,  !mand, !imp, 0, wam, wam);
-      defineCsr("sstateen2h", CsrNumber::MSTATEEN2H,  !mand, !imp, 0, wam, wam);
-      defineCsr("sstateen3h", CsrNumber::MSTATEEN3H,  !mand, !imp, 0, wam, wam);
+      mask = URV(0b1101111) << 25;   // Bits 25 to 31
+      defineCsr("sstateen0h", CsrNumber::MSTATEEN0H,  !mand, !imp, 0, mask, mask);
+      defineCsr("sstateen1h", CsrNumber::MSTATEEN1H,  !mand, !imp, 0, 0, 0);
+      defineCsr("sstateen2h", CsrNumber::MSTATEEN2H,  !mand, !imp, 0, 0, 0);
+      defineCsr("sstateen3h", CsrNumber::MSTATEEN3H,  !mand, !imp, 0, 0, 0);
 
-      defineCsr("hstateen0h", CsrNumber::HSTATEEN0H,  !mand, !imp, 0, wam, wam);
-      defineCsr("hstateen1h", CsrNumber::HSTATEEN1H,  !mand, !imp, 0, wam, wam);
-      defineCsr("hstateen2h", CsrNumber::HSTATEEN2H,  !mand, !imp, 0, wam, wam);
-      defineCsr("hstateen3h", CsrNumber::HSTATEEN3H,  !mand, !imp, 0, wam, wam);
+      defineCsr("hstateen0h", CsrNumber::HSTATEEN0H,  !mand, !imp, 0, mask, mask);
+      defineCsr("hstateen1h", CsrNumber::HSTATEEN1H,  !mand, !imp, 0, 0, 0);
+      defineCsr("hstateen2h", CsrNumber::HSTATEEN2H,  !mand, !imp, 0, 0, 0);
+      defineCsr("hstateen3h", CsrNumber::HSTATEEN3H,  !mand, !imp, 0, 0, 0);
     }
 }
 
