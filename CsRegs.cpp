@@ -992,7 +992,8 @@ URV
 CsRegs<URV>::legalizeMstatusValue(URV value) const
 {
   MstatusFields<URV> fields(value);
-  PrivilegeMode mode = PrivilegeMode(fields.bits_.MPP);
+  PrivilegeMode mpp = PrivilegeMode(fields.bits_.MPP);
+  PrivilegeMode spp = PrivilegeMode(fields.bits_.SPP);
 
   if (fields.bits_.FS == unsigned(FpStatus::Dirty) or fields.bits_.XS == unsigned(FpStatus::Dirty) or
       fields.bits_.VS == unsigned(VecStatus::Dirty))
@@ -1000,19 +1001,22 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
   else
     fields.bits_.SD = 0;
 
-  if (mode == PrivilegeMode::Machine)
-    return fields.value_;
+  assert(spp == PrivilegeMode(0) or spp == PrivilegeMode(1));
 
-  if (mode == PrivilegeMode::Supervisor and not superEnabled_)
-    mode = PrivilegeMode::User;
+  if (not superEnabled_)
+    spp = PrivilegeMode(0);
 
-  if (mode == PrivilegeMode::Reserved)
-    mode = PrivilegeMode::User;
+  if (mpp == PrivilegeMode::Supervisor and not superEnabled_)
+    mpp = PrivilegeMode::User;
 
-  if (mode == PrivilegeMode::User and not userEnabled_)
-    mode = PrivilegeMode::Machine;
+  if (mpp == PrivilegeMode::Reserved)
+    mpp = PrivilegeMode::User;
 
-  fields.bits_.MPP = unsigned(mode);
+  if (mpp == PrivilegeMode::User and not userEnabled_)
+    mpp = PrivilegeMode::Machine;
+
+  fields.bits_.MPP = unsigned(mpp);
+  fields.bits_.SPP = unsigned(spp);
 
   return fields.value_;
 }
