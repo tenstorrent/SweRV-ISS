@@ -494,5 +494,12 @@ Isa::applyIsaString(std::string_view isaStr)
 	}
     }
 
+  if (isEnabled(RvExtension::S) and not isEnabled(RvExtension::U))
+    {
+      std::cerr << "Having supervisor mode without user mode is not a legal architectural state."
+                << "Therefore, if 's' is included in the ISA string, 'u' must be as well.\n";
+      return false;
+    }
+
   return true;
 }

@@ -356,6 +356,11 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 		  << " to be compatible with write mask.\n";
       if (writeable & (URV(1) << ('E' - 'A')))
 	std::cerr << "Warning: Bit E of MISA cannot be writebale.\n";
+      if ((reset & (1 << ('S' - 'A'))) and not (reset & (1 << ('U' - 'A'))))
+        {
+          std::cerr << "Invalid MISA in config file: cannot have S=1 and U=0.\n";
+          return false;
+        }
     }
 
   if (verbose)
