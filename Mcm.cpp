@@ -429,21 +429,22 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  bool result = true;
-
   // Associate write op with instruction.
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
 
   instr->complete_ = checkStoreComplete(*instr);
 
+  bool result = pokeHartMemory(hart, physAddr, rtlData, size);
+
   if (instr->retired_)
     {
-      result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
       result = checkRtlWrite(hart.hartId(), *instr, op) and result;
       if (instr->complete_)
 	result = ppoRule1(hart, *instr) and result;
     }
+  else
+    ; // TODO: Mark instruction to avoid poking memory in retireStore
 
   return result;
 }
