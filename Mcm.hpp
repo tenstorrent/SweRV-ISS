@@ -20,16 +20,17 @@ namespace WdRiscv
 
   struct MemoryOp
   {
-    uint64_t time_ = 0;
-    uint64_t physAddr_ = 0;
-    uint64_t data_ = 0;
-    uint64_t rtlData_ = 0;
-    McmInstrIx instrTag_ = 0;
-    uint8_t hartIx_ = 0;
-    uint8_t size_ = 0;
-    bool isRead_ = false;
-    bool failRead_ = false;
-    bool canceled_ = false;
+    uint64_t   time_          = 0;
+    uint64_t   physAddr_      = 0;
+    uint64_t   data_          = 0;
+    uint64_t   rtlData_       = 0;
+    McmInstrIx instrTag_      = 0;
+    uint64_t   forwardTime_   = 0;  // Time of store instruction forwarding to this op.
+    uint8_t    hartIx_   : 8  = 0;
+    uint8_t    size_     : 8  = 0;
+    bool       isRead_   : 1  = false;
+    bool       failRead_ : 1  = false;
+    bool       canceled_ : 1  = false;
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
@@ -255,6 +256,11 @@ namespace WdRiscv
 	  mt = std::min(mt, sysMemOps_.at(opIx).time_);
       return mt;
     }
+
+    /// Return the smallest time of the memor operations of the given
+    /// instruction. Adjust read-operation times to account for
+    /// forwarding.
+    uint64_t effectiveReadTime(const McmInstr& instr) const;
 
     /// Return true if instruction a is before b in memory time.
     bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const

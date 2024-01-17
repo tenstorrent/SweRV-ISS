@@ -1459,6 +1459,8 @@ bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
+  uint64_t orig = mask;
+
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
   for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
     {
@@ -1466,6 +1468,7 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
       if (instr.isCanceled() or not instr.isRetired() or not instr.isStore_)
 	continue;
 
+      uint64_t prev = mask;
       if (not forwardTo(instr, instr.physAddr_, instr.data_, instr.size_, op, mask))
 	{
 	  if (instr.physAddr_ == instr.physAddr2_)
@@ -1478,6 +1481,9 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	  if (not forwardTo(instr, instr.physAddr2_, data2, size2, op, mask))
 	    continue;
 	}
+
+      if (prev == orig and mask == 0)
+	op.forwardTime_ = earliestOpTime(instr);
 
       const auto& di = instr.di_;
       if (di.instEntry()->isAtomic())
@@ -1936,6 +1942,32 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
 
 
 template <typename URV>
+uint64_t
+Mcm<URV>::effectiveReadTime(const McmInstr& instr) const
+{
+
+  if (not instr.isLoad_)
+    return earliestOpTime(instr);
+
+  if (not instr.complete_ and instr.memOps_.empty())
+    return time_;
+
+  uint64_t mint = ~uint64_t(0);
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	auto& op = sysMemOps_.at(opIx);
+	uint64_t t = op.time_;
+	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
+	  t = op.forwardTime_;
+	mint = std::min(mint, t);
+      }
+
+  return mint;
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 {
@@ -2007,7 +2039,8 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 	    }
 
 	  auto predTime = latestOpTime(pred);
-	  auto succTime = earliestOpTime(succ);
+	  auto succTime = effectiveReadTime(succ);
+
 	  if (predTime < succTime)
 	    continue;
 
