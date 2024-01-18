@@ -444,7 +444,9 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 	result = ppoRule1(hart, *instr) and result;
     }
   else
-    ; // TODO: Mark instruction to avoid poking memory in retireStore
+    {
+      // TODO: Mark instruction to avoid poking memory in retireStore
+    }
 
   return result;
 }
@@ -1333,11 +1335,11 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
   size_t count = 0;
   for (size_t i = 0; i < ops.size(); ++i)
     {
-      auto& op = sysMemOps_.at(ops.at(i));
-      if (not op.isCanceled())
+      auto opIx = ops.at(i);
+      if (opIx < sysMemOps_.size() and not sysMemOps_.at(opIx).isCanceled())
 	{
 	  if (count < i)
-	    ops.at(count) = ops.at(i);
+	    ops.at(count) = opIx;
 	  count++;
 	}
     }
@@ -1390,8 +1392,6 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
   for (size_t j = 0; j < nops; ++j)
     {
       auto opIx = instr->memOps_.at(nops - 1 - j);
-      if (opIx >= sysMemOps_.size())
-	continue;
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
@@ -1448,6 +1448,20 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
 	   << " tag=" << tag << '\n';
       ok = false;
     }
+
+  unsigned forwardCount = 0, readCount = 0;
+  for (auto opIx : instr->memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	{
+	  readCount++;
+	  if (op.forwardTime_)
+	    forwardCount++;
+	}
+    }
+  if (readCount and forwardCount == readCount)
+    instr->forwarded_ = true;
 
   instr->complete_ = true;  // FIX : Only for non-io
 
@@ -1749,6 +1763,9 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   // Instruction B must be a load/amo instruction.
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
+
+  if (instrB.forwarded_)
+    return true;
 
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);

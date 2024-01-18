@@ -20,17 +20,17 @@ namespace WdRiscv
 
   struct MemoryOp
   {
-    uint64_t   time_          = 0;
-    uint64_t   physAddr_      = 0;
-    uint64_t   data_          = 0;
-    uint64_t   rtlData_       = 0;
-    McmInstrIx instrTag_      = 0;
-    uint64_t   forwardTime_   = 0;  // Time of store instruction forwarding to this op.
-    uint8_t    hartIx_   : 8  = 0;
-    uint8_t    size_     : 8  = 0;
-    bool       isRead_   : 1  = false;
-    bool       failRead_ : 1  = false;
-    bool       canceled_ : 1  = false;
+    uint64_t   time_           = 0;
+    uint64_t   physAddr_       = 0;
+    uint64_t   data_           = 0;
+    uint64_t   rtlData_        = 0;
+    McmInstrIx instrTag_       = 0;
+    uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
+    uint8_t    hartIx_    : 8  = 0;
+    uint8_t    size_      : 8  = 0;
+    bool       isRead_    : 1  = false;
+    bool       failRead_  : 1  = false;
+    bool       canceled_  : 1  = false;
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
@@ -51,12 +51,13 @@ namespace WdRiscv
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;
     McmInstrIx tag_ = 0;
-    uint8_t size_ = 0;        // Data size for load/store insructions.
-    bool retired_ = false;
-    bool canceled_ = false;
-    bool isLoad_ = false;
-    bool isStore_ = false;
-    bool complete_ = false;
+    uint8_t size_   : 8 = 0;        // Data size for load/store insructions.
+    bool retired_   : 1 = false;
+    bool canceled_  : 1 = false;
+    bool isLoad_    : 1 = false;
+    bool isStore_   : 1 = false;
+    bool complete_  : 1 = false;
+    bool forwarded_ : 1 = false; // True if all bytes of load were forwarded.
 
     /// Return true if this a load/store isntruction.
     bool isMemory() const { return isLoad_ or isStore_; }
