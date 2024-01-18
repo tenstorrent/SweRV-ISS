@@ -2020,16 +2020,17 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal,
       return true;
     }
 
-  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
-  if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
-  invalidateDecodeCache(virtAddr, ldStSize_);
-
   ldStWrite_ = true;
   ldStData_ = storeVal;
 
+  invalidateDecodeCache(virtAddr, ldStSize_);
+
   if (mcm_)
-    return true;  // Memory updated when merge buffer is written.
+    return true;  // Memory updated & lr-canceled when merge buffer is written.
+
+  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+  if (addr2 != addr1)
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
 
   if (addr1 >= clintStart_ and addr1 < clintEnd_)
     {

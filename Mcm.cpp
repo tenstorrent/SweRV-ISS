@@ -730,6 +730,9 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   if (not checkBufferWriteParams(hart.hartId(), time, lineSize_, rtlSize, physAddr))
     return false;
 
+  uint64_t lineAddr = physAddr - (physAddr % lineSize_);
+  hart.cancelOtherHartsLr(physAddr);
+
   unsigned hartIx = hart.sysHartIndex();
 
   // Remove from hartPendingWrites_ the writes matching the RTL line
@@ -739,7 +742,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     return false;
 
   // Read our memory corresponding to RTL line addresses.
-  uint64_t lineEnd = physAddr + lineSize_ - (physAddr % lineSize_);
+  uint64_t lineEnd = lineAddr + lineSize_;
   std::vector<uint8_t> line;
   line.reserve(lineSize_);
   for (uint64_t addr = physAddr; addr < lineEnd; ++addr)

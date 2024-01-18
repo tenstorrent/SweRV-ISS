@@ -1414,6 +1414,13 @@ namespace WdRiscv
     CancelLrCause cancelLrCause() const
     { return memory_.cancelLrCause(hartIx_); }
 
+    /// Cancel load reservations in all other harts.
+    void cancelOtherHartsLr(uint64_t physAddr)
+    {
+      uint64_t lineAddr = physAddr - (physAddr % lrResSize_);
+      memory_.invalidateOtherHartLr(hartIx_, lineAddr, lrResSize_);
+    }
+
     /// Report the files opened by the target RISCV program during
     /// current run.
     void reportOpenedFiles(std::ostream& out)
