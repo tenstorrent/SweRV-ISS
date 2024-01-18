@@ -4952,9 +4952,9 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV delegVal = csRegs_.peekMideleg();
   URV hDelegVal = csRegs_.peekHideleg();
 
-  // Interrupts destined for machine mode must not be delegated.
-  URV machine = possible & ~delegVal;  // Machine interrupts.
-  if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and machine != 0)
+  // Non-delegated interrupts are destined for machine mode.
+  URV mdest = possible & ~delegVal;  // Interrupts destined for machine mode.
+  if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and mdest != 0)
     {
       // Check for interrupts destined for machine-mode (not-delegated).
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
@@ -4964,7 +4964,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  if ((machine & mask) != 0)
+	  if ((mdest & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
@@ -4972,11 +4972,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 	}
     }
   if (privMode_ == PM::Machine)
-    return false;
+    return false;   // Interrupts destined for lower privileges are disabled.
 
-  // Interrupts destined for supervisor mode (S/HS): must be delegated but not h-delegated.
-  URV super = possible & delegVal & ~hDelegVal;  // Interrupts targeting S/HS.
-  if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and super != 0)
+  // Delegated but non-h-delegated interrupts are destined for supervisor mode (S/HS).
+  URV sdest = possible & delegVal & ~hDelegVal;  // Interrupts destined for S/HS.
+  if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and sdest != 0)
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
@@ -4985,13 +4985,18 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  if ((super & mask) != 0)
+	  if ((sdest & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
 	    }
 	}
     }
+
+  // We now check for interrupts destined for VS mode. These are disabled if running in
+  // M/HS/U modes. If mode is M/HS then VS-destined are disabled because of VS is a lower
+  // privilege. If mode is U then VS-destined are explicilty disabled (see section 9.1 of
+  // privileged spec).
   if (not virtMode_)
     return false;
 
