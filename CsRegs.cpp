@@ -1502,8 +1502,18 @@ CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
 	  if (not vgein or vgein >= imsic_->guestCount())
 	    return false;
 	}
+
+      if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
+        {
+          CN siselect = advance(csr->getNumber(), -1);
+          URV sel = 0;
+          peek(siselect, sel);
+          return imsic_->isFileSelAccessible<URV>(sel, virtMode_);
+        }
     }
   else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
+    return false;
+  else if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
     return false;
   else if ((num == CN::STIMECMP or num == CN::STIMECMPH) and virtMode_)
     {
@@ -1542,8 +1552,17 @@ CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode mode ) const
 	  if (not vgein or vgein >= imsic_->guestCount())
 	    return false;
 	}
+      if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
+        {
+          CN siselect = advance(csr->getNumber(), -1);
+          URV sel = 0;
+          peek(siselect, sel);
+          return imsic_->isFileSelAccessible<URV>(sel, virtMode_);
+        }
     }
   else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
+    return false;
+  else if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
     return false;
 
   return true;
