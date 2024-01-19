@@ -488,14 +488,13 @@ Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 template <typename URV>
 bool
 Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		 const DecodedInst& di)
+		 const DecodedInst& di, bool trapped)
 {
+  unsigned hartIx = hart.sysHartIndex();
+  cancelNonRetired(hartIx, tag);
+
   if (not updateTime("Mcm::retire", time))
     return false;
-
-  unsigned hartIx = hart.sysHartIndex();
-
-  cancelNonRetired(hartIx, tag);
 
   McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (instr->retired_)
@@ -505,7 +504,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
-  if (not di.isValid())
+  if (not di.isValid() or trapped)
     {
       cancelInstr(*instr);  // Instruction took a trap.
       return true;
@@ -1686,7 +1685,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.isRetired())
 	{
 	  cerr << "Error: ppoRule1: hart-id=" << hart.hartId()
-	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
+	       << " tag1=" << (tag-1) << " tag2=" << instrB.tag_
 	       << " instruction of tag1 is not retired\n";
 	  return false;
 	}

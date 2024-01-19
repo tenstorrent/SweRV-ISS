@@ -326,7 +326,7 @@ namespace WdRiscv
 
     /// Initiate an instruction retire.
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		   const DecodedInst& di);
+		   const DecodedInst& di, bool trapped);
 
     bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
 

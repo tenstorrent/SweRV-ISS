@@ -734,11 +734,11 @@ System<URV>::mcmIEvict(Hart<URV>& hart, uint64_t /*time*/, uint64_t addr)
 template <typename URV>
 bool
 System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		       const DecodedInst& di)
+		       const DecodedInst& di, bool trapped)
 {
   if (not mcm_)
     return false;
-  return mcm_->retire(hart, time, tag, di);
+  return mcm_->retire(hart, time, tag, di, trapped);
 }
 
 template <typename URV>

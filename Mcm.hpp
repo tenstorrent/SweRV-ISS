@@ -164,7 +164,7 @@ namespace WdRiscv
 
     /// This is called when an instruction is retired.
     bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		const DecodedInst& di);
+		const DecodedInst& di, bool trapped);
 
     /// Perform PPO checks (e.g. rule 4) on pending instructions.
     bool finalChecks(Hart<URV>& hart);
