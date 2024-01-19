@@ -21,8 +21,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     enum ExternalInterruptCsr
     {
+      IPRIO0 = 0x30,
+      IPRIO15 = 0x3F,
+
       DELIVERY = 0x70,
+      RES0 = 0x71,
       THRESHOLD = 0x72,
+      RES1 = 0x73,
+      RES2 = 0x7F,
 
       P0 = 0x80,
       P63 = 0xBF,
@@ -381,9 +387,13 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool writeSireg(bool virt, unsigned guest, unsigned select, URV value)
     {
+      using EIC = File::ExternalInterruptCsr;
+
       if (virt)
 	{
-	  if (guest >= gfiles_.size())
+          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+            return false;
+	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
 	  bool ok = gfile.iregWrite(select, value);
@@ -407,9 +417,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool readSireg(bool virt, unsigned guest, unsigned select, URV& value) const
     {
+      using EIC = File::ExternalInterruptCsr;
+
       if (virt)
 	{
-	  if (guest >= gfiles_.size())
+          /// The guest file marks the prio array as inaccessible.
+          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+            return false;
+	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
 	  return gfile.iregRead(select, value);
@@ -518,6 +533,32 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
       sfile_.clearTrace();
       for (auto& g : gfiles_)
         g.clearTrace();
+    }
+
+    /// Returns false if address access will raise exception and true otherwise.
+    template <typename URV>
+    static constexpr bool isFileSelAccessible(unsigned select, bool virt)
+    {
+      using EIC = File::ExternalInterruptCsr;
+
+      if constexpr (sizeof(URV) == 8)
+        if (select & 1)
+          return false;
+
+      /// The guest file marks the prio array as inaccessible.
+      if (virt)
+        if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+          return false;
+
+      if ((select == EIC::DELIVERY) or
+          (select == EIC::THRESHOLD) or
+          (select == EIC::RES0) or
+          (select >= EIC::RES1 and select <= EIC::RES2) or
+          (select >= EIC::IPRIO0 and select <= EIC::IPRIO15) or
+          (select >= EIC::P0 and select <= EIC::P63) or
+          (select >= EIC::E0 and select <= EIC::E63))
+        return true;
+      return false;
     }
 
   private:

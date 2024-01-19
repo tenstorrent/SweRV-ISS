@@ -10,14 +10,24 @@ bool
 File::iregRead(unsigned sel, URV& val) const
 {
   using EIC = ExternalInterruptCsr;
+  val = 0;
 
   if (sel == EIC::DELIVERY)
     val = delivery_;
   else if (sel == EIC::THRESHOLD)
     val = threshold_;
+  else if ((sel == EIC::RES0) or
+           (sel >= EIC::RES1 and sel <= EIC::RES2))
+    return true;
+  else if (sel >= EIC::IPRIO0 and sel <= EIC::IPRIO15)
+    {
+      if constexpr (sizeof(URV) == 8)
+        if (sel & 1)
+          return false;
+      return true;
+    }
   else
     {
-      val = 0;
       unsigned offset = 0;
       const std::vector<bool>* vecPtr = nullptr;
       if (sel >= EIC::P0 and sel <= EIC::P63)
@@ -31,7 +41,7 @@ File::iregRead(unsigned sel, URV& val) const
           vecPtr = &enabled_;
         }
       else
-        return true;
+        return false;
 
       if constexpr (sizeof(URV) == 8)
         if (offset & 1)
@@ -63,6 +73,16 @@ File::iregWrite(unsigned sel, URV val)
     delivery_ = val;
   else if (sel == EIC::THRESHOLD)
     threshold_ = val;
+  else if ((sel == EIC::RES0) or
+           (sel >= EIC::RES1 and sel <= EIC::RES2))
+    return true;
+  else if (sel >= EIC::IPRIO0 and sel <= EIC::IPRIO15)
+    {
+      if constexpr (sizeof(URV) == 8)
+        if (sel & 1)
+          return false;
+      return true;
+    }
   else
     {
       unsigned offset = 0;
@@ -78,7 +98,7 @@ File::iregWrite(unsigned sel, URV val)
           vecPtr = &enabled_;
         }
       else
-        return true;
+        return false;
 
       if constexpr (sizeof(URV) == 8)
         if (offset & 1)
