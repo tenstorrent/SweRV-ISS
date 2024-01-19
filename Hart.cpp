@@ -1572,8 +1572,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
+      auto effPm = effectivePrivilege();
+      if (hyper)
+	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
       Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isRead(effectivePrivilege()))
+      if (not pmp.isRead(effPm))
 	{
 	  addr1 = va1;
 	  return EC::LOAD_ACC_FAULT;
@@ -1583,7 +1586,7 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
 	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isRead(effectivePrivilege()))
+	  if (not pmp2.isRead(effPm))
 	    {
 	      addr1 = va2;
 	      return EC::LOAD_ACC_FAULT;
@@ -10631,8 +10634,11 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
+      auto effPm = effectivePrivilege();
+      if (hyper)
+	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
       Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isWrite(effectivePrivilege()))
+      if (not pmp.isWrite(effPm))
 	{
 	  addr1 = va1;
 	  return EC::STORE_ACC_FAULT;
@@ -10642,7 +10648,7 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
  	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isWrite(effectivePrivilege()))
+	  if (not pmp2.isWrite(effPm))
 	    {
 	      addr1 = va2;
 	      return EC::STORE_ACC_FAULT;
