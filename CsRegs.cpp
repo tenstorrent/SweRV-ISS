@@ -496,7 +496,8 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
 		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
-		     CN::SENVCFG, CN::SATP, CN::MEDELEG, CN::MIDELEG } )
+		     CN::SENVCFG, CN::SATP, CN::MEDELEG, CN::MIDELEG,
+		     CN::SCONTEXT } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -650,7 +651,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
 	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
 	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH,
-        CN::MTVAL2, CN::MTINST } )
+        CN::MTVAL2, CN::MTINST, CN::HCONTEXT } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
