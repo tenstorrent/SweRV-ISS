@@ -593,7 +593,7 @@ namespace WdRiscv
 
     /// Return true if element at ix of mask destination is active; otherwise,
     /// return false and either read element at ix into val or set val to all
-    /// ones depending on mask-agnostic/tail-agnostic policy.
+    /// ones depending on the mask-agnostic/tail-agnostic policy.
     bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, bool& val) const
     {
       readMaskRegister(vd, ix, val);

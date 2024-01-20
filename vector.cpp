@@ -4058,14 +4058,12 @@ Hart<URV>::execVmop_mm(const DecodedInst* di, OP op)
   if (start < vecRegs_.elemCount())
     for (unsigned ix = start; ix < elems; ++ix)
       {
-	bool flag = false;
-	if (vecRegs_.isMaskDestActive(vd, ix, false /*masked*/, flag))
-	  {
-	    bool in1 = false, in2 = false;
-	    vecRegs_.readMaskRegister(vs1, ix, in1);
-	    vecRegs_.readMaskRegister(vs2, ix, in2);
-	    flag = op(unsigned(in1), unsigned(in2)) & 1;
-	  }
+	// Not masked. Tail elements computed.
+	bool in1 = false, in2 = false;
+	vecRegs_.readMaskRegister(vs1, ix, in1);
+	vecRegs_.readMaskRegister(vs2, ix, in2);
+	bool flag = op(unsigned(in1), unsigned(in2)) & 1;
+
 	vecRegs_.writeMaskRegister(vd, ix, flag);
       }
 
