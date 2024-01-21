@@ -314,6 +314,10 @@ namespace WdRiscv
     void useExecForRead(bool flag)
     { xForR_ = flag; }
 
+    /// Return true if use-exec-for-read is on.
+    bool isExecForRead() const
+    { return xForR_; }
+
     /// Heper to transAddrNoUpdate
     ExceptionCause transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 				 bool read, bool write, bool exec, uint64_t& pa);
