@@ -250,7 +250,7 @@ namespace WdRiscv
       /// Collect non-trigger CSRs and their values.
       for (CsrNumber csr : csrs)
         {
-          if (not hart_->peekCsr(csr, value))
+          if (not hart_->peekCsr(csr, value, false))
             continue;
           if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
             continue; // Debug trigger values collected below.

@@ -1078,8 +1078,14 @@ namespace WdRiscv
     { return triggers_.hasEnterDebugModeTripped(); }
 
     /// Set value to the value of the given register returning true on
+    /// success and false if number is out of bound. Peeks register assuming
+    /// virtMode.
+    bool peek(CsrNumber number, URV& value, bool virtMode) const;
+
+    /// Set value to the value of the given register returning true on
     /// success and false if number is out of bound.
-    bool peek(CsrNumber number, URV& value) const;
+    bool peek(CsrNumber number, URV& value) const
+    { return peek(number, value, virtMode_); }
 
     /// Set register to the given value masked by the poke mask. A
     /// read-only register can be changed this way as long as its poke

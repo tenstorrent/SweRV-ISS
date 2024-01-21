@@ -1987,8 +1987,6 @@ CsRegs<URV>::recordWrite(CsrNumber num)
   if (not recordWrite_)
     return;
   auto& lwr = lastWrittenRegs_;
-  if (std::find(lwr.begin(), lwr.end(), num) == lwr.end())
-    lwr.push_back(num);
   unsigned ix = unsigned(num);
 
   // When CSR with corresponds virtual CSR is written (e.g. stval and
@@ -1998,7 +1996,11 @@ CsRegs<URV>::recordWrite(CsrNumber num)
       CsrNumber vnum = advance(num, 0x100);  // Get VCSR corresponding to CSR
       if (std::find(lwr.begin(), lwr.end(), vnum) == lwr.end())
 	lwr.push_back(vnum);
+      return;
     }
+
+  if (std::find(lwr.begin(), lwr.end(), num) == lwr.end())
+    lwr.push_back(num);
 }
 
 
@@ -2863,11 +2865,11 @@ CsRegs<URV>::definePmaRegs()
 
 template <typename URV>
 bool
-CsRegs<URV>::peek(CsrNumber num, URV& value) const
+CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
 {
   using CN = CsrNumber;
 
-  auto csr = getImplementedCsr(num, virtMode_);
+  auto csr = getImplementedCsr(num, virtMode);
   if (not csr)
     return false;
   num = csr->getNumber();  // CSR may have been remapped from S to VS
@@ -2927,7 +2929,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
 
   if (num == CN::SIP or num == CN::SIE)
     value = adjustSipSieValue(value);  // Mask by delegation registers.
-  else if (virtMode_ and (num == CN::TIME or num == CN::TIMEH))
+  else if (virtMode and (num == CN::TIME or num == CN::TIMEH))
     value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
   else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
     value = adjustPmpValue(num, value);
