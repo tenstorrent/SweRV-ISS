@@ -204,11 +204,12 @@ namespace WdRiscv
 
     /// Save snapshot (registers, memory etc) into given directory
     /// which should alread exist. Return true on success.
-    bool saveSnapshot(Hart<URV>& hart, const std::string& dirPath);
+    bool saveSnapshot(const std::string& dirPath);
 
-    /// Load snapshot (registers, memory etc) from the given drectory.
-    /// Return true on succes.
-    bool loadSnapshot(const std::string& dirPath, Hart<URV>& hart);
+    /// Load register and memory state from snapshot previously saved
+    /// in the given directory. Return true on success and false on
+    /// failure.
+    bool loadSnapshot(const std::string& snapshotDirectory);
 
     /// Write contents of memory accessed by current run in verilog
     /// hex format to the file at the given path. Return true on

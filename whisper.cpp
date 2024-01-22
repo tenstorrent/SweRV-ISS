@@ -896,47 +896,6 @@ sanitizeStackPointer(Hart<URV>& hart, bool verbose)
 }
 
 
-/// Load register and memory state from snapshot previously saved
-/// in the given directory. Return true on success and false on
-/// failure.
-template <typename URV>
-static
-bool
-loadSnapshot(System<URV>& system, Hart<URV>& hart, const std::string& snapDir)
-{
-  using std::cerr;
-
-  if (not Filesystem::is_directory(snapDir))
-    {
-      cerr << "Error: Path is not a snapshot directory: " << snapDir << '\n';
-      return false;
-    }
-
-  Filesystem::path path(snapDir);
-  Filesystem::path regPath = path / "registers";
-  if (not Filesystem::is_regular_file(regPath))
-    {
-      cerr << "Error: Snapshot file does not exists: " << regPath << '\n';
-      return false;
-    }
-
-  Filesystem::path memPath = path / "memory";
-  if (not Filesystem::is_regular_file(regPath))
-    {
-      cerr << "Error: Snapshot file does not exists: " << memPath << '\n';
-      return false;
-    }
-
-  if (not system.loadSnapshot(path, hart))
-    {
-      cerr << "Error: Failed to load sanpshot from dir " << snapDir << '\n';
-      return false;
-    }
-
-  return true;
-}
-
-
 static
 bool
 getElfFilesIsaString(const Args& args, std::string& isaString)
@@ -1065,9 +1024,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (not args.loadFrom.empty())
     {
-      if (not loadSnapshot(system, hart, args.loadFrom))
-	errors++;
-
       if (not args.stdoutFile.empty() or not args.stderrFile.empty() or
 	  not args.stdinFile.empty())
 	std::cerr << "Info: Options --stdin, --stdout, and --stderr are ignored with --loadfrom\n";
@@ -1878,6 +1834,10 @@ session(const Args& args, const HartConfig& config)
     if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
       if (not args.interactive)
 	return false;
+
+  if (not args.loadFrom.empty())
+    if (not system.loadSnapshot(args.loadFrom))
+      return false;
 
   if (not args.initStateFile.empty())
     {

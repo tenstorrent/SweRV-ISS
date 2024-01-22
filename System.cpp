@@ -339,7 +339,7 @@ saveUsedMemBlocks(const std::string& filename,
 
 template <typename URV>
 bool
-System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
+System<URV>::saveSnapshot(const std::string& dir)
 {
   Filesystem::path dirPath = dir;
   if (not Filesystem::is_directory(dirPath))
@@ -349,11 +349,18 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
 	return false;
       }
 
-  Filesystem::path regPath = dirPath / "registers";
-  if (not hart.saveSnapshotRegs(regPath.string()))
-    return false;
+  for (auto hartPtr : sysHarts_)
+    {
+      std::string name = "registers";
+      if (hartCount_ > 1)
+	name += std::to_string(hartPtr->sysHartIndex());
+      Filesystem::path regPath = dirPath / name;
+      if (not hartPtr->saveSnapshotRegs(regPath.string()))
+	return false;
+    }
 
-  auto& syscall = hart.getSyscall();
+  auto& hart0 = *ithHart(0);
+  auto& syscall = hart0.getSyscall();
 
   Filesystem::path usedBlocksPath = dirPath / "usedblocks";
   std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
@@ -386,7 +393,7 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
     return false;
 
   Filesystem::path branchPath = dirPath / "branch-trace";
-  return hart.saveBranchTrace(branchPath);
+  return hart0.saveBranchTrace(branchPath);
 }
 
 
@@ -415,35 +422,6 @@ loadUsedMemBlocks(const std::string& filename,
     }
 
   return true;
-}
-
-
-template <typename URV>
-bool
-System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
-{
-  Filesystem::path dirPath = dir;
-  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
-
-  Filesystem::path regPath = dirPath / "registers";
-  if (not hart.loadSnapshotRegs(regPath.string()))
-    return false;
-
-  auto& syscall = hart.getSyscall();
-  Filesystem::path usedBlocksPath = dirPath / "usedblocks";
-  if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
-    return false;
-
-  Filesystem::path mmapPath = dirPath / "mmap";
-  if (not syscall.loadMmap(mmapPath.string()))
-    return false;
-
-  Filesystem::path memPath = dirPath / "memory";
-  if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
-    return false;
-
-  Filesystem::path fdPath = dirPath / "fd";
-  return syscall.loadFileDescriptors(fdPath.string());
 }
 
 
@@ -946,7 +924,7 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
 	  break;
 	}
 
-      if (not saveSnapshot(hart, pathStr))
+      if (not saveSnapshot(pathStr))
 	{
 	  std::cerr << "Error: Failed to save a snapshot\n";
 	  return false;
@@ -957,6 +935,74 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
 
   return true;
 }
+
+
+template <typename URV>
+bool
+System<URV>::loadSnapshot(const std::string& snapDir)
+{
+  using std::cerr;
+
+  if (not Filesystem::is_directory(snapDir))
+    {
+      cerr << "Error: Path is not a snapshot directory: " << snapDir << '\n';
+      return false;
+    }
+
+  if (hartCount_ == 0)
+    {
+      cerr << "Error: System::loadSnapshot: System with no harts\n";
+      return false;
+    }
+
+  Filesystem::path dirPath = snapDir;
+
+  // Restore the register values.
+  for (auto hartPtr : sysHarts_)
+    {
+      unsigned ix = hartPtr->sysHartIndex();
+      
+      std::string name = "registers" + std::to_string(ix);
+      
+      Filesystem::path regPath = dirPath / name;
+      bool missing = not Filesystem::is_regular_file(regPath);
+      if (missing and ix == 0 and hartCount_ == 1)
+	{
+	  // Support legacy snapshots where hart index was not appended to filename.
+	  regPath = dirPath / "registers";
+	  missing = not Filesystem::is_regular_file(regPath);
+	}
+      if (missing)
+	{
+	  cerr << "Error: Snapshot file does not exists: " << regPath << '\n';
+	  return false;
+	}
+
+      if (not hartPtr->loadSnapshotRegs(regPath.string()))
+	return false;
+    }
+
+
+  Filesystem::path usedBlocksPath = dirPath / "usedblocks";
+  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
+  if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
+    return false;
+
+  auto& hart0 = *ithHart(0);
+  auto& syscall = hart0.getSyscall();
+  Filesystem::path mmapPath = dirPath / "mmap";
+  if (not syscall.loadMmap(mmapPath.string()))
+    return false;
+
+  Filesystem::path memPath = dirPath / "memory";
+  if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
+    return false;
+
+  Filesystem::path fdPath = dirPath / "fd";
+  return syscall.loadFileDescriptors(fdPath.string());
+}
+
+
 
 
 template class WdRiscv::System<uint32_t>;
