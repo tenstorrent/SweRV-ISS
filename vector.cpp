@@ -3821,8 +3821,15 @@ Hart<URV>::execVredop_vs(const DecodedInst* di, OP op)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
+
   if (elems == 0)
     return;
 
@@ -3862,8 +3869,15 @@ Hart<URV>::execVredopu_vs(const DecodedInst* di, OP op)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
+
   if (elems == 0)
     return;
 
@@ -18277,8 +18291,15 @@ Hart<URV>::execVfredusum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
+
   if (elems == 0)
     return;
 
@@ -18337,8 +18358,15 @@ Hart<URV>::execVfredosum_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
+
   if (elems == 0)
     return;
 
@@ -18398,8 +18426,15 @@ Hart<URV>::execVfredmin_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
+
   if (elems == 0)
     return;
 
@@ -18458,8 +18493,15 @@ Hart<URV>::execVfredmax_vs(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
+
   if (elems == 0)
     return;
 
