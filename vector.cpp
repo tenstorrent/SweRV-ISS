@@ -485,7 +485,7 @@ template <typename URV>
 inline
 bool
 Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
-				 unsigned op2, unsigned groupX8)
+			    unsigned op2, unsigned groupX8)
 {
   if (not checkSewLmulVstart(di))
     return false;
@@ -7922,7 +7922,9 @@ Hart<URV>::execVadc_vvm(const DecodedInst* di)
 
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vcin = 0;
-  if (vd == vcin or not masked)   // cannot overlap vcin, unmasked verion reserved
+
+  // cannot overlap vcin, unmasked verion reserved
+  if (vd == vcin or vs1 == vcin or vs2 == vcin or not masked)
     {
       postVecFail(di);
       return;
@@ -7958,7 +7960,9 @@ Hart<URV>::execVadc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vd == vcin or not masked)   // cannot overlap vcin, unmasked verion reserved
+
+  // cannot overlap vcin, unmasked verion reserved
+  if (vd == vcin or vs1 == vcin or not masked)
     {
       postVecFail(di);
       return;
@@ -7995,7 +7999,9 @@ Hart<URV>::execVadc_vim(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vcin = 0;
-  if (vd == vcin or not masked)  // cannot overlap vcin, unmasked verion reserved
+
+  // cannot overlap vcin, unmasked verion reserved
+  if (vd == vcin or vs1 == vcin or not masked)
     {
       postVecFail(di);
       return;
@@ -8032,7 +8038,9 @@ Hart<URV>::execVsbc_vvm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  vbin = 0;
-  if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
+
+  // cannot overlap borrow-in, unmasked verion reserved
+  if (vd == vbin or vs1 == vbin or vs2 == vbin or not masked)
     {
       postVecFail(di);
       return;
@@ -8067,7 +8075,9 @@ Hart<URV>::execVsbc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   bool masked = di->isMasked();
   unsigned vd = di->op0(),  vs1 = di->op1(),  vbin = 0;
-  if (vd == vbin or not masked) // cannot overlap borrow-in, unmasked verion reserved
+
+// cannot overlap borrow-in, unmasked verion reserved
+  if (vd == vbin or vs1 == vbin or not masked)
     {
       postVecFail(di);
       return;
@@ -8105,6 +8115,13 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
+  // cannot overlap vcin
+  if (vs1 == vcin or vs2 == vcin)
+    {
+      postVecFail(di);
+      return;
+    }
+
   if (not checkVecMaskInst(di, vcout, vs1, vs2, group))
     return;
 
@@ -8133,6 +8150,13 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
 
   if (not checkVecMaskInst(di, vcout, vs1, group))
     return;
+
+  // cannot overlap vcin
+  if (vs1 == vcin)
+    {
+      postVecFail(di);
+      return;
+    }
 
   SRV e2 = SRV(intRegs_.read(di->op2()));
 
@@ -8163,6 +8187,13 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   if (not checkVecMaskInst(di, vcout, vs1, group))
     return;
 
+  // cannot overlap vcin
+  if (vs1 == vcin)
+    {
+      postVecFail(di);
+      return;
+    }
+
   SRV e2 = di->op2As<int32_t>();
 
   using EW = ElementWidth;
@@ -8188,6 +8219,13 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
+
+  // cannot overlap vbin
+  if (vs1 == vbin or vs2 == vbin)
+    {
+      postVecFail(di);
+      return;
+    }
 
   if (not checkVecMaskInst(di, vbout, vs1, vs2, group))
     return;
@@ -8215,6 +8253,13 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
   unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
+
+  // cannot overlap vbin
+  if (vs1 == vbin)
+    {
+      postVecFail(di);
+      return;
+    }
 
   if (not checkVecMaskInst(di, vbout, vs1, group))
     return;
