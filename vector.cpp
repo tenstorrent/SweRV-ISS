@@ -3998,6 +3998,12 @@ Hart<URV>::execVwredsumu_vs(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
 
@@ -4026,6 +4032,12 @@ Hart<URV>::execVwredsum_vs(const DecodedInst* di)
 
   unsigned elems = vecRegs_.elemCount();
   bool masked = di->isMasked();
+
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
 
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
@@ -18519,6 +18531,12 @@ Hart<URV>::execVfwredusum_vs(const DecodedInst* di)
   unsigned elems = vecRegs_.elemCount();
   bool masked = di->isMasked();
 
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
+
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
 
@@ -18583,6 +18601,12 @@ Hart<URV>::execVfwredosum_vs(const DecodedInst* di)
 
   unsigned elems = vecRegs_.elemCount();
   bool masked = di->isMasked();
+
+  if (masked and (vs1 == 0 or vs2 == 0))
+    {
+      postVecFail(di);  // v0 used with different EEWs
+      return;
+    }
 
   if (not checkRedOpVsEmul(di, vs1, group, start))
     return;
