@@ -1866,10 +1866,16 @@ namespace WdRiscv
     /// Fetch an instruction cache line.
     bool mcmIFetch(uint64_t addr)
     {
-      auto readMem =  [this](uint64_t addr, uint32_t& value) -> bool {
-	return this->memory_.read(addr, value);
+      auto fetchMem =  [this](uint64_t addr, uint32_t& value) -> bool {
+	if (pmpEnabled_)
+	  {
+	    Pmp pmp = pmpManager_.accessPmp(addr, PmpManager::AccessReason::Fetch);
+	    if (not pmp.isExec(privMode_))
+	      return false;
+	  }
+	return this->memory_.readInst(addr, value);
       };
-      return fetchCache_.addLine(addr, readMem);
+      return fetchCache_.addLine(addr, fetchMem);
     }
 
     /// Evict an instruction cache line.
