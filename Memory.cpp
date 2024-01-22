@@ -948,7 +948,7 @@ Memory::loadSnapshot(const std::string & filename,
 
 bool
 Memory::saveAddressTrace(std::string_view tag,
-			 const std::unordered_map<uint64_t, uint64_t>& lineMap,
+			 const LineMap& lineMap,
 			 const std::string& path)
 {
   std::ofstream out(path, std::ios::trunc);
@@ -970,13 +970,17 @@ Memory::saveAddressTrace(std::string_view tag,
 
   std::sort(addrVec.begin(), addrVec.end(),
 	    [&lineMap](uint64_t a, uint64_t b) {
-	      return lineMap.at(a) < lineMap.at(b);
+	      return lineMap.at(a).order < lineMap.at(b).order;
 	    });
 
   out << std::hex;
 
-  for (auto a : addrVec)
-    out << a << '\n';
+  for (auto vaddr : addrVec)
+    {
+      uint64_t paddr = lineMap.at(vaddr).paddr;
+      out << vaddr << ':' << paddr;
+      out << '\n';
+    }
 
   out << std::dec;
 
@@ -1064,28 +1068,4 @@ void
 Memory::resetMemoryMappedRegisters()
 {
   pmaMgr_.resetMemMapped();
-}
-
-
-bool
-Memory::defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask)
-{
-  if ((addr & 3) != 0)
-    {
-      std::cerr << "Memory mapped register address 0x" << std::hex << addr
-                << std::dec << " is not word aligned\n";
-      return false;
-    }
-
-  Pma pma = pmaMgr_.getPma(addr);
-  if (not pma.isMemMappedReg())
-    {
-      std::cerr << "Memory mapped register address 0x" << std::hex << addr
-                << std::dec << " is outside any memory mapped register area\n";
-      return false;
-    }
-
-  pmaMgr_.setMemMappedMask(addr, mask);
-
-  return true;
 }

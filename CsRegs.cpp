@@ -346,6 +346,29 @@ CsRegs<URV>::readSireg(CsrNumber num, URV& value) const
 
 template <typename URV>
 bool
+CsRegs<URV>::readVsireg(CsrNumber num, URV& value) const
+{
+  URV sel = 0;
+  peek(CsrNumber::VSISELECT, sel);
+  if (imsic_)
+    {
+      auto csr = getImplementedCsr(num, virtMode_);
+      if (not csr)
+	return false;
+
+      URV hs = 0;
+      peek(CsrNumber::HSTATUS, hs);
+      HstatusFields<URV> hsf(hs);
+      unsigned guest = hsf.bits_.VGEIN;
+
+      return imsic_->readSireg(true, guest, sel, value);
+    }
+  return false;
+}
+
+
+template <typename URV>
+bool
 CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
 {
   using CN = CsrNumber;
@@ -353,6 +376,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   auto csr = getImplementedCsr(num, virtMode_);
   if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode))
     return false;
+  num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
@@ -376,6 +400,9 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
     return readMireg(num, value);
   else if (num == CN::SIREG)
     return readSireg(num, value);
+  else if (num == CN::VSIREG)
+    return readVsireg(num, value);
+
   if (num == CN::MTOPEI)
     {
       if (not imsic_)
@@ -384,7 +411,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::STOPEI)
+  else if (num == CN::STOPEI)
     {
       if (not imsic_)
 	return false;
@@ -392,7 +419,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::VSTOPEI)
+  else if (num == CN::VSTOPEI)
     {
       if (not imsic_)
 	return false;
@@ -400,7 +427,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
       URV hsVal = hs.read();
       HstatusFields<URV> hsf(hsVal);
       unsigned vgein = hsf.bits_.VGEIN;
-      if (vgein >= imsic_->guestCount())
+      if (not vgein or vgein >= imsic_->guestCount())
 	return false;
       value = imsic_->guestTopId(vgein);
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
@@ -469,7 +496,8 @@ CsRegs<URV>::enableSupervisorMode(bool flag)
 
   for (auto csrn : { CN::SSTATUS, CN::SIE, CN::STVEC, CN::SCOUNTEREN,
 		     CN::SSCRATCH, CN::SEPC, CN::SCAUSE, CN::STVAL, CN::SIP,
-		     CN::SENVCFG, CN::SATP, CN::MEDELEG, CN::MIDELEG } )
+		     CN::SENVCFG, CN::SATP, CN::MEDELEG, CN::MIDELEG,
+		     CN::SCONTEXT } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -584,15 +612,19 @@ CsRegs<URV>::updateSstc()
   flag = flag and hyperEnabled_;
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
   vstimecmp->setImplemented(flag);
-  vstimecmp->setHypervisor(!hstce);
+  vstimecmp->setHypervisor(true);
   vstimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
       vstimecmph->setImplemented(flag);
-      vstimecmph->setHypervisor(!hstce);
+      vstimecmph->setHypervisor(true);
       vstimecmph->setPrivilegeMode(mode);
     }
+
+  stimecmp->setHypervisor(!hstce);
+  if (rv32_)
+    findCsr(CsrNumber::STIMECMPH)->setHypervisor(!hstce);
 
   auto hip = findCsr(CsrNumber::HIP);
   if (hip)
@@ -619,7 +651,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   for (auto csrn : { CN::HSTATUS, CN::HEDELEG, CN::HIDELEG, CN::HIE, CN::HCOUNTEREN,
 	CN::HGEIE, CN::HTVAL, CN::HIP, CN::HVIP, CN::HTINST, CN::HGEIP, CN::HENVCFG,
 	CN::HENVCFGH, CN::HGATP, CN::HCONTEXT, CN::HTIMEDELTA, CN::HTIMEDELTAH,
-        CN::MTVAL2, CN::MTINST } )
+        CN::MTVAL2, CN::MTINST, CN::HCONTEXT } )
     {
       auto csr = findCsr(csrn);
       if (not csr)
@@ -961,7 +993,8 @@ URV
 CsRegs<URV>::legalizeMstatusValue(URV value) const
 {
   MstatusFields<URV> fields(value);
-  PrivilegeMode mode = PrivilegeMode(fields.bits_.MPP);
+  PrivilegeMode mpp = PrivilegeMode(fields.bits_.MPP);
+  PrivilegeMode spp = PrivilegeMode(fields.bits_.SPP);
 
   if (fields.bits_.FS == unsigned(FpStatus::Dirty) or fields.bits_.XS == unsigned(FpStatus::Dirty) or
       fields.bits_.VS == unsigned(VecStatus::Dirty))
@@ -969,19 +1002,22 @@ CsRegs<URV>::legalizeMstatusValue(URV value) const
   else
     fields.bits_.SD = 0;
 
-  if (mode == PrivilegeMode::Machine)
-    return fields.value_;
+  assert(spp == PrivilegeMode(0) or spp == PrivilegeMode(1));
 
-  if (mode == PrivilegeMode::Supervisor and not superEnabled_)
-    mode = PrivilegeMode::User;
+  if (not superEnabled_)
+    spp = PrivilegeMode(0);
 
-  if (mode == PrivilegeMode::Reserved)
-    mode = PrivilegeMode::User;
+  if (mpp == PrivilegeMode::Supervisor and not superEnabled_)
+    mpp = PrivilegeMode::User;
 
-  if (mode == PrivilegeMode::User and not userEnabled_)
-    mode = PrivilegeMode::Machine;
+  if (mpp == PrivilegeMode::Reserved)
+    mpp = PrivilegeMode::User;
 
-  fields.bits_.MPP = unsigned(mode);
+  if (mpp == PrivilegeMode::User and not userEnabled_)
+    mpp = PrivilegeMode::Machine;
+
+  fields.bits_.MPP = unsigned(mpp);
+  fields.bits_.SPP = unsigned(spp);
 
   return fields.value_;
 }
@@ -1008,6 +1044,9 @@ legalizeMisa(Csr<URV>* csr, URV v)
 
   if ((v & (1 << ('F' - 'A'))) == 0 or (v & (1 << ('D' - 'A'))) == 0)
     v &= ~(URV(1) << ('V' - 'A'));  // V is off if F or D is off.
+
+  if ((v & (1 << ('U' - 'A'))) == 0)
+    v &= ~(URV(1) << ('S' - 'A')); // S is off if U is off.
 
   return v;
 }
@@ -1278,7 +1317,7 @@ CsRegs<URV>::writeVstopei()
   HstatusFields<URV> hsf(hsVal);
 
   unsigned vgein = hsf.bits_.VGEIN;
-  if (vgein >= imsic_->guestCount())
+  if (not vgein or vgein >= imsic_->guestCount())
     return false;
 
   unsigned id = imsic_->guestTopId(vgein);
@@ -1290,14 +1329,15 @@ CsRegs<URV>::writeVstopei()
 
 template <typename URV>
 bool
-CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
+CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 {
   using CN = CsrNumber;
 
-  Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode) or
+  Csr<URV>* csr = getImplementedCsr(csrn, virtMode_);
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(csrn, mode) or
       csr->isReadOnly())
     return false;
+  CN num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (csr->isDebug() and not inDebugMode())
     return false; // Debug-mode register.
@@ -1354,15 +1394,15 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
 
   if (num == CN::MIREG)
     return writeMireg(num, value);
-  else if (csr->getNumber() == CN::SIREG)
+  else if (num == CN::SIREG)
     return writeSireg(num, value);
-  else if (csr->getNumber() == CN::VSIREG)
+  else if (num == CN::VSIREG)
     return writeVsireg(num, value);
   else if (num == CN::MTOPEI)
     return writeMtopei();
-  else if (csr->getNumber() == CN::STOPEI)
+  else if (num == CN::STOPEI)
     return writeStopei();
-  else if (csr->getNumber() == CN::VSTOPEI)
+  else if (num == CN::VSTOPEI)
     return writeVstopei();
 
   if (num >= CN::PMPCFG0 and num <= CN::PMPCFG15)
@@ -1390,7 +1430,7 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
     }
 
   csr->write(value);
-  recordWrite(num);
+  recordWrite(csrn);
 
   if (num == CN::MENVCFG)
     {
@@ -1431,6 +1471,9 @@ CsRegs<URV>::write(CsrNumber num, PrivilegeMode mode, URV value)
   else
     hyperWrite(csr);   // Update hypervisor CSR aliased bits.
 
+  if (num == CN::MENVCFG or num == CN::HENVCFG)
+    updateSstc();
+
   return true;
 }
 
@@ -1457,11 +1500,21 @@ CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
 	  URV hsVal = hs.read();
 	  HstatusFields<URV> hsf(hsVal);
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  if (vgein >= imsic_->guestCount())
+	  if (not vgein or vgein >= imsic_->guestCount())
 	    return false;
 	}
+
+      if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
+        {
+          CN siselect = advance(csr->getNumber(), -1);
+          URV sel = 0;
+          peek(siselect, sel);
+          return imsic_->isFileSelAccessible<URV>(sel, virtMode_);
+        }
     }
   else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
+    return false;
+  else if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
     return false;
   else if ((num == CN::STIMECMP or num == CN::STIMECMPH) and virtMode_)
     {
@@ -1497,11 +1550,20 @@ CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode mode ) const
 	  URV hsVal = hs.read();
 	  HstatusFields<URV> hsf(hsVal);
 	  unsigned vgein = hsf.bits_.VGEIN;
-	  if (vgein >= imsic_->guestCount())
+	  if (not vgein or vgein >= imsic_->guestCount())
 	    return false;
 	}
+      if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
+        {
+          CN siselect = advance(csr->getNumber(), -1);
+          URV sel = 0;
+          peek(siselect, sel);
+          return imsic_->isFileSelAccessible<URV>(sel, virtMode_);
+        }
     }
   else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
+    return false;
+  else if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
     return false;
 
   return true;
@@ -1913,6 +1975,16 @@ CsRegs<URV>::recordWrite(CsrNumber num)
   auto& lwr = lastWrittenRegs_;
   if (std::find(lwr.begin(), lwr.end(), num) == lwr.end())
     lwr.push_back(num);
+  unsigned ix = unsigned(num);
+
+  // When CSR with corresponds virtual CSR is written (e.g. stval and
+  // vstval), mark the virtual CSR so that it gets reported as modified.
+  if (virtMode_ and ix < regs_.size() and regs_.at(ix).mapsToVirtual())
+    {
+      CsrNumber vnum = advance(num, 0x100);  // Get VCSR corresponding to CSR
+      if (std::find(lwr.begin(), lwr.end(), vnum) == lwr.end())
+	lwr.push_back(vnum);
+    }
 }
 
 
@@ -2707,34 +2779,40 @@ CsRegs<URV>::defineStateEnableRegs()
 {
   bool mand = true;  // Mndatory
   bool imp = true;   // Implemented
-  URV wam = ~URV(0);  // Write-all mask: all bits writeable.
 
-  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, wam, wam);
-  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, wam, wam);
-  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, wam, wam);
-  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, wam, wam);
+  // Default: none of the staten CSRs are writable.
+  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, 0, 0);
 
-  defineCsr("mstateen0", CsrNumber::MSTATEEN0,  !mand, !imp, 0, wam, wam);
-  defineCsr("mstateen1", CsrNumber::MSTATEEN1,  !mand, !imp, 0, wam, wam);
-  defineCsr("mstateen2", CsrNumber::MSTATEEN2,  !mand, !imp, 0, wam, wam);
-  defineCsr("mstateen3", CsrNumber::MSTATEEN3,  !mand, !imp, 0, wam, wam);
+  URV mask = 0;  // Default: nothing writable.
 
-  defineCsr("hstateen0", CsrNumber::HSTATEEN0,  !mand, !imp, 0, wam, wam);
-  defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, wam, wam);
-  defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, wam, wam);
-  defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, wam, wam);
+  if constexpr (sizeof(URV) == 8)
+    mask = uint64_t(0b1101111) << 57;   // Bits 57 to 63
+
+  defineCsr("mstateen0", CsrNumber::MSTATEEN0,  !mand, !imp, 0, mask, mask);
+  defineCsr("mstateen1", CsrNumber::MSTATEEN1,  !mand, !imp, 0, 0, 0);
+  defineCsr("mstateen2", CsrNumber::MSTATEEN2,  !mand, !imp, 0, 0, 0);
+  defineCsr("mstateen3", CsrNumber::MSTATEEN3,  !mand, !imp, 0, 0, 0);
+
+  defineCsr("hstateen0", CsrNumber::HSTATEEN0,  !mand, !imp, 0, mask, mask);
+  defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, 0, 0);
+  defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, 0, 0);
+  defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, 0, 0);
 
   if (sizeof(URV) == 4)
     {
-      defineCsr("sstateen0h", CsrNumber::MSTATEEN0H,  !mand, !imp, 0, wam, wam);
-      defineCsr("sstateen1h", CsrNumber::MSTATEEN1H,  !mand, !imp, 0, wam, wam);
-      defineCsr("sstateen2h", CsrNumber::MSTATEEN2H,  !mand, !imp, 0, wam, wam);
-      defineCsr("sstateen3h", CsrNumber::MSTATEEN3H,  !mand, !imp, 0, wam, wam);
+      mask = URV(0b1101111) << 25;   // Bits 25 to 31
+      defineCsr("sstateen0h", CsrNumber::MSTATEEN0H,  !mand, !imp, 0, mask, mask);
+      defineCsr("sstateen1h", CsrNumber::MSTATEEN1H,  !mand, !imp, 0, 0, 0);
+      defineCsr("sstateen2h", CsrNumber::MSTATEEN2H,  !mand, !imp, 0, 0, 0);
+      defineCsr("sstateen3h", CsrNumber::MSTATEEN3H,  !mand, !imp, 0, 0, 0);
 
-      defineCsr("hstateen0h", CsrNumber::HSTATEEN0H,  !mand, !imp, 0, wam, wam);
-      defineCsr("hstateen1h", CsrNumber::HSTATEEN1H,  !mand, !imp, 0, wam, wam);
-      defineCsr("hstateen2h", CsrNumber::HSTATEEN2H,  !mand, !imp, 0, wam, wam);
-      defineCsr("hstateen3h", CsrNumber::HSTATEEN3H,  !mand, !imp, 0, wam, wam);
+      defineCsr("hstateen0h", CsrNumber::HSTATEEN0H,  !mand, !imp, 0, mask, mask);
+      defineCsr("hstateen1h", CsrNumber::HSTATEEN1H,  !mand, !imp, 0, 0, 0);
+      defineCsr("hstateen2h", CsrNumber::HSTATEEN2H,  !mand, !imp, 0, 0, 0);
+      defineCsr("hstateen3h", CsrNumber::HSTATEEN3H,  !mand, !imp, 0, 0, 0);
     }
 }
 
@@ -2770,6 +2848,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
   auto csr = getImplementedCsr(num, virtMode_);
   if (not csr)
     return false;
+  num = csr->getNumber();  // CSR may have been remapped from S to VS
 
   if (num >= CN::TDATA1 and num <= CN::TDATA3)
     return readTdata(num, PrivilegeMode::Machine, value);
@@ -2795,7 +2874,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::STOPEI)
+  else if (num == CN::STOPEI)
     {
       if (not imsic_)
 	return false;
@@ -2803,7 +2882,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
       return true;
     }
-  else if (csr->getNumber() == CN::VSTOPEI)
+  else if (num == CN::VSTOPEI)
     {
       if (not imsic_)
 	return false;
@@ -2811,7 +2890,7 @@ CsRegs<URV>::peek(CsrNumber num, URV& value) const
       URV hsVal = hs.read();
       HstatusFields<URV> hsf(hsVal);
       unsigned vgein = hsf.bits_.VGEIN;
-      if (vgein >= imsic_->guestCount())
+      if (not vgein or vgein >= imsic_->guestCount())
 	return false;
       value = imsic_->guestTopId(vgein);
       value |= value << 16;  // Bits 26:16 same as bits 10;0 as required by spec.
@@ -2940,6 +3019,9 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
     updateVirtInterruptCtl();
   else
     hyperPoke(csr);    // Update hypervisor CSR aliased bits.
+
+  if (num == CN::MENVCFG or num == CN::HENVCFG)
+    updateSstc();
 
   return true;
 }
@@ -3103,7 +3185,9 @@ CsRegs<URV>::readTopi(CsrNumber number, URV& value) const
               HstatusFields<URV> hsf(hsVal);
               unsigned vgein = hsf.bits_.VGEIN;
 
-             id = imsic_->guestTopId(vgein);
+              if (not vgein or vgein >= imsic_->guestCount())
+                return false;
+              id = imsic_->guestTopId(vgein);
             }
           if (id != 0)
             value = (sExternal << iidShift) | id;
@@ -3415,13 +3499,13 @@ CsRegs<URV>::updateCounterPrivilege()
     {
       if (csr)
         {
-          if ((mMask & 2) == 0)  // TM bit set in mcounteren.
+          if ((mMask & 2) == 0)  // TM bit clear in mcounteren.
             csr->setPrivilegeMode(PrivilegeMode::Machine);
           else if (superEnabled_)
             csr->setPrivilegeMode(PrivilegeMode::Supervisor);
 
-          if (((hMask & 2) == 0) or ((mMask & 2) == 0)) // TM set in both mcounteren/hcounteren
-            csr->setHypervisor(true);
+          if (((hMask & 2) == 0) or ((mMask & 2) == 0)) // TM clear in either mcounteren/hcounteren
+            csr->setHypervisor(true);  // CSR is for HS mode.
           else
             csr->setHypervisor(false);
         }

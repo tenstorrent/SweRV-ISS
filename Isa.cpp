@@ -74,6 +74,8 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zimop", RvExtension::Zimop },
   { "zcmop", RvExtension::Zcmop },
   { "smrnmi", RvExtension::Smrnmi },
+  { "zicsr", RvExtension::Zicsr },
+  { "zifencei", RvExtension::Zifencei },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -143,6 +145,8 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zimop)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Zcmop)) = Info{ {{1,0}}, {1,0} };
   infoVec_.at(extIx(RvExtension::Smrnmi)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Zicsr)) = Info{ {{2,0}}, {2,0} };
+  infoVec_.at(extIx(RvExtension::Zifencei)) = Info{ {{2,0}}, {2,0} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }
@@ -488,6 +492,13 @@ Isa::applyIsaString(std::string_view isaStr)
 		    << " of extension " << extension << " is not "
 		    << "supported -- using default\n";
 	}
+    }
+
+  if (isEnabled(RvExtension::S) and not isEnabled(RvExtension::U))
+    {
+      std::cerr << "Having supervisor mode without user mode is not a legal architectural state."
+                << "Therefore, if 's' is included in the ISA string, 'u' must be as well.\n";
+      return false;
     }
 
   return true;

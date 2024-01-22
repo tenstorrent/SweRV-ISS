@@ -41,6 +41,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "specialize.h"
 #include "softfloat.h"
 
+#include <inttypes.h>
+#include <stdio.h>
+
 bfloat16_t f32_to_bf16( float32_t a )
 {
     union ui32_f32 uA;
@@ -61,17 +64,22 @@ bfloat16_t f32_to_bf16( float32_t a )
     frac = fracF32UI( uiA );
     /*------------------------------------------------------------------------
     *------------------------------------------------------------------------*/
+    // infinity or NaN cases
     if ( exp == 0xFF ) {
         if ( frac ) {
+            // NaN case
             softfloat_f32UIToCommonNaN( uiA, &commonNaN );
             uiZ = softfloat_commonNaNToBF16UI( &commonNaN );
         } else {
+            // infinity case
             uiZ = packToBF16UI( sign, 0xFF, 0 );
         }
         goto uiZ;
     }
     /*------------------------------------------------------------------------
     *------------------------------------------------------------------------*/
+    // frac is a 24-bit mantissa, right shifted by 9
+    // In the normal case, (24-9) = 15 are set 
     frac16 = frac>>9 | ((frac & 0x1FF) != 0);
     if ( ! (exp | frac16) ) {
         uiZ = packToBF16UI( sign, 0, 0 );
@@ -79,7 +87,16 @@ bfloat16_t f32_to_bf16( float32_t a )
     }
     /*------------------------------------------------------------------------
     *------------------------------------------------------------------------*/
-    return softfloat_roundPackToBF16( sign, exp - 1, frac16 | ((exp > 0) << 14) );
+    // softfloat_roundPackToBF16 exponent argument (2nd argument)
+    // must correspond to the exponent of fracIn[13] bits
+    // (fracIn is the 3rd and last argument) 
+    uint_fast32_t mask = exp ? 0x4000 : 0x0; // implicit one mask added if input is a normal number
+    // exponent for the lowest normal and largest subnormal should be equal
+    // but is not in IEEE encoding so mantissa must be partially normalized
+    // (by one bit) for subnormal numbers. Such that (exp - 1) corresponds
+    // to the exponent of frac16[13]
+    frac16 = frac16 << (exp ? 0 : 1);
+    return softfloat_roundPackToBF16( sign, exp - 1, frac16 | mask );
  uiZ:
     uZ.ui = uiZ;
     return uZ.f;

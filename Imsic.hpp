@@ -21,8 +21,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     enum ExternalInterruptCsr
     {
+      IPRIO0 = 0x30,
+      IPRIO15 = 0x3F,
+
       DELIVERY = 0x70,
+      RES0 = 0x71,
       THRESHOLD = 0x72,
+      RES1 = 0x73,
+      RES2 = 0x7F,
 
       P0 = 0x80,
       P63 = 0xBF,
@@ -65,8 +71,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     { return config_ and id < enabled_.size() and enabled_.at(id); }
 
     /// Mark the given interrupt id as pending/not-pending. Marking id 0
-    /// or an out of bounds id has no effect. Update the highest priority
-    /// enabled top id.
+    /// or an out of bounds id has no effect.
+    /// Update the highest priority enabled top id.
     void setPending(unsigned id, bool flag)
     {
       if (id > 0 and id < pending_.size())
@@ -79,6 +85,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	      else
 		updateTopId();
 	    }
+
+          // We trace the 8B base address
+          if (trace_)
+            selects_.emplace_back(id >> 6, sizeof(uint64_t));
 	}
     }
 
@@ -96,6 +106,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 	      else
 		updateTopId();
 	    }
+
+          // We trace the 8B base address
+          if (trace_)
+            selects_.emplace_back(id >> 6, sizeof(uint64_t));
 	}
     }
 
@@ -161,8 +175,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// count: interrupts ids are 1 to idCount - 1 inclusive.  All
     /// previous enable/pending state is lost. Given address must be
     /// page aligned and idCount must be a multiple of 64.
-    void configure(uint64_t addr, unsigned idCount)
+    void configure(uint64_t addr, unsigned idCount, unsigned pageSize)
     {
+      pageSize_ = pageSize;
       assert((addr % pageSize_) == 0);
       assert((idCount % 64) == 0);
       topId_ = 0;
@@ -196,6 +211,16 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool iregWrite(unsigned select, URV val);
 
+    void enableTrace(bool flag)
+    { trace_ = flag; }
+
+    void iregModified(std::vector<std::pair<unsigned, unsigned>>& selects) const
+    { selects = selects_; }
+
+    /// Clear trace related information.
+    void clearTrace()
+    { selects_.clear(); }
+
   private:
 
     uint64_t addr_ = 0;
@@ -205,7 +230,11 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     unsigned delivery_ = 0;
     unsigned threshold_ = 0;
     bool config_ = false;
-    const unsigned pageSize_ = 1024;
+    unsigned pageSize_ = 4096;
+
+    // For coverage information
+    bool trace_ = false;
+    std::vector<std::pair<unsigned, unsigned>> selects_;
   };
 
 
@@ -224,32 +253,32 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// with the given count of interrupt ids (idCount is the highest
     /// interrupt id plus 1 and must be a multiple of 64). All
     /// previous state enabled/pending state is lost.
-    void configureMachine(uint64_t addr, unsigned idCount)
-    { mfile_.configure(addr, idCount); }
+    void configureMachine(uint64_t addr, unsigned idCount, unsigned pageSize)
+    { mfile_.configure(addr, idCount, pageSize); }
 
     /// Configure the supervisor privilege file at the given address
     /// and with the given count of interrupt ids (idCount is the
     /// highest interrupt id plus 1 and must be a multiple of 64).
     /// All previous state enabled/pending state is lost.
-    void configureSupervisor(uint64_t addr, unsigned idCount)
-    { sfile_.configure(addr, idCount); }
+    void configureSupervisor(uint64_t addr, unsigned idCount, unsigned pageSize)
+    { sfile_.configure(addr, idCount, pageSize); }
 
     /// Configure g guest files of n-1 interrupt ids each. The guest
     /// addresses will be s+p, s+2p, s+3p, ... where s is the
     /// supervisor file address and p is the page size. A supervisor
     /// file must be configured before the guests files are
     /// configured. The parameter g must not exceed 64.
-    void configureGuests(unsigned g, unsigned n)
+    void configureGuests(unsigned g, unsigned n, unsigned pageSize)
     {
       assert(g <= 64);
       assert(sfile_.isConfigured());
       gfiles_.clear();
-      gfiles_.resize(g);
-      unsigned pageSize = sfile_.pageSize();
+      gfiles_.resize(g + 1);
+      assert(sfile_.pageSize() == pageSize);
       uint64_t addr = sfile_.address() + pageSize;
-      for (auto& file : gfiles_)
+      for (size_t i = 1; i < gfiles_.size(); ++i)
 	{
-	  file.configure(addr, n);
+	  gfiles_.at(i).configure(addr, n, pageSize);
 	  addr += pageSize;
 	}
     }
@@ -358,9 +387,13 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool writeSireg(bool virt, unsigned guest, unsigned select, URV value)
     {
+      using EIC = File::ExternalInterruptCsr;
+
       if (virt)
 	{
-	  if (guest >= gfiles_.size())
+          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+            return false;
+	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
 	  bool ok = gfile.iregWrite(select, value);
@@ -384,9 +417,14 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool readSireg(bool virt, unsigned guest, unsigned select, URV& value) const
     {
+      using EIC = File::ExternalInterruptCsr;
+
       if (virt)
 	{
-	  if (guest >= gfiles_.size())
+          /// The guest file marks the prio array as inaccessible.
+          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+            return false;
+	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
 	  return gfile.iregRead(select, value);
@@ -462,6 +500,66 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     void attachGInterrupt(const std::function<void(bool, unsigned)>& cb)
     { gInterrupt_ = cb; }
+
+    void enableTrace(bool flag)
+    {
+      mfile_.enableTrace(flag);
+      sfile_.enableTrace(flag);
+      for (auto& g : gfiles_)
+        g.enableTrace(flag);
+    }
+
+    void fileTraces(std::vector<std::pair<unsigned, unsigned>>& mselects,
+                    std::vector<std::pair<unsigned, unsigned>>& sselects,
+                    std::vector<std::vector<std::pair<unsigned, unsigned>>>& gselects) const
+    {
+      mselects.clear();
+      sselects.clear();
+      gselects.clear();
+
+      mfile_.iregModified(mselects);
+      sfile_.iregModified(sselects);
+      for (auto& g : gfiles_)
+        {
+          std::vector<std::pair<unsigned, unsigned>> tmp;
+          g.iregModified(tmp);
+          gselects.push_back(std::move(tmp));
+        }
+    }
+
+    void clearTrace()
+    {
+      mfile_.clearTrace();
+      sfile_.clearTrace();
+      for (auto& g : gfiles_)
+        g.clearTrace();
+    }
+
+    /// Returns false if address access will raise exception and true otherwise.
+    template <typename URV>
+    static constexpr bool isFileSelAccessible(unsigned select, bool virt)
+    {
+      using EIC = File::ExternalInterruptCsr;
+
+      if constexpr (sizeof(URV) == 8)
+        if (select & 1)
+          return false;
+
+      /// The guest file marks the prio array as inaccessible.
+      if (virt)
+        if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
+          return false;
+
+      if ((select == EIC::DELIVERY) or
+          (select == EIC::THRESHOLD) or
+          (select == EIC::RES0) or
+          (select >= EIC::RES1 and select <= EIC::RES2) or
+          (select >= EIC::IPRIO0 and select <= EIC::IPRIO15) or
+          (select >= EIC::P0 and select <= EIC::P63) or
+          (select >= EIC::E0 and select <= EIC::E63))
+        return true;
+      return false;
+    }
 
   private:
 

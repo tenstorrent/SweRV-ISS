@@ -40,6 +40,7 @@
 #include "Imsic.hpp"
 #include "FetchCache.hpp"
 #include "pci/Pci.hpp"
+#include "Stee.hpp"
 
 
 namespace WdRiscv
@@ -514,7 +515,7 @@ namespace WdRiscv
 
     /// Helper to single step N times. Returns false if program terminated
     /// with failing condition and true otherwise.
-    std::tuple<bool, bool> runSteps(uint64_t steps, FILE* file = nullptr);
+    bool runSteps(uint64_t steps, FILE* file = nullptr);
 
     /// Define the program counter value at which the run method will
     /// stop.
@@ -640,6 +641,10 @@ namespace WdRiscv
     /// Return the virtmem associated with this hart.
     const VirtMem& virtMem() const
     { return virtMem_; }
+
+    /// Return the IMSIC associated with this hart.
+    const std::shared_ptr<TT_IMSIC::Imsic> imsic() const
+    { return imsic_; }
 
     /// Locate the ELF function containing the give address returning true
     /// on success and false on failure.  If successful set name to the
@@ -811,6 +816,21 @@ namespace WdRiscv
       return ldStSize_;
     }
 
+    /// Similar to the previous lastStore but for page crossing stores, paddr2
+    /// will be set to the phsical address of the second page. If store did
+    /// not cross a page boundary paddr2 will be the same as paddr1. Vaddr is
+    /// the virtual address of the store data.
+    unsigned lastStore(uint64_t& vaddr, uint64_t& paddr1, uint64_t& paddr2, uint64_t& value) const
+    {
+      if (not ldStWrite_)
+	return 0;
+      vaddr = ldStAddr_;
+      paddr1 = ldStPhysAddr1_;
+      paddr2 = ldStPhysAddr2_;
+      value = ldStData_;
+      return ldStSize_;
+    }
+
     bool getLastVectorMemory(std::vector<uint64_t>& addresses,
 			     std::vector<uint64_t>& data,
 			     unsigned& elementSize) const
@@ -875,10 +895,6 @@ namespace WdRiscv
     /// Get executed instruction count.
     uint64_t getInstructionCount() const 
     { return instCounter_; }
-
-    /// Define a memory mapped register. Address must be within an
-    /// area already defined using defineMemoryMappedRegisterArea.
-    bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
 
     /// Return count of traps (exceptions or interrupts) seen by this
     /// hart.
@@ -1398,6 +1414,13 @@ namespace WdRiscv
     CancelLrCause cancelLrCause() const
     { return memory_.cancelLrCause(hartIx_); }
 
+    /// Cancel load reservations in all other harts.
+    void cancelOtherHartsLr(uint64_t physAddr)
+    {
+      uint64_t lineAddr = physAddr - (physAddr % lrResSize_);
+      memory_.invalidateOtherHartLr(hartIx_, lineAddr, lrResSize_);
+    }
+
     /// Report the files opened by the target RISCV program during
     /// current run.
     void reportOpenedFiles(std::ostream& out)
@@ -1651,9 +1674,10 @@ namespace WdRiscv
 
     /// Associate a mask with the word-aligned word at the given
     /// address. Return true on success and flase if given address is
-    /// not in a memory mapped region.
-    bool setMemMappedMask(uint64_t addr, uint32_t mask)
-    { return memory_.pmaMgr_.setMemMappedMask(addr, mask); }
+    /// not in a memory mapped region. The size must be 4 or 8. The
+    /// address must be word/double-word aligned if size is 4/8.
+    bool setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size)
+    { return memory_.pmaMgr_.setMemMappedMask(addr, mask, size); }
 
     /// Unpack the memory protection information defined by the given
     /// physical memory protection entry (entry 0 corresponds to
@@ -1696,6 +1720,10 @@ namespace WdRiscv
     /// Enable instruction line address tracing.
     void enableInstructionLineTrace()
     { instrLineTrace_ = true; }
+
+    /// Enable instruction line address tracing.
+    void enableDataLineTrace()
+    { dataLineTrace_ = true; }
 
     /// Enable/disable page-table-walk info in log.
     void tracePtw(bool flag)
@@ -1763,13 +1791,15 @@ namespace WdRiscv
 		     uint64_t mbase, uint64_t mend,
 		     uint64_t sbase, uint64_t send,
 		     std::function<bool(uint64_t, unsigned, uint64_t&)> readFunc,
-		     std::function<bool(uint64_t, unsigned, uint64_t)> writeFunc)
+		     std::function<bool(uint64_t, unsigned, uint64_t)> writeFunc,
+                     bool trace)
     {
       imsic_ = imsic;
       imsicMbase_ = mbase; imsicMend_ = mend;
       imsicSbase_ = sbase; imsicSend_ = send;
       imsicRead_ = readFunc;
       imsicWrite_ = writeFunc;
+      imsic_->enableTrace(trace);
       csRegs_.attachImsic(imsic);
 
       using IC = InterruptCause;
@@ -1846,8 +1876,26 @@ namespace WdRiscv
     bool mcmIEvict(uint64_t addr)
     { fetchCache_.removeLine(addr); return true; }
 
+    /// Config vector engine for updating whole mask register for mask-producing
+    /// instructions (if flag is false, we only update body and tail elements; otherwise,
+    /// we update body, tail, and elements within VLEN beyond tail).
+    void configVectorUpdateWholeMask(bool flag)
+    { vecRegs_.configUpdateWholeMask(flag); }
+
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
+
+    void configSteeZeroMask(uint64_t mask)
+    { stee_.configZeroMask(mask); }
+
+    void configSteeSecureMask(uint64_t mask)
+    { stee_.configSecureMask(mask); }
+
+    void configSteeSecureRegion(uint64_t low, uint64_t high)
+    { stee_.configSecureRegion(low, high); }
+
+    void enableStee(bool flag)
+    { steeEnabled_ = flag; }
 
   protected:
 
@@ -1875,6 +1923,16 @@ namespace WdRiscv
       if (mstatusMprv() and not nmieOverridesMprv())
 	pm = mstatusMpp();
       return pm;
+    }
+
+    /// Return the effective virtual mode: if mstatus.mprv then it is
+    /// the vritual mode in mstatus.mpv
+    bool effectiveVirtualMode() const
+    {
+      bool virt = virtMode_;
+      if (mstatusMprv() and not nmieOverridesMprv())
+	virt = mstatus_.bits_.MPV;
+      return virt;
     }
 
     /// Read an item that may span 2 physical pages. If pa1 is the
@@ -2291,7 +2349,8 @@ namespace WdRiscv
 					  unsigned ldSize, bool hyper);
 
     /// Helper to the cache block operation (cbo) instructions.
-    ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa, bool isRead);
+    ExceptionCause determineCboException(uint64_t addr, uint64_t& gpa, uint64_t& pa,
+					 bool isZero);
 
     /// Implement part of TIF protocol for writing the "tohost" magical
     /// location.
@@ -4287,9 +4346,9 @@ namespace WdRiscv
     void execVfncvt_rod_f_f_w(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vfredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked);
-    void execVfredsum_vs(const DecodedInst*);
+    void execVfredusum_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
@@ -4307,9 +4366,9 @@ namespace WdRiscv
     void execVfredmax_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
-    void vfwredsum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
+    void vfwredusum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
 		      unsigned start, unsigned elems, bool masked);
-    void execVfwredsum_vs(const DecodedInst*);
+    void execVfwredusum_vs(const DecodedInst*);
 
     template<typename ELEM_TYPE>
     void vfwredosum_vs(unsigned vd, unsigned vs1, unsigned vs2, unsigned group,
@@ -4698,6 +4757,7 @@ namespace WdRiscv
     bool csvTrace_ = false;      // Print trace in CSV format.
 
     bool instrLineTrace_ = false;
+    bool dataLineTrace_ = false;
 
     unsigned cacheLineSize_ = 64;
 
@@ -4819,6 +4879,10 @@ namespace WdRiscv
     // Physical memory protection.
     bool pmpEnabled_ = false; // True if one or more pmp register defined.
     PmpManager pmpManager_;
+
+    // Static tee (truseted execution environment).
+    bool steeEnabled_ = false;
+    TT_STEE::Stee stee_;
 
     VirtMem virtMem_;
     Isa isa_;

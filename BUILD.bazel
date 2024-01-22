@@ -1,3 +1,5 @@
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
+
 hdrs = [
     "HartConfig.hpp",
     "WhisperMessage.h",
@@ -15,7 +17,7 @@ hdrs = [
 
 cc_library(
     name          = "rvcore",
-    srcs          = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp"] + hdrs),
+    srcs          = glob(include = ["*.cpp", "*.hpp"], exclude = ["whisper.cpp", "py-bindings.cpp"] + hdrs),
     hdrs          = hdrs,
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
     deps          = ["//third_party:nlohmann", "//third_party:elfio", "//third_party:softfloat", "//third_party:linenoise", "//pci:pci"],
@@ -30,4 +32,17 @@ cc_binary(
     local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
     linkopts      = ["-lboost_program_options", "-rdynamic"],
     visibility    = ["//visibility:public"],
+)
+
+pybind_extension(
+    name          = "py-bindings",
+    srcs          = ["py-bindings.cpp"],
+    deps          = [":rvcore"],
+    local_defines = ["SOFT_FLOAT", "MEM_CALLBACKS"],
+    visibility    = ["//visibility:__pkg__"],
+)
+
+py_library(
+    name          = "pywhisper",
+    data          = ["py-bindings.so"],
 )

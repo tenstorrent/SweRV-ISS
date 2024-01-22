@@ -107,6 +107,10 @@ namespace WdRiscv
       return cores_.at(i);
     }
 
+    /// Return pointer to memory.
+    std::shared_ptr<Memory> memory() const
+    { return memory_; }
+
     /// With a true flag, when loading ELF files, error out if ELF
     /// file refers to unmapped memory. With a false flag, ignore
     /// unmapped memory in the ELF file.
@@ -119,7 +123,10 @@ namespace WdRiscv
     /// 0, 1, 1, 2, 1 and the compresses addresse reported will be
     /// 0, 2, 1.
     void enableDataLineTrace(const std::string& path)
-    { memory_->enableDataLineTrace(path); }
+    {
+      memory_->enableDataLineTrace(path);
+      for (auto hart : sysHarts_)  hart->enableDataLineTrace();
+    }
 
     /// Similar to enableDataLineTrace but for instructions.
     void enableInstructionLineTrace(const std::string& path)
@@ -197,11 +204,12 @@ namespace WdRiscv
 
     /// Save snapshot (registers, memory etc) into given directory
     /// which should alread exist. Return true on success.
-    bool saveSnapshot(Hart<URV>& hart, const std::string& dirPath);
+    bool saveSnapshot(const std::string& dirPath);
 
-    /// Load snapshot (registers, memory etc) from the given drectory.
-    /// Return true on succes.
-    bool loadSnapshot(const std::string& dirPath, Hart<URV>& hart);
+    /// Load register and memory state from snapshot previously saved
+    /// in the given directory. Return true on success and false on
+    /// failure.
+    bool loadSnapshot(const std::string& snapshotDirectory);
 
     /// Write contents of memory accessed by current run in verilog
     /// hex format to the file at the given path. Return true on
@@ -245,7 +253,8 @@ namespace WdRiscv
     /// id plus 1 and must be a multiple of 64.
     bool configImsic(uint64_t mbase, uint64_t mstride,
 		     uint64_t sbase, uint64_t sstride,
-		     unsigned guests, unsigned ids);
+		     unsigned guests, unsigned ids,
+                     bool trace);
 
     /// Enable memory consistency model. This is relevant in
     /// server/interactive where RTL monitor or interactive command
@@ -318,7 +327,7 @@ namespace WdRiscv
 
     /// Initiate an instruction retire.
     bool mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		   const DecodedInst& di);
+		   const DecodedInst& di, bool trapped);
 
     bool mcmSetCurrentInstruction(Hart<URV>& hart, uint64_t tag);
 
@@ -329,6 +338,22 @@ namespace WdRiscv
 
     bool getSparseMemUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& usedBlocks) const;
 
+    /// Run the simulated harts. Return true on sucess or false if
+    /// target program ends with a non-zero exit. If stepWindow is
+    /// non-zero run the harts in a single simulator thread
+    /// round-robin with each hart executing n instructions where n is
+    /// a random number in the range [1, stepWindow]. If stepWindow is
+    /// zero, each hart runs in its own simulator thread independent of
+    /// the other harts.
+    bool batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow);
+
+    /// Run producing a snapshot after each snapPeriod instructions. Each
+    /// snapshot goes into its own directory names <dir><n> where <dir> is
+    /// the string in snapDir and <n> is a sequential integer starting at
+    /// 0. Return true on success and false on failure.
+    bool snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snapDir,
+		     const std::vector<uint64_t>& periods);
+
   private:
 
     unsigned hartCount_;
@@ -338,7 +363,7 @@ namespace WdRiscv
     std::vector< std::shared_ptr<CoreClass> > cores_;
     std::vector< std::shared_ptr<HartClass> > sysHarts_; // All harts in system.
     std::unordered_map<URV, unsigned> hartIdToIndex_;
-    std::unique_ptr<Memory> memory_;
+    std::shared_ptr<Memory> memory_;
     std::unique_ptr<SparseMem> sparseMem_;
     std::shared_ptr<Mcm<URV>> mcm_;
     unsigned mbSize_ = 64;  // Merge buffer size.

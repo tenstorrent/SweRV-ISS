@@ -373,7 +373,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
       switch (f6)
 	{
 	case 0:    return instTable_.getEntry(InstId::vfadd_vv);
-	case 1:    return instTable_.getEntry(InstId::vfredsum_vs);
+	case 1:    return instTable_.getEntry(InstId::vfredusum_vs);
 	case 2:    return instTable_.getEntry(InstId::vfsub_vv);
 	case 3:    return instTable_.getEntry(InstId::vfredosum_vs);
 	case 4:    return instTable_.getEntry(InstId::vfmin_vv);
@@ -451,7 +451,7 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
           std::swap(op1, op2);  // per spec
 	  return instTable_.getEntry(InstId::vfnmsac_vv);
 	case 0x30: return instTable_.getEntry(InstId::vfwadd_vv);
-	case 0x31: return instTable_.getEntry(InstId::vfwredsum_vs);
+	case 0x31: return instTable_.getEntry(InstId::vfwredusum_vs);
 	case 0x32: return instTable_.getEntry(InstId::vfwsub_vv);
 	case 0x33: return instTable_.getEntry(InstId::vfwredosum_vs);
 	case 0x34: return instTable_.getEntry(InstId::vfwadd_wv);
@@ -597,8 +597,8 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0xf:  op2 = uimm; return instTable_.getEntry(InstId::vslidedown_vi);
         case 0x10: return instTable_.getEntry(InstId::vadc_vim);
         case 0x11: return instTable_.getEntry(InstId::vmadc_vim);
-	case 0x14: return instTable_.getEntry(InstId::vror_vi); // Bit 26 is zero.
-	case 0x15: op2 = uimm | 0x2f; return instTable_.getEntry(InstId::vror_vi); // Bit 26 is 1.
+	case 0x14: op2 = uimm; return instTable_.getEntry(InstId::vror_vi); // Bit 26 is zero.
+	case 0x15: op2 = uimm | 0x20; return instTable_.getEntry(InstId::vror_vi); // Bit 26 is 1.
 	case 0x17:
           if (vm == 0) return instTable_.getEntry(InstId::vmerge_vim);
           if (vm == 1)

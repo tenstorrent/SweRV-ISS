@@ -279,7 +279,7 @@ void
 printVersion()
 {
   unsigned version = 1;
-  unsigned subversion = 820;
+  unsigned subversion = 824;
   std::cout << "Version " << version << "." << subversion << " compiled on "
 	    << __DATE__ << " at " << __TIME__ << '\n';
 #ifdef GIT_SHA
@@ -896,47 +896,6 @@ sanitizeStackPointer(Hart<URV>& hart, bool verbose)
 }
 
 
-/// Load register and memory state from snapshot previously saved
-/// in the given directory. Return true on success and false on
-/// failure.
-template <typename URV>
-static
-bool
-loadSnapshot(System<URV>& system, Hart<URV>& hart, const std::string& snapDir)
-{
-  using std::cerr;
-
-  if (not Filesystem::is_directory(snapDir))
-    {
-      cerr << "Error: Path is not a snapshot directory: " << snapDir << '\n';
-      return false;
-    }
-
-  Filesystem::path path(snapDir);
-  Filesystem::path regPath = path / "registers";
-  if (not Filesystem::is_regular_file(regPath))
-    {
-      cerr << "Error: Snapshot file does not exists: " << regPath << '\n';
-      return false;
-    }
-
-  Filesystem::path memPath = path / "memory";
-  if (not Filesystem::is_regular_file(regPath))
-    {
-      cerr << "Error: Snapshot file does not exists: " << memPath << '\n';
-      return false;
-    }
-
-  if (not system.loadSnapshot(path, hart))
-    {
-      cerr << "Error: Failed to load sanpshot from dir " << snapDir << '\n';
-      return false;
-    }
-
-  return true;
-}
-
-
 static
 bool
 getElfFilesIsaString(const Args& args, std::string& isaString)
@@ -1065,9 +1024,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   if (not args.loadFrom.empty())
     {
-      if (not loadSnapshot(system, hart, args.loadFrom))
-	errors++;
-
       if (not args.stdoutFile.empty() or not args.stderrFile.empty() or
 	  not args.stdinFile.empty())
 	std::cerr << "Info: Options --stdin, --stdout, and --stderr are ignored with --loadfrom\n";
@@ -1433,14 +1389,18 @@ openUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandLo
                 name.insert(len - 3, std::to_string(ix));
             }
 
-          if (doGzip)
-            {
-              std::string cmd = "/usr/bin/gzip -c > ";
-              cmd += name;
-              traceFile = popen(cmd.c_str(), "w");
-            }
+          if ((ix == 0) || args.logPerHart)
+            if (doGzip)
+              {
+                std::string cmd = "/usr/bin/gzip -c > ";
+                cmd += name;
+                traceFile = popen(cmd.c_str(), "w");
+              }
+            else
+              traceFile = fopen(name.c_str(), "w");
           else
-            traceFile = fopen(name.c_str(), "w");
+              traceFile = traceFiles.at(0);   // point the same File pointer to each hart
+
           if (not traceFile)
             {
               std::cerr << "Failed to open trace file '" << name
@@ -1502,18 +1462,24 @@ closeUserFiles(const Args& args, std::vector<FILE*>& traceFiles, FILE*& commandL
     fclose(consoleOut);
   consoleOut = nullptr;
 
+
+  unsigned ix = 0;
   for (auto traceFile : traceFiles)
     {
-      if (traceFile and traceFile != stdout)
+      if (args.logPerHart or (ix == 0))
         {
-          size_t len = args.traceFile.size();
-          bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
-          if (doGzip)
-            pclose(traceFile);
-          else
-            fclose(traceFile);
+          if (traceFile and traceFile != stdout)
+          {
+            size_t len = args.traceFile.size();
+            bool doGzip = len > 3 and args.traceFile.substr(len-3) == ".gz";
+            if (doGzip)
+              pclose(traceFile);
+            else
+              fclose(traceFile);
+          }
+          traceFile = nullptr;
         }
-      traceFile = nullptr;
+      ++ix;
     }
 
   if (commandLog and commandLog != stdout)
@@ -1532,168 +1498,6 @@ static void
 kbdInterruptHandler(int)
 {
   std::cerr << "keyboard interrupt\n";
-}
-
-
-template <typename URV>
-static bool
-batchRun(System<URV>& system, std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow, unsigned seed)
-{
-  if (system.hartCount() == 0)
-    return true;
-
-  if (system.hartCount() == 1)
-    {
-      auto& hart = *system.ithHart(0);
-      bool ok = hart.run(traceFiles.at(0));
-#ifdef FAST_SLOPPY
-      hart.reportOpenedFiles(std::cout);
-#endif
-      return ok;
-    }
-
-  // Run each hart in its own thread.
-
-  if (not stepWindow)
-    {
-      std::vector<std::thread> threadVec;
-
-      std::atomic<bool> result = true;
-      std::atomic<unsigned> finished = 0;  // Count of finished threads.
-
-      auto threadFunc = [&result, &finished] (Hart<URV>* hart, FILE* traceFile) {
-                          bool r = hart->run(traceFile);
-                          result = result and r;
-                          finished++;
-                        };
-
-      for (unsigned i = 0; i < system.hartCount(); ++i)
-        {
-          Hart<URV>* hart = system.ithHart(i).get();
-          threadVec.emplace_back(std::thread(threadFunc, hart, traceFiles.at(i)));
-        }
-
-      if (waitAll)
-        {
-          for (auto& t : threadVec)
-            t.join();
-        }
-      else
-        {
-          // First thread to finish terminates run.
-          while (finished == 0)
-            ;
-
-          extern void forceUserStop(int);
-          forceUserStop(0);
-
-          for (auto& t : threadVec)
-            t.join();
-        }
-      return result;
-    }
-  else
-    {
-      bool result = true;
-      unsigned finished = 0;
-      std::vector<Hart<URV>*> harts;
-
-      for (unsigned i = 0; i < system.hartCount(); ++i)
-        {
-          Hart<URV>* hart = system.ithHart(i).get();
-          harts.push_back(hart);
-        }
-
-      srand(seed);
-
-      std::cout << "Deterministic multi-hart run with seed: " << seed << " and steps distribution between 1 and " << stepWindow << "\n";
-
-      while ((waitAll and finished != system.hartCount()) or
-             (not waitAll and finished == 0))
-        {
-          for (auto it = harts.begin(); it != harts.end();)
-            {
-              unsigned steps = (rand() % stepWindow) + 1;
-              // step N times
-              unsigned ix = (*it)->sysHartIndex();
-              auto [terminate, tmp] = (*it)->runSteps(steps, traceFiles.at(ix));
-              result = result and tmp;
-
-              if (terminate)
-                {
-                  it = harts.erase(it);
-                  finished++;
-                }
-              else
-                it++;
-            }
-        };
-      return result;
-    }
-}
-
-
-/// Run producing a snapshot after each snapPeriod instructions. Each
-/// snapshot goes into its own directory names <dir><n> where <dir> is
-/// the string in snapDir and <n> is a sequential integer starting at
-/// 0. Return true on success and false on failure.
-template <typename URV>
-static
-bool
-snapshotRun(System<URV>& system, FILE* traceFile, const std::string& snapDir,
-	    const Uint64Vec& periods)
-{
-  assert(system.hartCount() == 1);
-  Hart<URV>& hart = *(system.ithHart(0));
-
-  uint64_t globalLimit = hart.getInstructionCountLimit();
-
-  for (size_t ix = 0; true; ++ix)
-    {
-      uint64_t nextLimit = globalLimit;
-      if (not periods.empty())
-	{
-	  if (periods.size() == 1)
-	    nextLimit = hart.getInstructionCount() + periods.at(0);
-	  else
-	    nextLimit = ix < periods.size() ? periods.at(ix) : globalLimit;
-	}
-
-      nextLimit = std::min(nextLimit, globalLimit);
-      hart.setInstructionCountLimit(nextLimit);
-      uint64_t tag = ix;
-      if (periods.size() > 1)
-	tag = ix < periods.size() ? periods.at(ix) : nextLimit;
-      std::string pathStr = snapDir + std::to_string(tag);
-      Filesystem::path path = pathStr;
-      if (not Filesystem::is_directory(path) and not Filesystem::create_directories(path))
-	{
-	  std::cerr << "Error: Failed to create snapshot directory " << pathStr << '\n';
-	  return false;
-	}
-
-      hart.run(traceFile);
-
-      if (hart.hasTargetProgramFinished() or nextLimit >= globalLimit)
-	{
-	  Filesystem::remove_all(path);
-	  break;
-	}
-
-      if (not system.saveSnapshot(hart, pathStr))
-	{
-	  std::cerr << "Error: Failed to save a snapshot\n";
-	  return false;
-	}
-    }
-
-  hart.traceBranches(std::string(), 0);  // Turn off branch tracing.
-
-#ifdef FAST_SLOPPY
-  hart.reportOpenedFiles(std::cout);
-#endif
-
-  return true;
 }
 
 
@@ -1828,16 +1632,18 @@ sessionRun(System<URV>& system, const Args& args, std::vector<FILE*>& traceFiles
     }
 
   if (not args.snapshotPeriods.empty())
-    {
-      if (system.hartCount() == 1)
-        return snapshotRun(system, traceFiles.at(0), args.snapshotDir, args.snapshotPeriods);
-      std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
-    }
+    return system.snapshotRun(traceFiles, args.snapshotDir, args.snapshotPeriods);
 
   bool waitAll = not args.quitOnAnyHart;
   uint64_t stepWindow = args.deterministic.value_or(0);
   unsigned seed = args.seed.value_or(time(NULL));
-  return batchRun(system, traceFiles, waitAll, stepWindow, seed);
+  srand(seed);
+
+  if (stepWindow)
+    std::cout << "Deterministic multi-hart run with seed: " << seed
+	      << " and steps distribution between 1 and " << stepWindow << "\n";
+
+  return system.batchRun(traceFiles, waitAll, stepWindow);
 }
 
 
@@ -2028,6 +1834,10 @@ session(const Args& args, const HartConfig& config)
     if (not applyCmdLineArgs(args, *system.ithHart(i), system, config, clib))
       if (not args.interactive)
 	return false;
+
+  if (not args.loadFrom.empty())
+    if (not system.loadSnapshot(args.loadFrom))
+      return false;
 
   if (not args.initStateFile.empty())
     {

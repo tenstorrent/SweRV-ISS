@@ -363,6 +363,8 @@ Hart<URV>::processExtensions(bool verbose)
   enableExtension(RvExtension::Zcmop,    isa_.isEnabled(RvExtension::Zcmop));
   enableExtension(RvExtension::Smaia,    isa_.isEnabled(RvExtension::Smaia));
   enableExtension(RvExtension::Ssaia,    isa_.isEnabled(RvExtension::Ssaia));
+  enableExtension(RvExtension::Zicsr,    true /*isa_.isEnabled(RvExtension::Zicsr)*/);
+  enableExtension(RvExtension::Zifencei, true /*isa_.isEnabled(RvExtension::Zifencei)*/);
 
   if (isa_.isEnabled(RvExtension::Sstc))
     enableRvsstc(true);
@@ -663,7 +665,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   updateTranslationPbmt();
   csRegs_.updateSstc();
 
-  // If any PMPCFG CSR is defined, change the default PMA to no access.
+  // If any PMACFG CSR is defined, change the default PMA to no access.
   bool hasPmacfg = false;
   using CN = CsrNumber;
   for (unsigned ix = unsigned(CN::PMACFG0); ix <= unsigned(CN::PMACFG31); ++ix)
@@ -1570,8 +1572,11 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
+      auto effPm = effectivePrivilege();
+      if (hyper)
+	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
       Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isRead(effectivePrivilege()))
+      if (not pmp.isRead(effPm) or (not pmp.isExec(effPm) and virtMem_.isExecForRead()))
 	{
 	  addr1 = va1;
 	  return EC::LOAD_ACC_FAULT;
@@ -1581,12 +1586,20 @@ Hart<URV>::determineLoadException(uint64_t& addr1, uint64_t& addr2, uint64_t& ga
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + ldSize : addr2;
 	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isRead(effectivePrivilege()))
+	  if (not pmp2.isRead(effPm) or (not pmp.isExec(effPm) and virtMem_.isExecForRead()))
 	    {
 	      addr1 = va2;
 	      return EC::LOAD_ACC_FAULT;
 	    }
 	}
+    }
+
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, ldSize))
+	return EC::LOAD_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, ldSize))
+	return EC::LOAD_ACC_FAULT;
     }
 
   if (not misal)
@@ -1800,7 +1813,7 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
       if (mcm_)
 	{
 	  uint64_t mcmVal = 0;
-	  if (mcm_->getCurrentLoadValue(*this, addr1, ldStSize_, mcmVal))
+	  if (mcm_->getCurrentLoadValue(*this, virtAddr, addr1, addr2, ldStSize_, mcmVal))
 	    {
 	      narrow = mcmVal;
 	      hasMcmVal = true;
@@ -1820,6 +1833,9 @@ Hart<URV>::load(uint64_t virtAddr, [[maybe_unused]] bool hyper, uint64_t& data)
       if (addr1 != addr2 or memory_.getLineNumber(addr1) != memory_.getLineNumber(addr1 + ldStSize_))
 	dumpInitState("load", virtAddr + ldStSize_, addr2 + ldStSize_);
     }
+
+  if (dataLineTrace_)
+    memory_.traceDataLine(virtAddr, addr1);
 
   // Check for load-data-trigger.
   if (hasActiveTrigger())
@@ -2007,16 +2023,17 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal,
       return true;
     }
 
-  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
-  if (addr2 != addr1)
-    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
-  invalidateDecodeCache(virtAddr, ldStSize_);
-
   ldStWrite_ = true;
   ldStData_ = storeVal;
 
+  invalidateDecodeCache(virtAddr, ldStSize_);
+
   if (mcm_)
-    return true;  // Memory updated when merge buffer is written.
+    return true;  // Memory updated & lr-canceled when merge buffer is written.
+
+  memory_.invalidateOtherHartLr(hartIx_, addr1, ldStSize_);
+  if (addr2 != addr1)
+    memory_.invalidateOtherHartLr(hartIx_, addr2, ldStSize_);
 
   if (addr1 >= clintStart_ and addr1 < clintEnd_)
     {
@@ -2043,6 +2060,9 @@ Hart<URV>::store(URV virtAddr, [[maybe_unused]] bool hyper, STORE_TYPE storeVal,
     }
 
   memWrite(addr1, addr2, storeVal);
+
+  if (dataLineTrace_)
+    memory_.traceDataLine(virtAddr, addr1);
 
   STORE_TYPE temp = 0;
   memPeek(addr1, addr2, temp, false /*usePma*/);
@@ -2111,8 +2131,29 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	  return;
 	}
     }
-  else if (addr - clintStart_ >= 0xbff8)
-    return;  // Timer.
+  else if (addr - clintStart_ >= 0xbff8 and addr <= clintStart_ + 0xbfff)
+    {
+      // TODO: fix this for multicore -- need to update other harts' instCounter_
+      if (stSize == 4)
+        {
+          if ((addr & 7) == 0)
+            {
+              instCounter_ = (instCounter_ >> 32) << 32; // Clear low 32
+              instCounter_ |= uint32_t(storeVal) << counterToTimeShift_; // Fake time: instr count
+            }
+          else if ((addr & 3) == 0)
+            {
+              instCounter_ = (instCounter_ << 32) >> 32; // Clear high 32
+              instCounter_ |= (uint64_t(storeVal) << counterToTimeShift_) << 32; // Fake time: instr count
+            }
+        }
+      else if (stSize == 8)
+        {
+          if ((addr & 7) == 0)
+            instCounter_ = storeVal << counterToTimeShift_; // Fake time: instr count
+        }
+      return;  // Timer.
+    }
 
   // Address did not match any hart entry in clint.
   storeVal = 0;
@@ -2194,14 +2235,6 @@ Hart<URV>::readInst(uint64_t va, uint32_t& inst)
     }
 
   return false;
-}
-
-
-template <typename URV>
-bool
-Hart<URV>::defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask)
-{
-  return memory_.defineMemoryMappedRegisterWriteMask(addr, mask);
 }
 
 
@@ -2554,6 +2587,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
     mcm_->cancelInstruction(*this, instCounter_);
 
   bool origVirtMode = virtMode_;
+  bool gvaVirtMode = effectiveVirtualMode();
 
   using PM = PrivilegeMode;
   PM origMode = privMode_;
@@ -2582,7 +2616,7 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 		{
 		  virtMode_ = true;
 		  // Remap the cause to non-VS cause (e.g. VSTIME becomes STIME).
-		  if (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER) or cause == URV(IC::VS_SOFTWARE))
+		  if (interrupt and (cause == URV(IC::VS_EXTERNAL) or cause == URV(IC::VS_TIMER) or cause == URV(IC::VS_SOFTWARE)))
 		    cause--;
 		}
 	    }
@@ -2625,7 +2659,8 @@ Hart<URV>::initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info, URV i
 
   URV mtval2 = 0;  // New values of MTVAL2 CSR.
 
-  bool gva = isRvh() and not interrupt and (hyperLs_ or isGvaTrap(origVirtMode, cause));
+  bool gva = ( isRvh() and not interrupt and
+	       (hyperLs_ or isGvaTrap(gvaVirtMode, cause)) );
 
   // Update status register saving xIE in xPIE and previous privilege
   // mode in xPP by getting current value of xstatus, updating
@@ -3154,6 +3189,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     {
       updateTranslationPbmt();
       csRegs_.updateSstc();
+      stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
+      vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
     }
   else if (csr == CN::MIE or csr == CN::SIE or csr == CN::HIE or csr == CN::VSIE)
     cachedMie_ = peekCsr(CN::MIE);
@@ -4026,6 +4063,8 @@ Hart<URV>::clearTraceData()
   virtMem_.clearPageTableWalk();
   pmpManager_.clearPmpTrace();
   memory_.pmaMgr_.clearPmaTrace();
+  if (imsic_)
+    imsic_->clearTrace();
   lastBranchTaken_ = false;
   misalignedLdSt_ = false;
 }
@@ -4446,7 +4485,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	    countBasicBlocks(di);
 
 	  if (instrLineTrace_)
-	    memory_.traceInstructionLine(currPc_);
+	    memory_.traceInstructionLine(currPc_, physPc);
 
 	  if (doStats)
 	    accumulateInstructionStats(*di);
@@ -4508,7 +4547,7 @@ Hart<URV>::runUntilAddress(uint64_t address, FILE* traceFile)
 
 
 template <typename URV>
-std::tuple<bool, bool>
+bool
 Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
 {
   // Setup signal handlers. Restore on destruction.
@@ -4522,20 +4561,20 @@ Hart<URV>::runSteps(uint64_t steps, FILE* traceFile)
       if (instCounter_ >= limit)
         {
           std::cerr << "Stopped -- Reached instruction limit\n";
-          return std::make_tuple(true, true);
+          return true;
         }
       else if (pc_ == stopAddr)
         {
           std::cerr << "Stopped -- Reached end address\n";
-          return std::make_tuple(true, true);
+          return true;
         }
 
       singleStep(traceFile);
 
       if (hasTargetProgramFinished())
-        return std::make_tuple(true, stepResult_);
+        return stepResult_;
     }
-  return std::make_tuple(false, true);
+  return true;
 }
 
 
@@ -4692,7 +4731,7 @@ Hart<URV>::simpleRunWithLimit()
 	  ++retiredInsts_;
 
       if (instrLineTrace_)
-	memory_.traceInstructionLine(currPc_);
+	memory_.traceInstructionLine(currPc_, physPc);
 
       if (bbFile_)
 	countBasicBlocks(di);
@@ -4918,9 +4957,9 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV delegVal = csRegs_.peekMideleg();
   URV hDelegVal = csRegs_.peekHideleg();
 
-  // Interrupts destined for machine mode must not be delegated.
-  URV machine = possible & ~delegVal;  // Machine interrupts.
-  if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and machine != 0)
+  // Non-delegated interrupts are destined for machine mode.
+  URV mdest = possible & ~delegVal;  // Interrupts destined for machine mode.
+  if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and mdest != 0)
     {
       // Check for interrupts destined for machine-mode (not-delegated).
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
@@ -4930,7 +4969,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  if ((machine & mask) != 0)
+	  if ((mdest & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
@@ -4938,11 +4977,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 	}
     }
   if (privMode_ == PM::Machine)
-    return false;
+    return false;   // Interrupts destined for lower privileges are disabled.
 
-  // Interrupts destined for supervisor mode (S/HS): must be delegated but not h-delegated.
-  URV super = possible & delegVal & ~hDelegVal;  // Interrupts targeting S/HS.
-  if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and super != 0)
+  // Delegated but non-h-delegated interrupts are destined for supervisor mode (S/HS).
+  URV sdest = possible & delegVal & ~hDelegVal;  // Interrupts destined for S/HS.
+  if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and sdest != 0)
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
@@ -4951,13 +4990,18 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
 				 IC::VS_TIMER, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
-	  if ((super & mask) != 0)
+	  if ((sdest & mask) != 0)
 	    {
 	      cause = ic;
 	      return true;
 	    }
 	}
     }
+
+  // We now check for interrupts destined for VS mode. These are disabled if running in
+  // M/HS/U modes. If mode is M/HS then VS-destined are disabled because of VS is a lower
+  // privilege. If mode is U then VS-destined are explicilty disabled (see section 9.1 of
+  // privileged spec).
   if (not virtMode_)
     return false;
 
@@ -8335,8 +8379,8 @@ Hart<URV>::execute(const DecodedInst* di)
       execVfncvt_rod_f_f_w(di);
       return;
 
-    case InstId::vfredsum_vs:
-      execVfredsum_vs(di);
+    case InstId::vfredusum_vs:
+      execVfredusum_vs(di);
       return;
 
     case InstId::vfredosum_vs:
@@ -8351,8 +8395,8 @@ Hart<URV>::execute(const DecodedInst* di)
       execVfredmax_vs(di);
       return;
 
-    case InstId::vfwredsum_vs:
-      execVfwredsum_vs(di);
+    case InstId::vfwredusum_vs:
+      execVfwredusum_vs(di);
       return;
 
     case InstId::vfwredosum_vs:
@@ -9432,8 +9476,14 @@ Hart<URV>::execFence_tso(const DecodedInst*)
 
 template <typename URV>
 void
-Hart<URV>::execFencei(const DecodedInst*)
+Hart<URV>::execFencei(const DecodedInst* di)
 {
+  if (not extensionIsEnabled(RvExtension::Zifencei))
+    {
+      illegalInst(di);
+      return;
+    }
+
   // invalidateDecodeCache();  // No need for this. We invalidate on each write.
 }
 
@@ -9910,7 +9960,7 @@ Hart<URV>::execWfi(const DecodedInst* di)
     {
       if (virtMode_)
 	virtualInst(di);   // VU mode and TW=0. Section 9.6 of privilege spec.
-      if (wfiTimeout_ == 0)
+      else if (wfiTimeout_ == 0)
 	illegalInst(di);
       return;
     }
@@ -9989,7 +10039,9 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     {
       if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
 	{
-	  virtualInst(di);  // Section 2.3 of AIA.
+	  if (virtMode_)
+	    virtualInst(di);  // Section 2.3 of AIA.
+	  illegalInst(di);
 	  return false;
 	}
 
@@ -10111,7 +10163,9 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
     {
       if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
 	{
-	  virtualInst(di);  // Section 2.3 of AIA.
+	  if (virtMode_)
+	    virtualInst(di);  // Section 2.3 of AIA.
+	  illegalInst(di);
 	  return;
 	}
 
@@ -10193,6 +10247,12 @@ Hart<URV>::execCsrrw(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
+
   CsrNumber csr = CsrNumber(di->op2());
 
   if (preCsrInst_)
@@ -10226,6 +10286,12 @@ Hart<URV>::execCsrrs(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
 
   CsrNumber csr = CsrNumber(di->op2());
 
@@ -10270,6 +10336,12 @@ Hart<URV>::execCsrrc(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
+
   CsrNumber csr = CsrNumber(di->op2());
 
   if (preCsrInst_)
@@ -10313,6 +10385,12 @@ Hart<URV>::execCsrrwi(const DecodedInst* di)
   if (triggerTripped_)
     return;
 
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
+
   CsrNumber csr = CsrNumber(di->op2());
 
   if (preCsrInst_)
@@ -10344,6 +10422,12 @@ Hart<URV>::execCsrrsi(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
 
   CsrNumber csr = CsrNumber(di->op2());
 
@@ -10389,6 +10473,12 @@ Hart<URV>::execCsrrci(const DecodedInst* di)
 {
   if (triggerTripped_)
     return;
+
+  if (not extensionIsEnabled(RvExtension::Zicsr))
+    {
+      illegalInst(di);
+      return;
+    }
 
   CsrNumber csr = CsrNumber(di->op2());
 
@@ -10546,8 +10636,11 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
   // Physical memory protection. Assuming grain size is >= 8.
   if (pmpEnabled_)
     {
+      auto effPm = effectivePrivilege();
+      if (hyper)
+	effPm = hstatus_.bits_.SPVP ? PM::Supervisor : PM::User;
       Pmp pmp = pmpManager_.accessPmp(addr1, PmpManager::AccessReason::LdSt);
-      if (not pmp.isWrite(effectivePrivilege()))
+      if (not pmp.isWrite(effPm))
 	{
 	  addr1 = va1;
 	  return EC::STORE_ACC_FAULT;
@@ -10557,12 +10650,20 @@ Hart<URV>::determineStoreException(uint64_t& addr1, uint64_t& addr2,
 	  uint64_t aligned = addr1 & ~alignMask;
 	  uint64_t next = addr1 == addr2? aligned + stSize : addr2;
  	  Pmp pmp2 = pmpManager_.accessPmp(next, PmpManager::AccessReason::LdSt);
-	  if (not pmp2.isWrite(effectivePrivilege()))
+	  if (not pmp2.isWrite(effPm))
 	    {
 	      addr1 = va2;
-	      return EC::LOAD_ACC_FAULT;
+	      return EC::STORE_ACC_FAULT;
 	    }
 	}
+    }
+
+  if (steeEnabled_)
+    {
+      if (not stee_.isValidAccess(addr1, stSize))
+	return EC::STORE_ACC_FAULT;
+      if (addr2 != addr1 and not stee_.isValidAccess(addr2, stSize))
+	return EC::STORE_ACC_FAULT;
     }
 
   if (not misal)

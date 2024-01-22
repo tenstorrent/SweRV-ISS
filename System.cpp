@@ -339,7 +339,7 @@ saveUsedMemBlocks(const std::string& filename,
 
 template <typename URV>
 bool
-System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
+System<URV>::saveSnapshot(const std::string& dir)
 {
   Filesystem::path dirPath = dir;
   if (not Filesystem::is_directory(dirPath))
@@ -349,11 +349,18 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
 	return false;
       }
 
-  Filesystem::path regPath = dirPath / "registers";
-  if (not hart.saveSnapshotRegs(regPath.string()))
-    return false;
+  for (auto hartPtr : sysHarts_)
+    {
+      std::string name = "registers";
+      if (hartCount_ > 1)
+	name += std::to_string(hartPtr->sysHartIndex());
+      Filesystem::path regPath = dirPath / name;
+      if (not hartPtr->saveSnapshotRegs(regPath.string()))
+	return false;
+    }
 
-  auto& syscall = hart.getSyscall();
+  auto& hart0 = *ithHart(0);
+  auto& syscall = hart0.getSyscall();
 
   Filesystem::path usedBlocksPath = dirPath / "usedblocks";
   std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
@@ -386,7 +393,7 @@ System<URV>::saveSnapshot(Hart<URV>& hart, const std::string& dir)
     return false;
 
   Filesystem::path branchPath = dirPath / "branch-trace";
-  return hart.saveBranchTrace(branchPath);
+  return hart0.saveBranchTrace(branchPath);
 }
 
 
@@ -420,38 +427,10 @@ loadUsedMemBlocks(const std::string& filename,
 
 template <typename URV>
 bool
-System<URV>::loadSnapshot(const std::string& dir, Hart<URV>& hart)
-{
-  Filesystem::path dirPath = dir;
-  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
-
-  Filesystem::path regPath = dirPath / "registers";
-  if (not hart.loadSnapshotRegs(regPath.string()))
-    return false;
-
-  auto& syscall = hart.getSyscall();
-  Filesystem::path usedBlocksPath = dirPath / "usedblocks";
-  if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
-    return false;
-
-  Filesystem::path mmapPath = dirPath / "mmap";
-  if (not syscall.loadMmap(mmapPath.string()))
-    return false;
-
-  Filesystem::path memPath = dirPath / "memory";
-  if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
-    return false;
-
-  Filesystem::path fdPath = dirPath / "fd";
-  return syscall.loadFileDescriptors(fdPath.string());
-}
-
-
-template <typename URV>
-bool
 System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
 			 uint64_t sbase, uint64_t sstride,
-			 unsigned guests, unsigned ids)
+			 unsigned guests, unsigned ids,
+                         bool trace)
 {
   using std::cerr;
 
@@ -549,7 +528,7 @@ System<URV>::configImsic(uint64_t mbase, uint64_t mstride,
     {
       auto hart = ithHart(i);
       auto imsic = imsicMgr_.ithImsic(i);
-      hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc);
+      hart->attachImsic(imsic, mbase, mend, sbase, send, readFunc, writeFunc, trace);
     }
 
   return true;
@@ -645,7 +624,7 @@ System<URV>::enableMcm(unsigned mbLineSize, bool mbLineCheckAll)
 	return false;
       }
 
-  mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), mbLineSize);
+  mcm_ = std::make_shared<Mcm<URV>>(this->hartCount(), pageSize(), mbLineSize);
   mbSize_ = mbLineSize;
   mcm_->setCheckWholeMbLine(mbLineCheckAll);
 
@@ -733,11 +712,11 @@ System<URV>::mcmIEvict(Hart<URV>& hart, uint64_t /*time*/, uint64_t addr)
 template <typename URV>
 bool
 System<URV>::mcmRetire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		       const DecodedInst& di)
+		       const DecodedInst& di, bool trapped)
 {
   if (not mcm_)
     return false;
-  return mcm_->retire(hart, time, tag, di);
+  return mcm_->retire(hart, time, tag, di, trapped);
 }
 
 template <typename URV>
@@ -813,6 +792,217 @@ System<URV>::getSparseMemUsedBlocks(std::vector<std::pair<uint64_t, uint64_t>>& 
     }
   return false;
 }
+
+
+extern void forceUserStop(int);
+
+
+template <typename URV>
+bool
+System<URV>::batchRun(std::vector<FILE*>& traceFiles, bool waitAll, uint64_t stepWindow)
+{
+  if (hartCount() == 0)
+    return true;
+
+  if (hartCount() == 1)
+    {
+      auto& hart = *ithHart(0);
+      bool ok = hart.run(traceFiles.at(0));
+#ifdef FAST_SLOPPY
+      hart.reportOpenedFiles(std::cout);
+#endif
+      return ok;
+    }
+
+  if (not stepWindow)
+    {
+      // Run each hart in its own thread.
+      std::vector<std::thread> threadVec;
+      std::atomic<bool> result = true;
+      std::atomic<unsigned> finished = 0;  // Count of finished threads.
+
+      auto threadFunc = [&result, &finished] (Hart<URV>* hart, FILE* traceFile) {
+                          bool r = hart->run(traceFile);
+                          result = result and r;
+                          finished++;
+                        };
+
+      for (unsigned i = 0; i < hartCount(); ++i)
+        {
+          Hart<URV>* hart = ithHart(i).get();
+          threadVec.emplace_back(std::thread(threadFunc, hart, traceFiles.at(i)));
+        }
+
+      if (not waitAll)
+        {
+          // First thread to finish terminates run.
+          while (finished == 0)
+            sleep(1);
+          forceUserStop(0);
+        }
+
+      for (auto& t : threadVec)
+	t.join();
+      return result;
+    }
+
+  // Run all harts in one thread round-robin.
+  bool result = true;
+  unsigned finished = 0;
+
+  while ((waitAll and finished != hartCount()) or
+	 (not waitAll and finished == 0))
+    {
+      for (auto hptr : sysHarts_)
+	{
+	  if (hptr->hasTargetProgramFinished())
+	    continue;
+	  unsigned steps = (rand() % stepWindow) + 1;
+	  // step N times
+	  unsigned ix = hptr->sysHartIndex();
+	  result = hptr->runSteps(steps, traceFiles.at(ix)) and result;
+	  if (hptr->hasTargetProgramFinished())
+	    finished++;
+        }
+    }
+
+  return result;
+}
+
+
+/// Run producing a snapshot after each snapPeriod instructions. Each
+/// snapshot goes into its own directory names <dir><n> where <dir> is
+/// the string in snapDir and <n> is a sequential integer starting at
+/// 0. Return true on success and false on failure.
+template <typename URV>
+bool
+System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snapDir,
+			 const std::vector<uint64_t>& periods)
+{
+  if (hartCount() == 0)
+    return true;
+
+  if (hartCount() != 1)
+    {
+      std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
+      return false;
+    }
+
+  Hart<URV>& hart = *ithHart(0);
+
+  uint64_t globalLimit = hart.getInstructionCountLimit();
+
+  for (size_t ix = 0; true; ++ix)
+    {
+      uint64_t nextLimit = globalLimit;
+      if (not periods.empty())
+	{
+	  if (periods.size() == 1)
+	    nextLimit = hart.getInstructionCount() + periods.at(0);
+	  else
+	    nextLimit = ix < periods.size() ? periods.at(ix) : globalLimit;
+	}
+
+      nextLimit = std::min(nextLimit, globalLimit);
+      hart.setInstructionCountLimit(nextLimit);
+      uint64_t tag = ix;
+      if (periods.size() > 1)
+	tag = ix < periods.size() ? periods.at(ix) : nextLimit;
+      std::string pathStr = snapDir + std::to_string(tag);
+      Filesystem::path path = pathStr;
+      if (not Filesystem::is_directory(path) and not Filesystem::create_directories(path))
+	{
+	  std::cerr << "Error: Failed to create snapshot directory " << pathStr << '\n';
+	  return false;
+	}
+
+      batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindow*/);
+
+      if (hart.hasTargetProgramFinished() or nextLimit >= globalLimit)
+	{
+	  Filesystem::remove_all(path);
+	  break;
+	}
+
+      if (not saveSnapshot(pathStr))
+	{
+	  std::cerr << "Error: Failed to save a snapshot\n";
+	  return false;
+	}
+    }
+
+  hart.traceBranches(std::string(), 0);  // Turn off branch tracing.
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+System<URV>::loadSnapshot(const std::string& snapDir)
+{
+  using std::cerr;
+
+  if (not Filesystem::is_directory(snapDir))
+    {
+      cerr << "Error: Path is not a snapshot directory: " << snapDir << '\n';
+      return false;
+    }
+
+  if (hartCount_ == 0)
+    {
+      cerr << "Error: System::loadSnapshot: System with no harts\n";
+      return false;
+    }
+
+  Filesystem::path dirPath = snapDir;
+
+  // Restore the register values.
+  for (auto hartPtr : sysHarts_)
+    {
+      unsigned ix = hartPtr->sysHartIndex();
+      
+      std::string name = "registers" + std::to_string(ix);
+      
+      Filesystem::path regPath = dirPath / name;
+      bool missing = not Filesystem::is_regular_file(regPath);
+      if (missing and ix == 0 and hartCount_ == 1)
+	{
+	  // Support legacy snapshots where hart index was not appended to filename.
+	  regPath = dirPath / "registers";
+	  missing = not Filesystem::is_regular_file(regPath);
+	}
+      if (missing)
+	{
+	  cerr << "Error: Snapshot file does not exists: " << regPath << '\n';
+	  return false;
+	}
+
+      if (not hartPtr->loadSnapshotRegs(regPath.string()))
+	return false;
+    }
+
+
+  Filesystem::path usedBlocksPath = dirPath / "usedblocks";
+  std::vector<std::pair<uint64_t,uint64_t>> usedBlocks;
+  if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
+    return false;
+
+  auto& hart0 = *ithHart(0);
+  auto& syscall = hart0.getSyscall();
+  Filesystem::path mmapPath = dirPath / "mmap";
+  if (not syscall.loadMmap(mmapPath.string()))
+    return false;
+
+  Filesystem::path memPath = dirPath / "memory";
+  if (not memory_->loadSnapshot(memPath.string(), usedBlocks))
+    return false;
+
+  Filesystem::path fdPath = dirPath / "fd";
+  return syscall.loadFileDescriptors(fdPath.string());
+}
+
+
 
 
 template class WdRiscv::System<uint32_t>;

@@ -356,6 +356,11 @@ applyCsrConfig(Hart<URV>& hart, std::string_view nm, const nlohmann::json& conf,
 		  << " to be compatible with write mask.\n";
       if (writeable & (URV(1) << ('E' - 'A')))
 	std::cerr << "Warning: Bit E of MISA cannot be writebale.\n";
+      if ((reset & (1 << ('S' - 'A'))) and not (reset & (1 << ('U' - 'A'))))
+        {
+          std::cerr << "Invalid MISA in config file: cannot have S=1 and U=0.\n";
+          return false;
+        }
     }
 
   if (verbose)
@@ -954,6 +959,73 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
     hart.configVector(bytesPerVec, bytesPerElem.at(0), bytesPerElem.at(1), &minBytesPerLmul,
 		      &maxBytesPerLmul);
 
+  tag = "update_whole_mask";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorUpdateWholeMask(flag);
+    }
+
+
+  return errors == 0;
+}
+
+
+template <typename URV>
+static
+bool
+applySteeConfig(Hart<URV>& hart, const nlohmann::json& config)
+{
+  if (not config.contains("stee"))
+    return true;  // Nothing to apply
+
+  unsigned errors = 0;
+  const auto& sconf = config.at("stee");
+  
+  std::string tag = "zero_mask";
+  if (sconf.contains(tag))
+    {
+      uint64_t mask = 0;
+      if (not getJsonUnsigned(tag, sconf.at(tag), mask))
+	errors++;
+      else
+	hart.configSteeZeroMask(mask);
+    }
+
+  tag = "secure_mask";
+  if (sconf.contains(tag))
+    {
+      uint64_t mask = 0;
+      if (not getJsonUnsigned(tag, sconf.at(tag), mask))
+	errors++;
+      else
+	hart.configSteeSecureMask(mask);
+    }
+
+  tag = "secure_region";
+  if (sconf.contains(tag))
+    {
+      std::vector<uint64_t> vec;
+      if (not getJsonUnsignedVec(tag, sconf.at(tag), vec))
+	errors++;
+      else
+	{
+	  if (vec.size() != 2)
+	    {
+	      std::cerr << "Invalid config file stee.secure_region: Expecting an array of 2 integers\n";
+	      errors++;
+	    }
+	  else
+	    hart.configSteeSecureRegion(vec.at(0), vec.at(1));
+	}
+    }
+
+  if (not errors)
+    hart.enableStee(true);
+
   return errors == 0;
 }
 
@@ -1009,10 +1081,10 @@ template <typename URV>
 static
 bool
 processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::json& masks,
-		      uint64_t low, uint64_t high)
+		      uint64_t low, uint64_t high, unsigned size)
 {
   // Parse an array of entries, each entry is an array containing low
-  // address, high address, and maks.
+  // address, high address, and mask.
   unsigned ix = 0;
   unsigned errors = 0;
   for (auto maskIter = masks.begin(); maskIter != masks.end(); ++maskIter, ++ix)
@@ -1044,9 +1116,9 @@ processMemMappedMasks(Hart<URV>& hart, std::string_view path, const nlohmann::js
 	  continue;
 	}
 
-      uint32_t mask = vec.at(2);
-      for (uint64_t addr = vec.at(0); addr <= vec.at(1); addr += 4)
-	if (not hart.setMemMappedMask(addr, mask))
+      uint64_t mask = vec.at(2);
+      for (uint64_t addr = vec.at(0); addr <= vec.at(1); addr += size)
+	if (not hart.setMemMappedMask(addr, mask, size))
 	  {
 	    std::cerr << "Error: Failed to configure mask for config item "
 		      << entryPath << " at address 0x" << std::hex << addr
@@ -1125,9 +1197,31 @@ applyPmaConfig(Hart<URV>& hart, const nlohmann::json& config)
 		itemErrors++;
 	      else if (pma.isMemMappedReg())
 		{
-		  tag = "masks";
+		  unsigned size = 4;
+		  tag = "register_size";
 		  if (item.contains(tag))
-		    if (not processMemMappedMasks(hart, path, item.at(tag), low, high))
+		    {
+		      auto path2 = util::join(".", path, tag);
+		      if (not getJsonUnsigned(path2, item.at(tag), size))
+			itemErrors++;
+		      else if (size != 4 and size != 8)
+			{
+			  cerr << "Error: Invalid size in config item " << path2 << '\n';
+			  itemErrors++;
+			}
+		    }  
+
+		  if ((low & (size - 1)) != 0 and not itemErrors)
+		    {
+		      cerr << "Error: Memory mapped region address (0x" << std::hex
+			   << low << std::dec << ") must be aligned to its size ("
+			   << size << '\n';
+		      itemErrors++;
+		    }
+
+		  tag = "masks";
+		  if (item.contains(tag) and not itemErrors)
+		    if (not processMemMappedMasks(hart, path, item.at(tag), low, high, size))
 		      itemErrors++;
 		}
 	    }
@@ -1409,6 +1503,8 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
   applyVectorConfig(hart, *config_) or errors++;
 
+  applySteeConfig(hart, *config_) or errors++;
+
   tag = "even_odd_trigger_chains";
   if (config_ -> contains(tag))
     {
@@ -1489,7 +1585,6 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   if (config_ -> contains (tag))
     {
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
-      hart.enableMisalignedData(flag);
       hart.misalignedExceptionHasPriority(flag);
     }
 
@@ -1864,7 +1959,13 @@ HartConfig::applyImsicConfig(System<URV>& system) const
     if (not getJsonUnsigned("imsic.ids", imsic.at(tag), ids))
       return false;
 
-  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids);
+  bool trace = false;
+  tag = "trace";
+  if (imsic.contains(tag))
+    if (not getJsonBoolean("imsic.trace", imsic.at(tag), trace))
+      return false;
+
+  return system.configImsic(mbase, mstride, sbase, sstride, guests, ids, trace);
 }
 
 

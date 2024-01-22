@@ -1603,6 +1603,7 @@ InstTable::setupInstVec()
       { "c.li", InstId::c_li, 0x4001, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Write, 0xf80,
+	OperandType::IntReg, OperandMode::Read, 0,
 	OperandType::Imm, OperandMode::None, 0x107c },
 
       { "c.addi16sp", InstId::c_addi16sp, 0x6101, 0xef83,
@@ -1691,13 +1692,13 @@ InstTable::setupInstVec()
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Read, 0x380,
 	OperandType::IntReg, OperandMode::Read, 0,
-	OperandType::Imm, OperandMode::None, 0xc7c },
+	OperandType::Imm, OperandMode::None, 0x1c7c },
 
       { "c.bnez", InstId::c_bnez, 0xe001, 0xe003,
 	RvExtension::I, RvFormat::None,
 	OperandType::IntReg, OperandMode::Read, 0x380,
 	OperandType::IntReg, OperandMode::Read, 0,
-	OperandType::Imm, OperandMode::None, 0xc7c },
+	OperandType::Imm, OperandMode::None, 0x1c7c },
 
       { "c.slli", InstId::c_slli, 0x0002, 0xf003,
 	RvExtension::I, RvFormat::None,
@@ -6144,7 +6145,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask
       },
 
-      { "vfredsum.vs", InstId::vfredsum_vs,
+      { "vfredusum.vs", InstId::vfredusum_vs,
         0b000001'0'00000'00000'001'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
@@ -6180,7 +6181,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vfwredsum.vs", InstId::vfwredsum_vs,
+      { "vfwredusum.vs", InstId::vfwredusum_vs,
         0b110001'0'00000'00000'001'00000'1010111, // Opcode
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
@@ -7098,13 +7099,13 @@ InstTable::setupInstVec()
 
       { "hlv.wu", InstId::hlv_wu, 0x68104073, 0xfff0707f,
 	RvExtension::H, RvFormat::I,
-	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Write, rs2Mask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask
       },
 
       { "hlv.d", InstId::hlv_d, 0x6c004073, 0xfff0707f,
 	RvExtension::H, RvFormat::I,
-	OperandType::IntReg, OperandMode::Read, rs2Mask,
+	OperandType::IntReg, OperandMode::Write, rs2Mask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask
       },
 

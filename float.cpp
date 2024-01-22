@@ -2575,9 +2575,10 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
                 result64 <<= shift;
               else
                 result64 >>= -shift;
-              result = static_cast<int32_t>(static_cast<uint32_t>(result64));
+	      int32_t result32 = result64;
               if (std::signbit(d1))
-                result = -result;
+                result32 = -result32;
+	      result = result32;  // Sign extend.
             }
           if (exp > std::numeric_limits<int32_t>::digits)
             raiseSimulatorFpFlags(FpFlags::Invalid);
@@ -2650,7 +2651,10 @@ Hart<URV>::execFli_h(const DecodedInst* di)
       return;
     }
 
-  Float16 res = valueTable.at(di->op1());
+  unsigned ix = di->op1();
+  if (ix == 29)
+    ix = 30;   // Per spec entry 29 gets infinity just like entry 30.
+  Float16 res = valueTable.at(ix);
 
   fpRegs_.writeHalf(di->op0(), res);
   markFsDirty();

@@ -20,16 +20,17 @@ namespace WdRiscv
 
   struct MemoryOp
   {
-    uint64_t time_ = 0;
-    uint64_t physAddr_ = 0;
-    uint64_t data_ = 0;
-    uint64_t rtlData_ = 0;
-    McmInstrIx instrTag_ = 0;
-    uint8_t hartIx_ = 0;
-    uint8_t size_ = 0;
-    bool isRead_ = false;
-    bool failRead_ = false;
-    bool canceled_ = false;
+    uint64_t   time_           = 0;
+    uint64_t   physAddr_       = 0;
+    uint64_t   data_           = 0;
+    uint64_t   rtlData_        = 0;
+    McmInstrIx instrTag_       = 0;
+    uint64_t   forwardTime_    = 0;  // Time of store instruction forwarding to this op.
+    uint8_t    hartIx_    : 8  = 0;
+    uint8_t    size_      : 8  = 0;
+    bool       isRead_    : 1  = false;
+    bool       failRead_  : 1  = false;
+    bool       canceled_  : 1  = false;
 
     bool isCanceled() const { return canceled_; }
     void cancel() { canceled_ = true; }
@@ -40,7 +41,9 @@ namespace WdRiscv
   {
     // memOps contains indices into an array of MemoryOp items.
     std::vector<MemoryOpIx> memOps_;
-    uint64_t physAddr_ = 0;   // Data address for ld/store instruction.
+    uint64_t virtAddr_ = 0;   // Virtual data address for ld/st instructions.
+    uint64_t physAddr_ = 0;   // Phusical data address for ld/st instruction.
+    uint64_t physAddr2_ = 0;  // Additional data address for page crossing stores.
     uint64_t data_ = 0;       // Data for load/sore instructions.
     uint64_t addrTime_ = 0;   // Time address register was produced (for ld/st/amo).
     uint64_t dataTime_ = 0;   // Time data register was produced (for st/amo).
@@ -48,12 +51,13 @@ namespace WdRiscv
     McmInstrIx dataProducer_ = 0;
     DecodedInst di_;
     McmInstrIx tag_ = 0;
-    uint8_t size_ = 0;        // Data size for load/store insructions.
-    bool retired_ = false;
-    bool canceled_ = false;
-    bool isLoad_ = false;
-    bool isStore_ = false;
-    bool complete_ = false;
+    uint8_t size_   : 8 = 0;        // Data size for load/store insructions.
+    bool retired_   : 1 = false;
+    bool canceled_  : 1 = false;
+    bool isLoad_    : 1 = false;
+    bool isStore_   : 1 = false;
+    bool complete_  : 1 = false;
+    bool forwarded_ : 1 = false; // True if all bytes of load were forwarded.
 
     /// Return true if this a load/store isntruction.
     bool isMemory() const { return isLoad_ or isStore_; }
@@ -78,8 +82,9 @@ namespace WdRiscv
       memOps_.push_back(memOpIx);
     }
 
-    /// Return true if data memory referenced by this instruction
-    /// overlaps that of the given other instruction.
+    /// Return true if data memory referenced by this instruction overlaps that
+    /// of the given other instruction. Both instructions must be memory
+    /// instructions.  Both instructions must be retired.
     bool overlaps(const McmInstr& other) const
     {
       // A non-successful store conditional (zero size) does not overlap anything.
@@ -87,32 +92,18 @@ namespace WdRiscv
 	return false;
 	  
       if (size_ == 0 or other.size_ == 0)
-	{
-	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
-		    << " tag2=" << other.tag_ << " zero data size\n";
-	}
-      if (physAddr_ == other.physAddr_)
-	return true;
-      if (physAddr_ < other.physAddr_)
-	return other.physAddr_ - physAddr_ < size_;
-      return physAddr_ - other.physAddr_ < other.size_;
-    }
+	std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		  << " tag2=" << other.tag_ << " zero data size\n";
 
-    /// Return true if the data memory referenced by this instruction
-    /// overlpas that of the given memory operation.
-    bool overlaps(const MemoryOp& op) const
-    {
-      if (size_ == 0 or op.size_ == 0)
-	{
-	  std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
-		    << " tag2=" << op.instrTag_ << " zero data size\n";
-	  // assert(0 && "McmInstr::overlaps: zero data size\n");
-	}
-      if (physAddr_ == op.physAddr_)
+      if (not retired_ or not other.retired_)
+	std::cerr << "McmInstr::overlaps: Error: tag1=" << tag_
+		  << " tag2=" << other.tag_ << " non-retired instruction\n";
+
+      if (virtAddr_ == other.virtAddr_)
 	return true;
-      if (physAddr_ < op.physAddr_)
-	return op.physAddr_ - physAddr_ < size_;
-      return physAddr_ - op.physAddr_ < op.size_;
+      if (virtAddr_ < other.virtAddr_)
+	return other.virtAddr_ - virtAddr_ < size_;
+      return virtAddr_ - other.virtAddr_ < other.size_;
     }
 
     /// Return true if address of the data memory referenced by this
@@ -128,7 +119,7 @@ namespace WdRiscv
   {
   public:
 
-    Mcm(unsigned hartCount, unsigned mergeBufferSize);
+    Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize);
 
     ~Mcm();
 
@@ -173,17 +164,21 @@ namespace WdRiscv
 
     /// This is called when an instruction is retired.
     bool retire(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
-		const DecodedInst& di);
+		const DecodedInst& di, bool trapped);
 
     /// Perform PPO checks (e.g. rule 4) on pending instructions.
     bool finalChecks(Hart<URV>& hart);
 
     bool setCurrentInstruction(Hart<URV>& hart, uint64_t instrTag);
 
-    /// Return the load value of the current target instruction
-    /// (set with setCurrentInstruction).
-    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t addr, unsigned size,
-			     uint64_t& value);
+    /// Return the load value of the current target instruction which
+    /// must be a load instruction (set with setCurrentInstruction).
+    /// Paddr1 is the physical address of the loaded data. Paddr2 is
+    /// the same as paddr1 except for page corssing loads where paddr2
+    /// is the physical address of the second page. Vaddr is the virtual
+    /// address of the load data.
+    bool getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
+			     uint64_t paddr2, unsigned size, uint64_t& value);
 
     /// Return the merge buffer line size in bytes.
     unsigned mergeBufferLineSize() const
@@ -263,6 +258,11 @@ namespace WdRiscv
       return mt;
     }
 
+    /// Return the smallest time of the memor operations of the given
+    /// instruction. Adjust read-operation times to account for
+    /// forwarding.
+    uint64_t effectiveReadTime(const McmInstr& instr) const;
+
     /// Return true if instruction a is before b in memory time.
     bool isBeforeInMemoryTime(const McmInstr& a, const McmInstr& b) const
     {
@@ -294,6 +294,28 @@ namespace WdRiscv
 
     void cancelReplayedReads(McmInstr*);
 
+    /// Compute a mask of the instruction data bytes covered by the
+    /// given memory operation. Return 0 if the operation does not
+    /// overlap the given instruction.
+    unsigned determineOpMask(const McmInstr& instr, const MemoryOp& op) const;
+
+    /// If op overlaps instruction then trim high end of op to the
+    /// boundary of the instruction.
+    void trimMemoryOp(const McmInstr& instr, MemoryOp& op);
+
+    /// Helper to retire method: Capture paramters of store instruction and
+    /// commit its data to memory. Return true on success and false on failure.
+    /// Return true if instuction is not a a store.
+    bool retireStore(Hart<URV>& hart, McmInstr& instr);
+
+    /// Return the page number corresponding to the given address
+    uint64_t pageNum(uint64_t addr) const
+    { return addr >> 12; }
+
+    /// Return the address of the page with the given page number.
+    uint64_t pageAddress(uint64_t pageNum) const
+    { return pageNum << 12; }
+
     /// Remove from hartPendingWrites_ the write ops falling with the given RTL
     /// line and masked by rtlMask (rtlMask bit is on for op bytes) and place
     /// them sorted by instr tag in coveredWrites. Write ops may not straddle
@@ -309,7 +331,8 @@ namespace WdRiscv
     /// forward (bypass) operartion and is updated (bits cleared) if
     /// some parts of op, covered by the mask, are successfully
     /// updated.
-    bool forwardTo(const McmInstr& instr, MemoryOp& op, uint64_t& mask);
+    bool forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
+		   unsigned isize, MemoryOp& op, uint64_t& mask);
 
     /// Forward to the given read op from the stores of the retired
     /// instructions ahead of tag.
@@ -321,7 +344,53 @@ namespace WdRiscv
 			   std::vector<unsigned>& sourceRegs,
 			   std::vector<unsigned>& destRegs);
 
+    /// Return true if the data memory referenced by given instruction overlpas
+    /// that of the given memory operation.
+    bool overlaps(const McmInstr& instr, const MemoryOp& op) const
+    {
+      if (instr.size_ == 0 or op.size_ == 0)
+	std::cerr << "Mcm::overlaps: Error: tag1=" << instr.tag_
+		  << " tag2=" << op.instrTag_ << " zero data size\n";
+
+      if (instr.physAddr_ == instr.physAddr2_)   // Non-page-crossing
+	return rangesOverlap(instr.physAddr_, instr.size_, op.physAddr_, op.size_);
+
+      // Page crossing.
+      unsigned size1 = offsetToNextPage(instr.physAddr_);
+      if (rangesOverlap(instr.physAddr_, size1, op.physAddr_, op.size_))
+	return true;
+      unsigned size2 = instr.size_ - size1;
+      return rangesOverlap(instr.physAddr2_, size2, op.physAddr_, op.size_);
+    }
+
+    /// Return true if the given address ranges overlap one another.
+    bool rangesOverlap(uint64_t addr1, unsigned size1, uint64_t addr2, unsigned size2) const
+    {
+      if (addr1 <= addr2)
+	return addr2 - addr1 < size1;
+      return addr1 - addr2 < size2;
+    }
+
+    /// Return true if given instruction data addresses overlap the
+    /// given address. Return false if instruction is not a memory
+    /// instruction. Instruction must be retired.
+    bool instrOverlapsPhysAddr(const McmInstr& instr, uint64_t addr) const
+    {
+      if (not instr.isMemory())
+	return false;
+      assert(instr.isRetired());
+      if (instr.physAddr_ == instr.physAddr2_)
+	return instr.physAddr_ <= addr and addr - instr.physAddr_ < instr.size_;
+
+      unsigned size1 = offsetToNextPage(instr.physAddr_);
+      if (pageNum(instr.physAddr_) == pageNum(addr))
+	return instr.physAddr_ <= addr and addr - instr.physAddr_ < size1;
+      unsigned size2 = instr.size_ - size1;
+      return instr.physAddr2_ <= addr and addr - instr.physAddr2_ < size2;
+    }
+
     bool instrHasRead(const McmInstr& instr) const;
+
     bool instrHasWrite(const McmInstr& instr) const;
 
     bool checkStoreComplete(const McmInstr& instr) const;
@@ -330,8 +399,10 @@ namespace WdRiscv
 
     bool checkLoadComplete(const McmInstr& instr) const;
 
-    void clearMaskBitsForWrite(const McmInstr& storeInstr,
-			       const McmInstr& target, uint64_t& mask) const;
+    /// Clear in the given mask, bits corresponding to the target
+    /// instruction bytes covered by the given store instruction.
+    void clearMaskBitsForWrite(const McmInstr& storeInstr, const McmInstr& target,
+			       unsigned& mask) const;
 
     void cancelNonRetired(unsigned hartIx, uint64_t instrTag);
 
@@ -369,13 +440,17 @@ namespace WdRiscv
     /// csr regs have 64.
     unsigned effectiveRegIx(const DecodedInst& di, unsigned opIx) const;
 
+    /// Return the difference between the next page boundary and the
+    /// current address. Return 0 if address is on a page boundary.
+    unsigned offsetToNextPage(uint64_t addr) const
+    { return pageSize_ - (addr & (pageSize_ - 1)); }
+
   private:
 
     const unsigned intRegOffset_ = 0;
     const unsigned fpRegOffset_ = 32;
     const unsigned csRegOffset_ = 64;
     const unsigned totalRegCount_ = csRegOffset_ + 4096; // 4096: max csr count.
-
 
     using McmInstrVec = std::vector<McmInstr>;
 
@@ -387,6 +462,7 @@ namespace WdRiscv
     std::vector<MemoryOpVec> hartPendingWrites_; // One vector per hart.
 
     uint64_t time_ = 0;
+    unsigned pageSize_ = 4096;
     unsigned lineSize_ = 64; // Merge buffer line size.
     unsigned windowSize_ = 1000;
 

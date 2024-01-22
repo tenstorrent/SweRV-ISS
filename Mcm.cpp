@@ -9,8 +9,8 @@ using std::cerr;
 
 
 template <typename URV>
-Mcm<URV>::Mcm(unsigned hartCount, unsigned mergeBufferSize)
-  : lineSize_(mergeBufferSize)
+Mcm<URV>::Mcm(unsigned hartCount, unsigned pageSize, unsigned mergeBufferSize)
+  : pageSize_(pageSize), lineSize_(mergeBufferSize)
 {
   sysMemOps_.reserve(200000);
 
@@ -429,20 +429,23 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
       return false;
     }
 
-  bool result = true;
-
   // Associate write op with instruction.
   instr->addMemOp(sysMemOps_.size());
   sysMemOps_.push_back(op);
 
   instr->complete_ = checkStoreComplete(*instr);
 
+  bool result = pokeHartMemory(hart, physAddr, rtlData, size);
+
   if (instr->retired_)
     {
-      result = pokeHartMemory(hart, physAddr, rtlData, size) and result;
       result = checkRtlWrite(hart.hartId(), *instr, op) and result;
       if (instr->complete_)
 	result = ppoRule1(hart, *instr) and result;
+    }
+  else
+    {
+      // TODO: Mark instruction to avoid poking memory in retireStore
     }
 
   return result;
@@ -451,15 +454,47 @@ Mcm<URV>::bypassOp(Hart<URV>& hart, uint64_t time, uint64_t instrTag,
 
 template <typename URV>
 bool
-Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
-		 const DecodedInst& di)
+Mcm<URV>::retireStore(Hart<URV>& hart, McmInstr& instr)
 {
+  uint64_t vaddr = 0, paddr = 0, paddr2 = 0, value = 0;
+  unsigned stSize = hart.lastStore(vaddr, paddr, paddr2, value);
+  if (not stSize)
+    return true;   // Not a store.
+
+  instr.size_ = stSize;
+  instr.virtAddr_ = vaddr;
+  instr.physAddr_ = paddr;
+  instr.physAddr2_ = paddr2;
+  instr.data_ = value;
+  instr.isStore_ = true;
+  instr.complete_ = checkStoreComplete(instr);
+  if (not instr.complete_)
+    return true;
+
+  if (paddr == paddr2)
+    return pokeHartMemory(hart, paddr, value, stSize);
+
+  unsigned size1 = offsetToNextPage(paddr);
+  bool ok = pokeHartMemory(hart, paddr, value, size1);
+
+  unsigned size2 = stSize - size1;
+  uint64_t value2 = value >> (size1 * 8);
+  ok = pokeHartMemory(hart, paddr2, value2, size2) and ok;
+
+  return ok;
+}
+
+
+template <typename URV>
+bool
+Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
+		 const DecodedInst& di, bool trapped)
+{
+  unsigned hartIx = hart.sysHartIndex();
+  cancelNonRetired(hartIx, tag);
+
   if (not updateTime("Mcm::retire", time))
     return false;
-
-  unsigned hartIx = hart.sysHartIndex();
-
-  cancelNonRetired(hartIx, tag);
 
   McmInstr* instr = findOrAddInstr(hartIx, tag);
   if (instr->retired_)
@@ -469,7 +504,7 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
       return false;
     }
 
-  if (not di.isValid())
+  if (not di.isValid() or trapped)
     {
       cancelInstr(*instr);  // Instruction took a trap.
       return true;
@@ -478,21 +513,8 @@ Mcm<URV>::retire(Hart<URV>& hart, uint64_t time, uint64_t tag,
   instr->retired_ = true;
   instr->di_ = di;
 
-  bool ok = true;
-
   // If instruction is a store, save address, size, and written data.
-  uint64_t addr = 0, value = 0;
-  unsigned stSize = hart.lastStore(addr, value);
-  if (stSize)
-    {
-      instr->size_ = stSize;
-      instr->physAddr_ = addr;
-      instr->data_ = value;
-      instr->isStore_ = true;
-      instr->complete_ = checkStoreComplete(*instr);
-      if (instr->complete_)   // Write ops already seen. Commit data.
-	ok = pokeHartMemory(hart, addr, value, stSize) and ok;
-    }
+  bool ok = retireStore(hart, *instr);
 
   URV hartId = hart.hartId();
 
@@ -639,8 +661,8 @@ Mcm<URV>::collectCoveredWrites(Hart<URV>& hart, uint64_t time, uint64_t rtlAddr,
 	  if (not instr or instr->isCanceled())
 	    {
 	      cerr << "Error: Write for an invalid/speculated store time=" << time
-		   << " hart-id=" << hart.hartId() << "tag=" << op.instrTag_
-		   << "addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
+		   << " hart-id=" << hart.hartId() << " tag=" << op.instrTag_
+		   << " addr=0x" << std::hex << op.physAddr_ << std::dec << "\n";
 	      return false;
 	    }
 
@@ -707,6 +729,9 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
   if (not checkBufferWriteParams(hart.hartId(), time, lineSize_, rtlSize, physAddr))
     return false;
 
+  uint64_t lineAddr = physAddr - (physAddr % lineSize_);
+  hart.cancelOtherHartsLr(physAddr);
+
   unsigned hartIx = hart.sysHartIndex();
 
   // Remove from hartPendingWrites_ the writes matching the RTL line
@@ -716,7 +741,7 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
     return false;
 
   // Read our memory corresponding to RTL line addresses.
-  uint64_t lineEnd = physAddr + lineSize_ - (physAddr % lineSize_);
+  uint64_t lineEnd = lineAddr + lineSize_;
   std::vector<uint8_t> line;
   line.reserve(lineSize_);
   for (uint64_t addr = physAddr; addr < lineEnd; ++addr)
@@ -814,7 +839,8 @@ Mcm<URV>::mergeBufferWrite(Hart<URV>& hart, uint64_t time, uint64_t physAddr,
 
 template <typename URV>
 bool
-Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
+Mcm<URV>::forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
+		    unsigned isize, MemoryOp& readOp, uint64_t& mask)
 {
   if (mask == 0)
     return true;  // No bytes left to forward.
@@ -823,7 +849,7 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
     return false;
 
   uint64_t rol = readOp.physAddr_, roh = readOp.physAddr_ + readOp.size_ - 1;
-  uint64_t il = instr.physAddr_, ih = instr.physAddr_ + instr.size_ - 1;
+  uint64_t il = iaddr, ih = il + isize - 1;
   if (roh < il or rol > ih)
     return false;  // no overlap
 
@@ -855,7 +881,7 @@ Mcm<URV>::forwardTo(const McmInstr& instr, MemoryOp& readOp, uint64_t& mask)
       if (departed)
 	continue;
       
-      uint8_t byteVal = instr.data_ >> (byteAddr - il)*8;
+      uint8_t byteVal = idata >> (byteAddr - il)*8;
       uint64_t aligned = uint64_t(byteVal) << 8*rix;
 	
       readOp.data_ = (readOp.data_ & ~byteMask) | aligned;
@@ -905,10 +931,9 @@ Mcm<URV>::checkRtlRead(unsigned hartId, const McmInstr& instr,
 {
   if (op.size_ > instr.size_)
     {
-      cerr << "Error: Read operation size (" << unsigned(op.size_) << ") larger than "
+      cerr << "Warning: Read operation size (" << unsigned(op.size_) << ") larger than "
 	   << "instruction data size (" << unsigned(instr.size_) << "): Hart-id="
 	   << hartId << " time=" << op.time_ << " tag=" << instr.tag_ << '\n';
-      return false;
     }
 
   if (op.rtlData_ != op.data_)
@@ -961,7 +986,9 @@ Mcm<URV>::checkRtlWrite(unsigned hartId, const McmInstr& instr,
   if (data == op.rtlData_)
     return true;
 
-  cerr << "Error: RTL/whisper write mismatch time=" << op.time_
+  const char* tag = instr.di_.isAmo()? " AMO " : " ";
+
+  cerr << "Error: RTL/whisper" << tag << "write mismatch time=" << op.time_
        << " hart-id=" << hartId << " instr-tag="
        << instr.tag_ << " addr=0x" << std::hex << op.physAddr_
        << " size=" << unsigned(op.size_) << " rtl=0x" << op.rtlData_
@@ -998,42 +1025,67 @@ Mcm<URV>::checkStoreData(unsigned hartId, const McmInstr& storeInstr) const
 
 template <typename URV>
 void
-Mcm<URV>::clearMaskBitsForWrite(const McmInstr& storeInstr,
-				const McmInstr& target, uint64_t& mask) const
+Mcm<URV>::clearMaskBitsForWrite(const McmInstr& store, const McmInstr& target,
+				unsigned& mask) const
 {
-  /// Clear in the given mask, bits corresponding to the target instruction
-  /// bytes covered by the given store instruction writes.
-  uint64_t storeMask = 0; // Mask of bits written by store.
-  for (auto opIx : storeInstr.memOps_)
-    {
-      if (opIx >= sysMemOps_.size())
-	continue;
-      const auto& op = sysMemOps_.at(opIx);
-      if (op.isRead_)
-	continue;
+  if (not store.isStore_ or not target.isMemory() or not store.overlaps(target))
+    return;
 
-      uint64_t opMask = ~uint64_t(0);
-      if (op.physAddr_ <= target.physAddr_)
-	{
-	  uint64_t offset = target.physAddr_ - op.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  opMask >>= offset*8;
-	}
+  if (not store.isRetired() or not target.isRetired())
+    return;
+
+  if (store.virtAddr_ <= target.virtAddr_)
+    {
+      uint64_t overlap = store.virtAddr_ + store.size_ - target.virtAddr_;
+      if (overlap >= target.size_)
+	mask = 0;
       else
 	{
-	  uint64_t offset = op.physAddr_ - target.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  opMask <<= offset*8;
+	  unsigned m = (1 << overlap) - 1;
+	  mask = mask & ~m;
 	}
-      storeMask |= opMask;
+      return;
+    }
+  
+  uint64_t end = std::min(target.virtAddr_ + target.size_, store.virtAddr_ + store.size_);
+  uint64_t overlap = end - store.virtAddr_;
+  unsigned m = (1 << overlap) - 1;
+  m = m << (store.virtAddr_ - target.virtAddr_);
+  mask = mask & ~m;
+}
+
+
+/// Return a mask where the ith bit is set if addr + i is in the range
+/// [cover, cover + coverSize - 1]
+unsigned
+maskCoveredBytes(uint64_t addr, unsigned size, uint64_t cover, unsigned coverSize)
+{
+  if (cover <= addr)
+    {
+      if (cover + coverSize > addr)
+	{
+	  uint64_t overlap = cover + coverSize - addr;
+	  if (overlap > size)
+	    overlap = size;
+	  assert(overlap > 0 and overlap <= 8);
+	  return (1 << overlap) - 1;
+	}
+
+      return 0;  // No overlap.
     }
 
-  unsigned unused = (8 - storeInstr.size_)*8;  // Unwritten upper bits of store.
-  storeMask = (storeMask << unused) >> unused;
+  if (addr + size > cover)
+    {
+      uint64_t overlap = addr + size - cover;
+      if (overlap > coverSize)
+	overlap = coverSize;
+      assert(overlap > 0 and overlap <= 8);
+      unsigned mask = (1 << overlap) - 1;
+      mask = mask << (cover - addr);
+      return mask;
+    }
 
-  mask &= ~storeMask;
+  return 0;  // No overlap.
 }
 
 
@@ -1046,7 +1098,7 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
   unsigned writeMask = 0;   // Mask of bytes covered by write operations.
-  uint64_t addr = instr.physAddr_, size = instr.size_;
+  uint64_t addr = instr.physAddr_, addr2 = instr.physAddr2_, size = instr.size_;
   for (auto opIx : instr.memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -1056,23 +1108,21 @@ Mcm<URV>::checkStoreComplete(const McmInstr& instr) const
 	continue;
 
       unsigned mask = 0;
-      if (op.physAddr_ <= addr)
-	{
-	  if (op.physAddr_ + op.size_ > addr)
-	    {
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = (1 << overlap) - 1;
-	    }
-	}
+      if (addr == addr2)
+	mask = maskCoveredBytes(addr, size, op.physAddr_, op.size_);
       else
 	{
-	  if (addr + size > op.physAddr_)
+	  unsigned size1 = offsetToNextPage(addr);
+	  if (pageNum(op.physAddr_) == pageNum(addr))
+	    mask = maskCoveredBytes(addr, size1, op.physAddr_, op.size_);
+	  else
 	    {
-	      mask = (1 << op.size_) - 1;
-	      mask = mask << (op.physAddr_ - addr);
+	      unsigned size2 = size - size1;
+	      mask = maskCoveredBytes(addr2, size2, op.physAddr_, op.size_);
+	      mask = mask << size1;
 	    }
 	}
+
       mask &= expectedMask;
       writeMask |= mask;
     }
@@ -1085,12 +1135,12 @@ template <typename URV>
 bool
 Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
 {
-  if (instr.isCanceled() or not instr.isLoad_)
+  if (instr.isCanceled() or not instr.isLoad_ or instr.size_ == 0)
     return false;
 
   unsigned expectedMask = (1 << instr.size_) - 1;  // Mask of bytes covered by instruction.
   unsigned readMask = 0;   // Mask of bytes covered by read operations.
-  uint64_t addr = instr.physAddr_, size = instr.size_;
+  uint64_t addr = instr.physAddr_, addr2 = instr.physAddr2_, size = instr.size_;
   for (auto opIx : instr.memOps_)
     {
       if (opIx >= sysMemOps_.size())
@@ -1100,23 +1150,21 @@ Mcm<URV>::checkLoadComplete(const McmInstr& instr) const
 	continue;
 
       unsigned mask = 0;
-      if (op.physAddr_ <= addr)
-	{
-	  if (op.physAddr_ + op.size_ > addr)
-	    {
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = (1 << overlap) - 1;
-	    }
-	}
+      if (addr == addr2)
+	mask = maskCoveredBytes(addr, size, op.physAddr_, op.size_);
       else
 	{
-	  if (addr + size > op.physAddr_)
+	  unsigned size1 = offsetToNextPage(addr);
+	  if (pageNum(op.physAddr_) == pageNum(addr))
+	    mask = maskCoveredBytes(addr, size1, op.physAddr_, op.size_);
+	  else
 	    {
-	      mask = expectedMask;
-	      mask = mask << (op.physAddr_ - addr + 1);
+	      unsigned size2 = size - size1;
+	      mask = maskCoveredBytes(addr2, size2, op.physAddr_, op.size_);
+	      mask = mask << size1;
 	    }
 	}
+
       mask &= expectedMask;
       readMask |= mask;
     }
@@ -1134,20 +1182,131 @@ Mcm<URV>::setCurrentInstruction(Hart<URV>& hart, uint64_t tag)
 }
 
 
+/// Return a mask of the bytes of the given address range that are
+/// covered by the given memory operation. Bit i of the returned mask
+/// will be set if byte at addr+i is covered by op.
+unsigned
+getMask(uint64_t addr, unsigned size, const MemoryOp& op)
+{
+  unsigned mask = 0;
+
+  if (op.physAddr_ <= addr)
+    {
+      if (op.physAddr_ + op.size_ <= addr)
+	return mask;  // Op does not overlap address range.
+      uint64_t overlap = op.physAddr_ + op.size_ - addr;
+      if (overlap > size)
+	overlap = size;
+      assert(overlap > 0 and overlap <= 8);
+      mask = (1 << overlap) - 1;
+    }
+  else
+    {
+      if (addr + size <= op.physAddr_)
+	return mask;  // Op does not overlap address range.
+      uint64_t overlap = addr + size - op.physAddr_;
+      if (overlap > op.size_)
+	overlap = op.size_;
+      mask = (1 << overlap) - 1;
+      mask = mask << (op.physAddr_ - addr);
+    }
+
+  return mask;
+}
+
+
+template <typename URV>
+unsigned
+Mcm<URV>::determineOpMask(const McmInstr& instr, const MemoryOp& op) const
+{
+  unsigned size = instr.size_;
+  uint64_t addr1 = instr.physAddr_, addr2 = instr.physAddr2_;
+
+  if (addr1 == addr2)
+    return getMask(addr1, size, op);
+
+  unsigned size1 = offsetToNextPage(addr1);
+
+  if (pageNum(op.physAddr_) == pageNum(addr1))
+    {
+      assert(size1 < size);
+      return getMask(addr1, size1, op);
+    }
+
+  if (pageNum(op.physAddr_) == pageNum(addr2))
+    {
+      unsigned size2 = size - size1;
+      unsigned mask = getMask(addr2, size2, op);
+      mask = mask << size1;
+      return mask;
+    }
+
+  return 0;  // no overlap.
+}
+
+
+/// If given memory operation overlaps the given address range then
+/// set its high end to the end of the address range.
+void
+trimOp(MemoryOp& op, uint64_t addr, unsigned size)
+{
+  if (op.physAddr_ <= addr)
+    {
+      if (op.physAddr_ + op.size_ <= addr)
+	return;  // Op does not overlap instruction.
+      if (op.physAddr_ + op.size_ > addr + size)
+	op.size_ = addr + size - op.physAddr_;  // Trim wide op.
+    }
+  else
+    {
+      if (addr + size <= op.physAddr_)
+	return;  // Op does no overlap instruction.
+      if (op.physAddr_ + op.size_ > addr + size)
+	op.size_ = addr + size - op.physAddr_;  // Trim wide op.
+    }
+}
+
+
+template <typename URV>
+void
+Mcm<URV>::trimMemoryOp(const McmInstr& instr, MemoryOp& op)
+{
+  unsigned size = instr.size_;
+  uint64_t addr1 = instr.physAddr_, addr2 = instr.physAddr2_;
+
+  if (addr1 == addr2)
+    trimOp(op, addr1, size);
+  else
+    {
+      unsigned size1 = offsetToNextPage(addr1);
+      if (pageNum(op.physAddr_) == pageNum(addr1))
+	{
+	  assert(size1 < size);
+	  trimOp(op, addr1, size1);
+	}
+      else if (pageNum(op.physAddr_) == pageNum(addr2))
+	{
+	  unsigned size2 = size - size1;
+	  trimOp(op, addr2, size2);
+	}
+    }
+}
+
+
 template <typename URV>
 void
 Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 {
-  size_t nops = instr->memOps_.size();
   assert(instr->size_ > 0 and instr->size_ <= 8);
   unsigned expectedMask = (1 << instr->size_) - 1;  // Mask of bytes covered by instruction.
   unsigned readMask = 0;    // Mask of bytes covered by read operations.
 
-  uint64_t addr = instr->physAddr_;
-  unsigned size = instr->size_;
   auto& ops = instr->memOps_;
+  for (auto& opIx : ops)
+    trimMemoryOp(*instr, sysMemOps_.at(opIx));
 
   // Process read ops in reverse order so that later reads take precedence.
+  size_t nops = instr->memOps_.size();
   for (size_t j = 0; j < nops; ++j)
     {
       auto opIx = ops.at(nops - 1 - j);
@@ -1159,37 +1318,17 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
       instr->isLoad_ = true;
 
-      bool cancel = false;
-      unsigned mask = 0;
-      if (readMask == expectedMask)
-	cancel = true;
-      else if (op.physAddr_ <= addr)
+      bool cancel = (readMask == expectedMask);
+      if (not cancel)
 	{
-	  if (op.physAddr_ + op.size_ <= addr)
-	    cancel = true;  // Read op does not overlap instruction.
+	  unsigned mask = determineOpMask(*instr, op);
+	  mask &= expectedMask;
+	  if ((mask & readMask) == mask)
+	    cancel = true;  // Read op already covered by other read ops
 	  else
-	    {
-	      uint64_t overlap = op.physAddr_ + op.size_ - addr;
-	      assert(overlap > 0 and overlap <= 8);
-	      mask = (1 << overlap) - 1;
-	    }
-	}
-      else
-	{
-	  if (addr + size <= op.physAddr_)
-	    cancel = true;  // Read op does no overlap instruction.
-	  else
-	    {
-	      mask = (1 << op.size_) - 1;
-	      mask = mask << (op.physAddr_ - addr);
-	    }
+	    readMask |= mask;
 	}
 
-      mask &= expectedMask;
-      if ((mask & readMask) == mask)
-	cancel = true;  // Read op already covered by other read ops
-      else
-	readMask |= mask;
       if (cancel)
 	op.cancel();
     }
@@ -1198,11 +1337,11 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
   size_t count = 0;
   for (size_t i = 0; i < ops.size(); ++i)
     {
-      auto& op = sysMemOps_.at(ops.at(i));
-      if (not op.isCanceled())
+      auto opIx = ops.at(i);
+      if (opIx < sysMemOps_.size() and not sysMemOps_.at(opIx).isCanceled())
 	{
 	  if (count < i)
-	    ops.at(count) = ops.at(i);
+	    ops.at(count) = opIx;
 	  count++;
 	}
     }
@@ -1212,8 +1351,8 @@ Mcm<URV>::cancelReplayedReads(McmInstr* instr)
 
 template <typename URV>
 bool
-Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
-			      unsigned size, uint64_t& value)
+Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t vaddr, uint64_t paddr1,
+			      uint64_t paddr2, unsigned size, uint64_t& value)
 {
   value = 0;
   if (size == 0 or size > 8)
@@ -1239,9 +1378,13 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
     }
 
   instr->size_ = size;
-  instr->physAddr_ = addr;
+  instr->virtAddr_ = vaddr;
+  instr->physAddr_ = paddr1;
+  if (paddr2 == paddr1 and pageNum(paddr1 + size - 1) != pageNum(paddr1))
+    paddr2 = pageAddress(pageNum(paddr2) + 1);
+  instr->physAddr2_ = paddr2;
 
-  // Cancel early read ops that are covered by later ones.
+  // Cancel early read ops that are covered by later ones. Trim wide reads.
   cancelReplayedReads(instr);
 
   uint64_t mergeMask = 0;
@@ -1251,8 +1394,6 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
   for (size_t j = 0; j < nops; ++j)
     {
       auto opIx = instr->memOps_.at(nops - 1 - j);
-      if (opIx >= sysMemOps_.size())
-	continue;
       auto& op = sysMemOps_.at(opIx);
       if (not op.isRead_)
 	continue;
@@ -1262,21 +1403,37 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
 
       uint64_t opVal = op.data_;
       uint64_t mask = ~uint64_t(0);
-      if (op.physAddr_ <= addr)
+      if (pageNum(op.physAddr_) == pageNum(paddr1))
 	{
-	  uint64_t offset = addr - op.physAddr_;
-	  if (offset > 8)
-	    offset = 8;
-	  opVal >>= offset*8;
-	  mask >>= offset*8;
+	  if (op.physAddr_ <= paddr1)
+	    {
+	      uint64_t offset = paddr1 - op.physAddr_;
+	      if (offset > 8)
+		offset = 8;
+	      opVal >>= offset*8;
+	      mask >>= offset*8;
+	    }
+	  else
+	    {
+	      uint64_t offset = op.physAddr_ - paddr1;
+	      if (offset > 8)
+		offset = 8;
+	      opVal <<= offset*8;
+	      mask <<= offset*8;
+	    }
 	}
-      else
+      else if (pageNum(op.physAddr_) == pageNum(paddr2))
 	{
-	  uint64_t offset = op.physAddr_ - addr;
-	  if (offset > 8)
-	    offset = 8;
-	  opVal <<= offset*8;
-	  mask <<= offset*8;
+	  if (op.physAddr_ == paddr2)
+	    {
+	      uint64_t offset = offsetToNextPage(paddr1);
+	      if (offset > 8)
+		offset = 8;
+	      opVal <<= offset*8;
+	      mask <<= offset*8;
+	    }
+	  else
+	    assert(0);
 	}
       merged |= (opVal & mask);
       mergeMask |= mask;
@@ -1294,6 +1451,20 @@ Mcm<URV>::getCurrentLoadValue(Hart<URV>& hart, uint64_t addr,
       ok = false;
     }
 
+  unsigned forwardCount = 0, readCount = 0;
+  for (auto opIx : instr->memOps_)
+    {
+      auto& op = sysMemOps_.at(opIx);
+      if (op.isRead_)
+	{
+	  readCount++;
+	  if (op.forwardTime_)
+	    forwardCount++;
+	}
+    }
+  if (readCount and forwardCount == readCount)
+    instr->forwarded_ = true;
+
   instr->complete_ = true;  // FIX : Only for non-io
 
   return ok;
@@ -1305,12 +1476,31 @@ bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
+  uint64_t orig = mask;
+
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
   for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
     {
       const auto& instr = instrVec.at(ix-1);
-      if (not forwardTo(instr, op, mask))
+      if (instr.isCanceled() or not instr.isRetired() or not instr.isStore_)
 	continue;
+
+      uint64_t prev = mask;
+      if (not forwardTo(instr, instr.physAddr_, instr.data_, instr.size_, op, mask))
+	{
+	  if (instr.physAddr_ == instr.physAddr2_)
+	    continue;
+
+	  unsigned size1 = offsetToNextPage(instr.physAddr_);
+	  unsigned size2 = instr.size_ - size1;
+	  assert(size2 > 0 and size2 < 8);
+	  uint64_t data2 = instr.data_ >> size1 * 8;
+	  if (not forwardTo(instr, instr.physAddr2_, data2, size2, op, mask))
+	    continue;
+	}
+
+      if (prev == orig and mask == 0)
+	op.forwardTime_ = earliestOpTime(instr);
 
       const auto& di = instr.di_;
       if (di.instEntry()->isAtomic())
@@ -1495,7 +1685,7 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
       if (not instrA.isRetired())
 	{
 	  cerr << "Error: ppoRule1: hart-id=" << hart.hartId()
-	       << " tag1=" << instrA.tag_ << " tag2=" << instrB.tag_
+	       << " tag1=" << (tag-1) << " tag2=" << instrB.tag_
 	       << " instruction of tag1 is not retired\n";
 	  return false;
 	}
@@ -1512,16 +1702,45 @@ Mcm<URV>::ppoRule1(Hart<URV>& hart, const McmInstr& instrB) const
 	{
 	  // Check overlapped bytes.
 	  bool ok = true;
-	  for (unsigned i = 0; i < instrB.size_ and ok; ++i)
-	    {
-	      uint64_t byteAddr = instrB.physAddr_ + i;
-	      if (instrA.physAddr_ <= byteAddr and byteAddr < instrA.physAddr_ + instrA.size_)
+	  if (instrB.physAddr_ == instrB.physAddr2_)
+	    {    // Non-page crossing.
+	      for (unsigned i = 0; i < instrB.size_ and ok; ++i)
 		{
-		  uint64_t ta = latestByteTime(instrA, byteAddr);
-		  uint64_t tb = earliestByteTime(instrB, byteAddr);
-		  ok = ta < tb or (ta == tb and instrA.isStore_);
+		  uint64_t byteAddr = instrB.physAddr_ + i;
+		  if (instrOverlapsPhysAddr(instrA, byteAddr))
+		    {
+		      uint64_t ta = latestByteTime(instrA, byteAddr);
+		      uint64_t tb = earliestByteTime(instrB, byteAddr);
+		      ok = ta < tb or (ta == tb and instrA.isStore_);
+		    }
 		}
 	    }
+	  else
+	    {    // Page crossing.
+	      unsigned size1 = offsetToNextPage(instrB.physAddr_);
+	      unsigned size2 = instrB.size_ - size1;
+	      for (unsigned i = 0; i < size1 and ok; ++i)
+		{
+		  uint64_t byteAddr = instrB.physAddr_ + i;
+		  if (instrOverlapsPhysAddr(instrA, byteAddr))
+		    {
+		      uint64_t ta = latestByteTime(instrA, byteAddr);
+		      uint64_t tb = earliestByteTime(instrB, byteAddr);
+		      ok = ta < tb or (ta == tb and instrA.isStore_);
+		    }
+		}
+	      for (unsigned i = 0; i < size2 and ok; ++i)
+		{
+		  uint64_t byteAddr = instrB.physAddr2_ + i;
+		  if (instrOverlapsPhysAddr(instrA, byteAddr))
+		    {
+		      uint64_t ta = latestByteTime(instrA, byteAddr);
+		      uint64_t tb = earliestByteTime(instrB, byteAddr);
+		      ok = ta < tb or (ta == tb and instrA.isStore_);
+		    }
+		}
+	    }
+
 	  if (ok)
 	    continue;
 	}
@@ -1547,27 +1766,27 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
   if (not instrB.isLoad_)
     return true;  // NA: B is not a load.
 
+  if (instrB.forwarded_)
+    return true;
+
   unsigned hartIx = hart.sysHartIndex();
   const auto& instrVec = hartInstrVecs_.at(hartIx);
 
-  uint64_t mask = ~uint64_t(0);  // Bits of B not-written by preceeding stores.
-  unsigned shift = (8 - instrB.size_) * 8;
-  mask = (mask << shift) >> shift;
+  // Bit i of mask is 1 if byte i of data of instruction B is not
+  // written by a preceeding store.
+  unsigned mask = (1 << instrB.size_) - 1;
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
       const auto& instrA =  instrVec.at(tag-1);
-      if (instrA.isCanceled() or not instrA.isLoad_)
-	continue;
-
-      if (not instrA.overlaps(instrB))
+      if (instrA.isCanceled() or not instrA.isMemory() or not instrA.overlaps(instrB))
 	continue;
 
       clearMaskBitsForWrite(instrA, instrB, mask);
       if (mask == 0)
 	return true; // All bytes of B written by preceeding stores.
 
-      if (isBeforeInMemoryTime(instrA, instrB))
+      if (not instrA.isLoad_ or isBeforeInMemoryTime(instrA, instrB))
 	continue;
 
       // Is there a remote write between A and B memory time that
@@ -1587,15 +1806,9 @@ Mcm<URV>::ppoRule2(Hart<URV>& hart, const McmInstr& instrB) const
 	  const MemoryOp& op = sysMemOps_.at(ix);
 	  if (op.isCanceled())
 	    continue;
-	  if (op.hartIx_ != hartIx and not op.isRead_ and instrB.overlaps(op))
+	  if (op.hartIx_ != hartIx and not op.isRead_ and overlaps(instrB, op))
 	    {
-	      unsigned shift = 8*(8 - op.size_);
-	      uint64_t opMask = ~uint64_t(0);
-	      opMask = (opMask << shift) >> shift;
-	      if (op.physAddr_ <= instrB.physAddr_)
-		opMask >>= (instrB.physAddr_ - op.physAddr_)*8;
-	      else
-		opMask <<= (op.physAddr_- instrB.physAddr_)*8;
+	      unsigned opMask = determineOpMask(instrB, op);
 	      if ((opMask & mask) != 0)
 		{
 		  cerr << "Error: PPO Rule 2 failed: hart-id=" << hart.hartId()
@@ -1637,9 +1850,9 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
 
-  uint64_t mask = ~uint64_t(0);  // Bits of B not-written by preceeding non-atomic stores.
-  unsigned shift = (8 - instrB.size_) * 8;
-  mask = (mask << shift) >> shift;
+  // Bit i of mask is 1 if byte i of data of instruction B is not
+  // written by a preceeding store.
+  unsigned mask = (1 << instrB.size_) - 1;
 
   for (McmInstrIx tag = instrB.tag_; tag > 0; --tag)
     {
@@ -1667,7 +1880,7 @@ Mcm<URV>::ppoRule3(Hart<URV>& hart, const McmInstr& instrB) const
 	{
 	  clearMaskBitsForWrite(instrA, instrB, mask);
 	  if (mask == 0)
-	    return true;
+	    return true;   // All bytes of B written by non-atomic stores.
 	}
       else if (not isBeforeInMemoryTime(instrA, instrB))
 	{
@@ -1749,6 +1962,32 @@ Mcm<URV>::finalChecks(Hart<URV>& hart)
 
 
 template <typename URV>
+uint64_t
+Mcm<URV>::effectiveReadTime(const McmInstr& instr) const
+{
+
+  if (not instr.isLoad_)
+    return earliestOpTime(instr);
+
+  if (not instr.complete_ and instr.memOps_.empty())
+    return time_;
+
+  uint64_t mint = ~uint64_t(0);
+  for (auto opIx : instr.memOps_)
+    if (opIx < sysMemOps_.size())
+      {
+	auto& op = sysMemOps_.at(opIx);
+	uint64_t t = op.time_;
+	if (op.isRead_ and op.forwardTime_ and op.forwardTime_ > t)
+	  t = op.forwardTime_;
+	mint = std::min(mint, t);
+      }
+
+  return mint;
+}
+
+
+template <typename URV>
 bool
 Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 {
@@ -1811,8 +2050,17 @@ Mcm<URV>::ppoRule4(Hart<URV>& hart, const McmInstr& instr) const
 	      and not (succOut and succ.isStore_ and succPma.isIo()))
 	    continue;
 
+	  if (not pred.complete_ or not pred.retired_)
+	    {
+	      cerr << "Error: PPO rule 4 failed: hart-id=" << hart.hartId()
+		   << " tag1=" << pred.tag_ << " fence-tag=" << instr.tag_
+		   << " memory instruction before fence is not retired/complate\n";
+	      return false;
+	    }
+
 	  auto predTime = latestOpTime(pred);
-	  auto succTime = earliestOpTime(succ);
+	  auto succTime = effectiveReadTime(succ);
+
 	  if (predTime < succTime)
 	    continue;
 
@@ -1911,7 +2159,7 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
 		    continue;
 		  if (op.time_ < timeB)
 		    break;
-		  if (not op.isRead_ and instrB.overlaps(op) and op.hartIx_ != hartIx)
+		  if (not op.isRead_ and overlaps(instrB, op) and op.hartIx_ != hartIx)
 		    fail = true;
 		}
 	    }

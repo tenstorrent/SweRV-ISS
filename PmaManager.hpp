@@ -268,12 +268,12 @@ namespace WdRiscv
     /// Associate a mask with the word-aligned word at the given
     /// address. Return true on success and flase if given address is
     /// not in a memory mapped region.
-    bool setMemMappedMask(uint64_t addr, uint32_t mask);
+    bool setMemMappedMask(uint64_t addr, uint64_t mask, unsigned size);
 
     /// Return mask associated with the word-aligned word at the given
     /// address.  Return 0xffffffff if no mask was ever associated
     /// with given address.
-    uint32_t getMemMappedMask(uint64_t addr) const;
+    uint64_t getMemMappedMask(uint64_t addr) const;
 
     /// Return true if the word-algined word containing given address
     /// is in data closed coupled memory.
@@ -318,18 +318,33 @@ namespace WdRiscv
     void resetMemMapped()
     { for (auto& kv  : memMappedRegs_) kv.second.value_ = 0; }
 
-    /// Set value to the value of the memory mapped regiser at addr
-    /// returning true if addr is valid. Return false if addr is not word
-    /// aligned or is outside of the memory-mapped-regiser area.
+    /// Set value to the value of the memory mapped register at addr
+    /// returning true if addr is valid. Return false if addr is not
+    /// word aligned or is not that of a memory-mapped register. This
+    /// interface is for word-sized registers.
     bool readRegister(uint64_t addr, uint32_t& value) const;
+
+    /// Set value to the value of the memory mapped register at addr
+    /// returning true if addr is valid. Return false if addr is not
+    /// double-word aligned or is not that of a memory-mapped
+    /// register.  This interface is for double-word sized registers.
+    bool readRegister(uint64_t addr, uint64_t& value) const;
+
+    /// Interface for reading a register of an invalid (not word and
+    /// not double-word) size.
+    bool readRegister(uint64_t, auto&) const
+    { return false; }
 
     /// Set the value of the memory mapped regiser at addr to the
     /// given value returning true if addr is valid. Return false if
     /// addr is not a memory mapped reg leaving vlaue unmodified.
-    bool writeRegister(uint64_t addr, uint32_t value);
+    bool writeRegister(uint64_t addr, uint64_t value);
+
+    /// Return true if write is allowed.
+    bool checkRegisterWrite(uint64_t addr, unsigned size) const;
 
     /// Similar to writeRgister but no masking is applied to value.
-    bool pokeRegister(uint64_t addr, uint32_t value);
+    bool pokeRegister(uint64_t addr, uint64_t value);
 
     /// Set the value of the memory mapped regiser byte at addr to the
     /// given value applying masking and returning true if addr is
@@ -352,8 +367,9 @@ namespace WdRiscv
 
     struct MemMappedReg
     {
-      uint32_t value_ = 0;
-      uint32_t mask_ = ~uint32_t(0);
+      uint64_t value_ = 0;
+      uint64_t mask_ = ~uint64_t(0);
+      unsigned size_ = 4;
     };
 
     std::vector<Region> regions_;

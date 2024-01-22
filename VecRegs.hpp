@@ -403,9 +403,25 @@ namespace WdRiscv
     /// Return the maximum of the VLMAX and VLEN/SEW for tail elements
     /// when LMUL < 1.
     uint32_t elemMax() const
-    {
-      return elemMax(sew_);
-    }
+    { return elemMax(sew_); }
+
+    /// Return true if tail-agnostic is set.
+    bool isTailAgnostic() const
+    { return tailAgn_; }
+
+    /// Return true if tail-agnostic-policy is set to all-ones.
+    bool isTailAgnosticOnes() const
+    { return tailAgnOnes_; }
+
+    /// Return true if mask-producing instrctions should update the
+    /// whole destination register.
+    bool updateWholeMask() const
+    { return updateWholeMask_; }
+
+    /// Return true if mask-producing instrctions should update the
+    /// whole destination register.
+    void configUpdateWholeMask(bool flag)
+    { updateWholeMask_ = flag; }
 
     /// If flag is true, configure vector engine for writing ones in
     /// inactive destination register elements when mask-agnostic is
@@ -577,7 +593,7 @@ namespace WdRiscv
 
     /// Return true if element at ix of mask destination is active; otherwise,
     /// return false and either read element at ix into val or set val to all
-    /// ones depending on mask-agnostic/tail-agnostic policy.
+    /// ones depending on the mask-agnostic/tail-agnostic policy.
     bool isMaskDestActive(unsigned vd, unsigned ix, bool masked, bool& val) const
     {
       readMaskRegister(vd, ix, val);
@@ -725,6 +741,7 @@ namespace WdRiscv
     bool vill_ = false;                            // Cached VTYPE.VILL
     bool maskAgnOnes_ = true; // True if ones written in masked elems when mask agnostic.
     bool tailAgnOnes_ = true; // True if ones written in tail elems when mask agnostic.
+    bool updateWholeMask_ = false;  // True if mask instructions update whole mask reg.
 
     uint32_t groupX8_ = 8;    // Group multipler as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).

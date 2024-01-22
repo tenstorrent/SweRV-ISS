@@ -10,14 +10,24 @@ bool
 File::iregRead(unsigned sel, URV& val) const
 {
   using EIC = ExternalInterruptCsr;
+  val = 0;
 
   if (sel == EIC::DELIVERY)
     val = delivery_;
   else if (sel == EIC::THRESHOLD)
     val = threshold_;
+  else if ((sel == EIC::RES0) or
+           (sel >= EIC::RES1 and sel <= EIC::RES2))
+    return true;
+  else if (sel >= EIC::IPRIO0 and sel <= EIC::IPRIO15)
+    {
+      if constexpr (sizeof(URV) == 8)
+        if (sel & 1)
+          return false;
+      return true;
+    }
   else
     {
-      val = 0;
       unsigned offset = 0;
       const std::vector<bool>* vecPtr = nullptr;
       if (sel >= EIC::P0 and sel <= EIC::P63)
@@ -31,7 +41,7 @@ File::iregRead(unsigned sel, URV& val) const
           vecPtr = &enabled_;
         }
       else
-        return true;
+        return false;
 
       if constexpr (sizeof(URV) == 8)
         if (offset & 1)
@@ -56,10 +66,23 @@ File::iregWrite(unsigned sel, URV val)
 {
   using EIC = ExternalInterruptCsr;
 
+  if (trace_)
+    selects_.emplace_back(sel, sizeof(URV));
+
   if (sel == EIC::DELIVERY)
     delivery_ = val;
   else if (sel == EIC::THRESHOLD)
     threshold_ = val;
+  else if ((sel == EIC::RES0) or
+           (sel >= EIC::RES1 and sel <= EIC::RES2))
+    return true;
+  else if (sel >= EIC::IPRIO0 and sel <= EIC::IPRIO15)
+    {
+      if constexpr (sizeof(URV) == 8)
+        if (sel & 1)
+          return false;
+      return true;
+    }
   else
     {
       unsigned offset = 0;
@@ -75,11 +98,14 @@ File::iregWrite(unsigned sel, URV val)
           vecPtr = &enabled_;
         }
       else
-        return true;
+        return false;
 
       if constexpr (sizeof(URV) == 8)
         if (offset & 1)
           return false;
+
+      if (sel == EIC::P0 or sel == EIC::E0)
+	val = (val >> 1) << 1;   // Bit corresponding to id 0 is not writable.
 
       auto& vec = *vecPtr;
       constexpr size_t bits = sizeof(URV)*8;
@@ -121,7 +147,7 @@ Imsic::write(uint64_t addr,  unsigned size, uint64_t data)
       isSupervisor = true;
     }
   else
-    for (size_t i = 0; i < gfiles_.size(); ++i)
+    for (size_t i = 1; i < gfiles_.size(); ++i)
       if (gfiles_.at(i).coversAddress(addr))
 	{
 	  file = &gfiles_.at(i);
@@ -183,7 +209,7 @@ ImsicMgr::configureMachine(uint64_t addr, uint64_t stride, unsigned ids)
   mstride_ = stride;
   for (auto imsic : imsics_)
     {
-      imsic->configureMachine(addr, ids);
+      imsic->configureMachine(addr, ids, pageSize_);
       addr += stride;
     }
   return true;
@@ -203,7 +229,7 @@ ImsicMgr::configureSupervisor(uint64_t addr, uint64_t stride, unsigned ids)
   sstride_ = stride;
   for (auto imsic : imsics_)
     {
-      imsic->configureSupervisor(addr, ids);
+      imsic->configureSupervisor(addr, ids, pageSize_);
       addr += stride;
     }
   return true;
@@ -217,7 +243,7 @@ ImsicMgr::configureGuests(unsigned n, unsigned ids)
     return false;  // No enough space.
 
   for (auto imsic : imsics_)
-    imsic->configureGuests(n, ids);
+    imsic->configureGuests(n, ids, pageSize_);
 
   return true;
 }

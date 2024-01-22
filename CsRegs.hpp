@@ -68,6 +68,10 @@ namespace WdRiscv
       PMPCFG15 = 0x3af,
       PMPADDR0 = 0x3b0,
       PMPADDR63 = 0x3ef,
+      MCYCLECFG = 0x321,
+      MINSTRETCFG = 0x322,
+      MCYCLECFGH = 0x721,
+      MINSTRETCFGH = 0x722,
 
       MENVCFG = 0x30a,
       MENVCFGH = 0x31a,
@@ -1411,6 +1415,9 @@ namespace WdRiscv
 
     /// Heler to read method.
     bool readSireg(CsrNumber num, URV& value) const;
+
+    /// Heler to read method.
+    bool readVsireg(CsrNumber num, URV& value) const;
 
     /// Helper to write method: Mask with MIP/MIE/MIDELEG.
     bool writeSipSie(CsrNumber num, URV value);

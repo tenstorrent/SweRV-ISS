@@ -238,8 +238,8 @@ Interactive<URV>::stepCommand(Hart<URV>& hart, const std::string& /*line*/,
 	  hart.singleStep(di, traceFile);
 	  if (not di.isValid())
 	    assert(hart.lastInstructionTrapped());
-	  if (not hart.lastInstructionTrapped())
-	    system_.mcmRetire(hart, this->time_, tag++, di);
+	  bool trapped = hart.lastInstructionTrapped();
+	  system_.mcmRetire(hart, this->time_, tag++, di, trapped);
 	}
       else
 	hart.singleStep(traceFile);

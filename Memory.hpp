@@ -108,12 +108,8 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size read.
       if (pma1.isMemMappedReg())
-        {
-          if constexpr (sizeof(T) == 4)
-            return readRegister(address, value);
-          else
-            return false;
-        }
+	return readRegister(address, value);
+
 #endif
 
 #ifdef MEM_CALLBACKS
@@ -124,9 +120,6 @@ namespace WdRiscv
 #else
       value = *(reinterpret_cast<const T*>(data_ + address));
 #endif
-
-      if (dataLineTrace_)
-	traceDataLine(address);
 
       return true;
     }
@@ -178,9 +171,9 @@ namespace WdRiscv
       // Memory mapped region accessible only with word-size read.
       if (pma1.isMemMappedReg())
         {
-          if (readSize != 4)
+          if (readSize != 4 and readSize != 8)
             return false;
-          if ((address & 3) != 0)
+          if ((address & (readSize-1)) != 0)
             return false;
         }
 
@@ -204,12 +197,7 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size write.
       if (pma1.isMemMappedReg())
-        {
-          if (writeSize != 4)
-            return false;
-          if ((address & 3) != 0)
-            return false;
-        }
+	return pmaMgr_.checkRegisterWrite(address, writeSize);
 
       return true;
     }
@@ -237,8 +225,6 @@ namespace WdRiscv
 #ifdef FAST_SLOPPY
       if (address + sizeof(T) > size_)
         return false;
-      if (dataLineTrace_)
-	traceDataLine(address);
       *(reinterpret_cast<T*>(data_ + address)) = value;
 #else
 
@@ -255,14 +241,8 @@ namespace WdRiscv
 
       // Memory mapped region accessible only with word-size write.
       if (pma1.isMemMappedReg())
-        {
-          if constexpr (sizeof(T) != 4)
-	    return false;
-          return writeRegister(sysHartIx, address, value);
-	}
+	return writeRegister(sysHartIx, address, value);
 
-      if (dataLineTrace_)
-	traceDataLine(address);
   #ifdef MEM_CALLBACKS
       uint64_t val = value;
       if (not writeCallback_(address, sizeof(T), val))
@@ -339,12 +319,7 @@ namespace WdRiscv
       // Memory mapped region accessible only with word-size read.
       Pma pma1 = pmaMgr_.getPma(address);
       if (pma1.isMemMappedReg())
-        {
-          if constexpr (sizeof(T) == 4)
-            return readRegister(address, value);
-          else
-            return false;
-        }
+	return readRegister(address, value);
 
       if (usePma)
         {
@@ -545,8 +520,6 @@ namespace WdRiscv
 #endif
     }
 
-  protected:
-
     /// Same as write but effects not recorded in last-write info and
     /// physical memory attributes are ignored if usePma is false.
     template <typename T>
@@ -591,6 +564,8 @@ namespace WdRiscv
       return true;
     }
 
+  protected:
+
     /// Write byte to given address without write-access check. Return
     /// true on success. Return false if address is not mapped. This
     /// is used to initialize memory. If address is in
@@ -613,16 +588,9 @@ namespace WdRiscv
     /// Reset (to zero) all memory mapped registers.
     void resetMemoryMappedRegisters();
 
-    /// Define write mask for a memory-mapped register with given
-    /// address.  Return true on success and false if the address is
-    /// not within a memory-mapped area.
-    bool defineMemoryMappedRegisterWriteMask(uint64_t addr, uint32_t mask);
-
-    /// Read a memory mapped register.
-    bool readRegister(uint64_t addr, uint32_t& value) const
-    {
-      return pmaMgr_.readRegister(addr, value);
-    }
+    /// Read a memory mapped register word.
+    bool readRegister(uint64_t addr, auto& value) const
+    { return pmaMgr_.readRegister(addr, value); }
 
     /// Return memory mapped mask associated with the word containing
     /// the given address. Return all 1 if given address is not a
@@ -640,7 +608,7 @@ namespace WdRiscv
     }
 
     /// Write a memory mapped register.
-    bool writeRegister(unsigned sysHartIx, uint64_t addr, uint32_t value)
+    bool writeRegister(unsigned sysHartIx, uint64_t addr, auto value)
     {
       value = doRegisterMasking(addr, value);
       auto& lwd = lastWriteData_.at(sysHartIx);
@@ -651,7 +619,7 @@ namespace WdRiscv
 	  return false;
 	}
 
-      lwd.size_ = 4;
+      lwd.size_ = sizeof(value);
       lwd.addr_ = addr;
       lwd.value_ = value;
       return true;
@@ -749,17 +717,25 @@ namespace WdRiscv
     /// Helper to loadElfFile: Collet ELF sections.
     void collectElfSections(ELFIO::elfio& reader);
 
+    /// Structure to track data lines referenced by a run.
+    struct LineEntry
+    {
+      uint64_t paddr = 0;   // Physical line number.
+      uint64_t order = 0;   // Reference order.
+    };
+    typedef std::unordered_map<uint64_t, LineEntry> LineMap;
+
     static bool saveAddressTrace(std::string_view tag,
-                                 const std::unordered_map<uint64_t, uint64_t>& lineMap,
+                                 const LineMap& lineMap,
                                  const std::string& path);
 
     /// Add line of given address to the data line address trace.
-    void traceDataLine(uint64_t addr) const
-    { dataLineMap_[addr >> lineShift_] = memRefCount_++; }
+    void traceDataLine(uint64_t vaddr, uint64_t paddr)
+    { dataLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
 
     /// Add line of given address to the instruction line address trace.
-    void traceInstructionLine(uint64_t addr) const
-    { instrLineMap_[addr >> lineShift_] = memRefCount_++; }
+    void traceInstructionLine(uint64_t vaddr, uint64_t paddr)
+    { instrLineMap_[vaddr >> lineShift_] = LineEntry{paddr >> lineShift_, memRefCount_++}; }
 
   private:
 
@@ -798,9 +774,9 @@ namespace WdRiscv
     std::string dataLineFile_;
     std::string instrLineFile_;
     unsigned lineShift_ = 6;   // log2 of line size.
-    mutable uint64_t memRefCount_ = 0;
-    mutable std::unordered_map<uint64_t, uint64_t> dataLineMap_;  // Map line addr to order
-    mutable std::unordered_map<uint64_t, uint64_t> instrLineMap_;  // Map line addr to order
+    uint64_t memRefCount_ = 0;
+    LineMap dataLineMap_;   // Map virt data line addr to phys line and order.
+    LineMap instrLineMap_;  // Map virt instr line line addr to phys line and order.
 
     std::vector<std::shared_ptr<IoDevice>> ioDevs_;
 
