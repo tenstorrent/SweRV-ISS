@@ -8470,6 +8470,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
   SRV val = intRegs_.read(rs1);
 
   bool setTail = vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes();
+  unsigned tail = vecRegs_.vlmax(GroupMultiplier::One, sew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -8479,7 +8480,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
 	{
 	  vecRegs_.write(vd, 0, groupX8, int8_t(val));
 	  if (setTail)
-	    for (unsigned i = 1; i < vecRegs_.elemMax(); ++i)
+	    for (unsigned i = 1; i < tail; ++i)
 	      vecRegs_.write(vd, i, groupX8, uint8_t(~0));
 	}
       break;
@@ -8488,7 +8489,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
 	{
 	  vecRegs_.write(vd, 0, groupX8, int16_t(val));
 	  if (setTail)
-	    for (unsigned i = 1; i < vecRegs_.elemMax(); ++i)
+	    for (unsigned i = 1; i < tail; ++i)
 	      vecRegs_.write(vd, i, groupX8, uint16_t(~0));
 	}
       break;
@@ -8497,7 +8498,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
 	{
 	  vecRegs_.write(vd, 0, groupX8, int32_t(val));
 	  if (setTail)
-	    for (unsigned i = 1; i < vecRegs_.elemMax(); ++i)
+	    for (unsigned i = 1; i < tail; ++i)
 	      vecRegs_.write(vd, i, groupX8, uint32_t(~0));
 	}
       break;
@@ -8506,7 +8507,7 @@ Hart<URV>::execVmv_s_x(const DecodedInst* di)
 	{
 	  vecRegs_.write(vd, 0, groupX8, int64_t(val));
 	  if (setTail)
-	    for (unsigned i = 1; i < vecRegs_.elemMax(); ++i)
+	    for (unsigned i = 1; i < tail; ++i)
 	      vecRegs_.write(vd, i, groupX8, uint64_t(~uint64_t(0)));
 	}
       break;
@@ -8602,6 +8603,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
   ElementWidth sew = vecRegs_.elemWidth();
 
   bool setTail = vecRegs_.isTailAgnostic() and vecRegs_.isTailAgnosticOnes();
+  unsigned tail = vecRegs_.vlmax(GroupMultiplier::One, sew);
 
   using EW = ElementWidth;
   switch (sew)
@@ -8617,7 +8619,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 	  Float16 val = fpRegs_.readHalf(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
 	  if (setTail)
-	    for (unsigned i = 1; i < vecRegs_.elemMax(); ++i)
+	    for (unsigned i = 1; i < tail; ++i)
 	      vecRegs_.write(vd, i, groupX8, uint16_t(~0));
 	}
       break;
@@ -8629,7 +8631,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 	  float val = fpRegs_.readSingle(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
 	  if (setTail)
-	    for (unsigned i = 1; i < vecRegs_.elemMax(); ++i)
+	    for (unsigned i = 1; i < tail; ++i)
 	      vecRegs_.write(vd, i, groupX8, uint32_t(~0));
 	}
       break;
@@ -8641,7 +8643,7 @@ Hart<URV>::execVfmv_s_f(const DecodedInst* di)
 	  double val = fpRegs_.readDouble(rs1);
 	  vecRegs_.write(vd, 0, groupX8, val);
 	  if (setTail)
-	    for (unsigned i = 1; i < vecRegs_.elemMax(); ++i)
+	    for (unsigned i = 1; i < tail; ++i)
 	      vecRegs_.write(vd, i, groupX8, uint64_t(~uint64_t(0)));
 	}
       break;
