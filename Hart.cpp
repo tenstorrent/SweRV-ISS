@@ -3189,6 +3189,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     {
       updateTranslationPbmt();
       csRegs_.updateSstc();
+      stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
+      vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
     }
   else if (csr == CN::MIE or csr == CN::SIE or csr == CN::HIE or csr == CN::VSIE)
     cachedMie_ = peekCsr(CN::MIE);
