@@ -148,6 +148,10 @@ namespace WdRiscv
     unsigned roundingMode() const
     { return ((inst_ >> 12) & 7); }
 
+    /// Immediate values are to be (left) shifted by this size
+    unsigned immediateShiftSize() const
+    { return entry_? entry_->immediateShiftSize() : 0; }
+
     /// Relevant to atomic instructions: Return true if acquire bit is
     /// set in an atomic instruction.
     bool isAtomicAcquire() const

@@ -309,6 +309,10 @@ namespace WdRiscv
     unsigned storeSize() const
     { return stSize_; }
 
+    /// Return the size with which the immediate bits are to be (left)shifted
+    unsigned immediateShiftSize() const 
+    { return immedShiftSize_; }
+
     /// Return true if instruction has an explicit rouning mode field.
     bool hasRoundingMode() const
     { return hasRm_; }
@@ -350,6 +354,10 @@ namespace WdRiscv
     /// Set the size of store instructions.
     void setStoreSize(unsigned size)
     { stSize_ = size; isStore_ = true; isPerfStore_ = true; }
+
+    /// Set the shift size of immediate val
+    void setImmedShiftSize(unsigned size)
+    { immedShiftSize_ = size; }
 
     /// Mark as a conditional branch instruction.
     void setConditionalBranch(bool flag)
@@ -403,6 +411,7 @@ namespace WdRiscv
     unsigned opCount_;
     unsigned ldSize_ = 0;      // Load size: Zero for non-load.
     unsigned stSize_ = 0;      // Store size: Zero for non-store.
+    unsigned immedShiftSize_ = 0; // Shift size of immediate operand (eg. lui/auipc are automatically shifted left by 12) 
     bool isUns_ = false;       // True if source operands are unsigned.
     bool isBranch_ = false;    // True if a branch instruction.
     bool isCond_ = false;      // True if conditional branch.

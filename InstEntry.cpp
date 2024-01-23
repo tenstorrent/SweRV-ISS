@@ -253,6 +253,21 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::c_ldsp)) .setCompressedRv64(true);
   instVec_.at(size_t(InstId::c_sdsp)) .setCompressedRv64(true);
 
+  // Mark instruction which have their immediate shifted by n bits
+  instVec_.at(size_t(InstId::lui))   .setImmedShiftSize(12);
+  instVec_.at(size_t(InstId::auipc)) .setImmedShiftSize(12);
+  instVec_.at(size_t(InstId::c_lui)) .setImmedShiftSize(12);
+  instVec_.at(size_t(InstId::c_addi16sp)) .setImmedShiftSize(5);
+  instVec_.at(size_t(InstId::c_addi4spn)) .setImmedShiftSize(2);
+  instVec_.at(size_t(InstId::c_beqz)) .setImmedShiftSize(1);
+  instVec_.at(size_t(InstId::c_bnez)) .setImmedShiftSize(1);
+  instVec_.at(size_t(InstId::beq)) .setImmedShiftSize(1);
+  instVec_.at(size_t(InstId::blt)) .setImmedShiftSize(1);
+  instVec_.at(size_t(InstId::bge)) .setImmedShiftSize(1);
+  instVec_.at(size_t(InstId::bgeu)).setImmedShiftSize(1);
+  instVec_.at(size_t(InstId::jal)) .setImmedShiftSize(1);
+
+
   // Mark floating point instruction that modify FFLAGS.
   for (unsigned i = unsigned(InstId::flw); i <= unsigned(InstId::fcvt_h_lu); ++i)
     instVec_.at(i).setModifiesFflags(true);
