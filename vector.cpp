@@ -8141,8 +8141,8 @@ Hart<URV>::execVmadc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  // cannot overlap vcin
-  if (vs1 == vcin or vs2 == vcin)
+  // cannot overlap vcin if vcin is used
+  if (carry and (vs1 == vcin or vs2 == vcin))
     {
       postVecFail(di);
       return;
@@ -8177,8 +8177,8 @@ Hart<URV>::execVmadc_vxm(const DecodedInst* di)
   if (not checkVecMaskInst(di, vcout, vs1, group))
     return;
 
-  // cannot overlap vcin
-  if (vs1 == vcin)
+  // cannot overlap vcin if vcin is used
+  if (carry and (vs1 == vcin))
     {
       postVecFail(di);
       return;
@@ -8213,8 +8213,8 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   if (not checkVecMaskInst(di, vcout, vs1, group))
     return;
 
-  // cannot overlap vcin
-  if (vs1 == vcin)
+  // cannot overlap vcin if vcin is used
+  if (carry and (vs1 == vcin))
     {
       postVecFail(di);
       return;
@@ -8246,8 +8246,8 @@ Hart<URV>::execVmsbc_vvm(const DecodedInst* di)
   unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  // cannot overlap vbin
-  if (vs1 == vbin or vs2 == vbin)
+  // cannot overlap vbin if vbin is used
+  if (borrow and (vs1 == vbin or vs2 == vbin))
     {
       postVecFail(di);
       return;
@@ -8280,8 +8280,8 @@ Hart<URV>::execVmsbc_vxm(const DecodedInst* di)
   unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
-  // cannot overlap vbin
-  if (vs1 == vbin)
+  // cannot overlap vbin if vbin is used
+  if (borrow and vs1 == vbin)
     {
       postVecFail(di);
       return;
