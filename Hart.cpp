@@ -11574,3 +11574,4 @@ WdRiscv::Hart<uint64_t>::store<uint64_t>(uint64_t, bool, uint64_t, bool);
 
 template class WdRiscv::Hart<uint32_t>;
 template class WdRiscv::Hart<uint64_t>;
+

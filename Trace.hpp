@@ -68,6 +68,10 @@ namespace WdRiscv
     uint32_t ithOperand(unsigned i) const
     { return di_.ithOperand(i); }
 
+    /// Return the size with which the immediate data is left shifted
+    unsigned immediateShiftSize() const 
+    { return di_.immediateShiftSize(); }
+
     /// Return the rounding mode associated with a floating point instruction
     uint32_t roundingMode() const
     { return di_.roundingMode(); }
