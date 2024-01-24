@@ -875,10 +875,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       uint64_t pteAddr = gpteAddr; pa = gpteAddr;
       auto ec = stage2Translate(gpteAddr, privMode, true, false, false, pteAddr);
       if (ec != ExceptionCause::NONE)
-	{
-	  stage2ExceptionToStage1(ec, read, write, exec);
-	  return ec;
-	}
+	return stage2ExceptionToStage1(ec, read, write, exec);
 
       if (trace_)
         walkVec.back().emplace_back(pteAddr);
@@ -977,10 +974,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    uint64_t pteAddr2 = gpteAddr; pa = gpteAddr;
 	    auto ec = stage2Translate(gpteAddr, privMode, false, true, false, pteAddr2);
 	    if (ec != ExceptionCause::NONE)
-	      {
-		stage2ExceptionToStage1(ec, read, write, exec);
-		return ec;
-	      }
+	      return stage2ExceptionToStage1(ec, read, write, exec);
 	    assert(pteAddr == pteAddr2);
 	    if (not memWrite(pteAddr2, bigEnd_, pte.data_))
 	      return stage1PageFaultType(read, write, exec);
