@@ -16,10 +16,10 @@ namespace TT_FETCH_CACHE
       lineShift_ = std::log2(lineSize);
     }
 
-    /// Add a line to the cache. Data is obtained by calling readMem
+    /// Add a line to the cache. Data is obtained by calling fetchMem
     /// for the words of the line. Return true on success. Return false
     /// if any of the memory reads fails.
-    bool addLine(uint64_t addr, std::function<bool(uint64_t, uint32_t&)> readMem)
+    bool addLine(uint64_t addr, std::function<bool(uint64_t, uint32_t&)> fetchMem)
     {
       uint64_t lineNum = addr >> lineShift_;
       auto& vec = data_[lineNum];
@@ -30,7 +30,7 @@ namespace TT_FETCH_CACHE
       for (unsigned i = 0; i < words; ++i, addr += 4)
 	{
 	  uint32_t val = 0;
-	  ok = readMem(addr, val) and ok;
+	  ok = fetchMem(addr, val) and ok;
 	  unsigned j = i * 4;
 	  vec.at(j) = val;
 	  vec.at(j + 1) = val >> 8;

@@ -1527,10 +1527,10 @@ namespace WdRiscv
     void enableHypervisorMode(bool flag);
 
     /// Enable/disable vector extension.
-    void enableVectorExtension(bool flag);
+    void enableVector(bool flag);
 
     /// Enable/disable advanced interrupt artchitecture extension.
-    void enableAiaExtension(bool flag);
+    void enableAia(bool flag);
 
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
@@ -1742,6 +1742,7 @@ namespace WdRiscv
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
+    bool aiaEnabled_ = false;     // Aia extension.
 
     bool recordWrite_ = true;
     bool debugMode_ = false;

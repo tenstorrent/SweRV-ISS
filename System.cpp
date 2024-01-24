@@ -882,15 +882,9 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
   if (hartCount() == 0)
     return true;
 
-  if (hartCount() != 1)
-    {
-      std::cerr << "Warning: Snapshots not supported for multi-thread runs\n";
-      return false;
-    }
+  Hart<URV>& hart0 = *ithHart(0);
 
-  Hart<URV>& hart = *ithHart(0);
-
-  uint64_t globalLimit = hart.getInstructionCountLimit();
+  uint64_t globalLimit = hart0.getInstructionCountLimit();
 
   for (size_t ix = 0; true; ++ix)
     {
@@ -898,27 +892,31 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
       if (not periods.empty())
 	{
 	  if (periods.size() == 1)
-	    nextLimit = hart.getInstructionCount() + periods.at(0);
+	    nextLimit = hart0.getInstructionCount() + periods.at(0);
 	  else
 	    nextLimit = ix < periods.size() ? periods.at(ix) : globalLimit;
 	}
 
       nextLimit = std::min(nextLimit, globalLimit);
-      hart.setInstructionCountLimit(nextLimit);
+
       uint64_t tag = ix;
       if (periods.size() > 1)
 	tag = ix < periods.size() ? periods.at(ix) : nextLimit;
       std::string pathStr = snapDir + std::to_string(tag);
       Filesystem::path path = pathStr;
-      if (not Filesystem::is_directory(path) and not Filesystem::create_directories(path))
+      if (not Filesystem::is_directory(path) and
+	  not Filesystem::create_directories(path))
 	{
 	  std::cerr << "Error: Failed to create snapshot directory " << pathStr << '\n';
 	  return false;
 	}
 
+      for (auto hartPtr : sysHarts_)
+	hartPtr->setInstructionCountLimit(nextLimit);
+
       batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindow*/);
 
-      if (hart.hasTargetProgramFinished() or nextLimit >= globalLimit)
+      if (hart0.hasTargetProgramFinished() or nextLimit >= globalLimit)
 	{
 	  Filesystem::remove_all(path);
 	  break;
@@ -931,7 +929,8 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
 	}
     }
 
-  hart.traceBranches(std::string(), 0);  // Turn off branch tracing.
+  for (auto hartPtr : sysHarts_)
+    hartPtr->traceBranches(std::string(), 0);  // Turn off branch tracing.
 
   return true;
 }

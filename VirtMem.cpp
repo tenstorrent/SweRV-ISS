@@ -53,6 +53,11 @@ stage2PageFaultType(bool read, bool write, bool exec)
 }
 
 
+/// Change the exception resulting from an implicit access during the
+/// VS-stage to the exception type corresponding to the original
+/// explicit access (determined by one of read/write/exec). We keep
+/// the guest page fault but we may change its flavor. See section
+/// 9.5.1. of the privileged spec.
 static constexpr
 ExceptionCause
 stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
@@ -60,7 +65,7 @@ stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
   using EC = ExceptionCause;
   if (ec2 == EC::INST_GUEST_PAGE_FAULT or ec2 == EC::LOAD_GUEST_PAGE_FAULT or
       ec2 == EC::STORE_GUEST_PAGE_FAULT)
-    return stage1PageFaultType(read, write, exec);
+    return stage2PageFaultType(read, write, exec);
   return ec2;
 }
 
@@ -875,10 +880,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       uint64_t pteAddr = gpteAddr; pa = gpteAddr;
       auto ec = stage2Translate(gpteAddr, privMode, true, false, false, pteAddr);
       if (ec != ExceptionCause::NONE)
-	{
-	  stage2ExceptionToStage1(ec, read, write, exec);
-	  return ec;
-	}
+	return stage2ExceptionToStage1(ec, read, write, exec);
 
       if (trace_)
         walkVec.back().emplace_back(pteAddr);
@@ -977,10 +979,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	    uint64_t pteAddr2 = gpteAddr; pa = gpteAddr;
 	    auto ec = stage2Translate(gpteAddr, privMode, false, true, false, pteAddr2);
 	    if (ec != ExceptionCause::NONE)
-	      {
-		stage2ExceptionToStage1(ec, read, write, exec);
-		return ec;
-	      }
+	      return stage2ExceptionToStage1(ec, read, write, exec);
 	    assert(pteAddr == pteAddr2);
 	    if (not memWrite(pteAddr2, bigEnd_, pte.data_))
 	      return stage1PageFaultType(read, write, exec);
