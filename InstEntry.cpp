@@ -266,6 +266,8 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::bge)) .setImmedShiftSize(1);
   instVec_.at(size_t(InstId::bgeu)).setImmedShiftSize(1);
   instVec_.at(size_t(InstId::jal)) .setImmedShiftSize(1);
+  instVec_.at(size_t(InstId::c_j)) .setImmedShiftSize(1);
+
 
 
   // Mark floating point instruction that modify FFLAGS.
