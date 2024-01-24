@@ -2747,14 +2747,15 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("sireg",      CN::SIREG,      !mand, !imp, 0, wam, wam);
   defineCsr("stopei",     CN::STOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("stopi",      CN::STOPI,      !mand, !imp, 0, wam, wam);
-  defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, wam, wam);
-  defineCsr("hvictl",     CN::HVICTL,     !mand, !imp, 0, wam, wam);
-  defineCsr("hviprio1",   CN::HVIPRIO1,   !mand, !imp, 0, wam, wam);
-  defineCsr("hviprio2",   CN::HVIPRIO2,   !mand, !imp, 0, wam, wam);
-  defineCsr("vsiselect",  CN::VSISELECT,  !mand, !imp, 0, wam, wam);
-  defineCsr("vsireg",     CN::VSIREG,     !mand, !imp, 0, wam, wam);
-  defineCsr("vstopei",    CN::VSTOPEI,    !mand, !imp, 0, wam, wam);
-  defineCsr("vstopi",     CN::VSTOPI,     !mand, !imp, 0, wam, wam);
+
+  defineCsr("hvien",      CN::HVIEN,      !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  defineCsr("hvictl",     CN::HVICTL,     !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  defineCsr("hviprio1",   CN::HVIPRIO1,   !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  defineCsr("hviprio2",   CN::HVIPRIO2,   !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  defineCsr("vsiselect",  CN::VSISELECT,  !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  defineCsr("vsireg",     CN::VSIREG,     !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  defineCsr("vstopei",    CN::VSTOPEI,    !mand, !imp, 0, wam, wam)->setHypervisor(true);
+  defineCsr("vstopi",     CN::VSTOPI,     !mand, !imp, 0, wam, wam)->setHypervisor(true);
 
   for (auto csrn : { CN::VSISELECT, CN::VSIREG, CN::VSTOPEI, CN::VSTOPI } )
     {
@@ -2785,6 +2786,13 @@ CsRegs<URV>::defineAiaRegs()
 	  auto csr = findCsr(csrn);
 	  if (csr)
 	    csr->setMapsToVirtual(true);
+	}
+
+      for (auto csrn : { CN::HVIENH, CN::HVIPRIO1H, CN::HVIPRIO2H } )
+	{
+	  auto csr = findCsr(csrn);
+	  if (csr)
+	    csr->setHypervisor(true);
 	}
     }
 }
