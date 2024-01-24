@@ -444,7 +444,7 @@ template <typename URV>
 inline
 bool
 Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned dest,
-				 unsigned src, unsigned groupX8)
+			    unsigned src, unsigned groupX8)
 {
   if (not checkSewLmulVstart(di))
     return false;
@@ -457,6 +457,14 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned dest,
       return false;
     }
 #endif
+
+  // Source register (eew != 1) cannot overlap v0 (eew == 1) if instruction
+  // is masked.
+  if (di->isMasked() and src == 0)
+    {
+      postVecFail(di);
+      return false;
+    }
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
@@ -498,6 +506,14 @@ Hart<URV>::checkVecMaskInst(const DecodedInst* di, unsigned op0, unsigned op1,
       return false;
     }
 #endif
+
+  // Source registers (eew != 1) cannot overlap v0 (eew == 1) if instruction
+  // is masked.
+  if (di->isMasked() and (op1 == 0 or op2 == 0))
+    {
+      postVecFail(di);
+      return false;
+    }
 
   unsigned eg = groupX8 >= 8 ? groupX8 / 8 : 1;
   unsigned mask = eg - 1;   // Assumes eg is 1, 2, 4, or 8
@@ -8339,8 +8355,11 @@ Hart<URV>::execVmerge_vvm(const DecodedInst* di)
   if (not checkSewLmulVstart(di))
     return;
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2(),  start = csRegs_.peekVstart();
-  if (not di->isMasked() or di->op0() == 0) // Must be masked, dest must not overlap v0.
+  unsigned vd = di->op0(),  vs1 = di->op1(),  vs2 = di->op2();
+  unsigned start = csRegs_.peekVstart();
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0 or vs2 == 0)
     {
       postVecFail(di);
       return;
@@ -8398,8 +8417,11 @@ Hart<URV>::execVmerge_vxm(const DecodedInst* di)
   if (not checkSewLmulVstart(di))
     return;
 
-  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2(), start = csRegs_.peekVstart();
-  if (not di->isMasked() or di->op0() == 0)  // Must be masked, dest must not overlap v0.
+  unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
+  unsigned start = csRegs_.peekVstart();
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0)
     {
       postVecFail(di);
       return;
@@ -8436,7 +8458,9 @@ Hart<URV>::execVmerge_vim(const DecodedInst* di)
 
   unsigned vd = di->op0(), vs1 = di->op1(), start = csRegs_.peekVstart();
   int32_t imm = di->op2As<int32_t>();
-  if (not di->isMasked() or di->op0() == 0) // Must be masked. Dest must not overlap v0.
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0)
     {
       postVecFail(di);
       return;
@@ -16258,7 +16282,9 @@ Hart<URV>::execVfmerge_vfm(const DecodedInst* di)
     return;
 
   unsigned vd = di->op0(),  vs1 = di->op1(),  rs2 = di->op2();
-  if (not di->isMasked() or vd == 0)
+
+  // Must be masked, dest must not overlap v0. Source must not overlap v0.
+  if (not di->isMasked() or vd == 0 or vs1 == 0)
     {
       postVecFail(di);
       return;
