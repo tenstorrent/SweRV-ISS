@@ -54,8 +54,10 @@ stage2PageFaultType(bool read, bool write, bool exec)
 
 
 /// Change the exception resulting from an implicit access during the
-/// VS-stage to the exception type for the original explicit access
-/// (determined by one of read/write/exec).
+/// VS-stage to the exception type corresponding to the original
+/// explicit access (determined by one of read/write/exec). We keep
+/// the guest page fault but we may change its flavor. See section
+/// 9.5.1. of the privileged spec.
 static constexpr
 ExceptionCause
 stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
