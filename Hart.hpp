@@ -1467,7 +1467,7 @@ namespace WdRiscv
 
     /// Enable Advance Interrupt Architecture (AIA) extension.
     void enableAiaExtension(bool flag)
-    { enableExtension(RvExtension::Smaia, flag); csRegs_.enableAiaExtension(flag); }
+    { enableExtension(RvExtension::Smaia, flag); csRegs_.enableAia(flag); }
 
     /// For privileged spec v1.12, we clear mstatus.MPRV if xRET
     /// causes us to enter a privilege mode not Machine.

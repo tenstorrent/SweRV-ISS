@@ -753,6 +753,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
 
   updateSstc();  // To activate/deactivate VSTIMECMP.
   enableStateen(stateenOn_);  // To activate/deactivate STATEEN CSRs.
+  enableAia(aiaEnabled_);   // To activate/deactivate AIA hypervisor CSRs.
 }
 
 
@@ -943,7 +944,7 @@ CsRegs<URV>::enableSmrnmi(bool flag)
 
 template <typename URV>
 void
-CsRegs<URV>::enableVectorExtension(bool flag)
+CsRegs<URV>::enableVector(bool flag)
 {
   for (auto csrn : { CsrNumber::VSTART, CsrNumber::VXSAT, CsrNumber::VXRM,
 		     CsrNumber::VCSR, CsrNumber::VL, CsrNumber::VTYPE,
@@ -952,7 +953,7 @@ CsRegs<URV>::enableVectorExtension(bool flag)
       auto csr = findCsr(csrn);
       if (not csr)
         {
-          std::cerr << "Error: enableVectorExtension: CSR number 0x"
+          std::cerr << "Error: CsRegs::enableVector: CSR number 0x"
                     << std::hex << URV(csrn) << std::dec << " undefined\n";
           assert(0);
         }
@@ -964,26 +965,42 @@ CsRegs<URV>::enableVectorExtension(bool flag)
 
 template <typename URV>
 void
-CsRegs<URV>::enableAiaExtension(bool flag)
+CsRegs<URV>::enableAia(bool flag)
 {
   using CN = CsrNumber;
 
+  aiaEnabled_ = flag;
+
   for (auto csrn : { CN::MISELECT, CN::MIREG, CN::MTOPEI, CN::MTOPI, CN::MVIEN,
-		     CN::MVIP, CN::SISELECT, CN::SIREG, CN::STOPEI, CN::STOPI,
-		     CN::HVIEN, CN::HVICTL, CN::HVIPRIO1, CN::HVIPRIO2,   
-		     CN::VSISELECT, CN::VSIREG, CN::VSTOPEI, CN::VSTOPI } )
+		     CN::MVIP, CN::SISELECT, CN::SIREG, CN::STOPEI, CN::STOPI })
     {
       auto csr = findCsr(csrn);
       csr->setImplemented(flag);
     }
 
-  if (sizeof(URV) == 4)
-    for (auto csrn : { CN::MIDELEGH, CN::MIEH, CN::MVIENH, CN::MVIPH, CN::MIPH,       
-		       CN::SIEH, CN::SIPH, CN::HIDELEGH, CN::HVIENH, CN::HVIPH,
-		       CN::HVIPRIO1H, CN::HVIPRIO2H, CN::VSIEH, CN::VSIPH } )
+  bool hflag = hyperEnabled_ and flag;
+  for (auto csrn : { CN::HVIEN, CN::HVICTL, CN::HVIPRIO1, CN::HVIPRIO2,   
+		     CN::VSISELECT, CN::VSIREG, CN::VSTOPEI, CN::VSTOPI } )
     {
       auto csr = findCsr(csrn);
-      csr->setImplemented(flag);
+      csr->setImplemented(hflag);
+    }
+
+  if (sizeof(URV) == 4)
+    {
+      for (auto csrn : { CN::MIDELEGH, CN::MIEH, CN::MVIENH, CN::MVIPH, CN::MIPH,       
+			 CN::SIEH, CN::SIPH, CN::HIDELEGH } )
+	{
+	  auto csr = findCsr(csrn);
+	  csr->setImplemented(flag);
+	}
+
+      for (auto csrn : { CN::HVIENH, CN::HVIPH, CN::HVIPRIO1H, CN::HVIPRIO2H,
+			 CN::VSIEH, CN::VSIPH } )
+	{
+	  auto csr = findCsr(csrn);
+	  csr->setImplemented(hflag);
+	}
     }
 }
 
