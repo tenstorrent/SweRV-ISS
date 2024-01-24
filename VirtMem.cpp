@@ -53,6 +53,9 @@ stage2PageFaultType(bool read, bool write, bool exec)
 }
 
 
+/// Change the exception resulting from an implicit access during the
+/// VS-stage to the exception type for the original explicit access
+/// (determined by one of read/write/exec).
 static constexpr
 ExceptionCause
 stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
@@ -60,7 +63,7 @@ stage2ExceptionToStage1(ExceptionCause ec2, bool read, bool write, bool exec)
   using EC = ExceptionCause;
   if (ec2 == EC::INST_GUEST_PAGE_FAULT or ec2 == EC::LOAD_GUEST_PAGE_FAULT or
       ec2 == EC::STORE_GUEST_PAGE_FAULT)
-    return stage1PageFaultType(read, write, exec);
+    return stage2PageFaultType(read, write, exec);
   return ec2;
 }
 
