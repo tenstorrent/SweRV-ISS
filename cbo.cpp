@@ -141,7 +141,7 @@ Hart<URV>::execCbo_clean(const DecodedInst* di)
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask, gPhysAddr & ~mask);
+      initiateStoreException(di, cause, virtAddr & ~mask, gPhysAddr & ~mask);
     }
 }
 
@@ -189,7 +189,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask, gPhysAddr & ~mask);
+      initiateStoreException(di, cause, virtAddr & ~mask, gPhysAddr & ~mask);
     }
 }
 
@@ -227,7 +227,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
 	  return;
 	}
     }
-							   
+
 
 #if 0
   // If we are doing a flush then we require write access. If we are
@@ -255,7 +255,7 @@ Hart<URV>::execCbo_inval(const DecodedInst* di)
   if (cause != ExceptionCause::NONE)
     {
       uint64_t mask = uint64_t(cacheLineSize_) - 1;
-      initiateStoreException(cause, virtAddr & ~mask, gPhysAddr & ~mask);
+      initiateStoreException(di, cause, virtAddr & ~mask, gPhysAddr & ~mask);
     }
 }
 
@@ -306,7 +306,7 @@ Hart<URV>::execCbo_zero(const DecodedInst* di)
   auto cause = determineCboException(virtAddr, gPhysAddr, physAddr, isZero);
   if (cause != ExceptionCause::NONE)
     {
-      initiateStoreException(cause, virtAddr, gPhysAddr);
+      initiateStoreException(di, cause, virtAddr, gPhysAddr);
       return;
     }
 

@@ -158,7 +158,7 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
 
   URV virtAddr = intRegs_.read(di->op1());
   uint64_t data = 0;
-  if (load<LOAD_TYPE>(virtAddr, true /*hyper*/, data))
+  if (load<LOAD_TYPE>(di, virtAddr, true /*hyper*/, data))
     intRegs_.write(di->op0(), data);
 
   hyperLs_ = false;
@@ -273,7 +273,7 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   uint32_t rs1 = di->op1();
   URV virtAddr = intRegs_.read(rs1);
   STORE_TYPE value = STORE_TYPE(intRegs_.read(di->op0()));
-  store<STORE_TYPE>(virtAddr, true /*hyper*/, value);
+  store<STORE_TYPE>(di, virtAddr, true /*hyper*/, value);
 
   hyperLs_ = false;
   virtMem_.setBigEndian(prevTbe);

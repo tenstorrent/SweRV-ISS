@@ -231,6 +231,10 @@ namespace WdRiscv
     bool isVector() const
     { return entry_ and entry_->isVector(); }
 
+    // Return true if this is a CMO instruction.
+    bool isCmo() const
+    { return entry_ and entry_->isCmo(); }
+
     /// Return true if this is a vector load instruction.
     bool isVectorLoad() const
     {
@@ -297,6 +301,10 @@ namespace WdRiscv
     /// address is in a register.
     bool isBranchToRegister() const
     { return entry_ and entry_->isBranchToRegister(); }
+
+    /// Return true if this is a compressed instruction.
+    bool isCompressed() const
+    { return entry_ and entry_->isCompressed(); }
 
     /// Return the RISCV extension of this instruction.
     RvExtension extension() const

@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -85,7 +85,7 @@ namespace WdRiscv
     uint64_t addr_ = 0;
     uint64_t val_ = 0;
   };
-    
+
 
   /// Changes made by the execution of one instruction. Useful for
   /// test pattern generation.
@@ -104,7 +104,7 @@ namespace WdRiscv
     bool hasFpReg = false;     // True if there is an FP register change.
     unsigned fpRegIx = 0;      // Number of changed fp register if any.
     uint64_t fpRegValue = 0;   // Value of changed fp register if any.
-    
+
     unsigned memSize = 0;      // Size of changed memory (0 if none).
     uint64_t memAddr = 0;      // Address of changed memory if any.
     uint64_t memValue = 0;     // Value of changed memory if any.
@@ -186,7 +186,7 @@ namespace WdRiscv
     /// bounds. If successful, set name to the register name.
     bool peekIntReg(unsigned reg, URV& val, std::string_view& name) const;
 
-    /// Return to the value of integer register reg which must not be 
+    /// Return to the value of integer register reg which must not be
     /// out of bounds (otherwise we trigger an assert).
     URV peekIntReg(unsigned reg) const;
 
@@ -453,7 +453,7 @@ namespace WdRiscv
     /// exceptions in SC.W/D.
     void keepReservationOnScException(bool flag)
     { keepReservOnScException_ = flag; }
-      
+
     /// Get the values of the three components of the given debug
     /// trigger. Return true on success and false if trigger is out of
     /// bounds.
@@ -571,7 +571,7 @@ namespace WdRiscv
     }
 
     /// Define a memory mapped locations for interruptor agent.
-    void configInterruptor(uint64_t addr, 
+    void configInterruptor(uint64_t addr,
 			   std::function<Hart<URV>*(unsigned ix)> indexToHart)
     {
       interruptor_ = addr;
@@ -835,7 +835,7 @@ namespace WdRiscv
 			     std::vector<uint64_t>& data,
 			     unsigned& elementSize) const
     { return vecRegs_.getLastMemory(addresses, data, elementSize); }
-      
+
 
     void lastSyscallChanges(std::vector<std::pair<uint64_t, uint64_t>>& v) const
     { syscall_.getMemoryChanges(v); }
@@ -893,7 +893,7 @@ namespace WdRiscv
     { instCounter_ = count; }
 
     /// Get executed instruction count.
-    uint64_t getInstructionCount() const 
+    uint64_t getInstructionCount() const
     { return instCounter_; }
 
     /// Return count of traps (exceptions or interrupts) seen by this
@@ -1535,7 +1535,7 @@ namespace WdRiscv
     void setTlbSize(unsigned size)
     { virtMem_.setTlbSize(size); }
 
-    /// Debug method: print address translation table. 
+    /// Debug method: print address translation table.
     void printPageTable(std::ostream& out) const
     { virtMem_.printPageTable(out); }
 
@@ -1751,7 +1751,7 @@ namespace WdRiscv
     bool loadSnapshotRegs(const std::string& path);
 
     // Define the log2 of the factor by which to divide the instruction count
-    // to generate a time value. This is relevant to the clint. 
+    // to generate a time value. This is relevant to the clint.
     void setCounterToTimeShift(unsigned shift)
     { counterToTimeShift_ = shift; }
 
@@ -2318,11 +2318,11 @@ namespace WdRiscv
 
     /// Helper to load methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateLoadException(ExceptionCause cause, URV addr1, URV addr2 = 0);
+    void initiateLoadException(const DecodedInst* di, ExceptionCause cause, URV addr1, URV addr2 = 0);
 
     /// Helper to store methods: Initiate an exception with the given
     /// cause and data address.
-    void initiateStoreException(ExceptionCause cause, URV addr1, URV addr2 = 0);
+    void initiateStoreException(const DecodedInst* di, ExceptionCause cause, URV addr1, URV addr2 = 0);
 
     /// Helper to lb, lh, lw and ld. Load type should be int_8, int16_t
     /// etc... for signed byte, halfword etc... and uint8_t, uint16_t
@@ -2334,11 +2334,11 @@ namespace WdRiscv
     /// for hypervisor load/store instruction to select 2-stage address
     /// translation.
     template<typename LOAD_TYPE>
-    bool load(uint64_t virtAddr, bool hyper, uint64_t& value);
+    bool load(const DecodedInst* di, uint64_t virtAddr, bool hyper, uint64_t& value);
 
-    /// For use by performance model. 
+    /// For use by performance model.
     template<typename LOAD_TYPE>
-    bool fastLoad(uint64_t virtAddr, uint64_t& value);
+    bool fastLoad(const DecodedInst* di, uint64_t virtAddr, uint64_t& value);
 
     /// Helper to load method: Return possible load exception (without
     /// taking any exception). If supervisor mode is enabled, and
@@ -2370,11 +2370,11 @@ namespace WdRiscv
     /// be set to true for hypervisor load/store instruction to select
     /// 2-stage address translation.
     template<typename STORE_TYPE>
-    bool store(URV addr, bool hyper, STORE_TYPE value, bool amoLock = true);
+    bool store(const DecodedInst* di, URV addr, bool hyper, STORE_TYPE value, bool amoLock = true);
 
-    /// For use by performance model. 
+    /// For use by performance model.
     template<typename STORE_TYPE>
-    bool fastStore(URV addr, STORE_TYPE value);
+    bool fastStore(const DecodedInst* di, URV addr, STORE_TYPE value);
 
     /// Helper to store method: Return possible exception (without
     /// taking any exception). Update stored value by doing memory
@@ -2389,13 +2389,13 @@ namespace WdRiscv
     /// physAddr is set to the result of the virtual to physical
     /// translation of the referenced memory address.
     template<typename LOAD_TYPE>
-    bool loadReserve(uint32_t rd, uint32_t rs1);
+    bool loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1);
 
     /// Helper to execSc. Store type must be uint32_t, or uint64_t.
     /// Return true if store is successful. Return false otherwise
     /// (exception or trigger or condition failed).
     template<typename STORE_TYPE>
-    bool storeConditional(URV addr, STORE_TYPE value);
+    bool storeConditional(const DecodedInst* di, URV addr, STORE_TYPE value);
 
     /// Helper to the hypervisor load instructions.
     template<typename LOAD_TYPE>
@@ -2534,7 +2534,7 @@ namespace WdRiscv
     void printInstCsvTrace(const DecodedInst& di, FILE* out);
 
     /// Start a synchronous exceptions.
-    void initiateException(ExceptionCause cause, URV pc, URV info, URV info2 = 0);
+    void initiateException(ExceptionCause cause, URV pc, URV info, URV info2 = 0, const DecodedInst* di = nullptr);
 
     /// Start an asynchronous exception (interrupt).
     void initiateInterrupt(InterruptCause cause, URV pc);
@@ -2570,8 +2570,11 @@ namespace WdRiscv
     /// exception or the instruction to resume after asynchronous
     /// exception is handled). The info and info2 value holds additional
     /// information about an exception.
-    void initiateTrap(bool interrupt, URV cause, URV pcToSave, URV info,
+    void initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pcToSave, URV info,
                       URV info2 = 0);
+
+    /// Create trap instruction information for mtinst/htinst.
+    uint32_t createTrapInst(const DecodedInst* di, bool interrupt, unsigned cause, URV info) const;
 
     /// Illegal instruction. Initiate an illegal instruction trap.
     /// This is used for one of the following:
@@ -2604,7 +2607,7 @@ namespace WdRiscv
     /// the URV value (this is relevant for rv64). The accessed memory
     /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
     /// or access fault.
-    bool amoLoad32(uint64_t vaddr, Pma::Attrib attrib, URV& val);
+    bool amoLoad32(const DecodedInst* di, uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Do the load value part of a double-word-sized AMO
     /// instruction. Return true on success putting the loaded value
@@ -2612,7 +2615,7 @@ namespace WdRiscv
     /// place in which case val is not modified. The accessed memory
     /// must have the given attribute (e.g. Pma::Arith, Pma::Swap ...)
     /// or access fault.
-    bool amoLoad64(uint64_t vaddr, Pma::Attrib attrib, URV& val);
+    bool amoLoad64(const DecodedInst* di, uint64_t vaddr, Pma::Attrib attrib, URV& val);
 
     /// Invalidate cache entries overlapping the bytes written by a
     /// store.
@@ -3601,7 +3604,7 @@ namespace WdRiscv
     template<typename ELEM_TYPE>
     void vadc_vxm(unsigned vd, unsigned vs1, ELEM_TYPE e2, unsigned vcin,
                   unsigned group, unsigned start, unsigned elems);
-    
+
     template<typename ELEM_TYPE>
     void vsbc_vvm(unsigned vd, unsigned vs1, unsigned vs2, unsigned vbin,
                   unsigned group, unsigned start, unsigned elems);
@@ -4682,6 +4685,7 @@ namespace WdRiscv
       lastPageMode_ = virtMem_.mode();
       lastVsPageMode_ = virtMem_.vsMode();
       lastPageModeStage2_ = virtMem_.modeStage2();
+      virtMem_.clearTrapInfo();
       clearTraceData();
     }
 

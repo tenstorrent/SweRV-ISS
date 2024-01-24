@@ -868,6 +868,8 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       walkVec.back().emplace_back(address, WalkEntry::Type::GVA);
     }
 
+  stage1Trap_ = true;
+
   while (true)
     {
       // 2.
@@ -947,11 +949,12 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	  // We have a choice:
 	  // A. Page fault
 	  if (faultOnFirstAccess_)
-	    return stage1PageFaultType(read, write, exec);  // A
+            return stage1PageFaultType(read, write, exec);  // A
 
 	  // Or B
 	  saveUpdatedPte(pteAddr, sizeof(pte.data_), pte.data_);  // For logging
 
+          stage1AttemptedADUpdate_ = true;
 	  // B1. Check PMP. The privMode here is the effective one that
 	  // already accounts for MPRV.
 	  if (pmpMgr_.isEnabled())
@@ -1011,6 +1014,8 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
   tlbEntry.levels_ = 1+ii;
+
+  stage1Trap_ = false;
   return ExceptionCause::NONE;
 }
 

@@ -209,6 +209,13 @@ namespace WdRiscv
       dataPageCross_ = false;
     }
 
+    /// Clear extra trap information
+    void clearTrapInfo()
+    {
+      stage1Trap_ = false;
+      stage1AttemptedADUpdate_ = false;
+    }
+
     static constexpr const char* pageSize(Mode m, uint32_t level)
     {
       if (m == Mode::Bare)
@@ -481,6 +488,15 @@ namespace WdRiscv
     void setFaultOnFirstAccessStage2(bool flag)
     { faultOnFirstAccess2_ = flag; }
 
+    /// Return true if last translation had a fault in VS-stage translation and false otherwise.
+    /// Sets flag if attempted to update A/D bits on last stage 1 translation.
+    /// This is necessary to properly write mtinst/htinst.
+    bool stage1TrapInfo(bool& implicitWrite) const
+    {
+      implicitWrite = stage1AttemptedADUpdate_;
+      return stage1Trap_;
+    }
+
     /// Clear saved data for updated leaf level PTE.
     void clearUpdatedPtes()
     { updatedPtes_.clear(); }
@@ -587,6 +603,10 @@ namespace WdRiscv
     // Track page crossing information
     bool fetchPageCross_;
     bool dataPageCross_;
+
+    // Extra trap information
+    bool stage1Trap_ = false;
+    bool stage1AttemptedADUpdate_ = false;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;
