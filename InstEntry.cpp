@@ -257,7 +257,7 @@ InstTable::InstTable()
   instVec_.at(size_t(InstId::lui))   .setImmedShiftSize(12);
   instVec_.at(size_t(InstId::auipc)) .setImmedShiftSize(12);
   instVec_.at(size_t(InstId::c_lui)) .setImmedShiftSize(12);
-  instVec_.at(size_t(InstId::c_addi16sp)) .setImmedShiftSize(5);
+  instVec_.at(size_t(InstId::c_addi16sp)) .setImmedShiftSize(4);
   instVec_.at(size_t(InstId::c_addi4spn)) .setImmedShiftSize(2);
   instVec_.at(size_t(InstId::c_beqz)) .setImmedShiftSize(1);
   instVec_.at(size_t(InstId::c_bnez)) .setImmedShiftSize(1);
