@@ -232,7 +232,7 @@ printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
       fprintf(out, "0x%" PRIx64, entry.addr_);
       if (entry.type_ == VirtMem::WalkEntry::Type::PA)
         {
-          uint64_t pte;
+          uint64_t pte = 0;
           hart.peekMemory(entry.addr_, pte, true);
           fprintf(out, "=0x%" PRIx64, pte);
         }

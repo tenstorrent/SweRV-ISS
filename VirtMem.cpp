@@ -582,7 +582,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
-        return stage1PageFaultType(read, write, exec);
+        return accessFaultType(read, write, exec);
       if (not napotCheck(pte, va))
         return stage1PageFaultType(read, write, exec);
 
@@ -734,7 +734,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	}
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
-        return stage2PageFaultType(read, write, exec);
+        return accessFaultType(read, write, exec);
       if (not napotCheck(pte, va))
         return stage2PageFaultType(read, write, exec);
 
@@ -897,7 +897,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 	}
 
       if (! memRead(pteAddr, bigEnd_, pte.data_))
-        return stage1PageFaultType(read, write, exec);
+        return accessFaultType(read, write, exec);
       if (not napotCheck(pte, va))
         return stage1PageFaultType(read, write, exec);
 
