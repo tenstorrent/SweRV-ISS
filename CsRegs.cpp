@@ -707,9 +707,12 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
     mstatus->setReadMask(mask);
   }
 
-  auto csr = findCsr(CN::MIDELEG);
-  auto sgeip = geilen_ ? URV(1) << 12 : 0;  // Bit SGEIP
+  // Bits correspondig to VSEIP, VSTIP, VSSIP, and SGEIP.
+  using IC = InterruptCause;
+  URV vsBits = (1 << URV(IC::VS_EXTERNAL)) | (1 << URV(IC::VS_TIMER)) | (1 << URV(IC::VS_SOFTWARE));
+  vsBits |= geilen_ ? (1 << URV(IC::G_EXTERNAL)) : 0;  // Bit SGEIP
 
+  auto csr = findCsr(CN::MIDELEG);
   if (flag)
     {
       // Make VSEIP, VSTIP, and VSSIP read-only one.
@@ -717,7 +720,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
                                              std::pair{ &Csr<URV>::getPokeMask,  &Csr<URV>::setPokeMask } })
         {
           auto mask = (csr->*getMaskFn)();
-          mask &= ~URV(0x444) & ~sgeip;
+          mask &= ~vsBits;
           (csr->*setMaskFn)(mask);
         }
 
@@ -725,11 +728,11 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
                                                std::pair{ &Csr<URV>::read,          &Csr<URV>::poke } })
         {
           auto value = (csr->*getValueFn)();
-          auto newValue = value | sgeip | 0x444; // Bits VSEIP, VSTIP, and VSSIP.
+          auto newValue = value | vsBits;
           if (value != newValue)
             (csr->*setValueFn)(newValue);
         }
-      csr->setReadMask(csr->getReadMask() | sgeip | 0x444);
+      csr->setReadMask(csr->getReadMask() | vsBits);
     }
   else
     {
@@ -739,13 +742,23 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
       csr->setReadMask(mask);
     }
 
-  // Bit VSSIP is writeable if hypervisor is enabled, otherwise it is not
+  // Bit MIP.VSSIP is writeable if hypervisor is enabled, otherwise it is not
   csr = findCsr(CN::MIP);
   if (csr)
     {
       auto mask = csr->getWriteMask();
       mask = flag? mask | URV(4) : mask & ~URV(4);
       csr->setWriteMask(mask);
+    }
+
+  csr = findCsr(CN::MIE);
+  if (csr)
+    {
+      // Bits VSEIE, VSTIE, VSSIE and SGEIE become read-only zero if no hypervisor.
+      if (flag)
+	csr->setReadMask(csr->getReadMask() | vsBits); // Enable reading.
+      else
+	csr->setReadMask(csr->getReadMask() & ~URV(0x1444)); // Read-only-zero.
     }
 
   updateSstc();  // To activate/deactivate VSTIMECMP.
