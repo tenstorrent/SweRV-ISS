@@ -40,6 +40,8 @@ namespace WdRiscv
     enum Mode { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10, Sv64 = 11,
 		Limit_ = 12};
 
+    enum Pbmt { None = 0, Nc = 1, Io = 2, Reserved = 3 };
+
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
             PmpManager& pmpMgr, unsigned tlbSize);
 
@@ -207,6 +209,7 @@ namespace WdRiscv
       clearUpdatedPtes();
       fetchPageCross_ = false;
       dataPageCross_ = false;
+      pbmt_ = Pbmt::None;
     }
 
     /// Clear extra trap information
@@ -215,6 +218,10 @@ namespace WdRiscv
       stage1Trap_ = false;
       stage1AttemptedADUpdate_ = false;
     }
+
+    /// Return page based memory type of last translation.
+    Pbmt lastPbmt() const
+    { return pbmt_; }
 
     static constexpr const char* pageSize(Mode m, uint32_t level)
     {
@@ -607,6 +614,8 @@ namespace WdRiscv
     // Extra trap information
     bool stage1Trap_ = false;
     bool stage1AttemptedADUpdate_ = false;
+
+    Pbmt pbmt_ = Pbmt::None;
 
     PmpManager& pmpMgr_;
     Tlb tlb_;

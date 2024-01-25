@@ -166,6 +166,7 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 	    return stage1PageFaultType(read, write, exec);
 	  // We do not check/update access/dirty bits.
 	  pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+	  pbmt_ = Pbmt(entry->pbmt_);
 	  return ExceptionCause::NONE;
 	}
     }
@@ -251,6 +252,7 @@ VirtMem::translate(uint64_t va, PrivilegeMode priv, bool twoStage,
             entry->dirty_ = true;
         }
       pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+      pbmt_ = Pbmt(entry->pbmt_);
       return ExceptionCause::NONE;
     }
 
@@ -422,6 +424,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
             entry->dirty_ = true;
         }
       pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
+      pbmt_ = Pbmt(entry->pbmt_);
       return ExceptionCause::NONE;
     }
 
@@ -472,6 +475,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 		entry->dirty_ = true;
 	    }
 	  // Use TLB entry.
+	  pbmt_ = Pbmt(entry->pbmt_);
 	  gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	}
       else
@@ -689,6 +693,10 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
   tlbEntry.levels_ = 1+ii;
+  tlbEntry.pbmt_ = pte.pbmt();
+
+  pbmt_ = Pbmt(pte.pbmt());
+
   return ExceptionCause::NONE;
 }
 
@@ -841,6 +849,10 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
   tlbEntry.levels_ = 1+ii;
+  tlbEntry.pbmt_ = pte.pbmt();
+
+  pbmt_ = Pbmt(pte.pbmt());
+
   return ExceptionCause::NONE;
 }
 
@@ -1014,8 +1026,11 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.accessed_ = pte.accessed();
   tlbEntry.dirty_ = pte.dirty();
   tlbEntry.levels_ = 1+ii;
+  tlbEntry.pbmt_ = pte.pbmt();
 
+  pbmt_ = Pbmt(pte.pbmt());
   stage1Trap_ = false;
+
   return ExceptionCause::NONE;
 }
 

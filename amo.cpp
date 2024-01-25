@@ -85,6 +85,8 @@ Hart<URV>::amoLoad32(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attri
       Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
+      else if (virtMem_.lastPbmt() == VirtMem::Pbmt::Nc)
+	cause = ExceptionCause::STORE_ACC_FAULT;  // Non-cacheable pbmt.
     }
 
   if (cause != ExceptionCause::NONE)
@@ -142,6 +144,8 @@ Hart<URV>::amoLoad64(const DecodedInst* di, uint64_t virtAddr, Pma::Attrib attri
       Pma pma = memory_.pmaMgr_.accessPma(addr, PmaManager::AccessReason::LdSt);
       if (not pma.hasAttrib(attrib))
 	cause = ExceptionCause::STORE_ACC_FAULT;
+      else if (virtMem_.lastPbmt() == VirtMem::Pbmt::Nc)
+	cause = ExceptionCause::STORE_ACC_FAULT;  // Non-cacheable pbmt.
     }
 
   if (cause != ExceptionCause::NONE)
@@ -205,7 +209,10 @@ Hart<URV>::loadReserve(const DecodedInst* di, uint32_t rd, uint32_t rs1)
     fail = true;
 
   if (cause == ExceptionCause::NONE)
-    fail = fail or not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
+    {
+      fail = fail or not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
+      fail = fail or virtMem_.lastPbmt() == VirtMem::Pbmt::Nc; // Non-cacheable pbmt.
+    }
 
   if (fail and cause == ExceptionCause::NONE)
     cause = ExceptionCause::LOAD_ACC_FAULT;
@@ -314,6 +321,7 @@ Hart<URV>::storeConditional(const DecodedInst* di, URV virtAddr, STORE_TYPE stor
     {
       bool fail = not memory_.pmaMgr_.accessPma(addr1, PmaManager::AccessReason::LdSt).isRsrv();
       fail = fail or (amoInDccmOnly_ and not memory_.pmaMgr_.isAddrInDccm(addr1));
+      fail = fail or virtMem_.lastPbmt() == VirtMem::Pbmt::Nc; // Non-cacheable pbmt.
       if (fail)
 	cause = EC::STORE_ACC_FAULT;
     }
