@@ -409,7 +409,8 @@ Hart<URV>::printDecodedInstTrace(const DecodedInst& di, uint64_t tag, std::strin
   // Collect non-trigger CSRs and their values.
   for (CsrNumber csr : csrs)
     {
-      if (not csRegs_.peek(csr, value))
+      // We always record the real csr number for VS/S mappings
+      if (not csRegs_.peek(csr, value, false))
         continue;
       if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
         continue; // Debug trigger values collected below.
