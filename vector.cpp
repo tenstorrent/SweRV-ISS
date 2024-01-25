@@ -4093,21 +4093,30 @@ Hart<URV>::execVmop_mm(const DecodedInst* di, OP op)
     return;
 
   unsigned start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.bitsPerRegister();
-
+  unsigned bitsPerReg = vecRegs_.bitsPerRegister();
+  unsigned elemCount = vecRegs_.elemCount();
   unsigned vd = di->op0(), vs1 = di->op1(), vs2 = di->op2();
 
-  if (start < vecRegs_.elemCount())
-    for (unsigned ix = start; ix < elems; ++ix)
-      {
-	// Not masked. Tail elements computed.
-	bool in1 = false, in2 = false;
-	vecRegs_.readMaskRegister(vs1, ix, in1);
-	vecRegs_.readMaskRegister(vs2, ix, in2);
-	bool flag = op(unsigned(in1), unsigned(in2)) & 1;
+  if (start < elemCount)
+    {
+      unsigned count = vecRegs_.updateWholeMask() ? bitsPerReg : elemCount;
 
-	vecRegs_.writeMaskRegister(vd, ix, flag);
-      }
+      for (unsigned ix = start; ix < count; ++ix)
+	{
+	  // Not masked. Tail elements computed.
+	  bool in1 = false, in2 = false;
+	  vecRegs_.readMaskRegister(vs1, ix, in1);
+	  vecRegs_.readMaskRegister(vs2, ix, in2);
+	  bool flag = op(unsigned(in1), unsigned(in2)) & 1;
+
+	  vecRegs_.writeMaskRegister(vd, ix, flag);
+	}
+
+      // If not update-whole-mask and mask-anostic-ones, fill tail with ones.
+      if (vecRegs_.isTailAgnosticOnes())
+	for (unsigned ix = count; ix < bitsPerReg; ++ix)
+	  vecRegs_.writeMaskRegister(vd, ix, true);
+    }
 
   vecRegs_.touchMask(vd);  // In case nothing was written.
   postVecSuccess();
