@@ -1694,19 +1694,19 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableClearMtvalOnEbreak(flag);
     }
 
-  tag = "log2_counter_to_time";
+  tag = "time_shift";
   if (config_ ->contains(tag))
   {
-    unsigned factor = 0;
-    if (not getJsonUnsigned(tag, config_ -> at(tag), factor))
+    unsigned shift = 0;
+    if (not getJsonUnsigned(tag, config_ -> at(tag), shift))
       errors++;
     else
       {
-	if (factor <= 6)
-	  hart.setCounterToTimeShift(factor);
+	if (shift <= 10)
+	  hart.setTimeShift(shift);
 	else
 	  {
-	    cerr << "Invalid log2_counter_to_time: " << factor << " (expecting <= 6)\n";
+	    cerr << "Invalid config file time_shift: " << shift << " (expecting <= 10)\n";
 	    errors++;
 	  }
       }

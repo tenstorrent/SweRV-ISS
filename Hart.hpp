@@ -1752,8 +1752,8 @@ namespace WdRiscv
 
     // Define the log2 of the factor by which to divide the instruction count
     // to generate a time value. This is relevant to the clint.
-    void setCounterToTimeShift(unsigned shift)
-    { counterToTimeShift_ = shift; }
+    void setTimeShift(unsigned shift)
+    { timeShift_ = shift; }
 
     /// Return true if external interrupts are enabled and one or more
     /// external interrupt that is pending is also enabled. Set cause
@@ -4968,7 +4968,7 @@ namespace WdRiscv
     // fake timer value. For example, if shift amount is 3, we are
     // dividing instruction count by 8 (2 to power 3) to produce a
     // timer value.
-    unsigned counterToTimeShift_ = 0;
+    unsigned timeShift_ = 0;
 
     bool traceHeaderPrinted_ = false;
     bool ownTrace_ = false;
