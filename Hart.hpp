@@ -134,7 +134,7 @@ namespace WdRiscv
     /// within a system of cores -- see sysHartIndex method) and
     /// associate it with the given memory. The MHARTID is configured as
     /// a read-only CSR with a reset value of hartId.
-    Hart(unsigned hartIx, URV hartId, Memory& memory);
+    Hart(unsigned hartIx, URV hartId, Memory& memory, uint64_t& time);
 
     /// Destructor.
     ~Hart();
@@ -4770,6 +4770,8 @@ namespace WdRiscv
     bool dataLineTrace_ = false;
 
     unsigned cacheLineSize_ = 64;
+
+    uint64_t& time_;             // Only hart 0 increments this value.
 
     uint64_t retiredInsts_ = 0;  // Proxy for minstret CSR.
     uint64_t cycleCount_ = 0;    // Proxy for mcycle CSR.
