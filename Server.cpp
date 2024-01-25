@@ -590,7 +590,8 @@ Server<URV>::processStepCahnges(Hart<URV>& hart,
   for (CsrNumber csr : csrs)
     {
       URV value;
-      if (hart.peekCsr(csr, value))
+      // We always record the real csr number for VS/S mappings
+      if (hart.peekCsr(csr, value, false))
 	{
 	  if (csr >= CsrNumber::TDATA1 and csr <= CsrNumber::TDATA3)
 	    {

@@ -218,6 +218,9 @@ namespace WdRiscv
     [[nodiscard]] bool peekCsr(CsrNumber csr, URV& val) const
     { return csRegs_.peek(csr, val); }
 
+    [[nodiscard]] bool peekCsr(CsrNumber csr, URV& val, bool virtMode) const
+    { return csRegs_.peek(csr, val, virtMode); }
+
     /// Return value of the given csr. Throw exception if csr is out of bounds.
     URV peekCsr(CsrNumber csr) const;
 
