@@ -8,6 +8,7 @@
 #include "Hart.hpp"
 #include "Memory.hpp"
 #include "HartConfig.hpp"
+#include "DecodedInst.hpp"
 
 using namespace WdRiscv;
 namespace py = pybind11;
@@ -317,8 +318,55 @@ static void defineHart(M m)
   auto hartName = concat<T>("Hart");
   py::class_<Hart<T>, std::shared_ptr<Hart<T>>>(m_hart, hartName.data())
     .def("step", [](Hart<T>& self, bool verbose, File file) {
-          self.singleStep(verbose? file.file_ : nullptr);
-        }, py::arg("verbose") = false, py::arg("file") = File(stdout), py::doc("Step a single instruction."))
+          DecodedInst di;
+          self.singleStep(di, verbose? file.file_ : nullptr);
+
+          std::vector<py::object> changes;
+          int regIx = self.lastIntReg();
+          if (regIx > 0)
+            changes.push_back(py::cast("x" + std::to_string(regIx)));
+
+          int fpIx = self.lastFpReg();
+          if (fpIx >= 0)
+            changes.push_back(py::cast("f" + std::to_string(fpIx)));
+
+          unsigned groupSize = 0;
+          int vecIx = self.lastVecReg(di, groupSize);
+          if (vecIx >= 0)
+            for (unsigned ix = 0; ix < groupSize; ++ix)
+              changes.push_back(py::cast("v" + std::to_string(vecIx + ix)));
+
+          std::vector<CsrNumber> csrs;
+          self.lastCsr(csrs);
+          for (CsrNumber csrn : csrs)
+            {
+              auto csr = self.findCsr(csrn);
+              if (csr)
+                changes.push_back(py::cast(csr->getName()));
+            }
+
+          uint64_t addr, value;
+          unsigned size = self.lastStore(addr, value);
+          if (size)
+            {
+              auto p = std::make_pair("m" + std::to_string(addr), size);
+              changes.push_back(py::cast(p));
+            }
+          else
+            {
+              std::vector<uint64_t> addr;
+              std::vector<uint64_t> data;
+              unsigned elemSize = 0;
+              if (self.getLastVectorMemory(addr, data, elemSize) and not data.empty())
+                for (size_t i = 0; i < data.size(); ++i)
+                  {
+                    auto p = std::make_pair("m" + std::to_string(addr.at(i)), elemSize);
+                    changes.push_back(py::cast(p));
+                  }
+            }
+
+          return std::make_pair(self.hasTargetProgramFinished(), changes);
+        }, py::arg("verbose") = false, py::arg("file") = File(stdout), py::doc("Step a single instruction. Returns a tuple of (true if target program is finished, list of modified resources)."))
     .def("run", [](Hart<T>& self, bool verbose, File file) {
           self.run(verbose? file.file_ : nullptr);
         }, py::arg("verbose") = false, py::arg("file") = File(stdout), py::doc("Run until hart reaches stopping point."))
