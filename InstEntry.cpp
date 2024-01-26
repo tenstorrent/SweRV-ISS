@@ -1817,32 +1817,32 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "clz", InstId::clz, 0x60001013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "clzw", InstId::clzw, 0x6000101b, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "cpop", InstId::cpop, 0x60201013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "cpopw", InstId::cpopw, 0x6020101b, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "ctz", InstId::ctz, 0x60101013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "ctzw", InstId::ctzw, 0x6010101b, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
