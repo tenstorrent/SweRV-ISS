@@ -24,9 +24,11 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       return false;
     }
 
-  // Write Privilege Mode, Program Order, Program Break, and Program Counter.
-  ofs << "pm " << std::dec << unsigned(privilegeMode()) << '\n';
-  ofs << "po " << std::dec << getInstructionCount() << '\n';
+  // Write Privilege Mode, Virtual mode, Program Order, Program Break,
+  // and Program Counter.
+  ofs << "pm " << unsigned(privilegeMode()) << '\n';
+  ofs << "vm " << unsigned(virtMode()) << '\n';
+  ofs << "po " << getInstructionCount() << '\n';
   ofs << "pb 0x" << std::hex << syscall_.targetProgramBreak() << std::dec << '\n';
   ofs << "pc 0x" << std::hex << peekPc() << std::dec << '\n';
 
@@ -43,14 +45,21 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
 	ofs << "f " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
       }
 
-  // write control & status registers
+  // Write control & status registers. Write MISA first.
+  ofs << std::hex;
+  auto csr = csRegs_.findCsr(CsrNumber::MISA);
+  if (csr)
+    ofs << "c 0x" << unsigned(CsrNumber::MISA) << " 0x" << csr->read() << "\n";
   for (unsigned i = unsigned(CsrNumber::MIN_CSR_); i <= unsigned(CsrNumber::MAX_CSR_); i++)
     {
+      if (i == unsigned(CsrNumber::MISA))
+	continue;
       auto csr = csRegs_.findCsr(CsrNumber(i));
       if (not csr or not csr->isImplemented())
 	continue;
-      ofs << "c 0x" << std::hex << i << " 0x" << csr->read() << std::dec << "\n";
+      ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
     }
+  ofs << std::dec;
 
   // write vector registers.
   if (isRvv())
@@ -179,6 +188,7 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
   unsigned lineNum = 0, num = 0, errors = 0;
   uint64_t val = 0;
   auto privMode = PrivilegeMode::Machine;
+  bool virtMode = false;
 
   using std::cerr;
 
@@ -203,17 +213,24 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	  else
 	    pokePc(val);
         }
-      else if (type == "pm")  // Prrivilege Mode
+      else if (type == "pm")  // Prrivilege mode
 	{
 	  if (not loadSnapshotValue(iss, val))
-	    break;
-	  if (val == 0)
+	    errors++;
+	  else if (val == 0)
 	    privMode = PrivilegeMode::User;
 	  else if (val == 1)
 	    privMode = PrivilegeMode::Supervisor;
 	  else if (val == 3)
 	    privMode = PrivilegeMode::Machine;
 	  else 
+	    errors++;
+	}
+      else if (type == "vm")  // Virtual mode
+	{
+	  if (loadSnapshotValue(iss, val))
+	    virtMode = val;
+	  else
 	    errors++;
 	}
       else if (type == "po")  // Program order
@@ -292,6 +309,7 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
     }
 
   setPrivilegeMode(privMode);
+  virtMode_ = virtMode;
 
   if (errors)
     {
