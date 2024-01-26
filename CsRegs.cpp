@@ -708,35 +708,22 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
   }
 
   // Bits correspondig to VSEIP, VSTIP, VSSIP, and SGEIP.
-  using IC = InterruptCause;
-  URV vsBits = (1 << URV(IC::VS_EXTERNAL)) | (1 << URV(IC::VS_TIMER)) | (1 << URV(IC::VS_SOFTWARE));
-  vsBits |= geilen_ ? (1 << URV(IC::G_EXTERNAL)) : 0;  // Bit SGEIP
+  URV vsBits = 0x444;
+  URV sgBit = geilen_ ? 0x1000 : 0;  // Bit SGEIP
 
   auto csr = findCsr(CN::MIDELEG);
   if (flag)
     {
-      // Make VSEIP, VSTIP, and VSSIP read-only one.
-      for (auto&& [getMaskFn, setMaskFn] : { std::pair{ &Csr<URV>::getWriteMask, &Csr<URV>::setWriteMask },
-                                             std::pair{ &Csr<URV>::getPokeMask,  &Csr<URV>::setPokeMask } })
-        {
-          auto mask = (csr->*getMaskFn)();
-          mask &= ~vsBits;
-          (csr->*setMaskFn)(mask);
-        }
-
-      for (auto&& [getValueFn, setValueFn] : { std::pair{ &Csr<URV>::getResetValue, &Csr<URV>::setInitialValue },
-                                               std::pair{ &Csr<URV>::read,          &Csr<URV>::poke } })
-        {
-          auto value = (csr->*getValueFn)();
-          auto newValue = value | vsBits;
-          if (value != newValue)
-            (csr->*setValueFn)(newValue);
-        }
-      csr->setReadMask(csr->getReadMask() | vsBits);
+      // Make VSEIP, VSTIP, and VSSIP and posibly SGEIP read-only one.
+      URV rooMask = vsBits | sgBit;  // Bits to be made read-only-one.
+      csr->setWriteMask(csr->getWriteMask() | rooMask); // Make bits writeable.
+      csr->setReadMask(csr->getReadMask() | rooMask);  // Open for reading.
+      csr->write(csr->read() | rooMask);  // Set bits to one.
+      csr->setWriteMask(csr->getWriteMask() & ~rooMask); // Make bits read-only.
     }
   else
     {
-      // Make VSEIP, VSTIP, VSSIP and SGEIP read only zero.
+      // Make VSEIP, VSTIP, VSSIP, and SGEIP read only zero.
       auto mask = csr->getReadMask();
       mask &= ~URV(0x1444);
       csr->setReadMask(mask);
@@ -756,7 +743,7 @@ CsRegs<URV>::enableHypervisorMode(bool flag)
     {
       // Bits VSEIE, VSTIE, VSSIE and SGEIE become read-only zero if no hypervisor.
       if (flag)
-	csr->setReadMask(csr->getReadMask() | vsBits); // Enable reading.
+	csr->setReadMask(csr->getReadMask() | URV(0x1444)); // Enable reading.
       else
 	csr->setReadMask(csr->getReadMask() & ~URV(0x1444)); // Read-only-zero.
     }
@@ -1604,7 +1591,17 @@ CsRegs<URV>::reset()
 {
   for (auto& csr : regs_)
     if (csr.isImplemented())
-      csr.reset();
+      {
+	csr.reset();
+	if (hyperEnabled_ and csr.getNumber() == CsrNumber::MIDELEG)
+	  {
+	    // If hypervisor is enabled then VSEIP, VTSIP, VSSIP, and SGEIP bits
+	    // of MIDELEG are read-only one.
+	    auto sgeip = geilen_ ? URV(1) << 12 : URV(0);  // Bit SGEIP
+	    URV vsBits = URV(0x444) | sgeip;
+	    csr.pokeNoMask(csr.read() | vsBits);
+	  }
+      }
 
   triggers_.reset();
   mPerfRegs_.reset();
