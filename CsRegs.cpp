@@ -4146,8 +4146,7 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	}
       if (vsie)
         {
-	  if (hideleg)
-	    val &= hideleg->read();
+	  // Update vsie regadless of hideleg.  
           vsie->poke(val >> 1);
           recordWrite(CsrNumber::VSIE);
         }
