@@ -1028,11 +1028,15 @@ System<URV>::loadSnapshot(const std::string& snapDir)
   if (not loadUsedMemBlocks(usedBlocksPath.string(), usedBlocks))
     return false;
 
+  auto& hart0 = *ithHart(0);
+
   Filesystem::path timePath = dirPath / "time";
   if (not loadTime(timePath.string(), time_))
-    return false;
+    {
+      std::cerr << "Using instruction count for time\n";
+      time_ = hart0.getInstructionCount();  // Legacy snapshots.
+    }
 
-  auto& hart0 = *ithHart(0);
   auto& syscall = hart0.getSyscall();
   Filesystem::path mmapPath = dirPath / "mmap";
   if (not syscall.loadMmap(mmapPath.string()))
