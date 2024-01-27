@@ -890,7 +890,7 @@ Hart<URV>::logStop(const CoreException& ce, uint64_t counter, FILE* traceFile)
     cerr << std::dec;
     if (ce.type() == CoreException::Stop)
       cerr << (success? "Successful " : "Error: Failed ")
-           << "stop: " << ce.what() << ": " << ce.value() << "\n";
+           << "stop: Hart " << hartIx_ << ": " << ce.what() << ": " << ce.value() << "\n";
     else if (ce.type() == CoreException::Exit)
       cerr << "Target program exited with code " << ce.value() << '\n';
     else

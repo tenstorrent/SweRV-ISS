@@ -34,7 +34,11 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
 
   // write integer registers
   for (unsigned i = 1; i < 32; i++)
-    ofs << "x " << std::dec << i << " 0x" << std::hex << peekIntReg(i) << std::dec << "\n";
+    {
+      URV val = peekIntReg(i);
+      if (val)
+	ofs << "x " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
+    }
 
   // write floating point registers
   if (isRvf())
@@ -42,7 +46,8 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       {
 	uint64_t val = 0;
 	peekFpReg(i, val);
-	ofs << "f " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
+	if (val)
+	  ofs << "f " << std::dec << i << " 0x" << std::hex << val << std::dec << "\n";
       }
 
   // Write control & status registers. Write MISA first.
@@ -57,7 +62,8 @@ Hart<URV>::saveSnapshotRegs(const std::string & filename)
       auto csr = csRegs_.findCsr(CsrNumber(i));
       if (not csr or not csr->isImplemented())
 	continue;
-      ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
+      if (csr->read() != csr->getResetValue())
+	ofs << "c 0x" << i << " 0x" << csr->read() << "\n";
     }
   ofs << std::dec;
 
