@@ -3121,20 +3121,23 @@ unpackPmacfg(uint64_t val, bool& valid, uint64_t& low, uint64_t& high, Pma& pma)
     }
   else
     {
+      // Regular memory.
       if (cacheable)
-	attrib |= Pma::Attrib::Rsrv; // Regular memory and cacheable: allow LR/SC
+	{
+	  attrib |= Pma::Attrib::Rsrv;
+
+	  unsigned amoType = (val >> 5) & 3;   // Bits 6:5
+	  if (amoType == 1)
+	    attrib |= Pma::Attrib::AmoSwap;
+	  else if (amoType == 2)
+	    attrib |= Pma::Attrib::AmoLogical;
+	  else if (amoType == 3)
+	    attrib |= Pma::Attrib::AmoArith;
+	}
+
+      if (cacheable)  // Bit 7
+	attrib |= Pma::Attrib::Cacheable;
     }
-
-  unsigned amoType = (val >> 5) & 3;   // Bits 6:5
-  if (amoType == 1)
-    attrib |= Pma::Attrib::AmoSwap;
-  else if (amoType == 2)
-    attrib |= Pma::Attrib::AmoLogical;
-  else if (amoType == 3)
-    attrib |= Pma::Attrib::AmoArith;
-
-  if (cacheable)  // Bit 7
-    attrib |= Pma::Attrib::Cacheable;
 
   pma = Pma(Pma::Attrib(attrib));
 
