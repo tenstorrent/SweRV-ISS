@@ -151,9 +151,11 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
       return;
     }
 
-  // Use VS mode big-endian for translation.
+  // Use VS mode big-endian/make-exec-readbale for translation.
   bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
+  bool prevMxr = virtMem_.stage1ExecReadable();  // Previous stage1 MXR.
   virtMem_.setBigEndian(hstatus_.bits_.VSBE);
+  virtMem_.setStage1ExecReadable(vsstatus_.bits_.MXR);
   hyperLs_ = true;
 
   URV virtAddr = intRegs_.read(di->op1());
@@ -162,7 +164,8 @@ Hart<URV>::hyperLoad(const DecodedInst* di)
     intRegs_.write(di->op0(), data);
 
   hyperLs_ = false;
-  virtMem_.setBigEndian(prevTbe);
+  virtMem_.setBigEndian(prevTbe);            // Restore big endian mod.
+  virtMem_.setStage1ExecReadable(prevMxr);   // Restore stage1 MXR.
 }
 
 
@@ -267,6 +270,7 @@ Hart<URV>::hyperStore(const DecodedInst* di)
 
   // Use VS mode big-endian for translation.
   bool prevTbe = virtMem_.bigEndian();  // Previous translation big endian.
+  bool prevMxr = virtMem_.stage1ExecReadable();  // Previous stage1 MXR.
   virtMem_.setBigEndian(hstatus_.bits_.VSBE);
   hyperLs_ = true;
 
@@ -276,7 +280,8 @@ Hart<URV>::hyperStore(const DecodedInst* di)
   store<STORE_TYPE>(di, virtAddr, true /*hyper*/, value);
 
   hyperLs_ = false;
-  virtMem_.setBigEndian(prevTbe);
+  virtMem_.setBigEndian(prevTbe);            // Restore big endian mod.
+  virtMem_.setStage1ExecReadable(prevMxr);   // Restore stage1 MXR.
 }
 
 

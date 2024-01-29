@@ -431,10 +431,14 @@ namespace WdRiscv
     void setExecReadable(bool flag)
     { execReadable_ = flag; }
 
-    /// Make executable pages also readable (supports MXR bit in VSTATUS).
+    /// Make executable pages also readable (supports MXR bit in VSSTATUS).
     /// This only affects stage1 translation.
     void setStage1ExecReadable(bool flag)
     { s1ExecReadable_ = flag; }
+
+    /// Return the stage1 executable-readable state (MXR bit in VSSTATUS).
+    bool stage1ExecReadable() const
+    { return s1ExecReadable_; }
 
     /// Allow supervisor-mode code to access user-mode pages (supports SUM
     /// bit in MSTATUS).
