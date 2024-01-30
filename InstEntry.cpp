@@ -1871,7 +1871,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "orc.b", InstId::orc_b, 0x28005013, 0xf800707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
@@ -1882,7 +1882,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "rev8", InstId::rev8, 0x69805013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
@@ -1928,7 +1928,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
       { "sext.h", InstId::sext_h, 0x60501013, 0xfff0707f,
-	RvExtension::Zbb, RvFormat::I,
+	RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
