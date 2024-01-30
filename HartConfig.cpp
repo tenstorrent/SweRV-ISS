@@ -1694,6 +1694,10 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
         hart.enableClearMtvalOnEbreak(flag);
     }
 
+  // This is used to reduce the frequency of timer interupts. By
+  // default the timer runs at the frequence of the instruction
+  // counter. By adding a time shift, we put additional delay before
+  // the timer expires (reaches timecmp).
   tag = "time_shift";
   if (config_ ->contains(tag))
   {
@@ -1701,15 +1705,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     if (not getJsonUnsigned(tag, config_ -> at(tag), shift))
       errors++;
     else
-      {
-	if (shift <= 10)
-	  hart.setTimeShift(shift);
-	else
-	  {
-	    cerr << "Invalid config file time_shift: " << shift << " (expecting <= 10)\n";
-	    errors++;
-	  }
-      }
+      hart.setTimeShift(shift);
   }
 
   tag = "cancel_lr_on_ret";

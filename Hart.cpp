@@ -1790,7 +1790,7 @@ Hart<URV>::load(const DecodedInst* di, uint64_t virtAddr, [[maybe_unused]] bool 
   ULT narrow = 0;   // Unsigned narrow loaded value
   if (addr1 >= clintStart_ and addr1 < clintEnd_ and addr1 - clintStart_ >= 0xbff8)
     {
-      uint64_t tm = time_ >> timeShift_;
+      uint64_t tm = time_;
       tm = tm >> (addr1 - 0xbff8) * 8;
       narrow = tm;
     }
@@ -2115,7 +2115,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
 	  else if (stSize == 8)
 	    {
 	      if ((addr & 7) == 0)
-		hart->clintAlarm_ = storeVal;
+		hart->clintAlarm_ = storeVal + 10000;
 
 	      // An htif_getc may be pending, send char back to target.  FIX: keep track of pending getc.
 	      auto inFd = syscall_.effectiveFd(STDIN_FILENO);
@@ -2142,13 +2142,13 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
           if ((addr & 7) == 0)
             {
               tm = (time_ >> 32) << 32; // Clear low 32
-              tm |= uint32_t(storeVal) << timeShift_; 
+              tm |= uint32_t(storeVal);
               time_ = tm;
             }
           else if ((addr & 3) == 0)
             {
               tm = (time_ << 32) >> 32; // Clear high 32
-              tm |= (uint64_t(storeVal) << timeShift_) << 32;
+              tm |= uint64_t(storeVal) << 32;
               time_ = tm;
             }
         }
@@ -2156,8 +2156,7 @@ Hart<URV>::processClintWrite(uint64_t addr, unsigned stSize, URV& storeVal)
         {
           if ((addr & 7) == 0)
             {
-              tm = storeVal << timeShift_;
-              time_ = tm;
+              time_ = storeVal;
             }
         }
       return;  // Timer.
@@ -5162,7 +5161,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       if (hasClint())
 	{
 	  // Deliver/clear machine timer interrupt from clint.
-	  if ((time_ >> timeShift_) >= clintAlarm_)
+	  if (time_ >= clintAlarm_ + timeShift_)
 	    mipVal = mipVal | (URV(1) << URV(IC::M_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::M_TIMER));
@@ -5194,7 +5193,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear supervisor timer from stimecmp CSR.
       if (stimecmpActive_)
 	{
-	  if ((time_ >> timeShift_) >= stimecmp_)
+	  if (time_ >= stimecmp_ + timeShift_)
 	    mipVal = mipVal | (URV(1) << URV(IC::S_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::S_TIMER));
@@ -5203,7 +5202,7 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       // Deliver/clear virtual supervisor timer from vstimecmp CSR.
       if (vstimecmpActive_)
 	{
-	  if ((time_ >> timeShift_) >= (vstimecmp_ - htimedelta_))
+	  if (time_ >= (vstimecmp_ - htimedelta_ + timeShift_))
 	    mipVal = mipVal | (URV(1) << URV(IC::VS_TIMER));
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(IC::VS_TIMER));

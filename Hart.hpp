@@ -1753,8 +1753,8 @@ namespace WdRiscv
     // Load snapshot of registers (PC, integer, floating point, CSR) into file
     bool loadSnapshotRegs(const std::string& path);
 
-    // Define the log2 of the factor by which to divide the instruction count
-    // to generate a time value. This is relevant to the clint.
+    // Define the additional delay to add to the timecmp register
+    // before the timer expires. This is relevant to the clint.
     void setTimeShift(unsigned shift)
     { timeShift_ = shift; }
 
