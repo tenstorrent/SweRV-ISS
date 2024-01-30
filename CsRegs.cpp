@@ -3371,9 +3371,11 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
   if (n > 0 and n < 12)
     return prev;
 
+#if 0
   unsigned reserved = (val >> 52) & 0xf;  // Bits 55 to 52.
   if (reserved != 0)
     return prev;  // Reserved bits must be zero.
+#endif
 
   bool read = (val & 1);       // bit 0
   bool write = (val & 2);      // bit 1
@@ -3394,8 +3396,10 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 	return prev;  // IO must be amo-none.
       if (write and not read)
 	return prev;  // Cannot have write without read.
+#if 0
       if (not coherent)
 	return prev;  // IO routing constraint.
+#endif
     }
   else
     {
