@@ -582,11 +582,13 @@ CsRegs<URV>::updateSstc()
   auto stimecmp = findCsr(CsrNumber::STIMECMP);
   stimecmp->setImplemented(flag);
   stimecmp->setPrivilegeMode(mode);
+  stimecmp->setHypervisor(false);
   if (rv32_)
     {
       auto stimecmph = findCsr(CsrNumber::STIMECMPH);
       stimecmph->setImplemented(flag);
       stimecmph->setPrivilegeMode(mode);
+      stimecmp->setHypervisor(false);
     }
 
   if (superEnabled_)
@@ -622,9 +624,12 @@ CsRegs<URV>::updateSstc()
       vstimecmph->setPrivilegeMode(mode);
     }
 
-  stimecmp->setHypervisor(!hstce);
-  if (rv32_)
-    findCsr(CsrNumber::STIMECMPH)->setHypervisor(!hstce);
+  if (stce and not hstce)
+    {
+      stimecmp->setHypervisor(true);
+      if (rv32_)
+	findCsr(CsrNumber::STIMECMPH)->setHypervisor(true);
+    }
 
   auto hip = findCsr(CsrNumber::HIP);
   if (hip)
@@ -2353,14 +2358,7 @@ CsRegs<URV>::defineSupervisorRegs()
   defineCsr("satp",       Csrn::SATP,       !mand, !imp, 0, wam, wam);
 
   // Supervisor time compare.
-  auto stimecmp = defineCsr("stimecmp",   Csrn::STIMECMP,   !mand, !imp, 0, wam, wam);
-  stimecmp->setHypervisor(true); // small hack for stimecmp accessed in VS (vstimecmp)
-  if (rv32_)
-    {
-      auto stimecmph = defineCsr("stimecmph",  Csrn::STIMECMPH,  !mand, !imp, 0, wam, wam);
-      stimecmph->setHypervisor(true);
-    }
-
+  defineCsr("stimecmp",   Csrn::STIMECMP,   !mand, !imp, 0, wam, wam);
 
   // Mark supervisor CSR that maps to virtual supervisor counterpart
   for (auto csrn : { Csrn::SSTATUS, Csrn::SIE, Csrn::STVEC,
@@ -3547,11 +3545,19 @@ CsRegs<URV>::updateCounterPrivilege()
             csr->setPrivilegeMode(PrivilegeMode::Machine);
           else if (superEnabled_)
             csr->setPrivilegeMode(PrivilegeMode::Supervisor);
+        }
+    }
 
-          if (((hMask & 2) == 0) or ((mMask & 2) == 0)) // TM clear in either mcounteren/hcounteren
-            csr->setHypervisor(true);  // CSR is for HS mode.
-          else
-            csr->setHypervisor(false);
+  auto vstimecmp = getImplementedCsr(CsrNumber::VSTIMECMP);
+  auto vstimecmph = getImplementedCsr(CsrNumber::VSTIMECMPH);
+  for (auto csr : {vstimecmp, vstimecmph})
+    {
+      if (csr)
+        {
+          if ((mMask & 2) == 0)  // TM bit clear in mcounteren.
+            csr->setPrivilegeMode(PrivilegeMode::Machine);
+          else if (superEnabled_)
+            csr->setPrivilegeMode(PrivilegeMode::Supervisor);
         }
     }
 }
