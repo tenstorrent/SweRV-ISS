@@ -2766,7 +2766,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("vstopei",    CN::VSTOPEI,    !mand, !imp, 0, wam, wam)->setHypervisor(true);
   defineCsr("vstopi",     CN::VSTOPI,     !mand, !imp, 0, wam, wam)->setHypervisor(true);
 
-  for (auto csrn : { CN::VSISELECT, CN::VSIREG, CN::VSTOPEI, CN::VSTOPI } )
+  for (auto csrn : { CN::SISELECT, CN::SIREG, CN::STOPEI, CN::STOPI } )
     {
       auto csr = findCsr(csrn);
       if (csr)
@@ -2790,7 +2790,7 @@ CsRegs<URV>::defineAiaRegs()
       defineCsr("vsieh",    CN::VSIEH,    !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
       defineCsr("vsiph",    CN::VSIPH,    !mand, !imp, 0, wam, wam)->markAsHighHalf(true);
 
-      for (auto csrn : { CN::VSIEH, CN::VSIPH } )
+      for (auto csrn : { CN::SIEH, CN::SIPH } )
 	{
 	  auto csr = findCsr(csrn);
 	  if (csr)
