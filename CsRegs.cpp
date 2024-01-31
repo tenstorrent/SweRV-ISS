@@ -242,6 +242,7 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
       if (mcsr)
 	  value &= mcsr->read();
 
+      // If a bit is zero in HSTATEN, it becomes zero in SSTATEEN
       if (virtMode_)
 	{
 	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);

@@ -10124,6 +10124,7 @@ bool
 Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& value)
 {
   using PM = PrivilegeMode;
+  using CN = CsrNumber;
 
   // Check if HS qualified (section 9.6.1 of privileged spec).
   bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor);
@@ -10131,11 +10132,9 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor);
   if (virtMode_)
     {
-      if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
+      if (csr == CN::VSIREG or (csr == CN::SIREG and privMode_ == PM::User))
 	{
-	  if (virtMode_)
-	    virtualInst(di);  // Section 2.3 of AIA.
-	  illegalInst(di);
+	  virtualInst(di); // Section 2.3 of AIA.
 	  return false;
 	}
 
@@ -10154,7 +10153,7 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
         }
     }
 
-  if (csr == CsrNumber::SATP and privMode_ == PM::Supervisor)
+  if (csr == CN::SATP and privMode_ == PM::Supervisor)
     {
       if (mstatus_.bits_.TVM and not virtMode_)
 	{
@@ -10168,7 +10167,7 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	}
     }
 
-  if (csr == CsrNumber::HGATP and privMode_ == PM::Supervisor and not virtMode_)
+  if (csr == CN::HGATP and privMode_ == PM::Supervisor and not virtMode_)
     if (mstatus_.bits_.TVM)
       {
 	illegalInst(di);
@@ -10176,16 +10175,15 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
       }
 
   if (not isFpLegal())
-    if (csr == CsrNumber::FCSR or csr == CsrNumber::FRM or csr == CsrNumber::FFLAGS)
+    if (csr == CN::FCSR or csr == CN::FRM or csr == CN::FFLAGS)
       {
 	illegalInst(di);
 	return false;
       }
 
   if (not isVecLegal())
-    if (csr == CsrNumber::VSTART or csr == CsrNumber::VXSAT or csr == CsrNumber::VXRM
-	or csr == CsrNumber::VCSR or csr == CsrNumber::VL or csr == CsrNumber::VTYPE
-	or csr == CsrNumber::VLENB)
+    if (csr == CN::VSTART or csr == CN::VXSAT or csr == CN::VXRM or csr == CN::VCSR
+	or csr == CN::VL or csr == CN::VTYPE or csr == CN::VLENB)
       {
         illegalInst(di);
         return false;
@@ -10259,7 +10257,8 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	{
 	  if (virtMode_)
 	    virtualInst(di);  // Section 2.3 of AIA.
-	  illegalInst(di);
+	  else
+	    illegalInst(di);
 	  return;
 	}
 
