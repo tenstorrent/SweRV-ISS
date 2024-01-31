@@ -242,7 +242,7 @@ CsRegs<URV>::adjustSstateenValue(CsrNumber num, URV value) const
       if (mcsr)
 	  value &= mcsr->read();
 
-      // If a bit is zero in HSTATEN, it becomes zero in SSTATEEN
+      // If a bit is zero in HSTATEEN, it becomes zero in SSTATEEN
       if (virtMode_)
 	{
 	  CsrNumber hnum = advance(CN::HSTATEEN0, ix);
@@ -2813,11 +2813,11 @@ CsRegs<URV>::defineStateEnableRegs()
   bool mand = true;  // Mndatory
   bool imp = true;   // Implemented
 
-  // Default: none of the staten CSRs are writable.
-  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, 0, 0);
-  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, 0, 0);
-  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, 0, 0);
-  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, 0, 0);
+  // Default: none of the sstaten CSRs are writable.
+  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
+  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
+  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
+  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
 
   URV mask = 0;  // Default: nothing writable.
 
@@ -2829,10 +2829,10 @@ CsRegs<URV>::defineStateEnableRegs()
   defineCsr("mstateen2", CsrNumber::MSTATEEN2,  !mand, !imp, 0, 0, 0);
   defineCsr("mstateen3", CsrNumber::MSTATEEN3,  !mand, !imp, 0, 0, 0);
 
-  defineCsr("hstateen0", CsrNumber::HSTATEEN0,  !mand, !imp, 0, mask, mask);
-  defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, 0, 0);
-  defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, 0, 0);
-  defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, 0, 0);
+  defineCsr("hstateen0", CsrNumber::HSTATEEN0,  !mand, !imp, 0, mask, mask)->setHypervisor(true);
+  defineCsr("hstateen1", CsrNumber::HSTATEEN1,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
+  defineCsr("hstateen2", CsrNumber::HSTATEEN2,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
+  defineCsr("hstateen3", CsrNumber::HSTATEEN3,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
 
   if (sizeof(URV) == 4)
     {
