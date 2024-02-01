@@ -1455,18 +1455,18 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
   if (num == CN::MENVCFG)
     {
       // MENVCFG.STCE off make HENVCFG.STCE read-only zero.
-      bool stce = menvcfgStce();
+      sstcEnabled_ = menvcfgStce();
       if (rv32_)
 	{
 	  uint32_t mask = uint32_t(regs_.at(size_t(CN::HENVCFGH)).getReadMask());
 	  HenvcfghFields<uint32_t> hf{mask};
-	  hf.bits_.STCE = stce;
+	  hf.bits_.STCE = sstcEnabled_;
 	  regs_.at(size_t(CN::HENVCFGH)).setReadMask(hf.value_);
 	}
       else
 	{
 	  HenvcfgFields<uint64_t> hf{regs_.at(size_t(CN::HENVCFG)).getReadMask()};
-	  hf.bits_.STCE = stce;
+	  hf.bits_.STCE = sstcEnabled_;
 	  regs_.at(size_t(CN::HENVCFG)).setReadMask(hf.value_);
 	}
     }
