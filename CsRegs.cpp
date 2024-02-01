@@ -375,7 +375,7 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
   using CN = CsrNumber;
 
   auto csr = getImplementedCsr(num, virtMode_);
-  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode))
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode, virtMode_))
     return false;
   num = csr->getNumber();  // CSR may have been remapped from S to VS
 
@@ -1354,7 +1354,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
   using CN = CsrNumber;
 
   Csr<URV>* csr = getImplementedCsr(csrn, virtMode_);
-  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(csrn, mode) or
+  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(csrn, mode, virtMode_) or
       csr->isReadOnly())
     return false;
   CN num = csr->getNumber();  // CSR may have been remapped from S to VS
@@ -1500,10 +1500,10 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
 template <typename URV>
 bool
-CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
+CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode pm, bool vm) const
 {
-  const Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode) or
+  const Csr<URV>* csr = getImplementedCsr(num, vm);
+  if (not csr or pm < csr->privilegeMode() or not isStateEnabled(num, pm, vm) or
       csr->isReadOnly())
     return false;
 
@@ -1551,10 +1551,10 @@ CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode mode ) const
 
 template <typename URV>
 bool
-CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode mode ) const
+CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode pm, bool vm) const
 {
-  const Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-  if (not csr or mode < csr->privilegeMode() or not isStateEnabled(num, mode))
+  const Csr<URV>* csr = getImplementedCsr(num, vm);
+  if (not csr or pm < csr->privilegeMode() or not isStateEnabled(num, pm, vm))
     return false;
 
   if (csr->isDebug() and not inDebugMode())
@@ -2813,7 +2813,7 @@ CsRegs<URV>::defineStateEnableRegs()
   bool mand = true;  // Mndatory
   bool imp = true;   // Implemented
 
-  // Default: none of the sstaten CSRs are writable.
+  // Default: none of the sstateen CSRs are writable.
   defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
   defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
   defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
@@ -4373,15 +4373,15 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 
 template <typename URV>
 bool
-CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode mode) const
+CsRegs<URV>::isStateEnabled(CsrNumber num, PrivilegeMode pm, bool vm) const
 {
-  if (not stateenOn_ or mode == PrivilegeMode::Machine)
+  if (not stateenOn_ or pm == PrivilegeMode::Machine)
     return true;
 
   using CN = CsrNumber;
   // sstateen not applicable for now
   CN csrn = rv32_? CN::MSTATEEN0H : CN::MSTATEEN0;
-  if (virtMode_)
+  if (vm)
     csrn = rv32_? CN::HSTATEEN0H : CN::HSTATEEN0;
 
   int enableBit = -1;

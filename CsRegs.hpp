@@ -847,8 +847,8 @@ namespace WdRiscv
     bool write(CsrNumber number, PrivilegeMode mode, URV value);
 
     /// Return true if given register is writable by a CSR instruction
-    /// in the given mode.
-    bool isWriteable(CsrNumber number, PrivilegeMode mode) const;
+    /// in the given privilege and virtual mode.
+    bool isWriteable(CsrNumber number, PrivilegeMode mode, bool virtMode) const;
 
     /// Return true if this is a high-half of a CSR (e.g. MSTATUSH is
     /// the high half of MSTATUS).
@@ -859,8 +859,8 @@ namespace WdRiscv
     }
 
     /// Return true if given register is readable by a CSR instruction
-    /// in the given mode.
-    bool isReadable(CsrNumber number, PrivilegeMode mode) const;
+    /// in the given privlege and virtual modes.
+    bool isReadable(CsrNumber number, PrivilegeMode pm, bool virtMode) const;
 
     /// Fill the nums vector with the numbers of the CSRs written by
     /// the last instruction.
@@ -1708,7 +1708,7 @@ namespace WdRiscv
 
     /// Returns true if CSR is defined as part of a STATEEN and enabled, or
     /// not part of STATEEN. Returns false otherwise.
-    bool isStateEnabled(CsrNumber num, PrivilegeMode mode) const;
+    bool isStateEnabled(CsrNumber num, PrivilegeMode mode, bool virtMode) const;
 
   private:
 

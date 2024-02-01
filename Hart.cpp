@@ -10127,9 +10127,9 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
   using CN = CsrNumber;
 
   // Check if HS qualified (section 9.6.1 of privileged spec).
-  bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor);
+  bool hsq = isRvs() and csRegs_.isReadable(csr, PM::Supervisor, false /*virtMode*/);
   if (isWrite)
-    hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor);
+    hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor, false /*virtMode*/);
   if (virtMode_)
     {
       if (csr == CN::VSIREG or (csr == CN::SIREG and privMode_ == PM::User))
@@ -10139,7 +10139,7 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	}
 
       if (csRegs_.isHypervisor(csr) or
-	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User)))
+	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
 	{
 	  if (not csRegs_.isHighHalf(csr))
 	    {
@@ -10210,11 +10210,11 @@ Hart<URV>::isCsrWriteable(CsrNumber csr, PrivilegeMode privMode, bool virtMode) 
   if (virtMode)
     {
       if (csRegs_.isHypervisor(csr) or
-	  (privMode == PM::User and not csRegs_.isWriteable(csr, PM::User)))
+	  (privMode == PM::User and not csRegs_.isWriteable(csr, PM::User, virtMode)))
 	return false;
     }
 
-  if (not csRegs_.isWriteable(csr, privMode))
+  if (not csRegs_.isWriteable(csr, privMode, virtMode))
     return false;
 
   if (csr == CsrNumber::SATP and privMode == PrivilegeMode::Supervisor)
