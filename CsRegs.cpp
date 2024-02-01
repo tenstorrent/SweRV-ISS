@@ -1510,41 +1510,6 @@ CsRegs<URV>::isWriteable(CsrNumber num, PrivilegeMode pm, bool vm) const
   if (csr->isDebug() and not inDebugMode())
     return false;  // Debug-mode register.
 
-  using CN = CsrNumber;
-
-  if (imsic_)
-    {
-      if (csr->getNumber() == CN::VSTOPEI)
-	{
-	  const auto& hs = regs_.at(size_t(CN::HSTATUS));
-	  URV hsVal = hs.read();
-	  HstatusFields<URV> hsf(hsVal);
-	  unsigned vgein = hsf.bits_.VGEIN;
-	  if (not vgein or vgein >= imsic_->guestCount())
-	    return false;
-	}
-
-      if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
-        {
-          CN siselect = advance(csr->getNumber(), -1);
-          URV sel = 0;
-          peek(siselect, sel);
-          return imsic_->isFileSelAccessible<URV>(sel, virtMode_);
-        }
-    }
-  else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
-    return false;
-  else if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
-    return false;
-  else if ((num == CN::STIMECMP or num == CN::STIMECMPH) and virtMode_)
-    {
-      URV val = 0;
-      peek(CsrNumber::HVICTL, val);
-      HvictlFields hvictl(val);
-      if (hvictl.bits_.VTI)
-        return false;
-    }
-
   return true;
 }
 
@@ -1559,32 +1524,6 @@ CsRegs<URV>::isReadable(CsrNumber num, PrivilegeMode pm, bool vm) const
 
   if (csr->isDebug() and not inDebugMode())
     return false;  // Debug-mode register.
-
-  using CN = CsrNumber;
-
-  if (imsic_)
-    {
-      if (csr->getNumber() == CN::VSTOPEI)
-	{
-	  const auto& hs = regs_.at(size_t(CN::HSTATUS));
-	  URV hsVal = hs.read();
-	  HstatusFields<URV> hsf(hsVal);
-	  unsigned vgein = hsf.bits_.VGEIN;
-	  if (not vgein or vgein >= imsic_->guestCount())
-	    return false;
-	}
-      if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
-        {
-          CN siselect = advance(csr->getNumber(), -1);
-          URV sel = 0;
-          peek(siselect, sel);
-          return imsic_->isFileSelAccessible<URV>(sel, virtMode_);
-        }
-    }
-  else if (num == CN::MTOPEI or num == CN::STOPEI or num == CN::VSTOPEI)
-    return false;
-  else if (num == CN::MIREG or num == CN::SIREG or num == CN::VSIREG)
-    return false;
 
   return true;
 }

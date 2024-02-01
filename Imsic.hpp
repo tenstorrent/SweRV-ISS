@@ -21,20 +21,28 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     enum ExternalInterruptCsr
     {
+      RES0 = 0x00,
+      RES1 = 0x2F,
+
       IPRIO0 = 0x30,
       IPRIO15 = 0x3F,
 
+      RES2 = 0x40,
+      RES3 = 0x6F,
+
       DELIVERY = 0x70,
-      RES0 = 0x71,
+      SRES0 = 0x71,
       THRESHOLD = 0x72,
-      RES1 = 0x73,
-      RES2 = 0x7F,
+      SRES1 = 0x73,
+      SRES2 = 0x7F,
 
       P0 = 0x80,
       P63 = 0xBF,
 
       E0 = 0xC0,
-      E63 = 0xFF
+      E63 = 0xFF,
+
+      RES4 = 0x100
     };
 
     /// Define an non-configured file. File may be later configured
@@ -377,6 +385,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool writeMireg(unsigned select, URV value)
     {
+      if (not isFileSelAccessible<URV>(select, false) or isFileSelReserved(select))
+        return false;
       bool ok = mfile_.iregWrite(select, value);
       checkMInterrupt();
       return ok;
@@ -387,12 +397,11 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool writeSireg(bool virt, unsigned guest, unsigned select, URV value)
     {
-      using EIC = File::ExternalInterruptCsr;
+      if (not isFileSelAccessible<URV>(select, virt) or isFileSelReserved(select))
+        return false;
 
       if (virt)
 	{
-          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
-            return false;
 	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
@@ -409,7 +418,11 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     /// Called form the associated hart for a CSR read from mireg.
     template <typename URV>
     bool readMireg(unsigned select, URV& value) const
-    { return mfile_.iregRead(select, value); }
+    {
+      if (not isFileSelAccessible<URV>(select, false) or isFileSelReserved(select))
+        return false;
+      return mfile_.iregRead(select, value);
+    }
 
 
     /// Called form the associated hart for a CSR read from sireg/vsireg.
@@ -417,13 +430,11 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     template <typename URV>
     bool readSireg(bool virt, unsigned guest, unsigned select, URV& value) const
     {
-      using EIC = File::ExternalInterruptCsr;
+      if (not isFileSelAccessible<URV>(select, false) or isFileSelReserved(select))
+        return false;
 
       if (virt)
 	{
-          /// The guest file marks the prio array as inaccessible.
-          if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
-            return false;
 	  if (not guest or guest >= gfiles_.size())
 	    return false;
 	  auto& gfile = gfiles_.at(guest);
@@ -535,7 +546,7 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
         g.clearTrace();
     }
 
-    /// Returns false if address access will raise exception and true otherwise.
+    /// Returns false if IMSIC region is marked inaccessible.
     template <typename URV>
     static constexpr bool isFileSelAccessible(unsigned select, bool virt)
     {
@@ -550,13 +561,17 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
         if (select >= EIC::IPRIO0 and select <= EIC::IPRIO15)
           return false;
 
-      if ((select == EIC::DELIVERY) or
-          (select == EIC::THRESHOLD) or
-          (select == EIC::RES0) or
-          (select >= EIC::RES1 and select <= EIC::RES2) or
-          (select >= EIC::IPRIO0 and select <= EIC::IPRIO15) or
-          (select >= EIC::P0 and select <= EIC::P63) or
-          (select >= EIC::E0 and select <= EIC::E63))
+      return true;
+    }
+
+    /// Returns true if IMSIC region is marked reserved.
+    static constexpr bool isFileSelReserved(unsigned select)
+    {
+      using EIC = File::ExternalInterruptCsr;
+
+      if ((select >= EIC::RES0 and select <= EIC::RES1) or
+          (select >= EIC::RES2 and select <= EIC::RES3) or
+          (select >= EIC::RES4))
         return true;
       return false;
     }

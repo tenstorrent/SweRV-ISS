@@ -2408,6 +2408,11 @@ namespace WdRiscv
     template<typename LOAD_TYPE>
     void hyperStore(const DecodedInst* di);
 
+    /// Helper for IMSIC csr accesses. Return false if access would
+    /// raise virtual or illegal instruction exception and
+    /// false otherwise.
+    bool imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode mode, bool virtMode);
+
     /// Helper to CSR instructions: return true if given CSR is
     /// writebale in the given privielge level and virtual (V) mode
     /// and false otherwise.

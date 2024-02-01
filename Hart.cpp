@@ -10132,12 +10132,6 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
     hsq = hsq and csRegs_.isWriteable(csr, PM::Supervisor, false /*virtMode*/);
   if (virtMode_)
     {
-      if (csr == CN::VSIREG or (csr == CN::SIREG and privMode_ == PM::User))
-	{
-	  virtualInst(di); // Section 2.3 of AIA.
-	  return false;
-	}
-
       if (csRegs_.isHypervisor(csr) or
 	  (privMode_ == PM::User and not csRegs_.isReadable(csr, PM::User, virtMode_)))
 	{
@@ -10152,6 +10146,10 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 	  return false;
         }
     }
+
+  // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
+  if (not imsicAccessible(di, csr, privMode_, virtMode_))
+    return false;
 
   if (csr == CN::SATP and privMode_ == PM::Supervisor)
     {
@@ -10203,6 +10201,79 @@ Hart<URV>::doCsrRead(const DecodedInst* di, CsrNumber csr, bool isWrite, URV& va
 
 template <typename URV>
 bool
+Hart<URV>::imsicAccessible(const DecodedInst* di, CsrNumber csr, PrivilegeMode mode, bool virtMode)
+{
+  using CN = CsrNumber;
+  using PM = PrivilegeMode;
+
+  if (virtMode)
+    {
+      if (csr == CN::VSIREG or (csr == CN::SIREG and mode == PM::User))
+        {
+          virtualInst(di);
+          return false;
+        }
+    }
+
+  if (imsic_)
+    {
+      bool guestFile = (csr == CN::VSTOPEI) or (csr == CN::STOPEI and virtMode) or
+                       (csr == CN::VSIREG) or (csr == CN::SIREG and virtMode);
+
+      if (guestFile)
+        {
+	  unsigned vgein = hstatus_.bits_.VGEIN;
+	  if (not vgein or vgein >= imsic_->guestCount())
+            {
+              if (virtMode)
+                virtualInst(di);
+              else
+                illegalInst(di);
+              return false;
+            }
+	}
+      if (csr == CN::MIREG or csr == CN::SIREG or csr == CN::VSIREG)
+        {
+          CN iselect = CsRegs<URV>::advance(csr, -1);
+          if (guestFile)
+            iselect = CN::VSISELECT;
+
+          URV sel = 0;
+          if (not peekCsr(iselect, sel))
+            {
+              std::cerr << "Failed to peek AIA select csr\n";
+              return false;
+            }
+
+          if (TT_IMSIC::Imsic::isFileSelReserved(sel))
+            {
+              illegalInst(di);
+              return false;
+            }
+
+          if (not TT_IMSIC::Imsic::isFileSelAccessible<URV>(sel, virtMode))
+            {
+              if (virtMode)
+                virtualInst(di);
+              else
+                illegalInst(di);
+              return false;
+            }
+        }
+    }
+  else if (csr == CN::MTOPEI or csr == CN::STOPEI or csr == CN::VSTOPEI or
+           csr == CN::MIREG or csr == CN::SIREG or csr == CN::VSIREG)
+    {
+      illegalInst(di);
+      return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
 Hart<URV>::isCsrWriteable(CsrNumber csr, PrivilegeMode privMode, bool virtMode) const
 {
   using PM = PrivilegeMode;
@@ -10240,6 +10311,17 @@ Hart<URV>::isCsrWriteable(CsrNumber csr, PrivilegeMode privMode, bool virtMode) 
 	csr == CsrNumber::VLENB)
       return false;
 
+  if ((csr == CsrNumber::STIMECMP or csr == CsrNumber::STIMECMPH) and virtMode)
+    {
+      URV val = 0;
+      if (peekCsr(CsrNumber::HVICTL, val))
+        {
+          HvictlFields hvictl(val);
+          if (hvictl.bits_.VTI)
+            return false;
+        }
+    }
+
   return true;
 }
 
@@ -10253,15 +10335,6 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 
   if (not isCsrWriteable(csr, privMode_, virtMode_))
     {
-      if (csr == CsrNumber::VSIREG or (csr == CsrNumber::SIREG and privMode_ == PM::User))
-	{
-	  if (virtMode_)
-	    virtualInst(di);  // Section 2.3 of AIA.
-	  else
-	    illegalInst(di);
-	  return;
-	}
-
       if (virtMode_)
 	{
 	  if (csr == CsrNumber::SATP)
@@ -10278,6 +10351,10 @@ Hart<URV>::doCsrWrite(const DecodedInst* di, CsrNumber csr, URV val,
 	illegalInst(di);
       return;
     }
+
+  // Section 2.3 of AIA, lower priority than stateen. Doesn't follow normal hs-qualified rules.
+  if (not imsicAccessible(di, csr, privMode_, virtMode_))
+    return;
 
   // Make auto-increment happen before CSR write for minstret and cycle.
   if (csr == CsrNumber::MINSTRET or csr == CsrNumber::MINSTRETH)
