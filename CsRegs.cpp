@@ -2688,7 +2688,10 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mireg",      CN::MIREG,      !mand, !imp, 0, wam, wam);
   defineCsr("mtopei",     CN::MTOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("mtopi",      CN::MTOPI,      !mand, !imp, 0, wam, wam);
-  defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, wam, wam);
+  
+  URV mask = 0b10'0010'0010;  // Bits 9,5, and 1 (SEI, STI, SSI).
+  defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, mask, mask);
+
   defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, wam, wam);
   defineCsr("siselect",   CN::SISELECT,   !mand, !imp, 0, wam, wam);
   defineCsr("sireg",      CN::SIREG,      !mand, !imp, 0, wam, wam);
@@ -2799,6 +2802,7 @@ CsRegs<URV>::definePmaRegs()
   bool mand = true;
 
   uint64_t reset = 0x7, mask = 0xfcfffffffffff1ff;
+  uint64_t pokeMask = ~(uint64_t(0xf) << 52);   // Bits 52 to 55 are read only zero
 
   for (unsigned i = 0; i < 64; ++i)
     {
@@ -2806,7 +2810,7 @@ CsRegs<URV>::definePmaRegs()
       CN num = advance(CN::PMACFG0, i);
       if (i >= 32)
 	num = advance(CN::PMACFG32, i - 32);
-      defineCsr(name, num, !mand, !imp, reset, mask, mask);
+      defineCsr(name, num, !mand, !imp, reset, mask, pokeMask);
     }
 }
 
@@ -3334,10 +3338,8 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
 	return prev;  // IO must be amo-none.
       if (write and not read)
 	return prev;  // Cannot have write without read.
-#if 0
-      if (not coherent)
+      if (coherent)
 	return prev;  // IO routing constraint.
-#endif
     }
   else
     {
