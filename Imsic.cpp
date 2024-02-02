@@ -16,16 +16,11 @@ File::iregRead(unsigned sel, URV& val) const
     val = delivery_;
   else if (sel == EIC::THRESHOLD)
     val = threshold_;
-  else if ((sel == EIC::RES0) or
-           (sel >= EIC::RES1 and sel <= EIC::RES2))
+  else if ((sel == EIC::SRES0) or
+           (sel >= EIC::SRES1 and sel <= EIC::SRES2))
     return true;
-  else if (sel >= EIC::IPRIO0 and sel <= EIC::IPRIO15)
-    {
-      if constexpr (sizeof(URV) == 8)
-        if (sel & 1)
-          return false;
-      return true;
-    }
+  else if (sel >= EIC::IPRIO0 and sel <= EIC::IPRIO15) // accessible when V=1
+    return true;
   else
     {
       unsigned offset = 0;
@@ -73,16 +68,11 @@ File::iregWrite(unsigned sel, URV val)
     delivery_ = val;
   else if (sel == EIC::THRESHOLD)
     threshold_ = val;
-  else if ((sel == EIC::RES0) or
-           (sel >= EIC::RES1 and sel <= EIC::RES2))
+  else if ((sel == EIC::SRES0) or
+           (sel >= EIC::SRES1 and sel <= EIC::SRES2))
     return true;
   else if (sel >= EIC::IPRIO0 and sel <= EIC::IPRIO15)
-    {
-      if constexpr (sizeof(URV) == 8)
-        if (sel & 1)
-          return false;
-      return true;
-    }
+    return true;
   else
     {
       unsigned offset = 0;

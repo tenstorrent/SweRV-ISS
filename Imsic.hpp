@@ -552,6 +552,9 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     {
       using EIC = File::ExternalInterruptCsr;
 
+      if (select == EIC::SRES0 or (select >= EIC::SRES1 and select <= EIC::SRES2))
+        return true;
+
       if constexpr (sizeof(URV) == 8)
         if (select & 1)
           return false;
