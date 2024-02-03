@@ -2165,14 +2165,15 @@ Mcm<URV>::ppoRule5(Hart<URV>& hart, const McmInstr& instrB) const
       else
 	{
 	  auto timeB = earliestOpTime(instrB);
-	  if (timeB <= latestOpTime(instrA))
+	  auto timeA = latestOpTime(instrA);
+	  if (timeB <= timeA)
 	    {
-	      // B peforms before A -- Allow if there is no write overlapping B after B
-	      // from another core.
+	      // B peforms before A -- Allow if there is no write overlapping B 
+	      // between A and B from another core.
 	      for (size_t ix = sysMemOps_.size(); ix != 0 and not fail; ix--)
 		{
 		  const auto& op = sysMemOps_.at(ix-1);
-		  if (op.isCanceled())
+		  if (op.isCanceled() or op.time_ > timeA)
 		    continue;
 		  if (op.time_ < timeB)
 		    break;
