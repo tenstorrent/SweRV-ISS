@@ -4251,7 +4251,7 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
       // Writing HIP changes bit VSSIP in HVIP.
       if (hvip and num != CsrNumber::HVIP)
 	{
-	  URV mask = 0x400; // Bit VSSIP
+	  URV mask = 0x4; // Bit VSSIP
 	  URV newVal = (hip->read() & mask) | (hvip->read() & ~mask);
 	  hvip->poke(newVal);
 	}

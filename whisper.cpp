@@ -1054,7 +1054,10 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
 
   // Command-line entry point overrides that of ELF.
   if (args.startPc)
-    hart.pokePc(URV(*args.startPc));
+    {
+      hart.defineResetPc(*args.startPc);
+      hart.pokePc(URV(*args.startPc));
+    }
 
   // Command-line exit point overrides that of ELF.
   if (args.endPc)
