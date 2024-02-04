@@ -9579,6 +9579,9 @@ Hart<URV>::execFencei(const DecodedInst* di)
       return;
     }
 
+  if (mcm_)
+    fetchCache_.clear();
+
   // invalidateDecodeCache();  // No need for this. We invalidate on each write.
 }
 

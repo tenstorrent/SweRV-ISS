@@ -66,6 +66,10 @@ namespace TT_FETCH_CACHE
       return true;
     }
 
+    /// Empty fetch cache.
+    void clear()
+    { data_.clear(); }
+
   private:
 
     unsigned lineSize_ = 64;
