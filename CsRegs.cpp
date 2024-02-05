@@ -1474,7 +1474,7 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
     {
       updateCounterControl(num);
-      if (cofEnabled_)
+      if (cofEnabled_ and superEnabled_)
         {
           if (not rv32_ or (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
             updateScountovfValue(num, value);
@@ -2970,7 +2970,7 @@ CsRegs<URV>::poke(CsrNumber num, URV value)
       (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
     {
       updateCounterControl(num);
-      if (cofEnabled_)
+      if (cofEnabled_ and superEnabled_)
         {
           if (rv32_ and num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31)
             updateScountovfValue(num, value);
@@ -3559,7 +3559,7 @@ CsRegs<URV>::updateCounterControl(CsrNumber csrn)
   else
     event = std::min(event, maxEventId_);
 
-  if (cofEnabled_)
+  if (cofEnabled_ and superEnabled_)
     {
       MhpmeventFields fields(value);
       event = fields.bits_.EVENT;
