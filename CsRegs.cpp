@@ -3619,7 +3619,7 @@ CsRegs<URV>::addMachineFields()
   setCsrFields(CsrNumber::MTVAL, {{"mtval", xlen}});
   setCsrFields(CsrNumber::MCYCLE, {{"mcycle", xlen}});
   setCsrFields(CsrNumber::MINSTRET, {{"minstret", xlen}});
-  // TODO: add GVA/SBE fields
+
   if (rv32_)
     {
       setCsrFields(CsrNumber::MSTATUS,
@@ -3630,7 +3630,8 @@ CsRegs<URV>::addMachineFields()
          {"TVM",  1}, {"TW",   1}, {"TSR",  1}, {"res0",  8},
          {"SD",   1}});
       setCsrFields(CsrNumber::MSTATUSH,
-        {{"res1", 4}, {"SBE", 1}, {"MBE", 1}, {"res0", 26}});
+         {{"res1", 4}, {"SBE", 1}, {"MBE", 1}, {"GVA",   1},
+	  {"MPV",  1}, {"res0", 24}});
       setCsrFields(CsrNumber::MENVCFG,
         {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
          {"CBZE", 1}, {"res1", 24}});
@@ -3648,7 +3649,7 @@ CsRegs<URV>::addMachineFields()
          {"XS",   2},  {"MPRV", 1}, {"SUM",  1}, {"MXR",   1},
          {"TVM",  1},  {"TW",   1}, {"TSR",  1}, {"res1",  9},
          {"UXL",  2},  {"SXL",  2}, {"SBE",  1}, {"MBE",   1},
-         {"res0", 25}, {"SD",   1}});
+         {"GVA",  1},  {"MPV",  1}, {"res0", 23}, {"SD",   1}});
       setCsrFields(CsrNumber::MENVCFG,
         {{"FIOM", 1}, {"res0",  3}, {"CBIE", 2}, {"CBCFE", 1},
          {"CBZE", 1}, {"res1", 53}, {"ADUE", 1}, {"PBMTE", 1},
@@ -4010,12 +4011,14 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
       // logical-or external values for VSEIP and VSTIP.
       if (hip)
 	{
+	  // Bit 10 (VSEIP) of HIP is the or of bit 10 of HVIP and HGEIP bit
+	  // selected by GVEIN.
 	  URV hsVal = regs_.at(size_t(CsrNumber::HSTATUS)).read();
 	  HstatusFields<URV> hsf(hsVal);
 	  unsigned vgein = hsf.bits_.VGEIN;
 	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
-	  value = value | (bit << 10);
+	  value = value | (bit << 10);  // Or HGEIP bit selected by GVEIN.
 	  hip->poke(value);
 	  hipUpdated = true;
 	  recordWrite(CsrNumber::HIP);
@@ -4041,7 +4044,9 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  // Update bit VSEIP (10) of HIP.
 	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
 	  URV mask = bit << 10;
-          hip->poke(hip->read() | mask);  // Set bit 10 to HGEIP bit selected by VGEIN.
+	  if (hvip)
+	    mask |= (hvip->read() & (1 << 10));  // Or bit 10 of HVIP.
+          hip->poke(hip->read() | mask);  // Set HIP bit 10 to or of HVIP and HGEIP bits.
           hipUpdated = true;
 	  recordWrite(CsrNumber::HIP);
         }
