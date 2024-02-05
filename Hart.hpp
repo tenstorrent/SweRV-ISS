@@ -1878,7 +1878,10 @@ namespace WdRiscv
 	  }
 	return this->memory_.readInst(addr, value);
       };
-      return fetchCache_.addLine(addr, fetchMem);
+      bool ok = fetchCache_.addLine(addr, fetchMem);
+      if (not ok)
+	fetchCache_.removeLine(addr);
+      return ok;
     }
 
     /// Evict an instruction cache line.
