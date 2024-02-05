@@ -4038,8 +4038,10 @@ CsRegs<URV>::hyperWrite(Csr<URV>* csr)
 	  unsigned vgein = hsf.bits_.VGEIN;
 	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  // Update bit VSEIP (10) of HIP.
+	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
 	  URV mask = bit << 10;
-          hip->poke(hip->read() | mask);
+          hip->poke(hip->read() | mask);  // Set bit 10 to HGEIP bit selected by VGEIN.
           hipUpdated = true;
 	  recordWrite(CsrNumber::HIP);
         }
@@ -4224,8 +4226,10 @@ CsRegs<URV>::hyperPoke(Csr<URV>* csr)
 	  unsigned vgein = hsf.bits_.VGEIN;
 	  URV hgeipVal = regs_.at(size_t(CsrNumber::HGEIP)).read();
 	  unsigned bit = (hgeipVal >> vgein) & 1;  // Bit of HGEIP selected by VGEIN
+	  // Update bit VSEIP (10) of HIP.
+	  hip->poke(hip->read() & ~(URV(1) << 10));  // Clear bit 10 of HIP
 	  URV mask = bit << 10;
-          hip->poke(hip->read() | mask);
+          hip->poke(hip->read() | mask);  // Set bit 10 to HGEIP bit selected by VGEIN.
           hipUpdated = true;
         }
     }
