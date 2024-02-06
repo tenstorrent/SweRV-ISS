@@ -798,8 +798,6 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 {
   cofEnabled_ = flag;
 
-  flag &= superEnabled_;
-
   auto csrn = CsrNumber::SCOUNTOVF;
   auto csr = findCsr(csrn);
   if (not csr)
@@ -809,7 +807,7 @@ CsRegs<URV>::enableSscofpmf(bool flag)
       assert(0);
     }
   else
-    csr->setImplemented(flag);
+    csr->setImplemented(flag & superEnabled_);
 
   // un-mask LCOF bits
   if (flag)
@@ -858,12 +856,14 @@ CsRegs<URV>::enableSscofpmf(bool flag)
 	if (rv32_)
           {
             event->poke(fields.value_ >> 32);
-            updateScountovfValue(evnum, fields.value_ >> 32);
+	    if (superEnabled_)
+	      updateScountovfValue(evnum, fields.value_ >> 32);
           }
 	else
           {
             event->poke(fields.value_);
-            updateScountovfValue(evnum, fields.value_);
+	    if (superEnabled_)
+	      updateScountovfValue(evnum, fields.value_);
           }
 	this->recordWrite(evnum);
 
