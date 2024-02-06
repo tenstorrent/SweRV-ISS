@@ -56,6 +56,36 @@ struct MySr
 };
 
 
+/// Rotate left.
+/// Only the least sig n bits of b are used, n is log2(width of T).
+struct MyRol
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  {
+    constexpr unsigned bits = sizeof(T)*8;
+    constexpr unsigned mask = bits - 1;
+    unsigned amount = b & mask;
+    return ((a << amount) | (a >> (bits - amount)));
+  }
+};
+
+
+/// Rotate right.
+/// Only the least sig n bits of b are used, n is log2(width of T).
+struct MyRor
+{
+  template <typename T>
+  constexpr T operator() (const T& a, const T& b) const
+  {
+    constexpr unsigned bits = sizeof(T)*8;
+    constexpr unsigned mask = bits - 1;
+    unsigned amount = b & mask;
+    return ((a >> amount) | (a << (bits - amount)));
+  }
+};
+
+
 /// Function operator to perform carry-less multiply of a and b.
 struct MyClmul
 {
