@@ -1094,30 +1094,14 @@ CsRegs<URV>::writeSipSie(CsrNumber num, URV value)
       auto mideleg = getImplementedCsr(CN::MIDELEG);
       mask &= mideleg ? mideleg->read() >> virtMode_: 0; // Only delegated bits writeable
 
-      if (virtMode_)
-        {
-          auto hideleg = getImplementedCsr(CN::HIDELEG);
-          mask &= hideleg ? hideleg->read() >> 1: 0;
-        }
-
       // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
       mask &= ~ URV(0x1444);
-
-#if 0
-      // If hypervisor is enabled then VSSIP is an alias to bit in HIP
-      // which is writeable.
-      if (hyperEnabled_)
-	mask |= URV(4);
-#endif
 
       csr->setWriteMask(mask);
       csr->write(value);
       csr->setWriteMask(prevMask);
 
       recordWrite(num);
-
-      if (virtMode_)
-        hyperWrite(csr);
       return true;
     }
   return false;
