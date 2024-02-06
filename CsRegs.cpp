@@ -1103,10 +1103,12 @@ CsRegs<URV>::writeSipSie(CsrNumber num, URV value)
       // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
       mask &= ~ URV(0x1444);
 
+#if 0
       // If hypervisor is enabled then VSSIP is an alias to bit in HIP
       // which is writeable.
       if (hyperEnabled_)
 	mask |= URV(4);
+#endif
 
       csr->setWriteMask(mask);
       csr->write(value);
