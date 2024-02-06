@@ -5054,11 +5054,11 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if ((mstatus_.bits_.MIE or privMode_ != PM::Machine) and mdest != 0)
     {
       // Check for interrupts destined for machine-mode (not-delegated).
+      // VS interrupts (e.g. VSEIP) are always delegated.
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
 				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
-				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
-				 IC::VS_TIMER, IC::LCOF } )
+				 IC::G_EXTERNAL, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
 	  if ((mdest & mask) != 0)
@@ -5117,6 +5117,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
       URV vs = possible & delegVal & hDelegVal;
       if ((vsstatus_.bits_.SIE or (virtMode_ and privMode_ == PM::User)) and vs != 0)
         {
+	  // Only VS interrupts can be delegated in HIDELEG.
           for (InterruptCause ic : { IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE, IC::VS_TIMER } )
             {
               URV mask = URV(1) << unsigned(ic);
