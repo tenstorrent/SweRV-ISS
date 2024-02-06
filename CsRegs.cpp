@@ -3438,8 +3438,9 @@ CsRegs<URV>::updateCounterPrivilege()
           else if (userEnabled_)
             nextMode = PrivilegeMode::User;
 
-          // from the spec, if counter is visible from VU, by effect it will also
-          // be visible from U i.e. if a counter is visible from U and VS, then it must also be visible to VU.
+          // from the spec, if counter is visible from VU, by effect it will also be
+          // visible from U i.e. if a counter is visible from U and VS, then it must also
+          // be visible to VU.
           if (hyperEnabled_)
             virtAccess = (hMask >> i) & 1;
         }
@@ -3473,6 +3474,11 @@ CsRegs<URV>::updateCounterPrivilege()
             csr->setPrivilegeMode(PrivilegeMode::Machine);
           else if (superEnabled_)
             csr->setPrivilegeMode(PrivilegeMode::Supervisor);
+	  if (hyperEnabled_)
+	    {
+	      bool noVs = (mMask & 2) == 1 and (hMask & 2) == 0;
+	      csr->setHypervisor(noVs);  // Not accessible from VS
+	    }
         }
     }
 
