@@ -2533,7 +2533,7 @@ template <typename URV>
 void
 Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
 {
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;
@@ -2645,7 +2645,7 @@ Hart<URV>::execFli_h(const DecodedInst* di)
 {
   static constexpr auto valueTable = getFliValueTable<Float16>();
 
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isZfhLegal())
     {
       illegalInst(di);
       return;
@@ -2686,7 +2686,7 @@ Hart<URV>::execFli_d(const DecodedInst* di)
 {
   static constexpr auto valueTable = getFliValueTable<double>();
 
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;
@@ -3145,7 +3145,7 @@ template <typename URV>
 void
 Hart<URV>::execFround_d(const DecodedInst* di)
 {
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;
@@ -3217,7 +3217,7 @@ template <typename URV>
 void
 Hart<URV>::execFroundnx_d(const DecodedInst* di)
 {
-  if (not isRvzfa() or not isFpLegal())
+  if (not isRvzfa() or not isDpLegal())
     {
       illegalInst(di);
       return;
