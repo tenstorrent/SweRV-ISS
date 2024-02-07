@@ -7133,13 +7133,13 @@ InstTable::setupInstVec()
       },
 
       { "hinval.vvma", InstId::hinval_vvma, 0x26000073, 0xfe007fff,
-        RvExtension::S, RvFormat::I,
+        RvExtension::H, RvFormat::I,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask
       },
 
       { "hinval.gvma", InstId::hinval_gvma, 0x66000073, 0xfe007fff,
-        RvExtension::S, RvFormat::I,
+        RvExtension::H, RvFormat::I,
 	OperandType::IntReg, OperandMode::Read, rs1Mask,
         OperandType::IntReg, OperandMode::Read, rs2Mask
       },
