@@ -2552,6 +2552,7 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
   else
     {
       int    exp;
+      // frexp uses (-1, .5] and [.5, 1) for the fraction component
       double frac  = std::frexp(d1, &exp);
       if (exp < 1)
         {
@@ -2580,7 +2581,7 @@ Hart<URV>::execFcvtmod_w_d(const DecodedInst* di)
                 result32 = -result32;
 	      result = result32;  // Sign extend.
             }
-          if (exp > std::numeric_limits<int32_t>::digits)
+          if (exp > (1 + std::numeric_limits<int32_t>::digits))
             raiseSimulatorFpFlags(FpFlags::Invalid);
           else if (result != d1)
             raiseSimulatorFpFlags(FpFlags::Inexact);
