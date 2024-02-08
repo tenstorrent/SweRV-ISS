@@ -1492,7 +1492,7 @@ namespace WdRiscv
 
     /// Enable/disable supervisor time compare.
     void enableSstc(bool flag)
-    { sstcEnabled_ = flag; updateSstc(); }
+    { sstcEnabled_ = flag; enableMenvcfgStce(flag); updateSstc(); }
 
     /// Enable/disable top-of-range mode in pmp configurations.
     void enablePmpTor(bool flag)
@@ -1578,12 +1578,22 @@ namespace WdRiscv
     bool isHypervisor(CsrNumber csrn) const
     { auto csr = getImplementedCsr(csrn); return csr and csr->isHypervisor(); }
 
+    /// If flag is false, bit HENVCFG.STCE becomes read-only-zero;
+    /// otherwise, bit is readable.
+    void enableHenvcfgStce(bool flag);
+
+    /// If flag is false, bit MENVCFG.STCE becomes read-only-zero;
+    /// otherwise, bit is readable.
+    void enableMenvcfgStce(bool flag);
+
     /// Return the value of the STCE bit of the MENVCFG CSR. Return
-    /// false if CSR is not implemented.
+    /// false if CSR is not implemented or if SSTC extension is off.
     bool menvcfgStce()
     {
       auto csr = getImplementedCsr(rv32_? CsrNumber::MENVCFGH : CsrNumber::MENVCFG);
       if (not csr)
+	return false;
+      if (not sstcEnabled_)
 	return false;
       URV value = csr->read();
       if (rv32_)

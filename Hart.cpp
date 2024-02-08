@@ -376,8 +376,6 @@ Hart<URV>::processExtensions(bool verbose)
   if (isa_.isEnabled(RvExtension::Smrnmi))
     enableSmrnmi(true);
 
-  csRegs_.enableSstc(isRvsstc());
-
   stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
   vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
 }

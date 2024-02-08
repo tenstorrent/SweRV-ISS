@@ -980,7 +980,7 @@ namespace WdRiscv
 
     /// Enable/disable the supervisor timer compare extension (sstc).
     void enableRvsstc(bool flag)
-    { enableExtension(RvExtension::Sstc, flag); }
+    { enableExtension(RvExtension::Sstc, flag); csRegs_.enableSstc(flag); }
 
     /// Enable/disable counter overflow extension (sscofpmf)
     void enableSscofpmf(bool flag)
