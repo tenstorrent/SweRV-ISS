@@ -1498,6 +1498,10 @@ namespace WdRiscv
     void enablePmpTor(bool flag)
     { pmpTor_ = flag; }
 
+    /// Enable/disable NA4 mode in pmp configurations.
+    void enablePmpNa4(bool flag)
+    { pmpNa4_ = flag; }
+
     /// Update implementation status of Sstc (supervisor timer)
     /// related CSRs.  This is called when Sstc related configuration
     /// changes.
@@ -1758,6 +1762,7 @@ namespace WdRiscv
     bool cofEnabled_ = false;     // Counter overflow
     bool stateenOn_ = false;      // Mstateen extension.
     bool pmpTor_ = true;          // Top-of-range PMP mode enabled
+    bool pmpNa4_ = true;          // Na4 PMP mode enabled
     bool aiaEnabled_ = false;     // Aia extension.
 
     bool recordWrite_ = true;

@@ -1769,6 +1769,13 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
       hart.enablePmpTor(flag);
     }
 
+  tag = "enable_pmp_na4";
+  if (config_ -> contains(tag))
+    {
+      getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
+      hart.enablePmpNa4(flag);
+    }
+
   tag = "address_translation_modes";
   if (config_ -> contains(tag))
     {

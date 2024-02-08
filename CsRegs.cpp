@@ -3294,20 +3294,19 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
 	  if (aField == 2)   // NA4
 	    {
 	      // If G is >= 1 then NA4 is not selectable in the A field.
-	      if (pmpG_ != 0 and aField == 2)
-		nb = (nb & ~0x18) | (cb & 0x18);  // Preserve A field.
+	      if (not pmpNa4_ or (pmpG_ != 0 and aField == 2))
+		nb = nb & ~0x18;  // Clear A field.
 	    }
 	  else if (aField == 1)  // TOR
 	    {
 	      if (not pmpTor_)   // TOR not supported
-		nb = (nb & ~0x18) | (cb & 0x18);  // Preserve A field.
+		nb = nb & ~0x18;  // Clear A field.
 	    }
 
-	  // w=1 r=0 is not allowed. Preserve the xwr field.
+	  // w=1 r=0 is not allowed: Clear the xwr field.
 	  if ((nb & 3) == 2)
 	    {
-	      // nb = nb & ~3;   // Set wr to 00
-	      nb = (nb & ~7) | (cb & 7);  // Preserve xwr field.
+	      nb = nb & ~7;   // Set xwr to 000
 	    }
 	}
 
