@@ -9717,7 +9717,9 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
       tlb.invalidateVirtualPageAsid(vpn, asid);
     }
 
-  // std::cerr << "sfence.vma " << di->op0() << ' ' << di->op1() << '\n';
+  if (mcm_)
+    fetchCache_.clear();
+
   if (di->op0() == 0)
     invalidateDecodeCache();
   else
