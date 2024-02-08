@@ -1574,6 +1574,14 @@ namespace WdRiscv
     VirtMem::Mode lastPageMode() const
     { return lastPageMode_; }
 
+    /// Return the VS paging mode before last executed instruction.
+    VirtMem::Mode lastVsPageMode() const
+    { return lastVsPageMode_; }
+
+    /// Return the 2nd stage paging mode before last executed instruction.
+    VirtMem::Mode lastPageModeStage2() const
+    { return lastPageModeStage2_; }
+
     /// Return the current paging mode
     VirtMem::Mode pageMode() const
     { return virtMem_.mode(); }
@@ -1598,21 +1606,32 @@ namespace WdRiscv
     void getPageTableWalkAddresses(bool isInstr, unsigned ix, std::vector<VirtMem::WalkEntry>& addrs) const
     { addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix); }
 
-    /// Get the paget table entries of the page table walk of the last
-    /// executed instruction (see getPageTableAlkAddresses).
+    /// Get the page table entries of the page table walk of the last
+    /// executed instruction (see getPageTableWAlkAddresses).
     void getPageTableWalkEntries(bool isInstr, unsigned ix, std::vector<uint64_t>& ptes) const
     {
       const auto& addrs = isInstr? virtMem_.getFetchWalks(ix) : virtMem_.getDataWalks(ix);
       ptes.clear();
       for (const auto& addr : addrs)
 	{
-          if (addr.type_ == VirtMem::WalkEntry::Type::PA)
+        if (addr.type_ == VirtMem::WalkEntry::Type::PA)
           {
             URV pte = 0;
             peekMemory(addr.addr_, pte, true);
             ptes.push_back(pte);
           }
 	}
+    }
+
+    /// Get the page table walk of the last executed instruction.
+    void getPageTableWalkEntries(bool isInstr, std::vector<std::vector<VirtMem::WalkEntry>>& walks) const
+    {
+      walks.clear();
+      walks = isInstr? virtMem_.getFetchWalks() : virtMem_.getDataWalks();
+      for (auto& i : walks)
+        for (auto& entry: i)
+            if (entry.type_ == VirtMem::WalkEntry::Type::PA)
+                peekMemory(entry.addr_, entry.addr_, true);
     }
 
     /// Return PMP manager associated with this hart.
