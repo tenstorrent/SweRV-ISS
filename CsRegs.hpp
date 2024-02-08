@@ -1399,9 +1399,13 @@ namespace WdRiscv
     /// Return adjusted value.
     URV adjustPmpValue(CsrNumber csrn, URV value) const;
 
-    /// Adjust the value of SIP/SIE by masking with MIDELEG (and if
-    /// hyerpervisor also by HIDELEG).
-    URV adjustSipSieValue(URV value) const;
+    /// Adjust the value of SIP masking with MIDELEG (and if hyerpervisor also by
+    /// HIDELEG).
+    URV adjustSipValue(URV value) const;
+
+    /// Adjust the value of SIE masking with MIDELEG (and if hyerpervisor also by
+    /// HIDELEG).
+    URV adjustSieValue(URV value) const;
 
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
@@ -1425,8 +1429,11 @@ namespace WdRiscv
     /// Heler to read method.
     bool readVsireg(CsrNumber num, URV& value) const;
 
-    /// Helper to write method: Mask with MIP/MIE/MIDELEG.
-    bool writeSipSie(CsrNumber num, URV value);
+    /// Helper to write method: Mask with MIP/MIDELEG.
+    bool writeSip(URV value);
+
+    /// Helper to write method: Mask with SIP/MIDELEG.
+    bool writeSie(URV value);
 
     /// Helper to write method: Mask with MSTATEEN/HSTATEEN.
     bool writeSstateen(CsrNumber num, URV value);
@@ -1751,6 +1758,8 @@ namespace WdRiscv
     URV maxEventId_ = ~URV(0);  // Default unlimited.
     bool hasPerfEventSet_ = false;
     std::unordered_set<unsigned> perfEventSet_;
+
+    URV shadowSie_ = 0;     // Used where mideleg is 0 and mvien is 1.
 
     unsigned pmpG_ = 0;     // PMP G value: ln2(pmpGrain) - 2
     unsigned geilen_ = 0;   // Guest interrupt count.

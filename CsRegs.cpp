@@ -174,7 +174,7 @@ CsRegs<URV>::getImplementedCsr(CsrNumber num, bool virtualMode) const
 
 template <typename URV>
 URV
-CsRegs<URV>::adjustSipSieValue(URV value) const
+CsRegs<URV>::adjustSipValue(URV value) const
 {
   // Read value of MIP/SIP is masked by MIDELG/HIDELEG.
   auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
@@ -187,6 +187,48 @@ CsRegs<URV>::adjustSipSieValue(URV value) const
 	  if (hdeleg)
 	    value &= (hdeleg->read() >> 1);  // Bit positions in HIDELG are shifted.
 	}
+    }
+
+  // Where mideleg is 0 and mvien is 1, sip becomes an alias to mvip.
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (deleg and mvien and mvip)
+    {
+      URV mask = mvien->read() & ~deleg->read();
+      value = (value & ~mask) | (mvip->read() & mask);
+    }
+
+  // Bits SGEIP, VSEIP, VSTIP, VSSIP are read-only zero in SIE/SIP.
+  value &= ~ URV(0x1444);
+
+  return value;
+}
+
+
+template <typename URV>
+URV
+CsRegs<URV>::adjustSieValue(URV value) const
+{
+  // Read value of MIP/SIP is masked by MIDELG/HIDELEG.
+  auto deleg = getImplementedCsr(CsrNumber::MIDELEG);
+  if (deleg)
+    {
+      value &= deleg->read() >> virtMode_;
+      if (virtMode_)
+	{
+	  auto hdeleg = getImplementedCsr(CsrNumber::HIDELEG);
+	  if (hdeleg)
+	    value &= (hdeleg->read() >> 1);  // Bit positions in HIDELG are shifted.
+	}
+    }
+
+  // Where mideleg is 0 and mvien is 1, sie becomes a writable.
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (deleg and mvien and mvip)
+    {
+      URV mask = mvien->read() & ~deleg->read();
+      value = (value & ~mask) | (shadowSie_ & mask);
     }
 
   // Bits SGEIP, VSEIP, VSTIP, VSSIP are read-only zero in SIE/SIP.
@@ -441,8 +483,10 @@ CsRegs<URV>::read(CsrNumber num, PrivilegeMode mode, URV& value) const
 
   value = csr->read();
 
-  if (num == CN::SIP or num == CN::SIE)
-    value = adjustSipSieValue(value);  // Mask by delegation registers.
+  if (num == CN::SIP)
+    value = adjustSipValue(value);  // Mask by delegation registers.
+  else if (num == CN::SIE)
+    value = adjustSieValue(value);  // Mask by delegation registers.
   else if (virtMode_ and (num == CN::TIME or num == CN::TIMEH))
     value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
   else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
@@ -1071,37 +1115,91 @@ legalizeMisa(Csr<URV>* csr, URV v)
 
 template <typename URV>
 bool
-CsRegs<URV>::writeSipSie(CsrNumber num, URV value)
+CsRegs<URV>::writeSip(URV value)
 {
   using CN = CsrNumber;
 
-  if (num == CN::SIP or num == CN::SIE)
+  assert(not virtMode_);
+
+  Csr<URV>* sip = getImplementedCsr(CN::SIP);
+  if (not sip)
+    return false;
+
+  URV prevSipMask = sip->getWriteMask();
+  URV sipMask = prevSipMask;
+
+  auto mip = getImplementedCsr(CN::MIP);
+  if (mip)
+    sipMask &= mip->getWriteMask(); // In case SIP mask is more permissive than MIP.
+
+  auto mideleg = getImplementedCsr(CN::MIDELEG);
+  sipMask &= mideleg ? mideleg->read() : 0; // Only delegated bits writeable
+
+  // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
+  sipMask &= ~ URV(0x1444);
+
+  // Where mideleg is 0 and mvien is 1, SIP becomes an alias to mvip.
+  // See AIA spec section 5.3.
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (mideleg and mvien and mvip)
     {
-      Csr<URV>* csr = getImplementedCsr(num, virtMode_);
-      if (not csr)
-        return false;
-
-      URV prevMask = csr->getWriteMask();
-      URV mask = prevMask;
-
-      auto mcsr = getImplementedCsr(advance(num, 0x200));
-      if (mcsr)
-        mask &= mcsr->getWriteMask() >> virtMode_;
-
-      auto mideleg = getImplementedCsr(CN::MIDELEG);
-      mask &= mideleg ? mideleg->read() >> virtMode_: 0; // Only delegated bits writeable
-
-      // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
-      mask &= ~ URV(0x1444);
-
-      csr->setWriteMask(mask);
-      csr->write(value);
-      csr->setWriteMask(prevMask);
-
-      recordWrite(num);
-      return true;
+      URV mvipMask = mvien->read() & ~mideleg->read();
+      sipMask &= ~ mvipMask;  // Don't write SIP where SIP is an alias to mvip.
+      mvip->write((mvip->read() & ~mvipMask) | (value & mvipMask)); // Write mvip instead.
     }
-  return false;
+
+  sip->setWriteMask(sipMask);
+  sip->write(value);
+  sip->setWriteMask(prevSipMask);
+
+  recordWrite(CN::SIP);
+  return true;
+}
+
+
+template <typename URV>
+bool
+CsRegs<URV>::writeSie(URV value)
+{
+  using CN = CsrNumber;
+
+  assert(not virtMode_);
+
+  Csr<URV>* sie = getImplementedCsr(CN::SIE);
+  if (not sie)
+    return false;
+
+  URV prevSieMask = sie->getWriteMask();
+  URV sieMask = prevSieMask;
+
+  auto mie = getImplementedCsr(CN::MIE);
+  if (mie)
+    sieMask &= mie->getWriteMask(); // In case SIE mask is more permissive than MIE.
+
+  auto mideleg = getImplementedCsr(CN::MIDELEG);
+  sieMask &= mideleg ? mideleg->read() : 0; // Only delegated bits writeable
+
+  // Bits SGEIP, VSEIP, VSTIP, VSSIP are not writeable in SIE/SIP.
+  sieMask &= ~ URV(0x1444);
+
+  // Where mideleg is 0 and mvien is 1, SIE becomes writable independent of MIP.
+  // See AIA spec section 5.3.
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (mideleg and mvien and mvip)
+    {
+      URV smask = mvien->read() & ~mideleg->read();
+      sieMask &= ~ smask;  // Don't write SIE where SIE is indepedent of MIP.
+      shadowSie_ = (shadowSie_ & ~smask) | (value & smask); // Write shadow instead.
+    }
+
+  sie->setWriteMask(sieMask);
+  sie->write(value);
+  sie->setWriteMask(prevSieMask);
+
+  recordWrite(CN::SIE);
+  return true;
 }
 
 
@@ -1409,8 +1507,10 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
   // Write mask of SIP/SIE is a combined with that of MIP/MIE and
   // delgation registers.
-  if (num == CN::SIP or num == CN::SIE)
-    return writeSipSie(num, value);
+  if (num == CN::SIP)
+    return writeSip(value);
+  if (num == CN::SIE)
+    return writeSie(value);
 
   if (num >= CN::SSTATEEN0 and num <= CN::SSTATEEN3)
     return writeSstateen(num, value);
@@ -2706,7 +2806,7 @@ CsRegs<URV>::defineAiaRegs()
   defineCsr("mtopei",     CN::MTOPEI,     !mand, !imp, 0, wam, wam);
   defineCsr("mtopi",      CN::MTOPI,      !mand, !imp, 0, wam, wam);
   
-  URV mask = 0b10'0010'0010;  // Bits 9,5, and 1 (SEI, STI, SSI).
+  URV mask = 0b10'000'0010;  // Bits 9 and 1 (SEI, SSI).
   defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, mask, mask);
 
   defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, wam, wam);
@@ -2896,8 +2996,10 @@ CsRegs<URV>::peek(CsrNumber num, URV& value, bool virtMode) const
 
   value = csr->read();
 
-  if (num == CN::SIP or num == CN::SIE)
-    value = adjustSipSieValue(value);  // Mask by delegation registers.
+  if (num == CN::SIP)
+    value = adjustSipValue(value);  // Mask by delegation registers.
+  else if (num == CN::SIE)
+    value = adjustSieValue(value);  // Mask by delegation registers.
   else if (virtMode and (num == CN::TIME or num == CN::TIMEH))
     value = adjustTimeValue(num, value);  // In virt mode, time is time + htimedelta.
   else if (num >= CN::PMPADDR0 and num <= CN::PMPADDR63)
