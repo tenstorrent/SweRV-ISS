@@ -5023,9 +5023,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
     return false;
 
   URV mie = cachedMie_;
-  URV possible = mie & mip & ~deferredInterrupts_;
-  if (possible == 0)
-    return false;  // Nothing enabled that is also pending.
+  URV possible = mie & mip;
 
   // If in a non-maskable interrupt handler, then allinterrupts disabled.
   if (extensionIsEnabled(RvExtension::Smrnmi) and
@@ -5129,6 +5127,11 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 
   // MIP read value is ored with supervisor external interrupt pin.
   mip |= seiPin_ << URV(InterruptCause::S_EXTERNAL);
+
+  mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
+
+  if ((mip & cachedMie_) == 0)
+    return false;
 
   return isInterruptPossible(mip, cause);
 }
