@@ -1078,17 +1078,6 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.syscallSlam)
     hart.defineSyscallSlam(*args.syscallSlam);
 
-  // Set instruction count limit.
-  if (args.instCountLim)
-    {
-      uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
-      count += *args.instCountLim;
-      hart.setInstructionCountLimit(count);
-    }
-
-  // Print load-instruction data-address when tracing instructions.
-  // if (args.traceLdSt)  // Deprecated -- now always on.
-
   if (args.tracePtw)
     hart.tracePtw(true);
 
@@ -1841,6 +1830,16 @@ session(const Args& args, const HartConfig& config)
   if (not args.loadFrom.empty())
     if (not system.loadSnapshot(args.loadFrom))
       return false;
+
+  // Set instruction count limit.
+  if (args.instCountLim)
+    for (unsigned i = 0; i < system.hartCount(); ++i)
+      {
+	auto& hart = *system.ithHart(i);
+	uint64_t count = args.relativeInstCount? hart.getInstructionCount() : 0;
+	count += *args.instCountLim;
+	hart.setInstructionCountLimit(count);
+      }
 
   if (not args.initStateFile.empty())
     {
