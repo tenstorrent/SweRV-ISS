@@ -1382,15 +1382,6 @@ Hart<URV>::reportTrapStat(FILE* file) const
         case InterruptCause::M_EXTERNAL:
           fprintf(file, "  + M_EXTERNAL  : %" PRIu64 "\n", count);
           break;
-        case InterruptCause::M_INT_TIMER1:
-          fprintf(file, "  + M_INT_TIMER1: %" PRIu64 "\n", count);
-          break;
-        case InterruptCause::M_INT_TIMER0:
-          fprintf(file, "  + M_INT_TIMER0: %" PRIu64 "\n", count);
-          break;
-        case InterruptCause::M_LOCAL :
-          fprintf(file, "  + M_LOCAL     : %" PRIu64 "\n", count);
-          break;
         default:
           fprintf(file, "  + ????        : %" PRIu64 "\n", count);
         }
@@ -5053,9 +5044,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
     {
       // Check for interrupts destined for machine-mode (not-delegated).
       // VS interrupts (e.g. VSEIP) are always delegated.
-      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
-				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
-				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
+      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
+ 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
 				 IC::G_EXTERNAL, IC::LCOF } )
 	{
 	  URV mask = URV(1) << unsigned(ic);
@@ -5073,8 +5063,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   URV sdest = possible & delegVal & ~hDelegVal;  // Interrupts destined for S/HS.
   if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and sdest != 0)
     {
-      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_LOCAL, IC::M_SOFTWARE,
-				 IC::M_TIMER, IC::M_INT_TIMER0, IC::M_INT_TIMER1,
+      for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
 				 IC::S_EXTERNAL, IC::S_SOFTWARE, IC::S_TIMER,
 				 IC::G_EXTERNAL, IC::VS_EXTERNAL, IC::VS_SOFTWARE,
 				 IC::VS_TIMER, IC::LCOF } )
