@@ -1649,6 +1649,14 @@ namespace WdRiscv
       pmps = pmpManager_.getPmpTrace();
     }
 
+    /// Print current pmp map matching a particular address.
+    void printPmps(std::ostream& os, uint64_t address) const
+    { pmpManager_.printPmps(os, address); }
+
+    /// Print current pmp map.
+    void printPmps(std::ostream& os) const
+    { pmpManager_.printPmps(os); }
+
     // Get the PMAs accessed by the last executed instruction
     void getPmasAccessed(std::vector<PmaManager::PmaTrace>& pmas) const
     {

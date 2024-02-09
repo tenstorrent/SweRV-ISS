@@ -49,6 +49,35 @@ PmpManager::defineRegion(uint64_t a0, uint64_t a1, Pmp::Type type,
 }
 
 
+void
+PmpManager::printRegion(std::ostream& os, Region region) const
+{
+  const auto& pmp = region.pmp_;
+  os << "pmp ix: " << std::dec << pmp.pmpIndex() << "\n";
+  os << "base addr: " << std::hex << region.firstAddr_ << "\n";
+  os << "last addr: " << std::hex << region.lastAddr_ << "\n";
+
+  os << "rwx: " << Pmp::toString(Pmp::Mode(pmp.mode_)) << "\n";
+  os << "matching: " << Pmp::toString(Pmp::Type(pmp.type_)) << "\n";
+}
+
+
+void
+PmpManager::printPmps(std::ostream& os, uint64_t addr) const
+{
+  auto region = getRegion(addr);
+  printRegion(os, region);
+}
+
+
+void
+PmpManager::printPmps(std::ostream& os) const
+{
+  for (const auto& region : regions_)
+    printRegion(os, region);
+}
+
+
 std::string
 Pmp::toString(Pmp::Type type)
 {

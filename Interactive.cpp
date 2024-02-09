@@ -1269,6 +1269,10 @@ printInteractiveHelp()
   cout << "  Perform a memory write operation bypassing the mrege buffer. Given\n";
   cout << "  data (hexadecimal string) is from a different model (RTL) and is compared\n";
   cout << "  to whisper data.\n";
+  cout << "pmp [<address>]\n";
+  cout << "  Print the pmp map (all) or for a matching address\n";
+  cout << "pma [<address>]\n";
+  cout << "  Print the pma map (all) or for a matching address\n";
   cout << "quit\n";
   cout << "  Terminate the simulator\n\n";
 }
@@ -1775,6 +1779,24 @@ Interactive<URV>::executeLine(const std::string& inLine, FILE* traceFile,
       return true;
     }
 
+  if (command == "pmp")
+    {
+      if (not pmpCommand(hart, line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
+  if (command == "pma")
+    {
+      if (not pmaCommand(hart, line, tokens))
+        return false;
+      if (commandLog)
+        fprintf(commandLog, "%s\n", line.c_str());
+      return true;
+    }
+
   if (command == "h" or command == "?" or command == "help")
     {
       helpCommand(tokens);
@@ -2223,6 +2245,42 @@ Interactive<URV>::seiPinCommand(Hart<URV>& hart, const std::string& line,
       return false;
     }
 
+  return true;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::pmpCommand(Hart<URV>& hart, const std::string& line,
+			     const std::vector<std::string>& tokens)
+{
+  // pmp [<address>]
+  if (tokens.size() == 1)
+    hart.printPmps(std::cout);
+  else if (tokens.size() == 2)
+    {
+      uint64_t address;
+      if (not parseCmdLineNumber("pmp-address", tokens.at(1), address))
+        return false;
+
+      hart.printPmps(std::cout, address);
+    }
+  else
+    {
+      std::cerr << "Invalid pmp command: " << line << '\n';
+      std::cerr << "Expecting: pmp [<address>]\n";
+      return false;
+    }
+
+  return true;
+}
+
+
+template <typename URV>
+bool
+Interactive<URV>::pmaCommand(Hart<URV>& hart, const std::string& line,
+			     const std::vector<std::string>& tokens)
+{
   return true;
 }
 
