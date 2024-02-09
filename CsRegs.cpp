@@ -235,6 +235,38 @@ CsRegs<URV>::readSie(URV& value) const
 
 
 template <typename URV>
+bool
+CsRegs<URV>::readMvip(URV& value) const
+{
+  value = 0;
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (not mvip)
+    return false;
+  value = mvip->read();
+
+  // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is set in MVIEN.
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  auto mip = getImplementedCsr(CsrNumber::MIP);
+  if (mvien and mip)
+    {
+      URV mask = mvien->read();
+      value = (value & ~mask) | (mip->read() & mask);
+    }
+
+  // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
+  // Othrwise, it is zero.
+  if (mip)
+    {
+      URV mask = URV(0x20);  // Bit 5
+      if ((mip->getWriteMask() & mask) != 0)   // Bit 5 writable in mip
+	value = (value & ~mask) | (mip->read() & mask);
+    }
+
+  return true;
+}
+
+
+template <typename URV>
 URV
 CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value) const
 {
@@ -2830,7 +2862,7 @@ CsRegs<URV>::defineAiaRegs()
   URV mask = 0b10'000'0010;  // Bits 9 and 1 (SEI, SSI).
   defineCsr("mvien",      CN::MVIEN,      !mand, !imp, 0, mask, mask);
 
-  defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, wam, wam);
+  defineCsr("mvip",       CN::MVIP,       !mand, !imp, 0, mask, mask);
   defineCsr("siselect",   CN::SISELECT,   !mand, !imp, 0, wam, wam);
   defineCsr("sireg",      CN::SIREG,      !mand, !imp, 0, wam, wam);
   defineCsr("stopei",     CN::STOPEI,     !mand, !imp, 0, wam, wam);

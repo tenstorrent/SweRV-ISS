@@ -1407,6 +1407,9 @@ namespace WdRiscv
     /// maps to VSIP.
     bool readSie(URV& value) const;
 
+    /// Helper to read method.
+    bool readMvip(URV& value) const;
+
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
     URV adjustTimeValue(CsrNumber csrn, URV value) const;
