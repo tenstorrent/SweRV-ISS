@@ -1252,7 +1252,7 @@ namespace WdRiscv
       return csr.read();
     }
 
-    /// Fast peek method for HGEIP.
+    /// Fast peek method for HGEIE.
     URV peekHgeie() const
     {
       const auto& csr = regs_.at(size_t(CsrNumber::HGEIE));
@@ -1399,13 +1399,13 @@ namespace WdRiscv
     /// Return adjusted value.
     URV adjustPmpValue(CsrNumber csrn, URV value) const;
 
-    /// Adjust the value of SIP masking with MIDELEG (and if hyerpervisor also by
-    /// HIDELEG).
-    URV adjustSipValue(URV value) const;
+    /// Read value of SIP (MIP masked with MIDELEG). This never
+    /// maps to VSIP.
+    bool readSip(URV& value) const;
 
-    /// Adjust the value of SIE masking with MIDELEG (and if hyerpervisor also by
-    /// HIDELEG).
-    URV adjustSieValue(URV value) const;
+    /// Read value of SIE (MIE masked with MIDELEG). This never
+    /// maps to VSIP.
+    bool readSie(URV& value) const;
 
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
@@ -1560,6 +1560,10 @@ namespace WdRiscv
     /// Called after an MHPMEVENT CSR is written/poked to update the
     /// contorl of the underlying counter.
     void updateCounterControl(CsrNumber number);
+
+    /// Update bits of SIE that are distinct for MIE (happens where MVIEN bits are set and
+    /// corresponding bits in MIDELEG are clear).
+    void updateShadowSie();
 
     /// Turn on/off virtual mode. When virtual mode is on read/write to
     /// supervisor CSRs get redirected to virtual supervisor CSRs and read/write
