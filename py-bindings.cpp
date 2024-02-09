@@ -127,6 +127,8 @@ static void defineDecodedInst(M m)
   auto name = "DecodedInst";
   py::class_<DecodedInst>(m_di, name)
     .def("inst", &DecodedInst::inst, py::doc("Get 32b instruction."))
+    .def("address", &DecodedInst::address, py::doc("Get VA associated with instruction."))
+    .def("phys_address", &DecodedInst::physAddress, py::doc("Get PA associated with instruction."))
     .def("ith_operand", &DecodedInst::ithOperand, py::arg("i"), py::doc("Get the ith operand."))
     .def("ith_operand_type", &DecodedInst::ithOperandType, py::arg("i"), py::doc("Get the ith operand type."))
     .def("ith_operand_mode", &DecodedInst::ithOperandMode, py::arg("i"), py::doc("Get the ith operand mode."));
