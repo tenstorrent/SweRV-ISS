@@ -119,6 +119,22 @@ static void defineMemory(M m)
 }
 
 
+template <typename M>
+static void defineDecodedInst(M m)
+{
+  auto m_di = m.def_submodule("decoded_inst", "DecodedInst.hpp");
+
+  auto name = "DecodedInst";
+  py::class_<DecodedInst>(m_di, name)
+    .def("inst", &DecodedInst::inst, py::doc("Get 32b instruction."))
+    .def("address", &DecodedInst::address, py::doc("Get VA associated with instruction."))
+    .def("phys_address", &DecodedInst::physAddress, py::doc("Get PA associated with instruction."))
+    .def("ith_operand", &DecodedInst::ithOperand, py::arg("i"), py::doc("Get the ith operand."))
+    .def("ith_operand_type", &DecodedInst::ithOperandType, py::arg("i"), py::doc("Get the ith operand type."))
+    .def("ith_operand_mode", &DecodedInst::ithOperandMode, py::arg("i"), py::doc("Get the ith operand mode."));
+}
+
+
 template <typename T>
 static auto attr(Hart<T>& self, const std::string& attr)
 {
@@ -365,7 +381,7 @@ static void defineHart(M m)
                   }
             }
 
-          return std::make_pair(self.hasTargetProgramFinished(), changes);
+          return std::make_tuple(self.hasTargetProgramFinished(), di, changes);
         }, py::arg("verbose") = false, py::arg("file") = File(stdout), py::doc("Step a single instruction. Returns a tuple of (true if target program is finished, list of modified resources)."))
     .def("run", [](Hart<T>& self, bool verbose, File file) {
           self.run(verbose? file.file_ : nullptr);
@@ -453,6 +469,7 @@ PYBIND11_MODULE(whisper, m) {
   defineFile(m);
   defineEnums(m);
   defineMemory(m);
+  defineDecodedInst(m);
   defineHart<RV32>(m);
   defineSystem<RV32>(m);
   defineHart<RV64>(m);
