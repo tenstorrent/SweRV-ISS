@@ -1923,7 +1923,7 @@ InstTable::setupInstVec()
 	OperandType::IntReg, OperandMode::Read, rs2Mask },
 
       { "sext.b", InstId::sext_b, 0x60401013, 0xfff0707f,
-        RvExtension::Zbb, RvFormat::I,
+        RvExtension::Zbb, RvFormat::R,
 	OperandType::IntReg, OperandMode::Write, rdMask,
 	OperandType::IntReg, OperandMode::Read, rs1Mask },
 
