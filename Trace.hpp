@@ -191,13 +191,21 @@ namespace WdRiscv
     GroupMultiplier groupMultiplier() const
     { return hart_->groupMultiplier(); }
 
-    /// Return the paging mode before last executed instruction.
+    /// Return the paging mode of the last executed instruction.
     VirtMem::Mode pageMode() const
     { return hart_->lastPageMode(); }
 
     /// Return the paging mode after last executed instruction.
     VirtMem::Mode nextPageMode() const
     { return hart_->pageMode(); }
+
+    /// Return the VS paging mode of the last executed instruction.
+    VirtMem::Mode vsMode() const
+    { return hart_->lastVsPageMode(); }
+
+    /// Return the 2nd stage paging mode after last executed instruction.
+    VirtMem::Mode pageModeStage2() const
+    { return hart_->lastPageModeStage2(); }
 
     /// Return CSR value after last executed instruction.
     bool peekCsr(CsrNumber csr, URV& val) const
@@ -223,6 +231,11 @@ namespace WdRiscv
     void getPageTableWalkEntries(bool instr, unsigned ix,
                                  std::vector<uint64_t>& ptes) const
     { hart_->getPageTableWalkEntries(instr, ix, ptes); }
+
+    /// Return the entire page table walk for load/store/fetch of last executed instruction.
+    /// Will be empty if there was no walk.
+    void getPageTableWalkEntries(bool instr, std::vector<std::vector<VirtMem::WalkEntry>>& walks) const
+    { hart_->getPageTableWalkEntries(instr, walks); }
 
     bool peekIntReg(unsigned i, URV& value) const
     { return hart_->peekIntReg(i, value); }
