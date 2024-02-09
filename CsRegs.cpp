@@ -267,6 +267,38 @@ CsRegs<URV>::readMvip(URV& value) const
 
 
 template <typename URV>
+bool
+CsRegs<URV>::writeMvip(URV value)
+{
+  value = 0;
+  auto mvip = getImplementedCsr(CsrNumber::MVIP);
+  if (not mvip)
+    return false;
+
+  auto mvien = getImplementedCsr(CsrNumber::MVIEN);
+  auto mip = getImplementedCsr(CsrNumber::MIP);
+  if (mvien and mip)
+    {
+      // Bit 1/9 of MVIP is an alias to bit 1/9 in MIP if bit 1/9 is set in MVIEN.
+      URV mask = mvien->read();
+
+      // Bit STIE (5) of MVIP is an alias to bit 5 of MIP if bit 5 of MIP is writable.
+      // Othrwise, it is zero.
+      URV b5 = URV(0x20);  // Bit 5 mask
+      if ((mip->getWriteMask() & b5) != 0)   // Bit 5 writable in mip
+	mask |= b5;
+
+      mip->write((mip->read() & ~mask) | (value & mask));
+      mvip->write((mvip->read() & mask) | (value & ~mask));
+    }
+  else
+    mvip->write(value);
+
+  return true;
+}
+
+
+template <typename URV>
 URV
 CsRegs<URV>::adjustTimeValue(CsrNumber num, URV value) const
 {

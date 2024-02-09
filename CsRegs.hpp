@@ -1410,6 +1410,9 @@ namespace WdRiscv
     /// Helper to read method.
     bool readMvip(URV& value) const;
 
+    /// Helper to write method.
+    bool writeMvip(URV value);
+
     /// Adjust the value of TIME/TIMEH by adding the time delta in
     /// virtual mode.
     URV adjustTimeValue(CsrNumber csrn, URV value) const;
@@ -1429,7 +1432,7 @@ namespace WdRiscv
     /// Heler to read method.
     bool readSireg(CsrNumber num, URV& value) const;
 
-    /// Heler to read method.
+    /// Helper to read method.
     bool readVsireg(CsrNumber num, URV& value) const;
 
     /// Helper to write method: Mask with MIP/MIDELEG.
