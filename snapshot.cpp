@@ -324,6 +324,11 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
       cerr << "\t" << line << "\n";
     }
   ifs.close();
+
+  updateCachedMstatus();
+  updateAddressTranslation();
+  updateTranslationPbmt();
+
   return errors == 0;
 }
 
