@@ -615,7 +615,7 @@ Hart<URV>::reset(bool resetMemoryMappedRegs)
   processExtensions();
 
   csRegs_.reset();
-  cachedMie_ = peekCsr(CsrNumber::MIE);
+  effectiveIe_ = csRegs_.effectiveInterruptEnable();
 
   perfControl_ = ~uint32_t(0);
   URV value = 0;
@@ -3266,8 +3266,6 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
       stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
       vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
     }
-  else if (csr == CN::MIE or csr == CN::SIE or csr == CN::HIE or csr == CN::VSIE)
-    cachedMie_ = peekCsr(CN::MIE);
 
   if (csr == CN::STIMECMP)
     {
@@ -3285,6 +3283,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
             }
         }
     }
+
+  effectiveIe_ = csRegs_.effectiveInterruptEnable();
 }
 
 
@@ -4791,7 +4791,7 @@ Hart<URV>::simpleRunWithLimit()
       if (mcycleEnabled())
 	++cycleCount_;
 
-      if (cachedMie_ and processExternalInterrupt(nullptr, instStr))
+      if (effectiveIe_ and processExternalInterrupt(nullptr, instStr))
 	continue;  // Next instruction in trap handler.
 
       // Fetch/decode unless match in decode cache.
@@ -5022,7 +5022,7 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
   if (debugMode_)
     return false;
 
-  URV mie = cachedMie_;
+  URV mie = csRegs_.peekMie();
   URV possible = mie & mip;
 
   // If in a non-maskable interrupt handler, then allinterrupts disabled.
@@ -5058,7 +5058,8 @@ Hart<URV>::isInterruptPossible(URV mip, InterruptCause& cause) const
     return false;   // Interrupts destined for lower privileges are disabled.
 
   // Delegated but non-h-delegated interrupts are destined for supervisor mode (S/HS).
-  URV sdest = possible & delegVal & ~hDelegVal;  // Interrupts destined for S/HS.
+  URV sdest = (possible & delegVal) | (mip & csRegs_.shadowSie_);
+  sdest = sdest & ~hDelegVal;  // Interrupts destined for S/HS.
   if ((mstatus_.bits_.SIE or virtMode_ or privMode_ == PM::User) and sdest != 0)
     {
       for (InterruptCause ic : { IC::M_EXTERNAL, IC::M_SOFTWARE, IC::M_TIMER,
@@ -5130,7 +5131,7 @@ Hart<URV>::isInterruptPossible(InterruptCause& cause) const
 
   mip &= ~deferredInterrupts_;  // Inhibited by test-bench.
 
-  if ((mip & cachedMie_) == 0)
+  if ((mip & effectiveIe_) == 0)
     return false;
 
   return isInterruptPossible(mip, cause);

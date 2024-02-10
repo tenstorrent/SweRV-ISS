@@ -1266,6 +1266,14 @@ namespace WdRiscv
       return csr.read();
     }
 
+    /// Return the effective interrupt enable mask: This is MIE ored
+    /// with the virtual interrupt enable implied by MVIEN.
+    URV effectiveInterruptEnable() const
+    {
+      const auto& csr = regs_.at(size_t(CsrNumber::MIE));
+      return csr.read() | shadowSie_;
+    }
+
     /// Fast peek method for MSTATUS
     URV peekMstatus() const
     {

@@ -4875,7 +4875,7 @@ namespace WdRiscv
     Emstatus<URV> mstatus_;         // Cached value of mstatus CSR or mstatush/mstatus.
     MstatusFields<URV> vsstatus_;   // Cached value of vsstatus CSR
     HstatusFields<URV> hstatus_;    // Cached value of hstatus CSR
-    URV cachedMie_ = 0;             // Cached value of mie CSR
+    URV effectiveIe_ = 0;           // Effecive interrupt enable.
 
     bool clearMprvOnRet_ = true;
     bool cancelLrOnTrap_ = true;    // Cancel reservation on traps when true.
