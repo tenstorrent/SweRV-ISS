@@ -2958,10 +2958,10 @@ CsRegs<URV>::defineStateEnableRegs()
   bool imp = true;   // Implemented
 
   // Default: none of the sstateen CSRs are writable.
-  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
-  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
-  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
-  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, 0, 0)->setHypervisor(true);
+  defineCsr("sstateen0", CsrNumber::SSTATEEN0,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen1", CsrNumber::SSTATEEN1,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen2", CsrNumber::SSTATEEN2,  !mand, !imp, 0, 0, 0);
+  defineCsr("sstateen3", CsrNumber::SSTATEEN3,  !mand, !imp, 0, 0, 0);
 
   URV mask = 0;  // Default: nothing writable.
 
