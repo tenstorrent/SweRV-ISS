@@ -1,11 +1,11 @@
 // Copyright 2020 Western Digital Corporation or its affiliates.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -54,6 +54,32 @@ Pma::stringToAttrib(std::string_view str, Pma::Attrib& attrib)
   attrib = Pma::None;
   return false;
 }
+
+
+std::string
+Pma::attributesToString(uint32_t attrib)
+{
+  std::string result;
+
+  result += (attrib & Pma::None)? "none," : "";
+  result += (attrib & Pma::Read)? "read," : ",";
+  result += (attrib & Pma::Write)? "write," : ",";
+  result += (attrib & Pma::Exec)? "exec," : ",";
+  result += (attrib & Pma::Idempotent)? "idempotent," : ",";
+  result += (attrib & Pma::AmoOther)? "amoother," : ",";
+  result += (attrib & Pma::AmoSwap)? "amoswap," : ",";
+  result += (attrib & Pma::AmoLogical)? "amological," : ",";
+  result += (attrib & Pma::Iccm)? "iccm," : ",";
+  result += (attrib & Pma::Dccm)? "dccm," : ",";
+  result += (attrib & Pma::MemMapped)? "memmapped," : ",";
+  result += (attrib & Pma::Rsrv)? "rsrv," : ",";
+  result += (attrib & Pma::Io)? "io," : ",";
+  result += (attrib & Pma::Cacheable)? "cacheable," : ",";
+  result += (attrib & Pma::MisalOk)? "misalok," : ",";
+  result += (attrib & Pma::MisalAccFault)? "misalaccfault" : "";
+  return result;
+}
+
 
 PmaManager::PmaManager(uint64_t memSize)
   : memSize_(memSize)
@@ -193,4 +219,35 @@ PmaManager::pokeRegisterByte(uint64_t addr, uint8_t value)
   iter->second.value_ = iter->second.value_ & ~byteMask;
   iter->second.value_ = iter->second.value_ | shiftedByte;
   return true;
+}
+
+
+void
+PmaManager::printRegion(std::ostream& os, Region region) const
+{
+  const auto& pma = region.pma_;
+  os << "valid: " << std::hex << region.valid_ << "\n";
+  os << "base addr: " << std::hex << region.firstAddr_ << "\n";
+  os << "last addr: " << std::hex << region.lastAddr_ << "\n";
+
+  os << "attributes: " << Pma::attributesToString(pma.attrib_) << "\n";
+}
+
+
+void
+PmaManager::printPmas(std::ostream& os, uint64_t address) const
+{
+  auto region = getRegion(address);
+  printRegion(os, region);
+}
+
+
+void
+PmaManager::printPmas(std::ostream& os) const
+{
+  for (const auto& region : regions_)
+    {
+      if (region.valid_)
+        printRegion(os, region);
+    }
 }

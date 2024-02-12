@@ -2281,6 +2281,24 @@ bool
 Interactive<URV>::pmaCommand(Hart<URV>& hart, const std::string& line,
 			     const std::vector<std::string>& tokens)
 {
+  // pmam [<address>]
+  if (tokens.size() == 1)
+    hart.printPmas(std::cout);
+  else if (tokens.size() == 2)
+    {
+      uint64_t address;
+      if (not parseCmdLineNumber("pma-address", tokens.at(1), address))
+        return false;
+
+      hart.printPmas(std::cout, address);
+    }
+  else
+    {
+      std::cerr << "Invalid pma command: " << line << '\n';
+      std::cerr << "Expecting: pma [<address>]\n";
+      return false;
+    }
+
   return true;
 }
 

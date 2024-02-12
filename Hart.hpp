@@ -1664,6 +1664,14 @@ namespace WdRiscv
       pmas = memory_.pmaMgr_.getPmaTrace();
     }
 
+    /// Print current pma map matching a particular address.
+    void printPmas(std::ostream& os, uint64_t address) const
+    { memory_.pmaMgr_.printPmas(os, address); }
+
+    /// Print current pma map.
+    void printPmas(std::ostream& os) const
+    { memory_.pmaMgr_.printPmas(os); }
+
     /// Invalidate whole cache.
     void invalidateDecodeCache();
 

@@ -147,6 +147,8 @@ namespace WdRiscv
     /// dccm, mem_mapped, rsrv, io.
     static bool stringToAttrib(std::string_view str, Attrib& attrib);
 
+    static std::string attributesToString(uint32_t attrib);
+
   private:
 
     uint32_t attrib_ = 0;
@@ -312,6 +314,12 @@ namespace WdRiscv
     void enableTrace(bool flag)
     { trace_ = flag; }
 
+    /// Print current pma map matching a particular address.
+    void printPmas(std::ostream& os, uint64_t address) const;
+
+    /// Print current pma map.
+    void printPmas(std::ostream& os) const;
+
   protected:
 
     /// Reset (to zero) all memory mapped registers.
@@ -371,6 +379,24 @@ namespace WdRiscv
       uint64_t mask_ = ~uint64_t(0);
       unsigned size_ = 4;
     };
+
+    /// Return the Region object associated with the
+    /// word-aligned word designed by the given address. Return a
+    /// no-access object if the givena ddress is out of memory range.
+    Region getRegion(uint64_t addr) const
+    {
+      addr = (addr >> 2) << 2;
+      for (const auto& region : regions_)
+	if (region.valid_ and addr >= region.firstAddr_ and addr <= region.lastAddr_)
+          return region;
+
+      if (addr >= memSize_)
+	return { .pma_ = noAccessPma_ };
+      return { .pma_ = defaultPma_ };  // rwx amo rsrv idempotent misalok
+    }
+
+    /// Print current pmp map matching a particular address.
+    void printRegion(std::ostream& os, Region region) const;
 
     std::vector<Region> regions_;
     std::unordered_map<uint64_t, MemMappedReg> memMappedRegs_;
