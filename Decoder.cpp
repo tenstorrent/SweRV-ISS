@@ -1784,7 +1784,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	    }
 	  else if (f6 == 0x21)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 2;
 	      if (cl.funct1() == 0)
 		encodeLhu(op0, op1, op2, expanded);
 	      else
@@ -1797,7 +1797,7 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	    }
 	  else if (f6 == 0x23)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 1;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 2;
 	      if (cl.funct1() == 0)
 		encodeSh(op1, op0, op2, expanded);
 	    }
