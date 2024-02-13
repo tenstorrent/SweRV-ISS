@@ -1298,7 +1298,7 @@ namespace WdRiscv
 	inst = 0;
 	return false;
       }
-    inst = 0xc0501013 | (rd << 7) | (rs1 << 15);
+    inst = 0x60501013 | (rd << 7) | (rs1 << 15);
     return true;
   }
 
@@ -1309,7 +1309,7 @@ namespace WdRiscv
 	inst = 0;
 	return false;
       }
-    inst = 0x08000003b | (rd << 7) | (rs1 << 15) | (rs2 << 20);
+    inst = 0x0800003b | (rd << 7) | (rs1 << 15) | (rs2 << 20);
     return true;
   }
 }
