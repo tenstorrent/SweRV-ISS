@@ -1284,7 +1284,7 @@ namespace WdRiscv
 	inst = 0;
 	return false;
       }
-    inst = 0x080004033;
+    inst = 0x08004033;
     if (rv64)
       inst |= 8;
     inst = inst | (rd << 7) | (rs1 << 15);
