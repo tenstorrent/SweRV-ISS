@@ -4141,7 +4141,7 @@ Hart<URV>::execVmnand_mm(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVmandnot_mm(const DecodedInst* di)
+Hart<URV>::execVmandn_mm(const DecodedInst* di)
 {
   execVmop_mm(di, MyBitAndNot());
 }
@@ -4173,7 +4173,7 @@ Hart<URV>::execVmnor_mm(const DecodedInst* di)
 
 template <typename URV>
 void
-Hart<URV>::execVmornot_mm(const DecodedInst* di)
+Hart<URV>::execVmorn_mm(const DecodedInst* di)
 {
   execVmop_mm(di, MyBitOrNot());
 }

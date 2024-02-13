@@ -7102,8 +7102,8 @@ Hart<URV>::execute(const DecodedInst* di)
       execVmnand_mm(di);
       return;
 
-    case InstId::vmandnot_mm:
-      execVmandnot_mm(di);
+    case InstId::vmandn_mm:
+      execVmandn_mm(di);
       return;
 
     case InstId::vmxor_mm:
@@ -7118,8 +7118,8 @@ Hart<URV>::execute(const DecodedInst* di)
       execVmnor_mm(di);
       return;
 
-    case InstId::vmornot_mm:
-      execVmornot_mm(di);
+    case InstId::vmorn_mm:
+      execVmorn_mm(di);
       return;
 
     case InstId::vmxnor_mm:

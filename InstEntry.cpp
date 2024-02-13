@@ -3204,7 +3204,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vmandnot.mm", InstId::vmandnot_mm,
+      { "vmandn.mm", InstId::vmandn_mm,
         0b011000'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,
@@ -3240,7 +3240,7 @@ InstTable::setupInstVec()
         OperandType::VecReg, OperandMode::Read, rs2Mask,
       },
 
-      { "vmornot.mm", InstId::vmornot_mm,
+      { "vmorn.mm", InstId::vmorn_mm,
         0b011100'0'00000'00000'010'00000'1010111,
         0b111111'0'00000'00000'111'00000'1111111, // Mask of opcode bits
         RvExtension::V, RvFormat::R,

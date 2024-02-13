@@ -521,11 +521,11 @@ namespace WdRiscv
 
      vmand_mm,
      vmnand_mm,
-     vmandnot_mm,
+     vmandn_mm,
      vmxor_mm,
      vmor_mm,
      vmnor_mm,
-     vmornot_mm,
+     vmorn_mm,
      vmxnor_mm,
      vcpop_m,
      vfirst_m,

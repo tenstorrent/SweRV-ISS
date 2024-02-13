@@ -527,11 +527,11 @@ Decoder::decodeVec(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
         case 0x17: return instTable_.getEntry(InstId::vcompress_vm);
         case 0x19: return masked? illegal : instTable_.getEntry(InstId::vmand_mm);
         case 0x1d: return masked? illegal : instTable_.getEntry(InstId::vmnand_mm);
-        case 0x18: return masked? illegal : instTable_.getEntry(InstId::vmandnot_mm);
+        case 0x18: return masked? illegal : instTable_.getEntry(InstId::vmandn_mm);
         case 0x1b: return masked? illegal : instTable_.getEntry(InstId::vmxor_mm);
         case 0x1a: return masked? illegal : instTable_.getEntry(InstId::vmor_mm);
         case 0x1e: return masked? illegal : instTable_.getEntry(InstId::vmnor_mm);
-        case 0x1c: return masked? illegal : instTable_.getEntry(InstId::vmornot_mm);
+        case 0x1c: return masked? illegal : instTable_.getEntry(InstId::vmorn_mm);
         case 0x1f: return masked? illegal : instTable_.getEntry(InstId::vmxnor_mm);
         case 0x20: return instTable_.getEntry(InstId::vdivu_vv);
         case 0x21: return instTable_.getEntry(InstId::vdiv_vv);
