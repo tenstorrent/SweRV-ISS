@@ -1779,12 +1779,12 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	  unsigned f6 = cl.bits.funct6;
 	  if (f6 == 0x20)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed();
 	      encodeLbu(op0, op1, op2, expanded);
 	    }
 	  else if (f6 == 0x21)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 2;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed() & 2;
 	      if (cl.funct1() == 0)
 		encodeLhu(op0, op1, op2, expanded);
 	      else
@@ -1792,12 +1792,12 @@ Decoder::expandCompressedInst(uint16_t inst) const
 	    }
 	  else if (f6 == 0x22)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed();
 	      encodeSb(op1, op0, op2, expanded);
 	    }
 	  else if (f6 == 0x23)
 	    {
-	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.bits.uimm & 2;
+	      op1 = 8 + cl.bits.rs1p; op0 = 8 + cl.bits.rdp; op2 = cl.immed() & 2;
 	      if (cl.funct1() == 0)
 		encodeSh(op1, op0, op2, expanded);
 	    }
