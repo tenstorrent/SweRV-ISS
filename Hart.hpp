@@ -1649,11 +1649,15 @@ namespace WdRiscv
       pmps = pmpManager_.getPmpTrace();
     }
 
-    /// Print current pmp map matching a particular address.
+    /// Get PMP associated with an address
+    Pmp getPmp(uint64_t addr) const
+    { return pmpManager_.getPmp(addr); }
+
+    /// Print current PMP map matching a particular address.
     void printPmps(std::ostream& os, uint64_t address) const
     { pmpManager_.printPmps(os, address); }
 
-    /// Print current pmp map.
+    /// Print current PMP map.
     void printPmps(std::ostream& os) const
     { pmpManager_.printPmps(os); }
 
@@ -1664,11 +1668,11 @@ namespace WdRiscv
       pmas = memory_.pmaMgr_.getPmaTrace();
     }
 
-    /// Print current pma map matching a particular address.
+    /// Print current PMA map matching a particular address.
     void printPmas(std::ostream& os, uint64_t address) const
     { memory_.pmaMgr_.printPmas(os, address); }
 
-    /// Print current pma map.
+    /// Print current PMA map.
     void printPmas(std::ostream& os) const
     { memory_.pmaMgr_.printPmas(os); }
 

@@ -1258,6 +1258,38 @@ Server<URV>::interact(const WhisperMessage& msg, WhisperMessage& reply, FILE* tr
         }
         break;
 
+      case PmpEntry:
+        {
+          auto pmp = hart.getPmp(msg.address);
+
+          reply.flags = pmp.isRead(PrivilegeMode::Machine);
+          reply.flags |= (pmp.isWrite(PrivilegeMode::Machine) << 1);
+          reply.flags |= (pmp.isExec(PrivilegeMode::Machine) << 2);
+          if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " pmp 0x%" PRIx64 "\n",
+                    hartId, msg.address);
+          break;
+        }
+
+      case PmaEntry:
+        {
+          auto pma = hart.getPma(msg.address);
+
+          reply.flags = uint32_t(pma.isRead());
+          reply.flags |= (uint32_t(pma.isWrite()) << 1);
+          reply.flags |= (uint32_t(pma.isExec()) << 2);
+          reply.flags |= (uint32_t(pma.isIdempotent()) << 3);
+          reply.flags |= (uint32_t(pma.isAmo()) << 4);
+          reply.flags |= (uint32_t(pma.isRsrv()) << 5);
+          reply.flags |= (uint32_t(pma.isIo()) << 6);
+          reply.flags |= (uint32_t(pma.isCacheable()) << 7);
+          reply.flags |= (uint32_t(pma.isMisalignedOk()) << 8);
+          if (commandLog)
+            fprintf(commandLog, "hart=%" PRIu32 " pma 0x%" PRIx64 "\n",
+                    hartId, msg.address);
+          break;
+        }
+
       default:
         std::cerr << "Unknown command\n";
         reply.type = Invalid;
