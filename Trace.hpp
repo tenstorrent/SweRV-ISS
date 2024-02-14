@@ -69,7 +69,7 @@ namespace WdRiscv
     { return di_.ithOperand(i); }
 
     /// Return the size with which the immediate data is left shifted
-    unsigned immediateShiftSize() const 
+    unsigned immediateShiftSize() const
     { return di_.immediateShiftSize(); }
 
     /// Return the rounding mode associated with a floating point instruction
@@ -303,9 +303,12 @@ namespace WdRiscv
     }
 
     using SVP = std::pair<URV, uint64_t>;  // select-value pair
-    void getModifiedImsicCsrs(std::vector<SVP>& mcvps,
-                              std::vector<SVP>& scvps,
-                              std::vector<std::vector<SVP>>& gcvps) const
+    void getImsicChanges(std::vector<SVP>& mcvps,
+                         std::vector<SVP>& scvps,
+                         std::vector<std::vector<SVP>>& gcvps,
+                         std::vector<unsigned>& minterrupts,
+                         std::vector<unsigned>& sinterrupts,
+                         std::vector<std::vector<unsigned>>& ginterrupts) const
     {
       if (not hart_->imsic())
         return;
@@ -315,7 +318,7 @@ namespace WdRiscv
       std::vector<std::pair<unsigned, unsigned>> mselects, sselects;
       std::vector<std::vector<std::pair<unsigned, unsigned>>> gselects;
 
-      imsic.fileTraces(mselects, sselects, gselects);
+      imsic.fileTraces(mselects, sselects, gselects, minterrupts, sinterrupts, ginterrupts);
 
       bool ok; unsigned int value;
       for (auto [select, size] : mselects)

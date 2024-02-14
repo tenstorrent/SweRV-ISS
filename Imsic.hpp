@@ -94,9 +94,11 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 		updateTopId();
 	    }
 
-          // We trace the 8B base address
           if (trace_)
-            selects_.emplace_back(id >> 6, sizeof(uint64_t));
+            {
+              selects_.emplace_back(ExternalInterruptCsr::P0 + (id >> 6), sizeof(uint64_t));
+              externalInterrupts_.emplace_back(id);
+            }
 	}
     }
 
@@ -115,9 +117,8 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 		updateTopId();
 	    }
 
-          // We trace the 8B base address
           if (trace_)
-            selects_.emplace_back(id >> 6, sizeof(uint64_t));
+            selects_.emplace_back(ExternalInterruptCsr::E0 + (id >> 6), sizeof(uint64_t));
 	}
     }
 
@@ -225,9 +226,15 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
     void iregModified(std::vector<std::pair<unsigned, unsigned>>& selects) const
     { selects = selects_; }
 
+    void externalInterrupts(std::vector<unsigned>& interrupts) const
+    { interrupts = externalInterrupts_; }
+
     /// Clear trace related information.
     void clearTrace()
-    { selects_.clear(); }
+    {
+      selects_.clear();
+      externalInterrupts_.clear();
+    }
 
   private:
 
@@ -242,7 +249,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     // For coverage information
     bool trace_ = false;
+    // IMSIC updates from hart-side
     std::vector<std::pair<unsigned, unsigned>> selects_;
+    // IMSIC updates from external-side
+    std::vector<unsigned> externalInterrupts_;
   };
 
 
@@ -522,7 +532,10 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
 
     void fileTraces(std::vector<std::pair<unsigned, unsigned>>& mselects,
                     std::vector<std::pair<unsigned, unsigned>>& sselects,
-                    std::vector<std::vector<std::pair<unsigned, unsigned>>>& gselects) const
+                    std::vector<std::vector<std::pair<unsigned, unsigned>>>& gselects,
+                    std::vector<unsigned>& minterrupts,
+                    std::vector<unsigned>& sinterrupts,
+                    std::vector<std::vector<unsigned>> ginterrupts) const
     {
       mselects.clear();
       sselects.clear();
@@ -535,6 +548,19 @@ namespace TT_IMSIC      // TensTorrent Incoming Message Signaled Interrupt Contr
           std::vector<std::pair<unsigned, unsigned>> tmp;
           g.iregModified(tmp);
           gselects.push_back(std::move(tmp));
+        }
+
+      minterrupts.clear();
+      sinterrupts.clear();
+      ginterrupts.clear();
+
+      mfile_.externalInterrupts(minterrupts);
+      sfile_.externalInterrupts(sinterrupts);
+      for (auto& g : gfiles_)
+        {
+          std::vector<unsigned> tmp;
+          g.externalInterrupts(tmp);
+          ginterrupts.push_back(std::move(tmp));
         }
     }
 
