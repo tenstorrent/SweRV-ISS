@@ -3003,8 +3003,8 @@ CsRegs<URV>::definePmaRegs()
   bool imp = true;
   bool mand = true;
 
-  uint64_t reset = 0x7, mask = 0xfcfffffffffff1ff;
-  uint64_t pokeMask = ~(uint64_t(0xf) << 52);   // Bits 52 to 55 are read only zero
+  uint64_t reset = 0x7, mask = 0xfc0ffffffffff1ff;
+  uint64_t pokeMask = ~(uint64_t(0x3f) << 52);   // Bits 52 to 57 are read only zero
 
   for (unsigned i = 0; i < 64; ++i)
     {
@@ -3517,7 +3517,7 @@ CsRegs<URV>::legalizePmacfgValue(URV prev, URV next) const
     return prev;
 
 #if 0
-  unsigned reserved = (val >> 52) & 0xf;  // Bits 55 to 52.
+  unsigned reserved = (val >> 52) & 0x3f;  // Bits 57 to 52.
   if (reserved != 0)
     return prev;  // Reserved bits must be zero.
 #endif
