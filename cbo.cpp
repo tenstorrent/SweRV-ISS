@@ -161,7 +161,7 @@ Hart<URV>::execCbo_flush(const DecodedInst* di)
 
   MenvcfgFields<URV> menvf(peekCsr(CsrNumber::MENVCFG));
   SenvcfgFields<URV> senvf(isRvs()? peekCsr(CsrNumber::SENVCFG) : 0);
-  SenvcfgFields<URV> henvf(isRvs()? peekCsr(CsrNumber::HENVCFG) : 0);
+  HenvcfgFields<URV> henvf(isRvh()? peekCsr(CsrNumber::HENVCFG) : 0);
 
   if ( (pm != PM::Machine and not menvf.bits_.CBCFE) or
        (not virtMode_ and pm == PM::User and not senvf.bits_.CBCFE) )
