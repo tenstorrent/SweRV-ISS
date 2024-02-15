@@ -352,7 +352,7 @@ namespace WdRiscv
     /// address translation.
     template <typename PTE, typename VA>
     ExceptionCause stage2PageTableWalk(uint64_t va, PrivilegeMode pm, bool read, bool write,
-				       bool exec, bool forFetch, uint64_t& pa, TlbEntry& tlbEntry);
+				       bool exec, bool forFetch, bool isPteAddr, uint64_t& pa, TlbEntry& tlbEntry);
 
     /// Page table walk version 1.12 for the VS stage of 2-stage
     /// address translation.
@@ -371,12 +371,13 @@ namespace WdRiscv
 					  bool exec, uint64_t& pa, TlbEntry& entry);
 
     /// Helper to translate methods for 2nd stage of guest address translation
-    /// (guest physical address to host physical address).
+    /// (guest physical address to host physical address). We distinguish between
+    /// final G-stage translation and PTE address translations.
     ExceptionCause stage2TranslateNoTlb(uint64_t va, PrivilegeMode pm, bool r,
-					bool w, bool x, bool forFetch, uint64_t& pa, TlbEntry& entry);
+					bool w, bool x, bool forFetch, bool isPteAddr, uint64_t& pa, TlbEntry& entry);
 
     ExceptionCause stage2Translate(uint64_t va, PrivilegeMode priv, bool r, bool w,
-				   bool x, bool forFetch, uint64_t& pa);
+				   bool x, bool forFetch, bool isPteAddr, uint64_t& pa);
 
     ExceptionCause stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool r, bool w,
 					bool x, uint64_t& pa, TlbEntry& entry);
