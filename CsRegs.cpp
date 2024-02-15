@@ -3487,7 +3487,7 @@ CsRegs<URV>::legalizePmpcfgValue(URV current, URV value) const
 	  else if (aField == 1)  // TOR
 	    {
 	      if (not pmpTor_)   // TOR not supported
-		nb = (cb & 0x18) | (nb & ~0x18);  // Clear A field.
+		nb = (cb & 0x18) | (nb & ~0x18);  // Preserve A field.
 	    }
 
 	  // w=1 r=0 is not allowed: Preserve the xwr field.
