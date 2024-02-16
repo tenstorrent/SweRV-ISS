@@ -1733,7 +1733,7 @@ namespace WdRiscv
 
       value = csr->read();
 
-      if (rv32_ and cofEnabled_ and superEnabled_)
+      if (rv32_ and cofEnabled_)
 	  {
 	    CN hcsrn = CN(unsigned(CN::MHPMEVENTH3) + ix);
 	    auto hcsr = this->findCsr(hcsrn);
