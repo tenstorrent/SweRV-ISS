@@ -2848,7 +2848,7 @@ CsRegs<URV>::defineVectorRegs()
   uint64_t mask = 0x800000ff;
   if (not rv32_)
     mask = 0x80000000000000ffL;
-  defineCsr("vtype",  CsrNumber::VTYPE,  !mand, !imp, 0, mask, mask);
+  defineCsr("vtype",  CsrNumber::VTYPE,  !mand, !imp, mask & ~URV(0xff), mask, mask);
 
   defineCsr("vlenb",  CsrNumber::VLENB,  !mand, !imp, 0, 0, 0);
 
