@@ -8232,7 +8232,7 @@ Hart<URV>::execVmadc_vim(const DecodedInst* di)
   unsigned vcout = di->op0(),  vs1 = di->op1(),  vcin = 0;
 
   unsigned group = vecRegs_.groupMultiplierX8(),  start = csRegs_.peekVstart();
-  unsigned elems = vecRegs_.elemMax();
+  unsigned elems = vecRegs_.updateWholeMask()? vecRegs_.bitsPerRegister() : vecRegs_.elemMax();
   ElementWidth sew = vecRegs_.elemWidth();
 
   if (not checkVecMaskInst(di, vcout, vs1, group))
