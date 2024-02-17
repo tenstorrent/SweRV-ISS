@@ -286,7 +286,7 @@ VirtMem::twoStageTranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
     }
 
   TlbEntry entry2;
-  return stage2TranslateNoTlb(gpa, priv, read, write, exec, /*forFetch*/ exec, /* isPteAddr */ false, pa, entry2);
+  return stage2TranslateNoTlb(gpa, priv, read, write, exec, /* isPteAddr */ false, pa, entry2);
 }
 
 
@@ -346,10 +346,10 @@ VirtMem::translateNoTlb(uint64_t va, PrivilegeMode priv, bool twoStage, bool rea
 
 ExceptionCause
 VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
-			      bool write, bool exec, bool forFetch, bool isPteAddr, uint64_t& pa, TlbEntry& entry)
+			      bool write, bool exec, bool isPteAddr, uint64_t& pa, TlbEntry& entry)
 {
   // Perform a page table walk.
-  ExceptionCause (VirtMem::*stage2PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, bool, bool, uint64_t&, TlbEntry&);
+  ExceptionCause (VirtMem::*stage2PageTableWalk)(uint64_t, PrivilegeMode, bool, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned lowerMaskBitIndex = 0;
 
   if (modeStage2_ == Sv32)
@@ -384,13 +384,13 @@ VirtMem::stage2TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read,
 
   if ((va >> lowerMaskBitIndex) != 0)
     return stage2PageFaultType(read, write, exec);
-  return (this->*stage2PageTableWalk)(va, priv, read, write, exec, forFetch, isPteAddr, pa, entry);
+  return (this->*stage2PageTableWalk)(va, priv, read, write, exec, isPteAddr, pa, entry);
 }
 
 
 ExceptionCause
 VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
-			 bool exec, bool forFetch, bool isPteAddr, uint64_t& pa)
+			 bool exec, bool isPteAddr, uint64_t& pa)
 {
   // Exactly one of read/write/exec must be true.
   assert((static_cast<int>(read) + static_cast<int>(write) + static_cast<int>(exec)) == 1);
@@ -429,7 +429,7 @@ VirtMem::stage2Translate(uint64_t va, PrivilegeMode priv, bool read, bool write,
     }
 
   TlbEntry tlbEntry;
-  auto cause = stage2TranslateNoTlb(va, priv, read, write, exec, forFetch, isPteAddr, pa, tlbEntry);
+  auto cause = stage2TranslateNoTlb(va, priv, read, write, exec, isPteAddr, pa, tlbEntry);
 
   // If successful, put translation results in TLB.
   if (cause == ExceptionCause::NONE)
@@ -491,7 +491,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	}
     }
 
-  return stage2Translate(gpa, priv, read, write, exec, exec, /* isPteAddr */ false, pa);
+  return stage2Translate(gpa, priv, read, write, exec, /* isPteAddr */ false, pa);
 }
 
 
@@ -704,7 +704,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
 template<typename PTE, typename VA>
 ExceptionCause
 VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read, bool write,
-			     bool exec, bool forFetch, bool isPteAddr, uint64_t& pa, TlbEntry& tlbEntry)
+			     bool exec, bool isPteAddr, uint64_t& pa, TlbEntry& tlbEntry)
 {
   // 1. Root is "a" in section 4.3.2 of the privileged spec, ii is "i" in that section.
   uint64_t root = rootPageStage2_ * pageSize_;
@@ -717,7 +717,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   VA va(address);
 
   // Collect PTE addresses used in the translation process.
-  auto& walkVec = exec || forFetch ? fetchWalks_ : dataWalks_;
+  auto& walkVec = forFetch_ ? fetchWalks_ : dataWalks_;
   if (trace_)
     {
       walkVec.resize(walkVec.size() + 1);
@@ -892,7 +892,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
       // Translate guest pteAddr to host physical address.
       uint64_t pteAddr = gpteAddr; pa = gpteAddr;
-      auto ec = stage2Translate(gpteAddr, privMode, true, false, false, exec, /* isPteAddr */ true, pteAddr);
+      auto ec = stage2Translate(gpteAddr, privMode, true, false, false, /* isPteAddr */ true, pteAddr);
       if (ec != ExceptionCause::NONE)
 	return stage2ExceptionToStage1(ec, read, write, exec);
 
@@ -992,7 +992,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
 
 	    // Need to make sure we have write access to page.
 	    uint64_t pteAddr2 = gpteAddr; pa = gpteAddr;
-	    auto ec = stage2Translate(gpteAddr, privMode, false, true, false, exec, /* isPteAddr */ false, pteAddr2);
+	    auto ec = stage2Translate(gpteAddr, privMode, false, true, false, /* isPteAddr */ false, pteAddr2);
 	    if (ec != ExceptionCause::NONE)
 	      return stage2ExceptionToStage1(ec, read, write, exec);
 	    assert(pteAddr == pteAddr2);
