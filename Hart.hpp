@@ -2820,7 +2820,7 @@ namespace WdRiscv
     bool checkVecOpsVsEmulW1(const DecodedInst* di, unsigned op0, unsigned op1,
 			     unsigned groupX8);
 
-    /// Emit a trace record for the given branch instruction in the
+    /// Emit a trace record for the given branch instruction or trap in the
     /// branch trace file.
     void traceBranch(const DecodedInst* di);
 

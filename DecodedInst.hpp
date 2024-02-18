@@ -152,6 +152,12 @@ namespace WdRiscv
     unsigned immediateShiftSize() const
     { return entry_? entry_->immediateShiftSize() : 0; }
 
+    /// Return true if instruction is one of mret/sret/dret.
+    bool isXRet() const
+    { return entry_ and (entry_->instId() == InstId::mret or
+                         entry_->instId() == InstId::sret or
+                         entry_->instId() == InstId::dret); }
+
     /// Relevant to atomic instructions: Return true if acquire bit is
     /// set in an atomic instruction.
     bool isAtomicAcquire() const
