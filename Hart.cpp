@@ -2433,12 +2433,12 @@ template <typename URV>
 void
 Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
 {
+  hasInterrupt_ = true;
+  interruptCount_++;
+
   bool interrupt = true;
   URV info = 0;  // This goes into mtval.
   initiateTrap(nullptr, interrupt, URV(cause), pc, info);
-
-  hasInterrupt_ = true;
-  interruptCount_++;
 
   if (cause == InterruptCause::M_SOFTWARE)
     setSwInterrupt(0);
@@ -2820,6 +2820,9 @@ Hart<URV>::initiateTrap(const DecodedInst* di, bool interrupt, URV cause, URV pc
 
   if (instFreq_)
     accumulateTrapStats(false /*isNmi*/);
+
+  if (branchBuffer_.max_size() and not branchTraceFile_.empty())
+    traceBranch(nullptr);
 }
 
 
@@ -4572,7 +4575,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
 	      return true;
           prevPerfControl_ = perfControl_;
 
-	  if (traceBranchOn and di->isBranch())
+	  if (traceBranchOn and (di->isBranch() or di->isXRet()))
 	    traceBranch(di);
 	}
       catch (const CoreException& ce)
@@ -4791,13 +4794,13 @@ Hart<URV>::simpleRunWithLimit()
 	++cycleCount_;
 
       if (effectiveIe_ and processExternalInterrupt(nullptr, instStr))
-	continue;  // Next instruction in trap handler.
+        continue;  // Next instruction in trap handler.
 
       // Fetch/decode unless match in decode cache.
       uint32_t inst = 0;
       uint64_t physPc = 0;
       if (not fetchInst(pc_, physPc, inst))
-	continue;
+        continue;
       uint32_t ix = (physPc >> 1) & decodeCacheMask_;
       DecodedInst* di = &decodeCache_[ix];
       if (not di->isValid() or di->physAddress() != physPc or di->inst() != inst)
@@ -4816,7 +4819,7 @@ Hart<URV>::simpleRunWithLimit()
       if (bbFile_)
 	countBasicBlocks(di);
 
-      if (traceBranchOn and di->isBranch())
+      if (traceBranchOn and (di->isBranch() or di->isXRet()))
 	traceBranch(di);
     }
 
@@ -4867,7 +4870,7 @@ Hart<URV>::saveBranchTrace(const std::string& path)
   for (auto iter = branchBuffer_.begin(); iter != branchBuffer_.end(); ++iter)
     {
       auto& rec = *iter;
-      if (rec.size_)
+      if (rec.type_ != 0)
 	fprintf(file, "%c 0x%jx 0x%jx %d\n", rec.type_, uintmax_t(rec.pc_),
 		uintmax_t(rec.nextPc_), rec.size_);
     }
@@ -4882,8 +4885,15 @@ Hart<URV>::traceBranch(const DecodedInst* di)
 {
   bool hasTrap = hasInterrupt_ or hasException_;
   if (hasTrap)
-    return;
-  
+    {
+      char type = 'x';
+      if (branchBuffer_.max_size())
+        branchBuffer_.push_back(BranchRecord(type, currPc_, pc_, 0));
+      return;
+    }
+
+  assert(di != nullptr);
+
   char type = lastBranchTaken_ ? 't' : 'n';  // For conditional branch.
   if (not di->isConditionalBranch())
     {
@@ -4895,6 +4905,9 @@ Hart<URV>::traceBranch(const DecodedInst* di)
       else
 	type = indirect? 'i' : 'j';    // indirect-jump or jump.
     }
+
+  if (di->isXRet())
+    type = 'e';
 
   if (branchBuffer_.max_size())
     branchBuffer_.push_back(BranchRecord(type, currPc_, pc_, di->instSize()));
