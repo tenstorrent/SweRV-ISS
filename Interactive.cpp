@@ -2135,7 +2135,7 @@ Interactive<URV>::translateCommand(Hart<URV>& hart, const std::string& line,
 				   const std::vector<std::string>& tokens)
 {
   // translate va [r|w|x [s|u]]. Mode defaults to r, privilege to u.
-  if (tokens.size() < 2)
+  if (tokens.size() < 3)
     {
       std::cerr << "Invalid translate command: " << line << '\n';
       std::cerr << "Expecting: translate <vaddr> [r|w|x [s|u]]\n";

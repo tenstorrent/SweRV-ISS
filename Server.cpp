@@ -786,7 +786,7 @@ Server<URV>::translateCommand(const WhisperMessage& req,
   reply = req;
 
   // Hart id must be valid. Hart must be started.
-  if (not checkHart(req, "step", reply))
+  if (not checkHart(req, "translate", reply))
     return false;
 
   uint32_t hartId = req.hart;
