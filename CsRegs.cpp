@@ -2654,7 +2654,10 @@ CsRegs<URV>::defineHypervisorRegs()
   csr->setHypervisor(true);
   csr = defineCsr("henvcfgh",    Csrn::HENVCFGH,    !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true); csr->markAsHighHalf(true);
-  csr = defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, wam, wam);
+
+  mask = ~(URV(0x3) << (rv32_? 29 : 58));
+  pokeMask = mask;
+  csr = defineCsr("hgatp",       Csrn::HGATP,       !mand, !imp, 0, mask, pokeMask);
   csr->setHypervisor(true);
   csr = defineCsr("htimedelta",  Csrn::HTIMEDELTA,  !mand, !imp, 0, wam, wam);
   csr->setHypervisor(true);
