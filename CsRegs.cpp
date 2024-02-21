@@ -3698,7 +3698,7 @@ CsRegs<URV>::updateCounterPrivilege()
             csr->setPrivilegeMode(PrivilegeMode::Supervisor);
 	  if (hyperEnabled_)
 	    {
-	      bool noVs = (mMask & 2) == 1 and (hMask & 2) == 0;
+	      bool noVs = (mMask & 2) == 2 and (hMask & 2) == 0;
 	      csr->setHypervisor(noVs);  // Not accessible from VS
 	    }
         }
