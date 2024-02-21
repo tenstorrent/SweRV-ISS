@@ -1668,7 +1668,9 @@ CsRegs<URV>::write(CsrNumber csrn, PrivilegeMode mode, URV value)
 
   if (num == CN::MENVCFG)
     {
-      enableHenvcfgStce(menvcfgStce()); // MENVCFG.STCE off makes HENVCFG.STCE read-only zero.
+      bool stce = menvcfgStce();
+      sstcEnabled_ = stce;
+      enableHenvcfgStce(stce); // MENVCFG.STCE off makes HENVCFG.STCE read-only zero.
     }
   else if ((num >= CN::MHPMEVENT3 and num <= CN::MHPMEVENT31) or
 	   (num >= CN::MHPMEVENTH3 and num <= CN::MHPMEVENTH31))
