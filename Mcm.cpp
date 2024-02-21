@@ -853,6 +853,10 @@ Mcm<URV>::forwardTo(const McmInstr& instr, uint64_t iaddr, uint64_t idata,
   if (roh < il or rol > ih)
     return false;  // no overlap
 
+  unsigned offset = rol - il;  // Offset from instr addr to readOp addr.
+  if (pageNum(rol) != pageNum(instr.physAddr_))
+    offset += offsetToNextPage(instr.physAddr_);   // Op is in second page.
+
   unsigned count = 0; // Count of forwarded bytes
   for (unsigned rix = 0; rix < readOp.size_; ++rix)
     {
@@ -1476,7 +1480,6 @@ bool
 Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 {
   uint64_t mask = (~uint64_t(0)) >> (8 - op.size_)*8;
-  uint64_t orig = mask;
 
   const auto& instrVec = hartInstrVecs_.at(hart.sysHartIndex());
   for (McmInstrIx ix = tag; ix > 0 and mask != 0; --ix)
@@ -1499,8 +1502,10 @@ Mcm<URV>::forwardToRead(Hart<URV>& hart, uint64_t tag, MemoryOp& op)
 	    continue;
 	}
 
-      if (prev == orig and mask == 0)
+      if (op.forwardTime_ == 0)
 	op.forwardTime_ = earliestOpTime(instr);
+      else if (mask != prev)
+	op.forwardTime_ = std::min(earliestOpTime(instr), op.forwardTime_);
 
       const auto& di = instr.di_;
       if (di.instEntry()->isAtomic())
