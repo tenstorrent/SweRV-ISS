@@ -2009,7 +2009,7 @@ main(int argc, char* argv[])
       Args args;
       if (not parseCmdLineArgs(std::span(argv, argc), args))
         return 1;
-      if (args.help)
+      if (args.help or args.version)
         return 0;
 
       // Expand each target program string into program name and args.
