@@ -3003,17 +3003,18 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
               case 4:
                 {
                   unsigned top12 = op2;
+                  unsigned top7 = top12 >> 5;
                   RFormInst rform(inst);
                   op2 = rform.bits.rs2;
                   // mop.rr, although are I format seem to have rs2 as well.
-                  if (top12 == 0x820) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0x860) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0x8a0) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0x8e0) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xc20) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xc60) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xca0) return instTable_.getEntry(InstId::mop_rr);
-                  if (top12 == 0xce0) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x41) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x43) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x45) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x47) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x61) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x63) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x65) return instTable_.getEntry(InstId::mop_rr);
+                  if (top7 == 0x67) return instTable_.getEntry(InstId::mop_rr);
 
 
                   op2 = 0; // No offset for these instructions.
@@ -3060,7 +3061,6 @@ Decoder::decode(uint32_t inst, uint32_t& op0, uint32_t& op1, uint32_t& op2,
                   if (top12 == 0x681) return instTable_.getEntry(InstId::hlv_wu);
                   if (top12 == 0x6c0) return instTable_.getEntry(InstId::hlv_d);
 
-                  unsigned top7 = top12 >> 5;
                   unsigned rd = iform.fields.rd;
                   op0 = top12 & 0x1f;  // rs2 field
                   if (top7 == 0x31 and rd == 0) return instTable_.getEntry(InstId::hsv_b);
