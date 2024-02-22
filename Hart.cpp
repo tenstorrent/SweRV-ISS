@@ -4510,6 +4510,9 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
           if (not hartIx_)
             ++time_;
 
+	  if (mcycleEnabled())
+	    ++cycleCount_;
+
           if (processExternalInterrupt(traceFile, instStr))
 	    continue;  // Next instruction in trap handler.
 	  uint64_t physPc = 0;
@@ -4525,9 +4528,6 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
           // Increment pc and execute instruction
 	  pc_ += di->instSize();
 	  execute(di);
-
-	  if (mcycleEnabled())
-	    ++cycleCount_;
 
 	  if (initStateFile_)
 	    {
@@ -4674,7 +4674,7 @@ Hart<URV>::simpleRun()
         {
           bool hasLim = (instCountLim_ < ~uint64_t(0));
           if (hasLim or bbFile_ or instrLineTrace_ or not branchTraceFile_.empty() or
-	      isRvs() or isRvu() or hasClint())
+	      isRvs() or isRvu() or isRvv() or hasClint())
             simpleRunWithLimit();
           else
             simpleRunNoLimit();
@@ -4783,7 +4783,8 @@ Hart<URV>::simpleRunWithLimit()
 
   while (noUserStop and instCounter_ < limit) 
     {
-      hasException_ = hasInterrupt_ = lastBranchTaken_ = false;
+      resetExecInfo();
+
       currPc_ = pc_;
       ++instCounter_;
 
