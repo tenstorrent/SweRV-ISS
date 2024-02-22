@@ -1026,8 +1026,8 @@ applyCmdLineArgs(const Args& args, Hart<URV>& hart, System<URV>& system,
   if (args.logStart)
     hart.setLogStart(*args.logStart);
 
-  if (args.logPerHart)
-    hart.setOwnTrace(args.logPerHart);
+  if (args.logPerHart or (system.hartCount() == 1))
+    hart.setOwnTrace(args.logPerHart or (system.hartCount() == 1));
 
   if (not args.loadFrom.empty())
     {
