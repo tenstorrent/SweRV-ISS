@@ -706,8 +706,12 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 
       // auto unparsed = po::collect_unrecognized(parsed.options, po::include_positional);
 
+      bool earlyExit = false;
       if (args.version)
-        printVersion();
+        {
+          printVersion();
+          earlyExit = true;
+        }
 
       if (args.help)
 	{
@@ -723,8 +727,11 @@ parseCmdLineArgs(std::span<char*> argv, Args& args)
 	    "  whisper --newlib --log --target \"prog -x -y\"\n"
 	    "  whisper --linux --log --targetsep ':' --target \"prog:-x:-y\"\n\n";
 	  std::cout << desc;
-	  return true;
+          earlyExit = true;
 	}
+
+      if (earlyExit)
+        return true;
 
       if (not collectCommandLineValues(varMap, args))
 	return false;
