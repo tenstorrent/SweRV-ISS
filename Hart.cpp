@@ -4467,7 +4467,7 @@ Hart<URV>::untilAddress(uint64_t address, FILE* traceFile)
     {
       if (userStop)
         break;
-      resetExecInfo();
+      resetExecInfo(); clearTraceData();
 
       if (enableGdb_ and ++gdbCount >= gdbLimit)
         {
@@ -5309,7 +5309,7 @@ Hart<URV>::singleStep(DecodedInst& di, FILE* traceFile)
       uint32_t inst = 0;
       currPc_ = pc_;
 
-      resetExecInfo();
+      resetExecInfo(); clearTraceData();
 
       ++instCounter_;
 
