@@ -4275,11 +4275,11 @@ Hart<URV>::execVmsbf_m(const DecodedInst* di)
     for (uint32_t ix = start; ix < elems; ++ix)
       {
 	bool flag = false;
-	if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
+	if (vecRegs_.updateWholeMask() or
+	    vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	  {
 	    bool input = false;
 	    vecRegs_.readMaskRegister(vs1, ix, input);
-
 	    found = found or input;
 	    flag = not found;
 	  }
@@ -4317,12 +4317,13 @@ Hart<URV>::execVmsif_m(const DecodedInst* di)
     for (uint32_t ix = start; ix < elems; ++ix)
       {
 	bool flag = false;
-	if (vecRegs_.isMaskDestActive(vd, ix, masked, flag))
+	if (vecRegs_.updateWholeMask() or
+	    vecRegs_.isMaskDestActive(vd, ix, masked, flag))
 	  {
-	    flag = not found;
 	    bool input = false;
 	    vecRegs_.readMaskRegister(vs1, ix, input);
 	    found = found or input;
+	    flag = not found;
 	  }
 	vecRegs_.writeMaskRegister(vd, ix, flag);
       }
@@ -4357,7 +4358,8 @@ Hart<URV>::execVmsof_m(const DecodedInst* di)
   for (uint32_t ix = start; ix < elems; ++ix)
     {
       bool flag = false;
-      bool active = vecRegs_.isMaskDestActive(vd, ix, masked, flag);
+      bool active = (vecRegs_.updateWholeMask() or
+		     vecRegs_.isMaskDestActive(vd, ix, masked, flag));
 
       bool input = false;
       vecRegs_.readMaskRegister(vs1, ix, input);
