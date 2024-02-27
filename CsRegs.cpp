@@ -4154,7 +4154,7 @@ CsRegs<URV>::addHypervisorFields()
         {{"FIOM", 1}, {"res0", 3}, {"CBIE", 2}, {"CBCFE", 1}, {"CBZE", 1},
          {"res1", 54}, {"PBMTE", 1}, {"VSTCE", 1}});
       setCsrFields(Csrn::HGATP,
-        {{"PPN", 44}, {"VMID", 14}, {"zero", 4}, {"MODE", 4}});
+        {{"PPN", 44}, {"VMID", 14}, {"zero", 2}, {"MODE", 4}});
       setCsrFields(Csrn::VSSTATUS,
         {{"res0",  1}, {"SIE",  1}, {"res1",  3}, {"SPIE",  1},
          {"UBE",   1}, {"res2", 1}, {"SPP",   1}, {"VS",    2},
