@@ -2440,8 +2440,11 @@ Hart<URV>::initiateInterrupt(InterruptCause cause, URV pc)
   URV info = 0;  // This goes into mtval.
   initiateTrap(nullptr, interrupt, URV(cause), pc, info);
 
+#if 0
+  // Operating system code does this by writing to CLINT.
   if (cause == InterruptCause::M_SOFTWARE)
     setSwInterrupt(0);
+#endif
 
   if (not enableCounters_)
     return;
@@ -5190,7 +5193,12 @@ Hart<URV>::processExternalInterrupt(FILE* traceFile, std::string& instStr)
       if (swInterrupt_.bits_.alarm_)
         {
 	  if (swInterrupt_.bits_.flag_)
-	    mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
+	    {
+	      // Only deliver when 1 is written. Deliver and clear to
+	      // follow doorbell model.
+	      mipVal = mipVal | (URV(1) << URV(InterruptCause::M_SOFTWARE));
+	      setSwInterrupt(0);
+	    }
 	  else
 	    mipVal = mipVal & ~(URV(1) << URV(InterruptCause::M_SOFTWARE));
         }
