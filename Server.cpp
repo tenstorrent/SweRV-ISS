@@ -783,6 +783,7 @@ bool
 Server<URV>::translateCommand(const WhisperMessage& req, 
 			      WhisperMessage& reply)
 {
+  // FIXME: this needs to be updated for 2-stage translation
   reply = req;
 
   // Hart id must be valid. Hart must be started.
@@ -863,7 +864,12 @@ doPageTableWalk(const Hart<URV>& hart, WhisperMessage& reply)
       hart.getPageTableWalkAddresses(isInstr, index, addrs);
       for (auto& addr : addrs)
         if (addr.type_ == VirtMem::WalkEntry::Type::PA)
-          items.push_back(std::move(addr.addr_));
+          {
+            items.push_back(std::move(addr.addr_));
+            Pma pma = hart.getPma(addr.addr_);
+            pma = VirtMem::overridePmaWithPbmt(pma, addr.pbmt_);
+            items.push_back(pma.attributesToInt());
+          }
     }
   else
     hart.getPageTableWalkEntries(isInstr, index, items);

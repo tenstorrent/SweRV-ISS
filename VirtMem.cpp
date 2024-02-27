@@ -166,7 +166,7 @@ VirtMem::transNoUpdate(uint64_t va, PrivilegeMode priv, bool twoStage,
 	    return stage1PageFaultType(read, write, exec);
 	  // We do not check/update access/dirty bits.
 	  pa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
-	  pbmt_ = Pbmt(entry->pbmt_);
+          pbmt_ = Pbmt(entry->pbmt_);
 	  return ExceptionCause::NONE;
 	}
     }
@@ -455,6 +455,7 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
       TlbEntry* entry = vsTlb_.findEntryUpdateTime(virPageNum, vsAsid_);
       if (entry)
 	{
+          stage1Trap_ = true;
 	  if (priv == PrivilegeMode::User and not entry->user_)
             return stage1PageFaultType(read, write, exec);
 	  if (priv == PrivilegeMode::Supervisor)
@@ -475,7 +476,8 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 		entry->dirty_ = true;
 	    }
 	  // Use TLB entry.
-	  pbmt_ = Pbmt(entry->pbmt_);
+          pbmt_ = Pbmt(entry->pbmt_);
+          stage1Trap_ = false;
 	  gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	}
       else
@@ -572,8 +574,13 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
     {
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
+
+      int walkEntryIx;
       if (trace_)
-	walkVec.back().emplace_back(pteAddr);
+        {
+          walkVec.back().emplace_back(pteAddr);
+          walkEntryIx = walkVec.back().size() - 1;
+        }
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -609,6 +616,8 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       // 5.  pte.read_ or pte.exec_ : leaf pte
       if (pbmtEnabled_)
 	{
+          if (trace_)
+            walkVec.back().at(walkEntryIx).pbmt_ = static_cast<Pbmt>(pte.pbmt());
 	  if (pte.pbmt() == 3)
 	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
 	}
@@ -729,8 +738,12 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
 
+      int walkEntryIx;
       if (trace_)
-        walkVec.back().emplace_back(pteAddr);
+        {
+          walkVec.back().emplace_back(pteAddr);
+          walkEntryIx = walkVec.back().size() - 1;
+        }
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -765,6 +778,8 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // 5.  pte.read_ or pte.exec_ : leaf pte
       if (pbmtEnabled_)
 	{
+          if (trace_)
+            walkVec.back().at(walkEntryIx).pbmt_ = static_cast<Pbmt>(pte.pbmt());
 	  if (pte.pbmt() == 3)
 	    return stage2PageFaultType(read, write, exec);  // pbmt=3 is reserved.
 	}
@@ -873,7 +888,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   VA va(address);
 
   // Collect PTE addresses used in the translation process.
-  auto& walkVec = exec ? fetchWalks_ : dataWalks_;
+  auto& walkVec = forFetch_ ? fetchWalks_ : dataWalks_;
   if (trace_)
     {
       walkVec.resize(walkVec.size() + 1);
@@ -896,8 +911,12 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (ec != ExceptionCause::NONE)
 	return stage2ExceptionToStage1(ec, read, write, exec);
 
+      int walkEntryIx;
       if (trace_)
-        walkVec.back().emplace_back(pteAddr);
+        {
+          walkVec.back().emplace_back(pteAddr);
+          walkEntryIx = walkVec.back().size() - 1;
+        }
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -932,6 +951,8 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // 5.  pte.read_ or pte.exec_ : leaf pte
       if (pbmtEnabled_)
 	{
+          if (trace_)
+            walkVec.back().at(walkEntryIx).pbmt_ = static_cast<Pbmt>(pte.pbmt());
 	  if (pte.pbmt() == 3)
 	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
 	}
