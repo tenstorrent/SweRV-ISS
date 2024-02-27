@@ -574,9 +574,13 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
     {
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
+
+      int walkEntryIx;
       if (trace_)
-	walkVec.back().emplace_back(pteAddr);
-      auto walkEntry = walkVec.back().rbegin();
+        {
+          walkVec.back().emplace_back(pteAddr);
+          walkEntryIx = walkVec.back().size() - 1;
+        }
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -613,7 +617,7 @@ VirtMem::pageTableWalk1p12(uint64_t address, PrivilegeMode privMode, bool read, 
       if (pbmtEnabled_)
 	{
           if (trace_)
-            (*walkEntry).pbmt_ = static_cast<Pbmt>(pte.pbmt());
+            walkVec.back().at(walkEntryIx).pbmt_ = static_cast<Pbmt>(pte.pbmt());
 	  if (pte.pbmt() == 3)
 	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
 	}
@@ -734,9 +738,12 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       // 2.
       uint64_t pteAddr = root + va.vpn(ii)*pteSize;
 
+      int walkEntryIx;
       if (trace_)
-        walkVec.back().emplace_back(pteAddr);
-      auto walkEntry = walkVec.back().rbegin();
+        {
+          walkVec.back().emplace_back(pteAddr);
+          walkEntryIx = walkVec.back().size() - 1;
+        }
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -772,7 +779,7 @@ VirtMem::stage2PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (pbmtEnabled_)
 	{
           if (trace_)
-            (*walkEntry).pbmt_ = static_cast<Pbmt>(pte.pbmt());
+            walkVec.back().at(walkEntryIx).pbmt_ = static_cast<Pbmt>(pte.pbmt());
 	  if (pte.pbmt() == 3)
 	    return stage2PageFaultType(read, write, exec);  // pbmt=3 is reserved.
 	}
@@ -904,9 +911,12 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (ec != ExceptionCause::NONE)
 	return stage2ExceptionToStage1(ec, read, write, exec);
 
+      int walkEntryIx;
       if (trace_)
-        walkVec.back().emplace_back(pteAddr);
-      auto walkEntry = walkVec.back().rbegin();
+        {
+          walkVec.back().emplace_back(pteAddr);
+          walkEntryIx = walkVec.back().size() - 1;
+        }
 
       // Check PMP. The privMode here is the effective one that
       // already accounts for MPRV.
@@ -942,7 +952,7 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       if (pbmtEnabled_)
 	{
           if (trace_)
-            (*walkEntry).pbmt_ = static_cast<Pbmt>(pte.pbmt());
+            walkVec.back().at(walkEntryIx).pbmt_ = static_cast<Pbmt>(pte.pbmt());
 	  if (pte.pbmt() == 3)
 	    return stage1PageFaultType(read, write, exec);  // pbmt=3 is reserved.
 	}
