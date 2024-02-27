@@ -957,11 +957,16 @@ System<URV>::snapshotRun(std::vector<FILE*>& traceFiles, const std::string& snap
 
       batchRun(traceFiles, true /*waitAll*/, 0 /*stepWindow*/);
 
-      if (hart0.hasTargetProgramFinished() or nextLimit >= globalLimit)
-	{
-	  Filesystem::remove_all(path);
-	  break;
-	}
+      bool done = false;
+      for (auto& hartPtr : sysHarts_)
+	if (hartPtr->hasTargetProgramFinished() or nextLimit >= globalLimit)
+	  {
+	    done = true;
+	    Filesystem::remove_all(path);
+	    break;
+	  }
+      if (done)
+	break;
 
       if (not saveSnapshot(pathStr))
 	{
