@@ -229,7 +229,7 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	    privMode = PrivilegeMode::Supervisor;
 	  else if (val == 3)
 	    privMode = PrivilegeMode::Machine;
-	  else 
+	  else
 	    errors++;
 	}
       else if (type == "vm")  // Virtual mode
@@ -261,14 +261,15 @@ Hart<URV>::loadSnapshotRegs(const std::string & filename)
 	      continue;
 	    }
 	  auto csr = csRegs_.findCsr(CsrNumber(num));
+          // Poke to propagate updates to cached values
 	  if (csr and csr->isImplemented())
-	    csr->write(val);
+            pokeCsr(static_cast<CsrNumber>(num), val);
 	  else
 	    cerr << "Warning: Register snapshot loader: Line " << lineNum
 		 << ": No such CSR: " << line << '\n';
         }
       else if (type == "x")   // Integer register
-        {  
+        {
           if (not loadRegNumAndValue(iss, num, val))
 	    {
 	      errors++;
