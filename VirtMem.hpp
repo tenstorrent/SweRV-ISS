@@ -185,6 +185,9 @@ namespace WdRiscv
 
       uint64_t addr_ = 0;
       Type type_ = Type::PA;
+
+      // Only applicable for leaf entries
+      Pbmt pbmt_ = Pbmt::None;
     };
 
     /// Return the addresses of the instruction page table entries
@@ -224,7 +227,7 @@ namespace WdRiscv
       stage1AttemptedADUpdate_ = false;
     }
 
-    /// Return page based memory type of last translation.
+    /// Return page based memory type of last translation
     Pbmt lastPbmt() const
     { return pbmt_; }
 
@@ -275,6 +278,28 @@ namespace WdRiscv
 	  return true;
 	}
       return false;
+    }
+
+    static Pma overridePmaWithPbmt(Pma pma, Pbmt pbmt)
+    {
+      if (pbmt == Pbmt::None or pbmt == Pbmt::Reserved)
+        return pma;
+
+      pma.disable(Pma::Attrib::Cacheable);
+      pma.disable(Pma::Attrib::Amo);
+      pma.disable(Pma::Attrib::Rsrv);
+
+      if (pbmt == Pbmt::Nc)
+        {
+          pma.enable(Pma::Attrib::Idempotent);
+          pma.disable(Pma::Attrib::Io);
+        }
+      else
+        {
+          pma.disable(Pma::Attrib::Idempotent);
+          pma.enable(Pma::Attrib::Io);
+        }
+      return pma;
     }
 
   protected:

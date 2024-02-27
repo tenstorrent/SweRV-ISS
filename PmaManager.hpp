@@ -141,6 +141,11 @@ namespace WdRiscv
     bool hasAttrib(Attrib a) const
     { return (attrib_ & a) == a; }
 
+    /// Return an integer represenation of the attributes. For now,
+    /// just return as-is, could modify later.
+    uint32_t attributesToInt()
+    { return attrib_; }
+
     /// Convert given string to a Pma object. Return true on success
     /// return false if string does not contain a valid attribute names.
     /// Valid names: none, read, write, execute, idempotent, amo, iccm,

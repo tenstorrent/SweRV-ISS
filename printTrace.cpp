@@ -235,6 +235,10 @@ printPageTableWalk(FILE* out, const Hart<URV>& hart, const char* tag,
           uint64_t pte = 0;
           hart.peekMemory(entry.addr_, pte, true);
           fprintf(out, "=0x%" PRIx64, pte);
+
+          Pma pma = hart.getPma(entry.addr_);
+          pma = VirtMem::overridePmaWithPbmt(pma, entry.pbmt_);
+          fprintf(out, ", ma=0x%" PRIx32, pma.attributesToInt());
         }
       head = false;
     }
@@ -801,7 +805,13 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
         {
           buffer.print(sep).print(addrs.at(i).addr_);
           if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
-            buffer.printChar('=').print(entries.at(entryIx++));
+            {
+              buffer.printChar('=').print(entries.at(entryIx++));
+
+              Pma pma = getPma(addrs.at(i).addr_);
+              pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
+              buffer.print("ma").print(pma.attributesToInt());
+            }
           sep = ";";
         }
 
@@ -814,7 +824,13 @@ Hart<URV>::printInstCsvTrace(const DecodedInst& di, FILE* out)
         {
           buffer.print(sep).print(addrs.at(i).addr_);
           if (addrs.at(i).type_ == VirtMem::WalkEntry::Type::PA)
-            buffer.printChar('=').print(entries.at(entryIx++));
+            {
+              buffer.printChar('=').print(entries.at(entryIx++));
+
+              Pma pma = getPma(addrs.at(i).addr_);
+              pma = VirtMem::overridePmaWithPbmt(pma, addrs.at(i).pbmt_);
+              buffer.print(";ma=").print(pma.attributesToInt());
+            }
           sep = ";";
         }
     }
