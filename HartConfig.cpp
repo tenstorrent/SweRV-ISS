@@ -1619,7 +1619,8 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "page_fault_on_first_access";
   if (config_ -> contains(tag) and hart.sysHartIndex() == 0)
     {
-      cerr << "Warning: Config tag page_fault_on_first_access is deprecated -- feature is now controlled by bit 61 of the MENVCFG CSR.\n";
+      cerr << "Warning: Config tag " << tag << " is deprecated -- "
+	   << "feature is now controlled by bit 61 of the MENVCFG CSR.\n";
       getJsonBoolean(tag, config_ -> at(tag), flag) or errors++;
       // hart.setFaultOnFirstAccess(flag);
     }
@@ -1850,8 +1851,10 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   tag = "enable_supervisor_time_compare";
-  if (config_ ->contains(tag))
+  if (config_ ->contains(tag) and hart.sysHartIndex() == 0)
     {
+      cerr << "Warning: Config tag " << tag << " is deprecated. "
+	   << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableRvsstc(flag);
     }
