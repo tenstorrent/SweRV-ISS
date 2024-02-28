@@ -3268,8 +3268,8 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
     {
       updateTranslationPbmt();
       csRegs_.updateSstc();
-      stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
-      vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
+      stimecmpActive_ = csRegs_.menvcfgStce();
+      vstimecmpActive_ = csRegs_.henvcfgStce();
     }
 
   if (csr == CN::STIMECMP)
