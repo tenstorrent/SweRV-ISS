@@ -4755,7 +4755,7 @@ namespace WdRiscv
       lastVsPageMode_ = virtMem_.vsMode();
       lastPageModeStage2_ = virtMem_.modeStage2();
       virtMem_.clearExecInfo();
-      vecRegs_.clearLastWrittenReg();
+      vecRegs_.clearTraceData();
     }
 
     void countBasicBlocks(const DecodedInst* di);

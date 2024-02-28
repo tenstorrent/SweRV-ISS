@@ -508,6 +508,7 @@ namespace WdRiscv
     {
       ldStSize_ = 0;
       ldStAddr_.clear();
+      ldStPhysAddr_.clear();
       maskedAddr_.clear();
       stData_.clear();
       clearLastWrittenReg();
@@ -754,10 +755,11 @@ namespace WdRiscv
 
     // Following used for logging/tracing. Cleared before each instruction.
     // Collected by a vector load/store instruction.
-    unsigned ldStSize_ = 0;           // Vector load/store element size.
-    std::vector<uint64_t> ldStAddr_;  // Addresses of vector load/store instruction.
-    std::vector<bool> maskedAddr_;    // True if address is masked off (element skipped).
-    std::vector<uint64_t> stData_;    // Data of vector store instruction.
-    std::vector<unsigned> opsEmul_;   // Effective grouping of vector operands.
+    unsigned ldStSize_ = 0;               // Vector load/store element size.
+    std::vector<uint64_t> ldStAddr_;      // Addresses of vector load/store instruction.
+    std::vector<uint64_t> ldStPhysAddr_;  // Phys addresses of vector load/store instruction (FIXME: page crosses).
+    std::vector<bool> maskedAddr_;        // True if address is masked off (element skipped).
+    std::vector<uint64_t> stData_;        // Data of vector store instruction.
+    std::vector<unsigned> opsEmul_;       // Effective grouping of vector operands.
   };
 }
