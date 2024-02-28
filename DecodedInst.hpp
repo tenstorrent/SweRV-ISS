@@ -145,6 +145,9 @@ namespace WdRiscv
     { return entry_; }
 
     /// Relevant for floating point instructions with rounding mode.
+    bool hasRoundingMode() const
+    { return entry_ and entry_->hasRoundingMode(); }
+
     unsigned roundingMode() const
     { return ((inst_ >> 12) & 7); }
 
