@@ -217,14 +217,14 @@ namespace WdRiscv
       clearUpdatedPtes();
       fetchPageCross_ = false;
       dataPageCross_ = false;
-      pbmt_ = Pbmt::None;
     }
 
-    /// Clear extra trap information
-    void clearTrapInfo()
+    /// Clear extra translation information
+    void clearExecInfo()
     {
-      stage1Trap_ = false;
+      stage1ImplicitAccessTrap_ = false;
       stage1AttemptedADUpdate_ = false;
+      pbmt_ = Pbmt::None;
     }
 
     /// Return page based memory type of last translation
@@ -530,13 +530,13 @@ namespace WdRiscv
     void setFaultOnFirstAccessStage2(bool flag)
     { faultOnFirstAccess2_ = flag; }
 
-    /// Return true if last translation had a fault in VS-stage translation and false otherwise.
-    /// Sets flag if attempted to update A/D bits on last stage 1 translation.
-    /// This is necessary to properly write mtinst/htinst.
+    /// Return true if last translation had a fault in VS-stage translation caused by
+    /// implicit access and false otherwise. Sets flag if attempted to update A/D bits
+    /// on last stage 1 translation. This is necessary to properly write mtinst/htinst.
     bool stage1TrapInfo(bool& implicitWrite) const
     {
       implicitWrite = stage1AttemptedADUpdate_;
-      return stage1Trap_;
+      return stage1ImplicitAccessTrap_;
     }
 
     /// Clear saved data for updated leaf level PTE.
@@ -648,7 +648,7 @@ namespace WdRiscv
     bool dataPageCross_;
 
     // Extra trap information
-    bool stage1Trap_ = false;
+    bool stage1ImplicitAccessTrap_ = false;
     bool stage1AttemptedADUpdate_ = false;
 
     Pbmt pbmt_ = Pbmt::None;

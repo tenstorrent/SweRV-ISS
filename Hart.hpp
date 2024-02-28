@@ -4754,7 +4754,7 @@ namespace WdRiscv
       lastPageMode_ = virtMem_.mode();
       lastVsPageMode_ = virtMem_.vsMode();
       lastPageModeStage2_ = virtMem_.modeStage2();
-      virtMem_.clearTrapInfo();
+      virtMem_.clearExecInfo();
       vecRegs_.clearLastWrittenReg();
     }
 

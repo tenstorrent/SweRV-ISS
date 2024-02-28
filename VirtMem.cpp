@@ -455,7 +455,6 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
       TlbEntry* entry = vsTlb_.findEntryUpdateTime(virPageNum, vsAsid_);
       if (entry)
 	{
-          stage1Trap_ = true;
 	  if (priv == PrivilegeMode::User and not entry->user_)
             return stage1PageFaultType(read, write, exec);
 	  if (priv == PrivilegeMode::Supervisor)
@@ -477,7 +476,6 @@ VirtMem::twoStageTranslate(uint64_t va, PrivilegeMode priv, bool read, bool writ
 	    }
 	  // Use TLB entry.
           pbmt_ = Pbmt(entry->pbmt_);
-          stage1Trap_ = false;
 	  gpa = (entry->physPageNum_ << pageBits_) | (va & pageMask_);
 	}
       else
@@ -502,7 +500,11 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
 			      bool exec, uint64_t& pa, TlbEntry& entry)
 {
   if (vsMode_ == Sv32)
-    return stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
+    {
+      auto cause =  stage1PageTableWalk<Pte32, Va32>(va, priv, read, write, exec, pa, entry);
+      stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
+      return cause;
+    }
 
   ExceptionCause (VirtMem::*walkFn)(uint64_t, PrivilegeMode, bool, bool, bool, uint64_t&, TlbEntry&);
   unsigned vaMsb = 0;  // Most significant bit of va
@@ -543,7 +545,10 @@ VirtMem::stage1TranslateNoTlb(uint64_t va, PrivilegeMode priv, bool read, bool w
   if (va1 != va2)
     return stage1PageFaultType(read, write, exec);
 
-  return (this->*walkFn)(va, priv, read, write, exec, pa, entry);
+  auto cause = (this->*walkFn)(va, priv, read, write, exec, pa, entry);
+  // From here on, all traps come from implicit memory accesses
+  stage1ImplicitAccessTrap_ = cause != ExceptionCause::NONE;
+  return cause;
 }
 
 
@@ -895,8 +900,6 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
       walkVec.back().emplace_back(address, WalkEntry::Type::GVA);
     }
 
-  stage1Trap_ = true;
-
   while (true)
     {
       // 2.
@@ -1050,7 +1053,6 @@ VirtMem::stage1PageTableWalk(uint64_t address, PrivilegeMode privMode, bool read
   tlbEntry.pbmt_ = pte.pbmt();
 
   pbmt_ = Pbmt(pte.pbmt());
-  stage1Trap_ = false;
 
   return ExceptionCause::NONE;
 }
