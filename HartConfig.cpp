@@ -1702,6 +1702,7 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
   tag = "time_shift";
   if (config_ ->contains(tag))
   {
+    cerr << "Warning: Config tag time_shift may overflow timecmp and have unintended consequences.\n";
     unsigned shift = 0;
     if (not getJsonUnsigned(tag, config_ -> at(tag), shift))
       errors++;
