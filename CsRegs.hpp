@@ -1603,6 +1603,9 @@ namespace WdRiscv
     /// helper to add fields of hypervisor CSRs
     void addHypervisorFields();
 
+    /// helper to add fields of AIA CSRs
+    void addAiaFields();
+
     /// Return true if given CSR is a hypervisor CSR.
     bool isHypervisor(CsrNumber csrn) const
     { auto csr = getImplementedCsr(csrn); return csr and csr->isHypervisor(); }

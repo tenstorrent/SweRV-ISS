@@ -2951,6 +2951,8 @@ CsRegs<URV>::defineAiaRegs()
 	    csr->setHypervisor(true);
 	}
     }
+
+  addAiaFields();
 }
 
 
@@ -4163,6 +4165,22 @@ CsRegs<URV>::addHypervisorFields()
       setCsrFields(Csrn::VSATP,
         {{"PPN", 44}, {"ASID", 16}, {"MODE", 4}});
     }
+}
+
+
+template <typename URV>
+void
+CsRegs<URV>::addAiaFields()
+{
+  using Csrn = CsrNumber;
+  constexpr unsigned xlen = sizeof(URV)*8;
+
+  setCsrFields(Csrn::MTOPEI,
+      {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
+  setCsrFields(Csrn::STOPEI,
+      {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
+  setCsrFields(Csrn::VSTOPEI,
+      {{"prio", 11}, {"identity", 11}, {"zero", xlen - 22}});
 }
 
 
