@@ -111,7 +111,7 @@ struct MyClmulh
   {
     constexpr unsigned width = sizeof(T)*8;  // Bit count of T
     T res{0};
-    for (unsigned i = 0; i < width; ++i)
+    for (unsigned i = 1; i < width; ++i)
       if ((b >> i) & 1)
 	res ^= (a >> (width - i));
     return res;
