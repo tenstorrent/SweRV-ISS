@@ -1852,10 +1852,11 @@ HartConfig::applyConfig(Hart<URV>& hart, bool userMode, bool verbose) const
     }
 
   tag = "enable_supervisor_time_compare";
-  if (config_ ->contains(tag) and hart.sysHartIndex() == 0)
+  if (config_ -> contains(tag))
     {
-      cerr << "Warning: Config tag " << tag << " is deprecated. "
-	   << "Use sstc with --isa instead.\n";
+      if (hart.sysHartIndex() == 0)
+	cerr << "Warning: Config tag " << tag << " is deprecated. "
+	     << "Use sstc with --isa instead.\n";
       getJsonBoolean(tag, config_ ->at(tag), flag) or errors++;
       hart.enableRvsstc(flag);
     }
