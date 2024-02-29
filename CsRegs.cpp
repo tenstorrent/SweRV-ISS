@@ -678,22 +678,21 @@ template <typename URV>
 void
 CsRegs<URV>::updateSstc()
 {
-  bool flag = sstcEnabled_;
-
   bool stce = menvcfgStce();
   PrivilegeMode mode = stce? PrivilegeMode::Supervisor : PrivilegeMode::Machine;
 
-  flag = flag and superEnabled_;
   auto stimecmp = findCsr(CsrNumber::STIMECMP);
-  stimecmp->setImplemented(flag);
+  if (sstcEnabled_ and not stimecmp->isImplemented())
+    stimecmp->setImplemented(true);
   stimecmp->setPrivilegeMode(mode);
-  stimecmp->setHypervisor(false);
+  stimecmp->setHypervisor(stce);
   if (rv32_)
     {
       auto stimecmph = findCsr(CsrNumber::STIMECMPH);
-      stimecmph->setImplemented(flag);
+      if (sstcEnabled_ and not stimecmph->isImplemented())
+	stimecmph->setImplemented(true);
       stimecmph->setPrivilegeMode(mode);
-      stimecmp->setHypervisor(false);
+      stimecmp->setHypervisor(stce);
     }
 
   if (superEnabled_)
@@ -705,27 +704,25 @@ CsRegs<URV>::updateSstc()
 	{
 	  URV mask = mip->getWriteMask();
 	  URV stBit = URV(1) << unsigned(InterruptCause::S_TIMER);
-	  bool readOnly = flag and stce;
+	  bool readOnly = stce;
 	  mask = readOnly? mask & ~stBit : mask | stBit;
 	  mip->setWriteMask(mask);
 	}
     }
 
-  bool hstce = false;
-  auto henv = getImplementedCsr(CsrNumber::HENVCFG);
-  if (henv)
-    hstce = henvcfgStce();
+  bool hstce = henvcfgStce();
 
-  flag = flag and hyperEnabled_;
   auto vstimecmp = findCsr(CsrNumber::VSTIMECMP);
-  vstimecmp->setImplemented(flag);
-  vstimecmp->setHypervisor(true);
+  if (sstcEnabled_ and hyperEnabled_ and not vstimecmp->isImplemented())
+    vstimecmp->setImplemented(true);
+  vstimecmp->setHypervisor(stce);
   vstimecmp->setPrivilegeMode(mode);
   if (rv32_)
     {
       auto vstimecmph = findCsr(CsrNumber::VSTIMECMPH);
-      vstimecmph->setImplemented(flag);
-      vstimecmph->setHypervisor(true);
+      if (sstcEnabled_ and hyperEnabled_ and not vstimecmph->isImplemented())
+	vstimecmph->setImplemented(true);
+      vstimecmph->setHypervisor(stce);
       vstimecmph->setPrivilegeMode(mode);
     }
 
