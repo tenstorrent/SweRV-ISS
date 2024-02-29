@@ -663,6 +663,8 @@ The vector configuration is an object with the following fields:
 * mask_agnostic_policy: "ones" or "undisturb" to set behavior of mask-anostic instructions, default is "ones".
 * tail_agnostic_policy: "ones" or "undisturb" to set behavior of tail-anostic instructions, default is "ones".
 * trap_non_zero_vstart: causes vector instruction to trap on non-zero vstart, default is true.
+* update_whole_mask: when true, compute all the elements of the desitnation mask register for mask-logical and mask-manipulation instructions regardless of VL.
+* trap_invalid_vtype: when true, trap on invalid/unsupported vtype configurations, when false set vtype.vill instead.
 
 Example:
 ```

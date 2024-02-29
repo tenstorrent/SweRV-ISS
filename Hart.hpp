@@ -1937,6 +1937,11 @@ namespace WdRiscv
     void configVectorUpdateWholeMask(bool flag)
     { vecRegs_.configUpdateWholeMask(flag); }
 
+    /// When flag is trupe, trap on invalid/unsuported vtype configuraions in vsetvl,
+    /// vsetvli, vsetivli. When flag is false, set vtype.vill instead.  .
+    void configVectorTrapVtype(bool flag)
+    { vecRegs_.configVectorTrapVtype(flag); }
+
     bool readInstFromFetchCache(uint64_t addr, uint16_t& inst) const
     { return fetchCache_.read(addr, inst); }
 
@@ -2831,7 +2836,7 @@ namespace WdRiscv
 
     /// Called at the end of a trapping vector instruction to mark VS
     /// dirty if a vector register was updated.
-    void postVecFail(const DecodedInst* di, bool clearVstart = false);
+    void postVecFail(const DecodedInst* di);
 
     /// The program counter is adjusted (size of current instruction
     /// added) before any of the following exec methods are called. To
@@ -3172,7 +3177,10 @@ namespace WdRiscv
     void execFsrw(const DecodedInst*);
     void execFsriw(const DecodedInst*);
 
-    void vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
+    /// Code common to execVsetvli, and execVsetvl. Return true on success and false if an
+    /// illegal instruction trap must be taken.
+    bool vsetvl(unsigned rd, unsigned rs1, URV vtypeVal);
+
     void execVsetvli(const DecodedInst*);
     void execVsetivli(const DecodedInst*);
     void execVsetvl(const DecodedInst*);
@@ -4952,7 +4960,7 @@ namespace WdRiscv
 
     bool misalDataOk_ = true;
     bool misalHasPriority_ = true;
-    bool trapNonZeroVstart_ = true;  // Trap if vstart > 0 in arithmetic vec instructions
+    bool trapNonZeroVstart_ = true;  // Trap if vstart > 0 in arith vec instructions
     bool bigEnd_ = false;            // True if big endian
     bool stimecmpActive_ = false;    // True if STIMECMP CSR is implemented.
     bool vstimecmpActive_ = false;   // True if VSTIMECMP CSR is implemented.

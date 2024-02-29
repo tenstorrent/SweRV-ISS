@@ -969,6 +969,15 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
         hart.configVectorUpdateWholeMask(flag);
     }
 
+  tag = "trap_invalid_vtype";
+  if (vconf.contains(tag))
+    {
+      bool flag = false;
+      if (not getJsonBoolean(tag, vconf.at(tag), flag))
+        errors++;
+      else
+        hart.configVectorTrapVtype(flag);
+    }
 
   return errors == 0;
 }

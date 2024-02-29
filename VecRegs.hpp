@@ -435,6 +435,11 @@ namespace WdRiscv
     void configTailAgnosticAllOnes(bool flag)
     { tailAgnOnes_ = flag; }
 
+    /// When flag is true, trap on invalid/unsuported vtype configuraions in vsetvl,
+    /// vsetvli, vsetivli. When flag is false, set vtype.vill instead.
+    void configVectorTrapVtype(bool flag)
+    { trapVtype_ = flag; }
+
     /// Return a string representation of the given group multiplier.
     static constexpr std::string_view to_string(GroupMultiplier group)
     {
@@ -743,6 +748,7 @@ namespace WdRiscv
     bool maskAgnOnes_ = true; // True if ones written in masked elems when mask agnostic.
     bool tailAgnOnes_ = true; // True if ones written in tail elems when mask agnostic.
     bool updateWholeMask_ = false;  // True if mask instructions update whole mask reg.
+    bool trapVtype_ = false; // If true trap invalid vtype; else set VTYPE.VILL.
 
     uint32_t groupX8_ = 8;    // Group multiplier as a number scaled by 8.
     uint32_t sewInBits_ = 8;  // SEW expressed in bits (Byte corresponds to 8).

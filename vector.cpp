@@ -747,7 +747,7 @@ Hart<URV>::checkVecFpMaskInst(const DecodedInst* di, unsigned dest,
 
 
 template <typename URV>
-void
+bool
 Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 {
   bool ma = (vtypeVal >> 7) & 1;  // Mask agnostic
@@ -801,6 +801,9 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 
   if (vill)
     {
+      // Spec gives us a choice: Trap on illegal config or set vtype.vill.
+      if (vecRegs_.trapVtype_)
+	return false;  // Caller must trap.
       ma = false; ta = false; gm = GroupMultiplier(0); ew = ElementWidth(0);
       elems = 0;
     }
@@ -825,6 +828,8 @@ Hart<URV>::vsetvl(unsigned rd, unsigned rs1, URV vtypeVal)
 
   // Update cached vtype fields in vecRegs_.
   vecRegs_.updateConfig(ew, gm, ma, ta, vill);
+
+  return true;
 }
 
 
@@ -843,12 +848,10 @@ Hart<URV>::postVecSuccess()
 
 template <typename URV>
 void
-Hart<URV>::postVecFail(const DecodedInst* di, bool clearVstart)
+Hart<URV>::postVecFail(const DecodedInst* di)
 {
   illegalInst(di);
-  if (clearVstart)
-    csRegs_.clearVstart();
-  if (vecRegs_.getLastWrittenReg() >= 0 or clearVstart)
+  if (vecRegs_.getLastWrittenReg() >= 0)
     markVsDirty();
 }
 
@@ -868,8 +871,10 @@ Hart<URV>::execVsetvli(const DecodedInst* di)
   unsigned imm = di->op2();
   
   URV vtypeVal = imm;
-  vsetvl(rd, rs1, vtypeVal);
-  postVecSuccess();
+  if (vsetvl(rd, rs1, vtypeVal))
+    postVecSuccess();
+  else
+    postVecFail(di);
 }
 
 
@@ -911,6 +916,12 @@ Hart<URV>::execVsetivli(const DecodedInst* di)
 
   if (vill)
     {
+      // Spec gives us a choice: Trap on illegal config or set vtype.vill.
+      if (vecRegs_.trapVtype_)
+	{
+	  postVecFail(di);  // Trap.
+	  return;
+	}
       ma = false; ta = false; gm = GroupMultiplier(0); ew = ElementWidth(0);
       elems = 0;
     }
@@ -947,10 +958,12 @@ Hart<URV>::execVsetvl(const DecodedInst* di)
 
   unsigned rd = di->op0();
   unsigned rs1 = di->op1();
-
   URV vtypeVal = intRegs_.read(di->op2());
-  vsetvl(rd, rs1, vtypeVal);
-  postVecSuccess();
+
+  if (vsetvl(rd, rs1, vtypeVal))
+    postVecSuccess();
+  else
+    postVecFail(di);
 }
 
 
