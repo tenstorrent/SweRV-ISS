@@ -77,6 +77,8 @@ static constexpr auto STRING_EXT_PAIRS = std::to_array<std::pair<std::string_vie
   { "zicsr", RvExtension::Zicsr },
   { "zifencei", RvExtension::Zifencei },
   { "zihintpause", RvExtension::Zihintpause },
+  { "ssnpm", RvExtension::Ssnpm },
+  { "smnpm", RvExtension::Smnpm },
 });
 static_assert(STRING_EXT_PAIRS.size() == static_cast<unsigned>(RvExtension::None));
 
@@ -149,6 +151,8 @@ Isa::Isa()
   infoVec_.at(extIx(RvExtension::Zicsr)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zifencei)) = Info{ {{2,0}}, {2,0} };
   infoVec_.at(extIx(RvExtension::Zihintpause)) = Info{ {{1,0}}, {1,0} };
+  infoVec_.at(extIx(RvExtension::Ssnpm)) = Info{ {{0,81}}, {0,81} };
+  infoVec_.at(extIx(RvExtension::Smnpm)) = Info{ {{0,81}}, {0,81} };
 
   infoVec_.at(extIx(RvExtension::I)).enabled = true; // I always enabled.
 }
@@ -431,7 +435,7 @@ Isa::applyIsaString(std::string_view isaStr)
     {
       std::cerr << "Invalid ISA string: " << isaStr << '\n';
       return false;
-    }      
+    }
 
   // First token may have a z-extension without a preceeding underscore. Spilt it:
   // split something like a1p0m1p1zbb into: a1p0, m1p1 and zbb

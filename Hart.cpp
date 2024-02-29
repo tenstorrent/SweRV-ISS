@@ -375,6 +375,10 @@ Hart<URV>::processExtensions(bool verbose)
     enableTranslationPbmt(true);
   if (isa_.isEnabled(RvExtension::Smrnmi))
     enableSmrnmi(true);
+  if (isa_.isEnabled(RvExtension::Ssnpm))
+    enableSsnpm(true);
+  if (isa_.isEnabled(RvExtension::Smnpm))
+    enableSmnpm(true);
 
   stimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::STIMECMP) != nullptr;
   vstimecmpActive_ = csRegs_.getImplementedCsr(CsrNumber::VSTIMECMP) != nullptr;
@@ -3264,9 +3268,10 @@ Hart<URV>::postCsrUpdate(CsrNumber csr, URV val, URV lastVal)
 
   if (csr == CN::MISA and lastVal != val)
     processExtensions(false);
-  else if (csr == CN::MENVCFG or csr == CN::HENVCFG)
+  else if (csr == CN::MENVCFG or csr == CN::SENVCFG or csr == CN::HENVCFG)
     {
       updateTranslationPbmt();
+      updateTranslationPmm();
       csRegs_.updateSstc();
       stimecmpActive_ = csRegs_.menvcfgStce();
       vstimecmpActive_ = csRegs_.henvcfgStce();
@@ -9718,12 +9723,14 @@ Hart<URV>::execSfence_vma(const DecodedInst* di)
   else if (di->op0() != 0 and di->op1() == 0)
     {
       URV addr = intRegs_.read(di->op0());
+      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       tlb.invalidateVirtualPage(vpn);
     }
   else
     {
       URV addr = intRegs_.read(di->op0());
+      addr = virtMem_.applyPointerMask(addr, privMode_, virtMode_);
       uint64_t vpn = virtMem_.pageNumber(addr);
       URV asid = intRegs_.read(di->op1());
       tlb.invalidateVirtualPageAsid(vpn, asid);
@@ -9756,7 +9763,7 @@ Hart<URV>::execSinval_vma(const DecodedInst* di)
       else
 	illegalInst(di);
       return;
-    }
+   }
   execSfence_vma(di);
 }
 

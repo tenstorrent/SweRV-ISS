@@ -1488,6 +1488,9 @@ namespace WdRiscv
     /// Legalize scountovf, matching OF bit of given mhpmevent.
     void updateScountovfValue(CsrNumber mhpm, uint64_t value);
 
+    /// Legalize menvcfg/senvcfg/henvcfg. Changes pmm bits if necessary.
+    URV legalizeEnvcfgValue(URV current, URV value) const;
+
     /// Return true if given CSR number is a PMPADDR register and if
     /// that register is locked.  Return false otherwise.
     bool isPmpaddrLocked(CsrNumber csrn) const;
@@ -1562,6 +1565,14 @@ namespace WdRiscv
 
     /// Enable/disable advanced interrupt artchitecture extension.
     void enableAia(bool flag);
+
+    /// Enable/disable ssnpm extension. Sets senvcfg.PMM/henvcfg.PMM
+    /// to read-only zero if false.
+    void enableSsnpm(bool flag);
+
+    /// Enable/disable smnpm extension. Sets menvcfg.PMM to
+    /// read-only zero if false.
+    void enableSmnpm(bool flag);
 
     /// Enable/disable virtual supervisor. When enabled, the trap-related
     /// CSRs point to their virtual counterpars (e.g. reading writing sstatus will
@@ -1703,15 +1714,64 @@ namespace WdRiscv
       return fields.bits_.ADUE;
     }
 
-    /// Return the ADUE bit of MENVCFG CSR.
+    /// Return the ADUE bit of HENVCFG CSR.
     bool henvcfgAdue()
     {
       auto csr = getImplementedCsr(CsrNumber::HENVCFG);
       if (not csr)
 	return false;
       URV value = csr->read();
-      MenvcfgFields<uint64_t> fields(value);
+      HenvcfgFields<uint64_t> fields(value);
       return fields.bits_.ADUE;
+    }
+
+    /// Return the PMM bits of MENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t menvcfgPmm()
+    {
+      if constexpr (sizeof(URV) == 4)
+        return 0;
+      else
+        {
+          auto csr = getImplementedCsr(CsrNumber::MENVCFG);
+          if (not csr)
+            return 0;
+          URV value = csr->read();
+          MenvcfgFields<uint64_t> fields(value);
+          return fields.bits_.PMM;
+        }
+    }
+
+    /// Return the PMM bits of SENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t senvcfgPmm()
+    {
+      if (rv32_)
+        return 0;
+
+      auto csr = getImplementedCsr(CsrNumber::SENVCFG);
+      if (not csr)
+	return 0;
+      URV value = csr->read();
+      SenvcfgFields<uint64_t> fields(value);
+      return fields.bits_.PMM;
+    }
+
+    /// Return the PMM bits of HENVCFG CSR. Returns 0
+    /// if not implemented.
+    uint8_t henvcfgPmm()
+    {
+      if constexpr (sizeof(URV) == 4)
+        return 0;
+      else
+        {
+          auto csr = getImplementedCsr(CsrNumber::HENVCFG);
+          if (not csr)
+            return 0;
+          URV value = csr->read();
+          HenvcfgFields<uint64_t> fields(value);
+          return fields.bits_.PMM;
+        }
     }
 
     /// Set ix to the counter index corresponding to the given

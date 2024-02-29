@@ -40,7 +40,9 @@ namespace WdRiscv
     enum Mode { Bare = 0, Sv32 = 1, Sv39 = 8, Sv48 = 9, Sv57 = 10, Sv64 = 11,
 		Limit_ = 12};
 
-    enum Pbmt { None = 0, Nc = 1, Io = 2, Reserved = 3 };
+    enum class Pbmt : uint32_t { None = 0, Nc = 1, Io = 2, Reserved = 3 };
+
+    enum class Pmm : uint32_t { Off = 0, Reserved = 1, Pm57 = 2, Pm48 = 3 };
 
     VirtMem(unsigned hartIx, Memory& memory, unsigned pageSize,
             PmpManager& pmpMgr, unsigned tlbSize);
@@ -68,11 +70,13 @@ namespace WdRiscv
     }
 
     /// Similar to translate but targeting only read access.
+    [[deprecated("Use translateForLoad2 instead.")]]
     ExceptionCause translateForLoad(uint64_t va, PrivilegeMode pm, bool twoStage,
 				    uint64_t& gpa, uint64_t& pa)
     { return translate(va, pm, twoStage, true, false, false, gpa, pa); }
 
     /// Similar to translate but targeting only write access.
+    [[deprecated("Use translateForStore2 instead.")]]
     ExceptionCause translateForStore(uint64_t va, PrivilegeMode pm, bool twoStage,
 				     uint64_t& gpa, uint64_t& pa)
     { return translate(va, pm, twoStage, false, true, false, gpa, pa); }
@@ -169,6 +173,27 @@ namespace WdRiscv
     {
       unsigned ix = unsigned(mode);
       return ix < supportedModes_.size() ? supportedModes_.at(ix) : false;
+    }
+
+    /// Return true if PMM is supported.
+    bool isPmmSupported(Pmm pmm)
+    { return pmm != Pmm::Reserved; }
+
+    uint64_t applyPointerMask(uint64_t addr, PrivilegeMode priv, bool twoStage) const
+    {
+      if (twoStage)
+        {
+          if (vsMode_ != Mode::Bare)
+            return applyPointerMaskVa(addr, priv, twoStage);
+          else if (modeStage2_ != Mode::Bare)
+            return applyPointerMaskPa(addr, priv, twoStage);
+          else
+            return addr;
+        }
+
+      if (mode_ != Mode::Bare)
+        return applyPointerMaskVa(addr, priv, twoStage);
+      return addr;
     }
 
     struct WalkEntry
@@ -418,7 +443,6 @@ namespace WdRiscv
     ExceptionCause twoStageTranslate(uint64_t va, PrivilegeMode priv, bool r, bool w,
 				     bool x, uint64_t& gpa, uint64_t& pa);
 
-
     /// Set the page table root page: The root page is placed in
     /// physical memory at address root * page_size
     void setRootPage(uint64_t root)
@@ -496,9 +520,72 @@ namespace WdRiscv
     void enableNapot(bool flag)
     { napotEnabled_ = flag; }
 
-    /// Enable/disable pointer masking for user mode.
-    void enablePointerMasking(bool flag)
-    { pmEnabled_ = flag; }
+    /// Enable/disable pointer masking for HS mode.
+    void enablePointerMasking(Pmm pmm)
+    {
+      switch(pmm)
+      {
+        case Pmm::Off: sPmBits_ = 0; break;
+        case Pmm::Pm57: sPmBits_ = 7; break;
+        case Pmm::Pm48: sPmBits_ = 16; break;
+        default: assert(0);
+      }
+    }
+
+    /// Enable/disable pointer masking for VS mode.
+    void enableVsPointerMasking(Pmm pmm)
+    {
+      switch(pmm)
+      {
+        case Pmm::Off: vsPmBits_ = 0; break;
+        case Pmm::Pm57: vsPmBits_ = 7; break;
+        case Pmm::Pm48: vsPmBits_ = 16; break;
+        default: assert(0);
+      }
+    }
+
+    /// Enable/disable pointer masking for U/VU mode.
+    void enableUserPointerMasking(Pmm pmm)
+    {
+      switch(pmm)
+      {
+        case Pmm::Off: uPmBits_ = 0; break;
+        case Pmm::Pm57: uPmBits_ = 7; break;
+        case Pmm::Pm48: uPmBits_ = 16; break;
+        default: assert(0);
+      }
+    }
+
+    /// Transform virtual address by appropriate pointer masking mode. This is
+    /// only necessary for the effective address for load/stores.
+    uint64_t applyPointerMaskVa(uint64_t va, PrivilegeMode priv, bool twoStage) const
+    {
+      int64_t transformed;
+      memcpy(&transformed, &va, sizeof(uint64_t));
+
+      if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)
+        transformed = (transformed << sPmBits_) >> sPmBits_;
+      if (vsPmBits_ and priv == PrivilegeMode::Supervisor and twoStage)
+        transformed = (transformed << vsPmBits_) >> vsPmBits_;
+      if (uPmBits_ and priv == PrivilegeMode::User)
+        transformed = (transformed << uPmBits_) >> uPmBits_;
+
+      memcpy(&va, &transformed, sizeof(uint64_t));
+      return va;
+    }
+
+    /// Transform physical address by appropriate pointer masking mode. This
+    /// also applies to GPAs (see section 2.2 of v0.8.1 of the spec).
+    uint64_t applyPointerMaskPa(uint64_t pa, PrivilegeMode priv, bool twoStage) const
+    {
+      if (sPmBits_ and priv == PrivilegeMode::Supervisor and not twoStage)
+        pa = (pa << sPmBits_) >> sPmBits_;
+      if (vsPmBits_ and priv == PrivilegeMode::Supervisor and twoStage)
+        pa = (pa << vsPmBits_) >> vsPmBits_;
+      if (uPmBits_ and priv == PrivilegeMode::User)
+        pa = (pa << uPmBits_) >> uPmBits_;
+      return pa;
+    }
 
     /// Return true if successful and false if page size is not supported.
     bool setPageSize(uint64_t size);
@@ -615,7 +702,7 @@ namespace WdRiscv
 
     Memory& memory_;
     uint64_t rootPage_ = 0;        // Root page for S mode (V==0).
-    uint64_t vsRootPage_ = 0;  // Root page of VS 1st stage translation (V == 1).
+    uint64_t vsRootPage_ = 0;      // Root page of VS 1st stage translation (V == 1).
     uint64_t rootPageStage2_ = 0;  // Root page of VS 2nd stage translation (V == 1).
     Mode mode_ = Bare;
     Mode vsMode_ = Bare;
@@ -623,6 +710,9 @@ namespace WdRiscv
     uint32_t asid_ = 0;
     uint32_t vsAsid_ = 0;
     uint32_t vmid_ = 0;
+    unsigned sPmBits_ = 0;          // Pointer masking for HS translation
+    unsigned vsPmBits_ = 0;         // Pointer masking for VS translation
+    unsigned uPmBits_ = 0;          // Pointer masking for U/VU translation
     unsigned pageSize_ = 4096;
     unsigned pageBits_ = 12;
     uint64_t pageMask_ = 0xfff;
@@ -635,7 +725,6 @@ namespace WdRiscv
     bool pbmtEnabled_ = false;
     bool vsPbmtEnabled_ = false;
     bool napotEnabled_ = false;
-    bool pmEnabled_ = false;  // Pointer masking
 
     std::vector<UpdatedPte> updatedPtes_;
 
