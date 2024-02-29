@@ -685,8 +685,8 @@ applyPerfEvents(Hart<URV>& hart, const nlohmann::json& config,
 
 // Min SEW per LMUL is allowed by the spec for m1, m2, m4, and m8.
 bool
-processMinByesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
-		      std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
+processMinBytesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
+		       std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
 {
   if (not jsonMap.is_object())
     {
@@ -735,7 +735,7 @@ processMinByesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned
 // Maximum SEW per LMUL is allowed by the spec for mf8, mf4, and mf2.
 bool
 processMaxBytesPerLmul(const nlohmann::json& jsonMap, unsigned minBytes, unsigned maxBytes,
-		     std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
+		       std::unordered_map<GroupMultiplier, unsigned>& bytesPerLmul)
 {
   if (not jsonMap.is_object())
     {
@@ -862,16 +862,16 @@ applyVectorConfig(Hart<URV>& hart, const nlohmann::json& config)
   if (vconf.contains(tag))
     {
       std::cerr << "Tag min_sew_per_lmul is deprecated: Use min_bytes_per_lmul\n";
-      if (not processMinByesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
-				   minBytesPerLmul))
+      if (not processMinBytesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				     minBytesPerLmul))
 	errors++;
     }
 
   tag = "min_bytes_per_lmul";
   if (vconf.contains(tag))
     {
-      if (not processMinByesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
-				   minBytesPerLmul))
+      if (not processMinBytesPerLmul(vconf.at(tag), bytesPerElem.at(0), bytesPerElem.at(1),
+				     minBytesPerLmul))
 	errors++;
     }
 
